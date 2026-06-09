@@ -27,6 +27,10 @@ const CSVMapper = {
         + '</div></div>'
       + '<input type="file" class="csvm-file" accept=".csv,.xlsx,.xls" style="display:none;"/>'
       + '<div class="csvm-area"></div>';
+    // Optional external actions target (Import / Cancel render there, e.g. below
+    // a card instead of inside it). Cleared back to empty in the dropzone state.
+    const extEl = this._actionsEl(opts);
+    if (extEl) extEl.innerHTML = '';
     const zone = container.querySelector('.csvm-drop');
     const input = container.querySelector('.csvm-file');
     const over = on => { zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'var(--gold-bg)' : 'var(--input)'; };
@@ -38,6 +42,15 @@ const CSVMapper = {
   },
 
   _area(c) { return c.querySelector('.csvm-area'); },
+  // Resolve an optional external container for the action row (element, selector,
+  // or function returning one). Lets a caller place Import/Cancel outside the card.
+  _actionsEl(opts) {
+    const a = opts && opts.actionsEl;
+    if (!a) return null;
+    if (typeof a === 'string') return document.querySelector(a);
+    if (typeof a === 'function') return a();
+    return a;
+  },
   _msg(c, text, color) {
     this._area(c).innerHTML = '<div style="font-size:12px;color:' + (color || 'var(--t3)') + ';margin-top:12px;">' + esc(text) + '</div>';
   },
@@ -151,17 +164,22 @@ const CSVMapper = {
         + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
         + '</tbody></table></div></div>';
     }
-    html += '<div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
-      + '<div style="display:flex;gap:8px;align-items:center;margin-top:18px;"><button class="btn btn-primary csvm-go">'
+    const actionRow = '<div style="display:flex;gap:8px;align-items:center;margin-top:18px;"><button class="btn btn-primary csvm-go">'
       + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button>'
       + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div>';
+    const extEl = this._actionsEl(opts);
+    html += '<div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
+      + (extEl ? '' : actionRow);
     this._area(container).innerHTML = html;
+    // Action row goes in the external target when one was given, else inline.
+    if (extEl) extEl.innerHTML = actionRow;
+    const scope = extEl || this._area(container);
 
     // Cancel discards this file and returns to the drop zone to pick another.
-    const cancelBtn = this._area(container).querySelector('.csvm-cancel');
+    const cancelBtn = scope.querySelector('.csvm-cancel');
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.mount(container, opts));
 
-    this._area(container).querySelector('.csvm-go').addEventListener('click', () => {
+    scope.querySelector('.csvm-go').addEventListener('click', () => {
       const sels = {};
       this._area(container).querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
       const missing = opts.fields.filter(f => f.required && !sels[f.key]);
