@@ -4,18 +4,19 @@
    What you have and where your cash sits, from a chosen count: value by
    category, by location, versus the prior count, ranked high/low, plus dead
    stock (value on hand that did not move). Rankings by usage live in the
-   Movement Report; consumption in the Usage Report. */
+   Movement Report; consumption in the Usage Report.
+
+   Tabbed shell mirrors Labor Tip History: a .ch-tabs switcher over a stats
+   card, a Filter heading with Export, the controls-only filter card, then the
+   data card. Help lives on the nav "i" (see [[help-model]]); showHowTo is its
+   content. */
 
 S.InventoryStockReport = {
   tab: 'category',
   countId: null,
   TABS: [
-    ['category','By Category','rpt-s-category'],
-    ['location','By Location','rpt-s-location'],
-    ['vsprior','vs Last Count','rpt-s-prior'],
-    ['highest','Highest Value','rpt-s-highest'],
-    ['lowest','Lowest Value','rpt-s-lowest'],
-    ['dead','Dead Stock','rpt-s-dead']
+    ['category', 'By Category'], ['location', 'By Location'], ['vsprior', 'vs Last Count'],
+    ['highest', 'Highest Value'], ['lowest', 'Lowest Value'], ['dead', 'Dead Stock']
   ],
 
   countsAsc() {
@@ -38,6 +39,13 @@ S.InventoryStockReport = {
     const p = this.productById(it.product_id);
     return (p && p.primary_location) ? p.primary_location : 'Unassigned';
   },
+  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
+  qtyU(p, n) {
+    if (n == null || isNaN(n)) return '-';
+    const u = p ? App.unitAbbr(App.productUnit(p)) : '';
+    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
+    return u ? (num + ' ' + u) : num;
+  },
   selectedIdx(asc) {
     let i = asc.findIndex(c => c.id === this.countId);
     if (i < 0) i = asc.length - 1;
@@ -51,6 +59,26 @@ S.InventoryStockReport = {
       { h: 'Where Your Cash Sits', p: ['By Category and By Location show how your stock value splits up, so you see how much is tied up in liquor versus food, or in the walk-in versus the back bar. vs Last Count shows whether your stock value is creeping up, which usually means over-ordering.'] },
       { h: 'Highest, Lowest, And Dead', p: ['Highest and Lowest Value rank the products holding the most and least cash on hand. Dead Stock is the one to watch: product you are holding value in that did not move at all this period. That is dead cash and spoilage risk, your cue to stop re-ordering it or cut it.'] }
     ]);
+  },
+
+  // ── shared markup helpers (mirror Tip History) ──────────────────────────────
+  tabBar() {
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
+      + '</div>';
+  },
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  note(text, color) {
+    return '<div class="card"><div style="font-size:12px;color:' + (color || 'var(--t3)') + ';padding:8px 0;">' + esc(text) + '</div></div>';
   },
 
   render(container, actions) {
@@ -76,27 +104,37 @@ S.InventoryStockReport = {
     const idx = this.selectedIdx(asc);
     const latest = asc[idx];
     const prior = idx > 0 ? asc[idx - 1] : null;
+    const items = latest.items || [];
+
+    const totalValue = items.reduce((s, it) => s + this.itemValue(it), 0);
+    let changeStat = '';
+    if (prior) {
+      const priorVal = (prior.items || []).reduce((s, it) => s + this.itemValue(it), 0);
+      const change = totalValue - priorVal;
+      changeStat = this.statItem('vs Last Count', (change > 0 ? '+' : '') + App.fmtCurrency(change));
+    }
+    const statsCard = this.statsCard(
+      this.statItem('Stock Value', App.fmtCurrency(totalValue))
+      + this.statItem('Products', items.length)
+      + changeStat
+      + this.statItem('Count Date', this.fmtDate(latest.date)));
 
     const countOpts = asc.map((c, i) =>
       '<option value="' + c.id + '"' + (i === idx ? ' selected' : '') + '>'
       + this.fmtDate(c.date) + ' (' + esc(c.type || 'count') + ')</option>').reverse().join('');
 
-    const controls = '<div class="card no-print"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Stock Report</span>'
-      + App.helpButton('sr-how') + '</div>'
-      + '<div class="form-row" style="margin-bottom:0;"><div class="f" style="width:260px;">'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Stock</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div></div>';
+    const filterCard = '<div class="card no-print"><div class="form-row" style="margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;flex-shrink:0;">'
       + '<label>Count</label><select id="sr-count">' + countOpts + '</select></div></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + controls
-      + App.reportTabBar(this.TABS, this.tab)
-      + App.reportPanel(this.TABS, this.tab, 'sr-export', this.body(latest, prior)) + '</div>';
+    this.container.innerHTML = '<div class="screen">'
+      + this.tabBar() + statsCard + filterHeading + filterCard + this.body(latest, prior) + '</div>';
 
     this.container.onclick = ev => {
-      const how = ev.target.closest('#sr-how');
-      const exp = ev.target.closest('#sr-export');
-      const tab = ev.target.closest('.rpt-tab');
-      if (how) { this.showHowTo(); return; }
-      if (exp) { App.exportPDF({ title: 'Stock Report', root: this.container }); return; }
+      if (ev.target.closest('#sr-export')) { App.exportPDF({ title: 'Stock Report', root: this.container }); return; }
+      const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
     };
     document.getElementById('sr-count')?.addEventListener('change', e => { this.countId = e.target.value; this.draw(); });
@@ -105,18 +143,18 @@ S.InventoryStockReport = {
   body(latest, prior) {
     const items = latest.items || [];
     switch (this.tab) {
-      case 'category': return this.tabGroup(items, it => it.category || 'Uncategorized', 'Category');
       case 'location': return this.tabGroup(items, it => this.itemLoc(it), 'Location');
       case 'vsprior':  return this.tabVsPrior(latest, prior);
       case 'highest':  return this.tabRank(items, true);
       case 'lowest':   return this.tabRank(items, false);
       case 'dead':     return this.tabDead(latest, prior);
-      default:         return '';
+      default:         return this.tabGroup(items, it => it.category || 'Uncategorized', 'Category');
     }
   },
 
   tabGroup(items, keyFn, label) {
-    if (!items.length) return this.emptyBody();
+    const headers = '<th>' + label + '</th><th>Products</th><th>Total Value</th><th>% of Total</th>';
+    if (!items.length) return this.dataCard(headers, '<tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">This count has no items to report.</td></tr>');
     const groups = {};
     items.forEach(it => {
       const k = keyFn(it);
@@ -129,20 +167,11 @@ S.InventoryStockReport = {
       + '<td>' + groups[k].count + '</td>'
       + '<td class="val">' + App.fmtCurrency(groups[k].value) + '</td>'
       + '<td>' + (total ? (groups[k].value / total * 100).toFixed(1) : '0.0') + '%</td></tr>').join('');
-    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
-      + '<div class="calc-label">Total Stock Value</div><div class="calc-val good">' + App.fmtCurrency(total) + '</div></div></div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>' + label + '</th><th>Products</th><th>Total Value</th><th>% of Total</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return this.dataCard(headers, rows);
   },
 
   tabVsPrior(latest, prior) {
-    if (!prior) {
-      return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-        + 'No earlier count to compare against. Pick a count that has one before it.</div>';
-    }
-    const sum = c => (c.items || []).reduce((s, it) => s + this.itemValue(it), 0);
-    const a = sum(latest), b = sum(prior), change = a - b;
+    if (!prior) return this.note('No earlier count to compare against. Pick a count that has one before it.');
     const catVal = c => {
       const m = {};
       (c.items || []).forEach(it => { const k = it.category || 'Uncategorized'; m[k] = (m[k] || 0) + this.itemValue(it); });
@@ -150,27 +179,23 @@ S.InventoryStockReport = {
     };
     const la = catVal(latest), pb = catVal(prior);
     const cats = [...new Set([...Object.keys(la), ...Object.keys(pb)])].sort();
+    // Stock-value change is neutral: rising value can mean over-ordering, falling
+    // can mean running low. The sign carries it; no good/bad color.
     const rows = cats.map(c => {
       const av = la[c] || 0, bv = pb[c] || 0, d = av - bv;
       return '<tr><td><div class="val">' + esc(c) + '</div></td>'
         + '<td>' + App.fmtCurrency(bv) + '</td>'
         + '<td>' + App.fmtCurrency(av) + '</td>'
-        + '<td class="' + (d > 0 ? 'pos' : d < 0 ? 'neg' : '') + '">' + (d >= 0 ? '+' : '') + App.fmtCurrency(d) + '</td></tr>';
+        + '<td>' + (d > 0 ? '+' : '') + App.fmtCurrency(d) + '</td></tr>';
     }).join('');
-    return '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Last Count (' + this.fmtDate(prior.date) + ')</div><div class="calc-val">' + App.fmtCurrency(b) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">This Count (' + this.fmtDate(latest.date) + ')</div><div class="calc-val">' + App.fmtCurrency(a) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Change</div><div class="calc-val ' + (change >= 0 ? 'good' : 'warn') + '">' + (change >= 0 ? '+' : '') + App.fmtCurrency(change) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Category</th><th>Last Count</th><th>This Count</th><th>Change</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return this.dataCard('<th>Category</th><th>Last Count</th><th>This Count</th><th>Change</th>', rows);
   },
 
   tabRank(items, highest) {
-    const ranked = items.map(it => ({ name: it.name, category: it.category, value: this.itemValue(it), total: it.total }))
+    const ranked = items.map(it => ({ name: it.name, category: it.category, value: this.itemValue(it), total: it.total, product: this.productById(it.product_id) }))
       .sort((a, b) => highest ? b.value - a.value : a.value - b.value).slice(0, 10);
-    if (!ranked.length) return this.emptyBody();
+    const headers = '<th>Product</th><th></th><th>On Hand</th><th>Value</th>';
+    if (!ranked.length) return this.dataCard(headers, '<tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">This count has no items to report.</td></tr>');
     const max = Math.max(...ranked.map(r => r.value), 1);
     const body = ranked.map(r => {
       const pct = Math.min(100, r.value / max * 100);
@@ -179,46 +204,32 @@ S.InventoryStockReport = {
         + '<td style="width:40%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div></td>'
-        + '<td>' + (r.total != null ? r.total.toFixed(1) : '-') + '</td>'
+        + '<td>' + this.qtyU(r.product, r.total) + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.value) + '</td></tr>';
     }).join('');
-    return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Value</th><th>On Hand</th><th>Value</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+    return this.dataCard(headers, body);
   },
 
   tabDead(latest, prior) {
-    if (!prior) {
-      return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-        + 'Dead stock needs a prior count to measure movement. Pick a count that has one before it.</div>';
-    }
+    if (!prior) return this.note('Dead stock needs a prior count to measure movement. Pick a count that has one before it.');
     const base = App.computeUsagePair(prior, latest, this.deliveries());
     const items = (latest.items || []).map(it => {
       const p = this.productById(it.product_id) || {};
       const b = base[it.product_id];
-      // Only products counted in BOTH periods have measurable usage. A product
+      // Only products counted in BOTH periods have measurable usage; a product
       // absent from the prior count can't be called dead, so leave it out.
       const used = b ? Math.max(0, b.rawUsed) : null;
       return { product: p, name: it.name, category: it.category, total: it.total, value: this.itemValue(it), used };
     }).filter(x => x.value > 0 && x.used != null && x.used <= 0.001).sort((a, b) => b.value - a.value);
-    if (!items.length) {
-      return '<div style="font-size:12px;color:var(--gold);padding:20px 0;text-align:center;">'
-        + 'No dead stock. Everything you are holding value in moved this period.</div>';
-    }
+    if (!items.length) return this.note('No dead stock. Everything you are holding value in moved this period.', 'var(--green)');
     const total = items.reduce((s, x) => s + x.value, 0);
+    const deadLine = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + this.statItem('Dead Cash On Hand', App.fmtCurrency(total), 'warn') + '</div></div>';
     const body = items.map(x => '<tr><td><div class="val">' + esc(x.name) + '</div>'
       + '<div style="font-size:10px;color:var(--t3);">' + esc(x.category || '') + '</div></td>'
-      + '<td>' + esc(App.qtyWithUnit(x.product, x.total)) + '</td>'
+      + '<td>' + this.qtyU(x.product, x.total) + '</td>'
       + '<td>' + x.used.toFixed(1) + '</td>'
       + '<td class="val" style="color:var(--red);">' + App.fmtCurrency(x.value) + '</td></tr>').join('');
-    return '<div class="calc" style="margin-bottom:14px;"><div class="calc-item">'
-      + '<div class="calc-label">Dead Cash On Hand</div><div class="calc-val warn">' + App.fmtCurrency(total) + '</div></div></div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>On Hand</th><th>Used</th><th>Tied-Up Value</th>'
-      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
-  },
-
-  emptyBody() {
-    return '<div style="font-size:12px;color:var(--t3);padding:20px 0;text-align:center;">'
-      + 'This count has no items to report.</div>';
+    return deadLine + this.dataCard('<th>Product</th><th>On Hand</th><th>Used</th><th>Tied-Up Value</th>', body);
   }
 };
