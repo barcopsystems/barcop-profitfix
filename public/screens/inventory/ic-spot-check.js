@@ -278,13 +278,10 @@ S.InventorySpotCheck = {
     // Spot Check card: header with Save on the right, the four setup cells, a
     // divider, then Add Products + Load Last.
     const setup = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Spot Check</span>'
-        + '<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-          + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-          + '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>'
-        + '</span>'
-      + '</div>'
+      + App.collapsibleCardTitle('sp-setup', 'Spot Check',
+          '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+          + '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>')
+      + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
@@ -299,7 +296,7 @@ S.InventorySpotCheck = {
       + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;"><label>Add Products</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
         + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
-      + '</div></div>';
+      + '</div></div></div>';
 
     const lineHtmls = (dft.lines || []).map(ld => {
       const p = this.productById(ld.product_id);
@@ -318,17 +315,18 @@ S.InventorySpotCheck = {
 
     // POS sold: type on each line, or reveal the importer for this register's report.
     const posToggle = '<button type="button" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
-    const posCard = '<div class="sh" style="margin:24px 0 10px;">POS Sold</div>'
-      + '<div class="card no-print">'
+    const posCard = '<div class="card no-print">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product, or import this register\'s report to fill them in.</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product manually, or import this register\'s report to fill them in.</div>'
       + posToggle + '</div>'
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + setup + posCard
+      + '<div class="sh" style="margin:24px 0 10px;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
       + this.historyCard() + '</div>';
+    App.applyCollapsed(this.container);
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -373,6 +371,8 @@ S.InventorySpotCheck = {
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
 
     this.container.onclick = ev => {
+      const collHead = ev.target.closest('.card-collapse-head');
+      if (collHead && !ev.target.closest('#sp-save')) { App.toggleCollapse(collHead); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
       const posSeg = ev.target.closest('.sp-posmode');
@@ -412,7 +412,7 @@ S.InventorySpotCheck = {
     const loc = document.getElementById('sp-loc')?.value || 'this register';
     CSVMapper.mount(el, {
       dropTitle: 'Drop the ' + loc + ' POS sales report for this shift',
-      dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue. The sold number fills in on each product you have added.',
+      dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue.<br>The sold number fills in on each product you have added.',
       fields: [
         { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description'] },
         { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count'] }
