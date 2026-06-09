@@ -270,18 +270,35 @@ S.InventorySpotCheck = {
         + '<button class="btn btn-ghost btn-sm" id="sp-discard">Discard</button></div>'
       : '';
 
-    const setup = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Spot Check</span>'
+    const targets = this.lastTargets(dft.location);
+    const loadBtn = targets.length
+      ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
+      : '';
+
+    // Spot Check card: header with Save on the right, the four setup cells, a
+    // divider, then Add Products + Load Last.
+    const setup = '<div class="card form-card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Spot Check</span>'
+        + '<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+          + '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>'
+        + '</span>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
-      + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
-      + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
-      + '<select id="sp-by" style="height:44px;">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
+        + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location / Register</label>'
+        + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
+        + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
+        + '<select id="sp-by" style="height:44px;">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+      + '</div>'
+      + '<div class="divider"></div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
+        + '<div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;"><label>Add Products</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
+        + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
       + '</div></div>';
 
     const lineHtmls = (dft.lines || []).map(ld => {
@@ -292,28 +309,11 @@ S.InventorySpotCheck = {
       return this.lineHTML(lid, p, ld);
     }).join('');
 
-    const targets = this.lastTargets(dft.location);
-    const loadBtn = targets.length
-      ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
-      : '';
-
-    // Stats + Save (top right) + Add Product, above the product cards.
-    const statsAddCard = '<div class="card">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+    // The three stats in their own card at the top.
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg" id="sp-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg" id="sp-flagged">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg" id="sp-total">$0</div></div>'
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<span id="sp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
-      + '</div>'
-      + '</div>'
-      + '<div class="divider"></div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-      + '<div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;"><label>Add Product</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
-      + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
       + '</div></div>';
 
     // POS sold: type on each line, or reveal the importer for this register's report.
@@ -321,16 +321,14 @@ S.InventorySpotCheck = {
     const posCard = '<div class="sh" style="margin:24px 0 10px;">POS Sold</div>'
       + '<div class="card no-print">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS pours or bottles sold on each product above, from this register\'s report for the shift. Or import that register\'s report to fill them in.</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product, or import this register\'s report to fill them in.</div>'
       + posToggle + '</div>'
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + resumeBar + setup
-      + '<div class="sh" style="margin:24px 0 10px;">Products Checked</div>'
-      + statsAddCard
+    this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + setup + posCard
       + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + posCard + this.historyCard() + '</div>';
+      + this.historyCard() + '</div>';
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -376,7 +374,6 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
-      if (ev.target.closest('.sp-imp-how')) { this.showHowTo(); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
@@ -414,8 +411,8 @@ S.InventorySpotCheck = {
     if (!el || typeof CSVMapper === 'undefined') return;
     const loc = document.getElementById('sp-loc')?.value || 'this register';
     CSVMapper.mount(el, {
-      hint: 'Drop the POS <strong>sales</strong> report for <strong>' + esc(loc) + '</strong> for this shift. That register only, not the whole venue. '
-        + '<span class="sp-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      dropTitle: 'Drop the ' + loc + ' POS sales report for this shift',
+      dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue. The sold number fills in on each product you have added.',
       fields: [
         { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description'] },
         { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count'] }
