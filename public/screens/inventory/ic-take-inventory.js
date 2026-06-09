@@ -107,7 +107,7 @@ S.InventoryTakeInventory = {
         + '<div class="alert-text">A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.</div>'
         + '<div style="display:flex;gap:8px;">'
           + '<button class="btn btn-ghost btn-sm" id="ti-resume">Resume Count</button>'
-          + '<button class="btn btn-ghost btn-sm" id="ti-discard">Discard</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-discard">Start Over</button>'
         + '</div></div>'
       : '';
 
@@ -184,9 +184,9 @@ S.InventoryTakeInventory = {
   // a non-delete prompt, so it uses confirm, not confirmDelete).
   async confirmDiscardDraft() {
     const ok = await App.confirm({
-      title: 'Discard this count?',
+      title: 'Start over on this count?',
       message: 'Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.',
-      confirmText: 'Discard',
+      confirmText: 'Start Over',
       cancelText: 'Keep Counting'
     });
     if (!ok) return;
@@ -352,7 +352,7 @@ S.InventoryTakeInventory = {
       + ' &nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span> counted</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Discard</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Start Over</button>'
       + '</div></div>'
       + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;">'
       + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
@@ -366,7 +366,7 @@ S.InventoryTakeInventory = {
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Discard</button>'
+        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Start Over</button>'
       + '</div>'
       + '</div></div>';
 
