@@ -376,13 +376,13 @@ S.InventoryVarianceReport = {
 
     let importBlock;
     if (!this.posRows) {
-      importBlock = '<div class="card form-card"><div class="card-title">Import POS Sales</div><div id="vr-import"></div></div>';
+      importBlock = '<div class="sh" style="margin:24px 0 10px;">Import POS Sales</div><div id="vr-import"></div>';
     } else {
       importBlock = this.matchSummary() + this.unmatchedCard()
-        + '<div class="card form-card"><div class="card-actions" style="margin:0;border-top:none;padding-top:0;">'
+        + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="vr-run">Run Report</button>'
         + '<button class="btn btn-ghost" id="vr-reimport">Re-import a different file</button>'
-        + '</div></div>';
+        + '</div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + importBlock + '</div>';
@@ -574,11 +574,9 @@ S.InventoryVarianceReport = {
     const catOpts = '<option value="">All Categories</option>'
       + avail.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Variance</div>'
-      + '<div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-primary btn-sm" id="vr-new">Run New Report</button>'
-      + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div></div>';
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div>';
+    const runNewRow = '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-primary" id="vr-new">Run New Report</button></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:240px;flex-shrink:0;"><label>Period</label><select id="vr-run">' + runOpts + '</select></div>'
       + (avail.length ? '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>' : '')
@@ -586,10 +584,10 @@ S.InventoryVarianceReport = {
 
     let html;
     if (this.tab === 'history') {
-      html = this.tabBar() + this.tabHistory();
+      html = this.tabBar() + this.tabHistory() + runNewRow;
     } else {
       html = this.tabBar() + statsCard + filterHeading + filterCard
-        + (this.tab === 'usage' ? this.tabUsage() : this.tabSales());
+        + (this.tab === 'usage' ? this.tabUsage() : this.tabSales()) + runNewRow;
     }
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
 
@@ -765,7 +763,7 @@ S.InventoryVarianceReport = {
     const cols = [];
     for (let i = 0; i < n; i++) {
       if (i === 0) cols.push('<col style="width:260px;"/>');
-      else if (i === n - 1) cols.push('<col style="width:74px;"/>');
+      else if (i === n - 1) cols.push('<col style="width:92px;"/>');
       else cols.push('<col/>');
     }
     return '<colgroup>' + cols.join('') + '</colgroup>';
