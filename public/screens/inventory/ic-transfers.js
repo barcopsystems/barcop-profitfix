@@ -128,7 +128,7 @@ S.InventoryTransfers = {
       + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No transfers match the filter.</td></tr>') + '</tbody></table></div></div>'
       + App.showOlderBar('ic', 'transfer', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterLocation));
 
-    this.container.innerHTML = '<div class="screen">' + this.logFormCard() + statsCard + filterHeading + this.filterCard() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + filterHeading + this.filterCard() + listCard + '</div>';
     this.wireList();
     this.wireForm('tr-');
   },
@@ -151,10 +151,11 @@ S.InventoryTransfers = {
       + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer')
       + '<div class="collapse-body">'
       + this.formRows(null, 'tr-')
-      + '<div class="card-actions">'
+      + '</div></div>'
+      + '<div class="no-print" data-collapse-group="ic-transfers" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
-        + '<span id="tr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+        + '<span id="tr-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   // Shared two-row field layout for both the inline log form and the edit popup.
@@ -223,9 +224,17 @@ S.InventoryTransfers = {
   filterCard() {
     const locOpts = '<option value="">All locations</option>'
       + this.locations().map(l => '<option value="' + esc(l.name) + '"' + (this.filterLocation === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    // Only list products that actually appear in the logged transfers, not the
+    // whole catalog — prefer the live name, fall back to the stored one.
+    const loggedProds = new Map();
+    this.transfers().forEach(t => {
+      if (!t.product_id || loggedProds.has(t.product_id)) return;
+      const p = this.productById(t.product_id);
+      loggedProds.set(t.product_id, (p && p.name) || t.product_name || 'Unknown product');
+    });
     const prodOpts = '<option value="">All products</option>'
-      + this.products().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map(p => '<option value="' + p.id + '"' + (this.filterProductId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('');
+      + [...loggedProds.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+          .map(([id, name]) => '<option value="' + id + '"' + (this.filterProductId === id ? ' selected' : '') + '>' + esc(name) + '</option>').join('');
     return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tr-f-to" value="' + esc(this.filterTo) + '"/></div>'
