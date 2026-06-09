@@ -367,7 +367,7 @@ S.InventoryVarianceReport = {
       + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
     const viewSaved = this.runs().length
-      ? '<div style="align-self:flex-end;padding-bottom:9px;font-size:12px;color:var(--t3);">or <span id="vr-view-saved" style="color:var(--gold);cursor:pointer;text-decoration:underline;">view saved reports</span></div>'
+      ? '<div style="align-self:flex-end;padding-bottom:9px;font-size:12px;color:var(--t3);">or <span id="vr-view-saved" style="margin-left:5px;color:var(--gold);cursor:pointer;text-decoration:underline;">view saved reports</span></div>'
       : '';
     const controls = '<div class="card form-card no-print"><div class="card-title">Variance Report</div>'
       + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
@@ -376,7 +376,8 @@ S.InventoryVarianceReport = {
 
     let importBlock;
     if (!this.posRows) {
-      importBlock = '<div class="sh" style="margin:24px 0 10px;">Import POS Sales</div><div id="vr-import"></div>';
+      importBlock = '<div class="card form-card"><div class="card-title">Import POS Sales</div><div id="vr-import"></div></div>'
+        + '<div id="vr-import-actions"></div>';
     } else {
       importBlock = this.matchSummary() + this.unmatchedCard()
         + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
@@ -400,6 +401,7 @@ S.InventoryVarianceReport = {
 
     if (!this.posRows) {
       CSVMapper.mount(document.getElementById('vr-import'), {
+        actionsEl: document.getElementById('vr-import-actions'),
         confirmLabel: 'Import POS Sales',
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' – ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
