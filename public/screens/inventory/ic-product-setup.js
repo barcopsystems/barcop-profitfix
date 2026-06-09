@@ -1098,7 +1098,11 @@ S.InventoryProducts = {
       + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
       + '</div>';
     if (this._import.stage === 'mapper') {
-      return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>';
+      const rows = this._importRows || [];
+      return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>'
+        + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
+        + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
     }
     return '<div class="card">' + header
       + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
@@ -1107,13 +1111,12 @@ S.InventoryProducts = {
         + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
       + '</div>'
       + '<input type="file" id="ip-imp-input" accept=".csv,.xlsx,.xls" style="display:none;"/>'
-      + '<div style="margin-top:14px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
-      + '</div>';
+      + '</div>'
+      + '<div style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
   },
 
   columnMapperBodyHTML() {
     const cat = this._import.cat;
-    const spec = this.FORM_SPEC[cat];
     const headers = this._importHeaders || [], rows = this._importRows || [];
     const fields = this.importFieldsForCategory(cat);
     const autoMap = this.autoMap(headers, fields);
@@ -1138,9 +1141,7 @@ S.InventoryProducts = {
         + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
         + '</tbody></table></div></div>';
     }
-    html += '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
-      + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
+    html += '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>';
     return html;
   },
 
