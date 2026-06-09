@@ -95,11 +95,11 @@ S.InventoryCountHistory = {
       const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Counted By</label><select id="ch-filter">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Counted By</label><select id="ch-filter">'
         + '<option value="">All staff</option>'
         + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
         + '</select></div>'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Count Type</label><select id="ch-type-filter">'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Count Type</label><select id="ch-type-filter">'
         + '<option value="">All types</option>'
         + types.map(t => '<option value="' + esc(t) + '"' + (this.typeFilter === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
         + '</select></div>'
