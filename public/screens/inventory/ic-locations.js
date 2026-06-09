@@ -443,7 +443,7 @@ S.InventoryLocations = {
 
     const cnt = products ? this.editChecked.size : assigned.length;
     const cntWord = products ? 'selected' : 'added';
-    const linkLabel = products ? 'Save Product Changes' : '+ Add/Delete Products';
+    const linkLabel = products ? '&#10003; Save Product Changes' : '+ Add/Delete Products';
 
     const nameCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -454,7 +454,7 @@ S.InventoryLocations = {
         + '</span>'
       + '</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-top:16px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-editprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + cnt + ' product' + (cnt === 1 ? '' : 's') + ' ' + cntWord + '</span>'
       + '</div></div>';
