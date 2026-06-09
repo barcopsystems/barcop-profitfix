@@ -346,6 +346,16 @@ select:-webkit-autofill{
 .f.field-missing textarea{border-color:var(--red);}
 /* Spot Check product card flagged as missing its pre/post counts on a save attempt. */
 .sp-line.sp-missing{border-color:var(--red)!important;}
+
+/* Floating nav helpers (back + back-to-top), bottom-right. Each button is hidden
+   until it is useful (back: there is a view to return to; up: scrolled down). */
+#float-nav{position:fixed;bottom:22px;right:22px;z-index:8000;display:flex;align-items:center;gap:9px;}
+body:not(.chrome-on) #float-nav{display:none;}
+.fn-btn{width:42px;height:42px;border-radius:50%;display:none;align-items:center;justify-content:center;background:var(--c4);border:1px solid var(--b1);color:var(--t2);cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.45);transition:background .12s,color .12s,transform .12s;-webkit-tap-highlight-color:transparent;}
+.fn-btn.show{display:flex;}
+.fn-btn:hover{background:var(--c3);color:var(--t1);}
+.fn-btn:active{transform:scale(0.92);}
+@media (max-width:900px){#float-nav{bottom:16px;right:16px;gap:10px;}.fn-btn{width:46px;height:46px;}}
 .f input[type=number]{-moz-appearance:textfield;}
 .f input[type=number]::-webkit-inner-spin-button,
 .f input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
