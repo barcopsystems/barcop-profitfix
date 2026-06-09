@@ -260,7 +260,7 @@ S.PrepBatches = {
         + '<button class="btn btn-ghost" id="pb-cancel">Cancel</button>'
         + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 820 });
+    const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 900, noClose: true });
     this._scope = overlay;
     this.renderRows();
     this.calc();
