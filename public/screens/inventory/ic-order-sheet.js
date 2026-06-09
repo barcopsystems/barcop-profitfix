@@ -115,20 +115,21 @@ S.InventoryOrderSheet = {
       else visibleVendors.push(v);
     });
 
-    let body;
+    let statusHtml, vendorHtml = '';
     if (visibleVendors.length === 0 && hiddenVendors.length === 0) {
-      body = '<div class="card form-card"><div class="card-title">'
+      statusHtml = '<div class="card form-card"><div class="card-title">'
         + '<span>Order Status</span></div>'
         + '<div class="empty" style="margin:0;"><div class="empty-title">Everything is at par</div>'
         + '<div class="empty-sub">No products in the ' + this.fmtDate(data.latest.date)
         + ' count are below their par level. Nothing to order.</div></div>'
         + this.countAgeNote(data.latest, false) + '</div>';
     } else {
-      body = this.statusCardHTML(visibleVendors, hiddenVendors, data)
-        + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
+      statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
+      vendorHtml = visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('');
     }
 
-    this.container.innerHTML = '<div class="screen">' + body + this.customOrderPanelHTML() + '</div>';
+    // Custom Order card sits right below Order Status, above the suggested vendor cards.
+    this.container.innerHTML = '<div class="screen">' + statusHtml + this.customOrderPanelHTML() + vendorHtml + '</div>';
 
     // Per-card input handler for the quantity field on existing lines, plus the
     // in-row product picker on blank Add Item rows.
