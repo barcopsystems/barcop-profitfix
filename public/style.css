@@ -994,6 +994,12 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .data-card .tbl tbody td[data-label=""]{justify-content:flex-end;}
   .data-card .tbl tbody td[data-label=""]::before{content:none;}
   .data-card .tbl tbody td .row-actions{justify-content:flex-end;}
+  /* Drag handle reads as an empty box on mobile (the inline 32px width survives). Make it a clear full-width grip strip centered at the top of the stacked card. */
+  .data-card .tbl tbody td.dr-handle{width:auto!important;justify-content:center!important;padding:8px;}
+  /* Selected/dragging row on mobile: frame the WHOLE card with one gold border (gold-tint fill comes from the base rule) instead of a gold line across every stacked cell. */
+  .dr-dragging td{box-shadow:none!important;border-left:1px solid var(--gold-tint-bord)!important;border-right:1px solid var(--gold-tint-bord)!important;border-bottom:none!important;}
+  .dr-dragging td:first-child{border-top:1px solid var(--gold-tint-bord)!important;}
+  .dr-dragging td:last-child{border-bottom:1px solid var(--gold-tint-bord)!important;}
 
   /* Batch builders (Void/Comp, Waste) -> stacked full-width inputs per line. */
   .ing-tbl thead{display:none;}
