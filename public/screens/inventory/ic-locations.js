@@ -233,7 +233,7 @@ S.InventoryLocations = {
       const rows = active.map(l => {
         const n = this.productCount(l.name);
         return '<tr data-id="' + esc(l.id) + '">'
-          + '<td><button class="il-open" data-id="' + l.id + '" style="padding:0;border:none;background:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer;">' + esc(l.name) + '</button></td>'
+          + '<td><button class="il-open" data-id="' + l.id + '" style="padding:0;border:none;background:none;color:var(--t1);font-weight:700;font-size:13px;cursor:pointer;">' + esc(l.name) + '</button></td>'
           + '<td>' + this.holdsLabel(l.name) + '</td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
