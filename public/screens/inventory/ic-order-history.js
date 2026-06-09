@@ -277,10 +277,13 @@ S.InventoryOrderHistory = {
 
     // Open orders close by logging the delivery (which runs the receiving
     // verification and auto-marks Received). Received orders can be reopened.
+    // An open order can also be edited (back on the Order Sheet) or canceled.
     const actionBtns = App.canEdit('ic-order-history')
       ? (received
           ? '<button class="btn btn-ghost" id="oh-reopen">Reopen Order</button>'
-          : '<button class="btn btn-primary" id="oh-log">Log the Delivery</button>')
+          : '<button class="btn btn-primary" id="oh-log">Log the Delivery</button>'
+            + '<button class="btn btn-ghost" id="oh-edit">Edit Order</button>'
+            + '<button class="btn btn-ghost" id="oh-cancel" style="color:var(--red);">Cancel Order</button>')
       : '';
 
     this.container.innerHTML = '<div class="screen">'
@@ -299,7 +302,7 @@ S.InventoryOrderHistory = {
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-      + (actionBtns ? '<div style="margin-top:16px;">' + actionBtns + '</div>' : '')
+      + (actionBtns ? '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">' + actionBtns + '</div>' : '')
       + '</div>';
 
     this.container.onclick = ev => {
@@ -310,7 +313,32 @@ S.InventoryOrderHistory = {
         App.navigate('ic-receive-delivery');
         return;
       }
+      if (ev.target.closest('#oh-edit')) {
+        S.InventoryOrderSheet._pendingEditId = id;
+        App.navigate('ic-order-sheet');
+        return;
+      }
+      if (ev.target.closest('#oh-cancel')) { this.cancelOrder(id); return; }
     };
+  },
+
+  // Cancel a placed order: remove it; the vendor returns to the Order Sheet so
+  // it can be reordered. Same soft confirm as the Order Sheet ⋯ menu.
+  async cancelOrder(id) {
+    const o = this.orders().find(x => x.id === id);
+    if (!o) return;
+    const ok = await App.confirm({
+      title: 'Cancel this order?',
+      message: 'This removes the ' + (o.vendor || '') + ' order'
+        + (o.total ? ' for ' + App.fmtCurrency(o.total) : '')
+        + '. Those items return to your Order Sheet so you can reorder. This cannot be undone.',
+      confirmText: 'Cancel Order',
+      cancelText: 'Keep Order',
+      danger: true
+    });
+    if (!ok) return;
+    await App.removeRecord('ic', 'order', id);
+    App.goBack();
   },
 
   async toggleStatus(id) {
