@@ -157,16 +157,18 @@ S.InventoryReceiveDelivery = {
       + '<th></th>'
       + '</tr></thead><tbody id="rd-lines">' + this.lineHTML(++this._seq) + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="rd-add" type="button" style="margin-bottom:14px;">+ Add Line Item</button>'
+      + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg" id="rd-count">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Price Changes</div><div class="calc-val lg" id="rd-changes">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val lg" id="rd-shorts">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val lg" id="rd-total">$0.00</div></div>'
+      + '</div></div>'
       + '</div>'
-      + '<div class="card-actions">'
+      + '<div style="margin-top:16px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
-      + '<span id="rd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + detailsCard + linesCard + '</div>';
 
