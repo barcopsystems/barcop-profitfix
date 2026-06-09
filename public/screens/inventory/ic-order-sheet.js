@@ -329,9 +329,11 @@ S.InventoryOrderSheet = {
     if (sel) sel.value = '';
     const body = panel.querySelector('.os-co-body');
     if (body) body.style.display = 'none';
+    const actions = this.container.querySelector('.os-co-actions');
+    if (actions) actions.style.display = 'none';
     const tbody = panel.querySelector('.os-lines-tbody');
     if (tbody) tbody.innerHTML = '';
-    const err = panel.querySelector('.os-verr');
+    const err = actions ? actions.querySelector('.os-verr') : null;
     if (err) { err.textContent = ''; err.style.display = 'none'; }
     this.recalcVendor(panel);
   },
@@ -341,9 +343,15 @@ S.InventoryOrderSheet = {
     if (!panel) return;
     panel.dataset.vendor = vendorName || '';
     const body = panel.querySelector('.os-co-body');
+    const actions = this.container.querySelector('.os-co-actions');
     if (!body) return;
-    if (!vendorName) { body.style.display = 'none'; return; }
+    if (!vendorName) {
+      body.style.display = 'none';
+      if (actions) actions.style.display = 'none';
+      return;
+    }
     body.style.display = '';
+    if (actions) actions.style.display = 'flex';
     const tbody = panel.querySelector('.os-lines-tbody');
     if (tbody) tbody.innerHTML = this.blankLineRowHTML(vendorName, []);
     this.recalcVendor(panel);
@@ -354,7 +362,7 @@ S.InventoryOrderSheet = {
     if (!panel) return;
     const vendor = panel.dataset.vendor;
     if (!vendor) return;
-    const err = panel.querySelector('.os-verr');
+    const err = this.container.querySelector('.os-co-actions .os-verr');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     if (err) { err.textContent = ''; err.style.display = 'none'; }
 
@@ -393,7 +401,7 @@ S.InventoryOrderSheet = {
       created_at: new Date().toISOString()
     };
 
-    const btn = panel.querySelector('.os-co-create');
+    const btn = this.container.querySelector('.os-co-actions .os-co-create');
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
@@ -550,12 +558,12 @@ S.InventoryOrderSheet = {
           + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
           + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
         + '</div></div>'
-        + '<div class="card-actions">'
-          + '<button class="btn btn-primary os-co-create">Create Order</button>'
-          + '<button class="btn btn-ghost os-co-cancel">Cancel</button>'
-          + '<span class="os-verr" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '</div>'
       + '</div>'
+      + '</div>'
+      + '<div class="os-co-actions" style="display:none;margin:16px 0 32px;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary os-co-create">Create Order</button>'
+        + '<button class="btn btn-ghost os-co-cancel">Cancel</button>'
+        + '<span class="os-verr" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
 
