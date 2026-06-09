@@ -12,6 +12,14 @@ S.InventoryHelp = {
   tab: 0,
   query: '',
 
+  showHowTo() {
+    App.showHelpModal('Inventory Help and FAQ', [
+      { p: ['This page is the full Help and FAQ for Inventory Control: how to get started, the count and variance model, ordering and par judgment, the operations logs, and how Inventory feeds Profit Recovery, Accounting, and the Theft Risk score.'] },
+      { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "variance" or "par" lands you on the right answer fast.'] },
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Inventory Control carries its own directions. Open the screen you have a question about, like Take Inventory or Receive Delivery, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+    ]);
+  },
+
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Inventory Control do?',
