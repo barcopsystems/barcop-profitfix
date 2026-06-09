@@ -56,7 +56,7 @@ S.ShiftChecklistTemplates = {
       + '</div>').join('');
     const itemsBlock = this._items.length === 0
       ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
-      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the &#x2630; handle on the left to reorder. The checklist runs in this order.</div>' + itemRows;
+      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the handle on the left to reorder. The checklist runs in this order.</div>' + itemRows;
 
     return '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
