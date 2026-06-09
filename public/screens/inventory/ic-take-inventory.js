@@ -348,8 +348,7 @@ S.InventoryTakeInventory = {
       + '<div style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--b2);">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
-      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">Location ' + (this.locStep + 1) + ' of ' + groups.length
-      + ' &nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span> counted</span></div>'
+      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span> counted</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
         + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Start Over</button>'
