@@ -16,6 +16,11 @@ S.InventorySpotCheck = {
   DRAFT_KEY: 'ic_spot_check_draft',
   posMode: 'manual',     // 'manual' = type POS per line, 'import' = drop the register report
   _seq: 0,
+  _onHistory: false,
+  filterFrom: '',
+  filterTo: '',
+  locFilter: '',
+  byFilter: '',
   CAT_ORDER: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
 
   products() {
@@ -28,6 +33,18 @@ S.InventorySpotCheck = {
     if (!App.inventoryData) App.inventoryData = {};
     if (!Array.isArray(App.inventoryData.ic_spot_checks)) App.inventoryData.ic_spot_checks = [];
     return App.inventoryData.ic_spot_checks;
+  },
+  // Operator-set variance tolerance: a line flags when it is off by more than
+  // this percent of what the register rang, either direction. Persisted so it is
+  // set once and pre-fills every check. Defaults to 5%.
+  flagPctSetting() {
+    const v = App.inventoryData && App.inventoryData.spot_check_flag_pct;
+    return (v != null && !isNaN(v)) ? parseFloat(v) : 5;
+  },
+  async saveFlagPct() {
+    if (!App.inventoryData) App.inventoryData = {};
+    App.inventoryData.spot_check_flag_pct = this._flagPct;
+    await App.saveInventory();
   },
   poursPer(p) {
     if (!p) return 1;
@@ -120,7 +137,7 @@ S.InventorySpotCheck = {
       { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top shelf and your fast movers. Load Last Targets brings back the products from your last check at that bar so you are not re-picking every shift.'] },
       { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
       { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
-      { h: 'Reading The Result', p: ['Bar Cop works out what should have been sold from your counts and compares it to the POS. A gap flags red. A positive variance means more left the bar than was rung in, the classic sign of overpouring, give-aways, or theft.'] },
+      { h: 'Reading The Result', p: ['Bar Cop works out what physically left the bottle from your counts and compares it to what the register rang. Anything off by more than your Flag at % setting, in either direction, flags red. Over means more left the bar than was sold, the classic sign of overpouring, give-aways, or theft. Under means less left the bottle than was rung in, which points to short pours that skimp the guest. Set Flag at % up top to your own tolerance; it remembers what you set.'] },
       { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product can be sent straight to a Variance Investigation in Theft Risk with one click. Spot checks also feed your Theft Risk score and the Bar Cop Audit.'] }
     ]);
   },
@@ -258,6 +275,7 @@ S.InventorySpotCheck = {
 
     this._seq = 0;
     const dft = this.draft || { lines: [] };
+    this._flagPct = this.flagPctSetting();
     const resuming = !!(this.draft && this.draft.lines && this.draft.lines.length);
 
     const active = App.activeShift();
@@ -293,6 +311,8 @@ S.InventorySpotCheck = {
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
         + '<select id="sp-by" style="height:44px;">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Flag at %</label>'
+        + '<div class="fw"><input class="suf" type="number" id="sp-flagpct" min="0" step="0.5" value="' + this._flagPct + '" style="height:44px;"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="divider"></div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
@@ -378,6 +398,13 @@ S.InventorySpotCheck = {
     document.getElementById('sp-loc')?.addEventListener('change', () => { this.syncDraft(); this.renderMain(); });
     document.getElementById('sp-shift')?.addEventListener('change', () => this.syncDraft());
     document.getElementById('sp-by')?.addEventListener('change', () => this.syncDraft());
+    document.getElementById('sp-flagpct')?.addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      this._flagPct = (isNaN(v) || v < 0) ? 0 : v;
+      this.container.querySelectorAll('.sp-line').forEach(line => this.recalcLine(line));
+      this.recalcTotal();
+    });
+    document.getElementById('sp-flagpct')?.addEventListener('change', () => this.saveFlagPct());
     document.getElementById('sp-save')?.addEventListener('click', () => this.save());
 
     this.container.onclick = ev => {
@@ -395,25 +422,84 @@ S.InventorySpotCheck = {
   renderHistory() {
     this.actions.innerHTML = '';
     this._onHistory = true;
-    const list = [...this.checks()].sort((a, b) =>
+    const all = [...this.checks()].sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-    const flagged = list.reduce((s, c) => s + (c.flagged_count || 0), 0);
-    const totalVar = list.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
+    const flagged = all.reduce((s, c) => s + (c.flagged_count || 0), 0);
+    const totalVar = all.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + list.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + all.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg' + (flagged ? ' warn' : '') + '">' + flagged + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtCurrency(totalVar, 2) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (list.length ? this.fmtDate(list[0].date) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (all.length ? this.fmtDate(all[0].date) : '-') + '</div></div>'
       + '</div></div>';
-    const backRow = '<div class="no-print" style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Check</button></div>';
-    const listSection = list.length
-      ? this.historyCard()
-      : '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div><div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div>';
-    this.container.innerHTML = '<div class="screen">' + backRow + statsCard + listSection + '</div>';
-    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+    const backRow = '<div class="no-print" style="margin-top:18px;"><button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Check</button></div>';
 
+    if (all.length === 0) {
+      this.container.innerHTML = '<div class="screen">' + statsCard
+        + '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
+        + '<div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div>' + backRow + '</div>';
+      this.wireHistory();
+      return;
+    }
+
+    const locs  = [...new Set(all.map(c => c.location).filter(Boolean))].sort();
+    const staff = [...new Set(all.map(c => c.checked_by).filter(Boolean))].sort();
+    const filtered = all.filter(c =>
+      (!this.filterFrom || (c.date || '') >= this.filterFrom)
+      && (!this.filterTo || (c.date || '') <= this.filterTo)
+      && (!this.locFilter || c.location === this.locFilter)
+      && (!this.byFilter || c.checked_by === this.byFilter));
+
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Spot Checks</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-list-export">Export PDF</button></div></div>';
+
+    const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sp-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sp-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Register</label><select id="sp-loc-filter"><option value="">All</option>'
+      + locs.map(n => '<option value="' + esc(n) + '"' + (this.locFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Checked By</label><select id="sp-by-filter"><option value="">All staff</option>'
+      + staff.map(n => '<option value="' + esc(n) + '"' + (this.byFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sp-clear">Clear</button></div>'
+      + '</div></div>';
+
+    const rows = filtered.slice(0, App.listLimit('ic', 'spot_check')).map(c => {
+      const vd = c.total_variance_dollar || 0;
+      return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
+        + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
+        + '<td>' + esc(c.location || '-') + '</td>'
+        + '<td>' + esc(c.shift || '-') + '</td>'
+        + '<td>' + esc(c.checked_by || '-') + '</td>'
+        + '<td>' + (c.product_count || 0) + '</td>'
+        + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
+        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
+        + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
+        + '</div></td></tr>';
+    }).join('');
+    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Register</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks match the filters.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'spot_check', filtered, !!(this.filterFrom || this.filterTo || this.locFilter || this.byFilter));
+
+    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + backRow + '</div>';
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+    this.wireHistory();
+  },
+
+  wireHistory() {
+    document.getElementById('sp-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderHistory(); });
+    document.getElementById('sp-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderHistory(); });
+    document.getElementById('sp-loc-filter')?.addEventListener('change', e => { this.locFilter = e.target.value || ''; this.renderHistory(); });
+    document.getElementById('sp-by-filter')?.addEventListener('change', e => { this.byFilter = e.target.value || ''; this.renderHistory(); });
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-back')) { this.renderMain(); return; }
+      if (ev.target.closest('#sp-clear')) { this.filterFrom = ''; this.filterTo = ''; this.locFilter = ''; this.byFilter = ''; this.renderHistory(); return; }
+      if (ev.target.closest('#sp-list-export')) { App.exportPDF({ title: 'Spot Check History', root: this.container }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
       const hdel = ev.target.closest('.sp-hdel');
       const hview = ev.target.closest('.sp-hview');
@@ -558,7 +644,12 @@ S.InventorySpotCheck = {
       if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + '.</span> Enter POS ' + sw + ' sold to see the variance.';
       return;
     }
-    const flagged = Math.abs(r.variance) > 0.5 && Math.abs(r.vd) >= 1;
+    // Flag when the variance is more than the operator's percent of what the
+    // register rang, either direction, past a 1-pour floor so a small-sample
+    // rounding blip does not trip it.
+    const thr = (this._flagPct != null && !isNaN(this._flagPct)) ? this._flagPct : 5;
+    const pct = (r.sold > 0) ? Math.abs(r.variance) / r.sold * 100 : (Math.abs(r.variance) > 0 ? 100 : 0);
+    const flagged = Math.abs(r.variance) > 1 && pct >= thr;
     line.dataset.flag = flagged ? '1' : '0';
     const cls = flagged ? 'var(--red)' : 'var(--gold)';
     const direction = r.variance > 0 ? 'Over' : (r.variance < 0 ? 'Under' : 'On target');
@@ -638,6 +729,7 @@ S.InventorySpotCheck = {
       checked_by_id: document.getElementById('sp-by')?.value || '',
       checked_by:   (App.staffById(document.getElementById('sp-by')?.value) || {}).name || '',
       items,
+      flag_pct:       this._flagPct,
       product_count:  items.length,
       flagged_count:  items.filter(i => i.flagged).length,
       total_variance_dollar: items.reduce((t, i) => t + (i.variance_dollar || 0), 0),
@@ -653,32 +745,6 @@ S.InventorySpotCheck = {
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Try Again'; }
     }
-  },
-
-  historyCard() {
-    const list = [...this.checks()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-    if (list.length === 0) return '';
-    const rows = list.slice(0, App.listLimit('ic', 'spot_check')).map(c => {
-      const vd = c.total_variance_dollar || 0;
-      return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
-        + '<td>' + esc(c.location || '-') + '</td>'
-        + '<td>' + esc(c.shift || '-') + '</td>'
-        + '<td>' + esc(c.checked_by || '-') + '</td>'
-        + '<td>' + (c.product_count || 0) + '</td>'
-        + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
-        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) + '</td>'
-        + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
-        + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
-        + '</div></td></tr>';
-    }).join('');
-    return '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Location</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'spot_check', list, false);
   },
 
   renderDetail(id) {
@@ -712,7 +778,6 @@ S.InventorySpotCheck = {
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="no-print" style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" id="sp-back-hist">Back to History</button></div>'
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + meta('Location', esc(c.location || '-'))
       + meta('Shift', esc(c.shift || '-'))
@@ -727,6 +792,7 @@ S.InventorySpotCheck = {
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
       + '<th>Variance</th><th>Variance $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<div class="no-print" style="margin-top:18px;"><button class="btn btn-ghost btn-sm" id="sp-back-hist">Back to History</button></div>'
       + '</div>';
 
     this.container.onclick = ev => {
