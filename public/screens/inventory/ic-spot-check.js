@@ -279,11 +279,10 @@ S.InventorySpotCheck = {
       ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
       : '';
 
-    // Spot Check card: header with Save on the right, the four setup cells, a
-    // divider, then Add Products + Load Last.
+    // Spot Check card: collapsible header, the four setup cells, a divider, then
+    // Add Products + Load Last. Save lives at the bottom of the page.
     const setup = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sp-setup', 'Spot Check',
-          '<button class="btn btn-primary btn-sm" id="sp-save">Save Spot Check</button>')
+      + App.collapsibleCardTitle('sp-setup', 'Spot Check')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
@@ -328,9 +327,13 @@ S.InventorySpotCheck = {
     this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + setup + posCard
       + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + this.historyCard() + '</div>';
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
+        + '<button class="btn btn-ghost" id="sp-history">View History</button>'
+      + '</div></div>';
     App.applyCollapsed(this.container);
     this.updateProductsTitle();
+    this._onHistory = false;
 
     // Mount sliders for any restored lines.
     BottleSlider._inst = {};
@@ -379,15 +382,42 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       const collHead = ev.target.closest('.card-collapse-head');
-      if (collHead && !ev.target.closest('#sp-save')) { App.toggleCollapse(collHead); return; }
-      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
+      if (collHead) { App.toggleCollapse(collHead); return; }
       if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
+      if (ev.target.closest('#sp-history')) { this.renderHistory(); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
-      const hrow = ev.target.closest('.sp-hrow');
-      const hview = ev.target.closest('.sp-hview');
+    };
+  },
+
+  // ── History (its own page: a stat box + the saved-checks list) ──────────────
+  renderHistory() {
+    this.actions.innerHTML = '';
+    this._onHistory = true;
+    const list = [...this.checks()].sort((a, b) =>
+      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const flagged = list.reduce((s, c) => s + (c.flagged_count || 0), 0);
+    const totalVar = list.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + list.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg' + (flagged ? ' warn' : '') + '">' + flagged + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtCurrency(totalVar, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (list.length ? this.fmtDate(list[0].date) : '-') + '</div></div>'
+      + '</div></div>';
+    const backRow = '<div class="no-print" style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" id="sp-back">Back to Spot Check</button></div>';
+    const listSection = list.length
+      ? this.historyCard()
+      : '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div><div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div>';
+    this.container.innerHTML = '<div class="screen">' + backRow + statsCard + listSection + '</div>';
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+
+    this.container.onclick = ev => {
+      if (ev.target.closest('#sp-back')) { this.renderMain(); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
       const hdel = ev.target.closest('.sp-hdel');
+      const hview = ev.target.closest('.sp-hview');
+      const hrow = ev.target.closest('.sp-hrow');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
       else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
@@ -682,6 +712,7 @@ S.InventorySpotCheck = {
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val ' + (cls || '') + '">' + val + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
+      + '<div class="no-print" style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" id="sp-back-hist">Back to History</button></div>'
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + meta('Location', esc(c.location || '-'))
       + meta('Shift', esc(c.shift || '-'))
@@ -699,6 +730,7 @@ S.InventorySpotCheck = {
       + '</div>';
 
     this.container.onclick = ev => {
+      if (ev.target.closest('#sp-back-hist')) { this.renderHistory(); return; }
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
       const inv = ev.target.closest('.sp-investigate');
       if (inv) { ev.stopPropagation(); this.openInvestigation(inv.dataset.pid, inv.dataset.name); }
@@ -732,6 +764,6 @@ S.InventorySpotCheck = {
   async confirmDel(id) {
     if (!(await App.confirmDelete())) return;
     await App.removeRecord('ic', 'spot_check', id);
-    this.renderMain();
+    if (this._onHistory) this.renderHistory(); else this.renderMain();
   }
 };
