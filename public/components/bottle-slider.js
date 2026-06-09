@@ -60,7 +60,7 @@ const BottleSlider = {
         + '<path d="M40 14 L40 52 C40 58 18 64 16 88 L16 210 Q16 222 28 222 L62 222 Q74 222 74 210 L74 88 C72 64 50 58 50 52 L50 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>';
 
     return '<div class="bs" data-bs="' + esc(String(id)) + '" data-top="' + rng.top + '" data-bot="' + rng.bot + '" tabindex="0" '
-      + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;">'
+      + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;-webkit-tap-highlight-color:transparent;">'
 
       + '<div class="bs-fulls-row" style="display:flex;align-items:center;gap:10px;">'
       +   '<button type="button" class="bs-minus" aria-label="One less full bottle">&#8722;</button>'
@@ -71,7 +71,7 @@ const BottleSlider = {
       +   '<button type="button" class="bs-plus" aria-label="One more full bottle">+</button>'
       + '</div>'
 
-      + '<svg class="bs-svg" viewBox="0 0 90 230" width="92" height="210" style="touch-action:none;cursor:pointer;display:block;">'
+      + '<svg class="bs-svg" viewBox="0 0 90 230" width="92" height="210" style="touch-action:none;cursor:pointer;display:block;-webkit-tap-highlight-color:transparent;">'
       +   '<defs><clipPath id="' + clip + '">'
       +     '<path d="' + clipD + '"/>'
       +   '</clipPath></defs>'
