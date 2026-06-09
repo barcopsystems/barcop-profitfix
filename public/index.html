@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Bar Cop</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=101"/>
+<link rel="stylesheet" href="style.css?v=102"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -151,6 +151,12 @@
   <div class="tt-eg" id="tt-eg"></div>
 </div>
 
+<!-- Floating navigation helpers: back (within a screen's view pages, any depth) + back-to-top. Both appear only when useful. -->
+<div id="float-nav" class="no-print" aria-hidden="true">
+  <button type="button" id="fn-back" class="fn-btn" title="Back" aria-label="Back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  <button type="button" id="fn-up" class="fn-btn" title="Back to top" aria-label="Back to top"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>var S = {};</script>
@@ -232,16 +238,16 @@
 <script src="screens/inventory/ic-vendors.js?v=12"></script>
 <script src="screens/inventory/ic-prep-batches.js?v=12"></script>
 <script src="screens/inventory/ic-take-inventory.js?v=28"></script>
-<script src="screens/inventory/ic-count-history.js?v=20"></script>
-<script src="screens/inventory/ic-spot-check.js?v=34"></script>
+<script src="screens/inventory/ic-count-history.js?v=21"></script>
+<script src="screens/inventory/ic-spot-check.js?v=35"></script>
 <script src="screens/inventory/ic-transfers.js?v=13"></script>
 <script src="screens/inventory/ic-empties.js?v=17"></script>
 <script src="screens/inventory/ic-adjustments.js?v=14"></script>
 <script src="screens/inventory/ic-par-suggestions.js?v=18"></script>
-<script src="screens/inventory/ic-order-sheet.js?v=23"></script>
-<script src="screens/inventory/ic-order-history.js?v=17"></script>
+<script src="screens/inventory/ic-order-sheet.js?v=24"></script>
+<script src="screens/inventory/ic-order-history.js?v=18"></script>
 <script src="screens/inventory/ic-receive-delivery.js?v=29"></script>
-<script src="screens/inventory/ic-delivery-history.js?v=16"></script>
+<script src="screens/inventory/ic-delivery-history.js?v=17"></script>
 <script src="screens/inventory/ic-report-usage.js?v=15"></script>
 <script src="screens/inventory/ic-report-variance.js?v=39"></script>
 <script src="screens/inventory/ic-report-stock.js?v=12"></script>
@@ -288,6 +294,6 @@
 <script src="screens/labor/lc-dashboard.js?v=15"></script>
 <script src="components/onboarding.js?v=17"></script>
 <script src="db.js?v=54"></script>
-<script src="app.js?v=305"></script>
+<script src="app.js?v=306"></script>
 </body>
 </html>
