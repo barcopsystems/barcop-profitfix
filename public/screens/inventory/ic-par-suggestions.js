@@ -256,7 +256,7 @@ S.InventoryParSuggestions = {
         + '<th>Product</th><th>Current Par</th><th>Avg Weekly</th><th>Suggested Par</th><th>Status</th><th>Cash Impact</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + settingsCard + statsCard + filterHeading + filterCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + settingsCard + filterHeading + filterCard + listCard + '</div>';
     this.wire();
   },
 
