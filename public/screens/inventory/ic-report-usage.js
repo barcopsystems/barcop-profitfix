@@ -141,20 +141,15 @@ S.InventoryUsageReport = {
         + this.fmtDate(startC.date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>';
     }).reverse().join('');
     const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const locs = [...new Set(period.rows.flatMap(r => r.locations || []).filter(Boolean))].sort();
     const catOpts = '<option value="">All categories</option>'
       + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    const locOpts = '<option value="">All locations</option>'
-      + locs.map(l => '<option' + (this.locFilter === l ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Usage</div>'
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button></div></div>';
 
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:230px;flex-shrink:0;"><label>Count Period</label><select id="ur-period">' + periodOpts + '</select></div>'
       + '<div class="f" style="width:180px;flex-shrink:0;"><label>Category</label><select id="ur-cat">' + catOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Location</label><select id="ur-loc">' + locOpts + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ur-clear">Clear</button></div>'
       + '</div></div>';
 
@@ -174,7 +169,6 @@ S.InventoryUsageReport = {
     };
     document.getElementById('ur-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.catFilter = ''; this.locFilter = ''; this.draw(); });
     document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
-    document.getElementById('ur-loc')?.addEventListener('change', e => { this.locFilter = e.target.value; this.draw(); });
   },
 
   tabBody(rows) {
