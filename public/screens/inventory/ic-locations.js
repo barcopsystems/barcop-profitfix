@@ -28,8 +28,8 @@ S.InventoryLocations = {
   triageCat: 'All',
   triageChecked: null, // Set<pid> checked in the "needs a location" triage modal
   _triageDest: '',     // destination location name picked in the triage modal
-  addOpen: false,      // is the add-a-location form expanded
-  _addToggled: false,  // has the operator explicitly toggled the add form this session
+  pickerOpen: false,   // is the "+ Add products to location" picker expanded
+  _newName: '',        // typed location name, kept so a re-render does not lose it
   DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
@@ -80,6 +80,9 @@ S.InventoryLocations = {
     this.actions = actions;
     actions.innerHTML = '';
     this.editId = null;
+    this.pickerOpen = false;
+    this._newName = '';
+    this.newChecked = new Set();
     this.renderList();
   },
 
@@ -200,11 +203,9 @@ S.InventoryLocations = {
     this.actions.innerHTML = '';
     this.editId = null;
     this.newCat = 'All';
-    this.newChecked = new Set();
     const locs = this.locations();
     const active = locs.filter(l => !l.archived);
     const archived = locs.filter(l => l.archived);
-    if (!this._addToggled) this.addOpen = !active.length;
 
     const unplaced = this.unplacedProducts().length;
 
@@ -232,7 +233,6 @@ S.InventoryLocations = {
       const rows = active.map(l => {
         const n = this.productCount(l.name);
         return '<tr data-id="' + esc(l.id) + '">'
-          + DragReorder.handleCellHTML()
           + '<td><button class="il-open" data-id="' + l.id + '" style="padding:0;border:none;background:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer;">' + esc(l.name) + '</button></td>'
           + '<td>' + this.holdsLabel(l.name) + '</td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
@@ -242,11 +242,10 @@ S.InventoryLocations = {
           + '</div></td></tr>';
       }).join('');
 
-      const listHeading = '<div class="sh" style="margin-top:24px;">Your Locations</div>'
-        + (active.length ? '<div style="font-size:11px;color:var(--t3);margin:0 0 10px;">Drag the &#x2630; handle to set the order operators count locations in.</div>' : '');
+      const listHeading = '<div class="sh" style="margin-top:24px;">Your Locations</div>';
       const listCard = active.length
         ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-            + '<th style="width:32px;"></th><th>Location</th><th>Holds</th><th>Products</th><th></th>'
+            + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
             + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
         : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>';
       const archivedSection = archived.length
@@ -259,35 +258,68 @@ S.InventoryLocations = {
       listSection = listHeading + listCard + archivedSection;
     }
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + triageStrip + this.addFormCard() + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + triageStrip + this.addFormCard() + this.pickerSection() + listSection + '</div>';
     this.wireList();
   },
 
-  addFormCard() {
-    const collapsed = this.addOpen ? '' : ' collapsed';
-    return '<div class="card form-card' + collapsed + '" style="margin-top:14px;">'
-      + App.collapsibleCardTitle('ic-locations', 'Add a Location')
-      + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="width:240px;flex-shrink:0;"><label>Location Name</label>'
-          + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler"/></div>'
-      + '</div>'
-      + '<div class="sh" style="margin-top:4px;margin-bottom:8px;">Products Stored Here</div>'
-      + '<div id="il-new-filter">' + this.newFilterHTML() + '</div>'
-      + '<div class="card-actions" style="align-items:center;">'
+  // The product picker that opens under the Add a Location card when "+ Add
+  // products to location" is clicked: category tabs, bulk helpers, the product
+  // data list, then Save Location / Clear.
+  pickerSection() {
+    if (!this.pickerOpen) return '';
+    const n = this.newChecked.size;
+    return '<div style="margin-top:8px;"><div id="il-new-filter">' + this.newFilterHTML() + '</div>'
+      + '<div class="form-row" style="margin-top:14px;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
         + '<button class="btn btn-ghost" id="il-new-clear">Clear</button>'
-        + '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
-        + '<span id="il-new-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+        + '<span id="il-new-count" style="font-size:12px;color:var(--t3);">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>'
+        + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div></div>';
+  },
+
+  addFormCard() {
+    const linkLabel = this.pickerOpen ? '- Hide products' : '+ Add products to location';
+    return '<div class="card form-card" style="margin-top:14px;">'
+      + '<div class="card-title">Add a Location</div>'
+      + '<div class="f" style="max-width:300px;">'
+        + '<label style="display:flex;align-items:center;gap:8px;"><span class="setup-num">1</span> Name Location</label>'
+        + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"/>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:18px;">'
+        + '<span class="setup-num">2</span>'
+        + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
+      + '</div></div>';
   },
 
   newFilterHTML() {
     const prods = this.catProducts(this.newCat);
     return this.catTabsHTML(this.newCat, c => this.catProducts(c).length)
       + this.bulkControlsHTML('new')
-      + this.checklistPanelHTML(prods, this.newChecked, 'il-cb',
-          'No matching products yet. Add products on the Products screen first, then assign them here.');
+      + this.productSelectTable(prods, this.newChecked);
+  },
+
+  // The product selection list as a standard data-row table (checkbox + product
+  // info). Standalone section, so a full .data-card is fine here.
+  productSelectTable(prods, checkedSet) {
+    if (!prods.length) {
+      return '<div style="font-size:12px;color:var(--t4);padding:10px 2px;">No matching products yet. Add products on the Products screen first, then assign them here.</div>';
+    }
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th style="width:40px;"></th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
+      + '</tr></thead><tbody>'
+      + prods.map(p => '<tr class="il-prow" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
+          + '<td><input type="checkbox" class="il-cb" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
+          + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
+          + '<td>' + esc(p.category || '-') + '</td>'
+          + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+          + '<td>' + esc(p.vendor || '-') + '</td>'
+          + '</tr>').join('')
+      + '</tbody></table></div></div>';
+  },
+
+  _toggleNew(id, on) {
+    if (on) this.newChecked.add(id); else this.newChecked.delete(id);
+    this.updateNewCount();
   },
 
   updateNewCount() {
@@ -306,11 +338,21 @@ S.InventoryLocations = {
         if (el) el.innerHTML = this.newFilterHTML();
         return;
       }
-      const head = ev.target.closest('.card-collapse-head');
-      if (head) { this._addToggled = true; this.addOpen = !this.addOpen; const card = head.closest('.card'); if (card) card.classList.toggle('collapsed', !this.addOpen); return; }
+      if (ev.target.closest('.il-addprod-link')) {
+        this._newName = document.getElementById('il-new-name')?.value || '';
+        this.pickerOpen = !this.pickerOpen;
+        this.renderList();
+        return;
+      }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
       if (ev.target.closest('#il-triage-open')) { this.openTriage(); return; }
+      const prow = ev.target.closest('.il-prow');
+      if (prow && !ev.target.closest('input')) {
+        const cb = prow.querySelector('.il-cb');
+        if (cb) { cb.checked = !cb.checked; this._toggleNew(cb.value, cb.checked); }
+        return;
+      }
       const save = ev.target.closest('#il-new-save');
       const clr  = ev.target.closest('#il-new-clear');
       const open = ev.target.closest('.il-open');
@@ -319,7 +361,7 @@ S.InventoryLocations = {
       const un   = ev.target.closest('.il-unarchive');
       const addD = ev.target.closest('#il-add-defaults');
       if (save)      this.saveNewLocation();
-      else if (clr)  this.renderList();
+      else if (clr)  { this._newName = ''; this.newChecked = new Set(); this.pickerOpen = false; this.renderList(); }
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
       else if (arch) this.confirmDelete(arch.dataset.id);
@@ -332,13 +374,11 @@ S.InventoryLocations = {
         const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
       }
       if (ev.target.classList && ev.target.classList.contains('il-cb')) {
-        if (ev.target.checked) this.newChecked.add(ev.target.value);
-        else this.newChecked.delete(ev.target.value);
-        this.updateNewCount();
+        this._toggleNew(ev.target.value, ev.target.checked);
       }
     };
-    const body = document.getElementById('il-loc-body');
-    if (body) DragReorder.wire({ container: body, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', onCommit: ids => this._persistLocationOrder(ids) });
+    // Keep the typed name in state so opening the picker never loses it.
+    document.getElementById('il-new-name')?.addEventListener('input', e => { this._newName = e.target.value; });
   },
 
   async saveNewLocation() {
@@ -615,16 +655,6 @@ S.InventoryLocations = {
     if (!l) return;
     if (!(await App.confirmDelete())) return;
     this.setArchived(id, true);
-  },
-
-  async _persistLocationOrder(newActiveOrderIds) {
-    const all = this.locations();
-    const archived = all.filter(l => l.archived);
-    const byId = new Map(all.map(l => [l.id, l]));
-    const active = newActiveOrderIds.map(id => byId.get(id)).filter(Boolean);
-    App.inventoryData.ic_locations = [...active, ...archived];
-    await App.saveInventory();
-    this.renderList();
   },
 
   async setArchived(id, val) {
