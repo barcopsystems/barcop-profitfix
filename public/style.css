@@ -47,6 +47,10 @@
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+/* Kill the mobile browser tap-highlight (the translucent blue/grey box that
+   flashes on the first tap of any clickable element). App elements carry their
+   own :active / hover feedback, so the default flash is just noise on touch. */
+*{-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);color:var(--w);font-family:'Barlow',-apple-system,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;}
 
