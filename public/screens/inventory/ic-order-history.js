@@ -282,6 +282,7 @@ S.InventoryOrderHistory = {
       ? (received
           ? '<button class="btn btn-ghost" id="oh-reopen">Reopen Order</button>'
           : '<button class="btn btn-primary" id="oh-log">Log the Delivery</button>'
+            + '<button class="btn btn-ghost" id="oh-email">' + (o.status === 'Open' ? 'Email to Vendor' : 'Resend') + '</button>'
             + '<button class="btn btn-ghost" id="oh-edit">Edit Order</button>'
             + '<button class="btn btn-ghost" id="oh-cancel" style="color:var(--red);">Cancel Order</button>')
       : '';
@@ -318,8 +319,23 @@ S.InventoryOrderHistory = {
         App.navigate('ic-order-sheet');
         return;
       }
+      if (ev.target.closest('#oh-email')) { this.emailOrder(id); return; }
       if (ev.target.closest('#oh-cancel')) { this.cancelOrder(id); return; }
     };
+  },
+
+  // Email a placed order to the vendor (same body as the Order Sheet uses). An
+  // Open order is marked Submitted on send, so the button becomes Resend.
+  async emailOrder(id) {
+    const o = this.orders().find(x => x.id === id);
+    if (!o) return;
+    window.location.href = this.buildMailto(o);
+    if (o.status === 'Open') {
+      o.status = 'Submitted';
+      o.submitted_at = new Date().toISOString();
+      await App.putRecord('ic', 'order', o);
+      this.renderDetail(id);
+    }
   },
 
   // Cancel a placed order: remove it; the vendor returns to the Order Sheet so
