@@ -218,7 +218,9 @@ S.InventoryParSuggestions = {
       + stat('Added Stock', App.fmtCurrency(addedStock))
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Par Suggestions</div></div>';
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Filter Par Suggestions</div>'
+      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button></div></div>';
     const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
       + '<div class="f" style="width:280px;flex-shrink:0;"><label>Category</label><select id="ps-cat">' + catOpts + '</select></div>'
       + '</div></div>';
@@ -273,6 +275,7 @@ S.InventoryParSuggestions = {
     document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(e.target.value, 'buffer_pct'));
     document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(e.target.value, 'cycle_days'));
     document.getElementById('ps-cat')?.addEventListener('change',    e => { this.filterCategory = e.target.value || ''; this.draw(); });
+    document.getElementById('ps-export')?.addEventListener('click', () => App.exportPDF({ title: 'Dynamic Pars', root: this.container }));
 
     // One deliberate Update per product: the operator weighs each suggestion on
     // its own, applies the one row, and it drops off the list once its par
