@@ -134,8 +134,8 @@ S.InventoryTakeInventory = {
       }).join('');
       const head = '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Pick the locations to count.</div>';
       body = head + '<div class="ti-loc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">' + tiles + '</div>' + countedByRow;
-      startAction = '<div class="card-actions"><button class="btn btn-primary" id="ti-start">Start Count</button>'
-        + '<span id="ti-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
+      startAction = '<div style="margin:16px 0 0;display:flex;align-items:center;gap:8px;"><button class="btn btn-primary" id="ti-start">Start Count</button>'
+        + '<span id="ti-err" style="color:var(--red);font-size:12px;display:none;"></span></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + resumeBar
@@ -143,8 +143,9 @@ S.InventoryTakeInventory = {
       + '<span>Start an Inventory Count</span>'
       + '</div>'
       + body
+      + '</div>'
       + startAction
-      + '</div></div>';
+      + '</div>';
 
     this.container.onclick = ev => {
       const tile = ev.target.closest('.ti-loc-tile');
