@@ -10,8 +10,9 @@
 
 S.InventoryOrderSheet = {
   _created: null,
-  _editVendor: null,   // vendor whose placed order is pulled back for editing
-  _menuCloser: null,   // active outside-click closer for an open ⋯ menu
+  _editVendor: null,    // vendor whose placed order is pulled back for editing
+  _pendingEditId: null, // one-shot: order id to edit, set by Order History deep-link
+  _menuCloser: null,    // active outside-click closer for an open ⋯ menu
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
@@ -39,6 +40,11 @@ S.InventoryOrderSheet = {
     this.actions = actions;
     this._created = this._created || {};
     this._editVendor = null;   // fresh entry starts clean (not mid-edit)
+    if (this._pendingEditId) {   // deep-link from Order History "Edit Order"
+      const o = this.orders().find(x => x.id === this._pendingEditId);
+      this._pendingEditId = null;
+      if (o && o.status !== 'Received') this._editVendor = o.vendor;
+    }
     if (this._menuCloser) { document.removeEventListener('click', this._menuCloser, true); this._menuCloser = null; }
     this.renderMain();
   },
