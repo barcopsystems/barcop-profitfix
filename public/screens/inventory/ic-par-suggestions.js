@@ -181,12 +181,12 @@ S.InventoryParSuggestions = {
     const settingsCard = '<div class="card form-card"><div class="card-title">'
       + '<span>Dynamic Pars Settings</span></div>'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Window (weeks)</label>'
-          + '<input type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '"/></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Buffer (%)</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Count Window</label>'
+          + '<div class="fw"><input class="suf" type="number" id="ps-window" min="2" max="26" step="1" value="' + settings.window_weeks + '" style="padding-right:46px;"/><span class="suf">weeks</span></div></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Buffer (%)</label>'
           + '<div class="fw"><input class="suf" type="number" id="ps-buffer" min="0" max="100" step="5" value="' + settings.buffer_pct + '"/><span class="suf">%</span></div></div>'
-        + '<div class="f" style="width:190px;flex-shrink:0;"><label>Default Delivery Cycle</label>'
-          + '<input type="number" id="ps-cycle" min="1" max="30" step="1" value="' + settings.cycle_days + '"/></div>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Delivery Cycle</label>'
+          + '<div class="fw"><input class="suf" type="number" id="ps-cycle" min="1" max="30" step="1" value="' + settings.cycle_days + '" style="padding-right:40px;"/><span class="suf">days</span></div></div>'
       + '</div></div>';
 
     // Compute suggestions. Only surface pars that need a move and have not been
