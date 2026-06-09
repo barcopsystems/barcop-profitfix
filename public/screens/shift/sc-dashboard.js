@@ -9,6 +9,16 @@
    placeholder tiles, and guided panels until a shift is logged. */
 
 S.ShiftDashboard = {
+  showHowTo() {
+    App.showHelpModal('How the Shift Dashboard Works', [
+      { p: ['This is the Shift landing screen. It reads the last seven days of shifts, your drawer counts, and the open items on the floor so you can see how service is running at a glance. Every number comes from shifts you logged and drawers you counted. Until your first shift is logged, the screen shows this same layout in placeholder form with a Get Started strip.'] },
+      { h: 'The Four Tiles Up Top', p: ['Revenue, Last 7 Days and Covers, Last 7 Days are your volume for the week. Cash Over/Short, 7d is the net of every drawer you counted, and it should sit close to zero. A steady short building across the week is a cash-handling problem worth chasing. Open Items is anything 86d plus any open maintenance ticket, so the count is your quick read on what is still unresolved.'] },
+      { h: 'Active Shift', p: ['The wide band is the floor right now. If a shift is open it shows the running revenue, covers, and drawer status with a jump straight into Active Shift. If nothing is open, it is the place to open the floor for the next service. This is the one card you glance at mid-shift.'] },
+      { h: 'The Four Panels', p: ['Revenue by Daypart splits the week across brunch, lunch, dinner, and late night, so a soft Tuesday lunch or a strong Friday dinner stands right out. Exceptions This Week rolls up voids, comps, and walked tabs, the everyday give-aways and losses. Recent Shifts is every shift you ran, newest first. Shift Watch is the leaks panel: cash shorts, out-of-tolerance drawers, urgent maintenance, and 86d items. Tap any line to dig in.'] },
+      { h: 'Quick Actions And Day One', p: ['The buttons jump to the jobs you run most: Open the Floor, Cash Control, 86 List, and Reports. Before your first shift, the dashboard shows this same layout with a Get Started strip. Once a shift is logged, the panels fill with real numbers.'] }
+    ]);
+  },
+
   shifts()     { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
   drops()      { return ((App.shiftData && App.shiftData.sc_cash_drops) || []); },
   variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
