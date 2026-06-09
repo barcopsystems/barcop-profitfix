@@ -307,6 +307,26 @@ S.InventoryVarianceReport = {
     }
   },
 
+  // Open (or create) a variance investigation for a flagged product and jump to
+  // it in Profit Recovery > Theft Risk, where it is worked and resolved. Mirrors
+  // the Spot Check flag so the investigation trail is one shared place.
+  openInvestigation(productId, productName) {
+    if (!productId) return;
+    App.data.variance_investigations = App.data.variance_investigations || [];
+    const existing = App.data.variance_investigations.find(i => i.product_id === productId && i.status !== 'resolved');
+    if (!existing) {
+      const steps = (S.TheftRisk && S.TheftRisk.VARIANCE_STEPS)
+        ? S.TheftRisk.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })) : [];
+      App.putRecord('core', 'variance_investigation', {
+        id: App.uid(), product_id: productId, sku: productName || '',
+        opened_date: App.todayLocal(), created_at: new Date().toISOString(),
+        status: 'open', steps, resolution: ''
+      });
+    }
+    App.showApp('profit');
+    App.navigate('theft-risk');
+  },
+
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
@@ -582,6 +602,10 @@ S.InventoryVarianceReport = {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
     }));
+    this.container.querySelectorAll('.vr-flag').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      this.openInvestigation(b.dataset.pid, b.dataset.name);
+    }));
   },
 
   // ── History tab (variance trend across saved periods) ───────────────────────
@@ -613,8 +637,15 @@ S.InventoryVarianceReport = {
     return Math.abs(pct || 0) > (parseFloat(t.flag) || 0)
       ? { label: 'Flag', color: 'var(--red)' } : { label: 'OK', color: 'var(--green)' };
   },
-  badge(key, pct, unitVar) {
+  // A flagged row is an action: the status becomes a gold Flag button (cohesive
+  // with the Receive Delivery flag) that opens a variance investigation for that
+  // product in Profit Recovery. OK stays plain green text.
+  badge(key, pct, unitVar, pid, name) {
     const s = this.status(key, pct, unitVar);
+    if (s.label === 'Flag' && pid) {
+      return '<button type="button" class="vr-flag btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
+        + '" style="border-color:var(--gold);color:var(--gold);white-space:nowrap;">Flag</button>';
+    }
     return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
@@ -628,7 +659,21 @@ S.InventoryVarianceReport = {
       const u = usage[pid], pr = pos[pid], p = u.product;
       const viaMenu = pr.fromMenu && pr.sales === 0;
       const registerSales = pr.sales;
-      const theoSales = u.poursMade != null && p.menu_price ? u.poursMade * p.menu_price : null;
+      let theoSales = null, insufficient = false;
+      if (pr.mixedSizes) {
+        // Sold at more than one price/size, so "pours made x one menu price" is
+        // undefined. Instead value the ounces you USED at the blended price-per-
+        // ounce the POS actually sold at. Needs ounces sold + a sales amount;
+        // without those there isn't enough to compute it honestly.
+        const ouncesSold = pr.ouncesSold || 0;
+        if (u.ouncesUsed != null && ouncesSold > 0 && registerSales > 0) {
+          theoSales = u.ouncesUsed * (registerSales / ouncesSold);
+        } else {
+          insufficient = true;
+        }
+      } else {
+        theoSales = (u.poursMade != null && p.menu_price) ? u.poursMade * p.menu_price : null;
+      }
       const salesVar = theoSales != null ? theoSales - registerSales : null;
       const varPct = theoSales ? salesVar / theoSales * 100 : null;
       const actualCostPct = (registerSales && u.usageCost != null) ? u.usageCost / registerSales * 100 : null;
@@ -636,7 +681,7 @@ S.InventoryVarianceReport = {
       const byBottle = this.isByBottle(p);
       const bottlesSold = byBottle && p.container_size_oz ? (pr.ouncesSold || 0) / p.container_size_oz : (pr.qty || 0);
       const unitVar = (byBottle && u.poursMade != null) ? u.poursMade - bottlesSold : null;
-      return { name: u.name, category: p.category, key: this.stdKey(p), viaMenu, mixedSizes: pr.mixedSizes,
+      return { pid, name: u.name, category: p.category, key: this.stdKey(p), viaMenu, mixedSizes: pr.mixedSizes, insufficient,
         registerSales, theoSales, salesVar, varPct, actualCostPct, actualProfit, unitVar };
     }).filter(r => !r.viaMenu && (!this.catFilter || r.category === this.catFilter));
   },
@@ -650,17 +695,30 @@ S.InventoryVarianceReport = {
         + 'No direct-pour products matched your POS for this period. Beer, wine, and liquor sold by the glass or bottle show here. Cocktails and plates are in Usage Variance.</td></tr>');
     }
     const dash = '<span style="color:var(--t4);">-</span>';
-    const mixedNote = '<span style="color:var(--t4);font-size:11px;">mixed sizes</span>';
-    const body = rows.map(r => '<tr>'
-      + '<td><div class="val">' + esc(r.name) + '</div></td>'
-      + '<td>' + this.cur(r.registerSales) + '</td>'
-      + '<td>' + (r.mixedSizes ? mixedNote : this.cur(r.theoSales)) + '</td>'
-      + '<td>' + (r.mixedSizes ? dash : this.cur(r.salesVar)) + '</td>'
-      + '<td>' + (r.mixedSizes ? dash : this.pct(r.varPct)) + '</td>'
-      + '<td>' + this.pct(r.actualCostPct) + '</td>'
-      + '<td class="' + (r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.actualProfit) + '</td>'
-      + '<td>' + (r.mixedSizes ? dash : ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar) : '-')) + '</td>'
-      + '</tr>').join('');
+    const noData = '<span style="color:var(--t4);font-size:11px;" title="This product sells in more than one size. Map each size and include its quantity sold and sales amount so Bar Cop can compute the variance.">Not enough data to calculate</span>';
+    const blended = ' <span style="font-size:8px;color:var(--t3);font-weight:700;letter-spacing:1px;" title="Sold in multiple sizes: theoretical sales is the ounces you used valued at the blended price-per-ounce your POS sold at.">BLENDED</span>';
+    const profitCls = r => r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '';
+    const body = rows.map(r => {
+      if (r.insufficient) {
+        return '<tr>'
+          + '<td><div class="val">' + esc(r.name) + '</div></td>'
+          + '<td>' + this.cur(r.registerSales) + '</td>'
+          + '<td colspan="3">' + noData + '</td>'
+          + '<td>' + this.pct(r.actualCostPct) + '</td>'
+          + '<td class="' + profitCls(r) + '">' + this.cur(r.actualProfit) + '</td>'
+          + '<td>' + dash + '</td></tr>';
+      }
+      return '<tr>'
+        + '<td><div class="val">' + esc(r.name) + (r.mixedSizes ? blended : '') + '</div></td>'
+        + '<td>' + this.cur(r.registerSales) + '</td>'
+        + '<td>' + this.cur(r.theoSales) + '</td>'
+        + '<td>' + this.cur(r.salesVar) + '</td>'
+        + '<td>' + this.pct(r.varPct) + '</td>'
+        + '<td>' + this.pct(r.actualCostPct) + '</td>'
+        + '<td class="' + profitCls(r) + '">' + this.cur(r.actualProfit) + '</td>'
+        + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar, r.pid, r.name) : '-') + '</td>'
+        + '</tr>';
+    }).join('');
     return this.dataCard(headers, body);
   },
 
@@ -686,7 +744,7 @@ S.InventoryVarianceReport = {
       const u = usage[pid], pr = pos[pid], p = u.product || {};
       if (p.category !== cat) return;
       rows.push({
-        name: u.name, fromMenu: pr.fromMenu,
+        pid, name: u.name, fromMenu: pr.fromMenu,
         ouncesUsed: u.ouncesUsed, ouncesSold: pr.ouncesSold || 0,
         poursMade: u.poursMade, containersUsed: u.used,
         containerSizeOz: parseFloat(p.container_size_oz) || 0,
@@ -725,7 +783,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.ouncesSold) + '</td>' + '<td>' + this.n(r.ouncesUsed) + '</td>'
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (varPct != null ? this.badge(cat, varPct) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
   },
@@ -739,7 +797,7 @@ S.InventoryVarianceReport = {
         + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
         + '<td>' + this.n(bottlesSold, 0) + '</td>' + '<td>' + this.n(bottlesUsed, 0) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar) : '-') + '</td></tr>';
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', 'Status'], body);
   },
@@ -752,7 +810,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.ouncesSold) + '</td>' + '<td>' + this.n(r.ouncesUsed) + '</td>'
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed, 2) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', 'Status'], body);
   },
@@ -771,7 +829,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(bottlesSold, 0) + '</td>' + '<td>' + this.n(bottlesUsed, 0) + '</td>'
         + '<td>' + this.n(casesUsed) + '</td>' + '<td>' + this.n(caseVar) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar) : '-') + '</td></tr>';
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', 'Status'], body);
   },
@@ -785,7 +843,7 @@ S.InventoryVarianceReport = {
         + '<td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + this.n(recipeQt, 2) + '</td>' + '<td>' + this.n(countedQt, 2) + '</td>'
         + '<td>' + this.n(qtVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (varPct != null ? this.badge('Misc', varPct) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Mixer', 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', 'Status'], body);
   },
@@ -803,7 +861,7 @@ S.InventoryVarianceReport = {
         + '<td>' + esc(unit) + '</td>'
         + '<td>' + this.n(recipeUse, 2) + '</td>' + '<td>' + this.n(countedUse, 2) + '</td>'
         + '<td>' + this.n(useVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
-        + '<td>' + (varPct != null ? this.badge('Food', varPct) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
     return this.usageTbl(['Ingredient', 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
   },
