@@ -577,7 +577,7 @@ S.InventoryOrderSheet = {
     const parOff = this.parIssueCount(products || []);
     const parNudge = parOff > 0
       ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
-        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--gold);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> look off versus your real usage. Tuning them sharpens these reorder numbers.</span>'
+        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--gold);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> ' + (parOff === 1 ? 'looks' : 'look') + ' off versus your real usage. Tuning ' + (parOff === 1 ? 'it' : 'them') + ' sharpens these reorder numbers.</span>'
         + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
       : '';
     const title = isEdit
