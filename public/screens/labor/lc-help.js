@@ -13,6 +13,14 @@ S.LaborHelp = {
   tab: 0,
   query: '',
 
+  showHowTo() {
+    App.showHelpModal('Labor Help and FAQ', [
+      { p: ['This page is the full Help and FAQ for Labor Control: the roster and certifications, the coaching log, scheduling, hours and tips, pay periods and payroll, overtime, and how Labor feeds Revenue, Profit, Shift, and Accounting.'] },
+      { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "overtime" or "tip credit" lands you on the right answer fast.'] },
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Labor Control carries its own directions. Open the screen you have a question about, like Build Schedule or Log Hours, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+    ]);
+  },
+
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Labor Control do?',
