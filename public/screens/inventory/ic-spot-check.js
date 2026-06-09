@@ -268,7 +268,10 @@ S.InventorySpotCheck = {
     const resumeBar = resuming
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A spot check started ' + this.ago(this.draft.started_at) + ' is in progress. Add the post-shift counts and POS sold to finish it.</div>'
-        + '<button class="btn btn-ghost btn-sm" id="sp-discard">Discard</button></div>'
+        + '<div style="display:flex;gap:8px;">'
+          + '<button class="btn btn-ghost btn-sm" id="sp-resume">Resume Check</button>'
+          + '<button class="btn btn-ghost btn-sm" id="sp-discard">Start Over</button>'
+        + '</div></div>'
       : '';
 
     const targets = this.lastTargets(dft.location);
@@ -378,6 +381,7 @@ S.InventorySpotCheck = {
       const collHead = ev.target.closest('.card-collapse-head');
       if (collHead && !ev.target.closest('#sp-save')) { App.toggleCollapse(collHead); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
+      if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
       if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
