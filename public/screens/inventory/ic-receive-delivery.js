@@ -99,12 +99,12 @@ S.InventoryReceiveDelivery = {
       + '<td><div class="fw"><span class="pre">$</span><input class="form-input pre rd-price" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></div></td>'
       + '<td class="rd-ext val" style="white-space:nowrap;">$0.00</td>'
       + '<td><div class="row-actions">'
+        + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;"></span>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;border-color:var(--gold);color:var(--gold);white-space:nowrap;">Flag</button>'
         + '<span class="rd-flag-logged" style="display:none;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);white-space:nowrap;">Logged</span>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
       + '</div></td>'
-      + '</tr>'
-      + '<tr class="rd-flag-row" data-lid="' + lid + '" style="display:none;"><td colspan="5" class="rd-flag" style="font-size:11px;font-weight:700;color:var(--gold);padding:0 12px 10px;border-top:0;"></td></tr>';
+      + '</tr>';
   },
 
   renderForm() {
@@ -230,12 +230,10 @@ S.InventoryReceiveDelivery = {
     }
   },
 
-  // Remove a line: drop its data row AND its flag sub-row; keep at least one.
+  // Remove a line: drop its data row; keep at least one.
   removeLine(line) {
     if (!line) return;
-    const lid = line.dataset.lid;
     line.remove();
-    this.container.querySelector('.rd-flag-row[data-lid="' + lid + '"]')?.remove();
     const lines = document.getElementById('rd-lines');
     if (lines && this.container.querySelectorAll('.rd-line').length === 0) {
       lines.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq));
@@ -256,8 +254,7 @@ S.InventoryReceiveDelivery = {
     // cost-per-case.
     const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
 
-    const flagRow = this.container.querySelector('.rd-flag-row[data-lid="' + lid + '"]');
-    const flag    = flagRow ? flagRow.querySelector('.rd-flag') : null;
+    const flag    = line.querySelector('.rd-flag-msg');
     const flagBtn = line.querySelector('.rd-flag-btn');
     const messages = [];
     let hasPriceChange = false;
@@ -277,15 +274,14 @@ S.InventoryReceiveDelivery = {
     } else {
       line.dataset.shortCount = '';
     }
-    if (flagRow && flag) {
-      if (messages.length > 0) { flagRow.style.display = ''; flag.textContent = messages.join(' '); }
-      else { flagRow.style.display = 'none'; flag.textContent = ''; }
+    if (flag) {
+      if (messages.length > 0) { flag.style.display = ''; flag.textContent = messages.join(' '); }
+      else { flag.style.display = 'none'; flag.textContent = ''; }
     }
-    // Flagged lines tint gold across the data row AND the detail sub-row so they
-    // stand out down a long delivery.
+    // Flagged lines tint gold across the data row so they stand out down a
+    // long delivery.
     const flagged = messages.length > 0;
     line.classList.toggle('rd-flagged', flagged);
-    if (flagRow) flagRow.classList.toggle('rd-flagged', flagged);
 
     // Show the Flag button when a real diff is detected AND the line has not
     // already been flagged. The "Logged" badge takes over once filed.
