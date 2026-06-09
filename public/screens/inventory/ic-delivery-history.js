@@ -127,8 +127,8 @@ S.InventoryDeliveryHistory = {
       const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
-      if (view) { this.renderDetail(view.dataset.id); return; }
-      if (row)  { this.renderDetail(row.dataset.id); return; }
+      if (view) { const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
+      if (row)  { const id = row.dataset.id;  App.pushView(() => this.renderDetail(id)); return; }
     };
     document.getElementById('dh-filter')?.addEventListener('change', e => {
       this.vendorFilter = e.target.value || '';
