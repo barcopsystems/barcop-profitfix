@@ -254,8 +254,8 @@ S.LaborBuildSchedule = {
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
-        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ') '
-        + '<button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div><div class="calc-val lg">' + App.fmtCurrency(budget) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget)
+        + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div></div>';
@@ -325,15 +325,16 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-ghost btn-sm" id="bs-from-last">Start from last week</button></div>'
       : '';
 
-    const gridCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Weekly Grid</span>'
-      + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button></div>'
+    const gridCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
+      + '<div class="sh" style="margin:0;">Weekly Schedule Grid</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button>'
+      + '<button class="btn btn-ghost btn-sm" id="bs-worksheet">Worksheet</button></div></div>'
       + lastWeekNudge
-      + '<div class="tbl-wrap" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+      + '<div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
-      + '<tbody>' + body + footer + '</tbody></table></div>'
-      + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '')
-      + '</div>';
+      + '<tbody>' + body + footer + '</tbody></table></div></div>'
+      + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '');
 
     // Totals strip
     const totalsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -350,12 +351,13 @@ S.LaborBuildSchedule = {
       + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name</label>'
       + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional, name it to save as a template"/></div>'
       + '</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">'
+      + '<div class="f" style="margin-bottom:0;"><label>Notes</label><textarea id="bs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary btn-lg" id="bs-save">' + (this.editId ? 'Update Schedule' : 'Save Schedule') + '</button>'
       + (this.editId ? '<button class="btn btn-ghost" id="bs-cancel">Cancel Edit</button>' : '')
       + '<span id="bs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card"><div class="card-title">Week and Labor Budget</div>'
@@ -408,6 +410,7 @@ S.LaborBuildSchedule = {
     });
     document.getElementById('bs-cancel')?.addEventListener('click', () => { this.editId = null; App.navigate('lc-schedule-history'); });
     document.getElementById('bs-from-last')?.addEventListener('click', () => this.startFromLastWeek());
+    document.getElementById('bs-worksheet')?.addEventListener('click', () => this.printWorksheet());
 
     // Grid cell clicks: edit a block, or add to a cell.
     this.container.querySelectorAll('.bs-cell').forEach(cell => {
@@ -422,6 +425,18 @@ S.LaborBuildSchedule = {
     this.container.querySelectorAll('.bs-tmpl-load').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.loadTemplate(b.dataset.id); }));
     this.container.querySelectorAll('.bs-tmpl-del').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.confirmDelTemplate(b.dataset.id); }));
     this.container.querySelectorAll('.bs-tmpl-row').forEach(r => r.addEventListener('click', ev => { if (!ev.target.closest('.btn')) this.loadTemplate(r.dataset.id); }));
+  },
+
+  // Blank weekly grid to pencil in before entering — staff down the left, the
+  // seven days across, quarter-hour cells. Same paper-to-digital pattern as the
+  // Tip Log / 86 List worksheets (printBlankSheet auto-lands landscape for 8 cols).
+  printWorksheet() {
+    App.printBlankSheet({
+      title: 'Schedule Worksheet',
+      subtitle: 'Week of ____________________.   Write each person and their shift times in the day cells, then enter the week in Build Schedule.',
+      columns: [{ label: 'Staff', width: '20%' },
+        { label: 'Mon' }, { label: 'Tue' }, { label: 'Wed' }, { label: 'Thu' }, { label: 'Fri' }, { label: 'Sat' }, { label: 'Sun' }]
+    });
   },
 
   // Carry the most recent prior posted schedule's shifts onto the current
@@ -445,9 +460,9 @@ S.LaborBuildSchedule = {
     const sh = editing ? this.draft.shifts[idx] : { staff_id: staffId, day, start: '', end: '' };
     const sal = App.isSalaried(staff);
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Start</label><input type="time" id="bs-m-start" step="900" value="' + esc(sh.start || '') + '"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>End</label><input type="time" id="bs-m-end" step="900" value="' + esc(sh.end || '') + '"/></div>'
+      + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">'
+      + this._timeSelectFields('bs-m-start', sh.start, 'Start')
+      + this._timeSelectFields('bs-m-end', sh.end, 'End')
       + '</div>'
       + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
       + '<div class="card-actions">'
@@ -456,33 +471,65 @@ S.LaborBuildSchedule = {
       + '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (editing ? '<button class="btn btn-danger" id="bs-m-remove" style="margin-left:auto;">Remove</button>' : '')
       + '</div></div>';
-    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 420, noClose: true });
-    const startEl = document.getElementById('bs-m-start');
-    const endEl = document.getElementById('bs-m-end');
+    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 460, noClose: true });
     const calcEl = document.getElementById('bs-m-calc');
     const errEl = document.getElementById('bs-m-err');
     const updateCalc = () => {
-      const h = this.hoursOf(startEl.value, endEl.value);
-      if (!startEl.value || !endEl.value) { calcEl.textContent = ''; return; }
+      const start = this._readTime('bs-m-start'), end = this._readTime('bs-m-end');
+      if (!start || !end) { calcEl.textContent = ''; return; }
+      const h = this.hoursOf(start, end);
       if (sal) { calcEl.textContent = h.toFixed(1) + ' hrs · salaried (no hourly cost)'; return; }
       const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, this.draft.week_start) : (staff.wage || 0);
       calcEl.textContent = h.toFixed(1) + ' hrs · ' + App.fmtCurrency(h * wage) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '');
     };
     updateCalc();
-    startEl.addEventListener('input', updateCalc);
-    endEl.addEventListener('input', updateCalc);
+    document.querySelectorAll('#bs-shift-modal select').forEach(el => el.addEventListener('change', updateCalc));
     document.getElementById('bs-m-cancel')?.addEventListener('click', () => App.closeModal('bs-shift-modal'));
     document.getElementById('bs-m-remove')?.addEventListener('click', () => {
       if (editing) { this.draft.shifts.splice(idx, 1); this.saveDraft(); }
       App.closeModal('bs-shift-modal'); this.draw();
     });
     document.getElementById('bs-m-save')?.addEventListener('click', () => {
-      const start = startEl.value, end = endEl.value;
+      const start = this._readTime('bs-m-start'), end = this._readTime('bs-m-end');
       if (!start || !end) { errEl.textContent = 'Set a start and end time.'; errEl.style.display = 'inline'; return; }
       if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end }; }
       else { this.draft.shifts.push({ staff_id: staffId, day, start, end }); }
       this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
     });
+  },
+
+  // Hour / Minute(00,15,30,45) / AM-PM selects for a shift time. The native
+  // <input type=time> step does not reliably limit the minute list across
+  // browsers (some show every minute), so we build explicit selects — the only
+  // minute choices are quarter-hours. Stores/reads "HH:MM" 24h so the grid math
+  // (hoursOf, conflicts, cost) is unchanged.
+  _timeSelectFields(idp, val, label) {
+    let h12 = '', mm = '', ap = 'AM';
+    if (val && /^\d{1,2}:\d{2}/.test(val)) {
+      const [H, M] = val.split(':').map(Number);
+      ap = H >= 12 ? 'PM' : 'AM';
+      let hh = H % 12; if (hh === 0) hh = 12;
+      h12 = String(hh); mm = String(M).padStart(2, '0');
+    }
+    const hourOpts = '<option value="">--</option>'
+      + Array.from({ length: 12 }, (_, i) => { const hh = i + 1; return '<option value="' + hh + '"' + (String(hh) === h12 ? ' selected' : '') + '>' + hh + '</option>'; }).join('');
+    const minOpts = ['00', '15', '30', '45'].map(m => '<option value="' + m + '"' + (m === mm ? ' selected' : '') + '>' + m + '</option>').join('');
+    const apOpts = ['AM', 'PM'].map(a => '<option' + (a === ap ? ' selected' : '') + '>' + a + '</option>').join('');
+    return '<div class="f" style="flex-shrink:0;"><label>' + label + '</label>'
+      + '<div style="display:flex;gap:6px;align-items:center;">'
+      + '<select id="' + idp + '-h" style="width:62px;">' + hourOpts + '</select>'
+      + '<span style="color:var(--t3);">:</span>'
+      + '<select id="' + idp + '-m" style="width:62px;">' + minOpts + '</select>'
+      + '<select id="' + idp + '-ap" style="width:62px;">' + apOpts + '</select>'
+      + '</div></div>';
+  },
+  _readTime(idp) {
+    const h = document.getElementById(idp + '-h')?.value;
+    const m = document.getElementById(idp + '-m')?.value || '00';
+    const ap = document.getElementById(idp + '-ap')?.value || 'AM';
+    if (!h) return '';
+    let H = parseInt(h, 10) % 12; if (ap === 'PM') H += 12;
+    return String(H).padStart(2, '0') + ':' + m;
   },
 
   // ── Labor Cost Target modal (writes the ONE settings.targets.labor_cost_pct) ──
@@ -492,7 +539,7 @@ S.LaborBuildSchedule = {
   openLaborTargetModal() {
     const cur = App.laborTargetPct();
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Labor Cost Target</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">The share of sales you aim to spend on labor. Bar Cop uses this one number across the schedule budget and both Profit and Revenue Recovery, so changing it here updates it everywhere.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Your target labor cost as a share of sales. Used across Bar Cop.</div>'
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:170px;"><label>Labor Cost Target</label>'
       + '<div class="fw"><input class="suf" type="number" id="bs-lt-val" min="0" step="0.1" value="' + esc(String(cur)) + '"/><span class="suf">%</span></div></div></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Adjust all your targets in <span id="bs-lt-settings" style="color:var(--gold);cursor:pointer;text-decoration:underline;">App Settings</span>.</div>'
