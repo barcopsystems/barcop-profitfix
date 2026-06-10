@@ -244,7 +244,7 @@ S.LaborBuildSchedule = {
     // jumps the page or strands the prompt under the date picker.
     let budgetCard;
     if (!d.week_start) {
-      budgetCard = '<div class="card"><div style="font-size:13px;color:var(--t3);">Pick the week starting date above to set a forecast and labor budget.</div></div>';
+      budgetCard = '<div class="card"><div style="font-size:13px;color:var(--t3);">Pick the week starting date below to set a forecast and labor budget.</div></div>';
     } else if (fc <= 0) {
       budgetCard = '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div style="font-size:13px;color:var(--t2);">No revenue forecast set for this week.</div>'
@@ -360,6 +360,7 @@ S.LaborBuildSchedule = {
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
+      + budgetCard
       + '<div class="card form-card"><div class="card-title">Week and Labor Budget</div>'
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
@@ -368,7 +369,6 @@ S.LaborBuildSchedule = {
       + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week">&lsaquo;</button>'
       + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week">&rsaquo;</button></div></div>'
       + '</div></div>'
-      + budgetCard
       + gridCard + totalsCard + actionsCard
       + this.templatesSection()
       + '</div>';
