@@ -5,7 +5,7 @@ S.RevenueReports = {
     const t        = App.data.revenue_settings?.targets || {};
     const settings = App.data.settings || {};
     const targetCA = t.check_avg || 35;
-    const tgtLP    = ((t.bar_labor_pct||28)+(t.kitchen_labor_pct||30)+(t.floor_labor_pct||32))/3;
+    const tgtLP    = App.laborTargetPct();
 
     if (!weeks.length) {
       container.innerHTML = '<div class="screen"><div class="card"><div class="empty"><div class="empty-title">No Data Yet</div><div class="empty-sub">Enter at least one week in This Week to see reports.</div></div></div></div>';
