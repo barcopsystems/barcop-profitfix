@@ -12,10 +12,10 @@
 S.LaborTipLog = {
   editId: null,
   entryMode: 'manual',     // 'manual' = type a row, 'import' = drop a POS tips file
-  filterFrom: '',
-  filterTo: '',
-  filterShift: '',
-  filterStaff: '',
+  filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
+  filterTo: '',            // custom range only
 
   tips() {
     if (!App.laborData) App.laborData = {};
@@ -184,17 +184,23 @@ S.LaborTipLog = {
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
-    const modeBody = this.entryMode === 'import'
-      ? '<div id="tl-imp-csv"></div><div id="tl-imp-result"></div>'
-      : this.formBody(null)
-        + '<div class="card-actions">'
+    // Primary action lives BELOW the card (bottom-left), collapse-group tagged so
+    // it hides with the card. Import mode's Import/Cancel render into the same
+    // out-of-card slot via the CSVMapper actionsEl. Mirrors Log Hours.
+    let modeBody, actionRow;
+    if (this.entryMode === 'import') {
+      modeBody = '<div id="tl-imp-csv"></div><div id="tl-imp-result"></div>';
+      actionRow = '<div id="tl-imp-actions" data-collapse-group="lc-tip-log" style="margin-bottom:24px;"></div>';
+    } else {
+      modeBody = this.formBody(null);
+      actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tl-save">Save Tips</button>'
-        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '</div>';
+        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
+    }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Log Tips')
       + '<div class="collapse-body">'
-      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>';
 
@@ -217,7 +223,7 @@ S.LaborTipLog = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x =>
           '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
@@ -234,20 +240,15 @@ S.LaborTipLog = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('lc', 'tip', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterStaff));
+          + App.showOlderBar('lc', 'tip', filtered, this.filterPreset !== 'all');
       }
 
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button></div>';
-
-      below = statsCard + filterHeading + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      if (ev.target.closest('.tl-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.tl-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -255,11 +256,16 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save')) { this.save('tl-'); return; }
-      if (ev.target.closest('#tl-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
-      const tlPreset = ev.target.closest('.tl-preset');
-      if (tlPreset) { const r = App.datePresetRange(tlPreset.dataset.preset); this.filterFrom = r.from; this.filterTo = r.to; this.renderList(); return; }
-      const tlSc = ev.target.closest('.tl-shift-chip');
-      if (tlSc) { this.filterShift = tlSc.dataset.v; this.renderList(); return; }
+      const tlRange = ev.target.closest('.tl-range-chip');
+      if (tlRange) {
+        const v = tlRange.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.tl-row');
       const edit = ev.target.closest('.tl-edit');
@@ -276,14 +282,15 @@ S.LaborTipLog = {
     }
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('tl-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
   },
 
   mountTipImporter() {
     const el = document.getElementById('tl-imp-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
-      hint: 'Drop a POS tips export: <span class="tl-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      dropTitle: 'Drop your POS tips export here',
+      dropSub: 'Needs columns for staff name, date, and card or cash tips.',
+      actionsEl: '#tl-imp-actions',
       fields: [
         { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'server', 'server name'] },
         { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date'] },
@@ -346,38 +353,43 @@ S.LaborTipLog = {
           + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or no tip amount).</span>' : '') + '</div>';
   },
 
-  // Controls-only filter card. Export PDF + Worksheet live on the heading row.
-  filterCard() {
-    // Only staff who actually have tip entries (plus the current selection), so
-    // the dropdown stays relevant — non-tipped staff who never got tips never
-    // clutter it, and a tip-out to a support role still shows up.
-    const withTips = new Set(this.tips().map(t => t.staff_id).filter(Boolean));
-    const staffOpts = '<option value="">All staff</option>'
-      + this.staff().filter(s => withTips.has(s.id) || s.id === this.filterStaff)
-          .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-    const shiftChips = App.filterChips(this.filterShift,
-      [{ v: '', label: 'All Shifts' }].concat((App.SHIFT_TYPES || []).map(s => ({ v: s, label: s }))), 'tl-shift-chip');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tl-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="tl-f-staff">' + staffOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tl-f-clear">Clear</button></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + shiftChips + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">' + App.datePresetButtons('tl-preset') + '</div></div>';
+  // Effective date window from the active range chip (recomputed off "today" each
+  // render so This Week stays live); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
   },
-
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(t => {
       const date = t.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterShift && (t.shift_type || '') !== this.filterShift) return false;
-      if (this.filterStaff && (t.staff_id || '') !== this.filterStaff) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
+  },
+
+  // Sort/filter row above the data block: range chips left, Export + Worksheet
+  // right (no filter card). Custom reveals a bare From/To row. Same as Log Hours.
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'tl-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="tl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="tl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   // ── Edit in a focused pop-up (same form, own tle- ids) ──────────────────────
