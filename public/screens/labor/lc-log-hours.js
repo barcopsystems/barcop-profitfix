@@ -13,6 +13,8 @@ S.LaborLogHours = {
   entryMode: 'manual',     // 'manual' = type a row, 'schedule' = pull the posted week, 'import' = drop a timeclock file
   _modeOnce: null,         // one-shot mode override from a deep-link, consumed on the next render
   _fillWeek: '',           // Monday of the week being pulled from the schedule
+  _fillModel: null,        // in-memory Fill-from-Schedule rows (survive day-tab switches)
+  _fillTab: null,          // active day tab (Mon-first index) in Fill from Schedule
   filterFrom: '',
   filterTo: '',
   filterShift: '',
@@ -87,6 +89,7 @@ S.LaborLogHours = {
     if (isNaN(d.getTime())) return;
     d.setDate(d.getDate() + n);
     this._fillWeek = this.mondayOf(App.ymdLocal(d));
+    this._fillTab = null;
     this.renderList();
   },
 
@@ -98,6 +101,8 @@ S.LaborLogHours = {
     // hides the form + recent list. A deep-link sets _modeOnce for this one visit.
     this.entryMode = this._modeOnce || 'manual';
     this._modeOnce = null;
+    this._fillModel = null;   // fresh fill state on each visit (persists during the visit)
+    this._fillTab = null;
     this.renderList();
   },
 
@@ -308,9 +313,10 @@ S.LaborLogHours = {
     };
     if (this.entryMode === 'import') this.mountImporter();
     else if (this.entryMode === 'schedule') {
-      document.getElementById('lo-fill-week')?.addEventListener('change', e => { this._fillWeek = this.mondayOf(e.target.value) || ''; this.renderList(); });
+      document.getElementById('lo-fill-week')?.addEventListener('change', e => { this._fillWeek = this.mondayOf(e.target.value) || ''; this._fillTab = null; this.renderList(); });
       document.getElementById('lo-fill-prev')?.addEventListener('click', () => this.shiftFillWeek(-7));
       document.getElementById('lo-fill-next')?.addEventListener('click', () => this.shiftFillWeek(7));
+      this.container.querySelectorAll('.lo-fill-tab').forEach(b => b.addEventListener('click', () => { this.captureFill(); this._fillTab = parseInt(b.dataset.day, 10); this.renderList(); }));
       const tbl = document.getElementById('lo-fill-body');
       if (tbl) tbl.addEventListener('change', () => this.updateFillCount());
       if (tbl) tbl.addEventListener('input', () => this.updateFillCount());
@@ -444,10 +450,56 @@ S.LaborLogHours = {
   },
 
   // ── Fill from Schedule ───────────────────────────────────────────────────────
-  // Seed editable actuals rows from the posted schedule for a week. The operator
-  // edits the few that ran different and unchecks no-shows, then logs — instead of
-  // re-typing the whole week. Pre-filled hours are scheduled-as-actual until the
-  // operator confirms by logging; already-logged days are skipped (no double-count).
+  // Seed editable actuals rows from the posted schedule for a week, on per-day TABS
+  // so a long week never blurs into one list. The operator edits the few that ran
+  // different and unchecks no-shows on each day's tab, then logs the whole week at
+  // once. Edits + checkboxes live in an in-memory model (this._fillModel) so they
+  // survive tab switches (only the active day's rows are in the DOM). Pre-filled
+  // hours are scheduled-as-actual until confirmed; already-logged days are skipped.
+  ensureFillModel(ws) {
+    if (!this._fillModel || this._fillModel.ws !== ws) this.buildFillModel(ws);
+  },
+  buildFillModel(ws) {
+    const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const sched = this.scheduleForWeek(ws);
+    const rows = [];
+    if (sched) {
+      (sched.shifts || []).forEach(sh => {
+        const di = DAYS.indexOf(sh.day);
+        if (di < 0) return;
+        const date = this.weekDayYmd(ws, di);
+        if (!date) return;
+        const staff = this.staffById(sh.staff_id);
+        const already = this.actualExists(sh.staff_id, date);
+        rows.push({
+          staff_id: sh.staff_id, name: sh.name || (staff ? staff.name : '-'),
+          date, dayIdx: di, start: sh.start || '', end: sh.end || '',
+          hours: (sh.hours != null ? String(sh.hours) : ''),
+          checked: !already, already
+        });
+      });
+    }
+    rows.sort((a, b) => (a.dayIdx - b.dayIdx) || (a.name || '').localeCompare(b.name || ''));
+    rows.forEach((r, idx) => { r.i = idx; });
+    this._fillModel = { ws, rows };
+  },
+  // Read the visible day's checkbox + hours back into the model so edits survive a
+  // tab switch or commit (only the active day is in the DOM at any time).
+  captureFill() {
+    if (!this._fillModel) return;
+    document.querySelectorAll('#lo-fill-body .lo-fill-row').forEach(tr => {
+      const r = this._fillModel.rows[parseInt(tr.dataset.mi, 10)];
+      if (!r || r.already) return;
+      const cb = tr.querySelector('.lo-fill-cb');
+      const h = tr.querySelector('.lo-fill-hours');
+      if (cb) r.checked = cb.checked;
+      if (h) r.hours = h.value;
+    });
+  },
+  fillToLog() {
+    return (this._fillModel ? this._fillModel.rows : []).filter(r => !r.already && r.checked && parseFloat(r.hours) > 0);
+  },
+
   scheduleFillBody() {
     const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const ws = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
@@ -460,84 +512,72 @@ S.LaborLogHours = {
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:9px;">Week of ' + this.fmtDate(ws) + '</div></div>'
       + '</div>';
-    const sched = this.scheduleForWeek(ws);
-    if (!sched || !(sched.shifts || []).length) {
+    this.ensureFillModel(ws);
+    const model = this._fillModel;
+    if (!model.rows.length) {
       return picker + '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">No posted schedule for this week. '
         + '<span class="lo-go-build" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Build the schedule</span> first, or pick another week.</div>';
     }
-    const rows = (sched.shifts || []).map(sh => {
-      const di = DAYS.indexOf(sh.day);
-      const date = this.weekDayYmd(ws, di);
-      const staff = this.staffById(sh.staff_id);
-      return { sh, date, already: this.actualExists(sh.staff_id, date), name: sh.name || (staff ? staff.name : '-') };
-    }).filter(r => r.date)
-      .sort((a, b) => (a.date.localeCompare(b.date)) || (a.name || '').localeCompare(b.name || ''));
-    // Group the rows into day blocks (a gold day-header row spanning the table,
-    // then that day's staff rows). The repeating per-row date is dropped — the
-    // header carries it — so a long week reads as scannable Mon/Tue/Wed blocks
-    // instead of one undifferentiated list.
-    let trs = '';
-    let curDate = null;
-    rows.forEach(r => {
-      if (r.date !== curDate) {
-        curDate = r.date;
-        const n = rows.filter(x => x.date === curDate && !x.already).length;
-        trs += '<tr class="lo-fill-dayhdr"><td colspan="5" style="padding:11px 8px 5px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);background:var(--input);">'
-          + esc(this.fmtDayHeader(curDate))
-          + (n ? ' <span style="color:var(--t3);font-weight:400;letter-spacing:1px;">&middot; ' + n + ' to log</span>' : '')
-          + '</td></tr>';
-      }
-      const time = (r.sh.start && r.sh.end)
-        ? '<span style="color:var(--t3);font-size:11px;">' + esc(this.fmtTime(r.sh.start)) + '&ndash;' + esc(this.fmtTime(r.sh.end)) + '</span>'
+    // One tab per day that has shifts; the badge is that day's not-yet-logged count.
+    const presentDays = [...new Set(model.rows.map(r => r.dayIdx))].sort((a, b) => a - b);
+    if (this._fillTab == null || presentDays.indexOf(this._fillTab) < 0) this._fillTab = presentDays[0];
+    const tabs = '<div class="ch-tabs no-print">' + presentDays.map(di => {
+      const unlogged = model.rows.filter(r => r.dayIdx === di && !r.already).length;
+      return '<button class="ch-tab lo-fill-tab' + (di === this._fillTab ? ' on' : '') + '" data-day="' + di + '">'
+        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;">' + unlogged + '</span>' : '')
+        + '</button>';
+    }).join('') + '</div>';
+
+    const trs = model.rows.filter(r => r.dayIdx === this._fillTab).map(r => {
+      const time = (r.start && r.end)
+        ? '<span style="color:var(--t3);font-size:11px;">' + esc(this.fmtTime(r.start)) + '&ndash;' + esc(this.fmtTime(r.end)) + '</span>'
         : '';
-      trs += '<tr class="lo-fill-row" data-staff="' + esc(r.sh.staff_id) + '" data-date="' + esc(r.date) + '">'
-        + '<td style="width:36px;text-align:center;"><input type="checkbox" class="lo-fill-cb"' + (r.already ? ' disabled' : ' checked') + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
+      return '<tr class="lo-fill-row" data-mi="' + r.i + '">'
+        + '<td style="width:36px;text-align:center;"><input type="checkbox" class="lo-fill-cb"' + (r.already ? ' disabled' : (r.checked ? ' checked' : '')) + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
         + '<td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + time + '</td>'
-        + '<td><input type="number" class="lo-fill-hours form-input" min="0" step="0.25" value="' + (r.sh.hours != null ? r.sh.hours : '') + '"' + (r.already ? ' disabled' : '') + ' style="width:80px;"/></td>'
+        + '<td><input type="number" class="lo-fill-hours form-input" min="0" step="0.25" value="' + esc(r.hours) + '"' + (r.already ? ' disabled' : '') + ' style="width:80px;"/></td>'
         + '<td>' + (r.already ? '<span style="color:var(--t3);font-size:11px;">Already logged</span>' : '') + '</td>'
         + '</tr>';
-    });
-    const toLog = rows.filter(r => !r.already).length;
+    }).join('');
+    const dayLabel = this.fmtDayHeader(this.weekDayYmd(ws, this._fillTab));
+    const total = this.fillToLog().length;
+
     return picker
+      + tabs
+      + '<div style="font-size:11px;color:var(--t3);margin:2px 0 10px;">' + esc(dayLabel) + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:36px;"></th><th>Staff</th><th style="width:150px;">Shift</th><th style="width:90px;">Hours</th><th style="width:120px;"></th>'
       + '</tr></thead><tbody id="lo-fill-body">' + trs + '</tbody></table></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Hours are pre-filled from the posted schedule. Edit any that ran different, uncheck no-shows, then log. Days already logged are skipped.</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Hours are pre-filled from the posted schedule. Edit any that ran different, uncheck no-shows, then log. Cycle the day tabs to review the week; logging covers every checked day at once, not just this tab.</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lo-fill-save"' + (toLog ? '' : ' disabled') + '>Log ' + toLog + ' Entr' + (toLog === 1 ? 'y' : 'ies') + '</button>'
+      + '<button class="btn btn-primary" id="lo-fill-save"' + (total ? '' : ' disabled') + '>Log ' + total + ' Entr' + (total === 1 ? 'y' : 'ies') + '</button>'
       + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
   },
 
   updateFillCount() {
-    let n = 0;
-    document.querySelectorAll('.lo-fill-row').forEach(tr => {
-      const cb = tr.querySelector('.lo-fill-cb');
-      const h = parseFloat(tr.querySelector('.lo-fill-hours')?.value);
-      if (cb && !cb.disabled && cb.checked && !isNaN(h) && h > 0) n++;
-    });
+    this.captureFill();
+    const n = this.fillToLog().length;
     const btn = document.getElementById('lo-fill-save');
     if (btn) { btn.disabled = n === 0; btn.textContent = 'Log ' + n + ' Entr' + (n === 1 ? 'y' : 'ies'); }
   },
 
   async commitFill() {
+    this.captureFill();
     const err = document.getElementById('lo-fill-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const recs = [];
-    document.querySelectorAll('.lo-fill-row').forEach(tr => {
-      const cb = tr.querySelector('.lo-fill-cb');
-      if (!cb || cb.disabled || !cb.checked) return;
-      const staffId = tr.dataset.staff, date = tr.dataset.date;
-      const hours = parseFloat(tr.querySelector('.lo-fill-hours')?.value);
-      if (!staffId || !date || isNaN(hours) || hours <= 0) return;
-      if (this.actualExists(staffId, date)) return;
-      const staff = this.staffById(staffId);
+    this.fillToLog().forEach(r => {
+      if (this.actualExists(r.staff_id, r.date)) return;
+      const staff = this.staffById(r.staff_id);
       if (!staff) return;
+      const hours = parseFloat(r.hours);
+      if (isNaN(hours) || hours <= 0) return;
       const sal = App.isSalaried(staff);
-      const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staffId, date) : (staff.wage || 0));
+      const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(r.staff_id, r.date) : (staff.wage || 0));
       recs.push({
-        id: App.uid(), date, staff_id: staffId, name: staff.name,
+        id: App.uid(), date: r.date, staff_id: r.staff_id, name: staff.name,
         position_id: staff.position_id || '', shift_type: '',
         hours, wage, cost: sal ? 0 : hours * (wage || 0),
         notes: '', from_schedule: true, created_at: new Date().toISOString()
@@ -550,7 +590,8 @@ S.LaborLogHours = {
     for (const rec of recs) { this.actuals().push(rec); ok = (await App.putRecord('lc', 'actual', rec)) && ok; }
     if (ok) {
       App.markSetupDone('gs_lc_hours');
-      this.renderList();   // stays in schedule mode; logged rows flip to "Already logged" and the list below fills in
+      this._fillModel = null;   // rebuild so the just-logged rows flip to "Already logged"
+      this.renderList();
     } else {
       if (btn) { btn.disabled = false; this.updateFillCount(); }
       fail('Save failed. Try again.');
