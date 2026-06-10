@@ -1648,12 +1648,24 @@ S.ShiftActiveShift = {
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="ac-handoff" data-shift-id="' + esc(s.id) + '">Save Handoff PDF</button>'
+      + '<button class="btn btn-ghost" id="ac-hours">Log Staff Hours</button>'
       + '<button class="btn btn-ghost" id="ac-start">Start Another Shift</button>'
       + '<button class="btn btn-ghost" id="ac-history">View Shift History</button>'
-      + '</div></div></div>';
+      + '</div>'
+      + '<div style="text-align:center;font-size:11px;color:var(--t3);margin-top:10px;">Log Staff Hours opens Log Hours pre-filled from this week\'s schedule, so you confirm hours instead of re-typing them.</div>'
+      + '</div></div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#ac-start')) this.renderStart();
       else if (ev.target.closest('#ac-history')) App.navigate('sc-shift-history');
+      else if (ev.target.closest('#ac-hours')) {
+        // Carry this shift's week into Log Hours' Fill-from-Schedule path so the
+        // operator confirms scheduled hours instead of hand-logging the whole day.
+        if (S.LaborLogHours) {
+          S.LaborLogHours.entryMode = 'schedule';
+          S.LaborLogHours._fillWeek = S.LaborLogHours.mondayOf ? S.LaborLogHours.mondayOf(s.date) : '';
+        }
+        App.openScreen('lc-log-hours');
+      }
       else if (ev.target.closest('#ac-handoff')) {
         if (S.ShiftHandoff && S.ShiftHandoff.openForShift) S.ShiftHandoff.openForShift(s.id);
         else App.navigate('sc-shift-history');
