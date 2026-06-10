@@ -14,12 +14,12 @@
 S.InventoryDashboard = {
   showHowTo() {
     App.showHelpModal('How the Inventory Dashboard Works', [
-      { p: ['This is the Inventory landing screen, built to answer four questions at a glance: how much cash is sitting on your shelves, what you need to reorder, what is moving, and where you are leaking. Every number is figured from your real counts, deliveries, and logs. There are no made-up scores here, that is what the Bar Cop Audit is for. Until your first count lands, the screen shows a Get Started strip with the three steps to fill it in.'] },
+      { p: ['This is the Inventory landing screen, built to answer four questions at a glance: how much cash is sitting on your shelves, what you need to reorder, what is moving, and where you are leaking. Every number is figured from your real counts, deliveries, and logs. There are no made-up scores here, that is what the Bar Cop Audit is for. Until your first count lands, the screen shows a Get Started strip with the four steps to fill it in.'] },
       { h: 'The Four Tiles Up Top', p: ['Inventory Value is the dollars on hand from your latest count, with a rough read on how many weeks of usage that covers. To Reorder is the cost to bring everything back to par, with the item and vendor count behind it. Used This Period is the cost of what you went through between your last two counts. Count Freshness is how many days since you last counted, and it turns amber once a count is more than ten days old, because a stale count makes every number below it soft.'] },
-      { h: 'Reorder Plan', p: ['The wide band under the tiles is your order, grouped by vendor and totaled. It uses the same below-par math as the Order Sheet, so if House Cabernet drops under par it shows up under its vendor with the cost to refill. Hit Create Order on a vendor, or Open Order Sheet to work the whole thing. If a handful of pars look off versus your real usage, a nudge points you to Dynamic Pars, because the reorder number is only as good as the pars behind it.'] },
+      { h: 'Reorder Plan', p: ['The wide band under the tiles is your order, grouped by vendor and totaled. It uses the same below-par math as the Order Sheet, so if House Cabernet drops under par it shows up under its vendor with the cost to refill. Hit Create Order on a vendor, or jump to the Order Sheet to work the whole thing. If a handful of pars look off versus your real usage, a nudge points you to Dynamic Pars, because the reorder number is only as good as the pars behind it.'] },
       { h: 'Where Your Cash Sits And Movement', p: ['Where Your Cash Sits breaks your counted value down by category, so you can see if you are carrying too deep on Liquor versus Bottle Beer. Movement reads the last period three ways: Fast Movers (the workhorses to keep stocked deep), Slow Movers (crawling), and Dead Stock (counted, paid for, and did not move at all). A bottle of an odd amaro sitting at 40 dollars tied up with zero usage is exactly what Dead Stock is there to surface.'] },
       { h: 'Since Last Count And Leaks', p: ['Since Last Count is an honest better-or-worse readout on real signals: percent in stock versus reorder, how close your pars track usage, shrinkage written off, days between counts, and dead stock, each showing the prior value next to the current one so you can read the direction. Leaks and Watch surfaces the three things worth chasing in the last 30 days: shrinkage written off in the Adjustment Log, spot-check flags, and any item 86d twice or more. Tap any line to jump straight to it. A clean 30 days says so in plain words.'] },
-      { h: 'Quick Actions And Day One', p: ['The buttons at the bottom jump you to the jobs you run most: Start Count, Receive Delivery, Order Sheet, and Spot Check. Before your first count, the dashboard shows this same layout in placeholder form with a Get Started strip: add products, set locations, then take your first count. The moment that count lands, every panel fills with real numbers.'] }
+      { h: 'Quick Actions And Day One', p: ['The buttons at the bottom jump you to the jobs you run most: Start Count, Receive Delivery, Order Sheet, and Spot Check. Before your first count, the dashboard shows this same layout in placeholder form with a Get Started strip: list vendors, add products, set locations, then take your first count. The moment that count lands, every panel fills with real numbers.'] }
     ]);
   },
 
@@ -188,19 +188,21 @@ S.InventoryDashboard = {
   renderDayOne() {
     const hasProducts  = this.products().length > 0;
     const hasLocations = ((App.inventoryData && App.inventoryData.ic_locations) || []).length > 0;
+    const hasVendors   = ((App.inventoryData && App.inventoryData.ic_vendors) || []).length > 0;
     const step = (done, label, screen, current) =>
-      '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:170px;padding:10px 12px;border:1px solid ' + (current ? 'var(--gold)' : 'var(--b2)') + ';border-radius:6px;background:var(--input);">'
+      '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:170px;padding:10px 12px;border:1px solid var(--gold-tint-bord);border-radius:6px;background:var(--gold-tint);">'
       + '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
       + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : '') + '</span>'
       + '<span style="font-size:12px;font-weight:600;color:' + (current ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</span></div>';
 
     const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps and this dashboard fills in with what to reorder, where your cash is tied up, and where you are leaking.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this dashboard fills in with what to reorder, where your cash is tied up, and where you are leaking.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasProducts, '1. Add products', 'ic-product-setup', !hasProducts)
-      + step(hasLocations, '2. Set locations', 'ic-locations', hasProducts && !hasLocations)
-      + step(false, '3. Take your first count', 'ic-take-inventory', hasProducts && hasLocations)
+      + step(hasVendors, '1. List vendors', 'ic-vendors', !hasVendors)
+      + step(hasProducts, '2. Add products', 'ic-product-setup', hasVendors && !hasProducts)
+      + step(hasLocations, '3. Set locations', 'ic-locations', hasVendors && hasProducts && !hasLocations)
+      + step(false, '4. Take first count', 'ic-take-inventory', hasVendors && hasProducts && hasLocations)
       + '</div></div>';
 
     const cards =
@@ -336,8 +338,7 @@ S.InventoryDashboard = {
         + '<button class="btn btn-ghost btn-sm ic-d-go" data-go="ic-order-sheet" style="margin:0;">Create Order</button></div>').join('');
       reorderHero = this.panelCard('Reorder Plan',
         '<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Bring everything to par: <strong style="color:var(--gold);font-size:15px;">' + App.fmtCurrency(reorderTotal) + '</strong></div>'
-        + vRows + (parOff ? this.parNudge(parOff) : ''),
-        '<button class="btn btn-primary btn-sm ic-d-go" data-go="ic-order-sheet" style="margin:0;">Open Order Sheet</button>');
+        + vRows + (parOff ? this.parNudge(parOff) : ''));
     }
 
     // ── Where Your Cash Sits (the one bar chart on the page) ──
