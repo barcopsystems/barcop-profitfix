@@ -32,6 +32,59 @@ S.LaborCalloutLog = {
       c.staff_id === staffId && new Date((c.date || '') + 'T00:00:00') >= cutoff).length;
   },
 
+  // ── Schedule connection ──────────────────────────────────────────────────────
+  schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
+  get DAYS() { return App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; },
+  mondayOf(ymd) {
+    if (!ymd) return '';
+    const d = new Date(ymd + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return App.ymdLocal(d);
+  },
+  // What a staff member was scheduled for on a date, from the posted schedule:
+  // { shift, dayName } if found, { none:true } if scheduled-but-not-that-day,
+  // { noSchedule:true } if no schedule is posted for that week, or null.
+  scheduledShiftFor(staffId, date) {
+    if (!staffId || !date) return null;
+    const ws = this.mondayOf(date);
+    const sched = this.schedules().filter(s => s.week_start === ws)
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+    if (!sched) return { noSchedule: true };
+    const d = new Date(date + 'T00:00:00');
+    if (isNaN(d.getTime())) return { noSchedule: true };
+    const dayName = this.DAYS[(d.getDay() + 6) % 7];
+    const sh = (sched.shifts || []).find(x => x.staff_id === staffId && x.day === dayName);
+    return sh ? { shift: sh, dayName } : { none: true };
+  },
+  updateSchedNote(p) {
+    p = p || 'co-';
+    const el = document.getElementById(p + 'sched-note');
+    if (!el) return;
+    const staffId = document.getElementById(p + 'staff')?.value || '';
+    const date = document.getElementById(p + 'date')?.value || '';
+    if (!staffId || !date) { el.innerHTML = ''; return; }
+    const info = this.scheduledShiftFor(staffId, date);
+    let html = '';
+    if (info && info.shift) {
+      const sh = info.shift;
+      const time = (sh.start && sh.end) ? ' ' + esc(sh.start) + '–' + esc(sh.end) : '';
+      html = '<span style="color:var(--amber);font-weight:600;">Scheduled ' + esc(info.dayName) + time + ' — needs cover.</span>';
+    } else if (info && info.none) {
+      html = '<span style="color:var(--t3);">Not on the posted schedule for this day.</span>';
+    }
+    // Heads-up if the chosen coverer is also on the schedule that day.
+    const cb = document.getElementById(p + 'coveredby')?.value || '';
+    if (cb) {
+      const cbInfo = this.scheduledShiftFor(cb, date);
+      if (cbInfo && cbInfo.shift) {
+        const cbName = (App.staffById(cb) || {}).name || 'That person';
+        html += (html ? ' ' : '') + '<span style="color:var(--amber);">' + esc(cbName) + ' is also scheduled that day.</span>';
+      }
+    }
+    el.innerHTML = html;
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -74,6 +127,7 @@ S.LaborCalloutLog = {
       + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Covered By</label>'
         + '<select id="' + p + 'coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
+      + '<div id="' + p + 'sched-note" style="font-size:11px;line-height:1.5;margin:-2px 0 12px;min-height:14px;"></div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
         + '<input type="text" id="' + p + 'reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
@@ -150,6 +204,9 @@ S.LaborCalloutLog = {
       else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
       else if (row && App.canEdit('lc-callout-log')) this.openEditModal(row.dataset.id);
     };
+    ['co-staff', 'co-date', 'co-coveredby'].forEach(id =>
+      document.getElementById(id)?.addEventListener('change', () => this.updateSchedNote('co-')));
+    this.updateSchedNote('co-');
     App.applyCollapsed(this.container);
   },
 
@@ -171,6 +228,9 @@ S.LaborCalloutLog = {
     document.getElementById('coe-save')?.addEventListener('click', () => this.save('coe-'));
     document.getElementById('coe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); });
     document.getElementById('coe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); this.confirmDel(id); });
+    ['coe-staff', 'coe-date', 'coe-coveredby'].forEach(eid =>
+      document.getElementById(eid)?.addEventListener('change', () => this.updateSchedNote('coe-')));
+    this.updateSchedNote('coe-');
   },
 
   async save(p) {
