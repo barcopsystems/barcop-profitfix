@@ -318,9 +318,18 @@ S.LaborLogHours = {
     };
     if (this.entryMode === 'import') this.mountImporter();
     else if (this.entryMode === 'schedule') {
-      document.getElementById('lo-fill-week')?.addEventListener('change', e => { this._fillWeek = this.mondayOf(e.target.value) || ''; this._fillTab = null; this.renderList(); });
       document.getElementById('lo-fill-prev')?.addEventListener('click', () => this.shiftFillWeek(-7));
       document.getElementById('lo-fill-next')?.addEventListener('click', () => this.shiftFillWeek(7));
+      this.container.querySelectorAll('.lo-fill-week-chip').forEach(b => b.addEventListener('click', () => {
+        const ws = b.dataset.ws;
+        if (!ws || ws === this._fillWeek) return;
+        this._fillWeek = ws; this._fillTab = null; this.renderList();
+      }));
+      document.getElementById('lo-fill-now')?.addEventListener('click', () => {
+        const ws = this.mondayOf(App.todayLocal());
+        if (ws === this._fillWeek) return;
+        this._fillWeek = ws; this._fillTab = null; this.renderList();
+      });
       this.container.querySelectorAll('.lo-fill-tab').forEach(b => b.addEventListener('click', () => { this.captureFill(); this._fillTab = parseInt(b.dataset.day, 10); this.renderList(); }));
       const tbl = document.getElementById('lo-fill-body');
       if (tbl) tbl.addEventListener('change', () => this.updateFillCount());
@@ -503,17 +512,47 @@ S.LaborLogHours = {
     return (this._fillModel ? this._fillModel.rows : []).filter(r => !r.already && r.checked && parseFloat(r.hours) > 0);
   },
 
+  // Compact week label for the fill week chips ("Jun 9").
+  weekLabel(ws) {
+    const d = new Date((ws || '') + 'T00:00:00');
+    return isNaN(d.getTime()) ? esc(ws || '') : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+  // Monday-based week selector for Fill from Schedule (mirrors Build Schedule):
+  // a window of week chips by Monday date (live week tagged NOW, selected
+  // gold-tint) + step arrows + a snap to the current week. No calendar to hunt a
+  // Monday in.
+  fillWeekSelector(ws) {
+    const cur = this.mondayOf(App.todayLocal());
+    const step = (base, n) => {
+      const d = new Date((base || cur) + 'T00:00:00');
+      if (isNaN(d.getTime())) return base;
+      d.setDate(d.getDate() + n * 7);
+      return this.mondayOf(App.ymdLocal(d));
+    };
+    const chip = w => {
+      const on = w === ws, isCur = w === cur;
+      return '<button type="button" class="lo-fill-week-chip btn btn-sm" data-ws="' + w + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.weekLabel(w)
+        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let chips = '';
+    for (let i = -2; i <= 2; i++) chips += chip(step(ws, i));
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + chips
+      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
+      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>';
+  },
+
   scheduleFillBody() {
     const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const ws = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
     this._fillWeek = ws;
-    const picker = '<div class="form-row" style="gap:16px;margin-bottom:14px;align-items:flex-end;">'
-      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Schedule Week (Mon)</label>'
-      + '<input type="date" id="lo-fill-week" value="' + esc(ws) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
-      + '</div>';
+    const picker = this.fillWeekSelector(ws);
     this.ensureFillModel(ws);
     const model = this._fillModel;
     if (!model.rows.length) {
