@@ -714,6 +714,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 .collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
+/* Enter Manually / Import File segmented toggle (unified-import-pattern). Wraps instead of overflowing the card; stacks full-width on phones. */
+.seg-toggle{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+@media(max-width:560px){.seg-toggle{flex-direction:column;align-items:stretch;}.seg-toggle>.btn{width:100%;}}
 
 /* ══ SCORE ROWS ══ */
 .score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
