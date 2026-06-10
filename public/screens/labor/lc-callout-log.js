@@ -24,6 +24,16 @@ S.LaborCalloutLog = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  // 24h "HH:MM" -> 12h ("16:00" -> "4p", "00:00" -> "12a") so a scheduled shift
+  // reads like the rest of Bar Cop instead of a confusing 00:00 midnight.
+  fmtTime(t) {
+    if (!t) return '';
+    const [h, m] = String(t).split(':').map(Number);
+    if (isNaN(h)) return esc(t);
+    const ap = h < 12 ? 'a' : 'p';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return hr + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
+  },
   // call-outs for a staff member in the last 60 days
   repeatCount(staffId) {
     if (!staffId) return 0;
@@ -68,7 +78,7 @@ S.LaborCalloutLog = {
     let html = '';
     if (info && info.shift) {
       const sh = info.shift;
-      const time = (sh.start && sh.end) ? ' ' + esc(sh.start) + '–' + esc(sh.end) : '';
+      const time = (sh.start && sh.end) ? ' ' + this.fmtTime(sh.start) + '–' + this.fmtTime(sh.end) : '';
       html = '<span style="color:var(--amber);font-weight:600;">Scheduled ' + esc(info.dayName) + time + ' — needs cover.</span>';
     } else if (info && info.none) {
       html = '<span style="color:var(--t3);">Not on the posted schedule for this day.</span>';
@@ -153,10 +163,11 @@ S.LaborCalloutLog = {
       + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out')
       + '<div class="collapse-body">'
       + this.formCells(null)
-      + '<div class="card-actions">'
+      + '</div></div>'
+      + '<div data-collapse-group="lc-callout-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="co-save">Save Call-Out</button>'
       + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div>';
 
     const list = [...this.callouts()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
@@ -171,9 +182,7 @@ S.LaborCalloutLog = {
         return '<tr class="co-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.name || '-') + repTag + '</td>'
-          + '<td>' + (c.type === 'No-Show'
-              ? '<span style="color:var(--red);font-weight:700;">No-Show</span>'
-              : '<span style="color:var(--t3);font-weight:700;">' + esc(c.type || '-') + '</span>') + '</td>'
+          + '<td><span style="color:var(--t1);font-weight:600;">' + esc(c.type || '-') + '</span></td>'
           + '<td>' + esc(c.shift_type || '-') + '</td>'
           + '<td>' + (c.covered
               ? '<span style="color:var(--green);font-weight:700;">Covered</span>'
