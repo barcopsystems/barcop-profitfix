@@ -875,7 +875,7 @@ const DB = {
         annual_bar_revenue: 0, annual_food_revenue: 0,
         targets: {
           bar_pour_cost_pct: 22, food_cost_pct: 32,
-          bar_labor_cost_pct: 28, food_labor_cost_pct: 30, prime_cost_pct: 60
+          labor_cost_pct: 30, prime_cost_pct: 60
         },
         // Cash tolerance moved to App.shiftData.settings — Shift Control owns
         // it now. See sc-cash-settings.js + App.cashToleranceForShift().
@@ -897,9 +897,6 @@ const DB = {
       revenue_settings: {
         targets: {
           check_avg: 35,
-          bar_labor_pct: 28,
-          kitchen_labor_pct: 30,
-          floor_labor_pct: 32,
           rplh_lunch: 50,
           rplh_dinner: 75,
           rplh_bar: 65,
