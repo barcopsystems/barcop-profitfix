@@ -113,7 +113,7 @@ S.LaborBuildSchedule = {
         + '</button>';
     };
     let chips = '';
-    for (let i = -2; i <= 2; i++) chips += chip(this.addWeeks(sel, i));
+    for (let i = -1; i <= 1; i++) chips += chip(this.addWeeks(sel, i));
     return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + chips
