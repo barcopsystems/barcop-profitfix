@@ -157,9 +157,9 @@ S.PrepBatches = {
   formBodyHTML(b) {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
     return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="width:175px;flex-shrink:0;"><label>Batch Name</label>'
+        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
-        + '<div class="f" style="width:185px;flex-shrink:0;"><label>Category</label>'
+        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label>'
           + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
@@ -372,9 +372,9 @@ S.PrepBatches = {
     // Table goes full width; the ingredient dropdown is a fixed (less wide) column
     // and the empty last column absorbs the slack so Delete stays right-aligned.
     area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl"><thead><tr>'
+      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:320px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
-      + '<th style="width:100px;">Unit Cost</th><th style="width:100px;">Line Cost</th><th style="width:100%;"></th>'
+      + '<th style="width:110px;">Unit Cost</th><th style="width:110px;">Line Cost</th><th></th>'
       + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
         const unit = this.unitLabel(prod);
