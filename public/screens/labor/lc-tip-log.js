@@ -11,11 +11,16 @@
 
 S.LaborTipLog = {
   editId: null,
-  entryMode: 'manual',     // 'manual' = type a row, 'import' = drop a POS tips file
+  entryMode: 'manual',     // 'manual' = batch-enter rows, 'import' = drop a POS tips file
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
+  // Batch manual-entry state (preloaded from the picked shift).
+  _addShift: '',           // '' | shift id | '__manual'
+  _addDate: '',            // manual-mode date
+  _addShiftType: '',       // manual-mode shift type
+  _addRows: null,          // [{ staff_id, hours, cash, card }]
 
   tips() {
     if (!App.laborData) App.laborData = {};
@@ -78,13 +83,21 @@ S.LaborTipLog = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    // Fresh batch-entry state each visit. Default to the open shift (the close-out
+    // case) and preload its tipped staff; otherwise an empty form ready to pick one.
+    const a = this.activeShift();
+    this._addShift = a ? a.id : '';
+    this._addDate = App.todayLocal();
+    this._addShiftType = '';
+    this._addRows = [];
+    if (a) this.preloadFromShift(a.id);
     this.renderList();
   },
 
   showHowTo() {
     App.showHelpModal('How the Tip Log Works', [
       { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
-      { h: 'Logging Tips', p: ['Choose Enter Manually, pick the shift, then the staff member (the dropdown lists who worked that shift first), then enter cash and card tips. Tippable hours pull from logged hours automatically, and you can override them. Pick Manual entry instead of a shift for an off-cycle entry where you set the date and shift type yourself.'] },
+      { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee who worked it, with their hours already filled in, so you just type each person\'s cash and card off your tip sheet and save the whole shift at once. Add a row for anyone who needs a tip-out, or pick Manual entry to set the date and shift type yourself. Tippable hours pull from logged hours automatically and you can override them.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
@@ -192,9 +205,9 @@ S.LaborTipLog = {
       modeBody = '<div id="tl-imp-csv"></div><div id="tl-imp-result"></div>';
       actionRow = '<div id="tl-imp-actions" data-collapse-group="lc-tip-log" style="margin-bottom:24px;"></div>';
     } else {
-      modeBody = this.formBody(null);
+      modeBody = this.batchBody();
       actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="tl-save">Save Tips</button>'
+        + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
         + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     }
     const addCard = '<div class="card form-card">'
@@ -255,7 +268,7 @@ S.LaborTipLog = {
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
-      if (ev.target.closest('#tl-save')) { this.save('tl-'); return; }
+      if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
         const v = tlRange.dataset.v;
@@ -278,10 +291,220 @@ S.LaborTipLog = {
     if (this.entryMode === 'import') {
       this.mountTipImporter();
     } else {
-      this.wireForm(null, 'tl-');
+      this.wireBatch();
     }
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+  },
+
+  // ── Batch manual entry (preloaded from the shift) ────────────────────────────
+  // The manual lane is a multi-row builder: pick the shift up top and Bar Cop
+  // loads a row for every TIPPED employee who worked it (hours pre-filled), so the
+  // manager types each person's cash/card off the tip sheet and saves the whole
+  // shift at once. Mirrors the Void/Comp + Waste builders. The single-record form
+  // (formBody) is still used for the edit pop-up.
+  batchBody() {
+    const isManual = this._addShift === '__manual';
+    const header = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
+      + '<div class="f" style="flex:1.5 1 200px;min-width:0;"><label>Shift</label>'
+        + '<select id="tl-b-shift">' + this.shiftOptions(this._addShift) + '</select></div>'
+      + (isManual
+          ? '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+            + '<input type="date" id="tl-b-date" value="' + esc(this._addDate || App.todayLocal()) + '"/></div>'
+            + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label>'
+            + '<select id="tl-b-shift-type">' + (App.SHIFT_TYPES || []).map(t =>
+                '<option value="' + esc(t) + '"' + (this._addShiftType === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>'
+          : '')
+      + '</div>';
+    const rows = this._addRows || [];
+    const rowsHtml = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
+    const table = rows.length
+      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash</th><th style="width:110px;">Card</th><th style="width:100px;">Total</th><th style="width:90px;"></th>'
+        + '</tr></thead><tbody id="tl-b-rows">' + rowsHtml + '</tbody></table></div>'
+      : '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
+        + (this._addShift && !isManual
+            ? 'No tipped staff on this shift still need tips entered. Add a participant below for a tip-out.'
+            : 'Pick a shift above to load its tipped staff, or add participants by hand.') + '</div>';
+    return header + table
+      + '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Participant</button>';
+  },
+
+  batchRowHtml(r, i) {
+    r = r || {};
+    const total = (parseFloat(r.cash) || 0) + (parseFloat(r.card) || 0);
+    return '<tr class="tl-line" data-idx="' + i + '">'
+      + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
+      + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (total > 0 ? App.fmtCurrency(total, 2) : '-') + '</div></td>'
+      + '<td><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
+      + '</tr>';
+  },
+
+  // The effective date the batch logs against: the picked shift's date, or the
+  // manual date field.
+  batchDate() {
+    if (this._addShift === '__manual') return this._addDate || '';
+    const s = this.shiftById(this._addShift);
+    return s ? (s.date || '') : '';
+  },
+
+  // Read the batch form (header + rows) back into state for re-renders and save.
+  collectBatch() {
+    const shiftEl = document.getElementById('tl-b-shift');
+    if (shiftEl) this._addShift = shiftEl.value;
+    if (this._addShift === '__manual') {
+      this._addDate = document.getElementById('tl-b-date')?.value || this._addDate || App.todayLocal();
+      this._addShiftType = document.getElementById('tl-b-shift-type')?.value || this._addShiftType || '';
+    }
+    const rowEls = [...document.querySelectorAll('#tl-b-rows .tl-line')];
+    if (rowEls.length) {
+      this._addRows = rowEls.map(el => ({
+        staff_id: el.querySelector('.tl-b-staff')?.value || '',
+        hours:    el.querySelector('.tl-b-hours')?.value || '',
+        cash:     el.querySelector('.tl-b-cash')?.value || '',
+        card:     el.querySelector('.tl-b-card')?.value || ''
+      }));
+    }
+  },
+
+  // Build the participant rows for a picked shift: every TIPPED employee who
+  // logged hours that day and is not already tip-logged for the shift, hours
+  // pre-filled. Manual entry seeds one blank row.
+  preloadFromShift(shiftId) {
+    this._addShift = shiftId;
+    if (shiftId === '__manual') {
+      this._addDate = this._addDate || App.todayLocal();
+      this._addShiftType = this._addShiftType || ((App.SHIFT_TYPES || [])[0] || '');
+      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '' }];
+      return;
+    }
+    const s = shiftId ? this.shiftById(shiftId) : null;
+    if (!s) { this._addRows = []; return; }
+    const date = s.date || '';
+    const worked = new Set();
+    this.actuals().filter(a => a.date === date).forEach(a => { if (a.staff_id) worked.add(a.staff_id); });
+    const already = new Set(this.tips().filter(t => t.date === date && (t.shift_id || '') === shiftId).map(t => t.staff_id));
+    const rows = [];
+    this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(st => {
+      if (!worked.has(st.id) || already.has(st.id) || !App.isTipped(st)) return;
+      rows.push({ staff_id: st.id, hours: (App.hoursFor(st.id, date) || ''), cash: '', card: '' });
+    });
+    this._addRows = rows;
+  },
+
+  // Live per-row Total + the Save All count.
+  recalcBatch() {
+    [...document.querySelectorAll('#tl-b-rows .tl-line')].forEach(el => {
+      const t = (parseFloat(el.querySelector('.tl-b-cash')?.value) || 0) + (parseFloat(el.querySelector('.tl-b-card')?.value) || 0);
+      const tEl = el.querySelector('.tl-b-total');
+      if (tEl) tEl.textContent = t > 0 ? App.fmtCurrency(t, 2) : '-';
+    });
+    const n = this.batchReadyCount();
+    const btn = document.getElementById('tl-save-all');
+    if (btn && !btn.disabled) btn.textContent = n > 0 ? 'Save ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') : 'Save Tips';
+  },
+  batchReadyCount() {
+    return [...document.querySelectorAll('#tl-b-rows .tl-line')].filter(el => {
+      const staff = el.querySelector('.tl-b-staff')?.value;
+      const t = (parseFloat(el.querySelector('.tl-b-cash')?.value) || 0) + (parseFloat(el.querySelector('.tl-b-card')?.value) || 0);
+      return staff && t > 0;
+    }).length;
+  },
+
+  wireBatch() {
+    document.getElementById('tl-b-shift')?.addEventListener('change', e => {
+      this.collectBatch();
+      this.preloadFromShift(e.target.value);
+      this.renderList();
+    });
+    document.getElementById('tl-b-date')?.addEventListener('change', e => { this._addDate = e.target.value || ''; });
+    document.getElementById('tl-b-shift-type')?.addEventListener('change', e => { this._addShiftType = e.target.value || ''; });
+    document.getElementById('tl-b-add')?.addEventListener('click', () => {
+      this.collectBatch();
+      this._addRows = this._addRows || [];
+      this._addRows.push({ staff_id: '', hours: '', cash: '', card: '' });
+      this.renderList();
+    });
+    const rowsEl = document.getElementById('tl-b-rows');
+    if (rowsEl) {
+      rowsEl.addEventListener('input', () => this.recalcBatch());
+      rowsEl.addEventListener('change', ev => {
+        // Picking a staff member auto-fills that row's hours from logged hours.
+        if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
+          const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
+          const date = this.batchDate();
+          if (hoursInp && !hoursInp.value && date) {
+            const hrs = App.hoursFor(ev.target.value, date);
+            if (hrs != null && hrs > 0) hoursInp.value = hrs;
+          }
+        }
+        this.recalcBatch();
+      });
+      rowsEl.addEventListener('click', ev => {
+        if (ev.target.closest('.tl-b-remove')) {
+          this.collectBatch();
+          const idx = parseInt(ev.target.closest('.tl-line').dataset.idx, 10);
+          if (this._addRows && idx >= 0) this._addRows.splice(idx, 1);
+          this.renderList();
+        }
+      });
+    }
+    this.recalcBatch();
+  },
+
+  // Save every row that has a staff member and a tip amount as its own lc_tips
+  // record, skipping anyone already logged for the shift (no double-count).
+  async saveBatch() {
+    this.collectBatch();
+    const err = document.getElementById('tl-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (!this._addShift) { fail('Pick a shift or choose Manual entry.'); return; }
+    const date = this.batchDate();
+    if (!date) { fail('Date is required for manual entry.'); return; }
+    let shiftType = '', shiftId = '', managerId = '';
+    if (this._addShift === '__manual') {
+      shiftType = this._addShiftType || '';
+      managerId = App.activeManagerId ? App.activeManagerId() : '';
+    } else {
+      const s = this.shiftById(this._addShift);
+      if (!s) { fail('Shift not found.'); return; }
+      shiftId = s.id; shiftType = s.shift_type || ''; managerId = s.manager_id || '';
+    }
+
+    const recs = [];
+    let dupCount = 0;
+    (this._addRows || []).forEach(r => {
+      const staff = this.staffById(r.staff_id);
+      if (!staff) return;
+      const cash = parseFloat(r.cash) || 0, card = parseFloat(r.card) || 0;
+      if (cash + card <= 0) return;
+      if (this.tips().some(t => t.staff_id === staff.id && t.date === date && (t.shift_id || '') === shiftId)) { dupCount++; return; }
+      const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
+      recs.push({
+        id: App.uid(), shift_id: shiftId, manager_id: managerId, date,
+        staff_id: staff.id, name: staff.name, position_id: staff.position_id || '',
+        shift_type: shiftType, cash_tips: cash, card_tips: card, total_tips: cash + card,
+        hours: (h != null && !isNaN(h)) ? h : null, notes: '', created_at: new Date().toISOString()
+      });
+    });
+    if (!recs.length) { fail(dupCount ? 'Those entries are already logged for this shift.' : 'Enter cash or card tips for at least one person.'); return; }
+
+    const btn = document.getElementById('tl-save-all');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    let ok = true;
+    for (const rec of recs) { ok = (await App.putRecord('lc', 'tip', rec)) && ok; }
+    if (ok) {
+      // Reload the shift so just-logged people drop off and any stragglers remain.
+      this._addRows = [];
+      this.preloadFromShift(this._addShift);
+      this.renderList();
+    } else {
+      if (btn) { btn.disabled = false; this.recalcBatch(); }
+      fail('Save failed. Try again.');
+    }
   },
 
   mountTipImporter() {
