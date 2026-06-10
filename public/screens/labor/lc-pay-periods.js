@@ -175,9 +175,7 @@ S.LaborPayPeriods = {
       return t;
     }, { hours: 0, gross: 0, ot_hours: 0 });
 
-    const topCard = '<div class="card form-card">'
-      + '<div class="card-title">Pay Periods</div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+    const topCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Hours</div><div class="calc-val lg">' + totals.hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks OT Hours</div><div class="calc-val lg ' + (totals.ot_hours > 0 ? 'warn' : '') + '">' + totals.ot_hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Gross</div><div class="calc-val lg">' + App.fmtCurrency(totals.gross) + '</div></div>'
@@ -285,11 +283,7 @@ S.LaborPayPeriods = {
       ? '<button class="btn btn-ghost btn-sm" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
       : (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : '');
 
-    const periodCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</span>'
-      + titleAction + '</div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+    const periodCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + agg.totals.hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Hours</div><div class="calc-val lg ' + (agg.totals.ot_hours > 0 ? 'warn' : '') + '">' + agg.totals.ot_hours.toFixed(1) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.regular_cost) + '</div></div>'
@@ -302,14 +296,17 @@ S.LaborPayPeriods = {
       : '';
 
     const breakdownHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Staff Breakdown</div>'
+      + '<div class="sh" style="margin:0;">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button></div></div>';
 
     const tableCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + periodCard + warnLine + breakdownHeading + tableCard + '</div>';
+    // Close & Lock (open) or Reopen (closed) lives bottom-left, under the breakdown.
+    const actionRow = titleAction ? '<div class="no-print" style="margin:18px 0 24px;display:flex;gap:8px;">' + titleAction + '</div>' : '';
+
+    this.container.innerHTML = '<div class="screen">' + periodCard + warnLine + breakdownHeading + tableCard + actionRow + '</div>';
 
     document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Period', root: this.container }));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
