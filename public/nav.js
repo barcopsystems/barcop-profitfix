@@ -342,18 +342,9 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.4M8.5 12v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Call-Out Log</span>
       </div>
-      <div class="nav-section">Actuals</div>
       <div class="nav-item" data-screen="lc-log-hours" id="nav-lc-log-hours">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Log Hours</span>
-      </div>
-      <div class="nav-item" data-screen="lc-daily-view" id="nav-lc-daily-view">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="3" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 1.7v2.6M11.5 1.7v2.6M2.5 7h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="11" r="1.6" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Daily Snapshot</span>
-      </div>
-      <div class="nav-item" data-screen="lc-weekly-summary" id="nav-lc-weekly-summary">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Weekly Summary</span>
       </div>
       <div class="nav-section">Payroll</div>
       <div class="nav-item" data-screen="lc-pay-periods" id="nav-lc-pay-periods">
