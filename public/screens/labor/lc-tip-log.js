@@ -237,10 +237,9 @@ S.LaborTipLog = {
           + App.showOlderBar('lc', 'tip', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterStaff));
       }
 
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Filter Tips</div>'
-        + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button></div></div>';
+      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button></div>';
 
       below = statsCard + filterHeading + this.filterCard() + listHtml;
     }
@@ -257,6 +256,10 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save')) { this.save('tl-'); return; }
       if (ev.target.closest('#tl-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
+      const tlPreset = ev.target.closest('.tl-preset');
+      if (tlPreset) { const r = App.datePresetRange(tlPreset.dataset.preset); this.filterFrom = r.from; this.filterTo = r.to; this.renderList(); return; }
+      const tlSc = ev.target.closest('.tl-shift-chip');
+      if (tlSc) { this.filterShift = tlSc.dataset.v; this.renderList(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.tl-row');
       const edit = ev.target.closest('.tl-edit');
@@ -273,7 +276,6 @@ S.LaborTipLog = {
     }
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('tl-f-shift')?.addEventListener('change', e => { this.filterShift = e.target.value || ''; this.renderList(); });
     document.getElementById('tl-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
   },
 
@@ -354,16 +356,17 @@ S.LaborTipLog = {
       + this.staff().filter(s => withTips.has(s.id) || s.id === this.filterStaff)
           .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-    const shiftOpts = '<option value="">All shifts</option>'
-      + (App.SHIFT_TYPES || []).map(s => '<option value="' + esc(s) + '"' + (this.filterShift === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
+    const shiftChips = App.filterChips(this.filterShift,
+      [{ v: '', label: 'All Shifts' }].concat((App.SHIFT_TYPES || []).map(s => ({ v: s, label: s }))), 'tl-shift-chip');
     return '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tl-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="tl-f-shift">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="tl-f-staff">' + staffOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tl-f-clear">Clear</button></div>'
-      + '</div></div>';
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + shiftChips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">' + App.datePresetButtons('tl-preset') + '</div></div>';
   },
 
   applyFilters(list) {
