@@ -34,9 +34,13 @@ S.LaborPayrollExport = {
     }
     const today = App.todayLocal();
     const thisMon = pp.mondayOf(today);
-    // Last 12 weeks, newest first.
+    // Last 12 weeks, plus every saved closed period (even older than 12 weeks) so
+    // an old period's payroll worksheet can still be re-exported. Newest first.
     const weeks = [];
     for (let i = 0; i < 12; i++) weeks.push(pp.addDays(thisMon, -7 * i));
+    pp.periods().filter(p => p.status === 'Closed' && p.week_start && weeks.indexOf(p.week_start) < 0)
+      .forEach(p => weeks.push(p.week_start));
+    weeks.sort((a, b) => b.localeCompare(a));
 
     // Default to a deep-linked week from Pay Periods, else the most recent week
     // that has logged hours, else last week.
@@ -89,7 +93,20 @@ S.LaborPayrollExport = {
   // prompts again.
   _ackThenDownload(fmt, weekStart) {
     if (!weekStart) return;
-    const proceed = () => { if (fmt === 'xlsx') this._downloadWorkbook(weekStart); else this._downloadCSV(weekStart); };
+    const pp = S.LaborPayPeriods;
+    const saved = pp.periods().find(p => p.week_start === weekStart);
+    const isClosed = saved && saved.status === 'Closed';
+    const run = () => { if (fmt === 'xlsx') this._downloadWorkbook(weekStart); else this._downloadCSV(weekStart); };
+    // An unlocked (not-yet-closed) period can still change after the handoff, so
+    // warn before exporting one — even if the worksheet disclaimer was already ack'd.
+    const proceed = () => {
+      if (isClosed) { run(); return; }
+      App.confirm({
+        title: 'This period is not closed yet',
+        message: 'This week has not been closed and locked in Pay Periods, so its hours and pay can still change after you export. Close it first for a clean payroll handoff, or export anyway.',
+        confirmText: 'Export Anyway', cancelText: 'Cancel', danger: false
+      }).then(ok => { if (ok) run(); });
+    };
     if (this._ackGiven) { proceed(); return; }
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Before You Export Payroll</div>'

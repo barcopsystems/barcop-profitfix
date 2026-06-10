@@ -566,7 +566,28 @@ S.LaborBuildSchedule = {
       if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
       else list.push(rec);
     } else {
-      list.push(rec);
+      // Duplicate-week guard: a second schedule for the same week would make the
+      // compare screens (Daily, Weekly, OT, Pay Periods) pick one at random. Offer
+      // to replace the existing one in place instead of creating a duplicate.
+      const existing = list.find(x => x.week_start === d.week_start);
+      if (existing) {
+        const dt = new Date(d.week_start + 'T00:00:00');
+        const wkLabel = isNaN(dt.getTime()) ? d.week_start : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const replace = await App.confirm({
+          title: 'Replace this week\'s schedule?',
+          message: 'You already have a posted schedule for the week of ' + wkLabel + '. Saving will replace it. Your saved templates are not affected.',
+          confirmText: 'Replace', cancelText: 'Cancel', danger: false
+        });
+        if (!replace) return;
+        rec.id = existing.id;
+        rec.created_at = existing.created_at || rec.created_at;
+        rec.updated_at = new Date().toISOString();
+        const i = list.findIndex(x => x.id === existing.id);
+        if (i > -1) list[i] = rec; else list.push(rec);
+        saved = rec;
+      } else {
+        list.push(rec);
+      }
     }
 
     const btn = document.getElementById('bs-save');

@@ -154,22 +154,22 @@ S.LaborPayPeriods = {
     this.detailWeekStart = null;
     this.actions.innerHTML = '';
 
-    // Build the last 12 weeks ending with the current week, then split them into
-    // open (still working) and closed (locked) so the two never mix on one table.
+    // The trailing 12 weeks drive the "Open" list + the headline stats. Closed
+    // periods are pulled from ALL saved closed records (any age), so an old
+    // quarter-end period stays reachable to view + re-export, not just the last 12.
     const today = App.todayLocal();
     const thisMon = this.mondayOf(today);
-    const weeks = [];
-    for (let i = 0; i < 12; i++) weeks.push(this.addDays(thisMon, -7 * i));
+    const trailing = [];
+    for (let i = 0; i < 12; i++) trailing.push(this.addDays(thisMon, -7 * i));
 
-    const openWeeks = [];
-    const closedWeeks = [];
-    weeks.forEach(ws => {
-      const saved = this.periods().find(p => p.week_start === ws);
-      if (saved && saved.status === 'Closed') closedWeeks.push({ ws, saved });
-      else openWeeks.push({ ws });
-    });
+    const closedWeeks = this.periods()
+      .filter(p => p.status === 'Closed' && p.week_start)
+      .sort((a, b) => (b.week_start || '').localeCompare(a.week_start || ''))
+      .map(p => ({ ws: p.week_start, saved: p }));
+    const closedSet = new Set(closedWeeks.map(c => c.ws));
+    const openWeeks = trailing.filter(ws => !closedSet.has(ws)).map(ws => ({ ws }));
 
-    const totals = weeks.reduce((t, ws) => {
+    const totals = trailing.reduce((t, ws) => {
       const a = this.aggregateWeek(ws).totals;
       t.hours += a.hours; t.gross += a.gross; t.ot_hours += a.ot_hours;
       return t;
@@ -406,7 +406,13 @@ S.LaborPayPeriods = {
         if (part.staff_id === staffId) total += parseFloat(part.share) || 0;
       });
     });
-    return total;
+    if (total > 0) return total;
+    // No pool share for this person this week — fall back to their own logged
+    // tips so a house that logs tips without saving a pool split still gets a
+    // real tip-credit number instead of a false $0 / "Below Min" flag.
+    const tips = ((App.laborData && App.laborData.lc_tips) || []);
+    return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
+      ? s + (parseFloat(t.total_tips) || 0) : s, 0);
   },
 
   // Payroll files (formatted workbook + clean import CSV, with the legal

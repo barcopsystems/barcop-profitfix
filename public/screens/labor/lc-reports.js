@@ -89,11 +89,22 @@ S.LaborReports = {
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
     const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
     const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
+    // Actual revenue logged in the range (Shift module) drives labor % and revenue
+    // per labor hour, the numbers an operator manages to. Shown only when there's
+    // revenue to divide by, so a partial-data range never prints a false rate.
+    const periodRev = ((App.shiftData && App.shiftData.sc_shifts) || []).reduce((s, sh) => {
+      const d = sh.date || '';
+      if ((rFrom && d < rFrom) || (rTo && d > rTo)) return s;
+      return s + (parseFloat(sh.total_revenue) || 0);
+    }, 0);
+    const laborPctVal = periodRev > 0 ? (totCost / periodRev * 100) : null;
+    const rplhVal = (periodRev > 0 && totHours > 0) ? (periodRev / totHours) : null;
 
     const statsCard = this.statsCard(
-      this.statItem('Hours Entries', rows.length)
-      + this.statItem('Total Hours', totHours.toFixed(1))
+      this.statItem('Total Hours', totHours.toFixed(1))
       + this.statItem('Labor Cost', App.fmtCurrency(totCost))
+      + this.statItem('Labor %', laborPctVal != null ? App.fmtPct(laborPctVal) : '-')
+      + this.statItem('Rev / Labor Hr', rplhVal != null ? App.fmtCurrency(rplhVal) : '-')
       + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
@@ -121,6 +132,8 @@ S.LaborReports = {
       if (ev.target.closest('#lr-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Reports', root: this.container }); return; }
       if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
+      const sRow = ev.target.closest('.lr-staff-row');
+      if (sRow) { App._staffFocus = { staff_id: sRow.dataset.staff }; App.navigate('lc-staff-roster'); return; }
     };
     const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
       this[prop] = e.target.value || '';
@@ -178,9 +191,12 @@ S.LaborReports = {
     }
     // Labor Cost = straight-time + OT premium; Avg Wage stays the base rate.
     const cost = k => g[k].straight + (otByStaff[k] || 0);
+    const isStaffId = k => ((App.laborData && App.laborData.lc_staff) || []).some(st => st.id === k);
     const trs = Object.keys(g).sort((a, b) => cost(b) - cost(a)).map(k => {
       const s = g[k];
-      return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
+      const clickable = isStaffId(k);
+      return '<tr' + (clickable ? ' class="lr-staff-row" data-staff="' + esc(k) + '" style="cursor:pointer;"' : '') + '>'
+        + '<td><div class="val">' + esc(s.name) + '</div></td>'
         + '<td>' + s.hours.toFixed(1) + '</td>'
         + '<td>' + App.fmtCurrency(s.hours > 0 ? s.straight / s.hours : 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(cost(k)) + '</td>'

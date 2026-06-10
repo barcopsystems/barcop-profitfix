@@ -92,6 +92,13 @@ S.LaborStaffRoster = {
       this.openNoteModal(sid);
       return;
     }
+    // Cross-screen focus: Labor Reports (and others) set App._staffFocus =
+    // { staff_id } and navigate here to open that person's page directly.
+    if (App._staffFocus && App._staffFocus.staff_id) {
+      const sid = App._staffFocus.staff_id;
+      App._staffFocus = null;
+      if (this.staffById(sid)) { this.detailId = sid; this.renderUnified(sid); return; }
+    }
     this.renderList();
   },
 
