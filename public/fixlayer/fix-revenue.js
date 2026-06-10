@@ -104,9 +104,9 @@ FIX.revenue = [
         { kind: 'action', target: 'lc-overtime-watch', targetLabel: 'Overtime Watch',
           title: 'Clear projected overtime before you post',
           detail: 'Overtime Watch shows who is heading into overtime on the schedule you just built. Almost all overtime is hours concentrated on too few employees, not a need for more total hours. Redistribute the concentrated hours to under-scheduled staff before the schedule goes out.' },
-        { kind: 'result', target: 'lc-weekly-summary', targetLabel: 'Weekly Summary',
+        { kind: 'result', target: 'lc-reports', targetLabel: 'Labor Reports',
           title: 'Read labor cost on total labor',
-          detail: 'After the week, Weekly Summary shows labor cost percent by department against target. It is built on total labor, wages plus payroll taxes and employer benefits, which runs 10 to 15% above wages alone. A wages-only number understates the problem every week.' },
+          detail: 'After the week, the Week view in Labor Reports shows labor cost percent by department against target. It is built on total labor, wages plus payroll taxes and employer benefits, which runs 10 to 15% above wages alone. A wages-only number understates the problem every week.' },
         { kind: 'reference', target: 'Weekly_Labor_Review.pdf', targetLabel: 'Weekly Labor Review Form',
           title: 'Run the Monday labor review',
           detail: 'Download the Weekly Labor Review Form and work it every Monday before the new schedule is built. Flag any department more than 2 points over target, decide whether it was a scheduling error or a revenue miss, and assign one action before the review closes. A scheduling error is fixed in next week\'s schedule. A revenue miss is fixed in the pre-shift briefing.' }
