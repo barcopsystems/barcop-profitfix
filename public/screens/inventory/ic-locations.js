@@ -222,7 +222,7 @@ S.InventoryLocations = {
       : '';
 
     const triageStrip = (active.length && unplaced)
-      ? '<div class="card" style="margin-top:14px;border:1px solid var(--b-edge);background:var(--input);">'
+      ? '<div class="card" style="margin-top:14px;border:1px solid var(--gold-tint-bord);background:var(--gold-tint);">'
           + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
           + '<div style="font-size:13px;color:var(--t1);"><strong>' + unplaced + ' product' + (unplaced === 1 ? '' : 's') + ' ' + (unplaced === 1 ? 'is' : 'are') + ' not in any location yet.</strong> They will not be counted until you place them.</div>'
           + '<button class="btn btn-ghost btn-sm" id="il-triage-open">Assign Products</button>'
@@ -253,11 +253,17 @@ S.InventoryLocations = {
             + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
         : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>';
       const archivedSection = archived.length
-        ? '<div class="sh" style="margin:24px 0 8px;">Deleted</div>'
-          + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">Restore any of these to bring them back. Product assignments are preserved.</div>'
-          + archived.map(l => '<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--b1);">'
-              + '<span style="color:var(--t2);">' + esc(l.name) + ' &middot; ' + this.productCount(l.name) + ' products</span>'
-              + '<button class="btn btn-ghost btn-sm il-unarchive" data-id="' + l.id + '">Restore</button></div>').join('')
+        ? '<div class="sh" style="margin:24px 0 10px;">Deleted</div>'
+          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+            + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
+            + '</tr></thead><tbody>'
+            + archived.map(l => { const n = this.productCount(l.name); return '<tr data-id="' + esc(l.id) + '">'
+                + '<td><div class="val">' + esc(l.name) + '</div></td>'
+                + '<td>' + this.holdsLabel(l.name) + '</td>'
+                + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
+                + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm il-unarchive" data-id="' + esc(l.id) + '">Restore</button></div></td>'
+              + '</tr>'; }).join('')
+            + '</tbody></table></div></div>'
         : '';
       listSection = listHeading + listCard + archivedSection;
     }
