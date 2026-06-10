@@ -10,7 +10,8 @@
 
 S.LaborLogHours = {
   editId: null,
-  entryMode: 'manual',     // 'manual' = type a row, 'import' = drop a timeclock file
+  entryMode: 'manual',     // 'manual' = type a row, 'schedule' = pull the posted week, 'import' = drop a timeclock file
+  _fillWeek: '',           // Monday of the week being pulled from the schedule
   filterFrom: '',
   filterTo: '',
   filterShift: '',
@@ -33,6 +34,36 @@ S.LaborLogHours = {
     if (!raw) return '';
     const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
     return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
+  },
+
+  // ── Schedule-pull helpers (Fill from Schedule mode) ──────────────────────────
+  schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
+  mondayOf(ymd) {
+    if (!ymd) return '';
+    const d = new Date(ymd + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return App.ymdLocal(d);
+  },
+  weekDayYmd(weekStart, dayIdx) {
+    if (!weekStart || dayIdx < 0) return '';
+    const d = new Date(weekStart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + dayIdx);
+    return App.ymdLocal(d);
+  },
+  scheduleForWeek(ws) {
+    const matches = this.schedules().filter(s => s.week_start === ws);
+    if (!matches.length) return null;
+    return matches.slice().sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+  },
+  latestScheduleWeek() {
+    const list = this.schedules();
+    if (!list.length) return '';
+    return (list.slice().sort((a, b) => (b.week_start || '').localeCompare(a.week_start || ''))[0] || {}).week_start || '';
+  },
+  actualExists(staffId, date) {
+    return this.actuals().some(a => a.staff_id === staffId && a.date === date);
   },
 
   render(container, actions) {
@@ -132,17 +163,22 @@ S.LaborLogHours = {
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
-    const modeBody = this.entryMode === 'import'
-      ? '<div id="lo-csv"></div><div id="lo-imp-result"></div>'
-      : this.logFormCells(null)
+    let modeBody;
+    if (this.entryMode === 'import') {
+      modeBody = '<div id="lo-csv"></div><div id="lo-imp-result"></div>';
+    } else if (this.entryMode === 'schedule') {
+      modeBody = this.scheduleFillBody();
+    } else {
+      modeBody = this.logFormCells(null)
         + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
         + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
+    }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-log-hours', 'Log Hours', App.helpButton('lo-how'))
       + '<div class="collapse-body">'
-      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('schedule', 'Fill from Schedule') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>';
 
@@ -209,6 +245,8 @@ S.LaborLogHours = {
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
       if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
       if (ev.target.closest('#lo-save'))    { this.save('lo-'); return; }
+      if (ev.target.closest('#lo-fill-save')) { this.commitFill(); return; }
+      if (ev.target.closest('.lo-go-build')) { App.navigate('lc-build-schedule'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.lo-row');
       const edit = ev.target.closest('.lo-edit');
@@ -218,6 +256,12 @@ S.LaborLogHours = {
       else if (row && App.canEdit('lc-log-hours')) this.openEditModal(row.dataset.id);
     };
     if (this.entryMode === 'import') this.mountImporter();
+    else if (this.entryMode === 'schedule') {
+      document.getElementById('lo-fill-week')?.addEventListener('change', e => { this._fillWeek = this.mondayOf(e.target.value) || ''; this.renderList(); });
+      const tbl = document.getElementById('lo-fill-body');
+      if (tbl) tbl.addEventListener('change', () => this.updateFillCount());
+      if (tbl) tbl.addEventListener('input', () => this.updateFillCount());
+    }
     else this.wireForm('lo-');
     document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
@@ -287,6 +331,22 @@ S.LaborLogHours = {
     if (!staff) { fail('Choose a staff member.'); return; }
     const hours = parseFloat(document.getElementById(p + 'hours')?.value);
     if (isNaN(hours) || hours <= 0) { fail('Enter hours worked.'); return; }
+    const shiftType = document.getElementById(p + 'shift')?.value || '';
+
+    // Duplicate guard (new entries only): if this staff member already has hours
+    // logged for this date + shift, confirm before adding a second (catches a
+    // re-log / double-entry; a real split shift can still be added on purpose).
+    if (!this.editId) {
+      const dup = this.actuals().find(x => x.staff_id === staff.id && x.date === date && (x.shift_type || '') === shiftType);
+      if (dup) {
+        const proceed = await App.confirm({
+          title: 'Already logged',
+          message: staff.name + ' already has ' + (dup.hours != null ? dup.hours : 0) + ' hours logged for ' + this.fmtDate(date) + (shiftType ? ' (' + shiftType + ')' : '') + '. Add another entry anyway?',
+          confirmText: 'Add Anyway', cancelText: 'Cancel', danger: false
+        });
+        if (!proceed) return;
+      }
+    }
 
     // Resolve wage at the date the hours were worked (not today's wage).
     // Salaried (exempt) staff carry no hourly cost — pay is the fixed weekly
@@ -299,7 +359,7 @@ S.LaborLogHours = {
       staff_id:    staff.id,
       name:        staff.name,
       position_id: staff.position_id || '',
-      shift_type:  document.getElementById(p + 'shift')?.value || '',
+      shift_type:  shiftType,
       hours,
       wage,
       cost:        sal ? 0 : hours * (wage || 0),
@@ -326,6 +386,99 @@ S.LaborLogHours = {
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = isEdit ? 'Update' : 'Save Hours'; }
+      fail('Save failed. Try again.');
+    }
+  },
+
+  // ── Fill from Schedule ───────────────────────────────────────────────────────
+  // Seed editable actuals rows from the posted schedule for a week. The operator
+  // edits the few that ran different and unchecks no-shows, then logs — instead of
+  // re-typing the whole week. Pre-filled hours are scheduled-as-actual until the
+  // operator confirms by logging; already-logged days are skipped (no double-count).
+  scheduleFillBody() {
+    const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const ws = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
+    this._fillWeek = ws;
+    const picker = '<div class="form-row" style="gap:16px;margin-bottom:14px;align-items:flex-end;">'
+      + '<div class="f" style="width:190px;flex-shrink:0;"><label>Schedule Week (Mon)</label>'
+      + '<input type="date" id="lo-fill-week" value="' + esc(ws) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:9px;">Week of ' + this.fmtDate(ws) + '</div></div>'
+      + '</div>';
+    const sched = this.scheduleForWeek(ws);
+    if (!sched || !(sched.shifts || []).length) {
+      return picker + '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">No posted schedule for this week. '
+        + '<span class="lo-go-build" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Build the schedule</span> first, or pick another week.</div>';
+    }
+    const rows = (sched.shifts || []).map(sh => {
+      const di = DAYS.indexOf(sh.day);
+      const date = this.weekDayYmd(ws, di);
+      const staff = this.staffById(sh.staff_id);
+      return { sh, date, already: this.actualExists(sh.staff_id, date), name: sh.name || (staff ? staff.name : '-') };
+    }).filter(r => r.date)
+      .sort((a, b) => (a.date.localeCompare(b.date)) || (a.name || '').localeCompare(b.name || ''));
+    const trs = rows.map(r => '<tr class="lo-fill-row" data-staff="' + esc(r.sh.staff_id) + '" data-date="' + esc(r.date) + '">'
+      + '<td style="width:36px;text-align:center;"><input type="checkbox" class="lo-fill-cb"' + (r.already ? ' disabled' : ' checked') + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
+      + '<td><div class="val">' + esc(r.name) + '</div></td>'
+      + '<td>' + this.fmtDate(r.date) + '</td>'
+      + '<td>' + esc(r.sh.day || '') + (r.sh.start && r.sh.end ? ' <span style="color:var(--t3);font-size:10px;">' + esc(r.sh.start) + '–' + esc(r.sh.end) + '</span>' : '') + '</td>'
+      + '<td><input type="number" class="lo-fill-hours form-input" min="0" step="0.25" value="' + (r.sh.hours != null ? r.sh.hours : '') + '"' + (r.already ? ' disabled' : '') + ' style="width:80px;"/></td>'
+      + '<td>' + (r.already ? '<span style="color:var(--t3);font-size:11px;">Already logged</span>' : '') + '</td>'
+      + '</tr>').join('');
+    const toLog = rows.filter(r => !r.already).length;
+    return picker
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:36px;"></th><th>Staff</th><th style="width:120px;">Date</th><th style="width:170px;">Shift</th><th style="width:100px;">Hours</th><th></th>'
+      + '</tr></thead><tbody id="lo-fill-body">' + trs + '</tbody></table></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Hours are pre-filled from the posted schedule. Edit any that ran different, uncheck no-shows, then log. Days already logged are skipped.</div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="lo-fill-save"' + (toLog ? '' : ' disabled') + '>Log ' + toLog + ' Entr' + (toLog === 1 ? 'y' : 'ies') + '</button>'
+      + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+  },
+
+  updateFillCount() {
+    let n = 0;
+    document.querySelectorAll('.lo-fill-row').forEach(tr => {
+      const cb = tr.querySelector('.lo-fill-cb');
+      const h = parseFloat(tr.querySelector('.lo-fill-hours')?.value);
+      if (cb && !cb.disabled && cb.checked && !isNaN(h) && h > 0) n++;
+    });
+    const btn = document.getElementById('lo-fill-save');
+    if (btn) { btn.disabled = n === 0; btn.textContent = 'Log ' + n + ' Entr' + (n === 1 ? 'y' : 'ies'); }
+  },
+
+  async commitFill() {
+    const err = document.getElementById('lo-fill-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const recs = [];
+    document.querySelectorAll('.lo-fill-row').forEach(tr => {
+      const cb = tr.querySelector('.lo-fill-cb');
+      if (!cb || cb.disabled || !cb.checked) return;
+      const staffId = tr.dataset.staff, date = tr.dataset.date;
+      const hours = parseFloat(tr.querySelector('.lo-fill-hours')?.value);
+      if (!staffId || !date || isNaN(hours) || hours <= 0) return;
+      if (this.actualExists(staffId, date)) return;
+      const staff = this.staffById(staffId);
+      if (!staff) return;
+      const sal = App.isSalaried(staff);
+      const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staffId, date) : (staff.wage || 0));
+      recs.push({
+        id: App.uid(), date, staff_id: staffId, name: staff.name,
+        position_id: staff.position_id || '', shift_type: '',
+        hours, wage, cost: sal ? 0 : hours * (wage || 0),
+        notes: '', from_schedule: true, created_at: new Date().toISOString()
+      });
+    });
+    if (!recs.length) { fail('Nothing to log. Check at least one row with hours above zero.'); return; }
+    const btn = document.getElementById('lo-fill-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Logging...'; }
+    let ok = true;
+    for (const rec of recs) { this.actuals().push(rec); ok = (await App.putRecord('lc', 'actual', rec)) && ok; }
+    if (ok) {
+      App.markSetupDone('gs_lc_hours');
+      this.renderList();   // stays in schedule mode; logged rows flip to "Already logged" and the list below fills in
+    } else {
+      if (btn) { btn.disabled = false; this.updateFillCount(); }
       fail('Save failed. Try again.');
     }
   },
@@ -393,6 +546,7 @@ S.LaborLogHours = {
 
     const toAdd = [];
     const skipped = [];
+    let dupCount = 0;
     rows.forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const hours = parseFloat(r.hours);
@@ -401,6 +555,12 @@ S.LaborLogHours = {
         return;
       }
       const recDate = this.normDate(r.date);
+      // Skip an exact re-import (same staff + date + hours) so re-dropping a
+      // timeclock file doesn't silently double-count hours into gross pay.
+      if (this.actuals().some(x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
+        dupCount++;
+        return;
+      }
       const sal = App.isSalaried(staff);
       const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0));
       toAdd.push({
@@ -423,7 +583,8 @@ S.LaborLogHours = {
     const imported = toAdd.length;
     if (imported === 0) {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + 'No rows imported. No staff names matched the roster, or hours were missing.</div>';
+        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+                    : 'No rows imported. No staff names matched the roster, or hours were missing.') + '</div>';
       return;
     }
     // Each row persists as its own lc_actuals event; putRecord reverts its own
@@ -443,7 +604,9 @@ S.LaborLogHours = {
     if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
       + 'Imported ' + imported + ' hours entr' + (imported === 1 ? 'y' : 'ies') + '.'
       + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
-          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours).</span>' : '') + '</div>';
+          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours).</span>' : '')
+      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount
+          + ' already logged, skipped.</span>' : '') + '</div>';
   },
 
   async confirmDel(id) {
