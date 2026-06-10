@@ -61,9 +61,7 @@ S.LaborPayrollExport = {
 
     container.innerHTML = '<div class="screen">'
       + '<div class="card form-card" style="margin-bottom:18px;">'
-        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Payroll Export</span>'
-        + App.helpButton('px-how') + '</div>'
+        + '<div class="card-title">Payroll Export</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
           + '<div class="f" style="width:300px;"><label>Pay Period</label><select id="px-week">' + opts + '</select></div>'
           + '<div style="display:flex;align-items:flex-end;gap:10px;">'
@@ -80,7 +78,6 @@ S.LaborPayrollExport = {
       + this._whatsInsideCard()
       + '</div>';
 
-    document.getElementById('px-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('px-xlsx')?.addEventListener('click', () => this._ackThenDownload('xlsx', document.getElementById('px-week')?.value));
     document.getElementById('px-csv')?.addEventListener('click', () => this._ackThenDownload('csv', document.getElementById('px-week')?.value));
   },

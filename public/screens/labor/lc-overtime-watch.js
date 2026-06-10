@@ -122,9 +122,7 @@ S.LaborOvertimeWatch = {
       + '</div></div>';
 
     const dateCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Overtime Watch</span>'
-      + App.helpButton('ow-how') + '</div>'
+      + '<div class="card-title">Overtime Watch</div>'
       + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
       + '<input type="date" id="ow-start" value="' + esc(ws) + '"/></div>'
@@ -179,7 +177,6 @@ S.LaborOvertimeWatch = {
     }
 
     this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + projHeading + projBody + '</div>';
-    document.getElementById('ow-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
     document.getElementById('ow-start')?.addEventListener('change', e => {
       this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));

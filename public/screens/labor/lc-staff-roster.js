@@ -87,7 +87,7 @@ S.LaborStaffRoster = {
       const sid = App._coachingFocus.staff_id;
       App._coachingFocus = null;
       this.detailId = sid;
-      this.renderUnified(sid);
+      App.pushView(() => this.renderUnified(sid));
       this.noteEditId = null;
       this.openNoteModal(sid);
       return;
@@ -97,7 +97,7 @@ S.LaborStaffRoster = {
     if (App._staffFocus && App._staffFocus.staff_id) {
       const sid = App._staffFocus.staff_id;
       App._staffFocus = null;
-      if (this.staffById(sid)) { this.detailId = sid; this.renderUnified(sid); return; }
+      if (this.staffById(sid)) { this.detailId = sid; App.pushView(() => this.renderUnified(sid)); return; }
     }
     this.renderList();
   },
@@ -210,7 +210,7 @@ S.LaborStaffRoster = {
         + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member', App.helpButton('sr-how'))
+      + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
       + '<div class="collapse-body">'
       + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
@@ -256,7 +256,6 @@ S.LaborStaffRoster = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#sr-how'))      { this.showHowTo(); return; }
       if (ev.target.closest('.sr-imp-how'))  { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.sr-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
@@ -267,8 +266,8 @@ S.LaborStaffRoster = {
       const del = ev.target.closest('.sr-del');
       const row = ev.target.closest('.sr-row');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit)  { ev.stopPropagation(); this.renderUnified(edit.dataset.id); }
-      else if (row)   this.renderUnified(row.dataset.id);
+      else if (edit)  { ev.stopPropagation(); const id = edit.dataset.id; App.pushView(() => this.renderUnified(id)); }
+      else if (row)   { const id = row.dataset.id; App.pushView(() => this.renderUnified(id)); }
     };
     if (this.entryMode === 'import') this.mountImporter();
     else this.wirePayFields(false);
@@ -478,7 +477,7 @@ S.LaborStaffRoster = {
   wireUnified(staffId) {
     this.container.onclick = null;
     this.wirePayFields(true);
-    document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
+    document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; App.goBack(); });
     document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
     // Wage history (correct an effective date, or delete a change logged in error)
     this.container.querySelectorAll('.wh-edit').forEach(b => b.addEventListener('click', () => this.openWageEditModal(staffId, parseInt(b.dataset.idx, 10))));

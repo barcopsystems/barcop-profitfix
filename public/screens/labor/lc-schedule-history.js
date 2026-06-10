@@ -69,13 +69,12 @@ S.LaborScheduleHistory = {
       const avgCost = list.length ? list.reduce((t, x) => t + (x.total_cost || 0), 0) / list.length : 0;
       const withRplh = list.filter(x => x.rplh != null);
       const avgRplh = withRplh.length ? withRplh.reduce((t, x) => t + x.rplh, 0) / withRplh.length : null;
-      const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
-        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;flex:1;min-width:0;">'
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Schedules</div><div class="calc-val lg">' + list.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(avgCost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg Labor %</div><div class="calc-val lg ' + (avgPct != null ? (avgPct > target ? 'warn' : 'good') : '') + '">' + (avgPct != null ? App.fmtPct(avgPct) : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Avg RPLH</div><div class="calc-val lg">' + (avgRplh != null ? App.fmtCurrency(avgRplh) : '-') + '</div></div>'
-        + '</div>' + App.helpButton('lh-how') + '</div></div>';
+        + '</div></div>';
       html = statsCard
         + '<div class="sh" style="margin:24px 0 10px;">Schedule History</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -88,7 +87,6 @@ S.LaborScheduleHistory = {
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      if (ev.target.closest('#lh-how')) { this.showHowTo(); return; }
       const row = ev.target.closest('.lh-row');
       const view = ev.target.closest('.lh-view');
       const edit = ev.target.closest('.lh-edit');
@@ -96,8 +94,8 @@ S.LaborScheduleHistory = {
       const build = ev.target.closest('#lh-build');
       if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
       else if (edit)  { ev.stopPropagation(); this.editSchedule(edit.dataset.id); }
-      else if (view)  { ev.stopPropagation(); this.renderDetail(view.dataset.id); }
-      else if (row)   this.renderDetail(row.dataset.id);
+      else if (view)  { ev.stopPropagation(); const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); }
+      else if (row)   { const id = row.dataset.id; App.pushView(() => this.renderDetail(id)); }
       else if (build) App.navigate('lc-build-schedule');
     };
   },

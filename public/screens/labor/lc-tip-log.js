@@ -192,7 +192,7 @@ S.LaborTipLog = {
         + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-log', 'Log Tips', App.helpButton('tl-how'))
+      + App.collapsibleCardTitle('lc-tip-log', 'Log Tips')
       + '<div class="collapse-body">'
       + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
@@ -248,7 +248,6 @@ S.LaborTipLog = {
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      if (ev.target.closest('#tl-how')) { this.showHowTo(); return; }
       if (ev.target.closest('.tl-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.tl-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }

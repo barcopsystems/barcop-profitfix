@@ -150,7 +150,7 @@ S.LaborCalloutLog = {
     }
 
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out', App.helpButton('co-how'))
+      + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out')
       + '<div class="collapse-body">'
       + this.formCells(null)
       + '<div class="card-actions">'
@@ -192,7 +192,6 @@ S.LaborCalloutLog = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#co-how'))  { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#co-save')) { this.save('co-'); return; }

@@ -198,7 +198,7 @@ S.LaborLogHours = {
         + '</div>';
     }
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-log-hours', 'Log Hours', App.helpButton('lo-how'))
+      + App.collapsibleCardTitle('lc-log-hours', 'Log Hours')
       + '<div class="collapse-body">'
       + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('schedule', 'Fill from Schedule') + segBtn('import', 'Import File') + '</div>'
       + modeBody
@@ -258,7 +258,6 @@ S.LaborLogHours = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#lo-how'))     { this.showHowTo(); return; }
       if (ev.target.closest('.lo-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.lo-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }

@@ -306,7 +306,7 @@ S.LaborBuildSchedule = {
     // Save card — name it to also save a reusable template (optional).
     const actionsCard = '<div class="card form-card"><div class="card-title">Save</div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name ' + tt('bs-tmpl-name') + '</label>'
+      + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name</label>'
       + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional, name it to save as a template"/></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:14px;"><label>Notes</label><textarea id="bs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
@@ -317,8 +317,7 @@ S.LaborBuildSchedule = {
       + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Week and Labor Budget</span>'
-      + App.helpButton('bs-how') + '</div>'
+      + '<div class="card form-card"><div class="card-title">Week and Labor Budget</div>'
       + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
       + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
@@ -352,7 +351,6 @@ S.LaborBuildSchedule = {
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
     document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
-    document.getElementById('bs-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('bs-save')?.addEventListener('click', () => this.save());
     document.getElementById('bs-new')?.addEventListener('click', async () => {
       if (this.draft.shifts.length) {

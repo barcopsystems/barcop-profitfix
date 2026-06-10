@@ -72,9 +72,7 @@ S.LaborTipHistory = {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
   },
   statsCard(items) {
-    return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
-      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
-      + App.helpButton('th-how') + '</div></div>';
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
     return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -130,7 +128,6 @@ S.LaborTipHistory = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#th-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#th-export')) { App.exportPDF({ title: 'Tip History', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }

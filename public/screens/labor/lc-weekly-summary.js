@@ -109,9 +109,7 @@ S.LaborWeeklySummary = {
       + '</div></div>';
 
     const dateCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Weekly Summary</span>'
-      + App.helpButton('ws-how') + '</div>'
+      + '<div class="card-title">Weekly Summary</div>'
       + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
       + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
@@ -217,7 +215,6 @@ S.LaborWeeklySummary = {
       if (S.LaborLogHours) { S.LaborLogHours.entryMode = 'schedule'; S.LaborLogHours._fillWeek = this.weekStart; }
       App.navigate('lc-log-hours');
     });
-    document.getElementById('ws-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
     document.getElementById('ws-start')?.addEventListener('change', e => {
       this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));

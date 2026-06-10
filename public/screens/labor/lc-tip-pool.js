@@ -68,7 +68,7 @@ S.LaborTipPool = {
     const rowHtml = this.rows.map((r, i) => this.participantRowHtml(r, i, equal)).join('');
 
     const setupCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool', App.helpButton('tp-how'))
+      + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
@@ -160,7 +160,6 @@ S.LaborTipPool = {
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
     document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.renderMain(); });
-    document.getElementById('tp-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');

@@ -100,9 +100,7 @@ S.LaborDailyView = {
       + '</div></div>';
 
     const dateCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Daily Snapshot</span>'
-      + App.helpButton('dv-how') + '</div>'
+      + '<div class="card-title">Daily Snapshot</div>'
       + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
@@ -178,7 +176,6 @@ S.LaborDailyView = {
     }
 
     this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + actualsCard + schedCard + '</div>';
-    document.getElementById('dv-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('dv-export')?.addEventListener('click', () => App.exportPDF({ title: 'Daily Snapshot', root: this.container }));
     document.getElementById('dv-date')?.addEventListener('change', e => {
       this.date = e.target.value || this.date;

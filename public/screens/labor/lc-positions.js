@@ -59,7 +59,7 @@ S.LaborPositions = {
     });
 
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-positions', 'Add Position', App.helpButton('lp-how'))
+      + App.collapsibleCardTitle('lc-positions', 'Add Position')
       + '<div class="collapse-body">'
       + this.formBody(null)
       + '<div class="card-actions">'
@@ -90,7 +90,6 @@ S.LaborPositions = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('#lp-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lp-save')) { this.editId = null; this.save('lp-'); return; }

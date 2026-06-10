@@ -176,8 +176,7 @@ S.LaborPayPeriods = {
     }, { hours: 0, gross: 0, ot_hours: 0 });
 
     const topCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>Pay Periods</span>' + App.helpButton('pp-how') + '</div>'
+      + '<div class="card-title">Pay Periods</div>'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks Hours</div><div class="calc-val lg">' + totals.hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last 12 Weeks OT Hours</div><div class="calc-val lg ' + (totals.ot_hours > 0 ? 'warn' : '') + '">' + totals.ot_hours.toFixed(1) + '</div></div>'
@@ -239,8 +238,7 @@ S.LaborPayPeriods = {
 
     this.container.innerHTML = '<div class="screen">' + topCard + openCard + closedCard + '</div>';
 
-    document.getElementById('pp-how')?.addEventListener('click', () => this.showHowTo());
-    this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { this.detailWeekStart = b.dataset.ws; this.renderDetail(b.dataset.ws); }));
+    this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { const ws = b.dataset.ws; this.detailWeekStart = ws; App.pushView(() => this.renderDetail(ws)); }));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
   },

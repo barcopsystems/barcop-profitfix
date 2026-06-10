@@ -35,11 +35,9 @@ S.LaborWageSettings = {
 
     this.container.innerHTML = '<div class="screen">'
       + '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>State Minimum Wage</span>'
-      + App.helpButton('lws-how') + '</div>'
+      + '<div class="card-title">State Minimum Wage</div>'
       + '<div class="form-row" style="gap:14px;align-items:center;margin-bottom:0;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage ' + tt('lws-min-wage') + '</label>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>State Min Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="lws-min-wage" min="0" step="0.01" value="' + v(s.state_min_wage != null ? s.state_min_wage : '') + '" placeholder="Per hour"/></div></div>'
       + '</div>'
       + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:16px;">'
@@ -53,7 +51,6 @@ S.LaborWageSettings = {
       + '</div>'
       + '</div>';
 
-    document.getElementById('lws-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('lws-save')?.addEventListener('click', () => this.save());
   },
 

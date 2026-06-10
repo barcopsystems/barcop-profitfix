@@ -58,9 +58,7 @@ S.LaborReports = {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
   },
   statsCard(items) {
-    return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
-      + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
-      + App.helpButton('lr-how') + '</div></div>';
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   sectionHeading(title) {
     return '<div class="sh" style="margin:24px 0 10px;">' + esc(title) + '</div>';
@@ -151,7 +149,6 @@ S.LaborReports = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#lr-how'))    { this.showHowTo(); return; }
       if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Reports', root: this.container }); return; }
       if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
       const preset = ev.target.closest('.lr-preset');
