@@ -16,6 +16,7 @@ S.LaborLogHours = {
   _fillModel: null,        // in-memory Fill-from-Schedule rows (survive day-tab switches)
   _fillTab: null,          // active day tab (Mon-first index) in Fill from Schedule
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
@@ -292,8 +293,15 @@ S.LaborLogHours = {
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
       const rangeChip = ev.target.closest('.lo-range-chip');
       if (rangeChip) {
-        this.filterPreset = rangeChip.dataset.v;
-        if (this.filterPreset !== 'custom') { this.filterFrom = ''; this.filterTo = ''; }
+        const v = rangeChip.dataset.v;
+        if (v === 'custom') {
+          // Custom is a toggle: a second click on it closes the pickers and
+          // returns to whatever range was active before opening Custom.
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else {
+          this.filterPreset = v; this.filterFrom = ''; this.filterTo = '';
+        }
         this.renderList();
         return;
       }
@@ -518,7 +526,7 @@ S.LaborLogHours = {
     const tabs = '<div class="ch-tabs no-print">' + presentDays.map(di => {
       const unlogged = model.rows.filter(r => r.dayIdx === di && !r.already).length;
       return '<button class="ch-tab lo-fill-tab' + (di === this._fillTab ? ' on' : '') + '" data-day="' + di + '">'
-        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;font-size:10px;">(' + unlogged + ' to log)</span>' : '')
+        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;font-size:9px;letter-spacing:0;">(' + unlogged + ' to log)</span>' : '')
         + '</button>';
     }).join('') + '</div>';
 
