@@ -222,10 +222,10 @@ S.InventoryLocations = {
       : '';
 
     const triageStrip = (active.length && unplaced)
-      ? '<div class="card" style="margin-top:14px;border:1px solid var(--amber);background:rgba(154,93,52,0.08);">'
+      ? '<div class="card" style="margin-top:14px;border:1px solid var(--b-edge);background:var(--input);">'
           + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
           + '<div style="font-size:13px;color:var(--t1);"><strong>' + unplaced + ' product' + (unplaced === 1 ? '' : 's') + ' ' + (unplaced === 1 ? 'is' : 'are') + ' not in any location yet.</strong> They will not be counted until you place them.</div>'
-          + '<button class="btn btn-primary btn-sm" id="il-triage-open">Assign Products</button>'
+          + '<button class="btn btn-ghost btn-sm" id="il-triage-open">Assign Products</button>'
         + '</div></div>'
       : '';
 
@@ -262,7 +262,7 @@ S.InventoryLocations = {
       listSection = listHeading + listCard + archivedSection;
     }
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + triageStrip + this.addFormCard() + this.pickerSection() + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + triageStrip + this.addFormCard() + this.pickerSection() + this.saveLocRow() + listSection + '</div>';
     this.wireList();
   },
 
@@ -287,19 +287,22 @@ S.InventoryLocations = {
     }
     const nameErr = this._newNameError ? ' style="border-color:var(--red);"' : '';
     return '<div class="card form-card" style="margin-top:14px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Add a Location</span>'
-        + '<span style="display:flex;align-items:center;gap:10px;">'
-          + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
-          + '<button class="btn btn-primary btn-sm" id="il-new-save">Save Location</button>'
-        + '</span>'
-      + '</div>'
+      + '<div class="card-title">Add a Location</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Name Location</label>'
         + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"' + nameErr + '/></div>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + counter
       + '</div></div>';
+  },
+
+  // Save Location button below the Add a Location card (and below the product
+  // picker when it is open), bottom-left.
+  saveLocRow() {
+    return '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
+      + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   newFilterHTML() {
@@ -474,13 +477,7 @@ S.InventoryLocations = {
     const linkLabel = products ? '&#10003; Save Product Changes' : '+ Add/Delete Products';
 
     const nameCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Editing ' + esc(l.name) + '</span>'
-        + '<span style="display:flex;align-items:center;gap:10px;">'
-          + '<span id="il-err" style="color:var(--red);font-size:12px;display:none;text-transform:none;letter-spacing:0;font-weight:400;"></span>'
-          + '<button class="btn btn-primary btn-sm" id="il-update-loc">Update Location</button>'
-        + '</span>'
-      + '</div>'
+      + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-editprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
@@ -514,7 +511,11 @@ S.InventoryLocations = {
       middle = arrangeHeading + arrangeCard;
     }
 
-    return nameCard + middle;
+    const updateRow = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="il-update-loc">Update Location</button>'
+      + '<span id="il-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
+    return nameCard + middle + updateRow;
   },
 
   // The edit screen's Add/Delete picker: every active product (category-tabbed),
@@ -671,7 +672,7 @@ S.InventoryLocations = {
     this.triageChecked = new Set();
     const firstLoc = this.locations().find(l => !l.archived);
     this._triageDest = firstLoc ? firstLoc.name : '';
-    App.openModal(this.triageModalHTML(), { id: 'il-triage', maxWidth: 600 });
+    App.openModal(this.triageModalHTML(), { id: 'il-triage', maxWidth: 600, noClose: true });
     this.wireTriage();
   },
 
@@ -680,14 +681,14 @@ S.InventoryLocations = {
       .map(l => '<option value="' + esc(l.name) + '"' + (l.name === this._triageDest ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
     return '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Assign Products to a Location</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">These products are not in any location yet, so they will not be counted. Pick where they live, check them off, and assign. Repeat for other spots.</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Pick a location, check the products that live there, and assign.</div>'
       + '<div class="form-row" style="align-items:flex-end;gap:14px;margin-bottom:6px;">'
         + '<div class="f" style="width:260px;"><label>Add checked products to</label><select id="il-triage-dest">' + destOpts + '</select></div>'
       + '</div>'
       + '<div id="il-triage-filter">' + this.triageFilterHTML() + '</div>'
       + '<div class="card-actions" style="align-items:center;">'
         + '<button class="btn btn-primary" id="il-triage-assign">Assign to Location</button>'
-        + '<button class="btn btn-ghost" id="il-triage-close">Close</button>'
+        + '<button class="btn btn-ghost" id="il-triage-close">Cancel</button>'
         + '<span id="il-triage-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
       + '</div></div>';
   },
