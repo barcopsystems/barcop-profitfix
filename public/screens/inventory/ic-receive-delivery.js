@@ -637,10 +637,12 @@ S.InventoryReceiveDelivery = {
       }
     }
 
-    // Persist: product cost changes (config blob), the delivery (row), and the
+    // Persist DELIVERY FIRST so a mid-write failure leaves the delivery on
+    // record (replayable) rather than a product cost change with no delivery
+    // behind it: the delivery (row), then cost changes (config blob), then the
     // matched order's new status (row).
-    const okCfg = appliedUpdates.length ? await App.saveInventory() : true;
     const okDel = await App.putRecord('ic', 'delivery', record);
+    const okCfg = appliedUpdates.length ? await App.saveInventory() : true;
     const okOrd = matchedOrder ? await App.putRecord('ic', 'order', matchedOrder) : true;
     const ok = okDel && okCfg && okOrd;
     if (ok) {
