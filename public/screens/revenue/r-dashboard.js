@@ -16,7 +16,7 @@ S.RevenueDashboard = {
     const totalRev   = latest ? (latest.bar_revenue||0) + (latest.floor_revenue||0) : null;
     const covers     = latest?.covers ?? null;
     const targetCA   = t.check_avg ?? 35;
-    const targetLP   = ((t.bar_labor_pct||28) + (t.kitchen_labor_pct||30) + (t.floor_labor_pct||32)) / 3;
+    const targetLP   = App.laborTargetPct();
 
     // Alert
     let alertHtml = '';
@@ -387,7 +387,7 @@ S.RevenueDashboard = {
     const t  = App.data.revenue_settings?.targets || {};
     const avg = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : 0; };
     const caT = t.check_avg || 35;
-    const lpT = ((t.bar_labor_pct||28)+(t.kitchen_labor_pct||30)+(t.floor_labor_pct||32))/3;
+    const lpT = App.laborTargetPct();
     const caVals  = weeks.map(w=>w.check_avg).filter(v=>v!=null);
     const lpVals  = weeks.map(w=>w.labor_pct_blended).filter(v=>v!=null);
     const revVals = weeks.map(w=>(w.bar_revenue||0)+(w.floor_revenue||0));
