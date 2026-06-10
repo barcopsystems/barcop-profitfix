@@ -44,7 +44,7 @@ S.PrepBatches = {
   },
   toOz(v, u) { const m = this.YUNITS.find(x => x.l === u); return v * (m ? m.oz : 1); },
 
-  CATEGORIES: ['Cocktail Mix', 'Syrup', 'Sauce', 'Marinade', 'Stock', 'Dressing', 'Other'],
+  CATEGORIES: ['Cocktail Mix', 'Syrup', 'Infusion', 'Non-Alcoholic Mix', 'Sauce', 'Marinade', 'Stock', 'Dressing', 'Spice Blend / Rub', 'Brine / Pickle', 'Compound Butter', 'Batter / Breading', 'Other'],
 
   list() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -60,13 +60,19 @@ S.PrepBatches = {
   BAR_CATS:  ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
   FOOD_CATS: ['Food', 'Misc'],
   BATCH_CAT_TO_MODE: {
-    'Cocktail Mix': 'bar',
-    'Syrup':        'bar',
-    'Sauce':        'food',
-    'Marinade':     'food',
-    'Stock':        'food',
-    'Dressing':     'food',
-    'Other':        'all'
+    'Cocktail Mix':      'bar',
+    'Syrup':             'bar',
+    'Infusion':          'all',   // spirit base + a fruit/herb/pepper that lives in Food
+    'Non-Alcoholic Mix': 'food',  // juices/syrups (Misc) + fruit/tea/sugar (Food), no liquor
+    'Sauce':             'food',
+    'Marinade':          'food',
+    'Stock':             'food',
+    'Dressing':          'food',
+    'Spice Blend / Rub': 'food',
+    'Brine / Pickle':    'food',
+    'Compound Butter':   'food',
+    'Batter / Breading': 'food',
+    'Other':             'all'
   },
   modeForBatchCategory(cat) { return this.BATCH_CAT_TO_MODE[cat] || 'all'; },
 
@@ -363,7 +369,10 @@ S.PrepBatches = {
     if (!area) return;
     const currentCat = this._el('pb-cat')?.value || '';
     const mode = this.modeForBatchCategory(currentCat);
-    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
+    // Cap the builder width on the landing so the ingredient selector is not
+    // absurdly wide on a full-page form; the popup (narrower already) stays full.
+    const narrow = (this._scope === this.container) ? 'max-width:820px;' : '';
+    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;' + narrow + '">'
       + '<table class="ing-tbl"><thead><tr>'
       + '<th style="min-width:200px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
       + '<th style="width:100px;">Unit Cost</th><th style="width:100px;">Line Cost</th><th style="width:90px;"></th>'
