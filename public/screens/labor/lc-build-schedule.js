@@ -27,13 +27,8 @@ S.LaborBuildSchedule = {
   positionById(id) { return ((App.laborData && App.laborData.lc_positions) || []).find(p => p.id === id); },
   deptOf(staffId) { const p = this.positionById((this.staffById(staffId) || {}).position_id); return (p && p.department) || 'Other'; },
 
-  laborTarget() {
-    const t = (App.data && App.data.settings && App.data.settings.targets) || {};
-    if (t.labor_cost_pct != null) return Number(t.labor_cost_pct);
-    if (t.bar_labor_cost_pct != null && t.food_labor_cost_pct != null)
-      return (Number(t.bar_labor_cost_pct) + Number(t.food_labor_cost_pct)) / 2;
-    return 29;
-  },
+  // One canonical labor-cost target, shared with Revenue Recovery (App.laborTargetPct).
+  laborTarget() { return App.laborTargetPct(); },
   hoursOf(start, end) {
     if (!start || !end) return 0;
     const ps = start.split(':'), pe = end.split(':');
@@ -259,7 +254,8 @@ S.LaborBuildSchedule = {
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
-        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ') '
+        + '<button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div><div class="calc-val lg">' + App.fmtCurrency(budget) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div></div>';
@@ -399,6 +395,7 @@ S.LaborBuildSchedule = {
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
     document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
+    document.getElementById('bs-lt')?.addEventListener('click', () => this.openLaborTargetModal());
     document.getElementById('bs-save')?.addEventListener('click', () => this.save());
     document.getElementById('bs-new')?.addEventListener('click', async () => {
       if (this.draft.shifts.length) {
@@ -449,8 +446,8 @@ S.LaborBuildSchedule = {
     const sal = App.isSalaried(staff);
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Start</label><input type="time" id="bs-m-start" value="' + esc(sh.start || '') + '"/></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>End</label><input type="time" id="bs-m-end" value="' + esc(sh.end || '') + '"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Start</label><input type="time" id="bs-m-start" step="900" value="' + esc(sh.start || '') + '"/></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>End</label><input type="time" id="bs-m-end" step="900" value="' + esc(sh.end || '') + '"/></div>'
       + '</div>'
       + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
       + '<div class="card-actions">'
@@ -485,6 +482,38 @@ S.LaborBuildSchedule = {
       if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end }; }
       else { this.draft.shifts.push({ staff_id: staffId, day, start, end }); }
       this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
+    });
+  },
+
+  // ── Labor Cost Target modal (writes the ONE settings.targets.labor_cost_pct) ──
+  // Edits the global labor-cost target inline, since a new user has no idea the
+  // budget % comes from App Settings. Changing it here moves the target across
+  // Bar Cop (schedule budget + Profit/Revenue Recovery) — it is one setting.
+  openLaborTargetModal() {
+    const cur = App.laborTargetPct();
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Labor Cost Target</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">The share of sales you aim to spend on labor. Bar Cop uses this one number across the schedule budget and both Profit and Revenue Recovery, so changing it here updates it everywhere.</div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:170px;"><label>Labor Cost Target</label>'
+      + '<div class="fw"><input class="suf" type="number" id="bs-lt-val" min="0" step="0.1" value="' + esc(String(cur)) + '"/><span class="suf">%</span></div></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Adjust all your targets in <span id="bs-lt-settings" style="color:var(--gold);cursor:pointer;text-decoration:underline;">App Settings</span>.</div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="bs-lt-save">Save</button>'
+      + '<button class="btn btn-ghost" id="bs-lt-cancel">Cancel</button>'
+      + '<span id="bs-lt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'bs-lt-modal', maxWidth: 460, noClose: true });
+    document.getElementById('bs-lt-cancel')?.addEventListener('click', () => App.closeModal('bs-lt-modal'));
+    document.getElementById('bs-lt-settings')?.addEventListener('click', () => { App.closeModal('bs-lt-modal'); if (window.S && S.HubSettings) S.HubSettings.open(); });
+    document.getElementById('bs-lt-save')?.addEventListener('click', async () => {
+      const v = parseFloat(document.getElementById('bs-lt-val')?.value);
+      const err = document.getElementById('bs-lt-err');
+      if (isNaN(v) || v <= 0) { if (err) { err.textContent = 'Enter a labor cost target percent.'; err.style.display = 'inline'; } return; }
+      if (!App.data.settings) App.data.settings = {};
+      if (!App.data.settings.targets) App.data.settings.targets = {};
+      App.data.settings.targets.labor_cost_pct = Math.round(v * 10) / 10;
+      await App.saveKey('settings');
+      App.closeModal('bs-lt-modal');
+      this.draw();
     });
   },
 
