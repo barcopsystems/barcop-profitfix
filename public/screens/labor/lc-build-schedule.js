@@ -65,14 +65,27 @@ S.LaborBuildSchedule = {
     d.setDate(d.getDate() + dayIdx);
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
   },
-  // Jump the schedule a week back/forward from the arrow buttons.
-  shiftWeek(days) {
+  // A new, unsaved build (no editId, has shifts) would be discarded by loading
+  // another week, so confirm first. Viewing/editing a posted week needs no
+  // confirm — switching just re-reads the target week.
+  confirmLeaveUnsaved() {
+    if (this.editId || !(this.draft.shifts || []).length) return Promise.resolve(true);
+    return App.confirm({
+      title: 'Leave this unsaved schedule?',
+      message: 'You have a schedule started for this week that has not been saved. Switching weeks clears it. Save it first if you want to keep it.',
+      confirmText: 'Switch Weeks', cancelText: 'Stay', danger: false
+    });
+  },
+  // Jump the schedule a week back/forward from the arrow buttons, loading the
+  // target week's posted schedule or a fresh grid.
+  async shiftWeek(days) {
     const base = this.draft.week_start || this.mondayOf(App.todayLocal());
     const d = new Date(base + 'T00:00:00');
     if (isNaN(d.getTime())) return;
     d.setDate(d.getDate() + days);
-    this.draft.week_start = this.mondayOf(App.ymdLocal(d));
-    this.saveDraft();
+    const target = this.mondayOf(App.ymdLocal(d));
+    if (!(await this.confirmLeaveUnsaved())) return;
+    this.loadWeek(target);
     this.draw();
   },
   weekLabel(ws) {
@@ -106,21 +119,53 @@ S.LaborBuildSchedule = {
   },
   saveDraft() { if (this.editId) return; try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
   clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} },
+  savedDraft() { try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {} return null; },
+
+  // Point the grid at a given week: its posted schedule (editable, editId set) if
+  // one exists, otherwise an empty grid for that week (editId null, ready to
+  // build). editId always tracks the displayed week so a save targets the right
+  // record (or hits the duplicate-week guard for a brand-new week).
+  loadWeek(wk) {
+    const posted = this.schedules().find(s => s.week_start === wk);
+    if (posted) {
+      this.editId = posted.id;
+      this.draft = {
+        week_start: posted.week_start || wk,
+        shifts: (posted.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end })),
+        notes: posted.notes || ''
+      };
+    } else {
+      this.editId = null;
+      this.draft = { week_start: wk, shifts: [], notes: '' };
+    }
+    this.saveDraft();
+  },
 
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    // A plain visit (sidebar/Build Schedule) is always a fresh week. Only an
-    // explicit Edit handoff from Schedule History resumes a posted schedule, so
-    // a stale editId never silently overwrites a previously posted week.
-    if (this._enterEdit) this._enterEdit = false;
-    else this.editId = null;
-    this.draft = this.loadDraft();
-    // One-shot "go to this week" handoff (e.g. Overtime Watch → View Schedule
-    // for a week with no posted schedule). Start a fresh grid on that week.
-    if (this._gotoWeek) {
+    // Landing behavior. Every week change re-resolves editId to that week's
+    // posted schedule (or null), so editId always matches the displayed week and
+    // a save can never overwrite the wrong week.
+    if (this._enterEdit) {
+      // Explicit Edit handoff from Schedule History: resume that posted schedule
+      // by id (loadDraft reads it because editId is already set).
+      this._enterEdit = false;
+      this.draft = this.loadDraft();
+    } else if (this._gotoWeek) {
+      // One-shot "go to this week" (e.g. Overtime Watch → View Schedule).
       const gw = this._gotoWeek; this._gotoWeek = null;
-      if (!this.editId && this.draft.week_start !== gw) { this.draft = { week_start: gw, shifts: [], notes: '' }; this.saveDraft(); }
+      this.editId = null;
+      this.loadWeek(gw);
+    } else {
+      // Plain visit: resume an in-progress unsaved build if there is one, else
+      // land on the CURRENT week, showing its posted schedule (editable) or an
+      // empty grid ready to build. Landing on a populated current week saves the
+      // trip through Schedule History to make a quick change to this week.
+      this.editId = null;
+      const saved = this.savedDraft();
+      if (saved && (saved.shifts || []).length) this.draft = saved;
+      else this.loadWeek(this.mondayOf(App.todayLocal()));
     }
     if (this.activeStaff().length === 0) {
       App.setupCard(this.container, {
@@ -343,9 +388,12 @@ S.LaborBuildSchedule = {
   },
 
   _wire() {
-    document.getElementById('bs-week')?.addEventListener('change', e => {
-      this.draft.week_start = this.mondayOf(e.target.value) || '';
-      this.saveDraft(); this.draw();
+    document.getElementById('bs-week')?.addEventListener('change', async e => {
+      const target = this.mondayOf(e.target.value) || '';
+      if (!target) return;
+      if (!(await this.confirmLeaveUnsaved())) { e.target.value = this.draft.week_start || ''; return; }
+      this.loadWeek(target);
+      this.draw();
     });
     document.getElementById('bs-week-prev')?.addEventListener('click', () => this.shiftWeek(-7));
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
