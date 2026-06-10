@@ -369,7 +369,7 @@ S.LaborTipLog = {
       + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (total > 0 ? App.fmtCurrency(total, 2) : '-') + '</div></td>'
-      + '<td><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
+      + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
 
