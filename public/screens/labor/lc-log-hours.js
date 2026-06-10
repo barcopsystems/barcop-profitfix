@@ -31,6 +31,20 @@ S.LaborLogHours = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  // Day-block header for the Fill-from-Schedule table ("Monday, Jun 9").
+  fmtDayHeader(str) {
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  },
+  // 24h "HH:MM" -> 12h ("16:00" -> "4p", "00:00" -> "12a").
+  fmtTime(t) {
+    if (!t) return '';
+    const [h, m] = String(t).split(':').map(Number);
+    if (isNaN(h)) return esc(t);
+    const ap = h < 12 ? 'a' : 'p';
+    let hr = h % 12; if (hr === 0) hr = 12;
+    return hr + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
+  },
   normDate(raw) {
     if (!raw) return '';
     const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
@@ -218,12 +232,6 @@ S.LaborLogHours = {
       + modeBody
       + '</div></div>';
 
-    // The recent-entries list (stats + filter + table) shows only in Manual mode,
-    // so Fill-from-Schedule and Import stay focused on their task instead of a page
-    // that runs long below the fill table. The full history lives in Labor Reports
-    // (Day / Week / Range).
-    let below = '';
-    if (this.entryMode === 'manual') {
     const all = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
     const filtered = this.applyFilters(all);
@@ -231,6 +239,7 @@ S.LaborLogHours = {
     const totCost  = filtered.reduce((s, a) => s + (App.isSalaried(a.staff_id)
       ? (App.staffWeeklySalary(a.staff_id) / 7) : (parseFloat(a.cost) || 0)), 0);
 
+    let below;
     if (all.length === 0) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged yet. Log your first entry above, or import a '
         + 'timeclock export. Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div>';
@@ -273,7 +282,6 @@ S.LaborLogHours = {
         + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div></div>';
 
       below = statsCard + filterHeading + this.filterCard() + listHtml;
-    }
     }
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
@@ -464,18 +472,36 @@ S.LaborLogHours = {
       return { sh, date, already: this.actualExists(sh.staff_id, date), name: sh.name || (staff ? staff.name : '-') };
     }).filter(r => r.date)
       .sort((a, b) => (a.date.localeCompare(b.date)) || (a.name || '').localeCompare(b.name || ''));
-    const trs = rows.map(r => '<tr class="lo-fill-row" data-staff="' + esc(r.sh.staff_id) + '" data-date="' + esc(r.date) + '">'
-      + '<td style="width:36px;text-align:center;"><input type="checkbox" class="lo-fill-cb"' + (r.already ? ' disabled' : ' checked') + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
-      + '<td><div class="val">' + esc(r.name) + '</div></td>'
-      + '<td>' + this.fmtDate(r.date) + '</td>'
-      + '<td>' + esc(r.sh.day || '') + (r.sh.start && r.sh.end ? ' <span style="color:var(--t3);font-size:10px;">' + esc(r.sh.start) + '–' + esc(r.sh.end) + '</span>' : '') + '</td>'
-      + '<td><input type="number" class="lo-fill-hours form-input" min="0" step="0.25" value="' + (r.sh.hours != null ? r.sh.hours : '') + '"' + (r.already ? ' disabled' : '') + ' style="width:80px;"/></td>'
-      + '<td>' + (r.already ? '<span style="color:var(--t3);font-size:11px;">Already logged</span>' : '') + '</td>'
-      + '</tr>').join('');
+    // Group the rows into day blocks (a gold day-header row spanning the table,
+    // then that day's staff rows). The repeating per-row date is dropped — the
+    // header carries it — so a long week reads as scannable Mon/Tue/Wed blocks
+    // instead of one undifferentiated list.
+    let trs = '';
+    let curDate = null;
+    rows.forEach(r => {
+      if (r.date !== curDate) {
+        curDate = r.date;
+        const n = rows.filter(x => x.date === curDate && !x.already).length;
+        trs += '<tr class="lo-fill-dayhdr"><td colspan="5" style="padding:11px 8px 5px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);background:var(--input);">'
+          + esc(this.fmtDayHeader(curDate))
+          + (n ? ' <span style="color:var(--t3);font-weight:400;letter-spacing:1px;">&middot; ' + n + ' to log</span>' : '')
+          + '</td></tr>';
+      }
+      const time = (r.sh.start && r.sh.end)
+        ? '<span style="color:var(--t3);font-size:11px;">' + esc(this.fmtTime(r.sh.start)) + '&ndash;' + esc(this.fmtTime(r.sh.end)) + '</span>'
+        : '';
+      trs += '<tr class="lo-fill-row" data-staff="' + esc(r.sh.staff_id) + '" data-date="' + esc(r.date) + '">'
+        + '<td style="width:36px;text-align:center;"><input type="checkbox" class="lo-fill-cb"' + (r.already ? ' disabled' : ' checked') + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
+        + '<td><div class="val">' + esc(r.name) + '</div></td>'
+        + '<td>' + time + '</td>'
+        + '<td><input type="number" class="lo-fill-hours form-input" min="0" step="0.25" value="' + (r.sh.hours != null ? r.sh.hours : '') + '"' + (r.already ? ' disabled' : '') + ' style="width:80px;"/></td>'
+        + '<td>' + (r.already ? '<span style="color:var(--t3);font-size:11px;">Already logged</span>' : '') + '</td>'
+        + '</tr>';
+    });
     const toLog = rows.filter(r => !r.already).length;
     return picker
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
-      + '<th style="width:36px;"></th><th>Staff</th><th style="width:120px;">Date</th><th style="width:170px;">Shift</th><th style="width:100px;">Hours</th><th></th>'
+      + '<th style="width:36px;"></th><th>Staff</th><th style="width:150px;">Shift</th><th style="width:90px;">Hours</th><th style="width:120px;"></th>'
       + '</tr></thead><tbody id="lo-fill-body">' + trs + '</tbody></table></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Hours are pre-filled from the posted schedule. Edit any that ran different, uncheck no-shows, then log. Days already logged are skipped.</div>'
       + '<div class="card-actions">'
