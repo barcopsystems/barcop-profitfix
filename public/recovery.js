@@ -74,8 +74,7 @@ window.Recovery = {
       series: 'revenue_weeks', label: 'Labor Cost', lowerBetter: true,
       value: w => w.labor_pct_blended,
       base:  w => (w.bar_revenue || 0) + (w.floor_revenue || 0), baseKind: 'pts',
-      target: () => { const t = Recovery._rtargets();
-        return ((t.bar_labor_pct ?? 28) + (t.kitchen_labor_pct ?? 30) + (t.floor_labor_pct ?? 32)) / 3; },
+      target: () => App.laborTargetPct(),
       fmt: v => v.toFixed(1) + '%'
     },
     'rplh': {
