@@ -7,6 +7,7 @@
 
 S.LaborTipPool = {
   _pendingDelId: null,
+  _editId: null,      // id of a saved pool being edited (null = building a new one)
   date: '',
   pool: '',
   method: 'hours',
@@ -37,6 +38,7 @@ S.LaborTipPool = {
     this.pool = '';
     this.rows = [];
     this.method = 'hours';
+    this._editId = null;
     this.renderMain();
   },
 
@@ -66,7 +68,7 @@ S.LaborTipPool = {
     const rowHtml = this.rows.map((r, i) => this.participantRowHtml(r, i, equal)).join('');
 
     const setupCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-pool', 'Tip Pool', App.helpButton('tp-how'))
+      + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool', App.helpButton('tp-how'))
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
@@ -99,8 +101,8 @@ S.LaborTipPool = {
       + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
       + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="tp-save">Save Tip Pool</button>'
-      + '<button class="btn btn-ghost" id="tp-clear">Clear</button>'
+      + '<button class="btn btn-primary" id="tp-save">' + (this._editId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
+      + '<button class="btn btn-ghost" id="tp-clear">' + (this._editId ? 'Cancel Edit' : 'Clear') + '</button>'
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
       + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:16px;">'
@@ -157,7 +159,7 @@ S.LaborTipPool = {
     });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
-    document.getElementById('tp-clear')?.addEventListener('click', () => { this.rows = []; this.pool = ''; this.renderMain(); });
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.renderMain(); });
     document.getElementById('tp-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
@@ -166,8 +168,10 @@ S.LaborTipPool = {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.tp-hrow');
       const hview = ev.target.closest('.tp-hview');
+      const hedit = ev.target.closest('.tp-hedit');
       const hdel = ev.target.closest('.tp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hedit) { ev.stopPropagation(); this.editPool(hedit.dataset.id); }
       else if (hview) { ev.stopPropagation(); this.renderDetail(hview.dataset.id); }
       else if (hrow) this.renderDetail(hrow.dataset.id);
     };
@@ -303,30 +307,50 @@ S.LaborTipPool = {
       .filter(sh => sh.date === this.date)
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
 
+    const existing = this._editId ? this.pools().find(x => x.id === this._editId) : null;
     const rec = {
-      id:          App.uid(),
-      shift_id:    matchShift ? matchShift.id : '',
+      id:          this._editId || App.uid(),
+      shift_id:    matchShift ? matchShift.id : (existing ? existing.shift_id : ''),
       date:        this.date,
-      shift_type:  matchShift ? (matchShift.shift_type || '') : '',
+      shift_type:  matchShift ? (matchShift.shift_type || '') : (existing ? (existing.shift_type || '') : ''),
       method:      this.method,
       pool_amount: pool,
       total_hours: totalHours,
       participants,
-      created_at:  new Date().toISOString()
+      created_at:  (existing && existing.created_at) ? existing.created_at : new Date().toISOString()
     };
+    if (this._editId) rec.updated_at = new Date().toISOString();
 
     const btn = document.getElementById('tp-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    this.pools().push(rec);
+    const idx = this._editId ? this.pools().findIndex(x => x.id === this._editId) : -1;
+    if (idx >= 0) this.pools()[idx] = rec; else this.pools().push(rec);
     const ok = await App.putRecord('lc', 'tip_pool', rec);
     if (ok) {
+      this._editId = null;
       this.rows = [];
       this.pool = '';
       this.renderMain();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Tip Pool'; }
+      if (btn) { btn.disabled = false; btn.textContent = this._editId ? 'Update Tip Pool' : 'Save Tip Pool'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  // Load a saved pool back into the calculator to correct it; Update writes back
+  // to the SAME record (no duplicate). Cancel Edit / Clear exits edit mode.
+  editPool(id) {
+    const p = this.pools().find(x => x.id === id);
+    if (!p) { this.renderMain(); return; }
+    this._editId = id;
+    this.date = p.date || App.todayLocal();
+    this.pool = (p.pool_amount != null) ? String(p.pool_amount) : '';
+    this.method = p.method || 'hours';
+    this.rows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
+    try { localStorage.removeItem(App._collapseKey('lc-tip-pool')); } catch (e) {}  // make sure the form is open
+    this.renderMain();
+    const sc = this.container && this.container.closest('.content');
+    if (sc) sc.scrollTop = 0;
   },
 
   historyCard() {
@@ -340,6 +364,7 @@ S.LaborTipPool = {
       + '<td>' + ((p.participants || []).length) + '</td>'
       + '<td><div class="row-actions">'
       + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
+      + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
     return '<div class="sh" style="margin:24px 0 10px;">Saved Tip Pools</div>'
