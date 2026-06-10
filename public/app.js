@@ -3500,6 +3500,23 @@ const App = {
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
   },
 
+  // The ONE labor-cost target (% of revenue), read everywhere that needs a labor
+  // target: Build Schedule's budget + all of Revenue Recovery. Single source of
+  // truth = settings.targets.labor_cost_pct. Falls back to the old pre-2026-06-10
+  // per-department fields (Profit bar/food, then Revenue bar/kitchen/floor) so
+  // accounts seeded before the consolidation keep their effective number until
+  // they next save a target. Default 30 (full-service norm).
+  laborTargetPct() {
+    const t = (this.data && this.data.settings && this.data.settings.targets) || {};
+    if (t.labor_cost_pct != null && t.labor_cost_pct !== '') return Number(t.labor_cost_pct);
+    if (t.bar_labor_cost_pct != null && t.food_labor_cost_pct != null)
+      return (Number(t.bar_labor_cost_pct) + Number(t.food_labor_cost_pct)) / 2;
+    const rt = (this.data && this.data.revenue_settings && this.data.revenue_settings.targets) || {};
+    if (rt.bar_labor_pct != null && rt.kitchen_labor_pct != null && rt.floor_labor_pct != null)
+      return (Number(rt.bar_labor_pct) + Number(rt.kitchen_labor_pct) + Number(rt.floor_labor_pct)) / 3;
+    return 30;
+  },
+
   // ── Salaried staff ──────────────────────────────────────────────────────
   // A salaried (exempt) staff member's labor cost is FIXED per period
   // (annual_salary / 52 per week), not hours * wage. Their per-day lc_actuals
