@@ -529,7 +529,7 @@ S.LaborLogHours = {
     const tabs = '<div class="ch-tabs no-print">' + presentDays.map(di => {
       const unlogged = model.rows.filter(r => r.dayIdx === di && !r.already).length;
       return '<button class="ch-tab lo-fill-tab' + (di === this._fillTab ? ' on' : '') + '" data-day="' + di + '">'
-        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;">(' + unlogged + ' to log)</span>' : '')
+        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;font-size:10px;">(' + unlogged + ' to log)</span>' : '')
         + '</button>';
     }).join('') + '</div>';
 
