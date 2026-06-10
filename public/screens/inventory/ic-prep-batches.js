@@ -159,7 +159,7 @@ S.PrepBatches = {
     return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="width:175px;flex-shrink:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
-        + '<div class="f" style="width:135px;flex-shrink:0;"><label>Category</label>'
+        + '<div class="f" style="width:185px;flex-shrink:0;"><label>Category</label>'
           + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
@@ -369,13 +369,12 @@ S.PrepBatches = {
     if (!area) return;
     const currentCat = this._el('pb-cat')?.value || '';
     const mode = this.modeForBatchCategory(currentCat);
-    // Cap the builder width on the landing so the ingredient selector is not
-    // absurdly wide on a full-page form; the popup (narrower already) stays full.
-    const narrow = (this._scope === this.container) ? 'max-width:820px;' : '';
-    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;' + narrow + '">'
+    // Table goes full width; the ingredient dropdown is a fixed (less wide) column
+    // and the empty last column absorbs the slack so Delete stays right-aligned.
+    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
       + '<table class="ing-tbl"><thead><tr>'
-      + '<th style="min-width:200px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
-      + '<th style="width:100px;">Unit Cost</th><th style="width:100px;">Line Cost</th><th style="width:90px;"></th>'
+      + '<th style="width:320px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
+      + '<th style="width:100px;">Unit Cost</th><th style="width:100px;">Line Cost</th><th style="width:100%;"></th>'
       + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
         const unit = this.unitLabel(prod);
@@ -387,7 +386,7 @@ S.PrepBatches = {
           + '<td style="color:var(--t2);font-size:12px;">' + unit + '</td>'
           + '<td style="font-size:12px;">' + costD + '</td>'
           + '<td class="val" id="pb-lc-' + idx + '">' + lineD + '</td>'
-          + '<td><button class="btn btn-danger btn-sm pb-rm-ing" type="button" data-i="' + idx + '">Delete</button></td></tr>';
+          + '<td style="text-align:right;"><button class="btn btn-danger btn-sm pb-rm-ing" type="button" data-i="' + idx + '">Delete</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   },
 
