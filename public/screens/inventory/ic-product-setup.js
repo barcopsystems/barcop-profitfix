@@ -18,6 +18,8 @@ S.InventoryProducts = {
   _pendingDelIds: null,
   _formCategory: null,     // category being entered/edited in the open form
   activeCat: 'Liquor',     // list filter for the existing-products table
+  _selected: null,         // Set of product ids checked for bulk delete
+  _dismissedAlerts: null,  // Set of categories whose incomplete-data bar was dismissed
 
   get CATEGORIES() { return App.IC_CATEGORIES; },   // single source on App
 
@@ -278,6 +280,7 @@ S.InventoryProducts = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    this._selected = null;   // fresh entry starts with nothing selected
     this.renderLanding();
   },
 
@@ -346,8 +349,10 @@ S.InventoryProducts = {
         const costDisplay = p.unit_cost != null
           ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
           : '<span style="color:var(--t4);">-</span>';
+        const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
         return '<tr style="' + dim + '">'
-          + '<td><div class="val" style="' + (!complete ? 'color:var(--red);' : '') + '">' + esc(p.name)
+          + '<td style="width:40px;text-align:center;"><input type="checkbox" class="ip-sel" data-id="' + p.id + '"' + checked + ' style="appearance:auto;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;vertical-align:middle;"/></td>'
+          + '<td><div class="val">' + esc(p.name)
           + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
           + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
           + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
@@ -364,18 +369,27 @@ S.InventoryProducts = {
           + '</div></td></tr>';
       }).join('');
 
-      const alertBar = incompleteHere.length > 0
+      const dismissed = this._dismissedAlerts && this._dismissedAlerts.has(this.activeCat);
+      const alertBar = (incompleteHere.length > 0 && !dismissed)
         ? '<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'
           + incompleteHere.length + ' product' + (incompleteHere.length > 1 ? 's have' : ' has')
-          + ' incomplete data, highlighted red in the Product column.</div></div>'
+          + ' incomplete data, flagged in the Product column.</div>'
+          + '<button class="btn btn-ghost btn-sm ip-alert-dismiss" style="flex-shrink:0;border-color:rgba(255,255,255,0.5);color:var(--w);">Dismiss</button></div>'
         : '';
+
+      const selCount = this._selected ? this._selected.size : 0;
+      const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+        + '<button class="btn btn-ghost btn-sm ip-sel-all">Select All</button>'
+        + '<button class="btn btn-ghost btn-sm ip-sel-clear">Clear</button>'
+        + (selCount > 0 ? '<button class="btn btn-danger btn-sm ip-sel-del">Delete ' + selCount + ' Selected</button>' : '')
+        + '</div>';
 
       const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
       const costCol = 'Cost Per';
 
-      body = alertBar
+      body = alertBar + toolbar
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
+        + '<th style="width:40px;"></th><th>Product</th><th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
         + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -409,12 +423,22 @@ S.InventoryProducts = {
       const tab     = ev.target.closest('.ch-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
+      const dismiss = ev.target.closest('.ip-alert-dismiss');
+      const selAll  = ev.target.closest('.ip-sel-all');
+      const selClr  = ev.target.closest('.ip-sel-clear');
+      const selDel  = ev.target.closest('.ip-sel-del');
+      const selBox  = ev.target.closest('.ip-sel');
 
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
       if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat, stage: 'drop' }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
-      if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this.renderLanding(); return; }
+      if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
+      if (dismiss) { ev.stopPropagation(); (this._dismissedAlerts = this._dismissedAlerts || new Set()).add(this.activeCat); this.renderLanding(); return; }
+      if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.products().filter(p => (p.category || '') === this.activeCat).map(p => p.id)); this.renderLanding(); return; }
+      if (selClr)  { ev.stopPropagation(); this._selected = new Set(); this.renderLanding(); return; }
+      if (selDel)  { ev.stopPropagation(); this.confirmDel([...(this._selected || [])]); return; }
+      if (selBox)  { const id = selBox.dataset.id; this._selected = this._selected || new Set(); if (this._selected.has(id)) this._selected.delete(id); else this._selected.add(id); this.renderLanding(); return; }
     };
 
     // In-place import panel (drop zone -> column mapper, same spot). Wired only
@@ -957,8 +981,10 @@ S.InventoryProducts = {
 
   // ── Delete ────────────────────────────────────────────────────────────────
   async confirmDel(ids, msg) {
+    if (!ids.length) return;
     if (!(await App.confirmDelete(ids.length > 1 ? ids.length + ' products' : null))) return;
     App.inventoryData.ic_products = this.products().filter(p => !ids.includes(p.id));
+    if (this._selected) ids.forEach(id => this._selected.delete(id));
     await App.saveInventory();
     this.renderLanding();
   },
