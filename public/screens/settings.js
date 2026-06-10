@@ -68,8 +68,7 @@ S.HubSettings = {
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('sh-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-bl" value="' + (t.bar_labor_cost_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Labor % ' + tt('sh-food-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-fl" value="' + (t.food_labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Labor Cost %</label><div class="fw"><input class="suf" type="number" id="hs-lc" value="' + (t.labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
@@ -78,9 +77,6 @@ S.HubSettings = {
     const rt = ((App.data.revenue_settings||{}).targets) || {};
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Labor % ' + tt('r-bar-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-bl" value="' + (rt.bar_labor_pct ?? 28) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Kitchen Labor % ' + tt('r-kitchen-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-kl" value="' + (rt.kitchen_labor_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Floor Labor % ' + tt('r-floor-labor') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-fl" value="' + (rt.floor_labor_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rl" value="' + (rt.rplh_lunch ?? 50) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
@@ -167,25 +163,30 @@ S.HubSettings = {
     } else if (which === 'profit') {
       const s = App.data.settings;
       s.targets = Object.assign({}, s.targets, {
-        bar_pour_cost_pct:  numOr('hs-bpc', 22),
-        food_cost_pct:      numOr('hs-fc', 32),
-        bar_labor_cost_pct: numOr('hs-bl', 28),
-        food_labor_cost_pct:numOr('hs-fl', 30),
-        prime_cost_pct:     numOr('hs-pc', 60)
+        bar_pour_cost_pct: numOr('hs-bpc', 22),
+        food_cost_pct:     numOr('hs-fc', 32),
+        labor_cost_pct:    numOr('hs-lc', 30),
+        prime_cost_pct:    numOr('hs-pc', 60)
       });
+      // Drop the pre-consolidation per-department labor fields so stored data
+      // can't disagree with the single labor_cost_pct.
+      delete s.targets.bar_labor_cost_pct;
+      delete s.targets.food_labor_cost_pct;
       keys.push('settings');
     } else if (which === 'revenue') {
       const rs = App.data.revenue_settings = App.data.revenue_settings || {};
       rs.targets = Object.assign({}, rs.targets, {
         check_avg:         numOr('hs-r-ca', 35),
-        bar_labor_pct:     numOr('hs-r-bl', 28),
-        kitchen_labor_pct: numOr('hs-r-kl', 30),
-        floor_labor_pct:   numOr('hs-r-fl', 32),
         rplh_lunch:        numOr('hs-r-rl', 50),
         rplh_dinner:       numOr('hs-r-rd', 75),
         rplh_bar:          numOr('hs-r-rb', 65),
         event_close_rate:  numOr('hs-r-ec', 40)
       });
+      // Labor % is now the single settings.targets.labor_cost_pct (App.laborTargetPct);
+      // drop the old per-department copies so they can't drift.
+      delete rs.targets.bar_labor_pct;
+      delete rs.targets.kitchen_labor_pct;
+      delete rs.targets.floor_labor_pct;
       keys.push('revenue_settings');
     } else if (which === 'traffic') {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
@@ -324,7 +325,7 @@ S.HubSettings = {
     App.data.settings.city_state         = 'Austin, TX';
     App.data.settings.annual_bar_revenue = 624000;
     App.data.settings.annual_food_revenue= 374400;
-    App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, bar_labor_cost_pct:28, food_labor_cost_pct:30, prime_cost_pct:60 };
+    App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, labor_cost_pct:30, prime_cost_pct:60 };
     App.data.settings.onboarding_complete= true;
 
     // ── Bar Products ──
@@ -747,8 +748,7 @@ S.HubSettings = {
     //  events, dog tests and the price-change log.
     // ════════════════════════════════════════════════════════════════════
     App.data.revenue_settings = App.data.revenue_settings || {};
-    App.data.revenue_settings.targets = { check_avg:35, bar_labor_pct:28, kitchen_labor_pct:30,
-      floor_labor_pct:32, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
+    App.data.revenue_settings.targets = { check_avg:35, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
 
     // Four servers carry the floor. Each week's covers split by these weights,
     // with the top server running a higher check average than the bottom.
