@@ -79,7 +79,7 @@ S.LaborCalloutLog = {
     if (info && info.shift) {
       const sh = info.shift;
       const time = (sh.start && sh.end) ? ' ' + this.fmtTime(sh.start) + '–' + this.fmtTime(sh.end) : '';
-      html = '<span style="color:var(--amber);font-weight:600;">Scheduled ' + esc(info.dayName) + time + ' — needs cover.</span>';
+      html = '<span style="color:var(--amber);font-weight:600;">Scheduled ' + esc(info.dayName) + time + '. Needs cover.</span>';
     } else if (info && info.none) {
       html = '<span style="color:var(--t3);">Not on the posted schedule for this day.</span>';
     }
