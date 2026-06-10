@@ -1661,7 +1661,7 @@ S.ShiftActiveShift = {
         // Carry this shift's week into Log Hours' Fill-from-Schedule path so the
         // operator confirms scheduled hours instead of hand-logging the whole day.
         if (S.LaborLogHours) {
-          S.LaborLogHours.entryMode = 'schedule';
+          S.LaborLogHours._modeOnce = 'schedule';
           S.LaborLogHours._fillWeek = S.LaborLogHours.mondayOf ? S.LaborLogHours.mondayOf(s.date) : '';
         }
         App.openScreen('lc-log-hours');
