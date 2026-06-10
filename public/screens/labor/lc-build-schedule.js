@@ -87,6 +87,40 @@ S.LaborBuildSchedule = {
     const dt = new Date((ws || '') + 'T00:00:00');
     return isNaN(dt.getTime()) ? esc(ws || '') : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
+  // Step a Monday week_start by n weeks, returning the resulting Monday.
+  addWeeks(ws, n) {
+    const base = ws || this.mondayOf(App.todayLocal());
+    const d = new Date(base + 'T00:00:00');
+    if (isNaN(d.getTime())) return base;
+    d.setDate(d.getDate() + n * 7);
+    return this.mondayOf(App.ymdLocal(d));
+  },
+  // The Monday-based week selector that replaces the calendar: a window of week
+  // chips (each labeled by its Monday date, the live current week tagged NOW, the
+  // selected week gold-tint) flanked by step arrows, plus a snap back to the
+  // current week. Every option is already a Monday, so there is no calendar to
+  // open and no wrong day to pick.
+  weekSelector() {
+    const sel = this.draft.week_start || this.mondayOf(App.todayLocal());
+    const cur = this.mondayOf(App.todayLocal());
+    const chip = ws => {
+      const on = ws === sel, isCur = ws === cur;
+      return '<button type="button" class="bs-week-chip btn btn-sm" data-ws="' + ws + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.weekLabel(ws)
+        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let chips = '';
+    for (let i = -2; i <= 2; i++) chips += chip(this.addWeeks(sel, i));
+    return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
+      + (sel !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="bs-week-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>';
+  },
   // The most recent posted schedule strictly before the current week, used to
   // offer "Start from last week" on an empty grid.
   priorSchedule() {
@@ -244,7 +278,7 @@ S.LaborBuildSchedule = {
     // jumps the page or strands the prompt under the date picker.
     let budgetCard;
     if (!d.week_start) {
-      budgetCard = '<div class="card"><div style="font-size:13px;color:var(--t3);">Pick the week starting date below to set a forecast and labor budget.</div></div>';
+      budgetCard = '<div class="card"><div style="font-size:13px;color:var(--t3);">Use the week selector below to pick a week, then set a forecast and labor budget.</div></div>';
     } else if (fc <= 0) {
       budgetCard = '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div style="font-size:13px;color:var(--t2);">No revenue forecast set for this week.</div>'
@@ -320,13 +354,13 @@ S.LaborBuildSchedule = {
     // posted schedule forward so a typical week is not rebuilt shift by shift.
     const prior = (!this.editId && this.draft.shifts.length === 0) ? this.priorSchedule() : null;
     const lastWeekNudge = prior
-      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
         + '<div style="font-size:12px;color:var(--t2);">Start this week from your schedule for the week of <span style="color:var(--t1);font-weight:600;">' + this.weekLabel(prior.week_start) + '</span>?</div>'
         + '<button class="btn btn-ghost btn-sm" id="bs-from-last">Start from last week</button></div>'
       : '';
 
-    const gridCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      + '<div class="sh" style="margin:0;">Weekly Schedule Grid</div>'
+    const gridCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 14px;flex-wrap:wrap;">'
+      + this.weekSelector()
       + '<div class="no-print" style="display:flex;gap:8px;">'
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button>'
       + '<button class="btn btn-ghost btn-sm" id="bs-worksheet">Worksheet</button></div></div>'
@@ -361,14 +395,6 @@ S.LaborBuildSchedule = {
 
     this.container.innerHTML = '<div class="screen">'
       + budgetCard
-      + '<div class="card form-card"><div class="card-title">Week and Labor Budget</div>'
-      + '<div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting (Monday)</label>'
-      + '<input type="date" id="bs-week" value="' + esc(d.week_start) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
-      + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week">&lsaquo;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week">&rsaquo;</button></div></div>'
-      + '</div></div>'
       + gridCard + totalsCard + actionsCard
       + this.templatesSection()
       + '</div>';
@@ -386,15 +412,20 @@ S.LaborBuildSchedule = {
   },
 
   _wire() {
-    document.getElementById('bs-week')?.addEventListener('change', async e => {
-      const target = this.mondayOf(e.target.value) || '';
-      if (!target) return;
-      if (!(await this.confirmLeaveUnsaved())) { e.target.value = this.draft.week_start || ''; return; }
-      this.loadWeek(target);
-      this.draw();
-    });
     document.getElementById('bs-week-prev')?.addEventListener('click', () => this.shiftWeek(-7));
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
+    this.container.querySelectorAll('.bs-week-chip').forEach(b => b.addEventListener('click', async () => {
+      const target = b.dataset.ws;
+      if (!target || target === (this.draft.week_start || '')) return;
+      if (!(await this.confirmLeaveUnsaved())) return;
+      this.loadWeek(target); this.draw();
+    }));
+    document.getElementById('bs-week-now')?.addEventListener('click', async () => {
+      const target = this.mondayOf(App.todayLocal());
+      if (target === (this.draft.week_start || '')) return;
+      if (!(await this.confirmLeaveUnsaved())) return;
+      this.loadWeek(target); this.draw();
+    });
     document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
     document.getElementById('bs-lt')?.addEventListener('click', () => this.openLaborTargetModal());
