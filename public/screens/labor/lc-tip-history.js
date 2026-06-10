@@ -108,16 +108,16 @@ S.LaborTipHistory = {
       + this.statItem('Card', App.fmtCurrency(card))
       + this.statItem('Avg / Entry', App.fmtCurrency(rows.length ? total / rows.length : 0)));
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Tips</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button></div></div>';
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button></div>';
 
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="th-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="th-to" value="' + esc(this.filterTo) + '"/></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="th-staff">' + this.staffFilterOptions() + '</select></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="th-clear">Clear</button></div>'
-      + '</div></div>';
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + App.datePresetButtons('th-preset') + '</div></div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
@@ -132,6 +132,8 @@ S.LaborTipHistory = {
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       if (ev.target.closest('#th-clear')) { this.filterFrom = this.filterTo = this.filterStaff = ''; this.renderReport(); return; }
+      const thPreset = ev.target.closest('.th-preset');
+      if (thPreset) { const r = App.datePresetRange(thPreset.dataset.preset); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); return; }
     };
     const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
       this[prop] = e.target.value || '';
