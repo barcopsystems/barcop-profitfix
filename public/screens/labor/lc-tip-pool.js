@@ -100,18 +100,20 @@ S.LaborTipPool = {
       + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tp-c-alloc">$0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
       + '</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="tp-save">' + (this._editId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
-      + '<button class="btn btn-ghost" id="tp-clear">' + (this._editId ? 'Cancel Edit' : 'Clear') + '</button>'
-      + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-      + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
       + '</div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + this.historyCard() + '</div>';
+    // Save / Clear live BELOW the card (bottom-left), tagged to hide with the card on collapse.
+    const actionsRow = '<div data-collapse-group="lc-tip-pool" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="tp-save">' + (this._editId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
+      + '<button class="btn btn-ghost" id="tp-clear">' + (this._editId ? 'Cancel Edit' : 'Clear') + '</button>'
+      + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + actionsRow + this.historyCard() + '</div>';
 
     const rowsEl = document.getElementById('tp-rows');
     rowsEl.addEventListener('input', () => { this.collect(); this.recalc(); });
@@ -151,12 +153,10 @@ S.LaborTipPool = {
       this.method = e.target.value;
       this.renderMain();
     });
-    document.getElementById('tp-date')?.addEventListener('change', e => {
-      this.date = e.target.value;
-      // Auto-load tip log for the new date — operator doesn't have to press
-      // a button to do the obvious next step.
-      this.loadFromTipLog(true);
-    });
+    // The date picker only sets the date. Pulling that day's tips is the explicit
+    // "Load from Tip Log" button next to it — auto-loading on every date change
+    // surprised the operator and left stale data when the new date had no tips.
+    document.getElementById('tp-date')?.addEventListener('change', e => { this.date = e.target.value; });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
     document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.renderMain(); });
