@@ -232,7 +232,7 @@ S.LaborLogHours = {
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-log-hours', 'Log Hours')
       + '<div class="collapse-body">'
-      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('schedule', 'Fill from Schedule') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('schedule', 'Fill from Schedule') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>';
 
@@ -539,7 +539,7 @@ S.LaborLogHours = {
         + '</button>';
     };
     let chips = '';
-    for (let i = -2; i <= 2; i++) chips += chip(step(ws, i));
+    for (let i = -1; i <= 1; i++) chips += chip(step(ws, i));
     return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + chips
