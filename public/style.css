@@ -713,7 +713,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .card.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
-.collapse-off{display:none;}
+.collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
 
 /* ══ SCORE ROWS ══ */
 .score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
