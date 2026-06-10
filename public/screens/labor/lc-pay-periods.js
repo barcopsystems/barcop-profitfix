@@ -280,8 +280,8 @@ S.LaborPayPeriods = {
 
     // Close & Lock (open) or Reopen (closed) lives in the card title, top-right.
     const titleAction = isClosed
-      ? '<button class="btn btn-ghost btn-sm" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
-      : (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : '');
+      ? '<button class="btn btn-ghost" id="pp-reopen-detail" data-ws="' + weekStart + '">Reopen Period</button>'
+      : (agg.totalCount > 0 ? '<button class="btn btn-primary" id="pp-close-detail" data-ws="' + weekStart + '">Close &amp; Lock Period</button>' : '');
 
     const periodCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + agg.totals.hours.toFixed(1) + '</div></div>'
