@@ -29,7 +29,7 @@ S.InventoryTransfers = {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
   },
   locations() {
-    return ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => l.status !== 'Deleted' && l.status !== 'Archived');
+    return ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived);
   },
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
