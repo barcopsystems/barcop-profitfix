@@ -1,27 +1,80 @@
 'use strict';
 
-/* ── Labor Control — Labor Reports (reads lc_actuals) ─────────────────────────
-   Labor analysis over a date range: By Department and By Staff, with tips
-   context. Read-only. Both breakdowns are short aggregated tables, so they sit
-   on one page (no tabs): a stats card, a Filter heading with one Export that
-   covers both sections, the controls-only filter card, then the two data cards.
-   Salaried staff carry their fixed weekly salary across the range. */
+/* ── Labor Control — Labor Reports (reads lc_actuals, lc_schedules, lc_tips) ───
+   One home for viewing logged labor, three lenses on a tab switcher:
+     Day   — one day (was Daily Snapshot): who worked, hours, cost, vs schedule.
+     Week  — one week (was Weekly Summary): by staff + by day, labor % vs forecast.
+     Range — any date range (was Labor Reports): by department + by staff, tips.
+   Read-only except the inline Edit Hours pop-ups on the Day and Week lenses.
+   Replaces the standalone lc-daily-view + lc-weekly-summary screens. */
 
 S.LaborReports = {
-  filterFrom: '',
+  tab: 'week',
+  date: null,          // Day lens
+  weekStart: null,     // Week lens
+  filterFrom: '',      // Range lens
   filterTo: '',
+  DAYS: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  TABS: [['day', 'Day'], ['week', 'Week'], ['range', 'Range']],
 
-  actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
-  tips()    { return ((App.laborData && App.laborData.lc_tips) || []); },
+  actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
+  tips()      { return ((App.laborData && App.laborData.lc_tips) || []); },
+  schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
   positionById(id) { return ((App.laborData && App.laborData.lc_positions) || []).find(p => p.id === id); },
+  laborTarget() { return App.laborTargetPct(); },
+
+  // ── date helpers ────────────────────────────────────────────────────────────
+  dayName(dateStr) {
+    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
+    return isNaN(d.getTime()) ? '' : this.DAYS[d.getDay()];
+  },
+  addDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return App.ymdLocal(d);
+  },
+  mondayOf(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
+    return App.ymdLocal(date);
+  },
+  fmtDay(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  },
+  // Scheduled shifts for one date (Day lens)
+  scheduledForDate(dateStr) {
+    const target = new Date(dateStr + 'T00:00:00').getTime();
+    if (isNaN(target)) return null;
+    const day = this.dayName(dateStr);
+    for (const sched of this.schedules()) {
+      if (!sched.week_start) continue;
+      const start = new Date(sched.week_start + 'T00:00:00').getTime();
+      if (isNaN(start)) continue;
+      if (target >= start && target <= start + 6 * 86400000) return (sched.shifts || []).filter(sh => sh.day === day);
+    }
+    return null;
+  },
+  // The schedule covering a date (Week lens)
+  scheduleCovering(dateStr) {
+    const target = new Date(dateStr + 'T00:00:00').getTime();
+    if (isNaN(target)) return null;
+    for (const s of this.schedules()) {
+      if (!s.week_start) continue;
+      const start = new Date(s.week_start + 'T00:00:00').getTime();
+      if (isNaN(start)) continue;
+      if (target >= start && target <= start + 6 * 86400000) return s;
+    }
+    return null;
+  },
 
   inRange(rec) {
     if (this.filterFrom && (rec.date || '') < this.filterFrom) return false;
     if (this.filterTo && (rec.date || '') > this.filterTo) return false;
     return true;
   },
-
-  // Quick date-range presets for the filter (local-calendar based, never UTC).
+  // Quick date-range presets for the Range lens (local-calendar based, never UTC).
   presetRange(key) {
     const today = App.todayLocal();
     const d = new Date(today + 'T00:00:00');
@@ -33,10 +86,21 @@ S.LaborReports = {
     if (key === 'last-4') { const s = new Date(d); s.setDate(s.getDate() - 27); return { from: ymd(s), to: today }; }
     return { from: '', to: '' };
   },
-  applyPreset(key) {
-    const r = this.presetRange(key);
-    this.filterFrom = r.from; this.filterTo = r.to;
-    this.renderReport();
+  applyPreset(key) { const r = this.presetRange(key); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); },
+
+  // ── shared markup ─────────────────────────────────────────────────────────
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  noRow(cols, msg) {
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No hours match the filter.') + '</td></tr>';
   },
 
   render(container, actions) {
@@ -47,67 +111,383 @@ S.LaborReports = {
 
   showHowTo() {
     App.showHelpModal('How Labor Reports Work', [
-      { p: ['Labor Reports total your labor over a date range, two ways on one page: by department and by staff. Set the range and both update together.'] },
-      { h: 'The Two Views', p: ['By Department rolls labor up by department so you can see where the dollars go. By Staff lists each person\'s hours, average wage, labor cost, and share of total labor, sorted by cost. Salaried staff carry their fixed weekly salary across the range; their logged hours are coverage only.'] },
-      { h: 'Export', p: ['Export PDF saves the whole report, both the department and staff breakdowns, in one file.'] }
+      { p: ['Labor Reports is one place to see your logged labor, three ways. Switch the tab at the top: Day for a single day, Week for a full week, Range for any stretch of dates.'] },
+      { h: 'Day', p: ['One day at a time: who worked, their hours and cost, and how the day compared to the schedule. The Scheduled This Day table flags anyone who was scheduled but has no hours logged yet, so a missed entry never slips by. Click Edit Hours to fix an entry without leaving the page.'] },
+      { h: 'Week', p: ['A full week rolled up by staff and by day, with labor percentage and revenue per labor hour against the week\'s forecast. Use it Monday morning before building the next week. Salaried staff carry their fixed weekly salary.'] },
+      { h: 'Range', p: ['Any date range, broken down by department and by staff, with labor cost (straight time plus overtime premium), labor percent and revenue per labor hour from logged shift revenue, and tips. Use the quick presets or set your own dates. Click a staff row to open their page.'] },
+      { h: 'Editing And Export', p: ['Day and Week let you correct hours inline. Entries in a closed pay period show as locked; reopen the period in Pay Periods first. Export PDF saves whichever lens you are on.'] }
     ]);
-  },
-
-  // ── shared markup helpers (mirror Cash History / Tip History) ───────────────
-  statItem(label, val, cls) {
-    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-  },
-  statsCard(items) {
-    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
-  },
-  sectionHeading(title) {
-    return '<div class="sh" style="margin:24px 0 10px;">' + esc(title) + '</div>';
-  },
-  dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
-  },
-  noRow(cols, msg) {
-    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No hours match the filter.') + '</td></tr>';
   },
 
   renderReport() {
     this.actions.innerHTML = '';
-
     if (this.actuals().length === 0) {
       App.setupCard(this.container, {
         title: 'Labor Reports',
-        lead: 'Labor Reports break your labor down by department and by staff over any date range, with tips context.',
+        lead: 'Labor Reports show your logged labor by day, by week, and over any range, with cost, labor percentage, and tips.',
         steps: [
-          { title: 'Log some hours', desc: 'Hours you log in Log Hours feed this report. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
+          { title: 'Log some hours', desc: 'Hours you log in Log Hours feed every view here. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
         ]
       });
       return;
     }
+    if (!this.date) this.date = App.todayLocal();
+    if (!this.weekStart) this.weekStart = this.mondayOf(new Date());
 
+    const tabBar = '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, l]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + k + '">' + l + '</button>').join('')
+      + '</div>';
+    const body = this.tab === 'day' ? this.dayBody() : this.tab === 'week' ? this.weekBody() : this.rangeBody();
+
+    this.container.innerHTML = '<div class="screen">' + tabBar + body + '</div>';
+    this.wire();
+  },
+
+  wire() {
+    this.container.onclick = ev => {
+      const tab = ev.target.closest('.ch-tab');
+      if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
+      // Day lens
+      if (ev.target.closest('#dv-export')) { App.exportPDF({ title: 'Labor Report - Day', root: this.container }); return; }
+      if (ev.target.closest('#dv-prev')) { this.date = this.addDays(this.date, -1); this.renderReport(); return; }
+      if (ev.target.closest('#dv-next')) { this.date = this.addDays(this.date, 1); this.renderReport(); return; }
+      if (ev.target.closest('#dv-log-missing')) { this.logMissing(this.date, false); return; }
+      const dvEdit = ev.target.closest('.dv-edit'); if (dvEdit) { this.openDayEdit(dvEdit.dataset.id); return; }
+      // Week lens
+      if (ev.target.closest('#ws-export')) { App.exportPDF({ title: 'Labor Report - Week', root: this.container }); return; }
+      if (ev.target.closest('#ws-prev')) { this.weekStart = this.addDays(this.weekStart, -7); this.renderReport(); return; }
+      if (ev.target.closest('#ws-next')) { this.weekStart = this.addDays(this.weekStart, 7); this.renderReport(); return; }
+      if (ev.target.closest('#ws-log-missing')) { this.logMissing(this.weekStart, true); return; }
+      const wsEdit = ev.target.closest('.ws-edit'); if (wsEdit) { this.openWeekEdit(wsEdit.dataset.key); return; }
+      // Range lens
+      if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Report - Range', root: this.container }); return; }
+      if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
+      const preset = ev.target.closest('.lr-preset'); if (preset) { this.applyPreset(preset.dataset.preset); return; }
+      const sRow = ev.target.closest('.lr-staff-row'); if (sRow) { App._staffFocus = { staff_id: sRow.dataset.staff }; App.navigate('lc-staff-roster'); return; }
+    };
+    document.getElementById('dv-date')?.addEventListener('change', e => { this.date = e.target.value || this.date; this.renderReport(); });
+    document.getElementById('ws-start')?.addEventListener('change', e => { this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00')); this.renderReport(); });
+    document.getElementById('lr-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderReport(); });
+    document.getElementById('lr-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderReport(); });
+  },
+
+  // Hand off to Log Hours in Fill-from-Schedule mode (one-shot) for the right week.
+  logMissing(anchor, isWeek) {
+    let ws = anchor;
+    if (!isWeek) {
+      const d = new Date(anchor + 'T00:00:00');
+      if (!isNaN(d.getTime())) d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      ws = isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+    }
+    if (S.LaborLogHours) { S.LaborLogHours._modeOnce = 'schedule'; S.LaborLogHours._fillWeek = ws; }
+    App.navigate('lc-log-hours');
+  },
+
+  // ── DAY lens ────────────────────────────────────────────────────────────────
+  dayBody() {
+    const dayActuals = this.actuals().filter(a => a.date === this.date);
+    const actHours = dayActuals.reduce((t, a) => t + (a.hours || 0), 0);
+    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0)
+      + (dayActuals.length ? App.salariedCost(this.date, this.date).total : 0);
+
+    const sched = this.scheduledForDate(this.date);
+    let schedHours = null;
+    if (sched) schedHours = sched.reduce((t, s) => t + (s.hours || 0), 0);
+    const hoursVar = schedHours != null ? actHours - schedHours : null;
+
+    const pickerCard = '<div class="card"><div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
+      + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button></div></div>'
+      + '</div></div>';
+
+    const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + this.statItem('Headcount', String(dayActuals.length))
+      + this.statItem('Actual Hours', actHours.toFixed(1))
+      + this.statItem('Actual Cost', App.fmtCurrency(actCost))
+      + this.statItem('Scheduled Hours', schedHours != null ? schedHours.toFixed(1) : '-', 'dim')
+      + this.statItem('Hours vs Scheduled', hoursVar != null ? ((hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1)) : '-', hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good')
+      + '</div></div>';
+
+    const loggedHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Logged Hours</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div></div>';
+
+    let actualsCard;
+    if (dayActuals.length === 0) {
+      actualsCard = loggedHeading + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this day. Log them in Log Hours.</div>';
+    } else {
+      const canEdit = App.canEdit && App.canEdit('lc-log-hours');
+      const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
+        const locked = !!a.locked;
+        const editBtn = canEdit && !locked
+          ? '<button class="btn btn-ghost btn-sm dv-edit" data-id="' + a.id + '">Edit Hours</button>'
+          : locked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+        const sal = App.isSalaried(a.staff_id);
+        const wageCell = sal ? '<span style="color:var(--t3);">Salary</span>' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
+        const costCell = sal ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0);
+        return '<tr><td><div class="val">' + esc(a.name || '-') + '</div></td>'
+          + '<td>' + esc(a.shift_type || '-') + '</td>'
+          + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
+          + '<td>' + wageCell + '</td>'
+          + '<td class="val">' + costCell + '</td>'
+          + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
+      }).join('');
+      actualsCard = loggedHeading
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    let schedCard = '';
+    if (sched && sched.length) {
+      const loggedKeys = new Set(dayActuals.map(a => a.staff_id || a.name));
+      const notLogged = sched.filter(s => !loggedKeys.has(s.staff_id || s.name) && !App.isSalaried(s.staff_id));
+      const rows = [...sched].sort((a, b) => (a.start || '').localeCompare(b.start || '')).map(s => {
+        const isLogged = loggedKeys.has(s.staff_id || s.name);
+        const statusCell = isLogged
+          ? '<span style="color:var(--green);font-weight:700;">Logged</span>'
+          : App.isSalaried(s.staff_id)
+            ? '<span style="color:var(--t3);">Salary</span>'
+            : '<span style="color:var(--amber);font-weight:700;">Not logged</span>';
+        return '<tr><td><div class="val">' + esc(s.name || '-') + '</div></td>'
+          + '<td>' + esc(s.start || '-') + '</td>'
+          + '<td>' + esc(s.end || '-') + '</td>'
+          + '<td>' + (s.hours != null ? s.hours.toFixed(1) : '-') + '</td>'
+          + '<td class="val">' + App.fmtCurrency(s.cost || 0) + '</td>'
+          + '<td>' + statusCell + '</td></tr>';
+      }).join('');
+      const nudge = notLogged.length
+        ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+          + '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + notLogged.length + '</span> scheduled but not logged yet for this day.</div>'
+          + '<button class="btn btn-ghost btn-sm" id="dv-log-missing">Log Hours</button></div>'
+        : '';
+      schedCard = '<div class="sh" style="margin:24px 0 10px;">Scheduled This Day</div>'
+        + nudge
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Staff</th><th>Start</th><th>End</th><th>Hours</th><th>Cost</th><th>Status</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    return pickerCard + summaryCard + actualsCard + schedCard;
+  },
+
+  openDayEdit(actualId) {
+    const a = this.actuals().find(x => x.id === actualId);
+    if (!a) return;
+    const wage = a.wage != null ? a.wage : (App.wageForStaffOn ? App.wageForStaffOn(a.staff_id, a.date) : 0);
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">Edit Hours' + (a.name ? ' &middot; ' + esc(a.name) : '') + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Hours</label>'
+          + '<input type="number" id="dv-em-hours" min="0" step="0.25" value="' + (a.hours != null ? a.hours : '') + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:180px;"><label>Notes</label>'
+          + '<input type="text" id="dv-em-notes" value="' + esc(a.notes || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+      + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:8px;"></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="dv-em-save">Save</button>'
+        + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
+        + '<span id="dv-em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'dv-edit-modal', maxWidth: 540, noClose: true });
+    const hoursInp = document.getElementById('dv-em-hours');
+    const notesInp = document.getElementById('dv-em-notes');
+    const costEl = document.getElementById('dv-em-cost');
+    const updateCost = () => {
+      const h = parseFloat(hoursInp?.value) || 0;
+      if (costEl) costEl.textContent = wage > 0 ? 'Cost: ' + App.fmtCurrency(h * wage) + ' (' + App.fmtCurrency(wage) + '/hr)' : '';
+    };
+    updateCost();
+    hoursInp?.addEventListener('input', updateCost);
+    document.getElementById('dv-em-cancel')?.addEventListener('click', () => App.closeModal('dv-edit-modal'));
+    document.getElementById('dv-em-save')?.addEventListener('click', async () => {
+      const newHours = parseFloat(hoursInp?.value);
+      const err = document.getElementById('dv-em-err');
+      if (isNaN(newHours) || newHours < 0) { if (err) { err.textContent = 'Enter the hours worked.'; err.style.display = 'inline'; } return; }
+      App.closeModal('dv-edit-modal');
+      await App.updateActual(a, { hours: newHours, notes: notesInp?.value || '' });
+      this.renderReport();
+    });
+  },
+
+  // ── WEEK lens ─────────────────────────────────────────────────────────────
+  weekBody() {
+    const ws = this.weekStart;
+    const we = this.addDays(ws, 6);
+    const weekActuals = this.actuals().filter(a => a.date >= ws && a.date <= we);
+    const actHours = weekActuals.reduce((t, a) => t + (a.hours || 0), 0);
+    const salWk = App.salariedCost(ws, we);
+    const hasActivity = weekActuals.length > 0;
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + (hasActivity ? salWk.total : 0);
+
+    const sched = this.scheduleCovering(ws);
+    const schedHours = sched ? (sched.total_hours || 0) : null;
+    const forecast = sched ? (sched.revenue_forecast || 0) : 0;
+    const laborPct = forecast > 0 ? actCost / forecast * 100 : null;
+    const rplh = actHours > 0 && forecast > 0 ? forecast / actHours : null;
+    const target = this.laborTarget();
+    const hoursVar = schedHours != null ? actHours - schedHours : null;
+
+    const pickerCard = '<div class="card"><div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
+      + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
+      + '</div></div>';
+
+    const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + this.statItem('Actual Hours', actHours.toFixed(1))
+      + this.statItem('Actual Labor Cost', App.fmtCurrency(actCost))
+      + this.statItem('Scheduled Hours', schedHours != null ? schedHours.toFixed(1) : '-', 'dim')
+      + this.statItem('Hours vs Scheduled', hoursVar != null ? ((hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1)) : '-', hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good')
+      + this.statItem('Labor % (vs Forecast)', laborPct != null ? App.fmtPct(laborPct) : '-', laborPct == null ? '' : laborPct > target ? 'warn' : 'good')
+      + this.statItem('RPLH (vs Forecast)', rplh != null ? App.fmtCurrency(rplh) : '-')
+      + '</div></div>';
+
+    // By staff
+    const byStaff = {};
+    weekActuals.forEach(a => {
+      const k = a.staff_id || a.name || '?';
+      if (!byStaff[k]) byStaff[k] = { name: a.name || '-', days: {}, hours: 0, cost: 0 };
+      byStaff[k].days[a.date] = true;
+      byStaff[k].hours += (a.hours || 0);
+      byStaff[k].cost += (a.cost || 0);
+    });
+    if (hasActivity) {
+      ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+        if (!App.isSalaried(st) || st.status === 'Inactive') return;
+        const annual = parseFloat(st.annual_salary);
+        if (!annual || annual <= 0) return;
+        if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
+        byStaff[st.id].cost += annual / 52;
+      });
+    }
+    const staffHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">By Staff</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div></div>';
+
+    let staffCard;
+    const staffKeys = Object.keys(byStaff);
+    if (staffKeys.length === 0) {
+      staffCard = staffHeading + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this week.</div>';
+    } else {
+      const canEdit = App.canEdit && App.canEdit('lc-log-hours');
+      const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {
+        const s = byStaff[k];
+        const recs = weekActuals.filter(a => (a.staff_id || a.name) === k);
+        const anyLocked = recs.some(r => r.locked);
+        const editBtn = canEdit && !anyLocked && recs.length > 0
+          ? '<button class="btn btn-ghost btn-sm ws-edit" data-key="' + esc(k) + '">Edit Hours</button>'
+          : anyLocked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+        return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
+          + '<td>' + Object.keys(s.days).length + '</td>'
+          + '<td>' + s.hours.toFixed(1) + '</td>'
+          + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
+          + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
+      }).join('');
+      staffCard = staffHeading
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    // By day
+    const dayRows = [];
+    for (let i = 0; i < 7; i++) {
+      const dStr = this.addDays(ws, i);
+      const dayAct = weekActuals.filter(a => a.date === dStr);
+      const h = dayAct.reduce((t, a) => t + (a.hours || 0), 0);
+      const c = dayAct.reduce((t, a) => t + (a.cost || 0), 0) + (dayAct.length ? App.salariedCost(dStr, dStr).total : 0);
+      dayRows.push('<tr><td><div class="val">' + this.fmtDay(dStr) + '</div></td>'
+        + '<td>' + dayAct.length + '</td>'
+        + '<td>' + h.toFixed(1) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(c) + '</td></tr>');
+    }
+    const dayCard = '<div class="sh" style="margin:24px 0 10px;">By Day</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
+      + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
+
+    // Scheduled-but-not-logged nudge
+    let notLoggedNames = [];
+    if (sched && (sched.shifts || []).length) {
+      const loggedKeys = new Set(weekActuals.map(a => a.staff_id || a.name));
+      const seen = new Set();
+      (sched.shifts || []).forEach(sh => {
+        const k = sh.staff_id || sh.name;
+        if (!k || loggedKeys.has(k) || seen.has(k) || App.isSalaried(sh.staff_id)) return;
+        seen.add(k);
+        notLoggedNames.push(sh.name || '-');
+      });
+    }
+    const schedNudge = notLoggedNames.length
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin:16px 0 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + notLoggedNames.length + '</span> scheduled but not logged this week: <span style="color:var(--t2);">'
+        + notLoggedNames.slice(0, 6).map(esc).join(', ') + (notLoggedNames.length > 6 ? ', and more' : '') + '</span>.</div>'
+        + '<button class="btn btn-ghost btn-sm" id="ws-log-missing">Log Hours</button></div>'
+      : '';
+
+    return pickerCard + summaryCard + schedNudge + staffCard + dayCard;
+  },
+
+  openWeekEdit(key) {
+    const ws = this.weekStart, we = this.addDays(ws, 6);
+    const weekActuals = this.actuals().filter(a => a.date >= ws && a.date <= we);
+    const recs = weekActuals.filter(a => (a.staff_id || a.name) === key && !a.locked);
+    if (!recs.length) return;
+    const sorted = recs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const bodyRows = sorted.map(r =>
+      '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:10px;" data-id="' + r.id + '">'
+        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Date</label>'
+          + '<div style="font-size:12px;color:var(--t2);padding:8px 0;">' + esc(this.fmtDay(r.date)) + '</div></div>'
+        + '<div class="f" style="width:100px;flex-shrink:0;"><label>Hours</label>'
+          + '<input type="number" class="ws-em-hours" min="0" step="0.25" value="' + (r.hours != null ? r.hours : '') + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Notes</label>'
+          + '<input type="text" class="ws-em-notes" value="' + esc(r.notes || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+    ).join('');
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Edit Hours' + (recs[0].name ? ' &middot; ' + esc(recs[0].name) : '') + '</div>'
+      + bodyRows
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="ws-em-cancel">Cancel</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'ws-edit-modal', maxWidth: 600, noClose: true });
+    document.getElementById('ws-em-cancel')?.addEventListener('click', () => App.closeModal('ws-edit-modal'));
+    document.getElementById('ws-em-save')?.addEventListener('click', async () => {
+      const edits = [];
+      document.querySelectorAll('#ws-edit-modal .form-row[data-id]').forEach(row => {
+        const rec = this.actuals().find(a => a.id === row.dataset.id);
+        if (rec) edits.push({ rec, hours: parseFloat(row.querySelector('.ws-em-hours')?.value), notes: row.querySelector('.ws-em-notes')?.value || '' });
+      });
+      App.closeModal('ws-edit-modal');
+      for (const e of edits) { await App.updateActual(e.rec, { hours: e.hours, notes: e.notes }); }
+      this.renderReport();
+    });
+  },
+
+  // ── RANGE lens ──────────────────────────────────────────────────────────────
+  rangeBody() {
     const rows = this.actuals().filter(a => this.inRange(a));
     const tips = this.tips().filter(t => this.inRange(t));
 
-    // Salaried (exempt) cost over the report span (explicit range, or the span
-    // of the logged data when the filter is open-ended).
     const datesInRange = rows.map(a => a.date).filter(Boolean).sort();
     const rFrom = this.filterFrom || datesInRange[0] || '';
-    const rTo   = this.filterTo   || datesInRange[datesInRange.length - 1] || '';
+    const rTo = this.filterTo || datesInRange[datesInRange.length - 1] || '';
     const salWeeks = (rFrom && rTo)
       ? (Math.floor((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
       : 0;
-    const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0, bar: 0, food: 0 };
+    const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0 };
 
-    // Weekly overtime premium (0.5x on hours over 40/week per non-salaried
-    // person) summed across the range, so Labor Cost here reconciles with the
-    // gross on Pay Periods and Payroll Export instead of showing straight-time.
     const ot = this.otPremiums(rows);
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
     const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
     const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
-    // Actual revenue logged in the range (Shift module) drives labor % and revenue
-    // per labor hour, the numbers an operator manages to. Shown only when there's
-    // revenue to divide by, so a partial-data range never prints a false rate.
     const periodRev = ((App.shiftData && App.shiftData.sc_shifts) || []).reduce((s, sh) => {
       const d = sh.date || '';
       if ((rFrom && d < rFrom) || (rTo && d > rTo)) return s;
@@ -138,37 +518,18 @@ S.LaborReports = {
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
       + '<span style="font-size:11px;color:var(--t3);">Quick range:</span>' + presetBtns + '</div></div>';
 
-    this.container.innerHTML = '<div class="screen">'
-      + statsCard
-      + filterHeading
-      + filterCard
-      + this.sectionHeading('By Department')
+    return statsCard + filterHeading + filterCard
+      + '<div class="sh" style="margin:24px 0 10px;">By Department</div>'
       + this.byDept(rows, totCost, salWeeks, ot.byDept)
-      + this.sectionHeading('By Staff')
-      + this.byStaff(rows, totCost, salWeeks, ot.byStaff)
-      + '</div>';
-
-    this.container.onclick = ev => {
-      if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Reports', root: this.container }); return; }
-      if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
-      const preset = ev.target.closest('.lr-preset');
-      if (preset) { this.applyPreset(preset.dataset.preset); return; }
-      const sRow = ev.target.closest('.lr-staff-row');
-      if (sRow) { App._staffFocus = { staff_id: sRow.dataset.staff }; App.navigate('lc-staff-roster'); return; }
-    };
-    const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
-      this[prop] = e.target.value || '';
-      this.renderReport();
-    });
-    bind('lr-from', 'filterFrom');
-    bind('lr-to', 'filterTo');
+      + '<div class="sh" style="margin:24px 0 10px;">By Staff</div>'
+      + this.byStaff(rows, totCost, salWeeks, ot.byStaff);
   },
 
-  // Weekly OT premium per non-salaried staff (0.5x on hours over 40 in a
-  // Mon-Sun week), bucketed across the range and attributed to staff + dept so
-  // the Labor Cost columns match gross. Returns { total, byStaff, byDept }.
+  // Weekly OT premium per non-salaried staff (0.5x on hours over 40/week),
+  // bucketed across the range and attributed to staff + dept so Labor Cost
+  // reconciles with gross. Returns { total, byStaff, byDept }.
   otPremiums(rows) {
-    const wk = {};  // staffKey|weekStart -> { sk, dept, hours, cost }
+    const wk = {};
     rows.forEach(a => {
       if (App.isSalaried(a.staff_id)) return;
       const sk = a.staff_id || a.name || '?';
@@ -179,13 +540,13 @@ S.LaborReports = {
         wk[key] = { sk, dept: pos ? (pos.department || 'Other') : 'Unassigned', hours: 0, cost: 0 };
       }
       wk[key].hours += (a.hours || 0);
-      wk[key].cost  += (a.cost || 0);
+      wk[key].cost += (a.cost || 0);
     });
     const out = { total: 0, byStaff: {}, byDept: {} };
     Object.values(wk).forEach(b => {
       const otH = Math.max(0, b.hours - App.OT_THRESHOLD);
       if (otH <= 0 || b.hours <= 0) return;
-      const prem = otH * (b.cost / b.hours) * 0.5;   // 0.5x on the effective base rate that week
+      const prem = otH * (b.cost / b.hours) * 0.5;
       out.total += prem;
       out.byStaff[b.sk] = (out.byStaff[b.sk] || 0) + prem;
       out.byDept[b.dept] = (out.byDept[b.dept] || 0) + prem;
@@ -210,7 +571,6 @@ S.LaborReports = {
         g[st.id].straight += wk * salWeeks;
       });
     }
-    // Labor Cost = straight-time + OT premium; Avg Wage stays the base rate.
     const cost = k => g[k].straight + (otByStaff[k] || 0);
     const isStaffId = k => ((App.laborData && App.laborData.lc_staff) || []).some(st => st.id === k);
     const trs = Object.keys(g).sort((a, b) => cost(b) - cost(a)).map(k => {
