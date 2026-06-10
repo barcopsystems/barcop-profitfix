@@ -490,6 +490,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .os-omenu .om-item{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--t1);font-size:12px;font-weight:600;padding:8px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;}
 .os-omenu .om-item:hover{background:var(--c3);}
 .os-omenu .om-item.danger{color:var(--red);}
+/* Copy Location select styled to match the btn-ghost btn-sm controls beside it (same height, with a chevron). */
+.il-copysel{appearance:none;-webkit-appearance:none;background-color:transparent;border:1px solid var(--b1);border-radius:var(--r);color:var(--t2);font-family:'Barlow',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:5px 26px 5px 12px;line-height:1;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23889aa6' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;}
+.il-copysel:focus{outline:none;border-color:var(--focus);}
+.il-copysel option{font-weight:400;letter-spacing:0;text-transform:none;color:var(--t1);background:var(--surface);}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
    Scoped to .page so the rest of the app (.screen) is byte-for-byte unchanged.
