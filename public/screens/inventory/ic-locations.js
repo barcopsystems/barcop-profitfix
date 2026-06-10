@@ -32,6 +32,8 @@ S.InventoryLocations = {
   _triageDest: '',     // destination location name picked in the triage modal
   pickerOpen: false,   // is the "+ Add products to location" picker expanded
   _newName: '',        // typed location name, kept so a re-render does not lose it
+  _newNameError: false, // landing Name box flagged red (save attempted with no name)
+  _justSavedCount: null,// "X products saved" feedback after Save Products (null = hide)
   DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
@@ -84,6 +86,8 @@ S.InventoryLocations = {
     this.editId = null;
     this.pickerOpen = false;
     this._newName = '';
+    this._newNameError = false;
+    this._justSavedCount = null;
     this.newChecked = new Set();
     this.renderList();
   },
@@ -177,7 +181,7 @@ S.InventoryLocations = {
       const others = this.locations().filter(l => !l.archived && this.productCount(l.name) > 0 && !(ctx === 'edit' && l.id === this.editId));
       if (others.length) {
         copy = '<span style="color:var(--t4);font-size:11px;">or</span>'
-          + '<select class="il-copyfrom" data-ctx="' + ctx + '" style="height:30px;padding:0 8px;font-size:12px;max-width:230px;">'
+          + '<select class="il-copyfrom il-copysel" data-ctx="' + ctx + '" style="max-width:230px;">'
           + '<option value="">Copy Location</option>'
           + others.map(l => '<option value="' + esc(l.name) + '">' + esc(l.name) + ' (' + this.productCount(l.name) + ')</option>').join('')
           + '</select>';
@@ -185,7 +189,7 @@ S.InventoryLocations = {
     }
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;">'
       + '<button type="button" class="btn btn-ghost btn-sm il-selall" data-ctx="' + ctx + '"' + (n ? '' : ' disabled') + '>' + label + ' (' + n + ')</button>'
-      + '<button type="button" class="btn btn-ghost btn-sm il-clearsel" data-ctx="' + ctx + '">Clear selection</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm il-clearsel" data-ctx="' + ctx + '">Clear</button>'
       + copy
       + '</div>';
   },
@@ -271,14 +275,17 @@ S.InventoryLocations = {
   },
 
   addFormCard() {
-    const linkLabel = this.pickerOpen ? '- Hide products' : '+ Add products';
+    const linkLabel = this.pickerOpen ? '&#10003; Save Products' : '+ Add products';
     const n = this.newChecked.size;
     let counter = '';
     if (this.pickerOpen) {
-      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>';
+      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + n + ' product' + (n === 1 ? '' : 's') + ' selected</span>';
+    } else if (this._justSavedCount != null) {
+      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + this._justSavedCount + ' product' + (this._justSavedCount === 1 ? '' : 's') + ' saved</span>';
     } else if (n > 0) {
-      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:6px;">' + n + ' product' + (n === 1 ? '' : 's') + ' added</span>';
+      counter = '<span id="il-new-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + n + ' product' + (n === 1 ? '' : 's') + ' added</span>';
     }
+    const nameErr = this._newNameError ? ' style="border-color:var(--red);"' : '';
     return '<div class="card form-card" style="margin-top:14px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         + '<span>Add a Location</span>'
@@ -287,13 +294,9 @@ S.InventoryLocations = {
           + '<button class="btn btn-primary btn-sm" id="il-new-save">Save Location</button>'
         + '</span>'
       + '</div>'
-      + '<div style="display:flex;align-items:flex-start;gap:8px;">'
-        + '<span class="setup-num">1</span>'
-        + '<div class="f" style="max-width:300px;flex:1;margin:0;"><label>Name Location</label>'
-          + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"/></div>'
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-top:18px;">'
-        + '<span class="setup-num">2</span>'
+      + '<div class="f" style="max-width:300px;margin:0;"><label>Name Location</label>'
+        + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"' + nameErr + '/></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + counter
       + '</div></div>';
@@ -350,8 +353,8 @@ S.InventoryLocations = {
       }
       if (ev.target.closest('.il-addprod-link')) {
         this._newName = document.getElementById('il-new-name')?.value || '';
-        this.pickerOpen = !this.pickerOpen;
-        this.renderList();
+        if (this.pickerOpen) { this.commitNewProducts(); }   // "✓ Save Products"
+        else { this.pickerOpen = true; this._newNameError = false; this._justSavedCount = null; this.renderList(); }
         return;
       }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
@@ -385,35 +388,60 @@ S.InventoryLocations = {
         this._toggleNew(ev.target.value, ev.target.checked);
       }
     };
-    // Keep the typed name in state so opening the picker never loses it.
-    document.getElementById('il-new-name')?.addEventListener('input', e => { this._newName = e.target.value; });
+    // Keep the typed name in state so opening the picker never loses it. Typing
+    // also clears the red empty-name flag and the "saved" feedback.
+    document.getElementById('il-new-name')?.addEventListener('input', e => {
+      this._newName = e.target.value;
+      this._justSavedCount = null;
+      if (this._newNameError && e.target.value.trim()) { this._newNameError = false; e.target.style.borderColor = ''; }
+    });
   },
 
   async saveNewLocation() {
-    const name = document.getElementById('il-new-name')?.value.trim();
+    const name = (document.getElementById('il-new-name')?.value || '').trim();
     const err = document.getElementById('il-new-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!name) { fail('Enter a location name.'); return; }
+    if (!name) { this._newNameError = true; this.renderList(); return; }   // empty -> red border, no save
+    this._newNameError = false;
     if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { fail('A location with that name already exists.'); return; }
 
     const id = App.uid();
     this.locations().push({ id, name, archived: false });
-    // Assign every checked product (across all category tabs) to the new location.
-    const checked = this.newChecked;
-    if (checked && checked.size) {
-      this.products().forEach(p => {
-        if (!checked.has(p.id)) return;
-        const set = new Set(App.productLocations(p)); set.add(name);
-        p.locations = [...set];
-        if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
-      });
-    }
+    this._reconcileProducts(name, this.newChecked);   // assign every checked product
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.saveInventory();
     // Drop straight into the new location's arrange page (build → order in one flow).
     if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; } fail('Save failed. Try again.'); }
+  },
+
+  // "✓ Save Products" link (picker open): create the location + assign the checked
+  // products and persist, WITHOUT leaving the landing — no separate Save Location
+  // click needed. Closes the picker and shows the "X products saved" feedback, then
+  // resets the box for the next location. Empty name flags the Name box red.
+  async commitNewProducts() {
+    const name = (document.getElementById('il-new-name')?.value || '').trim();
+    this._newName = name;
+    const err = document.getElementById('il-new-err');
+    if (!name) { this._newNameError = true; if (err) { err.textContent = ''; err.style.display = 'none'; } this.renderList(); return; }
+    this._newNameError = false;
+    if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) {
+      if (err) { err.textContent = 'A location with that name already exists.'; err.style.display = 'inline'; }
+      return;
+    }
+    const id = App.uid();
+    this.locations().push({ id, name, archived: false });
+    this._reconcileProducts(name, this.newChecked);
+    const savedCount = this.newChecked.size;
+    await App.saveInventory();
+    App.markSetupDone('gs_ic_locations');
+    // Reset the box for the next location; show the saved feedback until they start one.
+    this.pickerOpen = false;
+    this._newName = '';
+    this.newChecked = new Set();
+    this._justSavedCount = savedCount;
+    this.renderList();
   },
 
   // ── Edit page (own page; one Update Location button saves name + products) ──
