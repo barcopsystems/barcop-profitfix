@@ -60,20 +60,20 @@ S.LaborPayrollExport = {
     }).join('');
 
     container.innerHTML = '<div class="screen">'
-      + '<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div class="card form-card">'
         + '<div class="card-title">Payroll Export</div>'
-        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
           + '<div class="f" style="width:300px;"><label>Pay Period</label><select id="px-week">' + opts + '</select></div>'
-          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
-            + '<button class="btn btn-primary" id="px-xlsx">Download Workbook</button>'
-            + '<button class="btn btn-ghost" id="px-csv">Download CSV</button>'
-          + '</div>'
         + '</div>'
-        + '<div id="px-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        + '<div style="border:1px solid var(--amber);background:var(--bg);border-radius:6px;padding:12px 14px;margin-top:18px;">'
+        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. This is a worksheet, not your official payroll or timekeeping record. Verify every figure before running payroll.</div>'
         + '</div>'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="px-xlsx">Download Workbook</button>'
+        + '<button class="btn btn-ghost" id="px-csv">Download CSV</button>'
+        + '<span id="px-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
       + '</div>';
