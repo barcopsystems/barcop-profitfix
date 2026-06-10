@@ -15,10 +15,9 @@ S.LaborLogHours = {
   _fillWeek: '',           // Monday of the week being pulled from the schedule
   _fillModel: null,        // in-memory Fill-from-Schedule rows (survive day-tab switches)
   _fillTab: null,          // active day tab (Mon-first index) in Fill from Schedule
-  filterFrom: '',
-  filterTo: '',
-  filterShift: '',
-  filterStaff: '',
+  filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  filterFrom: '',          // custom range only
+  filterTo: '',            // custom range only
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
   actuals() {
@@ -143,40 +142,45 @@ S.LaborLogHours = {
     this.calc(p);
   },
 
+  // Effective date window from the active range chip. A preset recomputes off
+  // "today" every render (so This Week always means the live current week);
+  // Custom reads the From/To pickers; All clears the window.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(a => {
       const date = a.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterShift && (a.shift_type || '') !== this.filterShift) return false;
-      if (this.filterStaff && (a.staff_id || '') !== this.filterStaff) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
 
-  // Controls-only filter card. Export PDF lives on the heading row above it, not
-  // in here. Export covers the full filtered set, not just the visible page.
-  filterCard() {
-    const staffOpts = '<option value="">All staff</option>'
-      + this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
-    const shiftChips = App.filterChips(this.filterShift,
-      [{ v: '', label: 'All Shifts' }].concat((App.SHIFT_TYPES || []).map(s => ({ v: s, label: s }))), 'lo-shift-chip');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lo-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lo-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="lo-f-staff">' + staffOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lo-f-clear">Clear</button></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + shiftChips + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">' + App.datePresetButtons('lo-preset') + '</div></div>';
-  },
-
-  applyPreset(key) {
-    const r = App.datePresetRange(key);
-    this.filterFrom = r.from; this.filterTo = r.to;
-    this.renderList();
+  // The sort/filter row that sits directly above the data block: range chips on
+  // the left, Export on the right (no filter card). Picking Custom reveals a bare
+  // From/To row beneath it. Time is the only filter this log needs — at one bar's
+  // volume a window of entries is small enough to read; narrow further via Export.
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'lo-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="lo-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="lo-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   renderList() {
@@ -251,7 +255,7 @@ S.LaborLogHours = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('lc', 'actual')).map(a => {
           const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
@@ -273,13 +277,10 @@ S.LaborLogHours = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterStaff));
+          + App.showOlderBar('lc', 'actual', filtered, this.filterPreset !== 'all');
       }
 
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>';
-
-      below = statsCard + filterHeading + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
@@ -289,11 +290,13 @@ S.LaborLogHours = {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
-      if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
-      const preset = ev.target.closest('.lo-preset');
-      if (preset) { this.applyPreset(preset.dataset.preset); return; }
-      const sc = ev.target.closest('.lo-shift-chip');
-      if (sc) { this.filterShift = sc.dataset.v; this.renderList(); return; }
+      const rangeChip = ev.target.closest('.lo-range-chip');
+      if (rangeChip) {
+        this.filterPreset = rangeChip.dataset.v;
+        if (this.filterPreset !== 'custom') { this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#lo-save'))    { this.save('lo-'); return; }
       if (ev.target.closest('#lo-fill-save')) { this.commitFill(); return; }
       if (ev.target.closest('.lo-go-build')) { App.navigate('lc-build-schedule'); return; }
@@ -318,7 +321,6 @@ S.LaborLogHours = {
     else this.wireForm('lo-');
     document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('lo-f-staff')?.addEventListener('change', e => { this.filterStaff = e.target.value || ''; this.renderList(); });
     App.applyCollapsed(this.container);
   },
 
