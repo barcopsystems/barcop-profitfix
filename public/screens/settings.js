@@ -1422,6 +1422,28 @@ S.HubSettings = {
     });
     App.inventoryData.ic_products = icProducts;
 
+    // Seed a few recent vendor price changes (cost_history) so the vendor "Recent
+    // Price Changes" card lands populated in the demo. Exactly the shape Receive
+    // Delivery writes when a price update is applied; new_cost = the product's
+    // current cost so the numbers stay honest. Mostly creeping up, one drop.
+    (function seedPriceChanges() {
+      const byName = {}; icProducts.forEach(p => { byName[p.name] = p; });
+      const dAgo = n => { const d = new Date(Date.now() - n * 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      const log = (name, oldCost, daysAgo) => {
+        const p = byName[name]; if (!p) return;
+        p.cost_history = p.cost_history || [];
+        p.cost_history.push({ date: dAgo(daysAgo), old_cost: oldCost, new_cost: p.unit_cost, vendor: p.vendor, delivery_id: 'seed', source: 'delivery' });
+      };
+      log('Don Julio Blanco', 42.00, 5);
+      log("Maker's Mark",     25.50, 9);
+      log('Woodford Reserve', 33.00, 7);
+      log('Buffalo Trace',    27.50, 12);   // a supplier drop (green)
+      log('Stella Artois',    36.00, 6);
+      log('Corona',           32.40, 14);
+      log('ABW Fire Eagle IPA', 185.00, 4);
+      log('Cranberry Juice',  3.25, 11);
+    })();
+
     // ── Beer + Wine as linked Menu Inventory Items ──────────────────────────
     // Direct-pour beverages live in the menu's Inventory Items tab, LINKED to
     // the Inventory Control product (the screen classifies on linked_product_id,
