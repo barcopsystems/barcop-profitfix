@@ -111,10 +111,11 @@ S.InventoryVendors = {
       + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
       + '<div class="collapse-body">'
       + this.formFieldsHTML(null)
-      + '<div class="card-actions" style="align-items:center;">'
+      + '</div></div>'
+      + '<div class="no-print" data-collapse-group="ic-vendors" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
-        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+        + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   wireList() {
@@ -142,6 +143,7 @@ S.InventoryVendors = {
     const prods = this.vendorProducts(v.name);
     this.container.innerHTML = '<div class="screen">'
       + this.editCard(v)
+      + this.editActionsRow()
       + this.renderProductsCard(prods)
       + this.renderPriceHistoryCard(prods)
       + '</div>';
@@ -153,11 +155,16 @@ S.InventoryVendors = {
     return '<div class="card form-card">'
       + '<div class="card-title">Editing ' + esc(v.name) + '</div>'
       + this.formFieldsHTML(v)
-      + '<div class="card-actions" style="align-items:center;">'
-        + '<button class="btn btn-primary" id="iv-save">Update Vendor</button>'
-        + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
-        + '<span id="iv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
+  },
+
+  // Update Vendor + Cancel below the edit card, bottom-left.
+  editActionsRow() {
+    return '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="iv-save">Update Vendor</button>'
+      + '<button class="btn btn-ghost" id="iv-cancel">Cancel</button>'
+      + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '</div>';
   },
 
   wireEdit() {
