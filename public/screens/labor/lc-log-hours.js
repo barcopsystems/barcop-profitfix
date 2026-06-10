@@ -172,8 +172,7 @@ S.LaborLogHours = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="lo-f-staff">' + staffOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lo-f-clear">Clear</button></div>'
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
-      + '<span style="font-size:11px;color:var(--t3);">Quick range:</span>' + presetBtns + '</div></div>';
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + presetBtns + '</div></div>';
   },
 
   // Quick date-range presets for the filter (local-calendar based, never UTC).
@@ -218,17 +217,26 @@ S.LaborLogHours = {
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
-    let modeBody;
+    // Primary action lives BELOW the card (bottom-left), collapse-group tagged so
+    // it hides with the card. The card body is just the entry surface per mode.
+    let modeBody, actionRow;
+    const rowOpen = '<div data-collapse-group="lc-log-hours" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">';
     if (this.entryMode === 'import') {
       modeBody = '<div id="lo-csv"></div><div id="lo-imp-result"></div>';
+      // Empty until a file is dropped; CSVMapper then renders its own spaced
+      // Import / Cancel row here (below the card), so no empty gap beforehand.
+      actionRow = '<div id="lo-imp-actions" data-collapse-group="lc-log-hours" style="margin-bottom:24px;"></div>';
     } else if (this.entryMode === 'schedule') {
       modeBody = this.scheduleFillBody();
+      const total = this.fillToLog().length;
+      actionRow = rowOpen
+        + '<button class="btn btn-primary" id="lo-fill-save"' + (total ? '' : ' disabled') + '>Log ' + total + ' Entr' + (total === 1 ? 'y' : 'ies') + '</button>'
+        + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     } else {
-      modeBody = this.logFormCells(null)
-        + '<div class="card-actions">'
+      modeBody = this.logFormCells(null);
+      actionRow = rowOpen
         + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
-        + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '</div>';
+        + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-log-hours', 'Log Hours')
@@ -282,16 +290,14 @@ S.LaborLogHours = {
           + App.showOlderBar('lc', 'actual', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterStaff));
       }
 
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Filter Hours</div>'
-        + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div></div>';
+      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+        + '<button class="btn btn-ghost btn-sm" id="lo-export">Export PDF</button></div>';
 
       below = statsCard + filterHeading + this.filterCard() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('.lo-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.lo-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -510,7 +516,6 @@ S.LaborLogHours = {
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:9px;">Week of ' + this.fmtDate(ws) + '</div></div>'
       + '</div>';
     this.ensureFillModel(ws);
     const model = this._fillModel;
@@ -524,7 +529,7 @@ S.LaborLogHours = {
     const tabs = '<div class="ch-tabs no-print">' + presentDays.map(di => {
       const unlogged = model.rows.filter(r => r.dayIdx === di && !r.already).length;
       return '<button class="ch-tab lo-fill-tab' + (di === this._fillTab ? ' on' : '') + '" data-day="' + di + '">'
-        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;">' + unlogged + '</span>' : '')
+        + (DAYS[di] || '') + (unlogged ? ' <span style="color:var(--t3);font-weight:400;">(' + unlogged + ' to log)</span>' : '')
         + '</button>';
     }).join('') + '</div>';
 
@@ -541,7 +546,6 @@ S.LaborLogHours = {
         + '</tr>';
     }).join('');
     const dayLabel = this.fmtDayHeader(this.weekDayYmd(ws, this._fillTab));
-    const total = this.fillToLog().length;
 
     return picker
       + tabs
@@ -549,11 +553,7 @@ S.LaborLogHours = {
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:36px;"></th><th>Staff</th><th style="width:150px;">Shift</th><th style="width:90px;">Hours</th><th style="width:120px;"></th>'
       + '</tr></thead><tbody id="lo-fill-body">' + trs + '</tbody></table></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Hours are pre-filled from the posted schedule. Edit any that ran different, uncheck no-shows, then log. Cycle the day tabs to review the week; logging covers every checked day at once, not just this tab.</div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="lo-fill-save"' + (total ? '' : ' disabled') + '>Log ' + total + ' Entr' + (total === 1 ? 'y' : 'ies') + '</button>'
-      + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>';
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:0;">Pre-filled from the schedule. Edit or uncheck, then log. Covers every checked day, not just this tab.</div>';
   },
 
   updateFillCount() {
@@ -643,7 +643,9 @@ S.LaborLogHours = {
     const el = document.getElementById('lo-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
-      hint: 'Drop a timeclock or POS export: <span class="lo-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      dropTitle: 'Drop your timeclock export here',
+      dropSub: 'Needs columns for staff name, date, and hours worked.',
+      actionsEl: '#lo-imp-actions',
       fields: [
         { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
         { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
