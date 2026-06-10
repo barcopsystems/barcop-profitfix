@@ -301,6 +301,8 @@ S.InventoryProducts = {
   // ── Landing: six category cards on top, filterable list below ────────────
   renderLanding() {
     const all = this.products();
+    // Short, category-specific labels for the per-card upload button.
+    const UPLOAD_LABEL = { 'Liquor': 'Liquor', 'Wine': 'Wine', 'Bottle Beer': 'Btl Beer', 'Draft Beer': 'Draft', 'Food': 'Food', 'Misc': 'Misc' };
     const cards = this.CATEGORIES.map(c => {
       const n = all.filter(p => (p.category || '') === c).length;
       const incomplete = all.filter(p => (p.category || '') === c && !this.isComplete(p)).length;
@@ -315,7 +317,7 @@ S.InventoryProducts = {
         + '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:18px;">'
           + '<span class="ip-card-add" data-cat="' + esc(c) + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add Single Product</span>'
           + '<span style="font-size:10px;color:var(--t4);letter-spacing:1px;">or</span>'
-          + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;">Upload Product List</button>'
+          + '<button type="button" class="ip-card-imp" data-cat="' + esc(c) + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;">Upload ' + esc(UPLOAD_LABEL[c] || c) + ' List</button>'
         + '</div>'
         + '</div>';
     }).join('');
