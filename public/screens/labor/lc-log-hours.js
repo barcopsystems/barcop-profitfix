@@ -11,6 +11,7 @@
 S.LaborLogHours = {
   editId: null,
   entryMode: 'manual',     // 'manual' = type a row, 'schedule' = pull the posted week, 'import' = drop a timeclock file
+  _modeOnce: null,         // one-shot mode override from a deep-link, consumed on the next render
   _fillWeek: '',           // Monday of the week being pulled from the schedule
   filterFrom: '',
   filterTo: '',
@@ -65,11 +66,24 @@ S.LaborLogHours = {
   actualExists(staffId, date) {
     return this.actuals().some(a => a.staff_id === staffId && a.date === date);
   },
+  // Step the Fill-from-Schedule week by the arrow buttons (always lands on a Monday).
+  shiftFillWeek(n) {
+    const base = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
+    const d = new Date(base + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    d.setDate(d.getDate() + n);
+    this._fillWeek = this.mondayOf(App.ymdLocal(d));
+    this.renderList();
+  },
 
   render(container, actions) {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
+    // Reset to Manual on each visit so a sticky Fill-from-Schedule / Import never
+    // hides the form + recent list. A deep-link sets _modeOnce for this one visit.
+    this.entryMode = this._modeOnce || 'manual';
+    this._modeOnce = null;
     this.renderList();
   },
 
@@ -204,6 +218,12 @@ S.LaborLogHours = {
       + modeBody
       + '</div></div>';
 
+    // The recent-entries list (stats + filter + table) shows only in Manual mode,
+    // so Fill-from-Schedule and Import stay focused on their task instead of a page
+    // that runs long below the fill table. The full history lives in Labor Reports
+    // (Day / Week / Range).
+    let below = '';
+    if (this.entryMode === 'manual') {
     const all = [...this.actuals()].sort((a, b) =>
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
     const filtered = this.applyFilters(all);
@@ -211,7 +231,6 @@ S.LaborLogHours = {
     const totCost  = filtered.reduce((s, a) => s + (App.isSalaried(a.staff_id)
       ? (App.staffWeeklySalary(a.staff_id) / 7) : (parseFloat(a.cost) || 0)), 0);
 
-    let below;
     if (all.length === 0) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged yet. Log your first entry above, or import a '
         + 'timeclock export. Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div>';
@@ -255,6 +274,7 @@ S.LaborLogHours = {
 
       below = statsCard + filterHeading + this.filterCard() + listHtml;
     }
+    }
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
@@ -281,6 +301,8 @@ S.LaborLogHours = {
     if (this.entryMode === 'import') this.mountImporter();
     else if (this.entryMode === 'schedule') {
       document.getElementById('lo-fill-week')?.addEventListener('change', e => { this._fillWeek = this.mondayOf(e.target.value) || ''; this.renderList(); });
+      document.getElementById('lo-fill-prev')?.addEventListener('click', () => this.shiftFillWeek(-7));
+      document.getElementById('lo-fill-next')?.addEventListener('click', () => this.shiftFillWeek(7));
       const tbl = document.getElementById('lo-fill-body');
       if (tbl) tbl.addEventListener('change', () => this.updateFillCount());
       if (tbl) tbl.addEventListener('input', () => this.updateFillCount());
@@ -425,6 +447,9 @@ S.LaborLogHours = {
     const picker = '<div class="form-row" style="gap:16px;margin-bottom:14px;align-items:flex-end;">'
       + '<div class="f" style="width:190px;flex-shrink:0;"><label>Schedule Week (Mon)</label>'
       + '<input type="date" id="lo-fill-week" value="' + esc(ws) + '"/></div>'
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:9px;">Week of ' + this.fmtDate(ws) + '</div></div>'
       + '</div>';
     const sched = this.scheduleForWeek(ws);
