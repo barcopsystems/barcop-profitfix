@@ -59,10 +59,7 @@ S.RevenueThisWeek = {
   },
 
   targets() { return (App.data.revenue_settings && App.data.revenue_settings.targets) || {}; },
-  laborTarget() {
-    const t = this.targets();
-    return ((t.bar_labor_pct || 28) + (t.kitchen_labor_pct || 30) + (t.floor_labor_pct || 32)) / 3;
-  },
+  laborTarget() { return App.laborTargetPct(); },
 
   // ── Draft ─────────────────────────────────────────────────────────────────
   loadDraft() {
