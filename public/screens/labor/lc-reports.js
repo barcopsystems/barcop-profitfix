@@ -74,19 +74,7 @@ S.LaborReports = {
     if (this.filterTo && (rec.date || '') > this.filterTo) return false;
     return true;
   },
-  // Quick date-range presets for the Range lens (local-calendar based, never UTC).
-  presetRange(key) {
-    const today = App.todayLocal();
-    const d = new Date(today + 'T00:00:00');
-    const ymd = x => App.ymdLocal(x);
-    const monday = new Date(d); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    if (key === 'this-week') return { from: ymd(monday), to: today };
-    if (key === 'last-week') { const s = new Date(monday); s.setDate(s.getDate() - 7); const e = new Date(monday); e.setDate(e.getDate() - 1); return { from: ymd(s), to: ymd(e) }; }
-    if (key === 'this-month') return { from: ymd(new Date(d.getFullYear(), d.getMonth(), 1)), to: today };
-    if (key === 'last-4') { const s = new Date(d); s.setDate(s.getDate() - 27); return { from: ymd(s), to: today }; }
-    return { from: '', to: '' };
-  },
-  applyPreset(key) { const r = this.presetRange(key); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); },
+  applyPreset(key) { const r = App.datePresetRange(key); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); },
 
   // ── shared markup ─────────────────────────────────────────────────────────
   statItem(label, val, cls) {
@@ -504,19 +492,15 @@ S.LaborReports = {
       + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Labor</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button></div></div>';
+    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button></div>';
 
-    const presetBtns = [['this-week', 'This Week'], ['last-week', 'Last Week'], ['this-month', 'This Month'], ['last-4', 'Last 4 Weeks']]
-      .map(([k, l]) => '<button class="btn btn-ghost btn-sm lr-preset" data-preset="' + k + '">' + l + '</button>').join('');
     const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lr-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lr-to" value="' + esc(this.filterTo) + '"/></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lr-clear">Clear</button></div>'
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
-      + '<span style="font-size:11px;color:var(--t3);">Quick range:</span>' + presetBtns + '</div></div>';
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + App.datePresetButtons('lr-preset') + '</div></div>';
 
     return statsCard + filterHeading + filterCard
       + '<div class="sh" style="margin:24px 0 10px;">By Department</div>'
