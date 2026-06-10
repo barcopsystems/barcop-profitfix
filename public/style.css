@@ -36,6 +36,7 @@
   --b1:        rgba(255,255,255,0.15);
   --b2:        rgba(255,255,255,0.06);
   --b-edge:    #16252E;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
+  --row-div:   #1B262B;                /* Divider line between #0D181E data rows — opaque so it reads identically no matter what sits behind it (data-card tables + .ing-tbl batch-builder line tables) */
 
   --r:  4px;
   --r2: 3px;
@@ -474,7 +475,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card{overflow:hidden;}
 .data-card .card-bleed-tbl{margin-top:-20px;margin-bottom:-20px;}
 .data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
-.data-card .tbl tbody td{background:#0D181E;}
+.data-card .tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
+.data-card .tbl tbody tr:last-child td{border-bottom:none;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
 /* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = gold-tint fill + gold border so the moving row stays clearly highlighted until dropped. */
 .dr-dragging td{background:var(--gold-tint)!important;box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord);}
@@ -760,7 +762,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* ══ ING TABLE ══ */
 .ing-tbl{width:100%;border-collapse:collapse;}
 .ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b2);white-space:nowrap;}
-.ing-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;color:var(--t2);}
+.ing-tbl td{padding:8px 10px;border-bottom:1px solid var(--row-div);vertical-align:middle;color:var(--t2);}
 .ing-tbl tr:last-child td{border-bottom:none;}
 
 /* ══ PROG BAR ══ */
