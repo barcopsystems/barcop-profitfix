@@ -36,8 +36,23 @@ S.InventoryStockReport = {
     return bc != null ? (it.total || 0) * bc : 0;
   },
   itemLoc(it) {
+    if (it.location) return it.location;
     const p = this.productById(it.product_id);
     return (p && p.primary_location) ? p.primary_location : 'Unassigned';
+  },
+  // A count stores one item line PER product PER location. Roll them up to one
+  // entry per product (summed value + on-hand) for the per-product views
+  // (Products tile, By Category, Highest/Lowest, Dead Stock); By Location keeps
+  // the raw per-line data so each location shows its own share.
+  itemsByProduct(items) {
+    const m = {};
+    (items || []).forEach(it => {
+      const k = it.product_id || it.name;
+      if (!m[k]) m[k] = { product_id: it.product_id, name: it.name, category: it.category, total: 0, value: 0 };
+      m[k].total += (it.total || 0);
+      m[k].value += this.itemValue(it);
+    });
+    return Object.values(m);
   },
   // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
   qtyU(p, n) {
@@ -115,7 +130,7 @@ S.InventoryStockReport = {
     }
     const statsCard = this.statsCard(
       this.statItem('Stock Value', App.fmtCurrency(totalValue))
-      + this.statItem('Products', items.length)
+      + this.statItem('Products', this.itemsByProduct(items).length)
       + changeStat
       + this.statItem('Count Date', this.fmtDate(latest.date)));
 
@@ -144,10 +159,10 @@ S.InventoryStockReport = {
     switch (this.tab) {
       case 'location': return this.tabGroup(items, it => this.itemLoc(it), 'Location');
       case 'vsprior':  return this.tabVsPrior(latest, prior);
-      case 'highest':  return this.tabRank(items, true);
-      case 'lowest':   return this.tabRank(items, false);
+      case 'highest':  return this.tabRank(this.itemsByProduct(items), true);
+      case 'lowest':   return this.tabRank(this.itemsByProduct(items), false);
       case 'dead':     return this.tabDead(latest, prior);
-      default:         return this.tabGroup(items, it => it.category || 'Uncategorized', 'Category');
+      default:         return this.tabGroup(this.itemsByProduct(items), it => it.category || 'Uncategorized', 'Category');
     }
   },
 
@@ -212,7 +227,7 @@ S.InventoryStockReport = {
   tabDead(latest, prior) {
     if (!prior) return this.note('Dead stock needs a prior count to measure movement. Pick a count that has one before it.');
     const base = App.computeUsagePair(prior, latest, this.deliveries());
-    const items = (latest.items || []).map(it => {
+    const items = this.itemsByProduct(latest.items).map(it => {
       const p = this.productById(it.product_id) || {};
       const b = base[it.product_id];
       // Only products counted in BOTH periods have measurable usage; a product
