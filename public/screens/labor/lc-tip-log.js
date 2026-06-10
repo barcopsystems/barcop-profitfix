@@ -32,6 +32,36 @@ S.LaborTipLog = {
   shifts() { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
   shiftById(id) { return this.shifts().find(s => s.id === id); },
   actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
+  schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
+  callouts() { return ((App.laborData && App.laborData.lc_callouts) || []); },
+  get DAYS() { return App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; },
+  mondayOf(ymd) {
+    if (!ymd) return '';
+    const d = new Date(ymd + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return App.ymdLocal(d);
+  },
+  dayNameFor(ymd) {
+    const d = new Date((ymd || '') + 'T00:00:00');
+    return isNaN(d.getTime()) ? '' : this.DAYS[(d.getDay() + 6) % 7];
+  },
+  // Posted schedule covering a date (most recent for that week).
+  scheduleForDate(date) {
+    const ws = this.mondayOf(date);
+    return this.schedules().filter(s => s.week_start === ws)
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
+  },
+  // Hours for a scheduled shift: its stored hours, else computed from start/end.
+  schedHours(sh) {
+    if (sh.hours != null && sh.hours !== '') return parseFloat(sh.hours) || 0;
+    if (!sh.start || !sh.end) return 0;
+    const ps = sh.start.split(':').map(Number), pe = sh.end.split(':').map(Number);
+    let mins = (pe[0] * 60 + (pe[1] || 0)) - (ps[0] * 60 + (ps[1] || 0));
+    if (isNaN(mins)) return 0;
+    if (mins <= 0) mins += 1440;
+    return mins / 60;
+  },
 
   // Shift dropdown options. Open shifts first, then closed shifts from the last
   // 14 days, then a Manual escape hatch for off-cycle entries.
@@ -306,7 +336,7 @@ S.LaborTipLog = {
   batchBody() {
     const isManual = this._addShift === '__manual';
     const header = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-      + '<div class="f" style="flex:1.5 1 200px;min-width:0;"><label>Shift</label>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="tl-b-shift">' + this.shiftOptions(this._addShift) + '</select></div>'
       + (isManual
           ? '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
@@ -324,10 +354,10 @@ S.LaborTipLog = {
         + '</tr></thead><tbody id="tl-b-rows">' + rowsHtml + '</tbody></table></div>'
       : '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
         + (this._addShift && !isManual
-            ? 'No tipped staff on this shift still need tips entered. Add a participant below for a tip-out.'
-            : 'Pick a shift above to load its tipped staff, or add participants by hand.') + '</div>';
+            ? 'No tipped staff on this shift still need tips entered. Add staff below for a tip-out.'
+            : 'Pick a shift above to load its tipped staff, or add staff by hand.') + '</div>';
     return header + table
-      + '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Participant</button>';
+      + '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
   },
 
   batchRowHtml(r, i) {
@@ -370,9 +400,12 @@ S.LaborTipLog = {
     }
   },
 
-  // Build the participant rows for a picked shift: every TIPPED employee who
-  // logged hours that day and is not already tip-logged for the shift, hours
-  // pre-filled. Manual entry seeds one blank row.
+  // Build participant rows for a picked shift from the POSTED SCHEDULE — who was
+  // scheduled to work that day (tipped only) — adjusted by the Call-Out Log: drop
+  // anyone who called out, add a tipped person who covered. Tippable hours come
+  // from logged actuals when they exist, otherwise the scheduled hours (an
+  // estimate you can override). Schedule, not logged hours, because tips are
+  // entered at close before hours are usually logged. Manual entry seeds a blank row.
   preloadFromShift(shiftId) {
     this._addShift = shiftId;
     if (shiftId === '__manual') {
@@ -384,14 +417,37 @@ S.LaborTipLog = {
     const s = shiftId ? this.shiftById(shiftId) : null;
     if (!s) { this._addRows = []; return; }
     const date = s.date || '';
-    const worked = new Set();
-    this.actuals().filter(a => a.date === date).forEach(a => { if (a.staff_id) worked.add(a.staff_id); });
+    // Scheduled tipped staff for that day -> scheduled hours (the hours fallback).
+    const schedHrs = new Map();
+    const sched = this.scheduleForDate(date);
+    if (sched) {
+      const dayName = this.dayNameFor(date);
+      (sched.shifts || []).forEach(sh => {
+        if (sh.day !== dayName || !sh.staff_id) return;
+        const st = this.staffById(sh.staff_id);
+        if (!st || !App.isTipped(st)) return;
+        schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + this.schedHours(sh));
+      });
+    }
+    // Call-out adjustments for this date (loosely matched on shift type): a
+    // caller-out didn't work; a tipped cover did.
+    this.callouts().filter(c => c.date === date && (!c.shift_type || !s.shift_type || c.shift_type === s.shift_type)).forEach(c => {
+      if (c.staff_id) schedHrs.delete(c.staff_id);
+      if (c.covered && c.covered_by_id) {
+        const cov = this.staffById(c.covered_by_id);
+        if (cov && App.isTipped(cov) && !schedHrs.has(c.covered_by_id)) schedHrs.set(c.covered_by_id, 0);
+      }
+    });
+    // Skip anyone already tip-logged for this shift, fill hours from actuals else schedule.
     const already = new Set(this.tips().filter(t => t.date === date && (t.shift_id || '') === shiftId).map(t => t.staff_id));
     const rows = [];
-    this.staff().slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(st => {
-      if (!worked.has(st.id) || already.has(st.id) || !App.isTipped(st)) return;
-      rows.push({ staff_id: st.id, hours: (App.hoursFor(st.id, date) || ''), cash: '', card: '' });
+    [...schedHrs.keys()].forEach(id => {
+      if (already.has(id)) return;
+      const logged = App.hoursFor(id, date);
+      const hours = (logged != null && logged > 0) ? logged : (schedHrs.get(id) || '');
+      rows.push({ staff_id: id, hours: hours || '', cash: '', card: '' });
     });
+    rows.sort((a, b) => { const sa = this.staffById(a.staff_id), sb = this.staffById(b.staff_id); return ((sa && sa.name) || '').localeCompare((sb && sb.name) || ''); });
     this._addRows = rows;
   },
 
