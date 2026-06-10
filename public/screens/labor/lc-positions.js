@@ -175,7 +175,20 @@ S.LaborPositions = {
   },
 
   async confirmDel(id) {
-    if (!(await App.confirmDelete())) return;
+    const pos = this.positions().find(x => x.id === id);
+    const staffUsing = ((App.laborData && App.laborData.lc_staff) || []).filter(s => s.position_id === id);
+    if (staffUsing.length) {
+      const ok = await App.confirm({
+        title: 'Delete this position?',
+        message: staffUsing.length + ' staff ' + (staffUsing.length === 1 ? 'member is' : 'members are') + ' assigned to ' + (pos ? pos.name : 'this position') + '. Deleting it leaves them with no position and drops their logged hours into Unassigned on reports. Reassign them first, or delete anyway.',
+        confirmText: 'Delete Anyway',
+        cancelText: 'Cancel',
+        danger: true
+      });
+      if (!ok) return;
+    } else if (!(await App.confirmDelete())) {
+      return;
+    }
     App.laborData.lc_positions = this.positions().filter(x => x.id !== id);
     await App.saveLabor();
     this.renderList();
