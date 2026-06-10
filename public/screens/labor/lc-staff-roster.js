@@ -237,8 +237,8 @@ S.LaborStaffRoster = {
               : '<span style="color:var(--t1);font-weight:700;">Active</span>') + '</td>'
           + '<td>' + certCell + '</td>'
           + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>'
+          + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>' : '')
+          + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       below = '<div class="sh" style="margin-top:24px;">Roster</div>'
@@ -662,8 +662,29 @@ S.LaborStaffRoster = {
   },
 
   async confirmDel(id) {
-    if (!(await App.confirmDelete())) return;
+    const s = this.staffById(id);
+    const hours = ((App.laborData && App.laborData.lc_actuals) || []).filter(a => a.staff_id === id).length;
+    const tips  = ((App.laborData && App.laborData.lc_tips)    || []).filter(t => t.staff_id === id).length;
+    const certN = this.certs().filter(c => c.staff_id === id).length;
+    const noteN = this.notes().filter(n => n.staff_id === id).length;
+    // If the person has any history, steer hard to Inactive (which keeps it all);
+    // deleting wipes their certs + coaching notes and leaves hours/tips nameless.
+    if (hours + tips + certN + noteN > 0) {
+      const ok = await App.confirm({
+        title: 'Delete ' + (s ? s.name : 'this staff member') + '?',
+        message: 'This person has logged history (hours, tips, certifications, or coaching notes). Deleting removes them and erases their certifications and coaching notes, and leaves their logged hours and tips with no name attached. Set them Inactive instead to keep every record intact. Delete anyway?',
+        confirmText: 'Delete Anyway',
+        cancelText: 'Cancel',
+        danger: true
+      });
+      if (!ok) return;
+    } else if (!(await App.confirmDelete())) {
+      return;
+    }
     App.laborData.lc_staff = this.staff().filter(x => x.id !== id);
+    // Clean up the person's certs + coaching notes so they don't orphan.
+    App.laborData.lc_certs = this.certs().filter(c => c.staff_id !== id);
+    App.laborData.lc_staff_notes = this.notes().filter(n => n.staff_id !== id);
     await App.saveLabor();
     this.renderList();
   }
