@@ -97,7 +97,12 @@ S.LaborDashboard = {
     else this.renderFull();
     this.container.onclick = ev => {
       const act = ev.target.closest('.ld-act');
-      if (act && act.dataset.go) App.navigate(act.dataset.go);
+      if (act && act.dataset.go) {
+        // A watch row that points at a single person carries data-staff; open
+        // that person's page directly instead of the roster list.
+        if (act.dataset.staff) App._staffFocus = { staff_id: act.dataset.staff };
+        App.navigate(act.dataset.go);
+      }
     };
   },
 
@@ -262,18 +267,24 @@ S.LaborDashboard = {
     const uncovered = this.callouts().filter(c => (c.date || '') >= cutoff && !c.covered).length;
     const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
     const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
-    const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
-    const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
-    const watchRow = (label, val, screen, warn) =>
-      '<div class="ld-act" data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+    const expiredCerts = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today);
+    const expiringCerts = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30);
+    const expired = expiredCerts.length;
+    const expiring = expiringCerts.length;
+    // When a cert row covers exactly one person, deep-link straight to them.
+    const oneStaff = certs => { const ids = new Set(certs.map(c => c.staff_id)); return ids.size === 1 ? [...ids][0] : ''; };
+    const expiredStaff = oneStaff(expiredCerts);
+    const expiringStaff = oneStaff(expiringCerts);
+    const watchRow = (label, val, screen, warn, staffId) =>
+      '<div class="ld-act" data-go="' + screen + '"' + (staffId ? ' data-staff="' + esc(staffId) + '"' : '') + ' style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
       + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
     const anyWatch = otPremium > 0 || uncovered > 0 || expired > 0 || expiring > 0;
     const watchCard = this.shPanel('Labor Watch',
       watchRow('Projected OT premium (this week)', App.fmtCurrency(otPremium), 'lc-overtime-watch', otPremium > 0)
       + watchRow('Uncovered call-outs (7d)', String(uncovered), 'lc-callout-log', uncovered > 0)
-      + watchRow('Certifications expired (active staff)', String(expired), 'lc-staff-roster', expired > 0)
-      + watchRow('Certifications expiring (30d)', String(expiring), 'lc-staff-roster', expiring > 0)
+      + watchRow('Certifications expired (active staff)', String(expired), 'lc-staff-roster', expired > 0, expiredStaff)
+      + watchRow('Certifications expiring (30d)', String(expiring), 'lc-staff-roster', expiring > 0, expiringStaff)
       + (anyWatch ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
                   : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No labor issues flagged.</div>'));
 

@@ -62,7 +62,7 @@ S.LaborOvertimeWatch = {
     App.showHelpModal('How Overtime Watch Works', [
       { p: ['Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, so you can adjust the schedule while there is still time. Step week to week with the arrows.'] },
       { h: 'How The Projection Works', p: ['For each hourly staff member, Projected is the greater of hours already logged and hours still scheduled this week. Anything over ' + App.OT_THRESHOLD + ' hours is overtime, and Extra OT Cost is the half-time premium on those hours. Salaried staff are exempt and never appear.'] },
-      { h: 'The Suggested Action', p: ['When someone is projected over, the Suggested Action column shows the exact hours to cut from their remaining shifts to clear the threshold. Open the week\'s schedule to make the change.'] },
+      { h: 'The Suggested Action', p: ['When someone is projected over, the Suggested Action column shows the exact hours to cut from their remaining shifts to clear the threshold. If they have already worked past the line, it reads Already over instead, since logged hours cannot be cut and the fix is to lighten their next week. View Schedule for This Week opens the same week in Build Schedule so you make the change in the right place.'] },
       { h: 'Export', p: ['Export PDF saves the week\'s projection for a manager or your own records.'] }
     ]);
   },
@@ -144,12 +144,20 @@ S.LaborOvertimeWatch = {
           : r.status === 'Approaching' ? '<span style="color:var(--amber);font-weight:700;">Approaching</span>'
           : '<span style="color:var(--green);font-weight:700;">OK</span>';
         // Actionable suggestion: when over OT, tell the operator the exact
-        // cut needed to clear the threshold. Saves them doing the math.
-        const action = r.status === 'Over'
-          ? '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>'
-          : r.status === 'Approaching'
-            ? '<span style="color:var(--amber);">Watch, ' + (App.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>'
-            : '<span style="color:var(--t3);">-</span>';
+        // cut needed to clear the threshold. But if they have ALREADY worked
+        // past 40 (actual over the line), those hours are logged and cannot be
+        // cut, so the suggestion changes to "already over" and the real fix is
+        // next week, not this one.
+        let action;
+        if (r.status === 'Over') {
+          action = r.actual > App.OT_THRESHOLD
+            ? '<span style="color:var(--red);font-weight:700;">Already over, ' + r.actual.toFixed(1) + ' hr logged</span>'
+            : '<span style="color:var(--red);font-weight:700;">Cut ' + r.cutHours.toFixed(1) + ' hr</span>';
+        } else if (r.status === 'Approaching') {
+          action = '<span style="color:var(--amber);">Watch, ' + (App.OT_THRESHOLD - r.projected).toFixed(1) + ' hr to OT</span>';
+        } else {
+          action = '<span style="color:var(--t3);">-</span>';
+        }
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
           + '<td>' + r.actual.toFixed(1) + '</td>'
@@ -179,6 +187,20 @@ S.LaborOvertimeWatch = {
     });
     document.getElementById('ow-prev')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, -7); this.draw(); });
     document.getElementById('ow-next')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, 7); this.draw(); });
-    document.getElementById('ow-view-schedule')?.addEventListener('click', () => App.navigate('lc-build-schedule'));
+    document.getElementById('ow-view-schedule')?.addEventListener('click', () => this.openWeekInSchedule());
+  },
+
+  // Open the week currently shown in Overtime Watch over in Build Schedule, on
+  // the SAME week (the old handler dropped you on the default week). A posted
+  // schedule for that week opens for edit; an unbuilt week opens a fresh grid
+  // pre-set to that week so the fix lands where it belongs.
+  openWeekInSchedule() {
+    const ws = this.weekStart;
+    if (S.LaborBuildSchedule) {
+      const posted = this.schedules().find(s => s.week_start === ws);
+      if (posted) { S.LaborBuildSchedule.editId = posted.id; S.LaborBuildSchedule._enterEdit = true; }
+      else { S.LaborBuildSchedule._gotoWeek = ws; }
+    }
+    App.navigate('lc-build-schedule');
   }
 };

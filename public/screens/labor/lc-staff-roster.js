@@ -365,6 +365,7 @@ S.LaborStaffRoster = {
 
     this.container.innerHTML = '<div class="screen">'
       + this.renderProfileEditCard(s)
+      + this.renderWageHistoryCard(s)
       + this.renderCertsCard(staffId)
       + this.renderNotesCard(staffId)
       + '</div>';
@@ -384,11 +385,104 @@ S.LaborStaffRoster = {
       + '</div></div>';
   },
 
+  // ── Wage History section ─────────────────────────────────────────────
+  // Visible + correctable. Each profile wage change is auto-recorded, and
+  // App.wageForStaffOn costs past hours at the wage in effect on the day worked,
+  // so an effective date logged on the wrong day mis-costs those shifts. The
+  // operator can fix the date here, or delete a change recorded in error. Only
+  // shows once there is at least one change on file (so it never clutters a
+  // brand-new profile). Salaried staff never accrue wage history.
+  renderWageHistoryCard(s) {
+    const hist = Array.isArray(s.wage_history) ? s.wage_history : [];
+    if (!hist.length) return '';
+    const heading = '<div class="sh" style="margin:24px 0 10px;">Wage History</div>';
+    const canEdit = App.canEdit('lc-staff-roster');
+    const rows = hist.map((h, idx) => ({ h, idx }))
+      .sort((a, b) => (b.h.effective_date || '').localeCompare(a.h.effective_date || ''))
+      .map(({ h, idx }) => {
+        const delta = (h.new_wage != null && h.prior_wage != null) ? h.new_wage - h.prior_wage : null;
+        const deltaCell = delta == null ? '<span style="color:var(--t3);">-</span>'
+          : '<span style="color:' + (delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--amber)' : 'var(--t3)') + ';font-weight:600;">'
+            + (delta > 0 ? '+' : '') + App.fmtCurrency(delta) + '/hr</span>';
+        return '<tr>'
+          + '<td><div class="val">' + this.fmtDate(h.effective_date) + '</div></td>'
+          + '<td>' + (h.prior_wage != null ? App.fmtCurrency(h.prior_wage) + '/hr' : '-') + '</td>'
+          + '<td class="val">' + (h.new_wage != null ? App.fmtCurrency(h.new_wage) + '/hr' : '-') + '</td>'
+          + '<td>' + deltaCell + '</td>'
+          + '<td><div class="row-actions">'
+          + (canEdit ? '<button class="btn btn-ghost btn-sm wh-edit" data-idx="' + idx + '">Edit</button>'
+            + '<button class="btn btn-danger btn-sm wh-del" data-idx="' + idx + '">Delete</button>' : '')
+          + '</div></td></tr>';
+      }).join('');
+    return heading
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Effective</th><th>Was</th><th>New Wage</th><th>Change</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Past hours cost out at the wage in effect on the day worked. Fix an effective date here if a change was recorded on the wrong day. To change the current wage, edit the profile above; that records a new change here.</div>';
+  },
+
+  // Edit a wage change's effective date (the field that drives past-hour costing).
+  openWageEditModal(staffId, idx) {
+    const s = this.staffById(staffId);
+    const h = (s && Array.isArray(s.wage_history)) ? s.wage_history[idx] : null;
+    if (!h) return;
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">Edit Wage Change</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+      + (h.prior_wage != null ? App.fmtCurrency(h.prior_wage) + '/hr' : 'Prior wage') + ' to '
+      + (h.new_wage != null ? App.fmtCurrency(h.new_wage) + '/hr' : 'new wage')
+      + '. Correct the date this change actually took effect so past hours cost out at the right rate.</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Effective Date</label>'
+          + '<input type="date" id="wh-date" value="' + esc(h.effective_date || '') + '"/></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="wh-save">Save</button>'
+        + '<button class="btn btn-ghost" id="wh-cancel">Cancel</button>'
+        + '<span id="wh-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'wh-modal', maxWidth: 460, noClose: true });
+    document.getElementById('wh-cancel')?.addEventListener('click', () => App.closeModal('wh-modal'));
+    document.getElementById('wh-save')?.addEventListener('click', async () => {
+      const v = document.getElementById('wh-date')?.value;
+      const err = document.getElementById('wh-err');
+      if (!v) { if (err) { err.textContent = 'Pick the effective date.'; err.style.display = 'inline'; } return; }
+      const list = this.staff();
+      const i = list.findIndex(x => x.id === staffId);
+      if (i > -1 && Array.isArray(list[i].wage_history) && list[i].wage_history[idx]) {
+        list[i].wage_history[idx].effective_date = v;
+        list[i].wage_history[idx].updated_at = new Date().toISOString();
+        await App.saveLabor();
+      }
+      App.closeModal('wh-modal');
+      this.renderUnified(staffId);
+    });
+  },
+
+  async confirmDelWage(staffId, idx) {
+    const ok = await App.confirm({
+      title: 'Delete this wage change?',
+      message: 'This removes the recorded change from the wage history. Past hours will then cost out at the wage in effect before it. The current wage on the profile does not change.',
+      confirmText: 'Delete', cancelText: 'Cancel', danger: true
+    });
+    if (!ok) return;
+    const list = this.staff();
+    const i = list.findIndex(x => x.id === staffId);
+    if (i > -1 && Array.isArray(list[i].wage_history)) {
+      list[i].wage_history.splice(idx, 1);
+      await App.saveLabor();
+    }
+    this.renderUnified(staffId);
+  },
+
   wireUnified(staffId) {
     this.container.onclick = null;
     this.wirePayFields(true);
     document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; this.renderList(); });
     document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
+    // Wage history (correct an effective date, or delete a change logged in error)
+    this.container.querySelectorAll('.wh-edit').forEach(b => b.addEventListener('click', () => this.openWageEditModal(staffId, parseInt(b.dataset.idx, 10))));
+    this.container.querySelectorAll('.wh-del').forEach(b => b.addEventListener('click', () => this.confirmDelWage(staffId, parseInt(b.dataset.idx, 10))));
     // Certifications
     document.getElementById('cert-add')?.addEventListener('click', () => { this.certEditId = null; this.openCertModal(staffId); });
     this.container.querySelectorAll('.cert-edit').forEach(b => b.addEventListener('click', () => { this.certEditId = b.dataset.id; this.openCertModal(staffId); }));

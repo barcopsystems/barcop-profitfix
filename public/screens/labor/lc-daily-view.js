@@ -146,15 +146,34 @@ S.LaborDailyView = {
 
     let schedCard = '';
     if (sched && sched.length) {
-      const rows = [...sched].sort((a, b) => (a.start || '').localeCompare(b.start || '')).map(s =>
-        '<tr><td><div class="val">' + esc(s.name || '-') + '</div></td>'
+      // Who was scheduled but has no logged hours yet — the end-of-day "still
+      // owed an entry" signal. Salaried staff are coverage only, so a missing
+      // log for them is not an hours gap.
+      const loggedKeys = new Set(dayActuals.map(a => a.staff_id || a.name));
+      const notLogged = sched.filter(s => !loggedKeys.has(s.staff_id || s.name) && !App.isSalaried(s.staff_id));
+      const rows = [...sched].sort((a, b) => (a.start || '').localeCompare(b.start || '')).map(s => {
+        const isLogged = loggedKeys.has(s.staff_id || s.name);
+        const statusCell = isLogged
+          ? '<span style="color:var(--green);font-weight:700;">Logged</span>'
+          : App.isSalaried(s.staff_id)
+            ? '<span style="color:var(--t3);">Salary</span>'
+            : '<span style="color:var(--amber);font-weight:700;">Not logged</span>';
+        return '<tr><td><div class="val">' + esc(s.name || '-') + '</div></td>'
         + '<td>' + esc(s.start || '-') + '</td>'
         + '<td>' + esc(s.end || '-') + '</td>'
         + '<td>' + (s.hours != null ? s.hours.toFixed(1) : '-') + '</td>'
-        + '<td class="val">' + App.fmtCurrency(s.cost || 0) + '</td></tr>').join('');
+        + '<td class="val">' + App.fmtCurrency(s.cost || 0) + '</td>'
+        + '<td>' + statusCell + '</td></tr>';
+      }).join('');
+      const nudge = notLogged.length
+        ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+          + '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + notLogged.length + '</span> scheduled but not logged yet for this day.</div>'
+          + '<button class="btn btn-ghost btn-sm" id="dv-log-missing">Log Hours</button></div>'
+        : '';
       schedCard = '<div class="sh" style="margin:24px 0 10px;">Scheduled This Day</div>'
+        + nudge
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Start</th><th>End</th><th>Hours</th><th>Cost</th>'
+        + '<th>Staff</th><th>Start</th><th>End</th><th>Hours</th><th>Cost</th><th>Status</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -167,11 +186,22 @@ S.LaborDailyView = {
     });
     document.getElementById('dv-prev')?.addEventListener('click', () => { this.date = this.addDays(this.date, -1); this.draw(); });
     document.getElementById('dv-next')?.addEventListener('click', () => { this.date = this.addDays(this.date, 1); this.draw(); });
+    document.getElementById('dv-log-missing')?.addEventListener('click', () => this.logMissing());
     // Inline edit on logged hours rows — opens the actuals editor in a modal
     // so the operator never leaves Daily View.
     this.container.querySelectorAll('.dv-edit').forEach(btn => {
       btn.addEventListener('click', () => this.openEditModal(btn.dataset.id));
     });
+  },
+
+  // Jump to Log Hours in Fill-from-Schedule mode for this day's week, so the
+  // scheduled-but-unlogged shifts come up pre-filled to confirm in one place.
+  logMissing() {
+    const d = new Date(this.date + 'T00:00:00');
+    if (!isNaN(d.getTime())) d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const ws = isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+    if (S.LaborLogHours) { S.LaborLogHours.entryMode = 'schedule'; S.LaborLogHours._fillWeek = ws; }
+    App.navigate('lc-log-hours');
   },
 
   // ── Hours edit pop-up (standard form-card modal) ───────────────────────────

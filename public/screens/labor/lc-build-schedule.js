@@ -75,6 +75,19 @@ S.LaborBuildSchedule = {
     this.saveDraft();
     this.draw();
   },
+  weekLabel(ws) {
+    const dt = new Date((ws || '') + 'T00:00:00');
+    return isNaN(dt.getTime()) ? esc(ws || '') : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+  // The most recent posted schedule strictly before the current week, used to
+  // offer "Start from last week" on an empty grid.
+  priorSchedule() {
+    const ws = this.draft && this.draft.week_start;
+    if (!ws) return null;
+    return this.schedules()
+      .filter(s => (s.week_start || '') < ws && (s.shifts || []).length)
+      .sort((a, b) => (b.week_start || '').localeCompare(a.week_start || ''))[0] || null;
+  },
 
   // ── Draft lifecycle ─────────────────────────────────────────────────────────
   loadDraft() {
@@ -103,6 +116,12 @@ S.LaborBuildSchedule = {
     if (this._enterEdit) this._enterEdit = false;
     else this.editId = null;
     this.draft = this.loadDraft();
+    // One-shot "go to this week" handoff (e.g. Overtime Watch → View Schedule
+    // for a week with no posted schedule). Start a fresh grid on that week.
+    if (this._gotoWeek) {
+      const gw = this._gotoWeek; this._gotoWeek = null;
+      if (!this.editId && this.draft.week_start !== gw) { this.draft = { week_start: gw, shifts: [], notes: '' }; this.saveDraft(); }
+    }
     if (this.activeStaff().length === 0) {
       App.setupCard(this.container, {
         title: 'Build Your First Schedule',
@@ -256,9 +275,19 @@ S.LaborBuildSchedule = {
     });
     footer += '</tr>';
 
+    // On an empty grid (fresh week, not editing), offer to carry last week's
+    // posted schedule forward so a typical week is not rebuilt shift by shift.
+    const prior = (!this.editId && this.draft.shifts.length === 0) ? this.priorSchedule() : null;
+    const lastWeekNudge = prior
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+        + '<div style="font-size:12px;color:var(--t2);">Start this week from your schedule for the week of <span style="color:var(--t1);font-weight:600;">' + this.weekLabel(prior.week_start) + '</span>?</div>'
+        + '<button class="btn btn-ghost btn-sm" id="bs-from-last">Start from last week</button></div>'
+      : '';
+
     const gridCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Weekly Grid</span>'
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button></div>'
+      + lastWeekNudge
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
       + '<tbody>' + body + footer + '</tbody></table></div>'
@@ -335,6 +364,7 @@ S.LaborBuildSchedule = {
       this.saveDraft(); this.draw();
     });
     document.getElementById('bs-cancel')?.addEventListener('click', () => { this.editId = null; App.navigate('lc-schedule-history'); });
+    document.getElementById('bs-from-last')?.addEventListener('click', () => this.startFromLastWeek());
 
     // Grid cell clicks: edit a block, or add to a cell.
     this.container.querySelectorAll('.bs-cell').forEach(cell => {
@@ -349,6 +379,19 @@ S.LaborBuildSchedule = {
     this.container.querySelectorAll('.bs-tmpl-load').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.loadTemplate(b.dataset.id); }));
     this.container.querySelectorAll('.bs-tmpl-del').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.confirmDelTemplate(b.dataset.id); }));
     this.container.querySelectorAll('.bs-tmpl-row').forEach(r => r.addEventListener('click', ev => { if (!ev.target.closest('.btn')) this.loadTemplate(r.dataset.id); }));
+  },
+
+  // Carry the most recent prior posted schedule's shifts onto the current
+  // (empty) week. No confirm: the grid is empty by precondition, so nothing is
+  // overwritten. The week and forecast stay on the current week.
+  startFromLastWeek() {
+    const prior = this.priorSchedule();
+    if (!prior) return;
+    this.editId = null;
+    this.draft.shifts = (prior.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
+    this.draft.from_template_name = '';
+    this.saveDraft();
+    this.draw();
   },
 
   // ── Shift add/edit modal (standard App.openModal + form-card) ───────────────
@@ -544,6 +587,22 @@ S.LaborBuildSchedule = {
     });
     totalCost += this.salariedWeekCost(d.week_start);
     const forecast = this.forecastTotal(d.week_start);
+
+    // Over-budget guard: if a forecast is set and the schedule blows past the
+    // labor budget, make posting a deliberate call instead of a surprise the
+    // operator only notices on the dashboard later in the week.
+    const target = this.laborTarget();
+    const budget = forecast > 0 ? forecast * target / 100 : 0;
+    if (budget > 0 && totalCost > budget) {
+      const okOver = await App.confirm({
+        title: 'Over your labor budget?',
+        message: 'This schedule is ' + App.fmtCurrency(totalCost - budget) + ' over your labor budget of '
+          + App.fmtCurrency(budget) + ' for the week (' + App.fmtPct(totalCost / forecast * 100)
+          + ' labor vs your ' + App.fmtPct(target) + ' target). Post it anyway?',
+        confirmText: 'Post Anyway', cancelText: 'Keep Editing', danger: false
+      });
+      if (!okOver) return;
+    }
 
     const rec = {
       id:               this.editId || App.uid(),

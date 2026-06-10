@@ -190,8 +190,33 @@ S.LaborWeeklySummary = {
       + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + staffCard + dayCard + '</div>';
+    // Scheduled-but-not-logged: people on the posted schedule for this week
+    // with zero logged hours. The end-of-week "still owed entries" nudge.
+    // Salaried staff are coverage only, so a missing log is not an hours gap.
+    let notLoggedNames = [];
+    if (sched && (sched.shifts || []).length) {
+      const loggedKeys = new Set(weekActuals.map(a => a.staff_id || a.name));
+      const seen = new Set();
+      (sched.shifts || []).forEach(sh => {
+        const k = sh.staff_id || sh.name;
+        if (!k || loggedKeys.has(k) || seen.has(k) || App.isSalaried(sh.staff_id)) return;
+        seen.add(k);
+        notLoggedNames.push(sh.name || '-');
+      });
+    }
+    const schedNudge = notLoggedNames.length
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin:16px 0 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + notLoggedNames.length + '</span> scheduled but not logged this week: <span style="color:var(--t2);">'
+        + notLoggedNames.slice(0, 6).map(esc).join(', ') + (notLoggedNames.length > 6 ? ', and more' : '') + '</span>.</div>'
+        + '<button class="btn btn-ghost btn-sm" id="ws-log-missing">Log Hours</button></div>'
+      : '';
 
+    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + schedNudge + staffCard + dayCard + '</div>';
+
+    document.getElementById('ws-log-missing')?.addEventListener('click', () => {
+      if (S.LaborLogHours) { S.LaborLogHours.entryMode = 'schedule'; S.LaborLogHours._fillWeek = this.weekStart; }
+      App.navigate('lc-log-hours');
+    });
     document.getElementById('ws-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ws-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly Summary', root: this.container }));
     document.getElementById('ws-start')?.addEventListener('change', e => {

@@ -62,7 +62,7 @@ S.LaborHelp = {
       { q: 'Why bother with a coaching log in software instead of memory?',
         a: 'Two reasons. First, when a staff member has been late seven times in two months and you need the conversation that leads to a final warning, a written history of every prior coaching moment is what makes the termination defensible. "I think we talked about this in March" is not a record. Second, the Praise category builds a positive trail you can pull at review time so a year-end conversation is grounded in real examples instead of last-week recency bias.' },
       { q: 'Who can see Coaching Log entries?',
-        a: 'Admin role only, per Bar Cop\'s role permissions. Staff and Viewer roles cannot reach the coaching cards. Treat the log as you would any personnel file: written by management, accessed by management, retained for the same period your jurisdiction requires for HR records.' }
+        a: 'The Coaching Log lives on each staff member\'s page, so anyone you give access to the Staff Roster screen can see it, along with that person\'s profile and certifications. Access follows the role permissions you set under Settings: an Admin has full access, a Viewer sees it read-only, and a Staff or Manager role sees it only if you grant them the Staff Roster screen. Treat the log as you would any personnel file and keep Staff Roster access limited to the people who should be reading HR notes. Retain entries for the same period your jurisdiction requires for HR records.' }
     ]},
     { t: 'Scheduling', qa: [
       { q: 'How does Build Schedule work?',

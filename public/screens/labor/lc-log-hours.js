@@ -129,6 +129,8 @@ S.LaborLogHours = {
           .map(s => '<option value="' + s.id + '"' + (this.filterStaff === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
     const shiftOpts = '<option value="">All shifts</option>'
       + (App.SHIFT_TYPES || []).map(s => '<option value="' + esc(s) + '"' + (this.filterShift === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
+    const presetBtns = [['this-week', 'This Week'], ['last-week', 'Last Week'], ['this-month', 'This Month'], ['last-4', 'Last 4 Weeks']]
+      .map(([k, l]) => '<button class="btn btn-ghost btn-sm lo-preset" data-preset="' + k + '">' + l + '</button>').join('');
     return '<div class="card no-print">'
       + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lo-f-from" value="' + esc(this.filterFrom) + '"/></div>'
@@ -136,7 +138,27 @@ S.LaborLogHours = {
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="lo-f-shift">' + shiftOpts + '</select></div>'
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="lo-f-staff">' + staffOpts + '</select></div>'
         + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lo-f-clear">Clear</button></div>'
-      + '</div></div>';
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">'
+      + '<span style="font-size:11px;color:var(--t3);">Quick range:</span>' + presetBtns + '</div></div>';
+  },
+
+  // Quick date-range presets for the filter (local-calendar based, never UTC).
+  presetRange(key) {
+    const today = App.todayLocal();
+    const d = new Date(today + 'T00:00:00');
+    const ymd = x => App.ymdLocal(x);
+    const monday = new Date(d); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    if (key === 'this-week') return { from: ymd(monday), to: today };
+    if (key === 'last-week') { const s = new Date(monday); s.setDate(s.getDate() - 7); const e = new Date(monday); e.setDate(e.getDate() - 1); return { from: ymd(s), to: ymd(e) }; }
+    if (key === 'this-month') return { from: ymd(new Date(d.getFullYear(), d.getMonth(), 1)), to: today };
+    if (key === 'last-4') { const s = new Date(d); s.setDate(s.getDate() - 27); return { from: ymd(s), to: today }; }
+    return { from: '', to: '' };
+  },
+  applyPreset(key) {
+    const r = this.presetRange(key);
+    this.filterFrom = r.from; this.filterTo = r.to;
+    this.renderList();
   },
 
   renderList() {
@@ -244,6 +266,8 @@ S.LaborLogHours = {
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#lo-export'))  { this.exportLogged(); return; }
       if (ev.target.closest('#lo-f-clear')) { this.filterFrom = this.filterTo = this.filterShift = this.filterStaff = ''; this.renderList(); return; }
+      const preset = ev.target.closest('.lo-preset');
+      if (preset) { this.applyPreset(preset.dataset.preset); return; }
       if (ev.target.closest('#lo-save'))    { this.save('lo-'); return; }
       if (ev.target.closest('#lo-fill-save')) { this.commitFill(); return; }
       if (ev.target.closest('.lo-go-build')) { App.navigate('lc-build-schedule'); return; }
