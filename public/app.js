@@ -1802,6 +1802,17 @@ const App = {
     return ((p && p.department) || '') === 'Kitchen';
   },
 
+  // True if the staff member's position is flagged Tipped in Positions. Accepts a
+  // record or a staff_id. Drives tipped-only preloads (Tip Log batch entry) and
+  // the tip-credit check. Pairs with the per-position `tipped` boolean.
+  isTipped(s) {
+    if (typeof s === 'string') s = this.staffById(s);
+    if (!s) return false;
+    const positions = (this.laborData && this.laborData.lc_positions) || [];
+    const p = positions.find(x => x.id === s.position_id);
+    return !!(p && p.tipped);
+  },
+
   // Resolve a staff_id (or legacy name) to the staff record. Save handlers
   // call this to denormalize the picked staff into a name field for display
   // alongside the id for joins.
