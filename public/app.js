@@ -2111,6 +2111,38 @@ const App = {
     return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
   },
 
+  // ── Filter UI helpers: date presets + single-select chips ───────────────────
+  // Kyle prefers click buttons over filter dropdowns ([[filter-chips-presets]]).
+  // Small categorical filters render as chips; date ranges get preset buttons.
+  DATE_PRESETS: [['this-week', 'This Week'], ['last-week', 'Last Week'], ['this-month', 'This Month'], ['last-4', 'Last 4 Weeks']],
+  datePresetRange(key) {
+    const today = this.todayLocal();
+    const d = new Date(today + 'T00:00:00');
+    const ymd = x => this.ymdLocal(x);
+    const monday = new Date(d); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    if (key === 'this-week') return { from: ymd(monday), to: today };
+    if (key === 'last-week') { const s = new Date(monday); s.setDate(s.getDate() - 7); const e = new Date(monday); e.setDate(e.getDate() - 1); return { from: ymd(s), to: ymd(e) }; }
+    if (key === 'this-month') return { from: ymd(new Date(d.getFullYear(), d.getMonth(), 1)), to: today };
+    if (key === 'last-4') { const s = new Date(d); s.setDate(s.getDate() - 27); return { from: ymd(s), to: today }; }
+    if (key === 'last-12') { const s = new Date(d); s.setDate(s.getDate() - 83); return { from: ymd(s), to: today }; }
+    if (key === 'all') return { from: '', to: '' };
+    return { from: '', to: '' };
+  },
+  datePresetButtons(cls, presets) {
+    return (presets || this.DATE_PRESETS).map(p =>
+      '<button type="button" class="btn btn-ghost btn-sm ' + (cls || 'date-preset') + '" data-preset="' + p[0] + '">' + p[1] + '</button>').join('');
+  },
+  // Single-select filter chips. options = [{ v, label }] with v:'' as the "All"
+  // chip. Active chip = gold-tint (the selection look). Caller wires the class.
+  filterChips(active, options, cls) {
+    return options.map(o => {
+      const on = (o.v || '') === (active || '');
+      return '<button type="button" class="btn btn-sm ' + (cls || 'fc-chip') + '" data-v="' + esc(o.v || '') + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(o.label) + '</button>';
+    }).join('');
+  },
+
   // ── Page directions (the nav "i" button) ────────────────────────────────────
   // ONE universal help affordance lives in the top nav (next to Settings, always
   // visible incl. mobile). It opens the CURRENT page's directions in a slide-in
