@@ -113,7 +113,7 @@ S.ShiftActiveShift = {
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
-      + '</div>' + App.helpButton('of-how') + '</div>'
+      + '</div></div>'
 
       + '<div style="margin-top:20px;"><div style="' + lbl + '">Daypart</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + chips + '</div></div>'
@@ -134,11 +134,12 @@ S.ShiftActiveShift = {
       + '<div class="fw" style="width:130px;"><span class="pre">$</span><input class="pre" type="number" id="of-tol" min="0" step="0.5" inputmode="decimal" value="' + esc(String(d.cash_tolerance != null ? d.cash_tolerance : '')) + '" oninput="S.ShiftActiveShift.setTol(this.value)"/></div></div>'
       + '</div>'
 
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary btn-lg" id="as-start">Open the Floor</button>'
+      + '<button class="btn btn-ghost" id="rs-log">Log a Past Shift</button>'
       + '<span id="as-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '<button class="btn btn-ghost" id="rs-log" style="margin-left:auto;">Log a Past Shift</button>'
-      + '</div></div>'
+      + '</div>'
       + this.recentShiftsCard()
       + '</div>';
 
@@ -146,7 +147,6 @@ S.ShiftActiveShift = {
       const chip = ev.target.closest('.of-chip');
       const mod = ev.target.closest('.of-mod');
       const tile = ev.target.closest('.reg-tile');
-      if (ev.target.closest('#of-how')) { this.showHowToOpen(); return; }
       if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
       if (ev.target.closest('#rs-log')) { this.showShiftForm(null); return; }
       if (ev.target.closest('#rs-export')) { App.exportPDF({ title: 'Recent Shifts', root: this.container }); return; }
@@ -155,7 +155,15 @@ S.ShiftActiveShift = {
       const rsView = ev.target.closest('.rs-view');
       if (rsView) { S.ShiftHistory._openDetailId = rsView.dataset.id; App.navigate('sc-shift-history'); return; }
       if (ev.target.closest('#rs-older')) { this._rsShow = (this._rsShow || this.RS_PAGE) + this.RS_PAGE; this.renderStart(); return; }
-      if (ev.target.closest('#rs-clear')) { this._rsFrom = this._rsTo = this._rsShift = this._rsMgr = ''; this._rsShow = this.RS_PAGE; this.renderStart(); return; }
+      const rsChip = ev.target.closest('.rs-range-chip');
+      if (rsChip) {
+        const val = rsChip.dataset.v;
+        if (val === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this._rsFrom = ''; this._rsTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = val; this._rsFrom = ''; this._rsTo = ''; }
+        this._rsShow = this.RS_PAGE; this.renderStart(); return;
+      }
       if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
       if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
       if (ev.target.closest('#of-staff-minus')) { d.staff_on_floor = Math.max(0, (parseInt(d.staff_on_floor) || 0) - 1); this.renderStart(); return; }
@@ -175,63 +183,60 @@ S.ShiftActiveShift = {
     };
     document.getElementById('rs-from')?.addEventListener('change', e => { this._rsFrom = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
     document.getElementById('rs-to')?.addEventListener('change', e => { this._rsTo = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
-    document.getElementById('rs-shift')?.addEventListener('change', e => { this._rsShift = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
-    document.getElementById('rs-mgr')?.addEventListener('change', e => { this._rsMgr = e.target.value || ''; this._rsShow = this.RS_PAGE; this.renderStart(); });
   },
 
   // ── Recent Shifts (opener-state command center: view/edit/log past shifts) ──
-  // A "Filter Recent Shifts" .sh heading sits above the filter card (date range +
-  // shift + manager + Clear), then the .data-card rows (no heading of their own).
-  // Log a Past Shift lives in the Open the Floor footer row. Shift History stays
-  // the read-only archive.
-  _rsFrom: '',
-  _rsTo: '',
-  _rsShift: '',
-  _rsMgr: '',
+  // A single row of time-range chips (Export on the right) sits above the .data-card
+  // rows. Custom reveals a bare From/To. Time is the only filter (the Labor model).
+  // Log a Past Shift lives below the opener card. Shift History stays the read-only
+  // archive.
+  _rsFrom: '',             // custom range only
+  _rsTo: '',               // custom range only
+  filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   RS_PAGE: 50,
   _rsShow: 50,
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
+  // Effective date window from the active range chip (Custom reads From/To).
+  _rsRange() {
+    if (this.filterPreset === 'custom') return { from: this._rsFrom, to: this._rsTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   recentShiftsCard() {
     const all = [...this.shifts()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    const from = this._rsFrom || '', to = this._rsTo || '', fShift = this._rsShift || '', fMgr = this._rsMgr || '';
-
-    // Manager filter options pulled from the shifts themselves (value = manager_id or name).
-    const mgrMap = {};
-    all.forEach(s => {
-      const id = s.manager_id || s.manager || '';
-      if (id && !mgrMap[id]) mgrMap[id] = s.manager || (App.staffById ? (App.staffById(s.manager_id) || {}).name : '') || String(id);
-    });
-    const shiftOpts = '<option value="">All shifts</option>'
-      + App.SHIFT_TYPES.map(t => '<option value="' + esc(t) + '"' + (fShift === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const mgrOpts = '<option value="">All managers</option>'
-      + Object.keys(mgrMap).map(id => '<option value="' + esc(id) + '"' + (fMgr === id ? ' selected' : '') + '>' + esc(mgrMap[id]) + '</option>').join('');
-
+    const { from, to } = this._rsRange();
     const list = all.filter(s => {
-      if (from && (s.date || '') < from) return false;
-      if (to && (s.date || '') > to) return false;
-      if (fShift && (s.shift_type || '') !== fShift) return false;
-      if (fMgr && (s.manager_id || s.manager || '') !== fMgr) return false;
+      const date = s.date || '';
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
-    // Paginate the whole list (filtered or not) so every view is consistent:
-    // show the most recent RS_PAGE, then a Show older button reveals RS_PAGE more.
+    // Paginate: show the most recent RS_PAGE, then a Show older button reveals more.
     const show = this._rsShow || this.RS_PAGE;
     const limited = list.slice(0, show);
 
-    const card = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Recent Shifts</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="rs-export">Export PDF</button></div></div>'
-      + '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(from) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="rs-to" value="' + esc(to) + '"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="rs-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="rs-mgr">' + mgrOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rs-clear">Clear</button></div>'
-      + '</div></div>';
+    // Range chips on the left, Export on the right (no filter card). Picking Custom
+    // reveals a bare From/To row beneath the chips.
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'rs-range-chip');
+    const card = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="rs-export">Export PDF</button></div>'
+      + '</div>'
+      + (this.filterPreset !== 'custom' ? '' :
+          '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+          + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="rs-from" value="' + esc(this._rsFrom) + '"/></div>'
+          + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="rs-to" value="' + esc(this._rsTo) + '"/></div>'
+          + '</div>');
 
     let below;
     if (!all.length) {
       below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts yet. Open the floor above, or log a past shift.</div>';
     } else if (!limited.length) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts match the filter.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts in this range. Pick a wider range above.</div>';
     } else {
       const trs = limited.map(s => {
         const statusText = s.status === 'Open'
@@ -286,20 +291,20 @@ S.ShiftActiveShift = {
     const typeOpts = App.SHIFT_TYPES.map(t => '<option' + (s && s.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const firstDrawer = ((App.shiftData && App.shiftData.sc_drawers) || []).find(d => d.active !== false);
     const defaultBank = (firstDrawer && firstDrawer.default_opening_bank != null) ? firstDrawer.default_opening_bank : '';
+    // One flex-wrap row of all ten cells. In the narrow-form modal each cell is
+    // forced to half-width, so an even count flows into clean 2-up rows with no
+    // orphaned cell. Order is paired for sense: date/type, the two revenues,
+    // manager/covers, bank/staff, walkouts/status.
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="asf-date" value="' + esc(s?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1;min-width:130px;"><label>Shift Type</label><select id="asf-type">' + typeOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-bar" step="0.01" value="' + v(s?.bar_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Floor Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-floor" step="0.01" value="' + v(s?.floor_revenue) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1;min-width:160px;"><label>Manager on Duty</label><select id="asf-mgr">' + App.staffOptions(s?.manager_id || s?.manager, { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>'
       + '<div class="f" style="flex:1;min-width:110px;"><label>Covers</label><input type="number" id="asf-covers" min="0" value="' + v(s?.covers) + '" oninput="S.ShiftActiveShift.calcShiftForm()"/></div>'
-      + '<div class="f" style="flex:1;min-width:110px;"><label>Walkouts</label><input type="number" id="asf-walkouts" min="0" value="' + v(s?.walkouts) + '" placeholder="0"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Opening Bank</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="asf-bank" step="0.01" value="' + v(s?.opening_bank != null ? s.opening_bank : defaultBank) + '"/></div></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Staff on Floor</label><input type="number" id="asf-staff" min="0" value="' + v(s?.staff_on_floor) + '"/></div>'
+      + '<div class="f" style="flex:1;min-width:110px;"><label>Walkouts</label><input type="number" id="asf-walkouts" min="0" value="' + v(s?.walkouts) + '" placeholder="0"/></div>'
       + '<div class="f" style="flex:1;min-width:120px;"><label>Status</label><select id="asf-status"><option' + (s && s.status === 'Open' ? ' selected' : '') + '>Open</option><option' + (!s || s.status !== 'Open' ? ' selected' : '') + '>Closed</option></select></div>'
       + '</div>'
       + '<div class="calc" style="margin-top:6px;">'
@@ -367,6 +372,13 @@ S.ShiftActiveShift = {
     this._shiftFormId = null;
     App.closeModal('as-shift-modal');
     this._reDispatch();
+  },
+
+  // The nav "i" routes here; dispatch to the directions for the current view.
+  showHowTo() {
+    if (this.mode === 'end' && this._closeDraft) return this.showHowToStep(this._closeDraft.step);
+    if (this.mode === 'active') return this.showHowToActive();
+    return this.showHowToOpen();
   },
 
   showHowToOpen() {
@@ -624,9 +636,7 @@ S.ShiftActiveShift = {
       + (s.manager ? 'Manager: ' + esc(s.manager) + ' &middot; ' : '')
       + (s.started_at ? 'Opened ' + this.fmtClock(s.started_at) : '')
       + (s.opening_bank != null ? ' &middot; Opening bank ' + App.fmtCurrency(s.opening_bank) : '') + '</div>'
-      + '</div>'
-      + App.helpButton('as-how')
-      + '</div>';
+      + '</div></div>';
 
     const statsRow = '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       + stat('Cover Goal', goalForToday > 0 ? goalForToday + '' : '-', coverGoalLabel)
@@ -656,10 +666,10 @@ S.ShiftActiveShift = {
       + '<div class="card form-card">'
       + this.subLabel('Log During This Shift') + logButtons
       + this.sectionDivider() + this.shiftNotesInner(s)
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary btn-lg" id="as-end">End Shift</button>'
       + '<button class="btn btn-ghost" id="as-cancel" style="color:var(--red);">Cancel Shift</button>'
-      + '</div>'
       + '</div>'
       + '</div>';
 
@@ -673,8 +683,7 @@ S.ShiftActiveShift = {
       if (ev.target.closest('#ld-waste')) { S.ShiftWaste.openLogModal(done, { date: s.date, shift_type: s.shift_type }); return; }
       if (ev.target.closest('#ld-86'))    { S.Shift86List.openLogModal(done, { date_86: s.date }); return; }
       if (ev.target.closest('#ld-maint')) { S.ShiftMaintenance.openLogModal(done, { date_reported: s.date }); return; }
-      if (ev.target.closest('#as-how')) this.showHowToActive();
-      else if (ev.target.closest('#as-cancel')) this.cancelShift(s);
+      if (ev.target.closest('#as-cancel')) this.cancelShift(s);
       else if (ev.target.closest('#as-end')) this.renderEnd(s);
       else if (ev.target.closest('#sn-add')) this.addShiftNote(s);
       else if (ev.target.closest('.sn-del')) this.removeShiftNote(s, ev.target.closest('.sn-del').dataset.id);
@@ -909,7 +918,6 @@ S.ShiftActiveShift = {
           + '<div style="font-size:18px;font-weight:800;color:var(--t1);margin-top:2px;">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</div>'
           + (s.manager ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Manager: ' + esc(s.manager) + '</div>' : '')
         + '</div>'
-        + App.helpButton('aw-how')
       + '</div>'
       + stepper
     + '</div>';
@@ -1377,7 +1385,6 @@ S.ShiftActiveShift = {
 
   wireWizard(s) {
     const d = this._closeDraft;
-    document.getElementById('aw-how')?.addEventListener('click', () => this.showHowToStep(d.step));
     document.getElementById('aw-cancel')?.addEventListener('click', () => {
       this._closeDraft = null;
       this.renderActive(s);
@@ -1652,7 +1659,6 @@ S.ShiftActiveShift = {
       + '<button class="btn btn-ghost" id="ac-start">Start Another Shift</button>'
       + '<button class="btn btn-ghost" id="ac-history">View Shift History</button>'
       + '</div>'
-      + '<div style="text-align:center;font-size:11px;color:var(--t3);margin-top:10px;">Log Staff Hours opens Log Hours pre-filled from this week\'s schedule, so you confirm hours instead of re-typing them.</div>'
       + '</div></div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#ac-start')) this.renderStart();
