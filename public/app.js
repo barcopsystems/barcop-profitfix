@@ -1813,6 +1813,23 @@ const App = {
     return !!(p && p.tipped);
   },
 
+  // Tip-out policy: percent of sales a tipped earner tips out to support staff,
+  // set in Wage Policy. 0 = the house does not use tip-outs, so the Tip Log keeps
+  // the simple form and the tip-out columns stay hidden.
+  tipOutPct() {
+    const v = this.laborData && this.laborData.settings && parseFloat(this.laborData.settings.tip_out_pct);
+    return (v && v > 0) ? v : 0;
+  },
+  // Net tip income for one tip record: gross tips minus any tip-out this person
+  // paid out, plus any tip-out they received. This is the honest figure the
+  // tip-credit check and payroll worksheet read — Bar Cop computes the amount;
+  // how it is physically paid out is the operator's payroll process, not ours.
+  netTips(t) {
+    if (!t) return 0;
+    const gross = (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0);
+    return gross - (parseFloat(t.tip_out_paid) || 0) + (parseFloat(t.tip_out_received) || 0);
+  },
+
   // Resolve a staff_id (or legacy name) to the staff record. Save handlers
   // call this to denormalize the picked staff into a name field for display
   // alongside the id for joins.
