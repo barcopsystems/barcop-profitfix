@@ -73,6 +73,8 @@ input,select,textarea{color-scheme:dark;}
    global input focus styles — give them the app's steel focus, not the browser's white ring. */
 .ccd-cnt:focus,.ccd-coins:focus{border-color:var(--focus)!important;outline:none;}
 .ccd-step:focus{outline:none;}
+/* Service-period drop-down inputs sit in a popover outside .app — give them the steel focus, not the browser white ring. */
+.sp-pop input:focus{border-color:var(--focus)!important;outline:none;}
 .form-input[type=number]{-moz-appearance:textfield;}
 .form-input[type=number]::-webkit-inner-spin-button,
 .form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
@@ -324,7 +326,7 @@ input,select,textarea{color-scheme:dark;}
   padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
-.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--focus);}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--focus);outline:none;}
 /* Kill Chrome's autofill yellow tint on every form input. Chrome paints
    autofilled inputs yellow by default to signal "this is autofilled" —
    but on a dark theme it shows up as a muddy color change. Force the
@@ -756,6 +758,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ob-pip.on{background:var(--gold);}
 .ob-pip.done{background:rgba(219,171,70,0.35);}
 .ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+/* Onboarding field rows stack full-width on phones. */
+@media(max-width:560px){
+  .ob-row{flex-direction:column;}
+  .ob-row > .f{flex:1 1 auto!important;width:100%!important;min-width:0!important;}
+}
 
 /* ══ AUTH ══ */
 .auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
