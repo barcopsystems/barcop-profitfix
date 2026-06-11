@@ -327,6 +327,7 @@ input,select,textarea{color-scheme:dark;}
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
 .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--focus);outline:none;}
+.f.ob-invalid input,.f.ob-invalid select,.f.ob-invalid textarea{border-color:var(--red)!important;}
 /* Kill Chrome's autofill yellow tint on every form input. Chrome paints
    autofilled inputs yellow by default to signal "this is autofilled" —
    but on a dark theme it shows up as a muddy color change. Force the
