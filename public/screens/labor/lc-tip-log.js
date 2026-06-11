@@ -114,15 +114,19 @@ S.LaborTipLog = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    // Fresh batch-entry state each visit. Default to the open shift (the close-out
-    // case) and preload its tipped staff; otherwise an empty form ready to pick one.
-    const a = this.activeShift();
-    this._addShift = a ? a.id : '';
-    this._addDate = App.todayLocal();
-    this._addShiftType = '';
-    this._addRows = [];
+    // Keep any unsaved in-progress entry so leaving the screen and coming back (or
+    // clicking a filter) never wipes it — only Save or Clear resets it. A "fresh"
+    // visit (no entered amounts) defaults to the open shift and preloads its crew.
+    const hasWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
+    if (!hasWork) {
+      const a = this.activeShift();
+      this._addShift = a ? a.id : '';
+      this._addDate = App.todayLocal();
+      this._addShiftType = '';
+      this._addRows = [];
+      if (a) this.preloadFromShift(a.id);
+    }
     this._savedNote = null;
-    if (a) this.preloadFromShift(a.id);
     this.renderList();
   },
 
@@ -265,8 +269,10 @@ S.LaborTipLog = {
     } else {
       modeBody = this.batchBody();
       const note = this._savedNote; this._savedNote = null;   // show once, after a save
+      const canClear = !!(this._addShift || (this._addRows || []).length);
       actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
+        + (canClear ? '<button class="btn btn-ghost" id="tl-clear">Clear</button>' : '')
         + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
         + '</div>';
@@ -341,6 +347,7 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
+      if (ev.target.closest('#tl-clear')) { this._addShift = ''; this._addRows = []; this._savedNote = null; this.renderList(); return; }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
         const v = tlRange.dataset.v;
@@ -657,7 +664,7 @@ S.LaborTipLog = {
     });
     const rowsEl = document.getElementById('tl-b-rows');
     if (rowsEl) {
-      rowsEl.addEventListener('input', () => this.recalcBatch());
+      rowsEl.addEventListener('input', () => { this.collectBatch(); this.recalcBatch(); });
       rowsEl.addEventListener('change', ev => {
         // Picking a staff member auto-fills that row's hours from logged hours.
         if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
