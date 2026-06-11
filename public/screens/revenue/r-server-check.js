@@ -175,13 +175,13 @@ S.RevenueServerCheck = {
     const t        = App.data.revenue_settings?.targets || {};
     const targetCA = t.check_avg || 35;
     const today    = App.todayLocal();
-    // Default shift type from active shift if one is running, otherwise infer
-    // from clock-hour using the canonical App.SHIFT_TYPES list.
+    // Default shift type from active shift if one is running, otherwise the
+    // operator's service period whose time window contains now.
     const active   = (App.activeShift && App.activeShift()) || null;
-    const h        = new Date().getHours();
+    const byTime   = App.servicePeriodByTime ? App.servicePeriodByTime() : null;
     const shift    = active && active.shift_type
       ? active.shift_type
-      : (h < 11 ? 'Brunch' : h < 16 ? 'Lunch' : h < 21 ? 'Dinner' : 'Late Night');
+      : (byTime ? byTime.name : (App.SHIFT_TYPES[0] || 'Dinner'));
 
     const log = (App.data.revenue_server_checks || []).slice(-30).reverse();
     const scorecard = this.computeScorecard(30);
