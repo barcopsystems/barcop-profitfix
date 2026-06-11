@@ -13,12 +13,12 @@
      ctrl.value();   // [{id,name,start,end,custom}] sorted by start time
 */
 window.ServicePeriods = {
-  get PRESETS() { return (window.App && App.SERVICE_PERIOD_PRESETS) || []; },
+  get PRESETS() { return (typeof App !== 'undefined' && App.SERVICE_PERIOD_PRESETS) || []; },
 
   _min(t) { const a = String(t || '').split(':'); return (parseInt(a[0], 10) || 0) * 60 + (parseInt(a[1], 10) || 0); },
   _sorted(list) { return list.slice().sort((a, b) => this._min(a.start) - this._min(b.start)); },
   _isFullDay(p) { return this._min(p.start) === 0 && this._min(p.end) >= 1439; },
-  _uid() { return (window.App && App.uid) ? App.uid() : 'sp_' + Math.random().toString(36).slice(2, 9); },
+  _uid() { return (typeof App !== 'undefined' && App.uid) ? App.uid() : 'sp_' + Math.random().toString(36).slice(2, 9); },
 
   mount(root, opts) {
     opts = opts || {};
