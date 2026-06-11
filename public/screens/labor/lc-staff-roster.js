@@ -201,22 +201,30 @@ S.LaborStaffRoster = {
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
-    const modeBody = this.entryMode === 'import'
-      ? '<div id="sr-csv"></div><div id="sr-imp-result"></div>'
-      : this.profileFormCells(null)
+    // Primary actions live BELOW the card (bottom-left), collapse-group tagged so
+    // they hide with the card. Import mode's Import / Cancel render into the same
+    // out-of-card slot via the CSVMapper actionsEl. Mirrors Log Hours / Tip Log.
+    let modeBody, actionRow;
+    if (this.entryMode === 'import') {
+      modeBody = '<div id="sr-csv"></div><div id="sr-imp-result"></div>';
+      actionRow = '<div id="sr-imp-actions" data-collapse-group="lc-staff-roster" style="margin-bottom:24px;"></div>';
+    } else {
+      modeBody = this.profileFormCells(null)
         + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
-        + '<label>Notes</label><textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
-        + '<div class="card-actions">'
+        + '<label>Notes</label><textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      actionRow = '<div data-collapse-group="lc-staff-roster" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
         + '<button class="btn btn-ghost" id="sr-startover">Start Over</button>'
         + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
+    }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
       + '<div class="collapse-body">'
       + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
-      + '</div></div>';
+      + '</div></div>'
+      + actionRow;
 
     const list = [...this.staff()].sort((a, b) => {
       if ((a.status === 'Inactive') !== (b.status === 'Inactive')) return a.status === 'Inactive' ? 1 : -1;
@@ -250,7 +258,7 @@ S.LaborStaffRoster = {
           + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="sh" style="margin-top:24px;">Roster</div>'
+      below = '<div class="sh" style="margin-top:24px;">Staff Roster</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -258,7 +266,6 @@ S.LaborStaffRoster = {
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
-      if (ev.target.closest('.sr-imp-how'))  { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.sr-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
@@ -297,7 +304,9 @@ S.LaborStaffRoster = {
     const el = document.getElementById('sr-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
-      hint: 'Drop a staff list export: <span class="sr-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      dropTitle: 'Drop your staff list here',
+      dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
+      actionsEl: '#sr-imp-actions',
       fields: [
         { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name'] },
         { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title'] },
