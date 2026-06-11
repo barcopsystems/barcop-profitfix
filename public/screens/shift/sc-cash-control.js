@@ -2,7 +2,7 @@
 
 /* ── Shift Control — Cash Board (the one place to do cash) ────────────────────
    Everything cash happens here. Top to bottom: the Safe (balance + safe
-   actions), the Registers (a tile per drawer with Log a Drop / Count Drawer),
+   actions), the Registers (a tile per drawer with Log a Drop / Reconcile Drawer),
    then Cash Activity (the full log, tap a row to edit). Entry and editing run
    through pop-ups + the shared bill counter, so there is one door.
 
@@ -189,7 +189,7 @@ S.ShiftCashControl = {
     App.showHelpModal('How Cash Control Works', [
       { p: ['Cash Control is the one place you handle cash. Everything is logged and edited right here, top to bottom: the safe, your registers, then the full activity list.'] },
       { h: 'The Safe', p: ['The big number is what should be in your safe right now, built from every safe entry on file. Cash drops mirror into the safe automatically, so the balance stays honest with no double entry.', 'Make a Deposit, Issue a Bank, or log other safe activity (cash added, paid out) with the buttons here. Count the Safe lets you count what is physically in the safe and catch an over or short against what should be there. A safe count flags the gap, it does not change your running balance.'] },
-      { h: 'Registers', p: ['Each drawer shows its standard bank, the drops pulled in the date range you picked, and how its last close came out. Log a Drop pulls cash from that register into the safe. Count Drawer reconciles the counted drawer against the POS at close and logs the over or short.'] },
+      { h: 'Registers', p: ['Each drawer shows its standard bank, the drops pulled in the date range you picked, and how its last reconcile came out. Log a Drop pulls cash from that register into the safe.', 'Reconcile Drawer counts a register against its expected POS cash and logs the over or short to the Variance Log. The End Shift close already reconciles every register automatically, so reach for Reconcile Drawer for an off-cycle count: a mid-shift cashier or drawer swap, a register that closes before the rest of the shift, or a recount. It does not replace the close\'s record, it adds another dated reconcile, and the tile shows the most recent one, tagged so you can tell a shift close from a manual count.'] },
       { h: 'Filter and Activity', p: ['The range chips above the activity list set the window. It drives the four totals (drops in, safe out, drawer net, flagged variances), the drops shown on each register, and the activity list below.', 'Every drop, deposit, bank move, drawer reconcile, and safe count lands in Cash Activity. Hit Edit on any row to change or delete it. Export PDF next to the chips prints the range you are viewing.'] },
       { h: 'History pages', p: ['Cash Drop History, Safe Log History, and Variance History in the sidebar hold the full filterable record of each type with their own Export. They are read-only. All logging and editing happens here on the board.'] }
     ]);
@@ -253,20 +253,22 @@ S.ShiftCashControl = {
         const vr = parseFloat(st.lastVar.variance) || 0;
         const status = st.lastVar.status || '';
         const col = this.statusColor(status);
+        const srcMap = { 'shift-close': 'from shift close', 'manual': 'manual count' };
+        const srcTag = srcMap[st.lastVar.source] ? ' &middot; ' + srcMap[st.lastVar.source] : '';
         closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
-          + '<span style="color:var(--t3);">' + esc(status) + ' (' + this.fmtDate(st.lastVar.date) + ')</span>';
+          + '<span style="color:var(--t3);">' + esc(status) + srcTag + ' (' + this.fmtDate(st.lastVar.date) + ')</span>';
       } else {
-        closeLine = '<span style="color:var(--t4);">No close logged yet</span>';
+        closeLine = '<span style="color:var(--t4);">No reconcile logged yet</span>';
       }
       return '<div style="border:1px solid var(--b1);border-radius:6px;padding:14px 16px;background:var(--surface);">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
         +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(d.name) + '</div>'
         +   '<div style="font-size:11px;color:var(--t3);">Bank ' + bank + '</div></div>'
         + '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Drops ' + winWord + ': <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(st.dropTotal) + '</span> <span style="color:var(--t3);">(' + st.dropCount + ')</span></div>'
-        + '<div style="font-size:12px;margin-top:4px;">Last close: ' + closeLine + '</div>'
+        + '<div style="font-size:12px;margin-top:4px;">Last reconcile: ' + closeLine + '</div>'
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
         +   '<button class="btn btn-ghost btn-sm cc-drop" data-id="' + esc(d.id) + '">Log a Drop</button>'
-        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Count Drawer</button>'
+        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile Drawer</button>'
         + '</div></div>';
     };
     const registersCard = '<div class="card form-card no-print" data-collapse-group="sc-cash-safe" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
@@ -639,7 +641,7 @@ S.ShiftCashControl = {
     else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Count'; } fail('Save failed. Try again.'); }
   },
 
-  // ── Count Drawer (new or edit) — reconcile a drawer count vs POS ────────────
+  // ── Reconcile Drawer (new or edit) — reconcile a drawer count vs POS ────────
   openCountDrawer(rec, drawerId) {
     const editing = !!rec;
     const active    = (App.activeShift && App.activeShift()) || null;
@@ -651,7 +653,7 @@ S.ShiftCashControl = {
       + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Count' : 'Count Drawer') + '</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
@@ -718,6 +720,7 @@ S.ShiftCashControl = {
       drawer:        (App.drawerById(drawerId) || {}).name || '',
       cashier_id:    cashId,
       cashier:       (App.staffById(cashId) || {}).name || '',
+      source:        (existing && existing.source) ? existing.source : 'manual',
       expected_cash: exp,
       counted_cash:  cnt,
       variance,

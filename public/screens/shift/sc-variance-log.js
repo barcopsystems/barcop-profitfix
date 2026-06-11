@@ -2,7 +2,7 @@
 
 /* ── Shift Control — Variance helpers ─────────────────────────────────────────
    Not a routed screen anymore. Drawer reconciles are logged/edited on the Cash
-   Board (Cash Control, Count Drawer) and viewed on Cash History (Variances tab).
+   Board (Cash Control, Reconcile Drawer) and viewed on Cash History (Variances tab).
    This module holds the canonical status logic + tolerance + reason/status
    lists the board and history read, and the shared write path. sc_variances
    feeds Profit Recovery's Cash Reconciliation and Theft Risk. */

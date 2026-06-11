@@ -1852,6 +1852,7 @@ S.ShiftActiveShift = {
           drawer:        c.name || '',
           cashier_id:    s.manager_id || '',
           cashier:       s.manager || '',
+          source:        'shift-close',
           expected_cash: c.expected,
           counted_cash:  c.counted_cash,
           variance:      c.variance,
