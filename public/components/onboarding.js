@@ -71,7 +71,9 @@ const Onboarding = {
     const city  = document.getElementById('ob-city')?.value.trim();
     const state = document.getElementById('ob-state')?.value.trim();
     if (!name) { fail('Please enter your bar or restaurant name.'); document.getElementById('ob-name')?.focus(); return; }
-    const periods = (this._spCtrl ? this._spCtrl.value() : []).filter(p => p && p.name);
+    const all = this._spCtrl ? this._spCtrl.value() : [];
+    if (all.some(p => !(p.name || '').trim())) { fail('Name your custom period, or turn it off.'); return; }
+    const periods = all.filter(p => p && p.name);
     if (!periods.length) { fail('Pick at least one service period.'); return; }
 
     const s = App.data.settings;
