@@ -588,6 +588,7 @@ S.ShiftActiveShift = {
     const i = list.findIndex(x => x.id === s.id);
     if (i > -1) list.splice(i, 1);
     await App.removeRecord('sc', 'shift', s.id);
+    this._closeDraft = null;
     this.renderStart();
   },
 
@@ -1564,8 +1565,13 @@ S.ShiftActiveShift = {
 
   wireWizard(s) {
     const d = this._closeDraft;
+    // Return To Shift pauses the close and drops back to the running view WITHOUT
+    // wiping what was entered — so the operator can log a void/comp/waste inline and
+    // come back to End Shift with all their step data (registers, tips, etc.) intact.
+    // Sync the visible step first so its inputs are captured before we leave it.
+    // The draft only clears on a real close (finalizeClose) or Cancel Shift.
     document.getElementById('aw-cancel')?.addEventListener('click', () => {
-      this._closeDraft = null;
+      this.syncWizardInputs();
       this.renderActive(s);
     });
     document.getElementById('aw-next')?.addEventListener('click', () => {
