@@ -25,6 +25,8 @@ S.HubGettingStarted = {
     // ── Phase 1: Foundation ──────────────────────────────────────────────
     { group:'foundation', id:'gs_profile', screen:'settings',
       label:'Set your operation profile in Settings: bar name, location, and annual bar and food revenue.' },
+    { group:'foundation', id:'gs_service_periods', screen:'settings',
+      label:'Set your service periods in Settings: the dayparts you run. These drive Open the Floor, schedules, and every shift-type field across Bar Cop.' },
     { group:'foundation', id:'gs_targets', screen:'settings',
       label:'Set your Profit, Revenue, and Traffic targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
 
