@@ -1813,6 +1813,17 @@ const App = {
     return !!(p && p.tipped);
   },
 
+  // Tip-out role of a tipped position: 'earner' (rings sales, tips out — servers,
+  // bartenders) or 'support' (receives tip-out — bussers, barbacks, runners).
+  // null when not tipped; a tipped position with no explicit role defaults earner.
+  tipRole(s) {
+    if (typeof s === 'string') s = this.staffById(s);
+    if (!s) return null;
+    const positions = (this.laborData && this.laborData.lc_positions) || [];
+    const p = positions.find(x => x.id === s.position_id);
+    if (!p || !p.tipped) return null;
+    return p.tip_role === 'support' ? 'support' : 'earner';
+  },
   // Tip-out policy: percent of sales a tipped earner tips out to support staff,
   // set in Wage Policy. 0 = the house does not use tip-outs, so the Tip Log keeps
   // the simple form and the tip-out columns stay hidden.
