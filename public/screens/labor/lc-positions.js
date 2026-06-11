@@ -56,7 +56,7 @@ S.LaborPositions = {
       + '<option value="no"' + (pays ? '' : ' selected') + '>No</option>'
       + '<option value="yes"' + (pays ? ' selected' : '') + '>Yes</option>'
       + '</select></div>'
-      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out %</label>'
+      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out (% on sales)</label>'
       + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
@@ -93,11 +93,12 @@ S.LaborPositions = {
       + App.collapsibleCardTitle('lc-positions', 'Add Position')
       + '<div class="collapse-body">'
       + this.formBody(null)
-      + '<div class="card-actions">'
+      + '</div></div>'
+      + '<div data-collapse-group="lc-positions" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="lp-save">Add Position</button>'
       + '<button class="btn btn-ghost" id="lp-startover">Start Over</button>'
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div>';
 
     let below;
     if (list.length === 0) {
