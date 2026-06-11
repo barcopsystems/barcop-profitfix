@@ -48,8 +48,8 @@ S.LaborTipPool = {
   },
 
   showHowTo() {
-    App.showHelpModal('How the Tip Pool Calculator Works', [
-      { p: ['The Tip Pool Calculator splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Set the date and pool amount, add the participants, and Bar Cop works out each person\'s share live.'] },
+    App.showHelpModal('How the Tip Pool Log Works', [
+      { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Set the date and pool amount, add the participants, and Bar Cop works out each person\'s share live.'] },
       { h: 'Load From The Tip Log', p: ['Pick a date and Load from Tip Log pulls in everyone who logged tips that day, totals their tips as the pool, and fills hours from their logged shift. From there you adjust participants or hours and the shares recompute.'] },
       { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
       { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] }
