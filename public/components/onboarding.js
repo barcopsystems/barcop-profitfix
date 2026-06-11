@@ -19,12 +19,13 @@ const Onboarding = {
   // A section = the numbered gold circle in its own left column, with the title
   // and everything else aligned to its right (nothing sits under the circle).
   _section(n, title, body) {
-    return '<div style="display:flex;gap:12px;align-items:flex-start;margin-top:24px;">'
-      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;">' + n + '</div>'
-      + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);margin-bottom:12px;">' + title + '</div>'
-      + body
-      + '</div></div>';
+    return '<div style="margin-top:34px;">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
+      +   '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + n + '</div>'
+      +   '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">' + title + '</div>'
+      + '</div>'
+      + '<div style="margin-left:36px;">' + body + '</div>'
+      + '</div>';
   },
 
   render() {
@@ -40,8 +41,8 @@ const Onboarding = {
 
     const numbers = '<div style="' + this._help + '">A rough estimate is fine. No food sales? Enter zero.</div>'
       + '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + v(s.annual_bar_revenue) + '"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + v(s.annual_food_revenue) + '"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + v(s.annual_bar_revenue) + '"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + v(s.annual_food_revenue) + '"/></div></div>'
       + '</div>';
 
     const service = '<div style="' + this._help + '">Turn on the services you run. Tap one to set its hours.</div>'
@@ -49,7 +50,7 @@ const Onboarding = {
 
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Fill in these basics, then continue to the quick setup checklist.</div>'
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Enter your basics here and then run your bar\'s first recovery audit.</div>'
       + this._section(1, 'The Basics', basics)
       + this._section(2, 'Your Numbers', numbers)
       + this._section(3, 'Service Periods', service)
