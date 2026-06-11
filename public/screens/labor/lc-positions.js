@@ -115,7 +115,7 @@ S.LaborPositions = {
         + (App.canEdit('lc-positions') ? '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>' : '')
         + (App.canEdit('lc-positions') ? '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      below = '<div class="sh" style="margin-top:24px;">Positions</div>'
+      below = '<div class="sh" style="margin-top:24px;">Staff Positions</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
