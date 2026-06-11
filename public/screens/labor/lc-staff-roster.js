@@ -404,11 +404,12 @@ S.LaborStaffRoster = {
       + this.profileFormCells(s)
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="sr-save">Update Profile</button>'
       + '<button class="btn btn-ghost" id="sr-cancel">Cancel</button>'
       + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
   },
 
   // ── Wage History section ─────────────────────────────────────────────
