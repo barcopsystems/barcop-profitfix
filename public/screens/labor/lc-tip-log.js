@@ -428,17 +428,20 @@ S.LaborTipLog = {
     const sTable = '<div class="sh" style="margin:14px 0 8px;">Receives Tip-Out</div>' + tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
     const recon = this.tipOutRecon(this._addRows);
-    // Reconciliation + the tip-out disclaimer sit in a dark recessed box UNDER the
-    // Add Staff button (like the Pool Calculator), and stay visible the whole time
-    // tip-out is on so the "not distributed" gap shows whether a support row is
-    // listed or not (recalcBatch keeps the numbers live as sales are typed).
-    const reconBox = '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:14px 16px;margin-top:16px;">'
-      + '<span id="tl-b-recon-text" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;">' + this._reconInner(recon) + '</span>'
-      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:14px;">'
+    // Reconciliation stats (a .calc box, same as the Pool Calculator) + the tip-out
+    // disclaimer below, UNDER the Add Staff button. Stays visible the whole time
+    // tip-out is on so the Not Distributed gap shows whether a support row is listed
+    // or not; recalcBatch keeps the numbers live as sales are typed.
+    const gapCls = Math.abs(recon.gap) > 0.01 ? 'warn' : 'good';
+    const reconBox = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+      + '<div class="calc-item"><div class="calc-label">Collected</div><div class="calc-val" id="tl-b-collected">' + App.fmtCurrency(recon.collected, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Distributed</div><div class="calc-val" id="tl-b-distributed">' + App.fmtCurrency(recon.distributed, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Not Distributed</div><div class="calc-val ' + gapCls + '" id="tl-b-gap">' + App.fmtCurrency(recon.gap, 2) + '</div></div>'
+      + '</div>'
+      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
-      + '</div>'
-    + '</div>';
+      + '</div>';
     return header + tables + addBtn + reconBox;
   },
 
@@ -520,15 +523,6 @@ S.LaborTipLog = {
     return { collected, distributed, gap: collected - distributed,
       hasSupport: out.some(o => o.role === 'support' && o.staff_id),
       hasEarner: out.some(o => o.paid > 0) };
-  },
-  _reconInner(recon) {
-    const gap = recon.gap;
-    const gapTxt = Math.abs(gap) < 0.005 ? 'all distributed'
-      : (gap > 0 ? App.fmtCurrency(gap, 2) + ' not distributed' : App.fmtCurrency(-gap, 2) + ' over');
-    const gapColor = Math.abs(gap) < 0.005 ? 'var(--green)' : 'var(--amber)';
-    return '<span style="color:var(--t3);">Collected <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(recon.collected, 2) + '</span></span>'
-      + '<span style="color:var(--t3);">Distributed <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(recon.distributed, 2) + '</span></span>'
-      + '<span style="color:' + gapColor + ';font-weight:700;">' + gapTxt + '</span>';
   },
 
   // The effective date the batch logs against: the picked shift's date, or the
@@ -644,8 +638,11 @@ S.LaborTipLog = {
       }
     });
     if (on) {
-      const rt = document.getElementById('tl-b-recon-text');
-      if (rt) rt.innerHTML = this._reconInner(this.tipOutRecon(rows));
+      const recon = this.tipOutRecon(rows);
+      const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+      set('tl-b-collected', App.fmtCurrency(recon.collected, 2));
+      set('tl-b-distributed', App.fmtCurrency(recon.distributed, 2));
+      set('tl-b-gap', App.fmtCurrency(recon.gap, 2), Math.abs(recon.gap) > 0.01 ? 'warn' : 'good');
     }
     const n = this.batchReadyCount();
     const btn = document.getElementById('tl-save-all');
