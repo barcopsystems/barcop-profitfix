@@ -130,7 +130,7 @@ S.LaborTipLog = {
     App.showHelpModal('How the Tip Log Works', [
       { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
       { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole shift at once. Use Add Staff for anyone the schedule missed, or pick Manual entry to set the date and shift type yourself.'] },
-      { h: 'Tip-Outs', p: ['If you set a Tip-Out % in Wage Policy, the form splits into two sections by the role you set on each Position. Tipped Staff (earners: servers, bartenders) enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at your percent of sales. Support Staff (bussers, barbacks, runners) get one cell: enter what each person actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
+      { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. Tipped Staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. Support Staff get one cell: enter what each person actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
@@ -162,17 +162,20 @@ S.LaborTipLog = {
     const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
     const defaultDate = x?.date || initialShift?.date || App.todayLocal();
     const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
-    // Tip-out edit row (edit pop-up only, when a tip-out % is set): earners get a
-    // Sales field (tip-out recomputes), support get their editable Received amount.
-    const toPct = App.tipOutPct();
+    // Tip-out edit row (edit pop-up, when the house uses tip-outs). An earner role
+    // gets Sales (tip-out recomputes at their role's %) AND a Received field (a
+    // bartender taking the bar share); a support role gets just Received.
+    const toPct = x ? App.tipOutPctFor(x.staff_id) : 0;
     const role = x ? (App.tipRole(x.staff_id) || 'earner') : 'earner';
-    const tipoutRow = (toPct > 0 && x)
+    const receivedCell = '<div class="f" style="width:170px;flex-shrink:0;"><label>Tip-Out Received</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(x?.tip_out_received) + '"/></div></div>';
+    const tipoutRow = (App.tipOutEnabled() && x)
       ? (role === 'support'
-          ? '<div class="form-row" style="gap:16px;"><div class="f" style="width:200px;flex-shrink:0;"><label>Tip-Out Received</label>'
-            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(x?.tip_out_received) + '"/></div></div></div>'
-          : '<div class="form-row" style="gap:16px;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
+          ? '<div class="form-row" style="gap:16px;">' + receivedCell + '</div>'
+          : '<div class="form-row" style="gap:16px;flex-wrap:wrap;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
             + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(x?.sales) + '"/></div></div>'
-            + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div></div>')
+            + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
+            + receivedCell + '</div>')
       : '';
 
     return '<div class="form-row data-row" style="gap:12px;">'
@@ -220,7 +223,7 @@ S.LaborTipLog = {
       const el = document.getElementById(p + 'c-tipout');
       if (!el) return;
       const sales = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
-      el.textContent = sales > 0 ? '-' + App.fmtCurrency(sales * App.tipOutPct() / 100, 2) : '-';
+      el.textContent = sales > 0 ? '-' + App.fmtCurrency(sales * App.tipOutPctFor(x ? x.staff_id : '') / 100, 2) : '-';
     };
     document.getElementById(p + 'sales')?.addEventListener('input', updTipout);
     updTipout();
@@ -374,7 +377,7 @@ S.LaborTipLog = {
   // (formBody) is still used for the edit pop-up.
   batchBody() {
     const isManual = this._addShift === '__manual';
-    const on = App.tipOutPct() > 0;
+    const on = App.tipOutEnabled();
     const header = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="tl-b-shift">' + this.shiftOptions(this._addShift) + '</select></div>'
@@ -412,9 +415,9 @@ S.LaborTipLog = {
     this._addRows = earners.concat(support);
     const eBody = earners.map((r, i) => this.batchEarnerRow(r, i)).join('');
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
-      || '<tr><td colspan="8" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff loaded. Add a busser or barback below if one worked.</td></tr>';
-    const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
-    const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;">Tip-Out</th><th style="width:90px;"></th><th style="width:70px;"></th>';
+      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff loaded. Add a busser or barback below if one worked.</td></tr>';
+    const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
+    const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
     const eTable = '<div class="sh" style="margin:0 0 8px;">Tipped Staff</div>' + tbl(grid, eBody);
     const sTable = '<div class="sh" style="margin:14px 0 8px;">Support Staff</div>' + tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
@@ -438,7 +441,9 @@ S.LaborTipLog = {
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
-  // Earner row: Staff / Hours / Cash Tips / Card Tips / Total Sales / Tip-Out (computed) / Net.
+  // Earner row: Staff / Hours / Cash Tips / Card Tips / Total Sales / Tip-Out
+  // (computed) / Received / Net. Received is for an earner who also gets a cut (a
+  // bartender taking the bar tip-out from servers); a server just leaves it blank.
   batchEarnerRow(r, i) {
     r = r || {};
     return '<tr class="tl-line" data-idx="' + i + '">'
@@ -448,19 +453,20 @@ S.LaborTipLog = {
       + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>'
+      + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">-</div></td>'
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
-  // Support row on the SAME 8-column grid as the earner row (so Staff/Hours widths
-  // line up exactly). Cash/Card/Sales/Net cells stay blank; the operator-entered
-  // Received sits under the Tip-Out column.
+  // Support row on the SAME 9-column grid as the earner row (Staff/Hours line up
+  // exactly). Cash/Card/Sales/Tip-Out/Net cells stay blank; the operator-entered
+  // Received sits under the Received column.
   batchSupportRow(r, i) {
     r = r || {};
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
-      + '<td></td><td></td><td></td>'
+      + '<td></td><td></td><td></td><td></td>'
       + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td></td>'
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
@@ -472,29 +478,31 @@ S.LaborTipLog = {
   // actual (not computed), because the real distribution is the manager's and Bar
   // Cop can't verify it. Net = cash + card - paid (earner) or + received (support).
   computeTipOut(rows) {
-    const pct = App.tipOutPct();
+    const on = App.tipOutEnabled();
     const out = (rows || []).map(r => {
       const role = App.tipRole(r.staff_id) || 'earner';
-      const sup = pct > 0 && role === 'support';   // support has no cash/card/sales
+      const sup = on && role === 'support';   // support has no cash/card/sales
       return {
         staff_id: r.staff_id || '', role,
         cash: sup ? 0 : (parseFloat(r.cash) || 0),
         card: sup ? 0 : (parseFloat(r.card) || 0),
         sales: sup ? 0 : (parseFloat(r.sales) || 0),
         hours: parseFloat(r.hours) || 0,
-        received: sup ? (parseFloat(r.received) || 0) : 0,
+        received: on ? (parseFloat(r.received) || 0) : 0,   // earners (a bartender) can receive too
+        pct: on ? App.tipOutPctFor(r.staff_id) : 0,         // this role's tip-out % of sales
         paid: 0
       };
     });
-    if (pct > 0) out.forEach(o => { if (o.staff_id && o.role === 'earner' && o.sales > 0) o.paid = o.sales * pct / 100; });
+    if (on) out.forEach(o => { if (o.staff_id && o.role === 'earner' && o.sales > 0) o.paid = o.sales * o.pct / 100; });
     out.forEach(o => { o.net = o.cash + o.card - o.paid + o.received; });
     return out;
   },
-  // Collected (earner paid) vs distributed (support received entered) + the gap.
+  // Collected (everyone's tip-out paid) vs distributed (everyone's received, incl.
+  // a bartender getting the bar share) + the gap.
   tipOutRecon(rows) {
     const out = this.computeTipOut(rows);
     const collected = out.reduce((s, o) => s + o.paid, 0);
-    const distributed = out.reduce((s, o) => s + (o.role === 'support' ? o.received : 0), 0);
+    const distributed = out.reduce((s, o) => s + o.received, 0);
     return { collected, distributed, gap: collected - distributed,
       hasSupport: out.some(o => o.role === 'support' && o.staff_id),
       hasEarner: out.some(o => o.paid > 0) };
@@ -604,7 +612,7 @@ S.LaborTipLog = {
   // + the Save All count. The support Received input is the operator's, never
   // overwritten here.
   recalcBatch() {
-    const on = App.tipOutPct() > 0;
+    const on = App.tipOutEnabled();
     const els = [...document.querySelectorAll('#tl-b-rows .tl-line')];
     const rows = this.batchDomRows();
     const out = this.computeTipOut(rows);
@@ -661,7 +669,7 @@ S.LaborTipLog = {
           }
           // Reshape the row to the picked staff's role (earner = Sales box,
           // support = Received box) by re-rendering, preserving entered values.
-          if (App.tipOutPct() > 0) { this.collectBatch(); this.renderList(); return; }
+          if (App.tipOutEnabled()) { this.collectBatch(); this.renderList(); return; }
         }
         this.recalcBatch();
       });
@@ -696,7 +704,7 @@ S.LaborTipLog = {
       shiftId = s.id; shiftType = s.shift_type || ''; managerId = s.manager_id || '';
     }
 
-    const tipOutOn = App.tipOutPct() > 0;
+    const tipOutOn = App.tipOutEnabled();
     const out = this.computeTipOut(this._addRows || []);
     const recs = [];
     let dupCount = 0;
@@ -984,15 +992,17 @@ S.LaborTipLog = {
     if (!staff) { fail('Choose a staff member.'); return; }
     const num = id => { const n = parseFloat(document.getElementById(p + id)?.value); return isNaN(n) ? null : n; };
     const cash = num('cash') || 0, card = num('card') || 0;
-    // Tip-out side (edit pop-up, when a % is set): earner pays sales x %, support
-    // has an operator-entered Received. A support row can be valid on received alone.
-    const toPct = App.tipOutPct();
+    // Tip-out side (edit pop-up). Earner pays sales x their role's %; anyone can
+    // have an operator-entered Received (a bartender takes the bar share). A row
+    // can be valid on received alone (support).
+    const tipOn = App.tipOutEnabled();
     const role = App.tipRole(staff) || 'earner';
+    const myPct = App.tipOutPctFor(staff);
     const r2 = n => Math.round((n || 0) * 100) / 100;
     let salesV = 0, paidV = 0, receivedV = 0;
-    if (toPct > 0) {
-      if (role === 'support') { receivedV = num('received') || 0; }
-      else { salesV = num('sales') || 0; paidV = salesV * toPct / 100; }
+    if (tipOn) {
+      receivedV = num('received') || 0;
+      if (role !== 'support') { salesV = num('sales') || 0; paidV = salesV * myPct / 100; }
     }
     if (cash + card <= 0 && receivedV <= 0) { fail('Enter cash or card tips.'); return; }
 
@@ -1011,10 +1021,10 @@ S.LaborTipLog = {
       hours:       num('hours'),
       notes:       document.getElementById(p + 'notes')?.value.trim() || ''
     };
-    if (toPct > 0) {
+    if (tipOn) {
       rec.sales = role === 'support' ? 0 : r2(salesV);
       rec.tip_out_paid = role === 'support' ? 0 : r2(paidV);
-      rec.tip_out_received = role === 'support' ? r2(receivedV) : 0;
+      rec.tip_out_received = r2(receivedV);
     }
     if (!this.editId) rec.created_at = new Date().toISOString();
 
