@@ -1813,23 +1813,31 @@ const App = {
     return !!(p && p.tipped);
   },
 
-  // Tip-out role of a tipped position: 'earner' (rings sales, tips out — servers,
-  // bartenders) or 'support' (receives tip-out — bussers, barbacks, runners).
-  // null when not tipped; a tipped position with no explicit role defaults earner.
-  tipRole(s) {
+  // The Position record for a staff member (or null).
+  positionFor(s) {
     if (typeof s === 'string') s = this.staffById(s);
     if (!s) return null;
-    const positions = (this.laborData && this.laborData.lc_positions) || [];
-    const p = positions.find(x => x.id === s.position_id);
-    if (!p || !p.tipped) return null;
-    return p.tip_role === 'support' ? 'support' : 'earner';
+    return ((this.laborData && this.laborData.lc_positions) || []).find(x => x.id === s.position_id) || null;
   },
-  // Tip-out policy: percent of sales a tipped earner tips out to support staff,
-  // set in Wage Policy. 0 = the house does not use tip-outs, so the Tip Log keeps
-  // the simple form and the tip-out columns stay hidden.
-  tipOutPct() {
-    const v = this.laborData && this.laborData.settings && parseFloat(this.laborData.settings.tip_out_pct);
+  // Per-position tip-out: percent of THIS role's sales it tips out (servers,
+  // bartenders > 0; bussers/barbacks/runners = 0). 0 for a non-tipped position.
+  tipOutPctFor(s) {
+    const p = this.positionFor(s);
+    const v = p && p.tipped ? parseFloat(p.tip_out_pct) : 0;
     return (v && v > 0) ? v : 0;
+  },
+  // Tip-out role, derived from the per-position %: 'earner' = a tipped role that
+  // tips out (rings sales, % > 0); 'support' = a tipped role that only receives
+  // (% = 0); null = not tipped.
+  tipRole(s) {
+    const p = this.positionFor(s);
+    if (!p || !p.tipped) return null;
+    return (parseFloat(p.tip_out_pct) || 0) > 0 ? 'earner' : 'support';
+  },
+  // True if the house uses tip-outs at all (any tipped position tips out a %).
+  // Drives whether the Tip Log shows the tip-out form vs the simple one.
+  tipOutEnabled() {
+    return ((this.laborData && this.laborData.lc_positions) || []).some(p => p.tipped && (parseFloat(p.tip_out_pct) || 0) > 0);
   },
   // Net tip income for one tip record: gross tips minus any tip-out this person
   // paid out, plus any tip-out they received. This is the honest figure the
