@@ -72,11 +72,15 @@ S.LaborReports = {
     };
     let chips = '';
     for (let i = -1; i <= 1; i++) chips += chip(this.addDays(ws, i * 7));
-    return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;">'
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + chips
       + '<button type="button" class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
       + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="ws-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
       + '</div>';
   },
   // Scheduled shifts for one date (Day lens)
@@ -238,15 +242,20 @@ S.LaborReports = {
     const hoursVar = schedHours != null ? actHours - schedHours : null;
 
     const isToday = this.date === App.todayLocal();
-    const pickerCard = '<div class="card"><div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
+    // Bare picker row where the "Logged Hours" heading was: date box + arrows +
+    // Today on the left, Export on the right. align-items:center keeps the native
+    // date box aligned with the chip-style buttons (a native date field can't be a
+    // pixel match for a button, but height-matched and centered it reads clean).
+    const pickerRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+      + '<input type="date" id="dv-date" value="' + esc(this.date) + '" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--w);font-family:\'Barlow\',sans-serif;font-size:11px;padding:5px 10px;color-scheme:dark;outline:none;"/>'
       + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
       + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button>'
-      + (isToday ? '' : '<button class="btn btn-ghost btn-sm" id="dv-today" style="margin-left:4px;">Today</button>')
-      + '</div></div>'
-      + '</div></div>';
+      + (isToday ? '' : '<button class="btn btn-ghost btn-sm" id="dv-today">Today</button>')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      + '<button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div>'
+      + '</div>';
 
     const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + this.statItem('Headcount', String(dayActuals.length))
@@ -256,13 +265,9 @@ S.LaborReports = {
       + this.statItem('Hours vs Scheduled', hoursVar != null ? ((hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1)) : '-', hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good')
       + '</div></div>';
 
-    const loggedHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Logged Hours</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dv-export">Export PDF</button></div></div>';
-
     let actualsCard;
     if (dayActuals.length === 0) {
-      actualsCard = loggedHeading + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this day. Log them in Log Hours.</div>';
+      actualsCard = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this day. Log them in Log Hours.</div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
@@ -280,8 +285,7 @@ S.LaborReports = {
           + '<td class="val">' + costCell + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      actualsCard = loggedHeading
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -316,7 +320,7 @@ S.LaborReports = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    return pickerCard + summaryCard + actualsCard + schedCard;
+    return summaryCard + pickerRow + actualsCard + schedCard;
   },
 
   openDayEdit(actualId) {
@@ -376,8 +380,6 @@ S.LaborReports = {
     const target = this.laborTarget();
     const hoursVar = schedHours != null ? actHours - schedHours : null;
 
-    const pickerCard = this.weekSelector(ws);
-
     const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + this.statItem('Actual Hours', actHours.toFixed(1))
       + this.statItem('Actual Labor Cost', App.fmtCurrency(actCost))
@@ -405,14 +407,10 @@ S.LaborReports = {
         byStaff[st.id].cost += annual / 52;
       });
     }
-    const staffHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">By Staff</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div></div>';
-
-    let staffCard;
+    let staffBody;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
-      staffCard = staffHeading + '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this week.</div>';
+      staffBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this week.</div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {
@@ -428,8 +426,7 @@ S.LaborReports = {
           + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      staffCard = staffHeading
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
@@ -470,7 +467,7 @@ S.LaborReports = {
         + '<button class="btn btn-ghost btn-sm" id="ws-log-missing">Log Hours</button></div>'
       : '';
 
-    return pickerCard + summaryCard + schedNudge + staffCard + dayCard;
+    return summaryCard + schedNudge + this.weekSelector(ws) + staffBody + dayCard;
   },
 
   openWeekEdit(key) {
@@ -545,7 +542,6 @@ S.LaborReports = {
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
     return statsCard + this.rangeFilterRow()
-      + '<div class="sh" style="margin:24px 0 10px;">By Department</div>'
       + this.byDept(rows, totCost, salWeeks, ot.byDept)
       + '<div class="sh" style="margin:24px 0 10px;">By Staff</div>'
       + this.byStaff(rows, totCost, salWeeks, ot.byStaff);
