@@ -61,7 +61,7 @@ window.CashCounter = {
     const coins =
       '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;">'
       + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">Coins</div>'
-      + '<div class="fw" style="flex:1;"><span class="pre">$</span>'
+      + '<div class="fw" style="flex:0 0 150px;width:150px;"><span class="pre">$</span>'
       + '<input class="pre ccd-coins" id="' + p + '-coins" type="number" min="0" step="0.01" inputmode="decimal" '
       + 'value="' + v(vals.coins) + '" style="height:44px;font-size:16px;'
       + 'background:var(--input);border:1px solid var(--b1);border-radius:6px;color:var(--w);"/></div>'
