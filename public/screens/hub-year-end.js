@@ -695,7 +695,7 @@ S.HubYearEnd = {
       if (t.shift_id && shiftIdsWithPools.has(t.shift_id)) return;
       const name = t.name || '(unnamed)';
       if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0 };
-      byEmp[name].tips  += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
+      byEmp[name].tips  += App.netTips(t);   // per-employee tips reported = net of tip-out
       byEmp[name].hours += parseFloat(t.hours) || 0;
     });
     if (Object.keys(byEmp).length) {
