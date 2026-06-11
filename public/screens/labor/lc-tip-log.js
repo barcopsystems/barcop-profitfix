@@ -134,7 +134,7 @@ S.LaborTipLog = {
     App.showHelpModal('How the Tip Log Works', [
       { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
       { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole shift at once. Use Add Staff for anyone the schedule missed, or pick Manual entry to set the date and shift type yourself.'] },
-      { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. Tipped Staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. Support Staff get one cell: enter what each person actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
+      { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
@@ -421,17 +421,25 @@ S.LaborTipLog = {
     this._addRows = earners.concat(support);
     const eBody = earners.map((r, i) => this.batchEarnerRow(r, i)).join('');
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
-      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff loaded. Add a busser or barback below if one worked.</td></tr>';
+      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No staff on schedule. Add staff below if one worked.</td></tr>';
     const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
     const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
-    const eTable = '<div class="sh" style="margin:0 0 8px;">Tipped Staff</div>' + tbl(grid, eBody);
-    const sTable = '<div class="sh" style="margin:14px 0 8px;">Support Staff</div>' + tbl(sGrid, sBody);
+    const eTable = '<div class="sh" style="margin:0 0 8px;">Pays / Receives Tip-Out</div>' + tbl(grid, eBody);
+    const sTable = '<div class="sh" style="margin:14px 0 8px;">Receives Tip-Out</div>' + tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
     const recon = this.tipOutRecon(this._addRows);
-    const reconHtml = (recon.hasEarner || recon.hasSupport)
-      ? '<div style="margin:0 0 12px;font-size:12px;"><span id="tl-b-recon-text" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">' + this._reconInner(recon) + '</span></div>'
-      : '';
-    return header + tables + reconHtml + addBtn;
+    // Reconciliation + the tip-out disclaimer sit in a dark recessed box UNDER the
+    // Add Staff button (like the Pool Calculator), and stay visible the whole time
+    // tip-out is on so the "not distributed" gap shows whether a support row is
+    // listed or not (recalcBatch keeps the numbers live as sales are typed).
+    const reconBox = '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:14px 16px;margin-top:16px;">'
+      + '<span id="tl-b-recon-text" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;">' + this._reconInner(recon) + '</span>'
+      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:14px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
+      + '</div>'
+    + '</div>';
+    return header + tables + addBtn + reconBox;
   },
 
   // Simple row (tip-out off): Staff / Tippable Hours / Cash / Card / Total.
