@@ -459,7 +459,14 @@ function computeRevenueAudit(appData, controlData, extracted) {
   const events = (appData.revenue_events || []).filter(e => num(e.revenue) != null);
 
   const checkTarget = num(rt.check_avg) != null ? rt.check_avg : 35;
-  const laborTarget = num(rt.labor_pct_blended) != null ? rt.labor_pct_blended
+  // Labor target now lives in one place: settings.targets.labor_cost_pct (mirrors
+  // the client App.laborTargetPct). Fall back to the older per-department fields so
+  // an audit on legacy settings still scores against a real number, not a default.
+  const st = settings.targets || {};
+  const laborTarget = num(st.labor_cost_pct) != null ? num(st.labor_cost_pct)
+    : (num(st.bar_labor_cost_pct) != null && num(st.food_labor_cost_pct) != null)
+      ? (num(st.bar_labor_cost_pct) + num(st.food_labor_cost_pct)) / 2
+    : num(rt.labor_pct_blended) != null ? rt.labor_pct_blended
     : (((num(rt.bar_labor_pct) != null ? rt.bar_labor_pct : 28)
       + (num(rt.kitchen_labor_pct) != null ? rt.kitchen_labor_pct : 30)
       + (num(rt.floor_labor_pct) != null ? rt.floor_labor_pct : 32)) / 3);
