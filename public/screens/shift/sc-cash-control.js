@@ -268,7 +268,7 @@ S.ShiftCashControl = {
         + '<div style="font-size:12px;margin-top:4px;">Last reconcile: ' + closeLine + '</div>'
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
         +   '<button class="btn btn-ghost btn-sm cc-drop" data-id="' + esc(d.id) + '">Log a Drop</button>'
-        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile Drawer</button>'
+        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile</button>'
         + '</div></div>';
     };
     const registersCard = '<div class="card form-card no-print" data-collapse-group="sc-cash-safe" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
