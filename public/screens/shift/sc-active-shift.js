@@ -965,35 +965,47 @@ S.ShiftActiveShift = {
   stepCash(s) {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
-    const tolerance = App.cashToleranceForShift(s);
     const cd = d.cashDrawers || [];
 
     let body;
     if (cd.length === 0) {
       body = '<div style="font-size:13px;color:var(--t3);padding:6px 0;">No registers were opened on this shift, so there is nothing to count. Continue to the next step.</div>';
     } else {
+      const fmt = x => x != null ? App.fmtCurrency(x) : '-';
+      // One compact row per register (the standard line table), totals in a bold
+      // Total row — same shape as the Shift History recap. Opening/Drops are read-
+      // only (auto-filled); POS Cash + Counted are the only inputs; Expected and
+      // Variance compute live (class names kept so the wiring is unchanged).
       const rows = cd.map((c, i) =>
-        '<div style="border:1px solid var(--b2);border-radius:8px;padding:14px;margin-bottom:10px;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:10px;">' + esc(c.name || 'Register') + '</div>'
-        + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:10px;">'
-          + '<div class="f" style="width:118px;flex-shrink:0;"><label>Opening Bank</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(c.opening_bank) + '" disabled style="height:42px;"/></div></div>'
-          + '<div class="f" style="width:118px;flex-shrink:0;"><label>Drops Out</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" value="' + v(c.drops_total) + '" disabled style="height:42px;"/></div></div>'
-          + '<div class="f" style="width:140px;flex-shrink:0;"><label>POS Cash Sales</label><div class="fw"><span class="pre">$</span><input class="pre aw-sales" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.sales_cash) + '" placeholder="From POS" style="height:42px;"/></div></div>'
-          + '<div class="f" style="width:140px;flex-shrink:0;"><label>Counted</label><div class="fw"><span class="pre">$</span><input class="pre aw-counted-d" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.counted_cash) + '" placeholder="From drawer" style="height:42px;"/></div></div>'
-        + '</div>'
-        + '<div style="display:flex;gap:22px;font-size:12px;color:var(--t3);">'
-          + '<div>Expected <span class="aw-exp" data-i="' + i + '" style="color:var(--t1);font-weight:700;">-</span></div>'
-          + '<div>Variance <span class="aw-var" data-i="' + i + '" style="font-weight:700;">-</span></div>'
-        + '</div></div>').join('');
-      const totals = '<div class="calc" style="margin-top:4px;">'
-        + '<div class="calc-item"><div class="calc-label">Total Expected</div><div class="calc-val" id="aw-t-expected">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Counted</div><div class="calc-val" id="aw-t-counted">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val" id="aw-t-variance">-</div></div>'
-        + '</div>';
-      body = rows + totals
-        + '<div style="margin-top:14px;"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
+        '<tr class="aw-cash-line">'
+        + '<td><div class="val">' + esc(c.name || 'Register') + '</div></td>'
+        + '<td>' + fmt(c.opening_bank) + '</td>'
+        + '<td>' + fmt(c.drops_total) + '</td>'
+        + '<td><input class="form-input aw-sales" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.sales_cash) + '" placeholder="From POS" style="width:100%;"/></td>'
+        + '<td><input class="form-input aw-counted-d" data-i="' + i + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + v(c.counted_cash) + '" placeholder="Counted" style="width:100%;"/></td>'
+        + '<td><span class="aw-exp" data-i="' + i + '" style="font-weight:700;color:var(--t1);">-</span></td>'
+        + '<td><span class="aw-var" data-i="' + i + '" style="font-weight:700;">-</span></td>'
+        + '</tr>').join('');
+      const sumOpen = cd.reduce((t, c) => t + (c.opening_bank || 0), 0);
+      const sumDrops = cd.reduce((t, c) => t + (c.drops_total || 0), 0);
+      const totalRow = '<tr class="aw-cash-line">'
+        + '<td><div class="val" style="font-weight:800;">Total</div></td>'
+        + '<td>' + App.fmtCurrency(sumOpen) + '</td>'
+        + '<td>' + App.fmtCurrency(sumDrops) + '</td>'
+        + '<td></td>'
+        + '<td><span id="aw-t-counted" style="font-weight:700;color:var(--t1);">-</span></td>'
+        + '<td><span id="aw-t-expected" style="font-weight:700;color:var(--t1);">-</span></td>'
+        + '<td><span id="aw-t-variance" style="font-weight:700;">-</span></td>'
+        + '</tr>';
+      const table = '<div class="card" style="padding:0;overflow:hidden;margin:4px 0 12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:150px;">Register</th><th style="width:90px;">Opening</th><th style="width:90px;">Drops</th>'
+        + '<th style="width:120px;">POS Cash</th><th style="width:120px;">Counted</th>'
+        + '<th style="width:100px;">Expected</th><th style="width:100px;">Variance</th>'
+        + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div>';
+      body = table
+        + '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;">'
           + '<input type="checkbox" id="aw-cash-skip" ' + (d.cash_skipped ? 'checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"/>'
-          + 'Skip cash reconciliation (drawers not counted this shift)</label></div>';
+          + 'Skip cash reconciliation (drawers not counted this shift)</label>';
     }
 
     return '<div class="card form-card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
