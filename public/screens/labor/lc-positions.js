@@ -30,6 +30,9 @@ S.LaborPositions = {
   // pop-up); the inline add form keeps the wide single-row layout.
   formBody(item, p, narrow) {
     p = p || 'lp-';
+    // Progressive disclosure: Tipped reveals Pays Tip Out; Pays = Yes reveals the %.
+    const tipped = !!(item && item.tipped);
+    const pays = tipped && (parseFloat(item.tip_out_pct) || 0) > 0;
     const deptOpts = this.DEPARTMENTS.map(d =>
       '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
     const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
@@ -44,15 +47,37 @@ S.LaborPositions = {
       + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
       + '<div class="f" style="' + cs(150) + '"><label>Type</label>'
       + '<select id="' + p + 'tipped">'
-      + '<option value="no"' + (item && item.tipped ? '' : ' selected') + '>Non-Tipped</option>'
-      + '<option value="yes"' + (item && item.tipped ? ' selected' : '') + '>Tipped</option>'
+      + '<option value="no"' + (tipped ? '' : ' selected') + '>Non-Tipped</option>'
+      + '<option value="yes"' + (tipped ? ' selected' : '') + '>Tipped</option>'
       + '</select></div>'
-      + '<div class="f" style="' + cs(150) + '"><label>Tips Out (% of Sales)</label>'
+      + '<div class="f" id="' + p + 'pays-wrap" style="' + cs(150) + (tipped ? '' : 'display:none;') + '"><label>Pays Tip Out</label>'
+      + '<select id="' + p + 'pays">'
+      + '<option value="no"' + (pays ? '' : ' selected') + '>No</option>'
+      + '<option value="yes"' + (pays ? ' selected' : '') + '>Yes</option>'
+      + '</select></div>'
+      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out %</label>'
       + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:-4px;margin-bottom:14px;">For a Tipped role, set what it tips out as a percent of its sales (servers, bartenders). Leave it at 0 for a role that only receives tip-out (bussers, barbacks, runners).</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(item?.notes || '') + '</textarea></div></div>';
+  },
+
+  // Show Pays Tip Out only when Tipped; show the Tip Out % only when Pays = Yes.
+  wireTipFields(p) {
+    p = p || 'lp-';
+    const typeEl = document.getElementById(p + 'tipped');
+    const paysEl = document.getElementById(p + 'pays');
+    const paysWrap = document.getElementById(p + 'pays-wrap');
+    const tipoutWrap = document.getElementById(p + 'tipout-wrap');
+    const refresh = () => {
+      const tipped = typeEl?.value === 'yes';
+      const pays = paysEl?.value === 'yes';
+      if (paysWrap) paysWrap.style.display = tipped ? '' : 'none';
+      if (tipoutWrap) tipoutWrap.style.display = (tipped && pays) ? '' : 'none';
+    };
+    typeEl?.addEventListener('change', refresh);
+    paysEl?.addEventListener('change', refresh);
+    refresh();
   },
 
   renderList() {
@@ -106,6 +131,7 @@ S.LaborPositions = {
       else if (row)  this.openEditModal(row.dataset.id);
     };
     App.applyCollapsed(this.container);
+    this.wireTipFields('lp-');
   },
 
   // Edit in a focused pop-up (own lpe- ids). Cancel closes it; Delete pushed right.
@@ -123,6 +149,7 @@ S.LaborPositions = {
       + '<button class="btn btn-danger" id="lpe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'lp-edit-modal', maxWidth: 540, noClose: true });
+    this.wireTipFields('lpe-');
     document.getElementById('lpe-save')?.addEventListener('click', () => this.save('lpe-'));
     document.getElementById('lpe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); });
     document.getElementById('lpe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); this.confirmDel(id); });
@@ -138,14 +165,16 @@ S.LaborPositions = {
     const wage = parseFloat(document.getElementById(p + 'wage')?.value);
 
     const isTipped = (document.getElementById(p + 'tipped')?.value || 'no') === 'yes';
+    const pays = isTipped && (document.getElementById(p + 'pays')?.value || 'no') === 'yes';
     const tipoutRaw = parseFloat(document.getElementById(p + 'tipout')?.value);
+    if (pays && (isNaN(tipoutRaw) || tipoutRaw <= 0)) { fail('Enter the tip-out percent, or set Pays Tip Out to No.'); return; }
     const rec = {
       id:           this.editId || App.uid(),
       name,
       department:   document.getElementById(p + 'dept')?.value || 'Other',
       default_wage: isNaN(wage) ? null : wage,
       tipped:       isTipped,
-      tip_out_pct:  isTipped && !isNaN(tipoutRaw) && tipoutRaw > 0 ? tipoutRaw : 0,
+      tip_out_pct:  pays ? tipoutRaw : 0,
       notes:        document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
