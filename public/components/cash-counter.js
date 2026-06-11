@@ -47,7 +47,7 @@ window.CashCounter = {
     const v = x => (x != null && x !== '') ? x : '';
 
     const row = dn =>
-      '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">'
+      '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;">'
       + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">' + dn.label + '</div>'
       + this._stepBtn(-1, dn.key)
       + '<input type="number" class="ccd-cnt" id="' + p + '-' + dn.key + '" data-key="' + dn.key + '" data-val="' + dn.val + '" '
@@ -59,7 +59,7 @@ window.CashCounter = {
       + '</div>';
 
     const coins =
-      '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+      '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;">'
       + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">Coins</div>'
       + '<div class="fw" style="flex:1;"><span class="pre">$</span>'
       + '<input class="pre ccd-coins" id="' + p + '-coins" type="number" min="0" step="0.01" inputmode="decimal" '
@@ -68,7 +68,9 @@ window.CashCounter = {
       + '</div>';
 
     return '<div class="cash-counter" data-prefix="' + p + '">'
-      + this.DENOMS.map(row).join('')
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px 18px;">'
+      +   this.DENOMS.map(row).join('')
+      + '</div>'
       + coins
       + '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--b2);margin-top:12px;padding-top:12px;">'
       +   '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Counted Total</div>'
