@@ -908,7 +908,7 @@ S.HubBooks = {
       if (t.shift_id && shiftIdsWithPools.has(t.shift_id)) return; // covered by pool
       const name = t.name || '(unnamed)';
       if (!byEmp[name]) byEmp[name] = { tips: 0, hours: 0, source: 'log' };
-      byEmp[name].tips  += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
+      byEmp[name].tips  += App.netTips(t);   // taxable per-employee allocation = net of tip-out
       byEmp[name].hours += parseFloat(t.hours) || 0;
     });
     const allocStartIdx = rows.length;
