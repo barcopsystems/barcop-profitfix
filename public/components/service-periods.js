@@ -1,7 +1,8 @@
 'use strict';
 
 /* ── Service Periods selector — shared by App Settings + Onboarding ───────────
-   A single row of pill chips, one per service (plus a Custom pill), with the
+   A single row of pill chips, one per service (plus a "+ Custom" pill that adds
+   up to three named customs), with the
    multi-select feel of the Open-the-Floor registers: tap a pill to turn it gold,
    tap again to grey it off. Under each SELECTED pill sits a small "set hours"
    chip; tapping it drops down a little box to set that period's time window
@@ -76,16 +77,18 @@ window.ServicePeriods = {
 
     const render = () => {
       const byName = nm => ctrl.periods.find(p => !p.custom && (p.name || '').toLowerCase() === nm.toLowerCase());
-      const custom = ctrl.periods.find(p => p.custom);
+      const customs = ctrl.periods.filter(p => p.custom);
 
       const presetUnits = this.PRESETS.map(pr =>
         unit(pr.name, 'preset', ' data-name="' + esc(pr.name) + '"', byName(pr.name))
       ).join('');
-      const customUnit = custom
-        ? unit(custom.name || 'Custom', 'custom', ' data-id="' + esc(custom.id) + '"', custom)
-        : unit('Custom', 'custom-add', '', null);
+      const customUnits = customs.map(c =>
+        unit(c.name || 'Custom', 'custom', ' data-id="' + esc(c.id) + '"', c)
+      ).join('');
+      // Up to 3 customs; the "+ Custom" add pill shows until you have three.
+      const addUnit = customs.length < 3 ? unit('Custom', 'custom-add', '', null) : '';
 
-      root.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:16px 12px;align-items:flex-start;">' + presetUnits + customUnit + '</div>';
+      root.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:16px 12px;align-items:flex-start;">' + presetUnits + customUnits + addUnit + '</div>';
       wire();
       emit();
     };
@@ -99,9 +102,11 @@ window.ServicePeriods = {
           if (idx >= 0) { if (editingId === ctrl.periods[idx].id) editingId = null; ctrl.periods.splice(idx, 1); }
           else { const pr = this.PRESETS.find(x => x.name === name); if (pr) ctrl.periods.push({ id: this._uid(), name: pr.name, start: pr.start, end: pr.end, custom: false }); }
         } else if (kind === 'custom') {
-          editingId = null;
-          ctrl.periods = ctrl.periods.filter(p => !p.custom);
+          const id = btn.dataset.id;
+          if (editingId === id) editingId = null;
+          ctrl.periods = ctrl.periods.filter(p => p.id !== id);
         } else {
+          if (ctrl.periods.filter(p => p.custom).length >= 3) return;   // cap at 3
           const np = { id: this._uid(), name: '', start: '16:00', end: '18:00', custom: true };
           ctrl.periods.push(np);
           editingId = np.id;   // open the drop-down so they name + set it
