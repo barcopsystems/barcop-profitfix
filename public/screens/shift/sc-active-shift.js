@@ -1083,7 +1083,7 @@ S.ShiftActiveShift = {
       body = this._poolBody(s);
     } else {
       body = App.tipOutEnabled()
-        ? this.tipoutBody(s)
+        ? this.tipoutSection(s)
         : '<div style="font-size:13px;color:var(--t2);padding:8px 2px;line-height:1.6;">Tip-out percentages are set per role in Positions. Add a Tip Out percent to your tipped roles to reconcile tip-outs here, or pick Tip Pool or Skip Tips for this shift.</div>';
     }
 
@@ -1166,6 +1166,83 @@ S.ShiftActiveShift = {
     d.tipout_rows = logged.concat(crew);
   },
 
+  // Tip-out section = a Manual / Import sub-toggle (mirrors the Labor Tip Log) over
+  // the two-section builder. Import drops a POS tips export straight into the
+  // builder rows, which then log to lc_tips on close like the typed rows.
+  tipoutSection(s) {
+    const d = this._closeDraft;
+    const tmode = d.tipout_mode || 'manual';
+    d.tipout_mode = tmode;
+    const segBtn = (m, label) => {
+      const on = tmode === m;
+      return '<button type="button" class="btn btn-sm aw-to-mode" data-mode="' + m + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    const toggle = '<div class="seg-toggle" style="margin-bottom:14px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+    const body = tmode === 'import'
+      ? '<div id="aw-to-csv"></div><div id="aw-to-result"></div>'
+      : this.tipoutBody(s);
+    return toggle + body;
+  },
+
+  // Drop a POS tips export into the tip-out builder. Same mapper the Labor Tip Log
+  // uses; the shift date is implicit (this shift), and Total Sales maps too so the
+  // tip-out computes. Matched rows merge into the builder and log on close.
+  mountTipoutImporter(s) {
+    const el = document.getElementById('aw-to-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS tips export here',
+      dropSub: 'Needs a staff name and card or cash tips. The shift date is used automatically; map Total Sales too so tip-outs compute.',
+      fields: [
+        { key: 'name',      label: 'Staff Name',  required: true,  match: ['employee', 'employee name', 'name', 'staff', 'server', 'server name'] },
+        { key: 'card_tips', label: 'Card Tips',   required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips'] },
+        { key: 'cash_tips', label: 'Cash Tips',   required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips'] },
+        { key: 'sales',     label: 'Total Sales', required: false, match: ['sales', 'net sales', 'total sales', 'gross sales'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importTipoutRows(s, rows)
+    });
+  },
+
+  importTipoutRows(s, rows) {
+    const d = this._closeDraft;
+    this._ensureTipoutRows(s);
+    const byName = {};
+    (App.laborData?.lc_staff || []).forEach(st => { byName[(st.name || '').trim().toLowerCase()] = st; });
+    const byStaff = {};
+    (d.tipout_rows || []).forEach(r => { if (r.staff_id) byStaff[r.staff_id] = r; });
+    let matched = 0; const skipped = [];
+    (rows || []).forEach(r => {
+      const st = byName[(r.name || '').trim().toLowerCase()];
+      const cash = parseFloat(r.cash_tips) || 0;
+      const card = parseFloat(r.card_tips) || 0;
+      const sales = parseFloat(r.sales) || 0;
+      if (!st || (cash + card + sales) <= 0) { skipped.push(r.name || '(blank)'); return; }
+      let row = byStaff[st.id];
+      if (!row) {
+        const hrs = App.hoursFor(st.id, s.date);
+        row = { staff_id: st.id, hours: (hrs != null && hrs > 0 ? hrs : ''), cash: '', card: '', sales: '', received: '' };
+        d.tipout_rows.push(row); byStaff[st.id] = row;
+      }
+      if (cash) row.cash = cash;
+      if (card) row.card = card;
+      if (sales) row.sales = sales;
+      matched++;
+    });
+    if (matched === 0) {
+      const result = document.getElementById('aw-to-result');
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. No staff names matched the roster, or no amounts were found.</div>';
+      return;
+    }
+    // Back to the builder so the imported amounts show, the recon updates, and they
+    // log to lc_tips on close with the typed rows.
+    d._tipoutNote = { matched, skipped: skipped.length };
+    d.tipout_mode = 'manual';
+    this.renderWizardStep(s);
+  },
+
   tipoutBody(s) {
     const d = this._closeDraft;
     this._ensureTipoutRows(s);
@@ -1194,7 +1271,16 @@ S.ShiftActiveShift = {
       + '<div class="calc-item"><div class="calc-label">Distributed</div><div class="calc-val" id="tl-b-distributed">' + App.fmtCurrency(recon.distributed, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Not Distributed</div><div class="calc-val ' + gapCls + '" id="tl-b-gap">' + App.fmtCurrency(recon.gap, 2) + '</div></div>'
       + '</div>';
-    return tables + '<button class="btn btn-ghost btn-sm" id="aw-to-add" style="margin-top:4px;">+ Add Staff</button>' + reconBox;
+    const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
+      + '</div>';
+    const note = d._tipoutNote; d._tipoutNote = null;
+    const noteHtml = note
+      ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:0 0 12px;">Imported ' + note.matched + ' row' + (note.matched === 1 ? '' : 's') + ' into the builder.'
+        + (note.skipped ? ' <span style="color:var(--t3);font-weight:400;">' + note.skipped + ' skipped (no roster match or no amount).</span>' : '') + '</div>'
+      : '';
+    return noteHtml + tables + '<button class="btn btn-ghost btn-sm" id="aw-to-add" style="margin-top:4px;">+ Add Staff</button>' + reconBox + headsUp;
   },
 
   collectTipout() {
@@ -1461,7 +1547,7 @@ S.ShiftActiveShift = {
       ]],
       tips: ['Step 4: Tip Reconciliation', [
         { p: ['Pick how tips were handled this shift, then do it right here without leaving the close. Bar Cop remembers your choice as the default next time.'] },
-        { h: 'Tip Out', p: ['Choose Tip Out when servers tip out a percent of their sales to support. Bar Cop loads the shift\'s tipped staff into two sections: those who ring sales and tip out (servers, bartenders) enter cash, card, and total sales, and those who only receive (bussers, barbacks) get a Received cell. The Collected vs Distributed line flags any gap. These log straight to the Tip Log on close, so they feed the tip-credit check, payroll, and Form 8027. Tip-out percents are set per role in Positions.'] },
+        { h: 'Tip Out', p: ['Choose Tip Out when servers tip out a percent of their sales to support. Bar Cop loads the shift\'s tipped staff into two sections: those who ring sales and tip out (servers, bartenders) enter cash, card, and total sales, and those who only receive (bussers, barbacks) get a Received cell. The Collected vs Distributed line flags any gap. These log straight to the Tip Log on close, so they feed the tip-credit check, payroll, and Form 8027. Tip-out percents are set per role in Positions.', 'Enter Manually loads the crew to type from your tip sheet. Or switch to Import File and drop a POS tips export to fill the rows from your file, then review and close. Either way the rows log on close.'] },
         { h: 'Tip Pool', p: ['Choose Tip Pool when tips go into one pot split across the staff who worked. Bar Cop pre-loads this shift\'s crew straight from the posted schedule, call-out adjusted, with hours from their logged actuals or scheduled hours. Enter the pool amount, pick split by hours or equal, and each share computes live. The split saves to a tip pool tied to this shift automatically when you close, no separate Save step, which the Books Form 8027 worksheet reads later. Verify who can legally share a pool for your jurisdiction.'] },
         { h: 'Skip Tips', p: ['Choose Skip Tips for a shift with nothing to reconcile, or when tips are handled outside Bar Cop. Nothing is captured.'] },
         { h: 'Already Logged', p: ['If you logged this shift\'s tips in the Tip Log before closing, they load in automatically and you just confirm.'] }
@@ -1616,36 +1702,48 @@ S.ShiftActiveShift = {
           this.refreshPoolCalc();
         });
       } else if (d.tip_mode === 'tipout' && App.tipOutEnabled()) {
-        // Tip-out builder: the Tip Log's canonical row engine drives the live
-        // tip-out + net + Collected/Distributed recon. Picking a staff member
-        // reshapes the row into its section via a step re-render (collect first).
-        const rowsEl = document.getElementById('tl-b-rows');
-        if (rowsEl) {
-          rowsEl.addEventListener('input', () => { this.collectTipout(); S.LaborTipLog.recalcBatch(); });
-          rowsEl.addEventListener('change', ev => {
-            if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
-              const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
-              if (hoursInp && !hoursInp.value && s.date) { const hrs = App.hoursFor(ev.target.value, s.date); if (hrs != null && hrs > 0) hoursInp.value = hrs; }
-              this.collectTipout(); this.renderWizardStep(s); return;
-            }
-            S.LaborTipLog.recalcBatch();
-          });
-          rowsEl.addEventListener('click', ev => {
-            if (ev.target.closest('.tl-b-remove')) {
-              this.collectTipout();
-              const idx = parseInt(ev.target.closest('.tl-line').dataset.idx, 10);
-              if (d.tipout_rows && idx >= 0) d.tipout_rows.splice(idx, 1);
-              this.renderWizardStep(s);
-            }
-          });
-        }
-        document.getElementById('aw-to-add')?.addEventListener('click', () => {
-          this.collectTipout();
-          d.tipout_rows = d.tipout_rows || [];
-          d.tipout_rows.push({ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' });
+        // Manual / Import sub-toggle (mirrors the Labor Tip Log). Switching preserves
+        // any typed rows first.
+        this.container.querySelectorAll('.aw-to-mode').forEach(b => b.addEventListener('click', () => {
+          if ((d.tipout_mode || 'manual') === 'manual') this.collectTipout();
+          d.tipout_mode = b.dataset.mode;
           this.renderWizardStep(s);
-        });
-        S.LaborTipLog.recalcBatch();
+        }));
+
+        if ((d.tipout_mode || 'manual') === 'import') {
+          this.mountTipoutImporter(s);
+        } else {
+          // Tip-out builder: the Tip Log's canonical row engine drives the live
+          // tip-out + net + Collected/Distributed recon. Picking a staff member
+          // reshapes the row into its section via a step re-render (collect first).
+          const rowsEl = document.getElementById('tl-b-rows');
+          if (rowsEl) {
+            rowsEl.addEventListener('input', () => { this.collectTipout(); S.LaborTipLog.recalcBatch(); });
+            rowsEl.addEventListener('change', ev => {
+              if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
+                const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
+                if (hoursInp && !hoursInp.value && s.date) { const hrs = App.hoursFor(ev.target.value, s.date); if (hrs != null && hrs > 0) hoursInp.value = hrs; }
+                this.collectTipout(); this.renderWizardStep(s); return;
+              }
+              S.LaborTipLog.recalcBatch();
+            });
+            rowsEl.addEventListener('click', ev => {
+              if (ev.target.closest('.tl-b-remove')) {
+                this.collectTipout();
+                const idx = parseInt(ev.target.closest('.tl-line').dataset.idx, 10);
+                if (d.tipout_rows && idx >= 0) d.tipout_rows.splice(idx, 1);
+                this.renderWizardStep(s);
+              }
+            });
+          }
+          document.getElementById('aw-to-add')?.addEventListener('click', () => {
+            this.collectTipout();
+            d.tipout_rows = d.tipout_rows || [];
+            d.tipout_rows.push({ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' });
+            this.renderWizardStep(s);
+          });
+          S.LaborTipLog.recalcBatch();
+        }
       }
     }
   },
