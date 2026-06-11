@@ -15,6 +15,7 @@ S.HubSettings = {
   render(container) {
     const secs = [
       { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
+      { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
       { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
       { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
@@ -61,6 +62,16 @@ S.HubSettings = {
       + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
       + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
       + '</div>';
+  },
+
+  // Service Periods — which dayparts the operator runs. Mounts the shared
+  // ServicePeriods selector (mounted in wire()); Save writes settings.service_periods.
+  secServicePeriods() {
+    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
+      + 'Turn on the services you run. These set every shift-type field across Bar Cop: Open the Floor, schedules, cash tolerances, and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'
+      + '</div>'
+      + '<div id="hs-sp-mount"></div>'
+      + '<span id="hs-sp-err" style="color:var(--red);font-size:12px;display:none;margin-top:8px;"></span>';
   },
 
   secProfit() {
@@ -139,6 +150,10 @@ S.HubSettings = {
     container.querySelectorAll('.hs-save').forEach(btn => {
       btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
     });
+    const spMount = container.querySelector('#hs-sp-mount');
+    if (spMount && window.ServicePeriods) {
+      this._spCtrl = ServicePeriods.mount(spMount, { selected: App.servicePeriods() });
+    }
   },
 
   _flashSaved(id) {
@@ -159,6 +174,16 @@ S.HubSettings = {
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
       s.annual_bar_revenue  = numOr('hs-abr', 0);
       s.annual_food_revenue = numOr('hs-afr', 0);
+      keys.push('settings');
+    } else if (which === 'service') {
+      const periods = (this._spCtrl ? this._spCtrl.value() : []).filter(p => p && p.name);
+      const errEl = document.getElementById('hs-sp-err');
+      if (!periods.length) {
+        if (errEl) { errEl.textContent = 'Pick at least one service period.'; errEl.style.display = 'inline'; }
+        return;
+      }
+      if (errEl) errEl.style.display = 'none';
+      App.data.settings.service_periods = periods;
       keys.push('settings');
     } else if (which === 'profit') {
       const s = App.data.settings;
@@ -227,6 +252,7 @@ S.HubSettings = {
       if (which === 'profit' || which === 'revenue' || which === 'traffic') {
         App.markSetupDone('gs_targets');
       }
+      if (which === 'service') App.markSetupDone('gs_service_periods');
     });
   },
 
