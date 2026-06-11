@@ -128,7 +128,7 @@ S.LaborTipLog = {
     App.showHelpModal('How the Tip Log Works', [
       { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
       { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole shift at once. Use Add Staff for anyone the schedule missed, or pick Manual entry to set the date and shift type yourself.'] },
-      { h: 'Tip-Outs', p: ['If you set a Tip-Out % in Wage Policy, each row also gets a Sales column. Enter each server or bartender\'s sales and Bar Cop figures their tip-out (sales times your percent), pools it, and splits it to the support staff (the rows with no sales) by hours. The Net column is each person\'s take-home, and those net amounts carry into the tip-credit check and the payroll worksheet. Bar Cop computes the amounts; how you actually pay a tip-out out is your call and your payroll provider\'s.'] },
+      { h: 'Tip-Outs', p: ['If you set a Tip-Out % in Wage Policy, the form splits by the role you set on each Position. Earners (servers, bartenders) get a Sales column and Bar Cop figures their tip-out at your percent. Support (bussers, barbacks, runners) get an editable Received amount: Use Suggested Split fills a by-hours suggestion, but you enter what each person actually got, because the real distribution is yours, not ours. The Collected vs Distributed line flags any gap, the Net column is each person\'s take-home, and those net amounts carry into the tip-credit check and payroll worksheet. Bar Cop computes the amounts; how a tip-out is actually paid out is your call.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
@@ -160,6 +160,18 @@ S.LaborTipLog = {
     const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
     const defaultDate = x?.date || initialShift?.date || App.todayLocal();
     const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
+    // Tip-out edit row (edit pop-up only, when a tip-out % is set): earners get a
+    // Sales field (tip-out recomputes), support get their editable Received amount.
+    const toPct = App.tipOutPct();
+    const role = x ? (App.tipRole(x.staff_id) || 'earner') : 'earner';
+    const tipoutRow = (toPct > 0 && x)
+      ? (role === 'support'
+          ? '<div class="form-row" style="gap:16px;"><div class="f" style="width:200px;flex-shrink:0;"><label>Tip-Out Received</label>'
+            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(x?.tip_out_received) + '"/></div></div></div>'
+          : '<div class="form-row" style="gap:16px;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
+            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(x?.sales) + '"/></div></div>'
+            + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div></div>')
+      : '';
 
     return '<div class="form-row data-row" style="gap:12px;">'
         + '<div class="f" style="flex:1.5 1 180px;min-width:0;"><label>Shift</label>'
@@ -175,6 +187,7 @@ S.LaborTipLog = {
         + '<div class="f" style="flex:0.8 1 100px;min-width:0;"><label>Total</label>'
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
+      + tipoutRow
 
       // Manual mode reveals date + shift type (a shift pick derives them instead).
       + '<div id="' + p + 'manual-row" class="form-row" style="gap:16px;' + (isManual ? '' : 'display:none;') + '">'
@@ -200,6 +213,15 @@ S.LaborTipLog = {
     document.getElementById(p + 'staff')?.addEventListener('change', () => this.onStaffChange(x, p));
     document.getElementById(p + 'cash')?.addEventListener('input', () => this.calc(p));
     document.getElementById(p + 'card')?.addEventListener('input', () => this.calc(p));
+    // Earner edit row: tip-out = sales x %, live.
+    const updTipout = () => {
+      const el = document.getElementById(p + 'c-tipout');
+      if (!el) return;
+      const sales = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
+      el.textContent = sales > 0 ? '-' + App.fmtCurrency(sales * App.tipOutPct() / 100, 2) : '-';
+    };
+    document.getElementById(p + 'sales')?.addEventListener('input', updTipout);
+    updTipout();
     this.populateStaffList(initialShiftId, x, p);
     this.renderShiftSummary(initialShiftId, p);
     this.calc(p);
@@ -269,20 +291,31 @@ S.LaborTipLog = {
       if (filtered.length === 0) {
         listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged in this range. Pick a wider range above.</div>';
       } else {
-        const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x =>
-          '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
+        const hasTipOut = filtered.some(x => (x.tip_out_paid || 0) > 0 || (x.tip_out_received || 0) > 0);
+        const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x => {
+          let extra = '';
+          if (hasTipOut) {
+            const adj = (parseFloat(x.tip_out_received) || 0) - (parseFloat(x.tip_out_paid) || 0);
+            const adjTxt = Math.abs(adj) < 0.005 ? '-' : (adj > 0 ? '+' : '') + App.fmtCurrency(adj, 2);
+            extra = '<td>' + adjTxt + '</td><td class="val">' + App.fmtCurrency(App.netTips(x)) + '</td>';
+          }
+          return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(x.date) + '</div></td>'
           + '<td>' + esc(x.name || '-') + '</td>'
           + '<td>' + esc(x.shift_type || '-') + '</td>'
           + '<td>' + App.fmtCurrency(x.cash_tips || 0) + '</td>'
           + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
-          + '<td class="val">' + App.fmtCurrency(x.total_tips || 0) + '</td>'
+          + '<td' + (hasTipOut ? '' : ' class="val"') + '>' + App.fmtCurrency(x.total_tips || 0) + '</td>'
+          + extra
           + '<td><div class="row-actions">'
           + (App.canEdit('lc-tip-log') ? '<button class="btn btn-ghost btn-sm tl-edit" data-id="' + x.id + '">Edit</button>' : '')
           + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
-          + '</div></td></tr>').join('');
+          + '</div></td></tr>';
+        }).join('');
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
+          + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>' + (hasTipOut ? 'Gross' : 'Total') + '</th>'
+          + (hasTipOut ? '<th>Tip-Out</th><th>Net</th>' : '')
+          + '<th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
           + App.showOlderBar('lc', 'tip', filtered, this.filterPreset !== 'all');
       }
@@ -358,55 +391,102 @@ S.LaborTipLog = {
       ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
         + ths
         + '</tr></thead><tbody id="tl-b-rows">' + rowsHtml + '</tbody></table></div>'
-        + (on ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin:0 0 12px;">Enter each server or bartender\'s sales; their tip-out is figured at ' + App.fmtPct(pct) + ' of sales and split to the support staff (rows with no sales) by hours. Bar Cop calculates the amounts only; how you pay a tip-out out is up to you and your payroll provider.</div>' : '')
+        + (on ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin:0 0 10px;">Earners enter sales (tip-out = ' + App.fmtPct(pct) + ' of sales). For support, enter what each person actually received — Bar Cop suggests a by-hours split, but the real distribution is yours. Bar Cop calculates the amounts only; how a tip-out is paid out is up to you and your payroll provider.</div>' : '')
       : '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
         + (this._addShift && !isManual
             ? 'No tipped staff on this shift still need tips entered. Add staff below for a tip-out.'
             : 'Pick a shift above to load its tipped staff, or add staff by hand.') + '</div>';
-    return header + table
+    const recon = (on && rows.length) ? this.tipOutRecon(rows) : null;
+    const reconHtml = (recon && (recon.hasEarner || recon.hasSupport))
+      ? '<div id="tl-b-recon" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 12px;font-size:12px;">'
+        + '<span id="tl-b-recon-text" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">' + this._reconInner(recon) + '</span>'
+        + (recon.hasSupport ? '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-suggest">Use suggested split</button>' : '')
+        + '</div>'
+      : '';
+    return header + table + reconHtml
       + '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
   },
 
   batchRowHtml(r, i) {
     r = r || {};
     const on = App.tipOutPct() > 0;
+    const role = App.tipRole(r.staff_id) || 'earner';
     const total = (parseFloat(r.cash) || 0) + (parseFloat(r.card) || 0);
+    let extra = '';
+    if (on) {
+      extra = (role === 'support')
+        // Support: no sales (they don't ring), an operator-ENTERED Received amount.
+        ? '<td><div style="color:var(--t4);font-size:11px;">support</div></td>'
+          + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+        // Earner: enter Sales, tip-out paid is computed.
+        : '<td><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+          + '<td><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>';
+    }
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + (on
-          ? '<td><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-            + '<td><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>'
-          : '')
+      + extra
       + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (on ? '-' : (total > 0 ? App.fmtCurrency(total, 2) : '-')) + '</div></td>'
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
 
-  // Tip-out math over the current rows: each earner (a row with sales) pays
-  // sales x %, the pool is split to the support rows (no sales) by hours, and
-  // each row's net = cash + card - tip-out paid + tip-out received.
+  // Tip-out math. Each EARNER (tipped-earner role) pays sales x % — a number Bar
+  // Cop can stand behind. Each SUPPORT row's `received` is the operator-ENTERED
+  // actual (not computed), because the real distribution is the manager's and Bar
+  // Cop can't verify it. Net = cash + card - paid (earner) or + received (support).
   computeTipOut(rows) {
     const pct = App.tipOutPct();
-    const out = (rows || []).map(r => ({
-      staff_id: r.staff_id || '',
-      cash: parseFloat(r.cash) || 0,
-      card: parseFloat(r.card) || 0,
-      sales: parseFloat(r.sales) || 0,
-      hours: parseFloat(r.hours) || 0,
-      paid: 0, received: 0
-    }));
-    if (pct > 0) {
-      let pool = 0;
-      out.forEach(o => { if (o.staff_id && o.sales > 0) { o.paid = o.sales * pct / 100; pool += o.paid; } });
-      const support = out.filter(o => o.staff_id && o.sales <= 0);
-      const totHrs = support.reduce((s, o) => s + o.hours, 0);
-      support.forEach(o => { o.received = totHrs > 0 ? pool * (o.hours / totHrs) : (support.length ? pool / support.length : 0); });
-    }
-    out.forEach(o => { o.net = o.cash + o.card - o.paid + o.received; });
+    const out = (rows || []).map(r => {
+      const role = App.tipRole(r.staff_id) || 'earner';
+      return {
+        staff_id: r.staff_id || '', role,
+        cash: parseFloat(r.cash) || 0,
+        card: parseFloat(r.card) || 0,
+        sales: parseFloat(r.sales) || 0,
+        hours: parseFloat(r.hours) || 0,
+        received: parseFloat(r.received) || 0,
+        paid: 0
+      };
+    });
+    if (pct > 0) out.forEach(o => { if (o.staff_id && o.role === 'earner' && o.sales > 0) o.paid = o.sales * pct / 100; });
+    out.forEach(o => { o.net = o.cash + o.card - o.paid + (o.role === 'support' ? o.received : 0); });
     return out;
+  },
+  // Suggested by-hours split of the collected pool across support rows -> map of
+  // row-index to amount. Powers "Use suggested split"; the operator can override.
+  suggestedSplit(rows) {
+    const out = this.computeTipOut(rows);
+    const pool = out.reduce((s, o) => s + o.paid, 0);
+    const support = out.filter(o => o.staff_id && o.role === 'support');
+    const totHrs = support.reduce((s, o) => s + o.hours, 0);
+    const map = {};
+    out.forEach((o, i) => {
+      if (o.role === 'support' && o.staff_id) {
+        map[i] = Math.round((totHrs > 0 ? pool * (o.hours / totHrs) : (support.length ? pool / support.length : 0)) * 100) / 100;
+      }
+    });
+    return map;
+  },
+  // Collected (earner paid) vs distributed (support received entered) + the gap.
+  tipOutRecon(rows) {
+    const out = this.computeTipOut(rows);
+    const collected = out.reduce((s, o) => s + o.paid, 0);
+    const distributed = out.reduce((s, o) => s + (o.role === 'support' ? o.received : 0), 0);
+    return { collected, distributed, gap: collected - distributed,
+      hasSupport: out.some(o => o.role === 'support' && o.staff_id),
+      hasEarner: out.some(o => o.paid > 0) };
+  },
+  _reconInner(recon) {
+    const gap = recon.gap;
+    const gapTxt = Math.abs(gap) < 0.005 ? 'all distributed'
+      : (gap > 0 ? App.fmtCurrency(gap, 2) + ' not distributed' : App.fmtCurrency(-gap, 2) + ' over');
+    const gapColor = Math.abs(gap) < 0.005 ? 'var(--green)' : 'var(--amber)';
+    return '<span style="color:var(--t3);">Collected <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(recon.collected, 2) + '</span></span>'
+      + '<span style="color:var(--t3);">Distributed <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(recon.distributed, 2) + '</span></span>'
+      + '<span style="color:' + gapColor + ';font-weight:700;">' + gapTxt + '</span>';
   },
 
   // The effective date the batch logs against: the picked shift's date, or the
@@ -432,7 +512,8 @@ S.LaborTipLog = {
         hours:    el.querySelector('.tl-b-hours')?.value || '',
         cash:     el.querySelector('.tl-b-cash')?.value || '',
         card:     el.querySelector('.tl-b-card')?.value || '',
-        sales:    el.querySelector('.tl-b-sales')?.value || ''
+        sales:    el.querySelector('.tl-b-sales')?.value || '',
+        received: el.querySelector('.tl-b-received')?.value || ''
       }));
     }
   },
@@ -448,7 +529,7 @@ S.LaborTipLog = {
     if (shiftId === '__manual') {
       this._addDate = this._addDate || App.todayLocal();
       this._addShiftType = this._addShiftType || ((App.SHIFT_TYPES || [])[0] || '');
-      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '', sales: '' }];
+      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' }];
       return;
     }
     const s = shiftId ? this.shiftById(shiftId) : null;
@@ -482,7 +563,7 @@ S.LaborTipLog = {
       if (already.has(id)) return;
       const logged = App.hoursFor(id, date);
       const hours = (logged != null && logged > 0) ? logged : (schedHrs.get(id) || '');
-      rows.push({ staff_id: id, hours: hours || '', cash: '', card: '', sales: '' });
+      rows.push({ staff_id: id, hours: hours || '', cash: '', card: '', sales: '', received: '' });
     });
     rows.sort((a, b) => { const sa = this.staffById(a.staff_id), sb = this.staffById(b.staff_id); return ((sa && sa.name) || '').localeCompare((sb && sb.name) || ''); });
     this._addRows = rows;
@@ -495,23 +576,23 @@ S.LaborTipLog = {
       hours: el.querySelector('.tl-b-hours')?.value || '',
       cash: el.querySelector('.tl-b-cash')?.value || '',
       card: el.querySelector('.tl-b-card')?.value || '',
-      sales: el.querySelector('.tl-b-sales')?.value || ''
+      sales: el.querySelector('.tl-b-sales')?.value || '',
+      received: el.querySelector('.tl-b-received')?.value || ''
     }));
   },
-  // Live per-row Tip-Out + Net (or Total when tip-out is off) + the Save All count.
+  // Live per-row Tip-Out (earner only) + Net (or Total when off) + reconciliation
+  // + the Save All count. The support Received input is the operator's, never
+  // overwritten here.
   recalcBatch() {
     const on = App.tipOutPct() > 0;
     const els = [...document.querySelectorAll('#tl-b-rows .tl-line')];
-    const out = this.computeTipOut(this.batchDomRows());
+    const rows = this.batchDomRows();
+    const out = this.computeTipOut(rows);
     els.forEach((el, i) => {
       const o = out[i]; if (!o) return;
       if (on) {
-        const toEl = el.querySelector('.tl-b-tipout');
-        if (toEl) {
-          if (o.paid > 0) { toEl.textContent = '-' + App.fmtCurrency(o.paid, 2); toEl.style.color = 'var(--t2)'; }
-          else if (o.received > 0) { toEl.textContent = '+' + App.fmtCurrency(o.received, 2); toEl.style.color = 'var(--t2)'; }
-          else { toEl.textContent = '-'; toEl.style.color = 'var(--t3)'; }
-        }
+        const toEl = el.querySelector('.tl-b-tipout');  // earner rows only
+        if (toEl) toEl.textContent = o.paid > 0 ? '-' + App.fmtCurrency(o.paid, 2) : '-';
         const nEl = el.querySelector('.tl-b-total');
         if (nEl) nEl.textContent = (o.staff_id && (o.cash + o.card > 0 || o.received > 0 || o.paid > 0)) ? App.fmtCurrency(o.net, 2) : '-';
       } else {
@@ -520,6 +601,10 @@ S.LaborTipLog = {
         if (tEl) tEl.textContent = t > 0 ? App.fmtCurrency(t, 2) : '-';
       }
     });
+    if (on) {
+      const rt = document.getElementById('tl-b-recon-text');
+      if (rt) rt.innerHTML = this._reconInner(this.tipOutRecon(rows));
+    }
     const n = this.batchReadyCount();
     const btn = document.getElementById('tl-save-all');
     if (btn && !btn.disabled) btn.textContent = n > 0 ? 'Save ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') : 'Save Tips';
@@ -539,7 +624,13 @@ S.LaborTipLog = {
     document.getElementById('tl-b-add')?.addEventListener('click', () => {
       this.collectBatch();
       this._addRows = this._addRows || [];
-      this._addRows.push({ staff_id: '', hours: '', cash: '', card: '' });
+      this._addRows.push({ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' });
+      this.renderList();
+    });
+    document.getElementById('tl-b-suggest')?.addEventListener('click', () => {
+      this.collectBatch();
+      const map = this.suggestedSplit(this._addRows || []);
+      Object.keys(map).forEach(i => { if (this._addRows[i]) this._addRows[i].received = String(map[i]); });
       this.renderList();
     });
     const rowsEl = document.getElementById('tl-b-rows');
@@ -554,6 +645,9 @@ S.LaborTipLog = {
             const hrs = App.hoursFor(ev.target.value, date);
             if (hrs != null && hrs > 0) hoursInp.value = hrs;
           }
+          // Reshape the row to the picked staff's role (earner = Sales box,
+          // support = Received box) by re-rendering, preserving entered values.
+          if (App.tipOutPct() > 0) { this.collectBatch(); this.renderList(); return; }
         }
         this.recalcBatch();
       });
@@ -873,7 +967,17 @@ S.LaborTipLog = {
     if (!staff) { fail('Choose a staff member.'); return; }
     const num = id => { const n = parseFloat(document.getElementById(p + id)?.value); return isNaN(n) ? null : n; };
     const cash = num('cash') || 0, card = num('card') || 0;
-    if (cash + card <= 0) { fail('Enter cash or card tips.'); return; }
+    // Tip-out side (edit pop-up, when a % is set): earner pays sales x %, support
+    // has an operator-entered Received. A support row can be valid on received alone.
+    const toPct = App.tipOutPct();
+    const role = App.tipRole(staff) || 'earner';
+    const r2 = n => Math.round((n || 0) * 100) / 100;
+    let salesV = 0, paidV = 0, receivedV = 0;
+    if (toPct > 0) {
+      if (role === 'support') { receivedV = num('received') || 0; }
+      else { salesV = num('sales') || 0; paidV = salesV * toPct / 100; }
+    }
+    if (cash + card <= 0 && receivedV <= 0) { fail('Enter cash or card tips.'); return; }
 
     const rec = {
       id:          this.editId || App.uid(),
@@ -890,6 +994,11 @@ S.LaborTipLog = {
       hours:       num('hours'),
       notes:       document.getElementById(p + 'notes')?.value.trim() || ''
     };
+    if (toPct > 0) {
+      rec.sales = role === 'support' ? 0 : r2(salesV);
+      rec.tip_out_paid = role === 'support' ? 0 : r2(paidV);
+      rec.tip_out_received = role === 'support' ? r2(receivedV) : 0;
+    }
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.tips();
