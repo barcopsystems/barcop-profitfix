@@ -15,11 +15,18 @@ S.LaborLogHours = {
   _fillWeek: '',           // Monday of the week being pulled from the schedule
   _fillModel: null,        // in-memory Fill-from-Schedule rows (survive day-tab switches)
   _fillTab: null,          // active day tab (Mon-first index) in Fill from Schedule
+  _draft: null,            // in-memory manual-entry draft (survives filter/leave-return)
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
+
+  // Does the manual-entry draft hold real work (date alone defaults to today)?
+  _draftHasWork() {
+    const d = this._draft;
+    return !!(d && (d['lo-staff'] || d['lo-hours'] || d['lo-notes'] || d['lo-shift']));
+  },
 
   actuals() {
     if (!App.laborData) App.laborData = {};
@@ -220,13 +227,16 @@ S.LaborLogHours = {
     } else if (this.entryMode === 'schedule') {
       modeBody = this.scheduleFillBody();
       const total = this.fillToLog().length;
+      const hasFill = !!(this._fillModel && this._fillModel.rows.length);
       actionRow = rowOpen
         + '<button class="btn btn-primary" id="lo-fill-save"' + (total ? '' : ' disabled') + '>Log ' + total + ' Entr' + (total === 1 ? 'y' : 'ies') + '</button>'
+        + (hasFill ? '<button class="btn btn-ghost" id="lo-fill-reset">Start Over</button>' : '')
         + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     } else {
       modeBody = this.logFormCells(null);
       actionRow = rowOpen
         + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
+        + (this._draftHasWork() ? '<button class="btn btn-ghost" id="lo-startover">Start Over</button>' : '')
         + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     }
     const addCard = '<div class="card form-card">'
@@ -306,7 +316,9 @@ S.LaborLogHours = {
         return;
       }
       if (ev.target.closest('#lo-save'))    { this.save('lo-'); return; }
+      if (ev.target.closest('#lo-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#lo-fill-save')) { this.commitFill(); return; }
+      if (ev.target.closest('#lo-fill-reset')) { this._fillModel = null; this._fillTab = null; this.renderList(); return; }
       if (ev.target.closest('.lo-go-build')) { App.navigate('lc-build-schedule'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row  = ev.target.closest('.lo-row');
@@ -335,7 +347,18 @@ S.LaborLogHours = {
       if (tbl) tbl.addEventListener('change', () => this.updateFillCount());
       if (tbl) tbl.addEventListener('input', () => this.updateFillCount());
     }
-    else this.wireForm('lo-');
+    else {
+      // Manual: restore an in-progress draft before wiring so the live cost preview
+      // reads the restored values; then capture on every input so it stays current.
+      const formRoot = this.container.querySelector('.collapse-body');
+      if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
+      this.wireForm('lo-');
+      if (formRoot) {
+        const cap = () => { this._draft = App.captureDraft(formRoot); };
+        formRoot.addEventListener('input', cap);
+        formRoot.addEventListener('change', cap);
+      }
+    }
     document.getElementById('lo-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('lo-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
     App.applyCollapsed(this.container);
@@ -453,6 +476,7 @@ S.LaborLogHours = {
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_hours');
+      if (!isEdit) this._draft = null;   // a saved manual entry clears its draft
       if (isEdit) App.closeModal('lo-edit-modal');
       this.renderList();
     } else {

@@ -7,7 +7,14 @@
 
 S.LaborCalloutLog = {
   editId: null,
+  _draft: null,            // in-memory inline-log draft (survives leave/return)
   TYPES: ['No-Show', 'Called Out Sick', 'Late Arrival', 'Left Early', 'Other'],
+
+  // Does the inline-log draft hold real work (not just untouched defaults)?
+  _draftHasWork() {
+    const d = this._draft;
+    return !!(d && (d['co-staff'] || d['co-reason'] || d['co-notes'] || d['co-coveredby'] || d['co-covered'] === 'yes'));
+  },
   // Reads canonical SHIFT_TYPES from App with a leading '' for the optional
   // "no specific shift" choice. Getter so a future SHIFT_TYPES change is picked up.
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
@@ -166,6 +173,7 @@ S.LaborCalloutLog = {
       + '</div></div>'
       + '<div data-collapse-group="lc-callout-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="co-save">Save Call-Out</button>'
+      + (this._draftHasWork() ? '<button class="btn btn-ghost" id="co-startover">Start Over</button>' : '')
       + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
@@ -203,6 +211,7 @@ S.LaborCalloutLog = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#co-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#co-save')) { this.save('co-'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const row = ev.target.closest('.co-row');
@@ -212,9 +221,18 @@ S.LaborCalloutLog = {
       else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
       else if (row && App.canEdit('lc-callout-log')) this.openEditModal(row.dataset.id);
     };
+    // Restore an in-progress draft before the schedule note recomputes off it;
+    // then capture on every input so the draft stays current through a re-render.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
     ['co-staff', 'co-date', 'co-coveredby'].forEach(id =>
       document.getElementById(id)?.addEventListener('change', () => this.updateSchedNote('co-')));
     this.updateSchedNote('co-');
+    if (formRoot) {
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
     App.applyCollapsed(this.container);
   },
 
@@ -281,6 +299,7 @@ S.LaborCalloutLog = {
     const ok = await App.putRecord('lc', 'callout', saved);
     this.editId = null;
     if (ok) {
+      if (!isEdit) this._draft = null;   // a saved call-out clears its draft
       if (isEdit) App.closeModal('co-edit-modal');
       this.renderList();
     } else {

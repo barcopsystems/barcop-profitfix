@@ -115,8 +115,8 @@ S.LaborTipLog = {
     this.container = container;
     this.actions = actions;
     // Keep any unsaved in-progress entry so leaving the screen and coming back (or
-    // clicking a filter) never wipes it — only Save or Clear resets it. A "fresh"
-    // visit (no entered amounts) defaults to the open shift and preloads its crew.
+    // clicking a filter) never wipes it — only Save or Start Over resets it. A
+    // "fresh" visit (no entered amounts) defaults to the open shift, preloads crew.
     const hasWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
     if (!hasWork) {
       const a = this.activeShift();
@@ -269,10 +269,10 @@ S.LaborTipLog = {
     } else {
       modeBody = this.batchBody();
       const note = this._savedNote; this._savedNote = null;   // show once, after a save
-      const canClear = !!(this._addShift || (this._addRows || []).length);
+      const canStartOver = !!(this._addShift || (this._addRows || []).length);
       actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-        + (canClear ? '<button class="btn btn-ghost" id="tl-clear">Clear</button>' : '')
+        + (canStartOver ? '<button class="btn btn-ghost" id="tl-startover">Start Over</button>' : '')
         + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
         + '</div>';
@@ -347,7 +347,7 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
-      if (ev.target.closest('#tl-clear')) { this._addShift = ''; this._addRows = []; this._savedNote = null; this.renderList(); return; }
+      if (ev.target.closest('#tl-startover')) { this._addShift = ''; this._addRows = []; this._savedNote = null; this.renderList(); return; }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
         const v = tlRange.dataset.v;

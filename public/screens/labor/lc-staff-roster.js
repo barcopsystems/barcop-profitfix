@@ -15,6 +15,13 @@ S.LaborStaffRoster = {
   certEditId: null,
   noteEditId: null,
   entryMode: 'manual',     // landing card: type a profile vs import a staff file
+  _draft: null,            // in-memory Add-Staff draft (survives leave/return)
+
+  // Does the Add-Staff draft hold real work (position/wage default in on their own)?
+  _draftHasWork() {
+    const d = this._draft;
+    return !!(d && (d['sr-name'] || d['sr-phone'] || d['sr-email'] || d['sr-notes'] || d['sr-lead'] === true));
+  },
 
   CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
     'ServSafe Manager', 'Allergen Awareness', 'CPR / First Aid', 'Food Handler Permit',
@@ -207,6 +214,7 @@ S.LaborStaffRoster = {
         + '<label>Notes</label><textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
         + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
+        + (this._draftHasWork() ? '<button class="btn btn-ghost" id="sr-startover">Start Over</button>' : '')
         + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
     const addCard = '<div class="card form-card">'
@@ -261,6 +269,7 @@ S.LaborStaffRoster = {
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#sr-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#sr-save'))     { this.saveProfile(null); return; }
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');
@@ -270,7 +279,22 @@ S.LaborStaffRoster = {
       else if (row)   { const id = row.dataset.id; App.pushView(() => this.renderUnified(id)); }
     };
     if (this.entryMode === 'import') this.mountImporter();
-    else this.wirePayFields(false);
+    else {
+      // Restore an in-progress Add-Staff draft, then sync the pay label to the
+      // restored Pay Type (a synthetic change event would wipe the pay value).
+      const formRoot = this.container.querySelector('.collapse-body');
+      if (formRoot && this._draft) {
+        App.restoreDraft(formRoot, this._draft);
+        const typeEl = document.getElementById('sr-paytype'), labelEl = document.getElementById('sr-pay-label');
+        if (typeEl && labelEl) labelEl.textContent = typeEl.value === 'Salary' ? 'Annual Salary' : 'Wage';
+      }
+      this.wirePayFields(false);
+      if (formRoot) {
+        const cap = () => { this._draft = App.captureDraft(formRoot); };
+        formRoot.addEventListener('input', cap);
+        formRoot.addEventListener('change', cap);
+      }
+    }
     App.applyCollapsed(this.container);
   },
 
@@ -754,7 +778,7 @@ S.LaborStaffRoster = {
     if (ok) {
       App.markSetupDone('gs_lc_roster');
       if (staffId) this.renderUnified(staffId);
-      else { this.detailId = null; this.renderList(); }
+      else { this.detailId = null; this._draft = null; this.renderList(); }   // a saved add clears its draft
     } else {
       if (btn) { btn.disabled = false; btn.textContent = staffId ? 'Update Profile' : 'Add Staff'; }
       fail('Save failed. Try again.');

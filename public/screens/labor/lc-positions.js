@@ -8,7 +8,14 @@
 
 S.LaborPositions = {
   editId: null,
+  _draft: null,            // in-memory inline-add draft (survives filter/leave-return)
   DEPARTMENTS: ['Bar', 'Front of House', 'Kitchen', 'Management', 'Other'],
+
+  // Does the inline-add draft hold real work (not just untouched defaults)?
+  _draftHasWork() {
+    const d = this._draft;
+    return !!(d && (d['lp-name'] || d['lp-wage'] || d['lp-notes'] || d['lp-tipout'] || d['lp-tipped'] === 'yes'));
+  },
 
   positions() {
     if (!App.laborData) App.laborData = {};
@@ -94,6 +101,7 @@ S.LaborPositions = {
       + this.formBody(null)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lp-save">Add Position</button>'
+      + (this._draftHasWork() ? '<button class="btn btn-ghost" id="lp-startover">Start Over</button>' : '')
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 
@@ -122,6 +130,7 @@ S.LaborPositions = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#lp-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#lp-save')) { this.editId = null; this.save('lp-'); return; }
       const edit = ev.target.closest('.lp-edit');
       const del = ev.target.closest('.lp-del');
@@ -131,7 +140,16 @@ S.LaborPositions = {
       else if (row)  this.openEditModal(row.dataset.id);
     };
     App.applyCollapsed(this.container);
+    // Restore an in-progress draft before wiring so the tip-field disclosure reads
+    // the restored values; then capture on every input so the draft stays current.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
     this.wireTipFields('lp-');
+    if (formRoot) {
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // Edit in a focused pop-up (own lpe- ids). Cancel closes it; Delete pushed right.
@@ -193,6 +211,7 @@ S.LaborPositions = {
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_positions');
+      if (!isEdit) this._draft = null;   // a saved add clears its draft
       if (isEdit) App.closeModal('lp-edit-modal');
       this.renderList();
     } else {
@@ -205,7 +224,7 @@ S.LaborPositions = {
     App.showHelpModal('How Positions Work', [
       { p: ['Positions are the job roles you schedule and pay: bartender, server, line cook, and so on. Every shift you build and every hour you log is tied to a position, so this is the list that drives your whole labor cost.'] },
       { h: 'Department and Default Wage', p: ['Each position belongs to a department (Bar, Front of House, Kitchen, Management) and carries a default hourly wage. That wage pre-fills when you add a staff member in the role, so you set the number once here instead of on every hire.'] },
-      { h: 'Tipped Roles and Tip-Out', p: ['Mark a position Tipped if the role earns tip income, then set Tips Out (% of Sales). A role that rings sales and tips out (servers, bartenders) gets a percent; a role that only receives tip-out (bussers, barbacks, runners) stays at 0. Different roles can tip out different percents. Bar Cop uses this in the Tip Log: roles with a percent get a Sales column and pay that percent of their sales, roles at 0 get an editable Received amount, and a role that both tips out and receives (a bartender getting the bar share from servers) gets both. It all feeds the Pay Periods tip-credit check.'] },
+      { h: 'Tipped Roles and Tip-Out', p: ['Mark a position Tipped if the role earns tip income. Then choose whether it Pays Tip Out: Yes for a role that rings sales and tips out (servers, bartenders), which opens a Tip Out % field; No for a role that only receives tip-out (bussers, barbacks, runners). Different roles can tip out different percents. Bar Cop uses this in the Tip Log: roles that pay get a Sales column and tip out that percent of their sales, roles that do not get an editable Received amount, and a role that both pays and receives (a bartender taking the bar share from servers) gets both. It all feeds the Pay Periods tip-credit check.'] },
       { h: 'Where Positions Show Up', p: ['Add a position once and it is available everywhere: the staff roster, the schedule builder, the hours log, and every labor report. Edit a position any time and the change carries forward without touching past records.'] }
     ]);
   },

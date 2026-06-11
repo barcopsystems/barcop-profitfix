@@ -32,13 +32,18 @@ S.LaborTipPool = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    // Fresh form on every entry from the sidebar — a loaded pool never sticks
-    // around. Working state only persists across the in-screen re-renders.
-    this.date = App.todayLocal();
-    this.pool = '';
-    this.rows = [];
-    this.method = 'hours';
-    this._editId = null;
+    // Keep an in-progress (or being-edited) pool through leaving the screen and
+    // coming back, plus the in-screen re-renders — only Save or Start Over resets
+    // it. A clean entry (nothing entered) starts fresh on today's date.
+    const hasWork = this._editId || (this.pool !== '' && this.pool != null)
+      || (this.rows || []).some(r => r && (r.staff_id || (r.hours !== '' && r.hours != null)));
+    if (!hasWork) {
+      this.date = App.todayLocal();
+      this.pool = '';
+      this.rows = [];
+      this.method = 'hours';
+      this._editId = null;
+    }
     this.renderMain();
   },
 
@@ -47,7 +52,7 @@ S.LaborTipPool = {
       { p: ['The Tip Pool Calculator splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Set the date and pool amount, add the participants, and Bar Cop works out each person\'s share live.'] },
       { h: 'Load From The Tip Log', p: ['Pick a date and Load from Tip Log pulls in everyone who logged tips that day, totals their tips as the pool, and fills hours from their logged shift. From there you adjust participants or hours and the shares recompute.'] },
       { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
-      { h: 'Saving And Clearing', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Clear empties the form to start a fresh pool without saving.'] }
+      { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] }
     ]);
   },
 
@@ -109,7 +114,7 @@ S.LaborTipPool = {
     // Save / Clear live BELOW the card (bottom-left), tagged to hide with the card on collapse.
     const actionsRow = '<div data-collapse-group="lc-tip-pool" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="tp-save">' + (this._editId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
-      + '<button class="btn btn-ghost" id="tp-clear">' + (this._editId ? 'Cancel Edit' : 'Clear') + '</button>'
+      + '<button class="btn btn-ghost" id="tp-clear">Start Over</button>'
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
@@ -159,7 +164,7 @@ S.LaborTipPool = {
     document.getElementById('tp-date')?.addEventListener('change', e => { this.date = e.target.value; });
     document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
-    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.renderMain(); });
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.method = 'hours'; this.date = App.todayLocal(); this.renderMain(); });
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
