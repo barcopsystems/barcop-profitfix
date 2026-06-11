@@ -9,8 +9,29 @@
 
 S.ShiftCashHistory = {
   tab: 'drops',
-  f: {},
+  filterPreset: 'last-4',  // active range chip, shared across the tabs
+  _prevPreset: 'last-4',
+  filterFrom: '',
+  filterTo: '',
   TABS: [['drops', 'Cash Drops'], ['safe', 'Safe Log'], ['variances', 'Variances']],
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
+  // Effective date window from the active range chip (recomputed off "today" each
+  // draw); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  inRange(date) {
+    const { from, to } = this.effectiveRange();
+    const d = date || '';
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  },
 
   fmtDate(str) {
     if (!str) return '-';
@@ -40,20 +61,9 @@ S.ShiftCashHistory = {
     const parts = this.tab === 'drops' ? this.bodyDrops()
       : this.tab === 'safe' ? this.bodySafe()
       : this.bodyVariances();
-    const tabLabel = (this.TABS.find(t => t[0] === this.tab) || ['', ''])[1];
-    // Tabs are a plain switcher; under them the page follows the standard stack:
-    // stats card, a Filter heading, the controls-only filter card, then the data card.
-    let body;
-    if (parts.empty) {
-      body = parts.empty;
-    } else {
-      body = parts.stats
-        + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter ' + esc(tabLabel) + '</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div></div>'
-        + '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-          + parts.controls
-        + '</div></div>'
-        + parts.table;
-    }
+    // Tabs are a plain switcher; under them: stats card, the range chips + Export,
+    // then the data card (the accepted filter model, no filter box).
+    const body = parts.empty ? parts.empty : (parts.stats + this.filterRow() + parts.table);
     this.container.innerHTML = '<div class="screen">' + this.tabBar() + body + '</div>';
     this.wire();
   },
@@ -61,28 +71,40 @@ S.ShiftCashHistory = {
   wire() {
     this.container.onclick = ev => {
       const tab = ev.target.closest('.ch-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.f = {}; this.draw(); return; }
+      if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }   // keep the range across tabs
+      const chip = ev.target.closest('.ch-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.draw();
+        return;
+      }
       if (ev.target.closest('#ch-export')) { App.exportPDF({ title: 'Cash History', root: this.container }); return; }
       if (ev.target.closest('#ch-go-board')) { App.navigate('sc-cash-control'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.draw()); return; }
     };
-    const bind = (id, key) => { const el = document.getElementById(id); if (el) el.addEventListener('change', e => { this.f[key] = e.target.value || ''; this.draw(); }); };
-    bind('ch-from', 'from'); bind('ch-to', 'to'); bind('ch-a', 'a'); bind('ch-b', 'b');
-    document.getElementById('ch-clear')?.addEventListener('click', () => { this.f = {}; this.draw(); });
+    document.getElementById('ch-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.draw(); });
+    document.getElementById('ch-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.draw(); });
   },
 
   // ── shared markup helpers ───────────────────────────────────────────────────
-  dateInputs() {
-    return '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.f.from || '') + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.f.to || '') + '"/></div>';
-  },
-  selInput(key, label, allLabel, names) {
-    const opts = '<option value="">' + esc(allLabel) + '</option>'
-      + names.map(n => '<option' + ((this.f[key] || '') === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
-    return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(label) + '</label><select id="ch-' + esc(key) + '">' + opts + '</select></div>';
-  },
-  clearBtn() {
-    return '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ch-clear" style="margin-bottom:2px;">Clear</button></div>';
+  // Range chips left, Export right, directly above the data block; Custom reveals
+  // a bare From/To row. Same accepted model as the other histories.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'ch-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
   statItem(label, val, cls) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
@@ -100,7 +122,7 @@ S.ShiftCashHistory = {
       + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
   noMatchRow(cols) {
-    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records match the filter.</td></tr>';
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records in this range. Pick a wider range above.</td></tr>';
   },
   emptyTab(line1, line2) {
     return '<div style="padding:18px 4px;font-size:13px;color:var(--t3);">' + esc(line1) + ' ' + esc(line2)
@@ -111,17 +133,8 @@ S.ShiftCashHistory = {
   bodyDrops() {
     const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on Cash Control.') };
-    const drawerNames = [...new Set(all.map(d => d.drawer).filter(Boolean))].sort();
-    const byNames = [...new Set(all.map(d => d.performed_by).filter(Boolean))].sort();
-    const filtered = all.filter(d => {
-      if (this.f.from && (d.date || '') < this.f.from) return false;
-      if (this.f.to && (d.date || '') > this.f.to) return false;
-      if (this.f.a && (d.drawer || '') !== this.f.a) return false;
-      if (this.f.b && (d.performed_by || '') !== this.f.b) return false;
-      return true;
-    });
+    const filtered = all.filter(d => this.inRange(d.date));
     const total = filtered.reduce((t, d) => t + (d.amount || 0), 0);
-    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Performed By', 'All staff', byNames) + this.clearBtn();
     const stats = this.statsCard(this.statItem('Drops', filtered.length) + this.statItem('Total Dropped', App.fmtCurrency(total)));
     const rows = filtered.length
       ? filtered.slice(0, App.listLimit('sc', 'cash_drop')).map(d => '<tr>'
@@ -132,29 +145,20 @@ S.ShiftCashHistory = {
           + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td></tr>').join('')
       : this.noMatchRow(5);
     const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', rows)
-      + App.showOlderBar('sc', 'cash_drop', filtered, false);
-    return { stats, controls, table };
+      + App.showOlderBar('sc', 'cash_drop', filtered, this.filterPreset !== 'all');
+    return { stats, table };
   },
 
   // ── Safe Log tab ────────────────────────────────────────────────────────────
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
     if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on Cash Control.') };
-    const byNames = [...new Set(chrono.map(e => e.performed_by).filter(Boolean))].sort();
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
     const lifetime = bal;
-    const match = e => {
-      if (this.f.from && (e.date || '') < this.f.from) return false;
-      if (this.f.to && (e.date || '') > this.f.to) return false;
-      if (this.f.a && (e.txn_type || '') !== this.f.a) return false;
-      if (this.f.b && (e.performed_by || '') !== this.f.b) return false;
-      return true;
-    };
-    const shown = withBal.filter(r => match(r.e));
+    const shown = withBal.filter(r => this.inRange(r.e.date));
     const totalIn = shown.filter(r => r.signed > 0).reduce((t, r) => t + r.signed, 0);
     const totalOut = shown.filter(r => r.signed < 0).reduce((t, r) => t - r.signed, 0);
-    const controls = this.dateInputs() + this.selInput('a', 'Type', 'All types', S.ShiftSafeLog.TYPES.map(t => t.name)) + this.selInput('b', 'Performed By', 'All staff', byNames) + this.clearBtn();
     const stats = this.statsCard(
       this.statItem('Safe Balance', App.fmtCurrency(lifetime), 'good')
       + this.statItem('Total In', App.fmtCurrency(totalIn))
@@ -175,26 +179,17 @@ S.ShiftCashHistory = {
       }).join('');
     }
     const table = this.dataCard('<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>', rows)
-      + (shown.length ? App.showOlderBar('sc', 'safe_log', shown, false) : '');
-    return { stats, controls, table };
+      + (shown.length ? App.showOlderBar('sc', 'safe_log', shown, this.filterPreset !== 'all') : '');
+    return { stats, table };
   },
 
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on Cash Control.') };
-    const drawerNames = [...new Set(all.map(v => v.drawer).filter(Boolean))].sort();
-    const cashierNames = [...new Set(all.map(v => v.cashier).filter(Boolean))].sort();
-    const filtered = all.filter(v => {
-      if (this.f.from && (v.date || '') < this.f.from) return false;
-      if (this.f.to && (v.date || '') > this.f.to) return false;
-      if (this.f.a && (v.drawer || '') !== this.f.a) return false;
-      if (this.f.b && (v.cashier || '') !== this.f.b) return false;
-      return true;
-    });
+    const filtered = all.filter(v => this.inRange(v.date));
     const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);
     const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
-    const controls = this.dateInputs() + this.selInput('a', 'Drawer', 'All drawers', drawerNames) + this.selInput('b', 'Cashier', 'All cashiers', cashierNames) + this.clearBtn();
     const stats = this.statsCard(
       this.statItem('Variances', filtered.length)
       + this.statItem('Net Over/Short', (net > 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
@@ -213,7 +208,7 @@ S.ShiftCashHistory = {
         + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
     }).join('');
     const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
-      + App.showOlderBar('sc', 'variance', filtered, false);
-    return { stats, controls, table };
+      + App.showOlderBar('sc', 'variance', filtered, this.filterPreset !== 'all');
+    return { stats, table };
   }
 };
