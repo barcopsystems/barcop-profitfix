@@ -3,11 +3,12 @@
 /* ── Onboarding — the first-run doorway, not the setup ────────────────────────
    One screen after login. The orientation lives in a short intro at the top; the
    only things captured are what the Hub needs from minute one: identity, dollar
-   baselines, and the services you run. Numbered gold circles match the Getting
-   Started page it hands off to, so login -> onboarding -> setup reads as one flow.
-   The six-module setup checklist is the wizard; this is just the front door. */
+   baselines, and the services you run. Numbered gold circles sit in their own
+   left column (the same badge the Getting Started page uses) with everything
+   aligned to their right, so login -> onboarding -> setup reads as one flow. */
 const Onboarding = {
   _spCtrl: null,
+  _help: 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;',
 
   start() {
     document.getElementById('ob-overlay').classList.remove('hidden');
@@ -15,12 +16,15 @@ const Onboarding = {
     this.render();
   },
 
-  // A numbered gold circle + label, the same badge the Getting Started page uses.
-  _sectionHead(n, title) {
-    return '<div style="display:flex;align-items:center;gap:12px;margin:26px 0 14px;">'
-      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + n + '</div>'
-      + '<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + title + '</div>'
-      + '</div>';
+  // A section = the numbered gold circle in its own left column, with the title
+  // and everything else aligned to its right (nothing sits under the circle).
+  _section(n, title, body) {
+    return '<div style="display:flex;gap:12px;align-items:flex-start;margin-top:24px;">'
+      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;">' + n + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);margin-bottom:12px;">' + title + '</div>'
+      + body
+      + '</div></div>';
   },
 
   render() {
@@ -28,33 +32,29 @@ const Onboarding = {
     const parts = (s.city_state || '').split(',').map(p => p.trim());
     const v = x => (x != null && x !== '') ? x : '';
 
+    const basics = '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="flex:2;min-width:170px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="flex:1.2;min-width:110px;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
+      + '</div>';
+
+    const numbers = '<div style="' + this._help + '">A rough estimate is fine. No food sales? Enter zero.</div>'
+      + '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + v(s.annual_bar_revenue) + '"/></div></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + v(s.annual_food_revenue) + '"/></div></div>'
+      + '</div>';
+
+    const service = '<div style="' + this._help + '">Turn on the services you run. Tap one to set its hours.</div>'
+      + '<div id="ob-sp-mount"></div>';
+
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;">Bar Cop captures your daily operation, finds where profit and revenue are leaking, and shows you exactly what to fix. Three quick things get every calculation working, then you continue to the setup checklist.</div>'
-
-      // ① The Basics
-      + this._sectionHead(1, 'The Basics')
-      + '<div style="display:flex;gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="flex:2;min-width:180px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
-      +   '<div class="f" style="flex:1.2;min-width:110px;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
-      +   '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
-      + '</div>'
-
-      // ② Your Numbers
-      + this._sectionHead(2, 'Your Numbers')
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:-6px 0 12px 36px;">A best estimate is fine. These set the dollar baselines for the Profit Audit, the Recovery Scoreboard, and every dashboard. No food sales? Enter zero for food. Change either any time in App Settings.</div>'
-      + '<div style="display:flex;gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="flex:1;min-width:150px;"><label>Annual Bar Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + v(s.annual_bar_revenue) + '"/></div></div>'
-      +   '<div class="f" style="flex:1;min-width:150px;"><label>Annual Food Revenue</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + v(s.annual_food_revenue) + '"/></div></div>'
-      + '</div>'
-
-      // ③ Service Periods
-      + this._sectionHead(3, 'Service Periods')
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:-6px 0 12px 36px;">Turn on the services you run. These set every shift-type field across Bar Cop, and Open the Floor pre-picks the right one by the time of day. Add a custom one if your venue runs something different.</div>'
-      + '<div id="ob-sp-mount"></div>'
-
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix. Fill in these basics, then continue to the setup checklist.</div>'
+      + this._section(1, 'The Basics', basics)
+      + this._section(2, 'Your Numbers', numbers)
+      + this._section(3, 'Service Periods', service)
       + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;"></div>'
-      + '<div class="ob-actions" style="margin-top:22px;justify-content:flex-start;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Continue to Bar Cop</button></div>';
+      + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Continue to Bar Cop</button></div>';
 
     this._spCtrl = window.ServicePeriods
       ? ServicePeriods.mount(document.getElementById('ob-sp-mount'), { selected: App.servicePeriods() })
