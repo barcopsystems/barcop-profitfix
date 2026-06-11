@@ -10,12 +10,20 @@
 
 S.LaborReports = {
   tab: 'week',
-  date: null,          // Day lens
-  weekStart: null,     // Week lens
-  filterFrom: '',      // Range lens
+  date: null,              // Day lens
+  weekStart: null,         // Week lens
+  filterPreset: 'last-4',  // Range lens active chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // Range lens, custom range only
   filterTo: '',
   DAYS: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   TABS: [['day', 'Day'], ['week', 'Week'], ['range', 'Range']],
+  // Range lens time chips (the only Range filter), daily cadence. Mirrors Log Hours.
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
   tips()      { return ((App.laborData && App.laborData.lc_tips) || []); },
@@ -43,6 +51,34 @@ S.LaborReports = {
     const d = new Date(dateStr + 'T00:00:00');
     return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   },
+  // Compact Monday-date label for the Week lens chips ("Jun 9").
+  weekLabel(ws) {
+    const d = new Date((ws || '') + 'T00:00:00');
+    return isNaN(d.getTime()) ? esc(ws || '') : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+  // Monday week selector for the Week lens (mirrors Build Schedule / Log Hours
+  // Fill): a window of week chips by Monday date (live week tagged NOW, selected
+  // gold-tint) + step arrows + a snap to the current week. No native calendar.
+  weekSelector(ws) {
+    const cur = this.mondayOf(new Date());
+    const chip = w => {
+      const on = w === ws, isCur = w === cur;
+      return '<button type="button" class="ws-week-chip btn btn-sm" data-ws="' + w + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.weekLabel(w)
+        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let chips = '';
+    for (let i = -1; i <= 1; i++) chips += chip(this.addDays(ws, i * 7));
+    return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + chips
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
+      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="ws-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>';
+  },
   // Scheduled shifts for one date (Day lens)
   scheduledForDate(dateStr) {
     const target = new Date(dateStr + 'T00:00:00').getTime();
@@ -69,12 +105,19 @@ S.LaborReports = {
     return null;
   },
 
+  // Effective Range-lens window from the active chip (preset recomputed off "today"
+  // each render so This Week stays live); Custom reads the From/To pickers.
+  rangeWindow() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   inRange(rec) {
-    if (this.filterFrom && (rec.date || '') < this.filterFrom) return false;
-    if (this.filterTo && (rec.date || '') > this.filterTo) return false;
+    const { from, to } = this.rangeWindow();
+    const d = rec.date || '';
+    if (from && d < from) return false;
+    if (to && d > to) return false;
     return true;
   },
-  applyPreset(key) { const r = App.datePresetRange(key); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); },
 
   // ── shared markup ─────────────────────────────────────────────────────────
   statItem(label, val, cls) {
@@ -100,9 +143,9 @@ S.LaborReports = {
   showHowTo() {
     App.showHelpModal('How Labor Reports Work', [
       { p: ['Labor Reports is one place to see your logged labor, three ways. Switch the tab at the top: Day for a single day, Week for a full week, Range for any stretch of dates.'] },
-      { h: 'Day', p: ['One day at a time: who worked, their hours and cost, and how the day compared to the schedule. The Scheduled This Day table flags anyone who was scheduled but has no hours logged yet, so a missed entry never slips by. Click Edit Hours to fix an entry without leaving the page.'] },
-      { h: 'Week', p: ['A full week rolled up by staff and by day, with labor percentage and revenue per labor hour against the week\'s forecast. Use it Monday morning before building the next week. Salaried staff carry their fixed weekly salary.'] },
-      { h: 'Range', p: ['Any date range, broken down by department and by staff, with labor cost (straight time plus overtime premium), labor percent and revenue per labor hour from logged shift revenue, and tips. Use the quick presets or set your own dates. Click a staff row to open their page.'] },
+      { h: 'Day', p: ['One day at a time: who worked, their hours and cost, and how the day compared to the schedule. Move between days with the date box or the arrows, and Today snaps back to the current day. The Scheduled This Day table flags anyone who was scheduled but has no hours logged yet, so a missed entry never slips by. Click Edit Hours to fix an entry without leaving the page.'] },
+      { h: 'Week', p: ['A full week rolled up by staff and by day, with labor percentage and revenue per labor hour against the week\'s forecast. Pick the week from the chips or the arrows; This Week snaps back to the current one. Use it Monday morning before building the next week. Salaried staff carry their fixed weekly salary.'] },
+      { h: 'Range', p: ['Any date range, broken down by department and by staff, with labor cost (straight time plus overtime premium), labor percent and revenue per labor hour from logged shift revenue, and tips. Pick a range with the chips, or Custom to set your own dates. Click a staff row to open their page.'] },
       { h: 'Editing And Export', p: ['Day and Week let you correct hours inline. Entries in a closed pay period show as locked; reopen the period in Pay Periods first. Export PDF saves whichever lens you are on.'] }
     ]);
   },
@@ -139,24 +182,35 @@ S.LaborReports = {
       if (ev.target.closest('#dv-export')) { App.exportPDF({ title: 'Labor Report - Day', root: this.container }); return; }
       if (ev.target.closest('#dv-prev')) { this.date = this.addDays(this.date, -1); this.renderReport(); return; }
       if (ev.target.closest('#dv-next')) { this.date = this.addDays(this.date, 1); this.renderReport(); return; }
+      if (ev.target.closest('#dv-today')) { this.date = App.todayLocal(); this.renderReport(); return; }
       if (ev.target.closest('#dv-log-missing')) { this.logMissing(this.date, false); return; }
       const dvEdit = ev.target.closest('.dv-edit'); if (dvEdit) { this.openDayEdit(dvEdit.dataset.id); return; }
       // Week lens
       if (ev.target.closest('#ws-export')) { App.exportPDF({ title: 'Labor Report - Week', root: this.container }); return; }
       if (ev.target.closest('#ws-prev')) { this.weekStart = this.addDays(this.weekStart, -7); this.renderReport(); return; }
       if (ev.target.closest('#ws-next')) { this.weekStart = this.addDays(this.weekStart, 7); this.renderReport(); return; }
+      if (ev.target.closest('#ws-now')) { this.weekStart = this.mondayOf(new Date()); this.renderReport(); return; }
+      const wsChip = ev.target.closest('.ws-week-chip'); if (wsChip) { this.weekStart = wsChip.dataset.ws; this.renderReport(); return; }
       if (ev.target.closest('#ws-log-missing')) { this.logMissing(this.weekStart, true); return; }
       const wsEdit = ev.target.closest('.ws-edit'); if (wsEdit) { this.openWeekEdit(wsEdit.dataset.key); return; }
       // Range lens
       if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Report - Range', root: this.container }); return; }
-      if (ev.target.closest('#lr-clear')) { this.filterFrom = this.filterTo = ''; this.renderReport(); return; }
-      const preset = ev.target.closest('.lr-preset'); if (preset) { this.applyPreset(preset.dataset.preset); return; }
+      const lrChip = ev.target.closest('.lr-range-chip');
+      if (lrChip) {
+        const v = lrChip.dataset.v;
+        if (v === 'custom') {
+          // Custom toggles: a second click closes the pickers and restores the prior range.
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderReport();
+        return;
+      }
       const sRow = ev.target.closest('.lr-staff-row'); if (sRow) { App._staffFocus = { staff_id: sRow.dataset.staff }; App.navigate('lc-staff-roster'); return; }
     };
     document.getElementById('dv-date')?.addEventListener('change', e => { this.date = e.target.value || this.date; this.renderReport(); });
-    document.getElementById('ws-start')?.addEventListener('change', e => { this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00')); this.renderReport(); });
-    document.getElementById('lr-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderReport(); });
-    document.getElementById('lr-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderReport(); });
+    document.getElementById('lr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderReport(); });
+    document.getElementById('lr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderReport(); });
   },
 
   // Hand off to Log Hours in Fill-from-Schedule mode (one-shot) for the right week.
@@ -183,12 +237,15 @@ S.LaborReports = {
     if (sched) schedHours = sched.reduce((t, s) => t + (s.hours || 0), 0);
     const hoursVar = schedHours != null ? actHours - schedHours : null;
 
+    const isToday = this.date === App.todayLocal();
     const pickerCard = '<div class="card"><div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
       + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
       + '<input type="date" id="dv-date" value="' + esc(this.date) + '"/></div>'
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
       + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button></div></div>'
+      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button>'
+      + (isToday ? '' : '<button class="btn btn-ghost btn-sm" id="dv-today" style="margin-left:4px;">Today</button>')
+      + '</div></div>'
       + '</div></div>';
 
     const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -319,13 +376,7 @@ S.LaborReports = {
     const target = this.laborTarget();
     const hoursVar = schedHours != null ? actHours - schedHours : null;
 
-    const pickerCard = '<div class="card"><div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
-      + '<input type="date" id="ws-start" value="' + esc(ws) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
-      + '</div></div>';
+    const pickerCard = this.weekSelector(ws);
 
     const summaryCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + this.statItem('Actual Hours', actHours.toFixed(1))
@@ -464,9 +515,10 @@ S.LaborReports = {
     const rows = this.actuals().filter(a => this.inRange(a));
     const tips = this.tips().filter(t => this.inRange(t));
 
+    const { from: winFrom, to: winTo } = this.rangeWindow();
     const datesInRange = rows.map(a => a.date).filter(Boolean).sort();
-    const rFrom = this.filterFrom || datesInRange[0] || '';
-    const rTo = this.filterTo || datesInRange[datesInRange.length - 1] || '';
+    const rFrom = winFrom || datesInRange[0] || '';
+    const rTo = winTo || datesInRange[datesInRange.length - 1] || '';
     const salWeeks = (rFrom && rTo)
       ? (Math.floor((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
       : 0;
@@ -492,21 +544,28 @@ S.LaborReports = {
       + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="lr-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="lr-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="lr-clear">Clear</button></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + App.datePresetButtons('lr-preset') + '</div></div>';
-
-    return statsCard + filterHeading + filterCard
+    return statsCard + this.rangeFilterRow()
       + '<div class="sh" style="margin:24px 0 10px;">By Department</div>'
       + this.byDept(rows, totCost, salWeeks, ot.byDept)
       + '<div class="sh" style="margin:24px 0 10px;">By Staff</div>'
       + this.byStaff(rows, totCost, salWeeks, ot.byStaff);
+  },
+
+  // Range chips left, Export right (no filter card), above the data block. Custom
+  // reveals a bare From/To row. Mirrors Tip History / Log Hours.
+  rangeFilterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'lr-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="lr-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="lr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="lr-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   // Weekly OT premium per non-salaried staff (0.5x on hours over 40/week),
