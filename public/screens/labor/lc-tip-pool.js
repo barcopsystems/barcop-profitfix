@@ -1,14 +1,16 @@
 'use strict';
 
-/* ── Labor Control — Tip Pool Calculator (writes lc_tip_pools) ────────────────
-   Splits a tip pool across staff — by hours worked or in an equal split. The
-   pool and participant hours can be pulled straight from the Tip Log. Saved
-   splits go to lc_tip_pools. */
+/* ── Labor Control — Tip Pool Log (writes lc_tip_pools) ───────────────────────
+   Splits a tip pool across staff — by hours worked or in an equal split. Pick the
+   shift and the crew preloads from the posted schedule (the same crew the Shift
+   Close pulls); the operator enters the pool amount. Saved splits go to
+   lc_tip_pools. */
 
 S.LaborTipPool = {
   _pendingDelId: null,
   _editId: null,      // id of a saved pool being edited (null = building a new one)
-  date: '',
+  shift_id: '',       // the shift the pool is for (drives the schedule preload)
+  date: '',           // derived from the picked shift
   pool: '',
   method: 'hours',
   rows: null,
@@ -35,9 +37,10 @@ S.LaborTipPool = {
     // Keep an in-progress (or being-edited) pool through leaving the screen and
     // coming back, plus the in-screen re-renders — only Save or Start Over resets
     // it. A clean entry (nothing entered) starts fresh on today's date.
-    const hasWork = this._editId || (this.pool !== '' && this.pool != null)
+    const hasWork = this._editId || this.shift_id || (this.pool !== '' && this.pool != null)
       || (this.rows || []).some(r => r && (r.staff_id || (r.hours !== '' && r.hours != null)));
     if (!hasWork) {
+      this.shift_id = '';
       this.date = App.todayLocal();
       this.pool = '';
       this.rows = [];
@@ -49,8 +52,8 @@ S.LaborTipPool = {
 
   showHowTo() {
     App.showHelpModal('How the Tip Pool Log Works', [
-      { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Set the date and pool amount, add the participants, and Bar Cop works out each person\'s share live.'] },
-      { h: 'Load From The Tip Log', p: ['Pick a date and Load from Tip Log pulls in everyone who logged tips that day, totals their tips as the pool, and fills hours from their logged shift. From there you adjust participants or hours and the shares recompute.'] },
+      { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Pick the shift, enter the pool amount, and Bar Cop works out each person\'s share live.'] },
+      { h: 'Pick The Shift', p: ['Choosing the shift pre-loads the crew straight from the posted schedule, call-out adjusted, with hours from their logged actuals or their scheduled hours. That is the same crew the Shift Close pulls, so the two match. Add or remove a person and adjust hours, and the shares recompute. Enter the pool amount yourself, since the pool is the total tips you are splitting.'] },
       { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
       { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] }
     ]);
@@ -75,17 +78,15 @@ S.LaborTipPool = {
     const setupCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool')
       + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
-      + '<input type="date" id="tp-date" value="' + esc(this.date) + '"/></div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
+      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Shift</label>'
+      + '<select id="tp-shift">' + ((S.LaborTipLog && S.LaborTipLog.shiftOptions) ? S.LaborTipLog.shiftOptions(this.shift_id) : '<option value="">Select a shift...</option>') + '</select></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
       + 'value="' + esc(this.pool) + '"/></div></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Method</label>'
       + '<select id="tp-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
       + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      + '<button class="btn btn-ghost" id="tp-load" style="margin-bottom:2px;">Load from Tip Log</button></div>'
       + '</div></div></div>';
 
     const rowsBlock = this.rows.length
@@ -94,7 +95,7 @@ S.LaborTipPool = {
         + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
         + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
-      : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Add one below or load from the Tip Log.</div>';
+      : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Pick a shift above to load the crew, or add one below.</div>';
 
     const participantsCard = '<div class="card form-card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
       + rowsBlock
@@ -158,13 +159,10 @@ S.LaborTipPool = {
       this.method = e.target.value;
       this.renderMain();
     });
-    // The date picker only sets the date. Pulling that day's tips is the explicit
-    // "Load from Tip Log" button next to it — auto-loading on every date change
-    // surprised the operator and left stale data when the new date had no tips.
-    document.getElementById('tp-date')?.addEventListener('change', e => { this.date = e.target.value; });
-    document.getElementById('tp-load')?.addEventListener('click', () => this.loadFromTipLog());
+    // Picking the shift preloads the crew from the schedule (no separate load step).
+    document.getElementById('tp-shift')?.addEventListener('change', e => this.loadFromShift(e.target.value));
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
-    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.method = 'hours'; this.date = App.todayLocal(); this.renderMain(); });
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.shift_id = ''; this.rows = []; this.pool = ''; this.method = 'hours'; this.date = App.todayLocal(); this.renderMain(); });
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
@@ -203,7 +201,6 @@ S.LaborTipPool = {
   },
 
   collect() {
-    this.date = document.getElementById('tp-date')?.value || this.date;
     this.pool = document.getElementById('tp-pool')?.value || '';
     const rows = [...document.querySelectorAll('.tp-row')];
     if (rows.length) {
@@ -214,33 +211,25 @@ S.LaborTipPool = {
     }
   },
 
-  // Load participants + pool amount from the tip log entries for the current
-  // date. If quiet=true, silently no-op when no entries exist (used for the
-  // date-change auto-load so it doesn't pop an error every time). Hours
-  // auto-fill from lc_actuals when the tip-log entry didn't capture them.
-  loadFromTipLog(quiet) {
+  // Pick a shift -> preload the participants from the posted SCHEDULE (call-out
+  // adjusted, hours from logged-actuals-else-scheduled), the same crew Tip Out
+  // loads via the Tip Log's preloadFromShift. The pool amount stays operator-
+  // entered, since the schedule has no tip totals and a pool house does not log
+  // per-person tips. Tip Log state is saved/restored so the call has no side effect.
+  loadFromShift(shiftId) {
     this.collect();
-    const date = this.date;
-    const dayTips = this.tips().filter(t => t.date === date);
-    if (dayTips.length === 0) {
-      if (!quiet) {
-        const err = document.getElementById('tp-err');
-        if (err) { err.textContent = 'No tip log entries found for ' + this.fmtDate(date) + '.'; err.style.display = 'inline'; }
-      }
-      return;
+    this.shift_id = shiftId || '';
+    const TL = S.LaborTipLog;
+    const shift = (TL && TL.shiftById) ? TL.shiftById(shiftId) : null;
+    if (shiftId && shift) this.date = shift.date || this.date || App.todayLocal();
+    let crew = [];
+    if (shiftId && TL && TL.preloadFromShift) {
+      const savedShift = TL._addShift, savedRows = TL._addRows;
+      TL.preloadFromShift(shiftId);
+      crew = (TL._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
+      TL._addShift = savedShift; TL._addRows = savedRows;
     }
-    const pool = dayTips.reduce((t, x) => t + (x.total_tips || 0), 0);
-    this.pool = pool ? String(pool) : '';
-    // One participant row per staff member with a tip-log entry that day.
-    // Hours come from the tip-log entry first, then fall back to lc_actuals.
-    const seen = {};
-    this.rows = [];
-    dayTips.forEach(t => {
-      if (!t.staff_id || seen[t.staff_id]) return;
-      seen[t.staff_id] = true;
-      const hrs = (t.hours != null && t.hours > 0) ? t.hours : (App.hoursFor(t.staff_id, date) || '');
-      this.rows.push({ staff_id: t.staff_id, hours: hrs });
-    });
+    this.rows = crew;
     this.renderMain();
   },
 
@@ -304,17 +293,19 @@ S.LaborTipPool = {
       return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share };
     });
 
-    // Auto-link to a shift if the pool's date matches one. Prefer the most
-    // recent matching shift. Lets Form 8027 + Tip History group pool splits
-    // by shift the same way the Shift Close wizard does.
-    const matchShift = ((App.shiftData?.sc_shifts) || [])
+    // Link the pool to the picked shift (falls back to a date match for an edited
+    // pool that predates shift-anchoring). Lets Form 8027 + Tip History group pool
+    // splits by shift the same way the Shift Close wizard does.
+    const TL = S.LaborTipLog;
+    const selShift = (this.shift_id && TL && TL.shiftById) ? TL.shiftById(this.shift_id) : null;
+    const matchShift = selShift || ((App.shiftData?.sc_shifts) || [])
       .filter(sh => sh.date === this.date)
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
 
     const existing = this._editId ? this.pools().find(x => x.id === this._editId) : null;
     const rec = {
       id:          this._editId || App.uid(),
-      shift_id:    matchShift ? matchShift.id : (existing ? existing.shift_id : ''),
+      shift_id:    this.shift_id || (matchShift ? matchShift.id : (existing ? existing.shift_id : '')),
       date:        this.date,
       shift_type:  matchShift ? (matchShift.shift_type || '') : (existing ? (existing.shift_type || '') : ''),
       method:      this.method,
@@ -332,6 +323,7 @@ S.LaborTipPool = {
     const ok = await App.putRecord('lc', 'tip_pool', rec);
     if (ok) {
       this._editId = null;
+      this.shift_id = '';
       this.rows = [];
       this.pool = '';
       this.renderMain();
@@ -347,6 +339,7 @@ S.LaborTipPool = {
     const p = this.pools().find(x => x.id === id);
     if (!p) { this.renderMain(); return; }
     this._editId = id;
+    this.shift_id = p.shift_id || '';
     this.date = p.date || App.todayLocal();
     this.pool = (p.pool_amount != null) ? String(p.pool_amount) : '';
     this.method = p.method || 'hours';
