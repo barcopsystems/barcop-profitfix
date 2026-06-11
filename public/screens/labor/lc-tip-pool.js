@@ -83,6 +83,21 @@ S.LaborTipPool = {
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
       : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Pick a shift above to load the crew, or add one below.</div>';
 
+    // The split summary + the disclaimer only appear once there are participants,
+    // so the empty card stays as clean as the Tip Log's empty state.
+    const calcAndHeads = this.rows.length
+      ? '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+        + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val" id="tp-c-hours">0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tp-c-alloc">$0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
+        + '</div>'
+        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+          + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
+        + '</div>'
+      : '';
+
     // One card holds the shift/amount/method row AND the participant rows + recon
     // + disclaimer, like the Tip Log's single Log Tips card.
     const card = '<div class="card form-card">'
@@ -100,16 +115,7 @@ S.LaborTipPool = {
       + '</div>'
       + rowsBlock
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val" id="tp-c-hours">0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tp-c-alloc">$0</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
-      + '</div>'
-      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
-      + '</div>'
+      + calcAndHeads
       + '</div></div>';
 
     // Save / Clear live BELOW the card (bottom-left), tagged to hide with the card on collapse.
