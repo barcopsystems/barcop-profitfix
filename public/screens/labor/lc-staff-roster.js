@@ -214,7 +214,7 @@ S.LaborStaffRoster = {
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
       + '<div class="collapse-body">'
-      + '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>';
 
