@@ -2190,6 +2190,34 @@ const App = {
     }).join('');
   },
 
+  // ── In-memory form drafts (fixed-field forms) ───────────────────────────────
+  // Keep a half-filled form alive across an in-screen re-render (a filter click)
+  // and leaving the screen and coming back, without a leave-confirm popup or a
+  // resume banner. The screen holds the draft in its own memory: capture it on
+  // every input, then restore it after the form re-renders fresh. In-memory by
+  // design, so it auto-clears on a full page reload (no stale-draft confusion);
+  // only Save or Start Over resets it. captureDraft snapshots every id'd control
+  // under `root`; restoreDraft writes them back, after which the screen re-runs
+  // its own disclosure/calc wiring so the restored values take effect. Array-state
+  // forms (Tip Log, Tip Pool) keep their own row state instead of using this.
+  captureDraft(root) {
+    if (!root) return null;
+    const d = {};
+    root.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      d[el.id] = (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value;
+    });
+    return Object.keys(d).length ? d : null;
+  },
+  restoreDraft(root, draft) {
+    if (!root || !draft) return;
+    Object.keys(draft).forEach(id => {
+      const el = root.querySelector('#' + id) || document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!draft[id];
+      else el.value = draft[id];
+    });
+  },
+
   // ── Page directions (the nav "i" button) ────────────────────────────────────
   // ONE universal help affordance lives in the top nav (next to Settings, always
   // visible incl. mobile). It opens the CURRENT page's directions in a slide-in
