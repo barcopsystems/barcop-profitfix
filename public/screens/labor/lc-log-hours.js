@@ -22,12 +22,6 @@ S.LaborLogHours = {
   filterTo: '',            // custom range only
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
 
-  // Does the manual-entry draft hold real work (date alone defaults to today)?
-  _draftHasWork() {
-    const d = this._draft;
-    return !!(d && (d['lo-staff'] || d['lo-hours'] || d['lo-notes'] || d['lo-shift']));
-  },
-
   actuals() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_actuals)) App.laborData.lc_actuals = [];
@@ -227,16 +221,15 @@ S.LaborLogHours = {
     } else if (this.entryMode === 'schedule') {
       modeBody = this.scheduleFillBody();
       const total = this.fillToLog().length;
-      const hasFill = !!(this._fillModel && this._fillModel.rows.length);
       actionRow = rowOpen
         + '<button class="btn btn-primary" id="lo-fill-save"' + (total ? '' : ' disabled') + '>Log ' + total + ' Entr' + (total === 1 ? 'y' : 'ies') + '</button>'
-        + (hasFill ? '<button class="btn btn-ghost" id="lo-fill-reset">Start Over</button>' : '')
+        + '<button class="btn btn-ghost" id="lo-fill-reset">Start Over</button>'
         + '<span id="lo-fill-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     } else {
       modeBody = this.logFormCells(null);
       actionRow = rowOpen
         + '<button class="btn btn-primary" id="lo-save">Save Hours</button>'
-        + (this._draftHasWork() ? '<button class="btn btn-ghost" id="lo-startover">Start Over</button>' : '')
+        + '<button class="btn btn-ghost" id="lo-startover">Start Over</button>'
         + '<span id="lo-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     }
     const addCard = '<div class="card form-card">'

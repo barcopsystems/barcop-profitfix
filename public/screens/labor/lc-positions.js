@@ -11,12 +11,6 @@ S.LaborPositions = {
   _draft: null,            // in-memory inline-add draft (survives filter/leave-return)
   DEPARTMENTS: ['Bar', 'Front of House', 'Kitchen', 'Management', 'Other'],
 
-  // Does the inline-add draft hold real work (not just untouched defaults)?
-  _draftHasWork() {
-    const d = this._draft;
-    return !!(d && (d['lp-name'] || d['lp-wage'] || d['lp-notes'] || d['lp-tipout'] || d['lp-tipped'] === 'yes'));
-  },
-
   positions() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_positions)) App.laborData.lc_positions = [];
@@ -101,7 +95,7 @@ S.LaborPositions = {
       + this.formBody(null)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lp-save">Add Position</button>'
-      + (this._draftHasWork() ? '<button class="btn btn-ghost" id="lp-startover">Start Over</button>' : '')
+      + '<button class="btn btn-ghost" id="lp-startover">Start Over</button>'
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div></div>';
 

@@ -17,12 +17,6 @@ S.LaborStaffRoster = {
   entryMode: 'manual',     // landing card: type a profile vs import a staff file
   _draft: null,            // in-memory Add-Staff draft (survives leave/return)
 
-  // Does the Add-Staff draft hold real work (position/wage default in on their own)?
-  _draftHasWork() {
-    const d = this._draft;
-    return !!(d && (d['sr-name'] || d['sr-phone'] || d['sr-email'] || d['sr-notes'] || d['sr-lead'] === true));
-  },
-
   CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
     'ServSafe Manager', 'Allergen Awareness', 'CPR / First Aid', 'Food Handler Permit',
     'ABC On-Premise', 'Health Card', 'Other'],
@@ -214,7 +208,7 @@ S.LaborStaffRoster = {
         + '<label>Notes</label><textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
         + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
-        + (this._draftHasWork() ? '<button class="btn btn-ghost" id="sr-startover">Start Over</button>' : '')
+        + '<button class="btn btn-ghost" id="sr-startover">Start Over</button>'
         + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
     const addCard = '<div class="card form-card">'

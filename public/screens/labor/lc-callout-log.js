@@ -9,12 +9,6 @@ S.LaborCalloutLog = {
   editId: null,
   _draft: null,            // in-memory inline-log draft (survives leave/return)
   TYPES: ['No-Show', 'Called Out Sick', 'Late Arrival', 'Left Early', 'Other'],
-
-  // Does the inline-log draft hold real work (not just untouched defaults)?
-  _draftHasWork() {
-    const d = this._draft;
-    return !!(d && (d['co-staff'] || d['co-reason'] || d['co-notes'] || d['co-coveredby'] || d['co-covered'] === 'yes'));
-  },
   // Reads canonical SHIFT_TYPES from App with a leading '' for the optional
   // "no specific shift" choice. Getter so a future SHIFT_TYPES change is picked up.
   get SHIFTS() { return ['', ...(App.SHIFT_TYPES || [])]; },
@@ -173,7 +167,7 @@ S.LaborCalloutLog = {
       + '</div></div>'
       + '<div data-collapse-group="lc-callout-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="co-save">Save Call-Out</button>'
-      + (this._draftHasWork() ? '<button class="btn btn-ghost" id="co-startover">Start Over</button>' : '')
+      + '<button class="btn btn-ghost" id="co-startover">Start Over</button>'
       + '<span id="co-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 

@@ -269,10 +269,9 @@ S.LaborTipLog = {
     } else {
       modeBody = this.batchBody();
       const note = this._savedNote; this._savedNote = null;   // show once, after a save
-      const canStartOver = !!(this._addShift || (this._addRows || []).length);
       actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-        + (canStartOver ? '<button class="btn btn-ghost" id="tl-startover">Start Over</button>' : '')
+        + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>'
         + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
         + '</div>';
