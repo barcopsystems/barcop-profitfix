@@ -346,6 +346,19 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Log Hours</span>
       </div>
+      <div class="nav-section">Tips</div>
+      <div class="nav-item" data-screen="lc-tip-log" id="nav-lc-tip-log">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M5.5 5h5a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Tip Log</span>
+      </div>
+      <div class="nav-item" data-screen="lc-tip-pool" id="nav-lc-tip-pool">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="2.5" width="11" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 5.5h6M5.5 8.5h6M5.5 11.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Tip Pool Log</span>
+      </div>
+      <div class="nav-item" data-screen="lc-tip-history" id="nav-lc-tip-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Tip History</span>
+      </div>
       <div class="nav-section">Payroll</div>
       <div class="nav-item" data-screen="lc-pay-periods" id="nav-lc-pay-periods">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M6 11h2M10 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -354,19 +367,6 @@ const Labor = {
       <div class="nav-item" data-screen="lc-payroll-export" id="nav-lc-payroll-export">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h6l3 3v9H4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2.5v3h3M8.5 7.5v4.5M6.5 10l2 2 2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Payroll Export</span>
-      </div>
-      <div class="nav-section">Tips</div>
-      <div class="nav-item" data-screen="lc-tip-log" id="nav-lc-tip-log">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M5.5 5h5a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Tip Log</span>
-      </div>
-      <div class="nav-item" data-screen="lc-tip-pool" id="nav-lc-tip-pool">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="2.5" width="11" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 5.5h6M5.5 8.5h6M5.5 11.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Pool Calculator</span>
-      </div>
-      <div class="nav-item" data-screen="lc-tip-history" id="nav-lc-tip-history">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
-        <span class="nav-label">Tip History</span>
       </div>
       <div class="nav-section">Reports</div>
       <div class="nav-item" data-screen="lc-reports" id="nav-lc-reports">
