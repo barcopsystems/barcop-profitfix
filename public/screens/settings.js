@@ -2163,6 +2163,7 @@ S.HubSettings = {
           drawer_id: scDrawers[vi % scDrawers.length].id,
           drawer:    scDrawers[vi % scDrawers.length].name,
           cashier:mgrs[(a.wk + vi) % 3],
+          source:'shift-close',
           expected_cash:exp, counted_cash:exp + variance, variance:variance,
           tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
           reason:'', notes:'', created_at:new Date().toISOString()
