@@ -20,7 +20,8 @@ S.LaborTipLog = {
   _addShift: '',           // '' | shift id | '__manual'
   _addDate: '',            // manual-mode date
   _addShiftType: '',       // manual-mode shift type
-  _addRows: null,          // [{ staff_id, hours, cash, card }]
+  _addRows: null,          // [{ staff_id, hours, cash, card, sales, received }]
+  _savedNote: null,        // count to confirm after a save (shown once)
 
   tips() {
     if (!App.laborData) App.laborData = {};
@@ -120,6 +121,7 @@ S.LaborTipLog = {
     this._addDate = App.todayLocal();
     this._addShiftType = '';
     this._addRows = [];
+    this._savedNote = null;
     if (a) this.preloadFromShift(a.id);
     this.renderList();
   },
@@ -259,9 +261,12 @@ S.LaborTipLog = {
       actionRow = '<div id="tl-imp-actions" data-collapse-group="lc-tip-log" style="margin-bottom:24px;"></div>';
     } else {
       modeBody = this.batchBody();
+      const note = this._savedNote; this._savedNote = null;   // show once, after a save
       actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
+        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
+        + '</div>';
     }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Log Tips')
@@ -407,11 +412,11 @@ S.LaborTipLog = {
     this._addRows = earners.concat(support);
     const eBody = earners.map((r, i) => this.batchEarnerRow(r, i)).join('');
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
-      || '<tr><td colspan="4" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff loaded. Add a busser or barback below if one worked.</td></tr>';
-    const eTable = '<div class="sh" style="margin:0 0 8px;">Tipped Staff</div>'
-      + tbl('<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Net</th><th style="width:70px;"></th>', eBody);
-    const sTable = '<div class="sh" style="margin:14px 0 8px;">Support Staff</div>'
-      + tbl('<th style="width:220px;">Staff</th><th style="width:100px;">Hours</th><th style="width:130px;">Tip-Out</th><th style="width:80px;"></th>', sBody);
+      || '<tr><td colspan="8" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff loaded. Add a busser or barback below if one worked.</td></tr>';
+    const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
+    const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;">Tip-Out</th><th style="width:90px;"></th><th style="width:70px;"></th>';
+    const eTable = '<div class="sh" style="margin:0 0 8px;">Tipped Staff</div>' + tbl(grid, eBody);
+    const sTable = '<div class="sh" style="margin:14px 0 8px;">Support Staff</div>' + tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
     const recon = this.tipOutRecon(this._addRows);
     const reconHtml = (recon.hasEarner || recon.hasSupport)
@@ -447,14 +452,17 @@ S.LaborTipLog = {
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
-  // Support row: Staff / Hours / Tip-Out (operator-entered received). No cash/card
-  // — support doesn't ring sales or declare tips; their income is the tip-out.
+  // Support row on the SAME 8-column grid as the earner row (so Staff/Hours widths
+  // line up exactly). Cash/Card/Sales/Net cells stay blank; the operator-entered
+  // Received sits under the Tip-Out column.
   batchSupportRow(r, i) {
     r = r || {};
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
+      + '<td></td><td></td><td></td>'
       + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td></td>'
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
@@ -717,9 +725,12 @@ S.LaborTipLog = {
     let ok = true;
     for (const rec of recs) { ok = (await App.putRecord('lc', 'tip', rec)) && ok; }
     if (ok) {
-      // Reload the shift so just-logged people drop off and any stragglers remain.
+      // Clear the form and confirm. We do NOT re-load the rest of the crew — people
+      // with no tips (hostess, left early) don't need an entry, and re-shoving them
+      // in read like the form was demanding them. The saved tips show in the list
+      // below; re-pick the shift only if you actually need to add more.
       this._addRows = [];
-      this.preloadFromShift(this._addShift);
+      this._savedNote = recs.length;
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; this.recalcBatch(); }
