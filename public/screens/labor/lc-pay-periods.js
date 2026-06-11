@@ -409,13 +409,5 @@ S.LaborPayPeriods = {
     const tips = ((App.laborData && App.laborData.lc_tips) || []);
     return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
       ? s + App.netTips(t) : s, 0);
-  },
-
-  // Payroll files (formatted workbook + clean import CSV, with the legal
-  // disclaimer) now live on the dedicated Payroll Export screen. These buttons
-  // deep-link there with this pay period preselected.
-  openPayrollExport(weekStart) {
-    App._payrollFocusWeek = weekStart;
-    App.navigate('lc-payroll-export');
   }
 };
