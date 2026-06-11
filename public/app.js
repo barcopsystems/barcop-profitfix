@@ -1911,10 +1911,51 @@ const App = {
     return list.find(d => d.id === id) || list.find(d => d.name === id) || null;
   },
 
-  // Canonical shift types. Every consumer reads from here so the list never
-  // drifts. Previously this list was duplicated as a fallback in 11
-  // different files, which would silently desync the moment one changed.
-  SHIFT_TYPES: ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'],
+  // ── Service periods (dayparts) — operator-configurable ──────────────────────
+  // The operator picks the services they run in App Settings / onboarding; stored
+  // in settings.service_periods as [{id,name,start,end}]. SHIFT_TYPES (the names)
+  // is DERIVED from this, so every shift-type consumer follows the operator's set
+  // with no per-file change. Defaults below until they set their own.
+  SERVICE_PERIOD_PRESETS: [
+    { name: 'Breakfast',  start: '06:00', end: '11:00' },
+    { name: 'Brunch',     start: '09:00', end: '14:00' },
+    { name: 'Lunch',      start: '11:00', end: '16:00' },
+    { name: 'Happy Hour', start: '15:00', end: '18:00' },
+    { name: 'Dinner',     start: '16:00', end: '22:00' },
+    { name: 'Late Night', start: '22:00', end: '02:00' },
+    { name: 'Full Day',   start: '00:00', end: '23:59' }
+  ],
+  DEFAULT_SERVICE_PERIODS: [
+    { id: 'sp_def_brunch', name: 'Brunch',     start: '09:00', end: '14:00' },
+    { id: 'sp_def_lunch',  name: 'Lunch',      start: '11:00', end: '16:00' },
+    { id: 'sp_def_dinner', name: 'Dinner',     start: '16:00', end: '22:00' },
+    { id: 'sp_def_late',   name: 'Late Night', start: '22:00', end: '02:00' },
+    { id: 'sp_def_full',   name: 'Full Day',   start: '00:00', end: '23:59' }
+  ],
+  servicePeriods() {
+    const sp = this.data && this.data.settings && this.data.settings.service_periods;
+    return (Array.isArray(sp) && sp.length) ? sp : this.DEFAULT_SERVICE_PERIODS;
+  },
+  // Canonical shift-type names, derived from the operator's service periods. Every
+  // consumer reads from here so the list never drifts.
+  get SHIFT_TYPES() { return this.servicePeriods().map(p => p.name); },
+  // The service period whose time window contains "now" — drives the Open-the-Floor
+  // auto-pick. Handles a window that wraps past midnight (Late Night); skips an
+  // all-day catch-all unless nothing else matches; falls back to the most recently
+  // started period, then the first.
+  servicePeriodByTime(periods) {
+    const list = periods || this.servicePeriods();
+    if (!list.length) return null;
+    const d = new Date();
+    const now = d.getHours() * 60 + d.getMinutes();
+    const min = t => { const a = String(t || '').split(':'); return (parseInt(a[0], 10) || 0) * 60 + (parseInt(a[1], 10) || 0); };
+    const allDay = p => min(p.start) === 0 && min(p.end) >= 1439;
+    const inWin = p => { const s = min(p.start), e = min(p.end); return e <= s ? (now >= s || now < e) : (now >= s && now < e); };
+    const hit = list.find(p => !allDay(p) && inWin(p));
+    if (hit) return hit;
+    const started = list.filter(p => min(p.start) <= now).sort((a, b) => min(b.start) - min(a.start))[0];
+    return started || list[0];
+  },
 
   // Void/Comp comp reasons — the single dropdown on a comp. Each carries its own
   // loss-vs-expense classification so the operator picks one thing and Theft
