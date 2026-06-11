@@ -8,6 +8,7 @@
 
 S.ShiftActiveShift = {
   mode: null,
+  _lastTipMode: null,   // remembers the Step 4 choice across shifts this session
 
   shifts() {
     if (!App.shiftData) App.shiftData = {};
@@ -881,8 +882,11 @@ S.ShiftActiveShift = {
         // Per-drawer cash recon
         cashDrawers:   this._initCashDrawers(s),
         cash_skipped:  false,
-        // Tip recon defaults
+        // Tip recon defaults. tip_mode is the Step 4 choice (tipout | pool | skip);
+        // it remembers the last mode used this session, falling back to config.
         tips_pos_reported: null,
+        tip_mode:      this._lastTipMode || (App.tipOutEnabled() ? 'tipout' : 'pool'),
+        tipout_rows:   null,
         // Exception acknowledgments (operator-set, just so they tick through)
         ack: {},
         handoff_notes: ''
@@ -952,8 +956,8 @@ S.ShiftActiveShift = {
         + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val good" id="aw-total">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="aw-check">-</div></div>'
       + '</div>'
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
-    + '</div>';
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Cash Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>';
   },
 
   // ── Step 2: Cash Reconciliation ───────────────────────────────────────────
@@ -994,8 +998,8 @@ S.ShiftActiveShift = {
     return '<div class="card form-card"><div class="card-title">Step 2 of 5 &middot; Cash Reconciliation</div>'
       + '<div style="margin-top:4px;"></div>'
       + body
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
-    + '</div>';
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Exception Review</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>';
   },
 
   // ── Step 3: Exception Review ──────────────────────────────────────────────
@@ -1047,8 +1051,8 @@ S.ShiftActiveShift = {
       + item('vc',  vc.length, 'Big Voids and Comps This Shift', vc.length === 0 ? 'No voids or comps over $' + vcThreshold + '.' : 'Over $' + vcThreshold + ' threshold &middot; ' + App.fmtCurrency(bigVcTotal) + ' total', 'sc-void-comp', 'var(--red)')
       + item('mt',  openMaint.length, 'Open Maintenance Issues', openMaint.length === 0 ? 'Nothing flagged.' : openMaint.slice(0, 3).map(m => m.issue || m.item || 'Issue').join(', ') + (openMaint.length > 3 ? '...' : ''), 'sc-maintenance', 'var(--red)')
       + item('cl',  checklistIncomplete ? 1 : 0, 'Closing Checklist', !closingCheck ? 'No closing checklist run yet for tonight.' : checklistIncomplete ? checklistDone + '% complete &middot; finish before closing' : 'Complete.', 'sc-checklists', 'var(--red)')
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
-    + '</div>';
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Tip Reconciliation</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>';
   },
 
   // ── Step 4: Tip Reconciliation ────────────────────────────────────────────
@@ -1057,7 +1061,43 @@ S.ShiftActiveShift = {
   // shift's logged tip entries (with hours from lc_actuals), so the operator
   // splits the pool right here without leaving the wizard. Save Pool writes
   // an lc_tip_pools record with shift_id, linking it permanently to this shift.
+  // Choice-first: the closer picks how tips are handled for THIS shift, then the
+  // right tool loads. No leaving Active Shift — tip-out is entered right here and
+  // logged straight to lc_tips on close, the pool split writes lc_tip_pools, Skip
+  // captures nothing. The choice is remembered as the next default.
   stepTips(s) {
+    const d = this._closeDraft;
+    const mode = d.tip_mode;
+    const tipChip = (m, label, sub) =>
+      '<button class="aw-tipmode-chip" data-mode="' + m + '" style="flex:1;min-width:150px;text-align:left;padding:12px 14px;border-radius:10px;cursor:pointer;'
+      + (mode === m ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : 'background:var(--input);border:1px solid var(--b1);') + '">'
+      + '<div style="font-size:13px;font-weight:700;color:' + (mode === m ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + sub + '</div></button>';
+    const chooser = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">'
+      + tipChip('tipout', 'Tip Out', 'Servers tip out a percent of sales')
+      + tipChip('pool', 'Tip Pool', 'One pot split across staff')
+      + tipChip('skip', 'Skip Tips', 'Not reconciling tips this shift')
+      + '</div>';
+
+    let body;
+    if (mode === 'skip') {
+      body = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;line-height:1.6;">Tips are not being reconciled for this shift. Continue to handoff notes.</div>';
+    } else if (mode === 'pool') {
+      body = this._poolBody(s);
+    } else {
+      body = App.tipOutEnabled()
+        ? this.tipoutBody(s)
+        : '<div style="font-size:13px;color:var(--t2);padding:8px 2px;line-height:1.6;">Tip-out percentages are set per role in Positions. Add a Tip Out percent to your tipped roles to reconcile tip-outs here, or pick Tip Pool or Skip Tips for this shift.</div>';
+    }
+
+    return '<div class="card form-card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
+      + chooser + body + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>';
+  },
+
+  // Tip Pool branch — the existing inline pool calculator (logged summary + POS
+  // variance + the split), unchanged, just gated behind the chooser.
+  _poolBody(s) {
     const d = this._closeDraft;
     const v = val => (val != null && val !== '') ? val : '';
     const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
@@ -1071,8 +1111,7 @@ S.ShiftActiveShift = {
     const pool = d.pool;
     const savedExisting = !!pool.saved_id;
 
-    return '<div class="card form-card"><div class="card-title">Step 4 of 5 &middot; Tip Reconciliation</div>'
-      + '<div style="margin-top:4px;"></div>'
+    return ''
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Logged Cash Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCash) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Logged Card Tips</div><div class="calc-val">' + App.fmtCurrency(tipsCard) + '</div></div>'
@@ -1118,10 +1157,105 @@ S.ShiftActiveShift = {
           + '<span id="aw-pool-status" style="font-size:11px;color:var(--gold);' + (savedExisting ? '' : 'display:none;') + '">Pool saved for this shift.</span>'
           + '<span id="aw-pool-err" style="color:var(--red);font-size:12px;display:none;"></span>'
         + '</div>'
-      + '</div>'
+      + '</div>';
+  },
 
-      + '<div class="card-actions"><button class="btn btn-primary btn-lg" id="aw-next">Continue to Handoff Notes</button><button class="btn btn-ghost" id="aw-cancel">Return To Shift</button></div>'
-    + '</div>';
+  // ── Tip Out branch — entered inline, logged to lc_tips on close ────────────
+  // Reuses the Tip Log's canonical tip-out engine (row HTML + math + live recon)
+  // so the two doors never drift; only the per-shift preload and the save are
+  // Active-Shift-local. Rows live on the close draft (d.tipout_rows).
+  _ensureTipoutRows(s) {
+    const d = this._closeDraft;
+    if (d.tipout_rows) return;
+    const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
+    if (tips.length) {
+      // Pre-logged in the Tip Log before close — load them in, operator confirms.
+      d.tipout_rows = tips.map(t => ({
+        staff_id: t.staff_id || '',
+        hours:    (t.hours != null ? t.hours : ''),
+        cash:     (t.cash_tips != null ? t.cash_tips : ''),
+        card:     (t.card_tips != null ? t.card_tips : ''),
+        sales:    (t.sales != null ? t.sales : ''),
+        received: (t.tip_out_received != null ? t.tip_out_received : '')
+      }));
+      return;
+    }
+    // Otherwise seed blank rows from the tipped staff who clocked in this shift.
+    const staff = (App.laborData && App.laborData.lc_staff) || [];
+    const rows = ((App.laborData && App.laborData.lc_actuals) || [])
+      .filter(a => a.date === s.date && a.staff_id)
+      .filter(a => { const st = staff.find(x => x.id === a.staff_id); return st && App.isTipped(st); })
+      .map(a => ({ staff_id: a.staff_id, hours: (a.hours != null ? a.hours : ''), cash: '', card: '', sales: '', received: '' }));
+    rows.sort((a, b) => { const sa = staff.find(x => x.id === a.staff_id), sb = staff.find(x => x.id === b.staff_id); return ((sa && sa.name) || '').localeCompare((sb && sb.name) || ''); });
+    d.tipout_rows = rows;
+  },
+
+  tipoutBody(s) {
+    const d = this._closeDraft;
+    this._ensureTipoutRows(s);
+    const TL = S.LaborTipLog;
+    const rows = d.tipout_rows || [];
+    // Earners first, then support, so data-idx stays aligned with the DOM order.
+    const isSupport = r => App.tipRole(r.staff_id) === 'support';
+    const earners = rows.filter(r => !isSupport(r));
+    const support = rows.filter(r => isSupport(r));
+    d.tipout_rows = earners.concat(support);
+    const eBody = earners.map((r, i) => TL.batchEarnerRow(r, i)).join('')
+      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No tipped earners on this shift. Add staff below if one worked.</td></tr>';
+    const sBody = support.map((r, j) => TL.batchSupportRow(r, earners.length + j)).join('')
+      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No support staff on this shift. Add staff below if one worked.</td></tr>';
+    const tbl = (head, b) => '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>' + head + '</tr></thead><tbody>' + b + '</tbody></table></div>';
+    const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
+    const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
+    const tables = '<div id="tl-b-rows">'
+      + '<div class="sh" style="margin:0 0 8px;">Pays / Receives Tip-Out</div>' + tbl(grid, eBody)
+      + '<div class="sh" style="margin:14px 0 8px;">Receives Tip-Out</div>' + tbl(sGrid, sBody)
+      + '</div>';
+    const recon = TL.tipOutRecon(d.tipout_rows);
+    const gapCls = Math.abs(recon.gap) > 0.01 ? 'warn' : 'good';
+    const reconBox = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+      + '<div class="calc-item"><div class="calc-label">Collected</div><div class="calc-val" id="tl-b-collected">' + App.fmtCurrency(recon.collected, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Distributed</div><div class="calc-val" id="tl-b-distributed">' + App.fmtCurrency(recon.distributed, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Not Distributed</div><div class="calc-val ' + gapCls + '" id="tl-b-gap">' + App.fmtCurrency(recon.gap, 2) + '</div></div>'
+      + '</div>';
+    return tables + '<button class="btn btn-ghost btn-sm" id="aw-to-add" style="margin-top:4px;">+ Add Staff</button>' + reconBox;
+  },
+
+  collectTipout() {
+    const d = this._closeDraft;
+    if (d.tip_mode !== 'tipout') return;
+    const rows = S.LaborTipLog.batchDomRows();
+    if (rows.length) d.tipout_rows = rows;
+  },
+
+  // Write the entered tip-out rows to lc_tips on close — the same record shape the
+  // Tip Log writes, so they feed tip-credit, payroll, and Form 8027 identically.
+  // Skips anyone already logged for this shift (no double-count).
+  async _saveTipoutRows(s) {
+    const d = this._closeDraft;
+    const rows = d.tipout_rows || [];
+    if (!rows.length) return;
+    const tipOutOn = App.tipOutEnabled();
+    const out = S.LaborTipLog.computeTipOut(rows);
+    const staff = (App.laborData && App.laborData.lc_staff) || [];
+    const existing = (App.laborData && App.laborData.lc_tips) || [];
+    const r2 = n => Math.round((n || 0) * 100) / 100;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i], o = out[i];
+      const st = staff.find(x => x.id === r.staff_id);
+      if (!st || !o) continue;
+      if ((o.cash + o.card) <= 0 && o.received <= 0) continue;
+      if (existing.some(t => t.staff_id === st.id && t.date === s.date && (t.shift_id || '') === s.id)) continue;
+      const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
+      const rec = {
+        id: App.uid(), shift_id: s.id, manager_id: s.manager_id || '', date: s.date,
+        staff_id: st.id, name: st.name, position_id: st.position_id || '',
+        shift_type: s.shift_type || '', cash_tips: o.cash, card_tips: o.card, total_tips: o.cash + o.card,
+        sales: tipOutOn ? r2(o.sales) : 0, tip_out_paid: tipOutOn ? r2(o.paid) : 0, tip_out_received: tipOutOn ? r2(o.received) : 0,
+        hours: (h != null && !isNaN(h)) ? h : null, notes: '', created_at: new Date().toISOString()
+      };
+      await App.putRecord('lc', 'tip', rec);
+    }
   },
 
   // ── Pool draft helpers ────────────────────────────────────────────────────
@@ -1319,12 +1453,12 @@ S.ShiftActiveShift = {
     return '<div class="card form-card"><div class="card-title">Step 5 of 5 &middot; Handoff Notes</div>'
       + '<div class="form-row" style="gap:14px;margin-top:4px;"><div class="f" style="width:100%;"><label>Notes for the Opener</label>'
         + '<textarea id="aw-handoff" rows="5" placeholder="Restock priorities, equipment to watch, customer follow-ups, anything the opener will inherit...">' + esc(d.handoff_notes || '') + '</textarea></div></div>'
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary btn-lg" id="aw-finalize">Close Shift</button>'
         + '<button class="btn btn-ghost" id="aw-cancel">Return To Shift</button>'
         + '<span id="aw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-    + '</div>';
+      + '</div>';
   },
 
   // Stash the current step's inputs into the draft. Called on Next / Back so
@@ -1345,7 +1479,8 @@ S.ShiftActiveShift = {
     } else if (d.step === 'exceptions') {
       document.querySelectorAll('.aw-ack').forEach(c => { d.ack[c.dataset.key] = c.checked; });
     } else if (d.step === 'tips') {
-      d.tips_pos_reported = num('aw-pos-tips');
+      if (d.tip_mode === 'tipout') this.collectTipout();
+      else if (d.tip_mode === 'pool') { this.collectPool(); d.tips_pos_reported = num('aw-pos-tips'); }
     } else if (d.step === 'handoff') {
       d.handoff_notes = document.getElementById('aw-handoff')?.value || '';
     }
@@ -1369,9 +1504,11 @@ S.ShiftActiveShift = {
         { h: 'Open And Acknowledge', p: ['Open any line to investigate or fix it on its own screen, then come right back. Tick Acknowledged once you have eyes on it. Acknowledgments save with the shift so the record shows you reviewed them.'] }
       ]],
       tips: ['Step 4: Tip Reconciliation', [
-        { p: ['Reconcile tips and split the pool without leaving the close.'] },
-        { h: 'Logged vs POS', p: ['Tips logged in Labor Control for this shift roll up here. Enter the total your POS reported so Bar Cop can show any variance.'] },
-        { h: 'Split The Pool', p: ['The inline pool calculator pre-loads the shift\'s tipped staff and their hours. Pick split by hours or equal, then Save Pool. It writes a tip pool tied to this shift, which the Books Form 8027 worksheet reads later.'] }
+        { p: ['Pick how tips were handled this shift, then do it right here without leaving the close. Bar Cop remembers your choice as the default next time.'] },
+        { h: 'Tip Out', p: ['Choose Tip Out when servers tip out a percent of their sales to support. Bar Cop loads the shift\'s tipped staff into two sections: those who ring sales and tip out (servers, bartenders) enter cash, card, and total sales, and those who only receive (bussers, barbacks) get a Received cell. The Collected vs Distributed line flags any gap. These log straight to the Tip Log on close, so they feed the tip-credit check, payroll, and Form 8027. Tip-out percents are set per role in Positions.'] },
+        { h: 'Tip Pool', p: ['Choose Tip Pool when tips go into one pot split across the staff who worked. The inline calculator pre-loads the shift\'s staff and hours; pick split by hours or equal, then Save Pool. It writes a tip pool tied to this shift, which the Books Form 8027 worksheet reads later.'] },
+        { h: 'Skip Tips', p: ['Choose Skip Tips for a shift with nothing to reconcile, or when tips are handled outside Bar Cop. Nothing is captured.'] },
+        { h: 'Already Logged', p: ['If you logged this shift\'s tips in the Tip Log before closing, they load in automatically and you just confirm.'] }
       ]],
       handoff: ['Step 5: Handoff Notes', [
         { p: ['The last word for whoever opens next.'] },
@@ -1473,51 +1610,90 @@ S.ShiftActiveShift = {
       }));
     }
 
-    // Step 4: live tip variance + inline Tip Pool calculator
+    // Step 4: the chooser + the chosen branch's wiring.
     if (d.step === 'tips') {
-      const recalcVar = () => {
-        const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
-        const tipsTotal = tips.reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0);
-        const pos = parseFloat(document.getElementById('aw-pos-tips')?.value) || 0;
-        const variance = pos - tipsTotal;
-        const el = document.getElementById('aw-tip-var');
-        if (el) {
-          el.textContent = pos > 0 ? (variance > 0 ? '+' : '') + App.fmtCurrency(variance) : '-';
-          el.style.color = pos > 0 ? (Math.abs(variance) < 5 ? 'var(--green)' : 'var(--red)') : '';
-        }
-      };
-      document.getElementById('aw-pos-tips')?.addEventListener('input', recalcVar);
-      recalcVar();
+      // Chooser: collect the current branch's inputs, switch mode, remember it.
+      this.container.querySelectorAll('.aw-tipmode-chip').forEach(b => b.addEventListener('click', () => {
+        if (d.tip_mode === 'tipout') this.collectTipout();
+        else if (d.tip_mode === 'pool') this.collectPool();
+        d.tip_mode = b.dataset.mode;
+        this._lastTipMode = b.dataset.mode;
+        this.renderWizardStep(s);
+      }));
 
-      // Inline pool calculator wiring
-      this.renderPoolRows();
-      this.refreshPoolCalc();
+      if (d.tip_mode === 'pool') {
+        const recalcVar = () => {
+          const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
+          const tipsTotal = tips.reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0);
+          const pos = parseFloat(document.getElementById('aw-pos-tips')?.value) || 0;
+          const variance = pos - tipsTotal;
+          const el = document.getElementById('aw-tip-var');
+          if (el) {
+            el.textContent = pos > 0 ? (variance > 0 ? '+' : '') + App.fmtCurrency(variance) : '-';
+            el.style.color = pos > 0 ? (Math.abs(variance) < 5 ? 'var(--green)' : 'var(--red)') : '';
+          }
+        };
+        document.getElementById('aw-pos-tips')?.addEventListener('input', recalcVar);
+        recalcVar();
 
-      // Pool inputs delegate listeners (per-row + amount/method)
-      const rowsEl = document.getElementById('aw-pool-rows');
-      rowsEl?.addEventListener('input', () => this.refreshPoolCalc());
-      rowsEl?.addEventListener('change', () => this.refreshPoolCalc());
-      rowsEl?.addEventListener('click', ev => {
-        if (ev.target.closest('.aw-pool-remove')) {
+        this.renderPoolRows();
+        this.refreshPoolCalc();
+        const rowsEl = document.getElementById('aw-pool-rows');
+        rowsEl?.addEventListener('input', () => this.refreshPoolCalc());
+        rowsEl?.addEventListener('change', () => this.refreshPoolCalc());
+        rowsEl?.addEventListener('click', ev => {
+          if (ev.target.closest('.aw-pool-remove')) {
+            this.collectPool();
+            d.pool.participants.splice(parseInt(ev.target.closest('.aw-pool-row').dataset.idx, 10), 1);
+            this.renderPoolRows();
+            this.refreshPoolCalc();
+          }
+        });
+        document.getElementById('aw-pool-add')?.addEventListener('click', () => {
           this.collectPool();
-          d.pool.participants.splice(parseInt(ev.target.closest('.aw-pool-row').dataset.idx, 10), 1);
+          d.pool.participants.push({ staff_id: '', name: '', hours: 0, share: 0 });
           this.renderPoolRows();
           this.refreshPoolCalc();
+        });
+        document.getElementById('aw-pool-amount')?.addEventListener('input', () => this.refreshPoolCalc());
+        document.getElementById('aw-pool-method')?.addEventListener('change', () => {
+          d.pool.method = document.getElementById('aw-pool-method').value;
+          this.renderPoolRows();
+          this.refreshPoolCalc();
+        });
+        document.getElementById('aw-pool-save')?.addEventListener('click', () => this.savePoolInline(s));
+      } else if (d.tip_mode === 'tipout' && App.tipOutEnabled()) {
+        // Tip-out builder: the Tip Log's canonical row engine drives the live
+        // tip-out + net + Collected/Distributed recon. Picking a staff member
+        // reshapes the row into its section via a step re-render (collect first).
+        const rowsEl = document.getElementById('tl-b-rows');
+        if (rowsEl) {
+          rowsEl.addEventListener('input', () => { this.collectTipout(); S.LaborTipLog.recalcBatch(); });
+          rowsEl.addEventListener('change', ev => {
+            if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
+              const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
+              if (hoursInp && !hoursInp.value && s.date) { const hrs = App.hoursFor(ev.target.value, s.date); if (hrs != null && hrs > 0) hoursInp.value = hrs; }
+              this.collectTipout(); this.renderWizardStep(s); return;
+            }
+            S.LaborTipLog.recalcBatch();
+          });
+          rowsEl.addEventListener('click', ev => {
+            if (ev.target.closest('.tl-b-remove')) {
+              this.collectTipout();
+              const idx = parseInt(ev.target.closest('.tl-line').dataset.idx, 10);
+              if (d.tipout_rows && idx >= 0) d.tipout_rows.splice(idx, 1);
+              this.renderWizardStep(s);
+            }
+          });
         }
-      });
-      document.getElementById('aw-pool-add')?.addEventListener('click', () => {
-        this.collectPool();
-        d.pool.participants.push({ staff_id: '', name: '', hours: 0, share: 0 });
-        this.renderPoolRows();
-        this.refreshPoolCalc();
-      });
-      document.getElementById('aw-pool-amount')?.addEventListener('input', () => this.refreshPoolCalc());
-      document.getElementById('aw-pool-method')?.addEventListener('change', () => {
-        d.pool.method = document.getElementById('aw-pool-method').value;
-        this.renderPoolRows();
-        this.refreshPoolCalc();
-      });
-      document.getElementById('aw-pool-save')?.addEventListener('click', () => this.savePoolInline(s));
+        document.getElementById('aw-to-add')?.addEventListener('click', () => {
+          this.collectTipout();
+          d.tipout_rows = d.tipout_rows || [];
+          d.tipout_rows.push({ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' });
+          this.renderWizardStep(s);
+        });
+        S.LaborTipLog.recalcBatch();
+      }
     }
   },
 
@@ -1532,6 +1708,11 @@ S.ShiftActiveShift = {
     const list = this.shifts();
     const i = list.findIndex(x => x.id === s.id);
     if (i < 0) { this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')); return; }
+
+    // Remember the tip choice for next shift, and log tip-out entries to lc_tips
+    // before the tip totals below are computed so they reflect what was entered.
+    this._lastTipMode = d.tip_mode;
+    if (d.tip_mode === 'tipout') await this._saveTipoutRows(s);
 
     const bar = d.bar_revenue || 0, floor = d.floor_revenue || 0;
     const tol = App.cashToleranceForShift(s);
@@ -1571,6 +1752,7 @@ S.ShiftActiveShift = {
         variance:     tVariance
       },
       tip_recon: {
+        mode:         d.tip_mode,
         logged_total: ((App.laborData && App.laborData.lc_tips) || [])
           .filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date))
           .reduce((t, r) => t + (parseFloat(r.total_tips) || 0), 0),
