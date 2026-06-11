@@ -75,20 +75,6 @@ S.LaborTipPool = {
     const equal = this.method === 'equal';
     const rowHtml = this.rows.map((r, i) => this.participantRowHtml(r, i, equal)).join('');
 
-    const setupCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool')
-      + '<div class="collapse-body">'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Shift</label>'
-      + '<select id="tp-shift">' + ((S.LaborTipLog && S.LaborTipLog.shiftOptions) ? S.LaborTipLog.shiftOptions(this.shift_id) : '<option value="">Select a shift...</option>') + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
-      + 'value="' + esc(this.pool) + '"/></div></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Method</label>'
-      + '<select id="tp-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
-      + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
-      + '</div></div></div>';
-
     const rowsBlock = this.rows.length
       ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
         + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
@@ -97,7 +83,21 @@ S.LaborTipPool = {
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
       : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Pick a shift above to load the crew, or add one below.</div>';
 
-    const participantsCard = '<div class="card form-card" data-collapse-group="lc-tip-pool"><div class="card-title">Participants</div>'
+    // One card holds the shift/amount/method row AND the participant rows + recon
+    // + disclaimer, like the Tip Log's single Log Tips card.
+    const card = '<div class="card form-card">'
+      + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool')
+      + '<div class="collapse-body">'
+      + '<div class="form-row" style="gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Shift</label>'
+      + '<select id="tp-shift">' + ((S.LaborTipLog && S.LaborTipLog.shiftOptions) ? S.LaborTipLog.shiftOptions(this.shift_id) : '<option value="">Select a shift...</option>') + '</select></div>'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
+      + 'value="' + esc(this.pool) + '"/></div></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Method</label>'
+      + '<select id="tp-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
+      + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
+      + '</div>'
       + rowsBlock
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
@@ -110,7 +110,7 @@ S.LaborTipPool = {
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
       + '</div>'
-      + '</div>';
+      + '</div></div>';
 
     // Save / Clear live BELOW the card (bottom-left), tagged to hide with the card on collapse.
     const actionsRow = '<div data-collapse-group="lc-tip-pool" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
@@ -119,7 +119,7 @@ S.LaborTipPool = {
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + setupCard + participantsCard + actionsRow + this.historyCard() + '</div>';
+    this.container.innerHTML = '<div class="screen">' + card + actionsRow + this.historyCard() + '</div>';
 
     const rowsEl = document.getElementById('tp-rows');
     rowsEl.addEventListener('input', () => { this.collect(); this.recalc(); });
