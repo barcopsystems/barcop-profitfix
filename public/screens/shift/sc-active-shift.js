@@ -405,10 +405,10 @@ S.ShiftActiveShift = {
   },
 
   _daypartByTime(types) {
-    const h = new Date().getHours();
-    let want = h < 11 ? 'Brunch' : h < 16 ? 'Lunch' : h < 22 ? 'Dinner' : 'Late Night';
-    if (!types.includes(want)) want = (want === 'Brunch' && types.includes('Lunch')) ? 'Lunch' : types[0];
-    return want;
+    // Pick the operator's service period whose time window contains now.
+    const p = App.servicePeriodByTime ? App.servicePeriodByTime() : null;
+    if (p && types.includes(p.name)) return p.name;
+    return types[0] || '';
   },
 
   // Manager-on-duty pool: the supervisor audience (Management department + staff
