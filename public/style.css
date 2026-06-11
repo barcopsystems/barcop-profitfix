@@ -69,6 +69,10 @@ input,select,textarea{color-scheme:dark;}
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
 .form-input:focus{border-color:var(--focus);}
+/* Bill-counter cells carry inline borders and sit in a modal, so they miss the
+   global input focus styles — give them the app's steel focus, not the browser's white ring. */
+.ccd-cnt:focus,.ccd-coins:focus{border-color:var(--focus)!important;outline:none;}
+.ccd-step:focus{outline:none;}
 .form-input[type=number]{-moz-appearance:textfield;}
 .form-input[type=number]::-webkit-inner-spin-button,
 .form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
