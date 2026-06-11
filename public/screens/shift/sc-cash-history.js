@@ -170,7 +170,8 @@ S.ShiftCashHistory = {
       const ordered = shown.slice().reverse();
       rows = ordered.slice(0, App.listLimit('sc', 'safe_log')).map(r => {
         const e = r.e;
-        const amt = r.signed < 0 ? '<span class="neg">' + App.fmtCurrency(r.signed) + '</span>' : '<span class="pos">+' + App.fmtCurrency(r.signed) + '</span>';
+        // Direction is neutral; the +/- sign carries In vs Out (matches Cash Control).
+        const amt = '<span style="color:var(--t1);">' + (r.signed < 0 ? App.fmtCurrency(r.signed) : '+' + App.fmtCurrency(r.signed)) + '</span>';
         return '<tr><td><div class="val">' + this.fmtDate(e.date) + '</div>'
           + (e.time ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.time) + '</div>' : '') + '</td>'
           + '<td>' + esc(e.txn_type || '-') + '</td><td>' + esc(e.performed_by || '-') + '</td>'
@@ -199,12 +200,14 @@ S.ShiftCashHistory = {
     else rows = filtered.slice(0, App.listLimit('sc', 'variance')).map(v => {
       const vr = v.variance || 0;
       const nc = v.status === 'Not Counted';
-      const cls = nc ? '' : v.status === 'Short' ? 'neg' : v.status === 'Over' ? '' : 'pos';
+      // Variance value follows the status scheme, same as the badge: Within = green,
+      // Short = red, Over = amber, Not Counted = grey.
+      const col = v.status === 'Short' ? 'var(--red)' : v.status === 'Over' ? 'var(--amber)' : nc ? 'var(--t3)' : 'var(--green)';
       const vc = nc ? '-' : (vr > 0 ? '+' : '') + App.fmtCurrency(vr);
       return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
         + '<td>' + esc(v.shift_type || '-') + '</td><td>' + esc(v.drawer || '-') + '</td>'
         + '<td>' + esc(v.cashier || '-') + '</td><td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
-        + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td class="' + cls + '">' + vc + '</td>'
+        + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td><span style="color:' + col + ';">' + vc + '</span></td>'
         + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
     }).join('');
     const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
