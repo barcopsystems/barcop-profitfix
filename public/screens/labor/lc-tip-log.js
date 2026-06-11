@@ -128,6 +128,7 @@ S.LaborTipLog = {
     App.showHelpModal('How the Tip Log Works', [
       { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
       { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole shift at once. Use Add Staff for anyone the schedule missed, or pick Manual entry to set the date and shift type yourself.'] },
+      { h: 'Tip-Outs', p: ['If you set a Tip-Out % in Wage Policy, each row also gets a Sales column. Enter each server or bartender\'s sales and Bar Cop figures their tip-out (sales times your percent), pools it, and splits it to the support staff (the rows with no sales) by hours. The Net column is each person\'s take-home, and those net amounts carry into the tip-credit check and the payroll worksheet. Bar Cop computes the amounts; how you actually pay a tip-out out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool calculator and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
@@ -346,12 +347,18 @@ S.LaborTipLog = {
                 '<option value="' + esc(t) + '"' + (this._addShiftType === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>'
           : '')
       + '</div>';
+    const pct = App.tipOutPct();
+    const on = pct > 0;
     const rows = this._addRows || [];
     const rowsHtml = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
+    const ths = on
+      ? '<th style="width:160px;">Staff</th><th style="width:80px;">Hours</th><th style="width:80px;">Cash</th><th style="width:80px;">Card</th><th style="width:90px;">Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Net</th><th style="width:70px;"></th>'
+      : '<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash</th><th style="width:110px;">Card</th><th style="width:100px;">Total</th><th style="width:90px;"></th>';
     const table = rows.length
       ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
-        + '<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash</th><th style="width:110px;">Card</th><th style="width:100px;">Total</th><th style="width:90px;"></th>'
+        + ths
         + '</tr></thead><tbody id="tl-b-rows">' + rowsHtml + '</tbody></table></div>'
+        + (on ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin:0 0 12px;">Enter each server or bartender\'s sales; their tip-out is figured at ' + App.fmtPct(pct) + ' of sales and split to the support staff (rows with no sales) by hours. Bar Cop calculates the amounts only; how you pay a tip-out out is up to you and your payroll provider.</div>' : '')
       : '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
         + (this._addShift && !isManual
             ? 'No tipped staff on this shift still need tips entered. Add staff below for a tip-out.'
@@ -362,15 +369,44 @@ S.LaborTipLog = {
 
   batchRowHtml(r, i) {
     r = r || {};
+    const on = App.tipOutPct() > 0;
     const total = (parseFloat(r.cash) || 0) + (parseFloat(r.card) || 0);
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (total > 0 ? App.fmtCurrency(total, 2) : '-') + '</div></td>'
+      + (on
+          ? '<td><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+            + '<td><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>'
+          : '')
+      + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (on ? '-' : (total > 0 ? App.fmtCurrency(total, 2) : '-')) + '</div></td>'
       + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
+  },
+
+  // Tip-out math over the current rows: each earner (a row with sales) pays
+  // sales x %, the pool is split to the support rows (no sales) by hours, and
+  // each row's net = cash + card - tip-out paid + tip-out received.
+  computeTipOut(rows) {
+    const pct = App.tipOutPct();
+    const out = (rows || []).map(r => ({
+      staff_id: r.staff_id || '',
+      cash: parseFloat(r.cash) || 0,
+      card: parseFloat(r.card) || 0,
+      sales: parseFloat(r.sales) || 0,
+      hours: parseFloat(r.hours) || 0,
+      paid: 0, received: 0
+    }));
+    if (pct > 0) {
+      let pool = 0;
+      out.forEach(o => { if (o.staff_id && o.sales > 0) { o.paid = o.sales * pct / 100; pool += o.paid; } });
+      const support = out.filter(o => o.staff_id && o.sales <= 0);
+      const totHrs = support.reduce((s, o) => s + o.hours, 0);
+      support.forEach(o => { o.received = totHrs > 0 ? pool * (o.hours / totHrs) : (support.length ? pool / support.length : 0); });
+    }
+    out.forEach(o => { o.net = o.cash + o.card - o.paid + o.received; });
+    return out;
   },
 
   // The effective date the batch logs against: the picked shift's date, or the
@@ -395,7 +431,8 @@ S.LaborTipLog = {
         staff_id: el.querySelector('.tl-b-staff')?.value || '',
         hours:    el.querySelector('.tl-b-hours')?.value || '',
         cash:     el.querySelector('.tl-b-cash')?.value || '',
-        card:     el.querySelector('.tl-b-card')?.value || ''
+        card:     el.querySelector('.tl-b-card')?.value || '',
+        sales:    el.querySelector('.tl-b-sales')?.value || ''
       }));
     }
   },
@@ -411,7 +448,7 @@ S.LaborTipLog = {
     if (shiftId === '__manual') {
       this._addDate = this._addDate || App.todayLocal();
       this._addShiftType = this._addShiftType || ((App.SHIFT_TYPES || [])[0] || '');
-      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '' }];
+      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '', sales: '' }];
       return;
     }
     const s = shiftId ? this.shiftById(shiftId) : null;
@@ -445,29 +482,50 @@ S.LaborTipLog = {
       if (already.has(id)) return;
       const logged = App.hoursFor(id, date);
       const hours = (logged != null && logged > 0) ? logged : (schedHrs.get(id) || '');
-      rows.push({ staff_id: id, hours: hours || '', cash: '', card: '' });
+      rows.push({ staff_id: id, hours: hours || '', cash: '', card: '', sales: '' });
     });
     rows.sort((a, b) => { const sa = this.staffById(a.staff_id), sb = this.staffById(b.staff_id); return ((sa && sa.name) || '').localeCompare((sb && sb.name) || ''); });
     this._addRows = rows;
   },
 
-  // Live per-row Total + the Save All count.
+  // Read the current rows from the DOM (shared by recalc + ready count).
+  batchDomRows() {
+    return [...document.querySelectorAll('#tl-b-rows .tl-line')].map(el => ({
+      staff_id: el.querySelector('.tl-b-staff')?.value || '',
+      hours: el.querySelector('.tl-b-hours')?.value || '',
+      cash: el.querySelector('.tl-b-cash')?.value || '',
+      card: el.querySelector('.tl-b-card')?.value || '',
+      sales: el.querySelector('.tl-b-sales')?.value || ''
+    }));
+  },
+  // Live per-row Tip-Out + Net (or Total when tip-out is off) + the Save All count.
   recalcBatch() {
-    [...document.querySelectorAll('#tl-b-rows .tl-line')].forEach(el => {
-      const t = (parseFloat(el.querySelector('.tl-b-cash')?.value) || 0) + (parseFloat(el.querySelector('.tl-b-card')?.value) || 0);
-      const tEl = el.querySelector('.tl-b-total');
-      if (tEl) tEl.textContent = t > 0 ? App.fmtCurrency(t, 2) : '-';
+    const on = App.tipOutPct() > 0;
+    const els = [...document.querySelectorAll('#tl-b-rows .tl-line')];
+    const out = this.computeTipOut(this.batchDomRows());
+    els.forEach((el, i) => {
+      const o = out[i]; if (!o) return;
+      if (on) {
+        const toEl = el.querySelector('.tl-b-tipout');
+        if (toEl) {
+          if (o.paid > 0) { toEl.textContent = '-' + App.fmtCurrency(o.paid, 2); toEl.style.color = 'var(--t2)'; }
+          else if (o.received > 0) { toEl.textContent = '+' + App.fmtCurrency(o.received, 2); toEl.style.color = 'var(--t2)'; }
+          else { toEl.textContent = '-'; toEl.style.color = 'var(--t3)'; }
+        }
+        const nEl = el.querySelector('.tl-b-total');
+        if (nEl) nEl.textContent = (o.staff_id && (o.cash + o.card > 0 || o.received > 0 || o.paid > 0)) ? App.fmtCurrency(o.net, 2) : '-';
+      } else {
+        const t = o.cash + o.card;
+        const tEl = el.querySelector('.tl-b-total');
+        if (tEl) tEl.textContent = t > 0 ? App.fmtCurrency(t, 2) : '-';
+      }
     });
     const n = this.batchReadyCount();
     const btn = document.getElementById('tl-save-all');
     if (btn && !btn.disabled) btn.textContent = n > 0 ? 'Save ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') : 'Save Tips';
   },
   batchReadyCount() {
-    return [...document.querySelectorAll('#tl-b-rows .tl-line')].filter(el => {
-      const staff = el.querySelector('.tl-b-staff')?.value;
-      const t = (parseFloat(el.querySelector('.tl-b-cash')?.value) || 0) + (parseFloat(el.querySelector('.tl-b-card')?.value) || 0);
-      return staff && t > 0;
-    }).length;
+    return this.computeTipOut(this.batchDomRows()).filter(o => o.staff_id && (o.cash + o.card > 0 || o.received > 0)).length;
   },
 
   wireBatch() {
@@ -530,19 +588,25 @@ S.LaborTipLog = {
       shiftId = s.id; shiftType = s.shift_type || ''; managerId = s.manager_id || '';
     }
 
+    const tipOutOn = App.tipOutPct() > 0;
+    const out = this.computeTipOut(this._addRows || []);
     const recs = [];
     let dupCount = 0;
-    (this._addRows || []).forEach(r => {
+    (this._addRows || []).forEach((r, i) => {
       const staff = this.staffById(r.staff_id);
       if (!staff) return;
-      const cash = parseFloat(r.cash) || 0, card = parseFloat(r.card) || 0;
-      if (cash + card <= 0) return;
+      const o = out[i];
+      if ((o.cash + o.card) <= 0 && o.received <= 0) return;
       if (this.tips().some(t => t.staff_id === staff.id && t.date === date && (t.shift_id || '') === shiftId)) { dupCount++; return; }
       const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
+      const r2 = n => Math.round((n || 0) * 100) / 100;
       recs.push({
         id: App.uid(), shift_id: shiftId, manager_id: managerId, date,
         staff_id: staff.id, name: staff.name, position_id: staff.position_id || '',
-        shift_type: shiftType, cash_tips: cash, card_tips: card, total_tips: cash + card,
+        shift_type: shiftType, cash_tips: o.cash, card_tips: o.card, total_tips: o.cash + o.card,
+        sales: tipOutOn ? r2(o.sales) : 0,
+        tip_out_paid: tipOutOn ? r2(o.paid) : 0,
+        tip_out_received: tipOutOn ? r2(o.received) : 0,
         hours: (h != null && !isNaN(h)) ? h : null, notes: '', created_at: new Date().toISOString()
       });
     });

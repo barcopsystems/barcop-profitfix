@@ -57,7 +57,7 @@ S.LaborTipHistory = {
   showHowTo() {
     App.showHelpModal('How Tip History Works', [
       { p: ['Tip History summarizes the tips you have logged over a date range, three ways: by staff, by shift, and by week. Set the range, and a staff member if you want just one person, then switch tabs to see each view.'] },
-      { h: 'The Three Views', p: ['By Staff totals each person\'s cash, card, and average per entry. By Shift groups tips under the shift they were logged against and shows whether a pool split was saved for it. By Week rolls the range up week by week so you can watch the trend.'] },
+      { h: 'The Three Views', p: ['By Staff totals each person\'s cash and card; if you use tip-outs, it also shows their tip-out adjustment and net take-home. By Shift groups tips under the shift they were logged against and shows whether a pool split was saved for it. By Week rolls the range up week by week so you can watch the trend.'] },
       { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand someone just the view they need, like one server\'s totals for the month.'] }
     ]);
   },
@@ -151,14 +151,32 @@ S.LaborTipHistory = {
   },
 
   byStaff(rows) {
+    const hasTipOut = rows.some(t => (t.tip_out_paid || 0) > 0 || (t.tip_out_received || 0) > 0);
     const g = {};
     rows.forEach(t => {
       const k = t.staff_id || t.name || '?';
-      if (!g[k]) g[k] = { name: t.name || '-', count: 0, cash: 0, card: 0 };
+      if (!g[k]) g[k] = { name: t.name || '-', count: 0, cash: 0, card: 0, tipout: 0, net: 0 };
       g[k].count++;
       g[k].cash += (t.cash_tips || 0);
       g[k].card += (t.card_tips || 0);
+      g[k].tipout += (parseFloat(t.tip_out_received) || 0) - (parseFloat(t.tip_out_paid) || 0);
+      g[k].net += App.netTips(t);
     });
+    // When the range has tip-outs, show the tip-out adjustment + net take-home
+    // instead of the gross total/average, since net is what actually matters.
+    if (hasTipOut) {
+      const trs = Object.keys(g).sort((a, b) => g[b].net - g[a].net).map(k => {
+        const s = g[k];
+        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (s.tipout > 0 ? '+' : '') + App.fmtCurrency(s.tipout, 2);
+        return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
+          + '<td>' + s.count + '</td>'
+          + '<td>' + App.fmtCurrency(s.cash) + '</td>'
+          + '<td>' + App.fmtCurrency(s.card) + '</td>'
+          + '<td>' + toCell + '</td>'
+          + '<td class="val">' + App.fmtCurrency(s.net) + '</td></tr>';
+      }).join('') || this.noRow(6);
+      return this.dataCard('<th>Staff</th><th>Entries</th><th>Cash</th><th>Card</th><th>Tip-Out</th><th>Net Tips</th>', trs);
+    }
     const trs = Object.keys(g)
       .sort((a, b) => (g[b].cash + g[b].card) - (g[a].cash + g[a].card))
       .map(k => {

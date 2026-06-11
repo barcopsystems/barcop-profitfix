@@ -404,10 +404,11 @@ S.LaborPayPeriods = {
     if (total > 0) return total;
     // No pool share for this person this week — fall back to their own logged
     // tips so a house that logs tips without saving a pool split still gets a
-    // real tip-credit number instead of a false $0 / "Below Min" flag.
+    // real tip-credit number instead of a false $0 / "Below Min" flag. Uses NET
+    // tips (after tip-out paid, plus tip-out received) so the figure is honest.
     const tips = ((App.laborData && App.laborData.lc_tips) || []);
     return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
-      ? s + (parseFloat(t.total_tips) || 0) : s, 0);
+      ? s + App.netTips(t) : s, 0);
   },
 
   // Payroll files (formatted workbook + clean import CSV, with the legal
