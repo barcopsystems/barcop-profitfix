@@ -192,7 +192,7 @@ S.ShiftDashboard = {
         + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">' + (active.manager ? 'Manager: ' + esc(active.manager) : 'Open the active shift to manage the floor') + '</div>';
       hero = this.panelCard('Active Shift', body, right);
     } else {
-      const right = '<button class="btn btn-primary btn-sm sd-act" data-go="sc-active-shift" style="margin:0;">Open the Floor</button>';
+      const right = '<button class="btn btn-ghost btn-sm sd-act" data-go="sc-active-shift" style="margin:0;">Open the Floor</button>';
       const body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No shift running right now. Open the floor to track cash, voids, and 86s live, then close it out with revenue and covers.</div>';
       hero = this.panelCard('Active Shift', body, right);
     }
