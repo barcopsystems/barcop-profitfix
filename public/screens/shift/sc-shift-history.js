@@ -8,10 +8,10 @@
    Inventory Transfer Log layout. */
 
 S.ShiftHistory = {
-  filterType: '',
-  filterManager: '',
-  filterFrom: '',
-  filterTo: '',
+  filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
+  filterTo: '',            // custom range only
   editId: null,
 
   shifts() {
@@ -28,12 +28,18 @@ S.ShiftHistory = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  // Effective date window from the active range chip (recomputed off "today" each
+  // render so This Week stays live); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   filtered() {
+    const { from, to } = this.effectiveRange();
     return this.sorted().filter(s => {
-      if (this.filterType && s.shift_type !== this.filterType) return false;
-      if (this.filterManager && (s.manager_id || s.manager || '') !== this.filterManager) return false;
-      if (this.filterFrom && (s.date || '') < this.filterFrom) return false;
-      if (this.filterTo && (s.date || '') > this.filterTo) return false;
+      const date = s.date || '';
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
@@ -56,25 +62,26 @@ S.ShiftHistory = {
       + '</div></div>';
   },
 
-  // ── Filter (controls only; the heading + Export sit above it in renderList) ──
-  filterCard() {
-    const typeOpts = '<option value="">All shift types</option>'
-      + App.SHIFT_TYPES.map(t => '<option' + (this.filterType === t ? ' selected' : '') + '>' + t + '</option>').join('');
-    const mgrMap = {};
-    this.shifts().forEach(s => {
-      const id = s.manager_id || s.manager || '';
-      if (id && !mgrMap[id]) mgrMap[id] = s.manager || (App.staffById ? (App.staffById(s.manager_id) || {}).name : '') || String(id);
-    });
-    const mgrOpts = '<option value="">All managers</option>'
-      + Object.keys(mgrMap).map(id => '<option value="' + esc(id) + '"' + (this.filterManager === id ? ' selected' : '') + '>' + esc(mgrMap[id]) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="sh-f-type">' + typeOpts + '</select></div>'
-        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Manager</label><select id="sh-f-mgr">' + mgrOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sh-f-clear">Clear</button></div>'
-      + '</div></div>';
+  // ── Range chips replace the filter card: chips left, Export right, directly above
+  // the list (the accepted filter model). Custom reveals a bare From/To row. ──
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'sh-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="sh-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="sh-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   renderList() {
@@ -99,8 +106,7 @@ S.ShiftHistory = {
 
     let rowsBody;
     if (rows.length === 0) {
-      rowsBody = '<div class="empty"><div class="empty-title">No shifts match these filters</div>'
-        + '<div class="empty-sub">Adjust or clear them above.</div></div>';
+      rowsBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No shifts in this range. Pick a wider range above.</div>';
     } else {
       const displayRows = rows.slice(0, App.listLimit('sc', 'shift'));
       const trs = displayRows.map(s => {
@@ -123,13 +129,12 @@ S.ShiftHistory = {
         + '<th>Date</th><th>Shift</th><th>Manager</th><th>Revenue</th>'
         + '<th>Covers</th><th>Check Avg</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
-        + App.showOlderBar('sc', 'shift', rows, !!(this.filterType || this.filterManager || this.filterFrom || this.filterTo));
+        + App.showOlderBar('sc', 'shift', rows, this.filterPreset !== 'all');
     }
 
     this.container.innerHTML = '<div class="screen">'
       + this.statsStrip(rows.length, totRev, totCov, avgChk)
-      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Shift History</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sh-export">Export PDF</button></div></div>'
-      + this.filterCard()
+      + this.filterRow()
       + rowsBody
       + '</div>';
     this.wireList();
@@ -138,21 +143,24 @@ S.ShiftHistory = {
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const chip = ev.target.closest('.sh-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       const view = ev.target.closest('.sh-view');
       const row = ev.target.closest('.sh-row');
       if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
       if (row) this.renderDetail(row.dataset.id);
     };
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
-    document.getElementById('sh-f-clear')?.addEventListener('click', () => {
-      this.filterType = this.filterManager = this.filterFrom = this.filterTo = '';
-      this.renderList();
-    });
-    const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => { this[prop] = e.target.value || ''; this.renderList(); });
-    bind('sh-f-type', 'filterType');
-    bind('sh-f-mgr', 'filterManager');
-    bind('sh-f-from', 'filterFrom');
-    bind('sh-f-to', 'filterTo');
+    document.getElementById('sh-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('sh-f-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderList(); });
   },
 
   // ── Detail (recap) — read-only ────────────────────────────────────────────────
@@ -163,6 +171,11 @@ S.ShiftHistory = {
     if (!s) { this.renderList(); return; }
 
     this.actions.innerHTML = '';
+
+    // Save Handoff PDF action — rides the Cash Reconciliation heading (right side),
+    // or a right-aligned row under the stats when a shift has no cash recon.
+    const handoffBtn = '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>';
+    const cashHead = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Cash Reconciliation</div><div style="display:flex;gap:8px;">' + handoffBtn + '</div></div>';
 
     const checkAvg = (s.covers && s.covers > 0) ? (s.total_revenue || 0) / s.covers : null;
     const meta = (label, val) =>
@@ -199,7 +212,7 @@ S.ShiftHistory = {
           + '<td>' + fmt(cr.expected) + '</td>'
           + '<td>' + (cr.counted_cash != null ? fmt(cr.counted_cash) : '-') + '</td>'
           + '<td>' + vCell(cr.variance, cr.skipped, cr.counted_cash) + '</td><td></td></tr>';
-        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
+        cashCard = cashHead
           + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Drawer</th><th>Opening</th><th>Drops</th><th>POS Cash</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>'
           + '</tr></thead><tbody>' + rows + totalRow + '</tbody></table></div></div>';
@@ -208,7 +221,7 @@ S.ShiftHistory = {
         const variance = cr.variance;
         const statusColor = skipped ? 'var(--t3)' : (variance == null ? 'var(--t3)' : (Math.abs(variance) <= tol ? 'var(--gold)' : 'var(--red)'));
         const statusText = skipped ? 'SKIPPED' : (variance == null ? 'NOT COUNTED' : (Math.abs(variance) <= tol ? 'OK' : variance < 0 ? 'SHORT' : 'OVER'));
-        cashCard = '<div class="sh" style="margin-top:24px;">Cash Reconciliation</div>'
+        cashCard = cashHead
           + '<div class="calc" style="margin-bottom:16px;">'
           + meta('Opening Bank', fmt(cr.opening_bank))
           + meta('POS Cash Sales', cr.sales_cash != null ? App.fmtCurrency(cr.sales_cash) : '-')
@@ -298,9 +311,8 @@ S.ShiftHistory = {
       : '';
 
     const statTile = (label, val, sub, color) =>
-      '<div style="flex:1;min-width:150px;background:var(--input);border:1px solid var(--b2);border-radius:8px;padding:14px 16px;text-align:center;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1.15;color:' + (color || 'var(--t1)') + ';">' + val + '</div>'
+      '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sub || '') + '</div></div>';
 
     let cashVar = '-', cashVarColor = 'var(--t1)', cashVarSub = 'No registers';
@@ -321,21 +333,19 @@ S.ShiftHistory = {
     if (s.staff_on_floor != null) heroMeta.push(s.staff_on_floor + ' on floor');
 
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
+      + '<div class="card"><div>'
       + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(s.shift_type || 'Shift') + ' &middot; ' + this.fmtDate(s.date) + '</span>' + statusPill + '</div>'
       + (heroMeta.length ? '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + heroMeta.join(' &middot; ') + '</div>' : '')
-      + '</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="sh-handoff">Save Handoff PDF</button>'
-      + '</div></div></div>'
+      + '</div></div>'
 
-      + '<div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;">'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;">'
       + statTile('Revenue', App.fmtCurrency(s.total_revenue || 0), App.fmtCurrency(s.bar_revenue || 0) + ' bar &middot; ' + App.fmtCurrency(s.floor_revenue || 0) + ' floor')
       + statTile('Covers', s.covers != null ? s.covers : '-', checkAvg != null ? App.fmtCurrency(checkAvg) + ' check avg' : 'No covers')
       + statTile('Cash Variance', cashVar, cashVarSub, cashVarColor)
       + statTile('Tips', tipsVal, tipsSub)
       + '</div></div>'
 
+      + (s.cash_recon ? '' : '<div class="no-print" style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">' + handoffBtn + '</div>')
       + cashCard
       + tipCard
       + sixCard
