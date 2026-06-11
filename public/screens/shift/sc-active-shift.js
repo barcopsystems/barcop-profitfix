@@ -1168,26 +1168,31 @@ S.ShiftActiveShift = {
     const d = this._closeDraft;
     if (d.tipout_rows) return;
     const tips = ((App.laborData && App.laborData.lc_tips) || []).filter(t => t.shift_id === s.id || (!t.shift_id && t.date === s.date));
-    if (tips.length) {
-      // Pre-logged in the Tip Log before close — load them in, operator confirms.
-      d.tipout_rows = tips.map(t => ({
-        staff_id: t.staff_id || '',
-        hours:    (t.hours != null ? t.hours : ''),
-        cash:     (t.cash_tips != null ? t.cash_tips : ''),
-        card:     (t.card_tips != null ? t.card_tips : ''),
-        sales:    (t.sales != null ? t.sales : ''),
-        received: (t.tip_out_received != null ? t.tip_out_received : '')
-      }));
-      return;
-    }
-    // Otherwise seed blank rows from the tipped staff who clocked in this shift.
-    const staff = (App.laborData && App.laborData.lc_staff) || [];
-    const rows = ((App.laborData && App.laborData.lc_actuals) || [])
-      .filter(a => a.date === s.date && a.staff_id)
-      .filter(a => { const st = staff.find(x => x.id === a.staff_id); return st && App.isTipped(st); })
-      .map(a => ({ staff_id: a.staff_id, hours: (a.hours != null ? a.hours : ''), cash: '', card: '', sales: '', received: '' }));
-    rows.sort((a, b) => { const sa = staff.find(x => x.id === a.staff_id), sb = staff.find(x => x.id === b.staff_id); return ((sa && sa.name) || '').localeCompare((sb && sb.name) || ''); });
-    d.tipout_rows = rows;
+    // Pre-logged in the Tip Log before close — load them with their amounts.
+    const logged = tips.map(t => ({
+      staff_id: t.staff_id || '',
+      hours:    (t.hours != null ? t.hours : ''),
+      cash:     (t.cash_tips != null ? t.cash_tips : ''),
+      card:     (t.card_tips != null ? t.card_tips : ''),
+      sales:    (t.sales != null ? t.sales : ''),
+      received: (t.tip_out_received != null ? t.tip_out_received : '')
+    }));
+    // The rest of the crew, blank to fill: the Tip Log's own shift preload (the
+    // posted SCHEDULE for the day, call-out adjusted, hours from logged-actuals-
+    // else-scheduled, already-logged skipped). Schedule, not actuals, because
+    // hours are usually not logged yet at close. Save/restore Tip Log state so the
+    // call leaves that screen untouched.
+    let crew = [];
+    try {
+      const TL = S.LaborTipLog;
+      if (TL && TL.preloadFromShift) {
+        const savedShift = TL._addShift, savedRows = TL._addRows;
+        TL.preloadFromShift(s.id);
+        crew = (TL._addRows || []).map(r => ({ staff_id: r.staff_id || '', hours: (r.hours != null ? r.hours : ''), cash: '', card: '', sales: '', received: '' }));
+        TL._addShift = savedShift; TL._addRows = savedRows;
+      }
+    } catch (e) { crew = []; }
+    d.tipout_rows = logged.concat(crew);
   },
 
   tipoutBody(s) {
