@@ -2,26 +2,40 @@
 
 /* ── Labor Control — Tip History (reads lc_tips) ──────────────────────────────
    Historical tip analysis over a date range, three connected-tab views: by
-   staff, by shift, and by week. Read-only. Same tabbed shell as Cash History:
-   a plain .ch-tabs switcher over a stats card, a Filter heading with Export,
-   the controls-only filter card, then the data card. The From/To/Staff filter
-   is global to the report, so it persists across tab switches. */
+   staff, by shift, and by week. Read-only. A plain .ch-tabs switcher over a
+   stats card, then a single row of time-range chips (Export on the right) sitting
+   directly above the data card. The range is global to the report, so it persists
+   across tab switches; time is the only filter (the Log Hours chip model). */
 
 S.LaborTipHistory = {
-  filterFrom: '',
-  filterTo: '',
-  filterStaff: '',
+  filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
+  filterTo: '',            // custom range only
   tab: 'staff',
   TABS: [['staff', 'By Staff'], ['shift', 'By Shift'], ['week', 'By Week']],
+  // Single-select time range chips (the only filter), daily cadence. Mirrors Log Hours.
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   tips() { return ((App.laborData && App.laborData.lc_tips) || []); },
   pools() { return ((App.laborData && App.laborData.lc_tip_pools) || []); },
   shifts() { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
   shiftById(id) { return this.shifts().find(s => s.id === id); },
+  // Effective date window from the active range chip (preset recomputed off "today"
+  // each render so This Week stays live); Custom reads the From/To pickers.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   inRange(t) {
-    if (this.filterFrom && (t.date || '') < this.filterFrom) return false;
-    if (this.filterTo && (t.date || '') > this.filterTo) return false;
-    if (this.filterStaff && (t.staff_id || '') !== this.filterStaff) return false;
+    const { from, to } = this.effectiveRange();
+    const date = t.date || '';
+    if (from && date < from) return false;
+    if (to && date > to) return false;
     return true;
   },
   mondayOf(dateStr) {
@@ -37,17 +51,6 @@ S.LaborTipHistory = {
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
-  // Staff who actually have tip entries (plus the current selection), so the
-  // filter dropdown stays relevant.
-  staffFilterOptions() {
-    const seen = {};
-    this.tips().forEach(t => { if (t.staff_id && !(t.staff_id in seen)) seen[t.staff_id] = t.name || '-'; });
-    const list = Object.keys(seen).map(id => ({ id, name: seen[id] }))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    return '<option value="">All staff</option>'
-      + list.map(o => '<option value="' + o.id + '"' + (this.filterStaff === o.id ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('');
-  },
-
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -56,7 +59,7 @@ S.LaborTipHistory = {
 
   showHowTo() {
     App.showHelpModal('How Tip History Works', [
-      { p: ['Tip History summarizes the tips you have logged over a date range, three ways: by staff, by shift, and by week. Set the range, and a staff member if you want just one person, then switch tabs to see each view.'] },
+      { p: ['Tip History summarizes the tips you have logged over a date range, three ways: by staff, by shift, and by week. Pick a range with the chips above the table, then switch tabs to see each view.'] },
       { h: 'The Three Views', p: ['By Staff totals each person\'s cash and card; if you use tip-outs, it also shows their tip-out adjustment and net take-home. By Shift groups tips under the shift they were logged against and shows whether a pool split was saved for it. By Week rolls the range up week by week so you can watch the trend.'] },
       { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand someone just the view they need, like one server\'s totals for the month.'] }
     ]);
@@ -79,7 +82,7 @@ S.LaborTipHistory = {
       + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
   noRow(cols, msg) {
-    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No tips match the filter.') + '</td></tr>';
+    return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No tips in this range. Pick a wider range above.') + '</td></tr>';
   },
 
   renderReport() {
@@ -108,22 +111,10 @@ S.LaborTipHistory = {
       + this.statItem('Card', App.fmtCurrency(card))
       + this.statItem('Avg / Entry', App.fmtCurrency(rows.length ? total / rows.length : 0)));
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="th-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="th-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Staff</label><select id="th-staff">' + this.staffFilterOptions() + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="th-clear">Clear</button></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;">' + App.datePresetButtons('th-preset') + '</div></div>';
-
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
       + statsCard
-      + filterHeading
-      + filterCard
+      + this.filterRow()
       + this.tabBody(rows)
       + '</div>';
 
@@ -131,17 +122,37 @@ S.LaborTipHistory = {
       if (ev.target.closest('#th-export')) { App.exportPDF({ title: 'Tip History', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
-      if (ev.target.closest('#th-clear')) { this.filterFrom = this.filterTo = this.filterStaff = ''; this.renderReport(); return; }
-      const thPreset = ev.target.closest('.th-preset');
-      if (thPreset) { const r = App.datePresetRange(thPreset.dataset.preset); this.filterFrom = r.from; this.filterTo = r.to; this.renderReport(); return; }
+      const chip = ev.target.closest('.th-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          // Custom toggles: a second click closes the pickers and restores the prior range.
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderReport();
+        return;
+      }
     };
-    const bind = (id, prop) => document.getElementById(id)?.addEventListener('change', e => {
-      this[prop] = e.target.value || '';
-      this.renderReport();
-    });
-    bind('th-from', 'filterFrom');
-    bind('th-to', 'filterTo');
-    bind('th-staff', 'filterStaff');
+    document.getElementById('th-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderReport(); });
+    document.getElementById('th-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderReport(); });
+  },
+
+  // Range chips on the left, Export on the right (no filter card), directly above
+  // the data block. Picking Custom reveals a bare From/To row. Mirrors Log Hours.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'th-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="th-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="th-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="th-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   tabBody(rows) {
