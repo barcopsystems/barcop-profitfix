@@ -176,12 +176,12 @@ S.HubSettings = {
       s.annual_food_revenue = numOr('hs-afr', 0);
       keys.push('settings');
     } else if (which === 'service') {
-      const periods = (this._spCtrl ? this._spCtrl.value() : []).filter(p => p && p.name);
+      const all = this._spCtrl ? this._spCtrl.value() : [];
       const errEl = document.getElementById('hs-sp-err');
-      if (!periods.length) {
-        if (errEl) { errEl.textContent = 'Pick at least one service period.'; errEl.style.display = 'inline'; }
-        return;
-      }
+      const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
+      if (all.some(p => !(p.name || '').trim())) { showErr('Name your custom period, or turn it off.'); return; }
+      const periods = all.filter(p => p && p.name);
+      if (!periods.length) { showErr('Pick at least one service period.'); return; }
       if (errEl) errEl.style.display = 'none';
       App.data.settings.service_periods = periods;
       keys.push('settings');
