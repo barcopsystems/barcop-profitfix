@@ -3348,7 +3348,7 @@ const App = {
         'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
         'lc-wage-settings':      ['Wage Policy', 'Labor Control'],
         'lc-tip-log':            ['Tip Log', 'Labor Control'],
-        'lc-tip-pool':           ['Pool Calculator', 'Labor Control'],
+        'lc-tip-pool':           ['Tip Pool Log', 'Labor Control'],
         'lc-tip-history':        ['Tip History', 'Labor Control'],
         'lc-reports':            ['Labor Reports', 'Labor Control'],
         'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
