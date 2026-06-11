@@ -98,12 +98,12 @@ S.LaborLogHours = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
-    // Reset to Manual on each visit so a sticky Fill-from-Schedule / Import never
-    // hides the form + recent list. A deep-link sets _modeOnce for this one visit.
-    this.entryMode = this._modeOnce || 'manual';
-    this._modeOnce = null;
-    this._fillModel = null;   // fresh fill state on each visit (persists during the visit)
-    this._fillTab = null;
+    // A deep-link can force a mode for this one visit (shift close / a report jump
+    // straight into Fill from Schedule). Otherwise STAY in whatever mode the
+    // operator was last working in, so leaving and coming back returns them right
+    // to it — including a half-done Fill from Schedule, whose rows persist. The
+    // recent list shows in every mode now, so a sticky mode hides nothing.
+    if (this._modeOnce) { this.entryMode = this._modeOnce; this._modeOnce = null; this._fillTab = null; }
     this.renderList();
   },
 
