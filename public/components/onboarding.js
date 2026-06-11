@@ -49,11 +49,11 @@ const Onboarding = {
 
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix. Fill in these basics, then continue to the setup checklist.</div>'
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Fill in these basics, then continue to the quick setup checklist.</div>'
       + this._section(1, 'The Basics', basics)
       + this._section(2, 'Your Numbers', numbers)
       + this._section(3, 'Service Periods', service)
-      + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;"></div>'
+      + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;text-align:center;"></div>'
       + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Continue to Bar Cop</button></div>';
 
     this._spCtrl = window.ServicePeriods
@@ -62,25 +62,40 @@ const Onboarding = {
 
     document.getElementById('ob-name')?.focus();
     document.getElementById('ob-finish')?.addEventListener('click', () => this.finish());
+    ['ob-name', 'ob-city', 'ob-state', 'ob-bar-rev'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('ob-invalid'));
+    });
   },
 
   async finish() {
     const err = document.getElementById('ob-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'block'; } };
-    const name  = document.getElementById('ob-name')?.value.trim();
-    const city  = document.getElementById('ob-city')?.value.trim();
-    const state = document.getElementById('ob-state')?.value.trim();
-    if (!name) { fail('Please enter your bar or restaurant name.'); document.getElementById('ob-name')?.focus(); return; }
+    const showErr = m => { if (err) { err.textContent = m; err.style.display = 'block'; } };
+    if (err) err.style.display = 'none';
+
+    // Required cells flag with a red border only, no message. Annual Food is optional.
+    let firstBad = null;
+    ['ob-name', 'ob-city', 'ob-state', 'ob-bar-rev'].forEach(id => {
+      const el = document.getElementById(id);
+      const blank = !el || !(el.value || '').trim();
+      el?.closest('.f')?.classList.toggle('ob-invalid', blank);
+      if (blank && !firstBad) firstBad = el;
+    });
+
     const all = this._spCtrl ? this._spCtrl.value() : [];
-    if (all.some(p => !(p.name || '').trim())) { fail('Name your custom period, or turn it off.'); return; }
+    const unnamed = all.some(p => !(p.name || '').trim());
     const periods = all.filter(p => p && p.name);
-    if (!periods.length) { fail('Pick at least one service period.'); return; }
+    if (unnamed) showErr('Name your custom period, or turn it off.');
+    else if (!periods.length) showErr('Pick at least one service period.');
+
+    if (firstBad || unnamed || !periods.length) { firstBad?.focus(); return; }
 
     const s = App.data.settings;
-    s.bar_name            = name;
+    const city  = document.getElementById('ob-city').value.trim();
+    const state = document.getElementById('ob-state').value.trim();
+    s.bar_name            = document.getElementById('ob-name').value.trim();
     s.city_state          = city && state ? city + ', ' + state : city || state || '';
-    s.annual_bar_revenue  = parseFloat(document.getElementById('ob-bar-rev')?.value)  || 0;
-    s.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev')?.value) || 0;
+    s.annual_bar_revenue  = parseFloat(document.getElementById('ob-bar-rev').value)  || 0;
+    s.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev').value) || 0;
     s.service_periods     = periods;
     s.onboarding_complete = true;
 
