@@ -814,7 +814,7 @@ OVERALL: weighted avg S1-S5.
 APP DATA:
 bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
 annual_bar_rev=$${settings.annual_bar_revenue||0} | annual_food_rev=$${settings.annual_food_revenue||0}
-check_avg_target=$${targets.check_avg||35} | labor_target=${targets.floor_labor_pct||32}%
+check_avg_target=$${targets.check_avg||35} | labor_target=${targets.labor_cost_pct||30}%
 rplh_targets: lunch=$${targets.rplh_lunch||50} dinner=$${targets.rplh_dinner||75} bar=$${targets.rplh_bar||65}
 servers_on_roster=${servers.length} | menu_items=${menuItems.length} | weeks_data=${weeks.length}
 avg_check_avg=$${avgCheckAvg?avgCheckAvg.toFixed(2):0} | avg_labor_pct=${avgLaborPct?avgLaborPct.toFixed(1):0}%
@@ -828,7 +828,7 @@ Return this exact JSON (all values calculated):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":61,"TARGET_SCORE":65,
 "OVERALL_SCORE":[calc weighted avg],
 "S1_SCORE":[calc],"S1_CHECK_AVG":[from app:${avgCheckAvg?avgCheckAvg.toFixed(2):0}],"S1_CHECK_AVG_TARGET":${targets.check_avg||35},"S1_BAR_CHECK_AVG":[from report or est],"S1_FOOD_CHECK_AVG":[from report or est],"S1_COVER_COUNT":${avgCovers?Math.round(avgCovers*4.33):0},"S1_MONTHLY_REVENUE":${avgBarRev&&avgFloorRev?Math.round((avgBarRev+avgFloorRev)*4.33):0},"S1_MONTHLY_GAP":[calc: (target-actual)*covers],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_LABOR_PCT":[from app:${avgLaborPct?avgLaborPct.toFixed(1):30}],"S2_LABOR_TARGET_PCT":${targets.floor_labor_pct||32},"S2_RPLH":[from app:${avgRPLH?avgRPLH.toFixed(2):0}],"S2_RPLH_TARGET":${targets.rplh_dinner||75},"S2_LABOR_PERIOD":[calc],"S2_SCHED_VS_ACTUAL":[obs],"S2_OVERTIME_HRS":[file or null],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],
+"S2_SCORE":[calc],"S2_LABOR_PCT":[from app:${avgLaborPct?avgLaborPct.toFixed(1):30}],"S2_LABOR_TARGET_PCT":${targets.labor_cost_pct||30},"S2_RPLH":[from app:${avgRPLH?avgRPLH.toFixed(2):0}],"S2_RPLH_TARGET":${targets.rplh_dinner||75},"S2_LABOR_PERIOD":[calc],"S2_SCHED_VS_ACTUAL":[obs],"S2_OVERTIME_HRS":[file or null],"S2_MONTHLY_GAP":[calc],"S2_ANNUAL_GAP":[calc],
 "S3_SCORE":[calc],"S3_STARS_COUNT":[file or 0],"S3_PLOWHORSES_COUNT":[file or 0],"S3_DOGS_COUNT":[file or 0],"S3_PUZZLES_COUNT":[file or 0],"S3_TOP_CATEGORY":[file or est],"S3_MONTHLY_GAP":[calc or 0],"S3_PRICING_OPPORTUNITY":[calc or 0],
 "S4_SCORE":[calc],"S4_SERVER_COUNT":${servers.length||0},"S4_TOP_CHECK_AVG":[file or 0],"S4_BOTTOM_CHECK_AVG":[file or 0],"S4_PERFORMANCE_SPREAD":[calc],"S4_APP_ATTACH_RATE":[file or null],"S4_DESSERT_ATTACH_RATE":[file or null],"S4_PRESHIFT_BRIEFING":[obs],"S4_MONTHLY_GAP":[calc or 0],"S4_ANNUAL_GAP":[calc],
 "S5_SCORE":50,"S5_EVENT_REV_PERIOD":[file or null],"S5_EVENTS_PER_MONTH":[file or null],"S5_AVG_EVENT_REVENUE":[file or null],"S5_MINIMUM_MET":[file or null],"S5_CATERING_REV_PERIOD":[file or null],"S5_ANNUAL_EVENT_GAP":[file or null],"S5_MONTHLY_GAP":[file or null],
