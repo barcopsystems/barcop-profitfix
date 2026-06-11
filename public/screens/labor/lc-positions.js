@@ -30,9 +30,6 @@ S.LaborPositions = {
   // pop-up); the inline add form keeps the wide single-row layout.
   formBody(item, p, narrow) {
     p = p || 'lp-';
-    // Tip type: Non-Tipped, or Tipped split into Earner (rings sales, tips out)
-    // vs Support (receives tip-out). A tipped position with no saved role = earner.
-    const tv = !item || !item.tipped ? 'no' : (item.tip_role === 'support' ? 'support' : 'earner');
     const deptOpts = this.DEPARTMENTS.map(d =>
       '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
     const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
@@ -45,13 +42,15 @@ S.LaborPositions = {
       + '<div class="f" style="' + cs(140) + '"><label>Default Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'wage" min="0" step="0.01" '
       + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="' + cs(180) + '"><label>Type</label>'
+      + '<div class="f" style="' + cs(150) + '"><label>Type</label>'
       + '<select id="' + p + 'tipped">'
-      + '<option value="no"' + (tv === 'no' ? ' selected' : '') + '>Non-Tipped</option>'
-      + '<option value="earner"' + (tv === 'earner' ? ' selected' : '') + '>Tipped - Earner</option>'
-      + '<option value="support"' + (tv === 'support' ? ' selected' : '') + '>Tipped - Support</option>'
+      + '<option value="no"' + (item && item.tipped ? '' : ' selected') + '>Non-Tipped</option>'
+      + '<option value="yes"' + (item && item.tipped ? ' selected' : '') + '>Tipped</option>'
       + '</select></div>'
+      + '<div class="f" style="' + cs(150) + '"><label>Tips Out (% of Sales)</label>'
+      + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:-4px;margin-bottom:14px;">For a Tipped role, set what it tips out as a percent of its sales (servers, bartenders). Leave it at 0 for a role that only receives tip-out (bussers, barbacks, runners).</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(item?.notes || '') + '</textarea></div></div>';
   },
@@ -82,7 +81,7 @@ S.LaborPositions = {
         + '<td>' + esc(p.department || '-') + '</td>'
         + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
         + '<td>' + (p.tipped
-            ? '<span style="color:var(--t1);font-weight:700;">Tipped</span><span style="color:var(--t3);"> &middot; ' + (p.tip_role === 'support' ? 'Support' : 'Earner') + '</span>'
+            ? '<span style="color:var(--t1);font-weight:700;">Tipped</span><span style="color:var(--t3);"> &middot; ' + ((parseFloat(p.tip_out_pct) || 0) > 0 ? 'tips out ' + App.fmtPct(p.tip_out_pct) : 'receives') + '</span>'
             : '<span style="color:var(--t3);font-weight:700;">Non-Tipped</span>') + '</td>'
         + '<td><div class="row-actions">'
         + (App.canEdit('lc-positions') ? '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>' : '')
@@ -138,14 +137,15 @@ S.LaborPositions = {
     if (!name) { fail('Position name is required.'); return; }
     const wage = parseFloat(document.getElementById(p + 'wage')?.value);
 
-    const typeVal = document.getElementById(p + 'tipped')?.value || 'no';
+    const isTipped = (document.getElementById(p + 'tipped')?.value || 'no') === 'yes';
+    const tipoutRaw = parseFloat(document.getElementById(p + 'tipout')?.value);
     const rec = {
       id:           this.editId || App.uid(),
       name,
       department:   document.getElementById(p + 'dept')?.value || 'Other',
       default_wage: isNaN(wage) ? null : wage,
-      tipped:       typeVal === 'earner' || typeVal === 'support',
-      tip_role:     typeVal === 'support' ? 'support' : (typeVal === 'earner' ? 'earner' : null),
+      tipped:       isTipped,
+      tip_out_pct:  isTipped && !isNaN(tipoutRaw) && tipoutRaw > 0 ? tipoutRaw : 0,
       notes:        document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
@@ -176,7 +176,7 @@ S.LaborPositions = {
     App.showHelpModal('How Positions Work', [
       { p: ['Positions are the job roles you schedule and pay: bartender, server, line cook, and so on. Every shift you build and every hour you log is tied to a position, so this is the list that drives your whole labor cost.'] },
       { h: 'Department and Default Wage', p: ['Each position belongs to a department (Bar, Front of House, Kitchen, Management) and carries a default hourly wage. That wage pre-fills when you add a staff member in the role, so you set the number once here instead of on every hire.'] },
-      { h: 'Tipped: Earner or Support', p: ['Mark a position Tipped if the role earns tip income, then choose Earner or Support. Earner is a role that rings sales and tips out (servers, bartenders); Support is a role that receives tip-out (bussers, barbacks, runners). Bar Cop uses this in the Tip Log: earners get a Sales column and pay tip-out, support get an editable Received amount. Both feed the Pay Periods tip-credit check, which flags anyone whose wage plus tips falls under your state minimum.'] },
+      { h: 'Tipped Roles and Tip-Out', p: ['Mark a position Tipped if the role earns tip income, then set Tips Out (% of Sales). A role that rings sales and tips out (servers, bartenders) gets a percent; a role that only receives tip-out (bussers, barbacks, runners) stays at 0. Different roles can tip out different percents. Bar Cop uses this in the Tip Log: roles with a percent get a Sales column and pay that percent of their sales, roles at 0 get an editable Received amount, and a role that both tips out and receives (a bartender getting the bar share from servers) gets both. It all feeds the Pay Periods tip-credit check.'] },
       { h: 'Where Positions Show Up', p: ['Add a position once and it is available everywhere: the staff roster, the schedule builder, the hours log, and every labor report. Edit a position any time and the change carries forward without touching past records.'] }
     ]);
   },
