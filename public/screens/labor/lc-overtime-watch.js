@@ -40,6 +40,34 @@ S.LaborOvertimeWatch = {
     return null;
   },
 
+  // Monday week selector (mirrors Build Schedule / Labor Reports): week chips by
+  // Monday date (live week tagged NOW, selected gold-tint) + step arrows + a snap
+  // to the current week, Export on the right. Replaces the native Week Starting box.
+  weekSelector(ws) {
+    const cur = this.mondayOf(new Date());
+    const chip = w => {
+      const on = w === ws, isCur = w === cur;
+      return '<button type="button" class="ow-week-chip btn btn-sm" data-ws="' + w + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.fmtDate(w)
+        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let chips = '';
+    for (let i = -1; i <= 1; i++) chips += chip(this.addDays(ws, i * 7));
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
+      + chips
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
+      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="ow-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      + '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div>'
+      + '</div>';
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -60,7 +88,7 @@ S.LaborOvertimeWatch = {
 
   showHowTo() {
     App.showHelpModal('How Overtime Watch Works', [
-      { p: ['Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, so you can adjust the schedule while there is still time. Step week to week with the arrows.'] },
+      { p: ['Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, so you can adjust the schedule while there is still time. Step week to week with the chips or arrows.'] },
       { h: 'How The Projection Works', p: ['For each hourly staff member, Projected is the greater of hours already logged and hours still scheduled this week. Anything over ' + App.OT_THRESHOLD + ' hours is overtime, and Extra OT Cost is the half-time premium on those hours. Salaried staff are exempt and never appear.'] },
       { h: 'The Suggested Action', p: ['When someone is projected over, the Suggested Action column shows the exact hours to cut from their remaining shifts to clear the threshold. If they have already worked past the line, it reads Already over instead, since logged hours cannot be cut and the fix is to lighten their next week. View Schedule for This Week opens the same week in Build Schedule so you make the change in the right place.'] },
       { h: 'Export', p: ['Export PDF saves the week\'s projection for a manager or your own records.'] }
@@ -121,19 +149,8 @@ S.LaborOvertimeWatch = {
       + '<div class="calc-item"><div class="calc-label">Extra OT Cost</div><div class="calc-val lg ' + (totalOtCost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(totalOtCost) + '</div></div>'
       + '</div></div>';
 
-    const dateCard = '<div class="card form-card">'
-      + '<div class="card-title">Overtime Watch</div>'
-      + '<div class="form-row" style="gap:10px;margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Week Starting</label>'
-      + '<input type="date" id="ow-start" value="' + esc(ws) + '"/></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><div style="display:flex;gap:6px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&rsaquo;</button></div></div>'
-      + '</div></div>';
-
-    let projHeading, projBody;
+    let projBody;
     if (rows.length === 0) {
-      projHeading = '<div class="sh" style="margin:24px 0 10px;">Hours Projection</div>';
       projBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</div>'
         + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     } else {
@@ -166,9 +183,6 @@ S.LaborOvertimeWatch = {
           + '<td>' + badge + '</td>'
           + '<td>' + action + '</td></tr>';
       }).join('');
-      projHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Hours Projection</div>'
-        + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div></div>';
       projBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
@@ -176,14 +190,12 @@ S.LaborOvertimeWatch = {
         + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + dateCard + summaryCard + projHeading + projBody + '</div>';
+    this.container.innerHTML = '<div class="screen">' + summaryCard + this.weekSelector(ws) + projBody + '</div>';
     document.getElementById('ow-export')?.addEventListener('click', () => App.exportPDF({ title: 'Overtime Watch', root: this.container }));
-    document.getElementById('ow-start')?.addEventListener('change', e => {
-      this.weekStart = this.mondayOf(new Date(e.target.value + 'T00:00:00'));
-      this.draw();
-    });
     document.getElementById('ow-prev')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, -7); this.draw(); });
     document.getElementById('ow-next')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, 7); this.draw(); });
+    document.getElementById('ow-now')?.addEventListener('click', () => { this.weekStart = this.mondayOf(new Date()); this.draw(); });
+    this.container.querySelectorAll('.ow-week-chip').forEach(b => b.addEventListener('click', () => { this.weekStart = b.dataset.ws; this.draw(); }));
     document.getElementById('ow-view-schedule')?.addEventListener('click', () => this.openWeekInSchedule());
   },
 
