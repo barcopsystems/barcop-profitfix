@@ -93,9 +93,18 @@ S.InventoryUsageReport = {
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
       + '</div></div>';
   },
-  dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+  dataCard(headers, rowsHtml, fixedColgroup) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"'
+      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:760px;"' : '') + '>'
+      + (fixedColgroup || '') + '<thead><tr>'
       + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  // Product column fixed-wide; the nine data columns share the rest equally, so
+  // every category table lines its columns up with the ones above and below it.
+  usageColgroup() {
+    let cols = '<col style="width:200px;"/>';
+    for (let i = 1; i < 10; i++) cols += '<col/>';
+    return '<colgroup>' + cols + '</colgroup>';
   },
   noRow(cols, msg) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">'
@@ -252,7 +261,7 @@ S.InventoryUsageReport = {
     });
     return cats.map(c => {
       const catRows = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''));
+      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''), this.usageColgroup());
     }).join('');
   },
 
