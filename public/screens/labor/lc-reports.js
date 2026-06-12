@@ -233,8 +233,10 @@ S.LaborReports = {
   dayBody() {
     const dayActuals = this.actuals().filter(a => a.date === this.date);
     const actHours = dayActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0)
-      + (dayActuals.length ? App.salariedCost(this.date, this.date).total : 0);
+    // Day cost is the hourly labor that happened this day (reconciles to the table
+    // below). Salaried pay is a fixed weekly cost, shown on the Week and Range
+    // lenses, not split across days.
+    const actCost = dayActuals.reduce((t, a) => t + (a.cost || 0), 0);
 
     const sched = this.scheduledForDate(this.date);
     let schedHours = null;
@@ -369,8 +371,9 @@ S.LaborReports = {
     const weekActuals = this.actuals().filter(a => a.date >= ws && a.date <= we);
     const actHours = weekActuals.reduce((t, a) => t + (a.hours || 0), 0);
     const salWk = App.salariedCost(ws, we);
-    const hasActivity = weekActuals.length > 0;
-    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + (hasActivity ? salWk.total : 0);
+    // Salaried pay accrues every week regardless of hourly activity, so it is always
+    // in the week total (and itemized in the By Staff table below).
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total;
 
     const sched = this.scheduleCovering(ws);
     const schedHours = sched ? (sched.total_hours || 0) : null;
@@ -398,15 +401,13 @@ S.LaborReports = {
       byStaff[k].hours += (a.hours || 0);
       byStaff[k].cost += (a.cost || 0);
     });
-    if (hasActivity) {
-      ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
-        if (!App.isSalaried(st) || st.status === 'Inactive') return;
-        const annual = parseFloat(st.annual_salary);
-        if (!annual || annual <= 0) return;
-        if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
-        byStaff[st.id].cost += annual / 52;
-      });
-    }
+    ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
+      if (!App.isSalaried(st) || st.status === 'Inactive') return;
+      const annual = parseFloat(st.annual_salary);
+      if (!annual || annual <= 0) return;
+      if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
+      byStaff[st.id].cost += annual / 52;
+    });
     let staffBody;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
@@ -437,7 +438,7 @@ S.LaborReports = {
       const dStr = this.addDays(ws, i);
       const dayAct = weekActuals.filter(a => a.date === dStr);
       const h = dayAct.reduce((t, a) => t + (a.hours || 0), 0);
-      const c = dayAct.reduce((t, a) => t + (a.cost || 0), 0) + (dayAct.length ? App.salariedCost(dStr, dStr).total : 0);
+      const c = dayAct.reduce((t, a) => t + (a.cost || 0), 0);  // hourly only; salary is weekly-fixed (in the total + By Staff)
       dayRows.push('<tr><td><div class="val">' + this.fmtDay(dStr) + '</div></td>'
         + '<td>' + dayAct.length + '</td>'
         + '<td>' + h.toFixed(1) + '</td>'
@@ -445,7 +446,7 @@ S.LaborReports = {
     }
     const dayCard = '<div class="sh" style="margin:24px 0 10px;">By Day</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Cost</th>'
+      + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Hourly Cost</th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
     // Scheduled-but-not-logged nudge
