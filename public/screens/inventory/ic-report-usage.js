@@ -225,6 +225,9 @@ S.InventoryUsageReport = {
 
   tabUsage(rows) {
     const headers = '<th>Product</th><th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th><th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>';
+    // Everything after the Product column; each category table puts the category
+    // name into the first header ("Liquor Products", "Wine Products", ...).
+    const restHeaders = '<th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th><th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>';
     if (!rows.length) return this.dataCard(headers, this.noRow(10));
     const rowHtml = r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + '</div></td>'
@@ -249,7 +252,7 @@ S.InventoryUsageReport = {
     });
     return cats.map(c => {
       const catRows = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      return '<div class="sh" style="margin:24px 0 10px;">' + esc(c) + '</div>' + this.dataCard(headers, catRows.map(rowHtml).join(''));
+      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''));
     }).join('');
   },
 
