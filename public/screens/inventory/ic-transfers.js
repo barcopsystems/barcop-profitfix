@@ -12,10 +12,14 @@
 
 S.InventoryTransfers = {
   editId: null,
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip (weekly cadence)
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterProductId: '',
-  filterLocation: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' }, { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   transfers() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -58,6 +62,30 @@ S.InventoryTransfers = {
       + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   },
 
+  // Effective window from the active range chip (preset recomputed off "today"
+  // each render); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export + Worksheet right, directly above the list (the
+  // accepted filter model). Custom reveals a bare From/To row. Weekly cadence.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'tr-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
+      + '</div></div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="tr-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
+  },
+
   // ── Entry ───────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
@@ -89,8 +117,11 @@ S.InventoryTransfers = {
       return;
     }
 
-    const filtered = this.applyFilters(all)
-      .sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+    const { from, to } = this.effectiveRange();
+    const filtered = all.filter(t => {
+      const date = (t.date_time || '').slice(0, 10);
+      return (!from || date >= from) && (!to || date <= to);
+    }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
     const lastDate = all.reduce((m, t) => {
       const d = t.date_time || t.created_at || '';
       return (!m || new Date(d).getTime() > new Date(m).getTime()) ? d : m;
@@ -100,11 +131,6 @@ S.InventoryTransfers = {
       + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + all.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
       + '</div></div>';
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="tr-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank">Worksheet</button>'
-      + '</div>';
 
     const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
       const p = this.productById(t.product_id);
@@ -123,10 +149,10 @@ S.InventoryTransfers = {
     }).join('');
     const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>When</th><th>From &rarr; To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No transfers match the filter.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'transfer', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterLocation));
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No transfers in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'transfer', filtered, this.filterPreset !== 'all');
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + filterHeading + this.filterCard() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + this.filterRow() + listCard + '</div>';
     this.wireList();
     this.wireForm('tr-');
   },
@@ -135,10 +161,10 @@ S.InventoryTransfers = {
     App.showHelpModal('How the Transfer Log Works', [
       { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went. When a bottle goes missing from the front bar, the first question is whether it ever left the back. This log answers it.'] },
       { h: 'When You Run Multiple Locations', p: ['The Transfer Log earns its keep the moment your stock lives in more than one place. At The Anchor the well liquor is counted at the front bar and the service bar separately, with the backup cases in the stockroom. If a manager grabs three bottles of house tequila off the stockroom shelf and walks them to the service bar on a busy Friday, that move gets logged here so each location count still ties out.'] },
-      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Pick the right unit too. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move. Notes are optional but worth a line when the move is out of the ordinary.'] },
+      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Pick the right unit too. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move. Notes are optional but worth a line when the move is out of the ordinary. Start Over clears the form if you want to begin fresh.'] },
       { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have in the building. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations, so logging one never throws off your numbers.'] },
       { h: 'A Real Example', p: ['Say the front bar runs dry on Tito\'s in the middle of dinner service and your bartender pulls a fresh case from the stockroom. Log it: product Tito\'s, quantity one case if you moved it by the case or the loose bottle count if you broke one out, from Stockroom, to Front Bar, performed by whoever grabbed it. Now when you count the front bar at close and the stockroom on Sunday, both reconcile and nobody is left wondering where the vodka went.'] },
-      { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the filters to pull up a date range, a single product, or one location. Edit or delete any entry if you need to fix a mistake.'] },
+      { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it. Edit or delete any entry if you need to fix a mistake.'] },
       { h: 'Worksheet', p: ['The Worksheet button gives you a clean PDF grid to print and carry on the floor during a shift. Jot down moves as they happen, then enter them here after close. That beats trying to remember at the end of the night.'] }
     ]);
   },
@@ -152,6 +178,7 @@ S.InventoryTransfers = {
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-transfers" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
+        + '<button class="btn btn-ghost" id="tr-startover">Start Over</button>'
         + '<span id="tr-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
@@ -200,10 +227,20 @@ S.InventoryTransfers = {
   // Wire the always-open inline log form.
   wireForm(idp) {
     document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
+    document.getElementById('tr-startover')?.addEventListener('click', () => this.startOver());
     this.wireProdChange(idp);
     const head = this.container.querySelector('.card-collapse-head');
     if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
     App.applyCollapsed(this.container);
+  },
+
+  // Reset the inline log form to a fresh starting state, keeping the form open.
+  startOver() {
+    const body = this.container.querySelector('.collapse-body');
+    if (body) body.innerHTML = this.formRows(null, 'tr-');
+    const err = document.getElementById('tr-err');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    this.wireProdChange('tr-');
   },
 
   // Product change: re-pop unit options + default From to the product's primary.
@@ -218,44 +255,19 @@ S.InventoryTransfers = {
     });
   },
 
-  // ── Filter card (controls only; Export/Worksheet live on the heading row) ──
-  filterCard() {
-    const locOpts = '<option value="">All locations</option>'
-      + this.locations().map(l => '<option value="' + esc(l.name) + '"' + (this.filterLocation === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
-    // Only list products that actually appear in the logged transfers, not the
-    // whole catalog — prefer the live name, fall back to the stored one.
-    const loggedProds = new Map();
-    this.transfers().forEach(t => {
-      if (!t.product_id || loggedProds.has(t.product_id)) return;
-      const p = this.productById(t.product_id);
-      loggedProds.set(t.product_id, (p && p.name) || t.product_name || 'Unknown product');
-    });
-    const prodOpts = '<option value="">All products</option>'
-      + [...loggedProds.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-          .map(([id, name]) => '<option value="' + id + '"' + (this.filterProductId === id ? ' selected' : '') + '>' + esc(name) + '</option>').join('');
-    return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="tr-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="tr-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Product</label><select id="tr-f-prod">' + prodOpts + '</select></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Location (either side)</label><select id="tr-f-loc">' + locOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="tr-f-clear">Clear</button></div>'
-      + '</div></div>';
-  },
-
-  applyFilters(list) {
-    return list.filter(t => {
-      const date = (t.date_time || '').slice(0, 10);
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterProductId && t.product_id !== this.filterProductId) return false;
-      if (this.filterLocation && t.from_location !== this.filterLocation && t.to_location !== this.filterLocation) return false;
-      return true;
-    });
-  },
-
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const chip = ev.target.closest('.tr-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       const row  = ev.target.closest('.tr-row');
       const edit = ev.target.closest('.tr-edit');
       const del  = ev.target.closest('.tr-del');
@@ -267,12 +279,6 @@ S.InventoryTransfers = {
     document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
     document.getElementById('tr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('tr-f-prod')?.addEventListener('change', e => { this.filterProductId = e.target.value || ''; this.renderList(); });
-    document.getElementById('tr-f-loc')?.addEventListener('change',  e => { this.filterLocation  = e.target.value || ''; this.renderList(); });
-    document.getElementById('tr-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterProductId = this.filterLocation = '';
-      this.renderList();
-    });
   },
 
   // ── Form options ────────────────────────────────────────────────────
