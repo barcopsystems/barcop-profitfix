@@ -459,7 +459,7 @@ const Shift = {
       <div class="nav-section">Reports</div>
       <div class="nav-item" data-screen="sc-reports" id="nav-sc-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Shift and Cash</span>
+        <span class="nav-label">Shift Reports</span>
       </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="sc-drawers" id="nav-sc-drawers">
