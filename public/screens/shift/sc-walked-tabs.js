@@ -9,12 +9,17 @@
 
 S.ShiftWalkedTabs = {
   editId: null,
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterServerId: '',
-  filterReason: '',
 
   REASONS: ['Walked', 'Mis-bill', 'Refused to Pay', 'Lost Check', 'Other'],
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   tabs() {
     if (!App.shiftData) App.shiftData = {};
@@ -79,27 +84,32 @@ S.ShiftWalkedTabs = {
       + '</div>' + notesRow;
   },
 
-  filterCard() {
-    const reasonOpts = '<option value="">All reasons</option>'
-      + this.REASONS.map(r => '<option value="' + esc(r) + '"' + (this.filterReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="wt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="wt-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label>'
-          + '<select id="wt-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="wt-f-reason">' + reasonOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wt-f-clear">Clear</button></div>'
-      + '</div></div>';
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export right, directly above the list; Custom reveals a bare
+  // From/To row. The accepted filter model (no filter card, no categorical dropdowns).
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'wt-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="wt-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="wt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="wt-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(r => {
       const date = r.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterServerId && r.server_id !== this.filterServerId) return false;
-      if (this.filterReason && r.reason !== this.filterReason) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
@@ -112,12 +122,16 @@ S.ShiftWalkedTabs = {
     const totalLoss = filtered.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-walked-tabs', 'Log a Walked Tab', App.helpButton('wt-how'))
+      + App.collapsibleCardTitle('sc-walked-tabs', 'Log a Walked Tab')
       + '<div class="collapse-body">'
       + this.formFields(null)
-      + '<div class="card-actions"><button class="btn btn-primary" id="wt-save">Log Walked Tab</button>'
-      + '<span id="wt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
-      + '</div></div>';
+      + '</div></div>'
+      // Log + Start Over below the card (bottom-left), hidden with the card on collapse.
+      + '<div data-collapse-group="sc-walked-tabs" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="wt-save">Log Walked Tab</button>'
+        + '<button class="btn btn-ghost" id="wt-startover">Start Over</button>'
+        + '<span id="wt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
 
     let below;
     if (all.length === 0) {
@@ -129,7 +143,7 @@ S.ShiftWalkedTabs = {
         + '</div></div>';
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'walked_tab')).map(r => '<tr class="wt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div>'
@@ -146,9 +160,9 @@ S.ShiftWalkedTabs = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>When</th><th>Server</th><th>Check #</th><th>Amount</th><th>Reason</th><th>Manager</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('sc', 'walked_tab', filtered, !!(this.filterFrom || this.filterTo || this.filterServerId || this.filterReason));
+          + App.showOlderBar('sc', 'walked_tab', filtered, this.filterPreset !== 'all');
       }
-      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Walked Tabs</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wt-export">Export PDF</button></div></div>' + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -158,11 +172,21 @@ S.ShiftWalkedTabs = {
 
   wireList() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#wt-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.wt-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#wt-export')) { App.exportPDF({ title: 'Walked Tabs', root: this.container }); return; }
       if (ev.target.closest('#wt-save')) { this.save(); return; }
+      if (ev.target.closest('#wt-startover')) { this.startOver(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const edit = ev.target.closest('.wt-edit');
       const del  = ev.target.closest('.wt-del');
@@ -171,14 +195,14 @@ S.ShiftWalkedTabs = {
       if (edit)      { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
       if (row) this.openEditModal(row.dataset.id);
     };
-    document.getElementById('wt-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('wt-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('wt-f-server')?.addEventListener('change', e => { this.filterServerId = e.target.value || ''; this.renderList(); });
-    document.getElementById('wt-f-reason')?.addEventListener('change', e => { this.filterReason = e.target.value || ''; this.renderList(); });
-    document.getElementById('wt-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterServerId = this.filterReason = '';
-      this.renderList();
-    });
+    document.getElementById('wt-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('wt-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+  },
+
+  // Reset the inline log form to a fresh blank walked tab.
+  startOver() {
+    this.editId = null;
+    this.renderList();
   },
 
   // Edit in a focused pop-up (own wte- ids). Cancel closes it.
