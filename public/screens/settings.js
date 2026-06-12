@@ -1302,10 +1302,11 @@ S.HubSettings = {
       { id:uid(), name:'Local Produce Co.',   rep:'Gabe Flores', phone:'512-555-0177', email:'orders@localproduce.example', delivery_days:'Tue, Fri', payment_terms:'Net 15', account_number:'LPC-3050',  notes:'Produce and dairy', created_at:new Date().toISOString() },
     ];
 
+    const SERVICE_BARS = new Set(['Main Bar', 'Back Bar']);   // a register sits here; spot checks run at these
     App.inventoryData.ic_locations = [
       ['Main Bar','bar'], ['Back Bar','bar'], ['Liquor Room','bar'],
       ['Walk-in Cooler','both'], ['Kitchen Line','kitchen'], ['Dry Storage','both']
-    ].map(([n, type]) => ({ id:uid(), name:n, type, archived:false }));
+    ].map(([n, type]) => ({ id:uid(), name:n, type, archived:false, service_bar: SERVICE_BARS.has(n) }));
 
     // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
     const icProducts = [
