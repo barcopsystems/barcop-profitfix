@@ -1215,6 +1215,22 @@ S.Hub = {
       }
     });
 
+    // 4d. Urgent maintenance still open — pulled from Shift Control's Maintenance
+    // Log. An Urgent issue that has not been Resolved carries across shift changes
+    // until someone fixes it, so it stays on the Hub alerts until it is closed.
+    const maintList = (App.shiftData || {}).sc_maintenance || [];
+    const urgentOpen = maintList.filter(m => m && m.priority === 'Urgent' && m.status !== 'Resolved');
+    if (urgentOpen.length) {
+      const label = (urgentOpen[0].issue || urgentOpen[0].item || 'An urgent issue');
+      out.push({
+        sev: 'bad',
+        text: urgentOpen.length === 1
+          ? label + ' is flagged Urgent and still open in the Maintenance Log. Handle it before it costs you a shift.'
+          : urgentOpen.length + ' urgent maintenance issues are still open, including ' + label + '. Handle them before they cost you a shift.',
+        screen: 'sc-maintenance', mod: 'shift'
+      });
+    }
+
     // 5. Vendor price re-drift — fresh price increases in recent deliveries
     const dels = (App.inventoryData || {}).ic_deliveries || [];
     const cutoff = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return iso(d); })();
