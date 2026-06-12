@@ -88,7 +88,7 @@ S.Hub = {
     const foodT = pt.food_cost_pct ?? 32;
     const primeT= pt.prime_cost_pct ?? 60;
     const caT   = rt.check_avg ?? 35;
-    const laborT= rt.labor_pct ?? 30;
+    const laborT= App.laborTargetPct();
     const grT   = tTar.google_rating ?? 4.3;
 
     const metrics = [
