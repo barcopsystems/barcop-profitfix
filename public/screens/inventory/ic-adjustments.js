@@ -21,10 +21,14 @@
 
 S.InventoryAdjustments = {
   editId: null,
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip (weekly cadence)
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterProductId: '',
-  filterReason: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' }, { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   REASONS: ['Damage', 'Theft', 'Expiration', 'Found', 'Other'],
   // Default direction per reason — operator can override on Other.
@@ -66,6 +70,30 @@ S.InventoryAdjustments = {
       + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   },
 
+  // Effective window from the active range chip (preset recomputed off "today"
+  // each render); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export + Worksheet right, directly above the list (the
+  // accepted filter model). Custom reveals a bare From/To row. Weekly cadence.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'adj-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
+      + '</div></div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="adj-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
+  },
+
   render(container, actions) {
     this.container = container;
     this.actions = actions;
@@ -96,8 +124,11 @@ S.InventoryAdjustments = {
       return;
     }
 
-    const filtered = this.applyFilters(all)
-      .sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+    const { from, to } = this.effectiveRange();
+    const filtered = all.filter(r => {
+      const date = (r.date_time || '').slice(0, 10);
+      return (!from || date >= from) && (!to || date <= to);
+    }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
 
     let totalLoss = 0, totalFound = 0, lastDate = '';
     all.forEach(r => {
@@ -114,16 +145,10 @@ S.InventoryAdjustments = {
       + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;">'
-        + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
-      + '</div></div>';
-
     const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
       const dirText = r.direction === 'in'
-        ? '<span style="color:var(--green);font-weight:600;">Found</span>'
-        : '<span style="color:var(--red);font-weight:600;">Loss</span>';
+        ? '<span style="color:var(--t2);">Found</span>'
+        : '<span style="color:var(--t2);">Loss</span>';
       const valStr = r.direction === 'in'
         ? '<span style="color:var(--green);">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
         : '<span style="color:var(--red);">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
@@ -142,10 +167,10 @@ S.InventoryAdjustments = {
     }).join('');
     const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No adjustments match the filter.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'adjustment', filtered, !!(this.filterFrom || this.filterTo || this.filterProductId || this.filterReason));
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No adjustments in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'adjustment', filtered, this.filterPreset !== 'all');
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + filterHeading + this.filterCard() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + this.filterRow() + listCard + '</div>';
     this.wireList();
     this.wireForm('adj-');
   },
@@ -153,11 +178,11 @@ S.InventoryAdjustments = {
   showHowTo() {
     App.showHelpModal('How the Adjustment Log Works', [
       { p: ['An adjustment documents stock that left or came back into inventory outside of a normal sale, like product damaged in storage, theft you confirmed, product that expired, or stock you found that was never counted. It keeps your counts clean while attributing the loss to a real cause. Without it, every broken bottle and dumped keg shows up as mystery shrinkage and looks like theft.'] },
-      { h: 'Logging An Adjustment', p: ['Set the date and time, pick the reason, and confirm the direction. Loss for product that left, Found for stock that came back. Pick the product, the quantity, and the unit. Draft is by the keg, bottle beer by the case, liquor and wine by the bottle. Bar Cop estimates the dollar value from the product cost as you go, so you see what the loss actually cost you in real money before you save it.'] },
+      { h: 'Logging An Adjustment', p: ['Set the date and time, pick the reason, and confirm the direction. Loss for product that left, Found for stock that came back. Pick the product, the quantity, and the unit. Draft is by the keg, bottle beer by the case, liquor and wine by the bottle. Bar Cop estimates the dollar value from the product cost as you go, so you see what the loss actually cost you in real money before you save it. Start Over clears the form if you want to begin fresh.'] },
       { h: 'Reasons And Direction', p: ['Damage, Theft, and Expiration default to a Loss. Found defaults to an increase. Other lets you set the direction yourself. Use the right reason, because a write-off labeled Theft feeds your Theft Risk picture while one labeled Damage does not. Honest reasons keep that signal clean.'] },
       { h: 'A Real Example', p: ['A barback at The Anchor drops a full bottle of Hennessy on the way to the well and it shatters. Log it: reason Damage, direction Loss, product Hennessy, quantity one bottle. Bar Cop prices it off your cost, say a 750ml bottle that runs you about thirty dollars, and books a thirty dollar documented loss. Now when you run variance for the period, that thirty dollars is accounted for and does not get mistaken for product walking out the door.'] },
       { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your last count or auto-subtract from variance. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail they can stand behind at tax time.'] },
-      { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Filter by date range, product, or reason, and edit or delete any entry to fix a mistake. The Worksheet button prints a clean grid you can carry into the storeroom during a damage or expiration walk-through, then enter the rows here after.'] }
+      { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it, and edit or delete any entry to fix a mistake. The Worksheet button prints a clean grid you can carry into the storeroom during a damage or expiration walk-through, then enter the rows here after.'] }
     ]);
   },
 
@@ -170,6 +195,7 @@ S.InventoryAdjustments = {
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-adjustments" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="adj-save">Log Adjustment</button>'
+        + '<button class="btn btn-ghost" id="adj-startover">Start Over</button>'
         + '<span id="adj-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
@@ -221,10 +247,20 @@ S.InventoryAdjustments = {
   // Wire the always-open inline log form.
   wireForm(idp) {
     document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
+    document.getElementById('adj-startover')?.addEventListener('click', () => this.startOver());
     this.wireFormFields(idp);
     const head = this.container.querySelector('.card-collapse-head');
     if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
     App.applyCollapsed(this.container);
+  },
+
+  // Reset the inline log form to a fresh starting state, keeping the form open.
+  startOver() {
+    const body = this.container.querySelector('.collapse-body');
+    if (body) body.innerHTML = this.formRows(null, 'adj-');
+    const err = document.getElementById('adj-err');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    this.wireFormFields('adj-');
   },
 
   // Reason → default direction, product → unit options, and live value recalc.
@@ -245,43 +281,19 @@ S.InventoryAdjustments = {
     this.recalc(idp);
   },
 
-  filterCard() {
-    const reasonOpts = '<option value="">All reasons</option>'
-      + this.REASONS.map(r => '<option value="' + esc(r) + '"' + (this.filterReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
-    // Only list products that actually appear in the logged adjustments, not the
-    // whole catalog — prefer the live name, fall back to the stored one.
-    const loggedProds = new Map();
-    this.adjustments().forEach(r => {
-      if (!r.product_id || loggedProds.has(r.product_id)) return;
-      const p = this.productById(r.product_id);
-      loggedProds.set(r.product_id, (p && p.name) || r.product_name || 'Unknown product');
-    });
-    const prodOpts = '<option value="">All products</option>'
-      + [...loggedProds.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-          .map(([id, name]) => '<option value="' + id + '"' + (this.filterProductId === id ? ' selected' : '') + '>' + esc(name) + '</option>').join('');
-    return '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="adj-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="adj-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Product</label><select id="adj-f-prod">' + prodOpts + '</select></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label><select id="adj-f-reason">' + reasonOpts + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="adj-f-clear">Clear</button></div>'
-      + '</div></div>';
-  },
-
-  applyFilters(list) {
-    return list.filter(r => {
-      const date = (r.date_time || '').slice(0, 10);
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterProductId && r.product_id !== this.filterProductId) return false;
-      if (this.filterReason && r.reason !== this.filterReason) return false;
-      return true;
-    });
-  },
-
   wireList() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const chip = ev.target.closest('.adj-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       const row  = ev.target.closest('.adj-row');
       const edit = ev.target.closest('.adj-edit');
       const del  = ev.target.closest('.adj-del');
@@ -291,14 +303,8 @@ S.InventoryAdjustments = {
     };
     document.getElementById('adj-export')?.addEventListener('click', () => App.exportPDF({ title: 'Adjustment Log', root: this.container }));
     document.getElementById('adj-print-blank')?.addEventListener('click', () => this.printBlank());
-    document.getElementById('adj-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('adj-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('adj-f-prod')?.addEventListener('change',   e => { this.filterProductId = e.target.value || ''; this.renderList(); });
-    document.getElementById('adj-f-reason')?.addEventListener('change', e => { this.filterReason     = e.target.value || ''; this.renderList(); });
-    document.getElementById('adj-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterProductId = this.filterReason = '';
-      this.renderList();
-    });
+    document.getElementById('adj-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
   },
 
   // ── Form options ────────────────────────────────────────────────────
