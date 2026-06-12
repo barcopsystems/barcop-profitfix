@@ -17,10 +17,14 @@ S.InventorySpotCheck = {
   posMode: 'manual',     // 'manual' = type POS per line, 'import' = drop the register report
   _seq: 0,
   _onHistory: false,
-  filterFrom: '',
+  filterPreset: 'last-4',  // history range chip (weekly cadence)
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
   filterTo: '',
-  locFilter: '',
-  byFilter: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' }, { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
   CAT_ORDER: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
 
   products() {
@@ -196,13 +200,15 @@ S.InventorySpotCheck = {
     this.renderMain();
   },
 
-  // Optional. Sourced from the registers set up in Shift Control (each drawer
-  // carries a location), so a spot check can tag the bar/register it was run at
-  // without offering storage rooms like a walk-in. Blank is fine; the variance
-  // math does not need it.
+  // Optional. The bar/location being spot-checked, sourced from the inventory
+  // locations that actually hold bar product, so a kitchen or dry-storage room is
+  // not offered. Scopes the product picker. Blank is fine; the variance math does
+  // not need it.
   locationOptions(selected) {
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => !d.archived);
-    const list = [...new Set(drawers.map(d => (d.location || '').trim()).filter(Boolean))].sort();
+    const bar = App.BAR_CATS;
+    const list = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+      .filter(l => !l.archived && this.products().some(p => bar.includes(p.category) && App.productLocations(p).includes(l.name)))
+      .map(l => l.name).sort();
     let h = '<option value="">Optional</option>';
     list.forEach(name => { h += '<option value="' + esc(name) + '"' + (selected === name ? ' selected' : '') + '>' + esc(name) + '</option>'; });
     return h;
@@ -305,7 +311,7 @@ S.InventorySpotCheck = {
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Register (optional)</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar (optional)</label>'
         + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
@@ -344,12 +350,13 @@ S.InventorySpotCheck = {
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + setup + posCard
+    const historyRow = '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="sp-history">View History</button></div>';
+    this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + historyRow + setup + posCard
       + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;flex-wrap:wrap;">'
+      + '<div style="margin-top:18px;">'
         + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
-        + '<button class="btn btn-ghost" id="sp-history">View History</button>'
       + '</div></div>';
     App.applyCollapsed(this.container);
     this.updateProductsTitle();
@@ -418,6 +425,27 @@ S.InventorySpotCheck = {
     };
   },
 
+  // Effective window from the active range chip; Custom reads From/To, All clears.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export right, above the list (the accepted filter model).
+  // Custom reveals a bare From/To row. Weekly cadence for inventory.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'sp-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="sp-list-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="sp-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="sp-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
+  },
+
   // ── History (its own page: a stat box + the saved-checks list) ──────────────
   renderHistory() {
     this.actions.innerHTML = '';
@@ -441,29 +469,9 @@ S.InventorySpotCheck = {
       return;
     }
 
-    const locs  = [...new Set(all.map(c => c.location).filter(Boolean))].sort();
-    const staff = [...new Set(all.map(c => c.checked_by).filter(Boolean))].sort();
+    const { from, to } = this.effectiveRange();
     const filtered = all.filter(c =>
-      (!this.filterFrom || (c.date || '') >= this.filterFrom)
-      && (!this.filterTo || (c.date || '') <= this.filterTo)
-      && (!this.locFilter || c.location === this.locFilter)
-      && (!this.byFilter || c.checked_by === this.byFilter));
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Filter Spot Checks</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-list-export">Export PDF</button></div></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="sp-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="sp-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Register</label><select id="sp-loc-filter"><option value="">All</option>'
-      + locs.map(n => '<option value="' + esc(n) + '"' + (this.locFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
-      + '</select></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Checked By</label><select id="sp-by-filter"><option value="">All staff</option>'
-      + staff.map(n => '<option value="' + esc(n) + '"' + (this.byFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
-      + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="sp-clear">Clear</button></div>'
-      + '</div></div>';
+      (!from || (c.date || '') >= from) && (!to || (c.date || '') <= to));
 
     const rows = filtered.slice(0, App.listLimit('ic', 'spot_check')).map(c => {
       const vd = c.total_variance_dollar || 0;
@@ -481,11 +489,11 @@ S.InventorySpotCheck = {
         + '</div></td></tr>';
     }).join('');
     const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Register</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks match the filters.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'spot_check', filtered, !!(this.filterFrom || this.filterTo || this.locFilter || this.byFilter));
+      + '<th>Date</th><th>Bar</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'spot_check', filtered, this.filterPreset !== 'all');
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.filterRow() + listCard + '</div>';
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
     this.wireHistory();
   },
@@ -493,10 +501,17 @@ S.InventorySpotCheck = {
   wireHistory() {
     document.getElementById('sp-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderHistory(); });
     document.getElementById('sp-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderHistory(); });
-    document.getElementById('sp-loc-filter')?.addEventListener('change', e => { this.locFilter = e.target.value || ''; this.renderHistory(); });
-    document.getElementById('sp-by-filter')?.addEventListener('change', e => { this.byFilter = e.target.value || ''; this.renderHistory(); });
     this.container.onclick = ev => {
-      if (ev.target.closest('#sp-clear')) { this.filterFrom = ''; this.filterTo = ''; this.locFilter = ''; this.byFilter = ''; this.renderHistory(); return; }
+      const chip = ev.target.closest('.sp-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderHistory();
+        return;
+      }
       if (ev.target.closest('#sp-list-export')) { App.exportPDF({ title: 'Spot Check History', root: this.container }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
       const hdel = ev.target.closest('.sp-hdel');
@@ -757,7 +772,7 @@ S.InventorySpotCheck = {
       const cus = cu ? ' ' + cu : '';
       const sw = (it.category === 'Bottle Beer') ? 'btls' : 'pours';
       const action = (it.flagged && it.product_id)
-        ? '<button class="btn btn-ghost btn-sm sp-investigate" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '">Investigate</button>'
+        ? '<button class="btn btn-ghost btn-sm sp-investigate" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">Investigate</button>'
         : '';
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
