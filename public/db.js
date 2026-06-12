@@ -260,11 +260,10 @@ const DB = {
     'sc-shift-history':'log-shift',
     'sc-active-shift':'active-shift',
     'sc-cash-history':'cash-mgmt',
-    'sc-cash-control':'cash-mgmt','sc-cash-settings':'cash-mgmt','sc-drawers':'cash-mgmt',
+    'sc-cash-control':'cash-mgmt','sc-shift-policies':'cash-mgmt','sc-drawers':'cash-mgmt',
     'sc-checklists':'checklists','sc-checklist-templates':'checklists',
     'sc-86-list':'86-list',
     'sc-void-comp':'void-comp',
-    'sc-comp-settings':'void-comp',
     'sc-maintenance':'maintenance',
     'sc-walked-tabs':'cash-mgmt',
     'sc-reports':'shift-reports',
@@ -878,7 +877,7 @@ const DB = {
           labor_cost_pct: 30, prime_cost_pct: 60
         },
         // Cash tolerance moved to App.shiftData.settings — Shift Control owns
-        // it now. See sc-cash-settings.js + App.cashToleranceForShift().
+        // it now. See sc-shift-policies.js + App.cashToleranceForShift().
         onboarding_complete: false
       },
       bar_products: [], kitchen_products: [],
