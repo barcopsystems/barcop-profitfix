@@ -188,8 +188,14 @@ S.InventoryUsageReport = {
         + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
         + '</button>';
     };
+    // Always show two adjacent periods (no jumping between two and three): the
+    // selected sits on the right with its older neighbor on the left, except at
+    // the oldest end where it sits on the left.
+    let winStart = selIdx - 1;
+    if (winStart < 0) winStart = 0;
+    if (winStart > len - 2) winStart = Math.max(0, len - 2);
     let chips = '';
-    for (let i = selIdx - 1; i <= selIdx + 1; i++) { if (i >= 0 && i < len) chips += chip(i); }
+    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
     const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
     const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
     return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
