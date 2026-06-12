@@ -67,10 +67,50 @@ S.InventoryStockReport = {
     return i;
   },
 
+  // Count selector as a two-count scroller (like the Usage/Variance reports):
+  // the selected count plus its older neighbor, step arrows, newest tagged NOW,
+  // and a Latest snap. Keeps a long count history compact.
+  countStepper() {
+    const asc = this.countsAsc();
+    const len = asc.length;
+    const selIdx = this.selectedIdx(asc);
+    const chip = idx => {
+      const c = asc[idx];
+      const on = idx === selIdx, isNewest = idx === len - 1;
+      return '<button type="button" class="sr-count-chip btn btn-sm" data-v="' + esc(c.id) + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.fmtDate(c.date)
+        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let winStart = selIdx - 1;
+    if (winStart < 0) winStart = 0;
+    if (winStart > len - 2) winStart = Math.max(0, len - 2);
+    let chips = '';
+    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
+    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
+    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="sr-count-prev" title="Older count" aria-label="Older count"' + prevDis + '>&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="sr-count-next" title="Newer count" aria-label="Newer count"' + nextDis + '>&rsaquo;</button>'
+      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="sr-count-latest" style="margin-left:4px;">Latest</button>' : '')
+      + '</div>';
+  },
+  stepCount(delta) {
+    const asc = this.countsAsc();
+    if (!asc.length) return;
+    const ni = this.selectedIdx(asc) + delta;
+    if (ni < 0 || ni >= asc.length) return;
+    this.countId = asc[ni].id;
+    this.draw();
+  },
+
   showHowTo() {
     App.showHelpModal('How the Stock Report Works', [
       { p: ['The Stock Report is a snapshot of what you are holding and what it is worth, taken from one of your counts. It answers one question: where is my cash sitting right now.'] },
-      { h: 'Pick A Count', p: ['Use the Count picker to choose which count to read. The whole page reflects that snapshot. Default is your latest.'] },
+      { h: 'Pick A Count', p: ['Use the count scroller up top, or the arrows, to choose which count to read. The whole page reflects that snapshot. Default is your latest.'] },
       { h: 'Where Your Cash Sits', p: ['By Category and By Location show how your stock value splits up, so you see how much is tied up in liquor versus food, or in the walk-in versus the back bar. vs Last Count shows whether your stock value is creeping up, which usually means over-ordering.'] },
       { h: 'Highest, Lowest, And Dead', p: ['Highest and Lowest Value rank the products holding the most and least cash on hand. Dead Stock is the one to watch: product you are holding value in that did not move at all this period. That is dead cash and spoilage risk, your cue to stop re-ordering it or cut it.'] }
     ]);
@@ -134,24 +174,26 @@ S.InventoryStockReport = {
       + changeStat
       + this.statItem('Count Date', this.fmtDate(latest.date)));
 
-    const countOpts = asc.map((c, i) =>
-      '<option value="' + c.id + '"' + (i === idx ? ' selected' : '') + '>'
-      + this.fmtDate(c.date) + ' (' + esc(c.type || 'count') + ')</option>').reverse().join('');
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div></div>';
-    const filterCard = '<div class="card no-print"><div class="form-row" style="margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;flex-shrink:0;">'
-      + '<label>Count</label><select id="sr-count">' + countOpts + '</select></div></div></div>';
+    // Count selector = a two-count scroller (like the Usage/Variance reports),
+    // not a dropdown card.
+    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + this.countStepper()
+      + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button>'
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + this.tabBar() + statsCard + filterHeading + filterCard + this.body(latest, prior) + '</div>';
+      + this.tabBar() + statsCard + filterArea + this.body(latest, prior) + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sr-export')) { App.exportPDF({ title: 'Stock Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
+      if (ev.target.closest('#sr-count-prev')) { this.stepCount(-1); return; }
+      if (ev.target.closest('#sr-count-next')) { this.stepCount(1); return; }
+      if (ev.target.closest('#sr-count-latest')) { this.countId = null; this.draw(); return; }
+      const cchip = ev.target.closest('.sr-count-chip');
+      if (cchip) { this.countId = cchip.dataset.v; this.draw(); return; }
     };
-    document.getElementById('sr-count')?.addEventListener('change', e => { this.countId = e.target.value; this.draw(); });
   },
 
   body(latest, prior) {
