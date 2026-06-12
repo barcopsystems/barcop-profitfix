@@ -98,8 +98,8 @@ S.TheftRisk = {
   },
 
   // Unauthorized large comps. Reads sc_void_comps where auth_threshold_override
-  // is true — meaning the operator saved a Comp over the Hub Settings threshold
-  // without a manager in Authorized By and acknowledged the warning. This is
+  // is true — meaning the operator saved a Comp over the Shift Policies comp
+  // threshold without a manager in Authorized By and acknowledged the warning. This is
   // one of the most common bar-theft patterns (bartender comping a round of
   // drinks without manager involvement) and the auth override is the explicit
   // signal that it happened. 90-day window.
