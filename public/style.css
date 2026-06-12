@@ -1052,9 +1052,14 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:transparent;}
   .ing-tbl tbody td.rd-flag::before{content:none;}
 
-  /* Category-grouped tables (table-layout:fixed) on mobile: show the category
-     ONCE as a header band per card, and the product name as the card title,
-     instead of repeating "<Category> Products" as a label on every stacked row. */
+  /* Category-grouped tables (table-layout:fixed) on mobile: drop the desktop
+     fixed layout + min-width so they stack FULL WIDTH like every other data
+     section (the min-width was forcing them wider than the phone, clipping them
+     to half the screen). Then show the category ONCE as a header band per card,
+     with the product name as the card title, instead of repeating "<Category>
+     Products" as a label on every stacked row. */
+  .data-card .tbl[style*="table-layout:fixed"]{table-layout:auto !important;width:100% !important;min-width:0 !important;}
+  .data-card .tbl[style*="table-layout:fixed"] col{width:auto !important;}
   .data-card .tbl[style*="table-layout:fixed"] thead{display:block;}
   .data-card .tbl[style*="table-layout:fixed"] thead tr{display:block;}
   .data-card .tbl[style*="table-layout:fixed"] thead th{display:none;}
