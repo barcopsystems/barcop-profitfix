@@ -13,10 +13,15 @@ S.ShiftVoidComp = {
   _modalMode: 'manual',    // active-shift log pop-up: same two modes
   _draft: null,            // in-memory header draft (survives leave/return)
   _draftRows: null,        // in-memory line rows
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterType: '',
-  filterServerId: '',
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   // Void reasons. Comp reasons live in App.SC_COMP_REASONS (each tagged loss vs
   // policy expense) so the operator picks ONE thing and Theft Risk, Books, and
@@ -168,25 +173,30 @@ S.ShiftVoidComp = {
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────────
-  filterCard() {
-    const typeOpts = ['', 'Void', 'Comp'].map(x => '<option value="' + x + '"' + (this.filterType === x ? ' selected' : '') + '>' + (x === '' ? 'All types' : x) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="vc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="vc-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Type</label><select id="vc-f-type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Server</label><select id="vc-f-server">' + App.staffOptions(this.filterServerId, { placeholder: 'All servers', audience: 'service' }) + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vc-f-clear">Clear</button></div>'
-      + '</div></div>';
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'vc-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="vc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="vc-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(r => {
       const date = r.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterType && r.type !== this.filterType) return false;
-      if (this.filterServerId && (r.staff_id || '') !== this.filterServerId) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
@@ -216,7 +226,7 @@ S.ShiftVoidComp = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No voids or comps in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'void_comp')).map(r => '<tr class="vc-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
@@ -233,9 +243,9 @@ S.ShiftVoidComp = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th><th>Authorized By</th><th>Reason</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('sc', 'void_comp', filtered, !!(this.filterFrom || this.filterTo || this.filterType || this.filterServerId));
+          + App.showOlderBar('sc', 'void_comp', filtered, this.filterPreset !== 'all');
       }
-      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Void and Comp Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -246,16 +256,25 @@ S.ShiftVoidComp = {
 
   wireList() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#vc-how')) { this.showHowTo(); return; }
-      if (ev.target.closest('.vc-imp-how')) { this.showHowTo(); return; }
       const modeBtn = ev.target.closest('.vc-mode');
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.vc-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#vc-export')) { App.exportPDF({ title: 'Void and Comp Log', root: this.container }); return; }
       if (ev.target.closest('#vc-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
       if (ev.target.closest('#vcb-save')) { this.saveBatch(); return; }
+      if (ev.target.closest('#vcb-startover')) { this.startOver(); return; }
       const rm = ev.target.closest('.vcl-del');
       if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
@@ -268,14 +287,8 @@ S.ShiftVoidComp = {
     };
     // Per-line conditional fields (delegated so new lines work without rewiring).
     this.container.onchange = ev => this.onLineChange(ev);
-    document.getElementById('vc-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('vc-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('vc-f-type')?.addEventListener('change',   e => { this.filterType = e.target.value || ''; this.renderList(); });
-    document.getElementById('vc-f-server')?.addEventListener('change', e => { this.filterServerId = e.target.value || ''; this.renderList(); });
-    document.getElementById('vc-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterType = this.filterServerId = '';
-      this.renderList();
-    });
+    document.getElementById('vc-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('vc-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
 
     // Hold the in-progress batch through leave/return (manual builder only; import
     // mode has no form to hold). Restore the header, then capture header + line rows.
@@ -366,7 +379,7 @@ S.ShiftVoidComp = {
           + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
           + '</div>';
       const html = '<div class="card form-card" style="margin:0;">'
-        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Log Voids / Comps</span>' + App.helpButton('vc-how') + '</div>'
+        + '<div class="card-title">Log Voids / Comps</div>'
         + this.modeToggleHtml(this._modalMode, 'vc-mmode')
         + body
         + '</div>';
@@ -374,8 +387,6 @@ S.ShiftVoidComp = {
       if (!modal) return;
       modal.addEventListener('change', ev => this.onLineChange(ev));
       modal.addEventListener('click', ev => {
-        if (ev.target.closest('#vc-how')) { this.showHowTo(); return; }
-        if (ev.target.closest('.vc-imp-how')) { this.showHowTo(); return; }
         const mb = ev.target.closest('.vc-mmode');
         if (mb) { this._modalMode = mb.dataset.mode; mount(); return; }
         if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
@@ -504,17 +515,25 @@ S.ShiftVoidComp = {
   },
 
   builderCard() {
-    const body = this.entryMode === 'import'
+    const isImport = this.entryMode === 'import';
+    const body = isImport
       ? '<div id="vc-csv"></div><div id="vc-imp-result"></div>'
-      : this.builderInner(null, true)
-        + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
-        + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
+      : this.builderInner(null, true);
+    // Manual mode: Save All + Start Over live below the card (bottom-left), hidden
+    // with the card on collapse. Import mode has no Save (the importer confirms).
+    const belowBtns = isImport ? '' :
+      '<div data-collapse-group="sc-void-comp" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
+      + '<button class="btn btn-ghost" id="vcb-startover">Start Over</button>'
+      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', App.helpButton('vc-how'))
+      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps')
       + '<div class="collapse-body">'
       + this.modeToggleHtml(this.entryMode, 'vc-mode')
       + body
-      + '</div></div>';
+      + '</div></div>'
+      + belowBtns;
   },
 
   // One entry line = one table row. Type drives the Reason list; a tracked
@@ -547,6 +566,14 @@ S.ShiftVoidComp = {
     // Keep at least one row; clearing the last one just resets it.
     if (wrap.querySelectorAll('.vc-line').length <= 1) wrap.innerHTML = this.lineHtml();
     else line.remove();
+  },
+
+  // Reset the manual batch builder to a fresh blank line.
+  startOver() {
+    this.editId = null;
+    this._draft = null;
+    this._draftRows = null;
+    this.renderList();
   },
 
   async saveBatch(after) {
@@ -634,7 +661,8 @@ S.ShiftVoidComp = {
     if (!el || typeof CSVMapper === 'undefined') return;
     const resultId = elId === 'vc-csv-m' ? 'vc-imp-result-m' : 'vc-imp-result';
     CSVMapper.mount(el, {
-      hint: 'Drop a POS voids/comps export: <span class="vc-imp-how" style="color:var(--gold);cursor:pointer;text-decoration:underline;">How it works</span>',
+      dropTitle: 'Drop your POS voids and comps export here',
+      dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
       fields: [
         { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
         { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
