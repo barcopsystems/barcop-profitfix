@@ -249,9 +249,9 @@ S.InventoryCountHistory = {
         + '</tr>';
     }).join('');
 
-    // Compare dropdown — every other count
-    const others = asc.filter(c => c.id !== id);
-    const cmpOpts = '<option value="">Compare to another count...</option>'
+    // Compare dropdown — the 10 most recent other counts, newest first.
+    const others = [...asc].reverse().filter(c => c.id !== id).slice(0, 10);
+    const cmpOpts = '<option value="">Compare Count</option>'
       + others.map(c => '<option value="' + c.id + '"' + (this.compareId === c.id ? ' selected' : '') + '>'
           + esc(c.type) + ', ' + this.fmtDate(c.date) + '</option>').join('');
 
@@ -296,11 +296,12 @@ S.InventoryCountHistory = {
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
       + meta('Locations', esc((count.locations || []).join(', ') || '-'))
       + '</div></div>'
-      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      + '<div class="sh" style="margin:0;">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-      +   '<select id="ch-compare" style="font-size:11px;padding:5px 26px 5px 9px;background:var(--input);border:1px solid var(--b1);border-radius:var(--r);color:var(--t1);line-height:1;cursor:pointer;max-width:240px;">' + cmpOpts + '</select>'
-      +   '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div></div>'
+      + '<div class="no-print" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
+      + '<div>'
+      +   '<div class="sh" style="margin:0 0 8px;">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
+      +   '<select id="ch-compare" class="il-copysel" style="max-width:240px;">' + cmpOpts + '</select>'
+      + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
       + bodyTable + bodyNote
       + '</div>';
 
