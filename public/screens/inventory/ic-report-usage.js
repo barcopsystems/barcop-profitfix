@@ -73,7 +73,7 @@ S.InventoryUsageReport = {
     App.showHelpModal('How the Usage Report Works', [
       { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you. Starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts. Every product is measured in its own stock unit, so liquor and wine show up in bottles, draft in kegs, and bottle beer in cases.'] },
       { h: 'The Math, Spelled Out', p: ['Take a single product across one period. You counted forty bottles of Tito\'s at the front bar to start. A Republic National delivery brought in two cases, so twenty four bottles in. At the next count you had eighteen bottles left. Usage is forty plus twenty four minus eighteen, which is forty six bottles poured through. Bar Cop runs that for every product and every period off your counts and deliveries.'] },
-      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between. Filter by Category or Location to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
+      { h: 'Pick A Period', p: ['Tap a count period up top to choose which two counts to measure between, and tap a category to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
       { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
       { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] }
     ]);
@@ -135,29 +135,25 @@ S.InventoryUsageReport = {
       + this.statItem('Theo Sales', App.fmtCurrency(totSales))
       + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'));
 
-    const periodOpts = asc.slice(1).map((c, i) => {
-      const startC = asc[i];
-      return '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
-        + this.fmtDate(startC.date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>';
-    }).reverse().join('');
+    // Count periods + category as gold-tint chips (Kyle prefers click buttons to
+    // dropdowns). Period chips left + Export right; category chips on a row below.
+    const periodChipItems = asc.slice(1).map((c, i) => ({
+      v: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date)
+    })).reverse();
     const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const catOpts = '<option value="">All categories</option>'
-      + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    const catChipItems = [{ v: '', label: 'All Categories' }].concat(cats.map(c => ({ v: c, label: c })));
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button></div></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:230px;flex-shrink:0;"><label>Count Period</label><select id="ur-period">' + periodOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Category</label><select id="ur-cat">' + catOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ur-clear">Clear</button></div>'
-      + '</div></div>';
+    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + App.filterChips(period.endC.id, periodChipItems, 'ur-period-chip') + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button></div>'
+      + '</div>'
+      + '<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">'
+      + App.filterChips(this.catFilter || '', catChipItems, 'ur-cat-chip') + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
       + statsCard
-      + filterHeading
-      + filterCard
+      + filterArea
       + this.tabBody(rows)
       + '</div>';
 
@@ -165,10 +161,11 @@ S.InventoryUsageReport = {
       if (ev.target.closest('#ur-export')) { App.exportPDF({ title: 'Usage Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
-      if (ev.target.closest('#ur-clear')) { this.catFilter = ''; this.locFilter = ''; this.endCountId = null; this.draw(); return; }
+      const pchip = ev.target.closest('.ur-period-chip');
+      if (pchip) { this.endCountId = pchip.dataset.v; this.catFilter = ''; this.locFilter = ''; this.draw(); return; }
+      const cchip = ev.target.closest('.ur-cat-chip');
+      if (cchip) { this.catFilter = cchip.dataset.v || ''; this.draw(); return; }
     };
-    document.getElementById('ur-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.catFilter = ''; this.locFilter = ''; this.draw(); });
-    document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
   },
 
   tabBody(rows) {
