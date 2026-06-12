@@ -8,10 +8,14 @@
 S.InventoryCountHistory = {
   viewId: null,
   compareId: null,
-  countedByFilter: '',
-  typeFilter: '',
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip (weekly cadence)
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
   filterTo: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' }, { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   counts() {
     return ((App.inventoryData && App.inventoryData.ic_counts) || []);
@@ -26,6 +30,28 @@ S.InventoryCountHistory = {
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
+  // Effective window from the active range chip (preset recomputed off "today" each
+  // render); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export right, directly above the list (the accepted filter
+  // model). Custom reveals a bare From/To row. Weekly cadence for inventory counts.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'ch-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
+  },
+
   showHowTo() {
     App.showHelpModal('How Count History Works', [
       { p: ['Count History is the record of every inventory count you have finalized. Each row is one count, with its value, how it moved versus the count before it, and a full breakdown you can open. This is where you come to prove what your stock was worth on any given day and to see how it is trending week over week.'] },
@@ -36,7 +62,7 @@ S.InventoryCountHistory = {
       { h: 'Watch The Trend, Not One Row', p: ['One count is a photo. The list is the movie. If The Anchor counts every Sunday night and the total value climbs steadily while sales are flat, cash is piling up on the shelves and you are over-ordering. If it drops faster than your sales can explain, that is the first place a leak shows up. Count on the same day and the same way every week so the trend means something.'] },
       { h: 'The Detail View', p: ['Open any count with View to see every product, what you counted, its unit cost, and its value. Bottle beer shows in cases, liquor and wine in bottles, draft in kegs, and food in its own unit. Any note your counter left on a product rides along under the name, so if someone flagged a cracked case of Modelo or a half keg that read low, you see it here.'] },
       { h: 'Comparing Two Counts', p: [
-        'Inside a count, pick another count from the Side-by-Side Comparison menu and the table switches to show what changed product by product. A drop is product you used between the two counts. A rise is product you received.',
+        'Inside a count, pick another count from the compare dropdown at the top and the table switches to show what changed product by product. A drop is product you used between the two counts. A rise is product you received.',
         'Say you compare last Sunday to this Sunday and a 750ml of your house bourbon shows a drop of four bottles. At 1.5 oz a pour that is roughly 67 pours that should match what the register rang. If the bottles moved but the sales did not, that gap is the conversation you need to have.'
       ] },
       { h: 'Deleting A Count', p: ['Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.'] },
@@ -67,18 +93,14 @@ S.InventoryCountHistory = {
       });
       return;
     } else {
-      const counters = [...new Set(asc.map(c => c.counted_by).filter(Boolean))].sort();
-      const types = [...new Set(asc.map(c => c.type).filter(Boolean))].sort();
+      const { from, to } = this.effectiveRange();
       const ordered = asc.map((c, i) => {
         const prior = i > 0 ? asc[i - 1] : null;
         const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
         const isLatest = i === asc.length - 1;
         return { c, variance, isLatest };
       }).reverse()
-        .filter(r => (!this.countedByFilter || r.c.counted_by === this.countedByFilter)
-          && (!this.typeFilter || r.c.type === this.typeFilter)
-          && (!this.filterFrom || (r.c.date || '') >= this.filterFrom)
-          && (!this.filterTo || (r.c.date || '') <= this.filterTo));
+        .filter(r => (!from || (r.c.date || '') >= from) && (!to || (r.c.date || '') <= to));
 
       const latest = asc[asc.length - 1];
       const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
@@ -87,23 +109,6 @@ S.InventoryCountHistory = {
         + '<div class="calc-item"><div class="calc-label">Latest Value</div><div class="calc-val lg">' + App.fmtCurrency(latest.total_value || 0) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(latest.date) + '</div></div>'
         + '</div></div></div>';
-
-      const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-        + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-list-export">Export PDF</button></div></div>';
-
-      const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="ch-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="ch-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Counted By</label><select id="ch-filter">'
-        + '<option value="">All staff</option>'
-        + counters.map(n => '<option value="' + esc(n) + '"' + (this.countedByFilter === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('')
-        + '</select></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Count Type</label><select id="ch-type-filter">'
-        + '<option value="">All types</option>'
-        + types.map(t => '<option value="' + esc(t) + '"' + (this.typeFilter === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
-        + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="ch-clear">Clear</button></div>'
-        + '</div></div>';
 
       const rows = ordered.slice(0, App.listLimit('ic', 'count')).map(r => {
         const c = r.c;
@@ -128,17 +133,26 @@ S.InventoryCountHistory = {
       const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts match the filters.</td></tr>') + '</tbody></table></div></div>'
-        + App.showOlderBar('ic', 'count', ordered, !!(this.countedByFilter || this.typeFilter || this.filterFrom || this.filterTo));
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+        + App.showOlderBar('ic', 'count', ordered, this.filterPreset !== 'all');
 
-      html = statsCard + filterHeading + filterCard + listCard;
+      html = statsCard + this.filterRow() + listCard;
     }
 
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const chip = ev.target.closest('.ch-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#ch-list-export')) { this.exportList(); return; }
-      if (ev.target.closest('#ch-clear')) { this.countedByFilter = ''; this.typeFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
       const del = ev.target.closest('.ch-del');
       const view = ev.target.closest('.ch-view');
       const row = ev.target.closest('.ch-row');
@@ -148,14 +162,6 @@ S.InventoryCountHistory = {
       if (row)  { const id = row.dataset.id;  App.pushView(() => this.renderDetail(id)); return; }
       if (take) App.navigate('ic-take-inventory');
     };
-    document.getElementById('ch-filter')?.addEventListener('change', e => {
-      this.countedByFilter = e.target.value || '';
-      this.renderList();
-    });
-    document.getElementById('ch-type-filter')?.addEventListener('change', e => {
-      this.typeFilter = e.target.value || '';
-      this.renderList();
-    });
     document.getElementById('ch-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('ch-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderList(); });
   },
@@ -290,11 +296,11 @@ S.InventoryCountHistory = {
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
       + meta('Locations', esc((count.locations || []).join(', ') || '-'))
       + '</div></div>'
-      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
       + '<div class="sh" style="margin:0;">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div></div>'
-      + '<div class="card no-print"><div class="form-row" style="margin-bottom:0;"><div class="f" style="width:280px;margin-bottom:0;">'
-      + '<label>Side-by-Side Comparison</label><select id="ch-compare">' + cmpOpts + '</select></div></div></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      +   '<select id="ch-compare" style="font-size:11px;padding:5px 26px 5px 9px;background:var(--input);border:1px solid var(--b1);border-radius:var(--r);color:var(--t1);line-height:1;cursor:pointer;max-width:240px;">' + cmpOpts + '</select>'
+      +   '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div></div>'
       + bodyTable + bodyNote
       + '</div>';
 
