@@ -131,7 +131,7 @@ S.InventorySpotCheck = {
   _isPourable(p) { return !!(p.container_size_oz && p.pour_size_oz); },
   _restockUnit(p) { return p.category === 'Draft Beer' ? 'kegs' : 'btl'; },
   _posUnit(p)     { return this._isCaseBeer(p) ? 'btl' : 'pours'; },
-  _posLabel(p)    { return this._isCaseBeer(p) ? 'POS Bottles Sold' : 'POS Pours Sold'; },
+  _posLabel(p)    { const prefix = (this._curBar || 'POS'); return prefix + (this._isCaseBeer(p) ? ' Bottles Sold' : ' Pours Sold'); },
   _servingWord(p) { return this._isCaseBeer(p) ? 'bottles' : 'pours'; },
 
   showHowTo() {
@@ -281,6 +281,7 @@ S.InventorySpotCheck = {
 
     this._seq = 0;
     const dft = this.draft || { lines: [] };
+    this._curBar = (dft.location || '').trim();   // drives the per-line "<Bar> Pours Sold" label
     this._flagPct = this.flagPctSetting();
     const resuming = !!(this.draft && this.draft.lines && this.draft.lines.length);
 
