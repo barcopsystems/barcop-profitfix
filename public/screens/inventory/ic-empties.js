@@ -183,9 +183,9 @@ S.InventoryEmpties = {
       ? this._draftRows.map(r => this.lineHtml(r)).join('')
       : this.lineHtml();
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Date</label>'
           + '<input type="date" id="emb-date" value="' + esc(App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Performed By</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="emb-by">' + App.staffOptions(defaultBy, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
