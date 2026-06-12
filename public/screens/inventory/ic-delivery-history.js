@@ -5,9 +5,14 @@
    line-item detail view, and print-to-PDF export. */
 
 S.InventoryDeliveryHistory = {
-  vendorFilter: '',
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip (weekly cadence)
+  _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
+  filterFrom: '',          // custom range only
   filterTo: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' }, { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   deliveries() {
     return ((App.inventoryData && App.inventoryData.ic_deliveries) || []);
@@ -20,6 +25,28 @@ S.InventoryDeliveryHistory = {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+
+  // Effective window from the active range chip (preset recomputed off "today"
+  // each render); Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export right, directly above the list (the accepted filter
+  // model). Custom reveals a bare From/To row. Weekly cadence for deliveries.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'dh-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="dh-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="dh-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   // ── Entry ─────────────────────────────────────────────────────────────────
@@ -37,7 +64,7 @@ S.InventoryDeliveryHistory = {
         'Clean means every line matched your expected price and the full quantity showed up. Anything else gets tagged so you can see at a glance which deliveries need a follow-up call before you pay the invoice.'
       ] },
       { h: 'Why The Discrepancy Flag Matters', p: ['Distributors raise prices quietly. A nickel a bottle on your well vodka does not jump off an invoice, but across a year and every case you buy it adds up to real money. When Republic National bumps the price on a line, Delivery History catches it and shows you the old price next to the new one so you can decide to eat it, push back, or switch brands. That is the whole point of recording deliveries instead of just stacking invoices in a drawer.'] },
-      { h: 'Filter By Vendor', p: ['Use the vendor filter to pull up just one distributor. Handy when you are reviewing a single vendor\'s pricing over the last few months or chasing a credit on their account. Pull up Republic National before your rep visits and you walk into that meeting knowing exactly what they have been charging you.'] },
+      { h: 'Filter By Date', p: ['Use the range chips above the list to pull up a stretch of deliveries: this month, the last four or twelve weeks, all of it, or a custom span. Reviewing one distributor before your rep visits, like everything Republic National billed you this quarter? Set the range, hit Export PDF, and sort it by vendor in your spreadsheet.'] },
       { h: 'The Detail View', p: [
         'Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases, so a delivery of Modelo reads in cases the way you order it and pay for it, not loose bottles.',
         'If a line shows a price change, the old price is right there next to what you just paid. If a count came up short, that line tells you what you were billed for versus what hit the floor, which is your starting point for a credit.'
@@ -49,10 +76,6 @@ S.InventoryDeliveryHistory = {
   renderList() {
     this.actions.innerHTML = '';
     const all = this.sorted();
-    const filtered = all.filter(d =>
-      (!this.vendorFilter || d.vendor === this.vendorFilter)
-      && (!this.filterFrom || (d.date || '') >= this.filterFrom)
-      && (!this.filterTo || (d.date || '') <= this.filterTo));
 
     if (all.length === 0) {
       App.setupCard(this.container, {
@@ -65,7 +88,10 @@ S.InventoryDeliveryHistory = {
       return;
     }
 
-    const vendors = [...new Set(all.map(d => d.vendor).filter(Boolean))].sort();
+    const { from, to } = this.effectiveRange();
+    const filtered = all.filter(d =>
+      (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to));
+
     const totalReceived = all.reduce((s, d) => s + (d.total || 0), 0);
     const flagged = all.filter(d => d.has_discrepancy).length;
     const last = all[0];
@@ -77,19 +103,6 @@ S.InventoryDeliveryHistory = {
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg">' + flagged + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Delivery</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
       + '</div></div></div>';
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-list-export">Export PDF</button></div></div>';
-
-    const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="dh-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="dh-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Vendor</label><select id="dh-filter">'
-      + '<option value="">All vendors</option>'
-      + vendors.map(v => '<option value="' + esc(v) + '"' + (this.vendorFilter === v ? ' selected' : '') + '>' + esc(v) + '</option>').join('')
-      + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="dh-clear">Clear</button></div>'
-      + '</div></div>';
 
     const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {
       let disc;
@@ -114,14 +127,23 @@ S.InventoryDeliveryHistory = {
     }).join('');
     const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries match the filter.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'delivery', filtered, !!(this.vendorFilter || this.filterFrom || this.filterTo));
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + App.showOlderBar('ic', 'delivery', filtered, this.filterPreset !== 'all');
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + filterHeading + filterCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + this.filterRow() + listCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const chip = ev.target.closest('.dh-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
-      if (ev.target.closest('#dh-clear')) { this.vendorFilter = ''; this.filterFrom = ''; this.filterTo = ''; this.renderList(); return; }
       const del = ev.target.closest('.dh-del');
       const view = ev.target.closest('.dh-view');
       const row = ev.target.closest('.dh-row');
@@ -129,10 +151,6 @@ S.InventoryDeliveryHistory = {
       if (view) { const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
       if (row)  { const id = row.dataset.id;  App.pushView(() => this.renderDetail(id)); return; }
     };
-    document.getElementById('dh-filter')?.addEventListener('change', e => {
-      this.vendorFilter = e.target.value || '';
-      this.renderList();
-    });
     document.getElementById('dh-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('dh-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderList(); });
   },
