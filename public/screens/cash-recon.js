@@ -90,7 +90,7 @@ S.CashRecon = {
         + '<th>Expected</th><th>Counted</th><th>Over/Short</th><th>Status</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-        + 'Tolerance &plusmn;' + App.fmtCurrency(this.tolerance()) + ' (set in Hub Settings). '
+        + 'Tolerance &plusmn;' + App.fmtCurrency(this.tolerance()) + ' (set in Shift Control under Shift Policies). '
         + 'Repeated shortages feed the Theft Risk scorecard.</div></div>';
     }
 
