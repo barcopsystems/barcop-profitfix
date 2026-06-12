@@ -137,7 +137,7 @@ S.InventorySpotCheck = {
   showHowTo() {
     App.showHelpModal('How the Spot Check Works', [
       { p: ['A spot check is a fast theft and overpour check on a few high-risk bar products for one shift. You count a product before and after the shift, tell Bar Cop what the register rang, and it shows whether what left the bar matches what was sold. It does not touch your inventory counts; it only borrows the product list.'] },
-      { h: 'One Bar At A Time', p: ['A spot check is scoped to one location and its register. Pick the bar you are checking; the product picker holds that bar\'s liquor, wine, bottle beer, and draft. The POS sold you enter or import must be that register\'s sales for the shift, not the whole venue, or the variance is meaningless.'] },
+      { h: 'One Bar At A Time', p: ['A spot check is scoped to one service bar and its register. Pick the bar you are checking from the dropdown (the service bars you marked in Set Locations), and the product picker narrows to that bar\'s liquor, wine, bottle beer, and draft. The POS sold you enter or import must be THAT register\'s sales for the shift, not the whole venue. That single-register scope is the whole point: it is the only way the bottles that left can be matched to what was actually rung. Mark a bar as a service bar with the checkbox on Set Locations.'] },
       { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top shelf and your fast movers. Load Last Targets brings back the products from your last check at that bar so you are not re-picking every shift.'] },
       { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
       { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
@@ -200,16 +200,14 @@ S.InventorySpotCheck = {
     this.renderMain();
   },
 
-  // Optional. The bar/location being spot-checked, sourced from the inventory
-  // locations that actually hold bar product, so a kitchen or dry-storage room is
-  // not offered. Scopes the product picker. Blank is fine; the variance math does
-  // not need it.
+  // The service bars (a register is there), marked in Set Locations. A spot check
+  // is run at ONE of them: it scopes the product picker and tags the saved check.
+  serviceBars() {
+    return ((App.inventoryData && App.inventoryData.ic_locations) || []).filter(l => !l.archived && l.service_bar);
+  },
   locationOptions(selected) {
-    const bar = App.BAR_CATS;
-    const list = ((App.inventoryData && App.inventoryData.ic_locations) || [])
-      .filter(l => !l.archived && this.products().some(p => bar.includes(p.category) && App.productLocations(p).includes(l.name)))
-      .map(l => l.name).sort();
-    let h = '<option value="">Optional</option>';
+    const list = this.serviceBars().map(l => l.name).sort();
+    let h = '<option value="">Select bar...</option>';
     list.forEach(name => { h += '<option value="' + esc(name) + '"' + (selected === name ? ' selected' : '') + '>' + esc(name) + '</option>'; });
     return h;
   },
@@ -268,12 +266,14 @@ S.InventorySpotCheck = {
   renderMain() {
     this.actions.innerHTML = '';
 
-    if (this.products().length === 0) {
+    const sbList = this.serviceBars();
+    if (this.products().length === 0 || sbList.length === 0) {
       App.setupCard(this.container, {
         title: 'Set Up Spot Checks',
-        lead: 'A spot check is a fast theft check on a few high-risk bottles for one shift. Add your products and you can run one in under a minute.',
+        lead: 'A spot check is a fast theft check on a few high-risk bottles for one shift, run at one service bar. Set these up and you can run one in under a minute.',
         steps: [
-          { title: 'Add your products', desc: 'A spot check runs against the bottles you stock, so add your products first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 }
+          { title: 'Add your products', desc: 'A spot check runs against the bottles you stock, so add your products first.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 },
+          { title: 'Mark your service bars', desc: 'In Set Locations, check "Service bar" on each bar that has a register. A spot check is run at one of these.', btn: 'Set Locations', screen: 'ic-locations', done: sbList.length > 0 }
         ]
       });
       return;
@@ -311,7 +311,7 @@ S.InventorySpotCheck = {
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar (optional)</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar</label>'
         + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
@@ -691,13 +691,13 @@ S.InventorySpotCheck = {
 
   async save() {
     if (!App.canEdit('ic-spot-check')) return;
-    // No warning text. A missing required field turns its cell border red, the
-    // same as the Add Product form. Register is optional.
+    // A missing required field turns its cell border red, like the Add Product form.
     this.clearMissing();
     const mark = id => { document.getElementById(id)?.closest('.f')?.classList.add('field-missing'); };
     const date = document.getElementById('sp-date')?.value;
     if (!date) { this.expandSetup(); mark('sp-date'); return; }
     const location = document.getElementById('sp-loc')?.value || '';
+    if (!location) { this.expandSetup(); mark('sp-loc'); return; }
 
     const lines = [...document.querySelectorAll('.sp-line')];
     if (lines.length === 0) { this.expandSetup(); mark('sp-add'); return; }
