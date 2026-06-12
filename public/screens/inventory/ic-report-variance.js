@@ -4,13 +4,18 @@
    Compares what was used (from inventory counts) against what was sold (from a
    POS sales CSV). Two-step flow:
 
-   SETUP (landing): pick the Count Period, set Variance Standards, import the POS
-   sales for that exact date range, map any unmatched products, then Run Report.
-   Running SAVES the run (the period + the uploaded POS) to history, keyed by the
-   count period — one run per period, re-running overwrites it. Standards are NOT
-   saved: OK/Flag always re-derives from your CURRENT standards, so changing a
-   standard re-judges every saved period consistently and never makes junk
-   history. (See [[help-model]] context: the nav "i" carries directions.)
+   LANDING: front and center is the QUICK VARIANCE CHECK — pick a count period and
+   key in your actual category sales (off the POS sales-by-category report); Bar Cop
+   compares them to the theoretical (the period's comp/waste-adjusted usage valued at
+   each product's pour price, summed by category) for an instant per-category +
+   overall variance, with a vs-last-period column and an overall-variance trend strip.
+   No upload needed; actuals save per period (variance_category_sales). BELOW that,
+   "Dig Deeper" is the product-level path: set Variance Standards, import the POS
+   sales for that date range, map any unmatched products, then Run Report. Running
+   SAVES the run (the period + the uploaded POS) to history, keyed by the count
+   period — one run per period, re-running overwrites it. Standards are NOT saved:
+   OK/Flag always re-derives from your CURRENT standards, so changing a standard
+   re-judges every saved period consistently. (See [[help-model]]: the nav "i".)
 
    REPORT: a clean read-only view of one saved run — a two-period scroller over
    the saved runs for lookback, stats, and the Sales Variance / Usage Variance /
@@ -68,7 +73,8 @@ S.InventoryVarianceReport = {
   showHowTo() {
     App.showHelpModal('How the Variance Report Works', [
       { p: ['Variance is the leak detector. It takes what your counts say you used and compares it to what your POS actually sold. The gap is product that left the bar without a matching sale: over-pour, theft, give-aways, or a count error.'] },
-      { h: 'Set It Up, Then Run It', p: ['On the setup screen pick the count period, set your variance standards, then upload a product sales report from your POS for that exact date range. Map the product name, quantity, and sales columns once, map anything unmatched, then Run Report. Bar Cop saves the run so you can look back at it later.'] },
+      { h: 'Quick Variance Check (No Upload)', p: ['The fastest read is the Quick Variance Check on the landing. Pick a count period and Bar Cop shows what each beverage category should have rung at your standard pour pricing. Type in your actual category sales off your POS sales-by-category report and the variance shows instantly, per category and overall, with last period beside it. A few percent is normal over-pour and rounding; a big gap is where to look. No file upload needed. It assumes your drinks are priced off your standard pour costs; food and recipe items are covered in the deep dive below.'] },
+      { h: 'Dig Deeper: Set It Up, Then Run It', p: ['For product-by-product detail, scroll to Dig Deeper, set your variance standards, then upload a product sales report from your POS for that exact date range. Map the product name, quantity, and sales columns once, map anything unmatched, then Run Report. Bar Cop saves the run so you can look back at it later.'] },
       { h: 'Map Anything Unmatched', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once and Bar Cop remembers it for every future upload. Cocktails and plates explode through their recipe so each ingredient gets its share. If a product sells in more than one size, a pint and a pitcher, each size you set up shows as its own choice, so map the pitcher line to the pitcher size and it draws the right ounces and revenue.'] },
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS, so variance is unexplained loss, not give-aways you already tracked.'] },
       { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours, and bottles. Draft shows ounces and kegs. Bottle beer matches bottle for bottle. Mixers read in quarts. Food reads per ingredient in its own unit. Cocktails and plates explode through their recipe so each ingredient gets its share.'] },
@@ -333,12 +339,11 @@ S.InventoryVarianceReport = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
-    // Entering the screen with nothing in flight: open the latest saved run if
-    // one exists, otherwise start in setup.
-    if (!this.reportOpen && !this.posRows) {
-      const latest = this.runsSorted()[0];
-      if (latest) this.loadRun(latest);
-    }
+    // Always land on the Quick Variance Check (setup). The deep-dive product
+    // report opens from a POS run or "View saved reports".
+    this.reportOpen = false;
+    this.posRows = null;
+    this._unmatchedCollapsed = null;
     this.draw();
   },
 
@@ -359,25 +364,18 @@ S.InventoryVarianceReport = {
     else this.renderSetup();
   },
 
-  // ── SETUP (landing) ─────────────────────────────────────────────────────────
+  // ── SETUP / LANDING (Quick Variance Check + the deep-dive upload) ───────────
   renderSetup() {
-    const asc = this.countsAsc();
     const period = this.currentPeriod();
-    const periodOpts = asc.slice(1).map((c, i) =>
-      '<option value="' + c.id + '"' + (c.id === period.endC.id ? ' selected' : '') + '>'
-      + this.fmtDate(asc[i].date) + ' &rarr; ' + this.fmtDate(c.date) + '</option>').reverse().join('');
 
-    const viewSaved = this.runs().length
-      ? '<div style="align-self:flex-end;padding-bottom:9px;font-size:12px;color:var(--t3);">or <span id="vr-view-saved" style="margin-left:5px;color:var(--gold);cursor:pointer;text-decoration:underline;">view saved reports</span></div>'
-      : '';
-    const controls = '<div class="card form-card no-print"><div class="card-title">Variance Report</div>'
-      + '<div class="form-row" style="gap:16px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;"><div class="f" style="width:280px;margin-bottom:0;">'
-      + '<label>Select Count Period</label><select id="vr-period">' + periodOpts + '</select></div>'
-      + viewSaved + '</div></div>';
+    const periodRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;">'
+      + this.periodStepper()
+      + (this.runs().length ? '<button class="btn btn-ghost btn-sm" id="vr-view-saved">View saved reports</button>' : '')
+      + '</div>';
 
     let importBlock;
     if (!this.posRows) {
-      importBlock = '<div class="card form-card"><div class="card-title">Import POS Sales</div><div id="vr-import"></div></div>'
+      importBlock = '<div class="card form-card"><div class="card-title">Upload Full POS Sales</div><div id="vr-import"></div></div>'
         + '<div id="vr-import-actions"></div>';
     } else {
       importBlock = this.matchSummary() + this.unmatchedCard()
@@ -386,18 +384,34 @@ S.InventoryVarianceReport = {
         + '<button class="btn btn-ghost" id="vr-reimport">Re-import a different file</button>'
         + '</div>';
     }
+    const digDeeper = '<div class="sh" style="margin:28px 0 10px;">Dig Deeper: Product-by-Product Detail</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Upload your full POS sales for this period to break variance down to every product and run the recipe-level Sales and Usage Variance.</div>'
+      + this.varianceStandardsCard() + importBlock;
 
-    this.container.innerHTML = '<div class="screen">' + controls + this.varianceStandardsCard() + importBlock + '</div>';
+    this.container.innerHTML = '<div class="screen">'
+      + periodRow + this.quickCheckCard() + this.quickTrendStrip() + digDeeper + '</div>';
 
-    // Changing the period invalidates any already-dropped file (a file belongs to
-    // one date range), so clear it and return to the dropzone for the new period.
-    document.getElementById('vr-period')?.addEventListener('change', e => {
-      this.endCountId = e.target.value;
-      this.posRows = null;
-      this._unmatchedCollapsed = null;
-      this.draw();
-    });
+    // Period scroller.
+    document.getElementById('vrq-period-prev')?.addEventListener('click', () => this.stepPeriod(-1));
+    document.getElementById('vrq-period-next')?.addEventListener('click', () => this.stepPeriod(1));
+    document.getElementById('vrq-period-latest')?.addEventListener('click', () => { const a = this.countsAsc(); if (a.length) { this.endCountId = a[a.length - 1].id; this.posRows = null; this._unmatchedCollapsed = null; this.draw(); } });
+    this.container.querySelectorAll('.vrq-period-chip').forEach(b => b.addEventListener('click', () => { this.endCountId = b.dataset.v; this.posRows = null; this._unmatchedCollapsed = null; this.draw(); }));
     document.getElementById('vr-view-saved')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); this.scrollTop(); } });
+
+    // Quick Variance Check: live recompute on input, save the actuals per period
+    // on change.
+    this.container.querySelectorAll('.qv-in').forEach(inp => {
+      inp.addEventListener('input', () => this.recomputeQuickCheck());
+      inp.addEventListener('change', async () => {
+        const store = this.categorySalesStore(), eid = period.endC.id;
+        if (!store[eid]) store[eid] = {};
+        const raw = inp.value;
+        if (raw === '' || raw == null || isNaN(parseFloat(raw))) delete store[eid][inp.dataset.cat];
+        else store[eid][inp.dataset.cat] = parseFloat(raw);
+        await App.saveInventory();
+      });
+    });
+
     this.wireStandards();
 
     if (!this.posRows) {
@@ -419,7 +433,7 @@ S.InventoryVarianceReport = {
           })).filter(r => r.name);
           this.manualMap = { ...this.savedPosMap() };
           this._unmatchedCollapsed = null;
-          this.draw();                 // stay in setup; now shows mapping + Run Report
+          this.draw();                 // stay on the landing; now shows mapping + Run Report
         }
       });
     } else {
@@ -427,6 +441,201 @@ S.InventoryVarianceReport = {
       document.getElementById('vr-reimport')?.addEventListener('click', () => { this.posRows = null; this._unmatchedCollapsed = null; this.draw(); });
       this.wireSetupMapping();
     }
+  },
+
+  // ── Quick Variance Check (key in category sales, no POS upload) ──────────────
+  categorySalesStore() {
+    if (!App.inventoryData) App.inventoryData = {};
+    if (!App.inventoryData.variance_category_sales) App.inventoryData.variance_category_sales = {};
+    return App.inventoryData.variance_category_sales;
+  },
+  categorySalesFor(endCountId) { return this.categorySalesStore()[endCountId] || {}; },
+
+  // Theoretical category sales for the CURRENT period: each product's pours valued
+  // at its menu price, summed by category, with coverage (priced of sellable). Only
+  // products sold by a pour/serving contribute, so Food/Misc ingredients drop out.
+  categoryTheoretical() {
+    const usage = this.usageMap();
+    const out = {};
+    Object.keys(usage).forEach(pid => {
+      const u = usage[pid], p = u.product || {};
+      const cat = p.category;
+      if (!this.CAT_ORDER.includes(cat) || u.poursMade == null) return;
+      if (!out[cat]) out[cat] = { theo: 0, priced: 0, total: 0 };
+      out[cat].total++;
+      if (p.menu_price) { out[cat].theo += u.poursMade * p.menu_price; out[cat].priced++; }
+    });
+    return out;
+  },
+  // Same, for an arbitrary period (vs-Last + trend). Save/restore the selected
+  // period so the live page is untouched.
+  categoryTheoForPeriod(endCountId) {
+    const saved = this.endCountId;
+    this.endCountId = endCountId;
+    const out = this.categoryTheoretical();
+    this.endCountId = saved;
+    return out;
+  },
+  // Overall variance for a period across only the categories the operator entered
+  // (apples to apples). Null if nothing entered.
+  overallVarianceForPeriod(endCountId) {
+    const theoMap = this.categoryTheoForPeriod(endCountId);
+    const actuals = this.categorySalesFor(endCountId);
+    let theo = 0, actual = 0, any = false;
+    Object.keys(theoMap).forEach(cat => {
+      if (actuals[cat] == null) return;
+      theo += theoMap[cat].theo; actual += parseFloat(actuals[cat]) || 0; any = true;
+    });
+    if (!any) return null;
+    return { theo, actual, variance: theo - actual, pct: theo ? (theo - actual) / theo * 100 : null };
+  },
+
+  quickCheckCard() {
+    const period = this.currentPeriod();
+    const theoMap = this.categoryTheoretical();
+    const actuals = this.categorySalesFor(period.endC.id);
+    const cats = this.CAT_ORDER.filter(c => theoMap[c] && theoMap[c].total > 0);
+    this._qvTheo = {};
+    cats.forEach(c => { this._qvTheo[c] = theoMap[c].theo; });
+
+    const note = 'This compares what your pours should have rung at your standard pour pricing against the category sales you key in from your POS. A few percent is normal over-pour and rounding; a big gap is where to look. It assumes your drinks are priced off your standard pour costs. Food and recipe items are covered in the product detail below.';
+    if (!cats.length) {
+      return '<div class="sh" style="margin:0 0 10px;">Quick Variance Check</div>'
+        + '<div class="card"><div style="font-size:13px;color:var(--t3);padding:6px 2px;">No beverage usage to check for this period yet. This works once your counts cover liquor, beer, or wine and those products have a menu price set.</div></div>';
+    }
+
+    const asc = this.countsAsc();
+    const endIdx = asc.findIndex(x => x.id === period.endC.id);
+    const priorEndId = endIdx >= 2 ? asc[endIdx - 1].id : null;
+    const priorTheo = priorEndId ? this.categoryTheoForPeriod(priorEndId) : {};
+    const priorActuals = priorEndId ? this.categorySalesFor(priorEndId) : {};
+    const priorPct = c => {
+      const pt = (priorTheo[c] && priorTheo[c].theo) || null, pa = priorActuals[c];
+      if (pt == null || pa == null) return null;
+      return pt ? (pt - (parseFloat(pa) || 0)) / pt * 100 : null;
+    };
+    const dash = '<span style="color:var(--t4);">-</span>';
+
+    let totTheo = 0, totActual = 0, any = false;
+    const body = cats.map(c => {
+      const t = theoMap[c].theo;
+      const av = actuals[c];
+      const entered = av != null;
+      const v = entered ? t - (parseFloat(av) || 0) : null;
+      const pct = (entered && t) ? v / t * 100 : null;
+      if (entered) { totTheo += t; totActual += (parseFloat(av) || 0); any = true; }
+      const pp = priorPct(c);
+      const cov = (theoMap[c].priced < theoMap[c].total)
+        ? ' <span style="font-size:9px;color:var(--t3);">(' + theoMap[c].priced + ' of ' + theoMap[c].total + ' priced)</span>' : '';
+      return '<tr>'
+        + '<td><div class="val">' + esc(c) + cov + '</div></td>'
+        + '<td>' + App.fmtCurrency(t) + '</td>'
+        + '<td><div class="fw" style="max-width:150px;"><span class="pre">$</span><input class="form-input pre qv-in" data-cat="' + esc(c) + '" type="number" min="0" step="0.01" value="' + (entered ? esc(String(av)) : '') + '" placeholder="0.00"/></div></td>'
+        + '<td class="qv-var" data-cat="' + esc(c) + '">' + (entered ? App.fmtCurrency(v) : dash) + '</td>'
+        + '<td class="qv-pct" data-cat="' + esc(c) + '">' + (pct != null ? pct.toFixed(1) + '%' : dash) + '</td>'
+        + '<td style="color:var(--t3);">' + (pp != null ? pp.toFixed(1) + '%' : dash) + '</td>'
+        + '</tr>';
+    }).join('');
+    const overall = '<tr style="font-weight:700;">'
+      + '<td>Overall</td>'
+      + '<td id="qv-theo-total">' + (any ? App.fmtCurrency(totTheo) : dash) + '</td>'
+      + '<td id="qv-actual-total">' + (any ? App.fmtCurrency(totActual) : dash) + '</td>'
+      + '<td id="qv-var-total">' + (any ? App.fmtCurrency(totTheo - totActual) : dash) + '</td>'
+      + '<td id="qv-pct-total">' + (any && totTheo ? ((totTheo - totActual) / totTheo * 100).toFixed(1) + '%' : dash) + '</td>'
+      + '<td></td></tr>';
+
+    const headers = '<th>Category</th><th>Theoretical Sales</th><th>Actual Sales</th><th>Variance</th><th>Variance %</th><th>Last Period</th>';
+    return '<div class="sh" style="margin:0 0 10px;">Quick Variance Check</div>'
+      + this.dataCard(headers, body + overall)
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:10px 2px 0;">' + note + '</div>';
+  },
+
+  recomputeQuickCheck() {
+    const theo = this._qvTheo || {};
+    const dash = '<span style="color:var(--t4);">-</span>';
+    let totTheo = 0, totActual = 0, any = false;
+    this.container.querySelectorAll('.qv-in').forEach(inp => {
+      const cat = inp.dataset.cat, t = theo[cat] || 0, raw = inp.value;
+      const varCell = this.container.querySelector('.qv-var[data-cat="' + cat + '"]');
+      const pctCell = this.container.querySelector('.qv-pct[data-cat="' + cat + '"]');
+      if (raw === '' || raw == null || isNaN(parseFloat(raw))) {
+        if (varCell) varCell.innerHTML = dash;
+        if (pctCell) pctCell.innerHTML = dash;
+        return;
+      }
+      const actual = parseFloat(raw) || 0, v = t - actual, pct = t ? v / t * 100 : null;
+      if (varCell) varCell.textContent = App.fmtCurrency(v);
+      if (pctCell) pctCell.textContent = pct == null ? '-' : pct.toFixed(1) + '%';
+      totTheo += t; totActual += actual; any = true;
+    });
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.innerHTML = txt; };
+    set('qv-theo-total', any ? App.fmtCurrency(totTheo) : dash);
+    set('qv-actual-total', any ? App.fmtCurrency(totActual) : dash);
+    set('qv-var-total', any ? App.fmtCurrency(totTheo - totActual) : dash);
+    set('qv-pct-total', any && totTheo ? ((totTheo - totActual) / totTheo * 100).toFixed(1) + '%' : dash);
+  },
+
+  quickTrendStrip() {
+    const asc = this.countsAsc();
+    const periods = asc.slice(1).map(c => ({ endId: c.id, label: this.fmtDate(c.date) })).reverse().slice(0, 6);
+    const items = periods.map(p => {
+      const ov = this.overallVarianceForPeriod(p.endId);
+      return ov && ov.pct != null ? { label: p.label, pct: ov.pct } : null;
+    }).filter(Boolean);
+    if (items.length < 2) return '';
+    const cells = items.reverse().map(it => {
+      const col = Math.abs(it.pct) > 5 ? 'var(--amber)' : 'var(--t1)';
+      return '<div style="text-align:center;min-width:64px;">'
+        + '<div style="font-size:15px;font-weight:700;color:' + col + ';">' + it.pct.toFixed(1) + '%</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px;">' + esc(it.label) + '</div></div>';
+    }).join('');
+    return '<div class="sh" style="margin:24px 0 10px;">Overall Variance Trend</div>'
+      + '<div class="card"><div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;">' + cells + '</div></div>';
+  },
+
+  periodStepper() {
+    const asc = this.countsAsc();
+    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date) }));
+    const len = periods.length;
+    const cur = this.currentPeriod();
+    let selIdx = periods.findIndex(p => p.endId === (cur ? cur.endC.id : null));
+    if (selIdx < 0) selIdx = len - 1;
+    const chip = idx => {
+      const p = periods[idx];
+      const on = idx === selIdx, isNewest = idx === len - 1;
+      return '<button type="button" class="vrq-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + esc(p.label)
+        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let winStart = selIdx - 1;
+    if (winStart < 0) winStart = 0;
+    if (winStart > len - 2) winStart = Math.max(0, len - 2);
+    let chips = '';
+    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
+    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
+    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="vrq-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="vrq-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
+      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="vrq-period-latest" style="margin-left:4px;">Latest</button>' : '')
+      + '</div>';
+  },
+  stepPeriod(delta) {
+    const ids = this.countsAsc().slice(1).map(c => c.id);
+    if (!ids.length) return;
+    const cur = this.currentPeriod();
+    let selIdx = ids.indexOf(cur ? cur.endC.id : null);
+    if (selIdx < 0) selIdx = ids.length - 1;
+    const ni = selIdx + delta;
+    if (ni < 0 || ni >= ids.length) return;
+    this.endCountId = ids[ni];
+    this.posRows = null;
+    this._unmatchedCollapsed = null;
+    this.draw();
   },
 
   matchSummary() {
@@ -919,7 +1128,8 @@ S.InventoryVarianceReport = {
     return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
   },
   renderUsageCat(cat, rows) {
-    const label = esc(cat) + ' Products';
+    // Misc rows are mixers, Food rows are recipe ingredients — name them so.
+    const label = cat === 'Misc' ? 'Misc Mixers' : cat === 'Food' ? 'Food Ingredients' : esc(cat) + ' Products';
     if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows, label);
     if (cat === 'Draft Beer')  return this.usageTableDraft(rows, label);
     if (cat === 'Misc')        return this.usageTableMisc(rows, label);
