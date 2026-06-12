@@ -492,7 +492,7 @@ S.HubBarCopAudit = {
     expSoon.forEach(c => {
       const daysLeft = this._daysSince(c.expiration_date) * -1;
       out.push({
-        label:    (c.cert_name || c.name || 'Certification') + ' expiring in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's'),
+        label:    (c.cert_type || c.cert_name || c.name || 'Certification') + ' expiring in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's'),
         detail:   (c.staff_name ? 'For ' + c.staff_name + '. ' : '') + 'Renew before lapse to stay compliant.',
         severity: daysLeft <= 7 ? 'critical' : 'warn'
       });
