@@ -13,14 +13,16 @@
      - Found      (increase — discovered stock not previously counted)
      - Other      (operator picks direction)
 
-   Each record: { id, date_time, product_id, product_name, category, quantity,
-   unit, direction:'in'|'out', reason, unit_cost_at_adjustment, value,
-   performed_by_id, performed_by, witnessed_by_id, witnessed_by, notes,
-   created_at }. Variance math does NOT auto-subtract these — the report
-   surfaces them separately so the operator sees the attribution. */
+   Entry is a BATCH builder (a shared header over a stack of line rows, Add Line,
+   one Save All) matching the Waste / Void-Comp logs. Each line saves as its own
+   record. Edit a past one in a focused pop-up. Variance math does NOT
+   auto-subtract these — the report surfaces them separately so the operator sees
+   the attribution. */
 
 S.InventoryAdjustments = {
   editId: null,
+  _draft: null,            // in-memory header draft (survives leave/return)
+  _draftRows: null,        // in-memory line rows
   filterPreset: 'last-4',  // active range chip (weekly cadence)
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
@@ -50,6 +52,11 @@ S.InventoryAdjustments = {
   },
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
+  activeShift() {
+    const list = (App.shiftData && App.shiftData.sc_shifts) || [];
+    return list.filter(s => s.status === 'Open')
+      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0] || null;
+  },
 
   fmtDate(str) {
     if (!str) return '-';
@@ -70,14 +77,20 @@ S.InventoryAdjustments = {
       + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   },
 
-  // Effective window from the active range chip (preset recomputed off "today"
-  // each render); Custom reads the From/To pickers; All clears it.
+  // Per-unit cost for the chosen unit (case-tracked beer reads per-case in
+  // 'cases', per-bottle otherwise). Drives the per-line Value + the snapshot.
+  perUnitCostFor(p, unit) {
+    if (!p) return 0;
+    if (p.category === 'Bottle Beer' && p.case_size) return (unit === 'cases') ? (App.unitCost(p) || 0) : (App.bottleCost(p) || 0);
+    return App.unitCost(p) || 0;
+  },
+  costFor(p, qty, unit) { return (qty > 0 ? qty : 0) * this.perUnitCostFor(p, unit); },
+
+  // Effective window from the active range chip; Custom reads From/To; All clears.
   effectiveRange() {
     if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
     return App.datePresetRange(this.filterPreset);
   },
-  // Range chips left, Export + Worksheet right, directly above the list (the
-  // accepted filter model). Custom reveals a bare From/To row. Weekly cadence.
   filterRow() {
     const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'adj-range-chip');
     const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
@@ -97,6 +110,7 @@ S.InventoryAdjustments = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    if (actions) actions.innerHTML = '';
     this.renderList();
   },
 
@@ -117,92 +131,295 @@ S.InventoryAdjustments = {
     }
 
     const all = this.adjustments();
+    const formCard = this.builderCard();
+
+    let below;
     if (all.length === 0) {
-      this.container.innerHTML = '<div class="screen">' + this.logFormCard()
-        + '<div style="font-size:13px;color:var(--t3);padding:14px 2px;">No adjustments logged yet. Use the form above to log the first one.</div></div>';
-      this.wireForm('adj-');
-      return;
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No adjustments logged yet. Use the form above to log the first one.</div>';
+    } else {
+      const { from, to } = this.effectiveRange();
+      const filtered = all.filter(r => {
+        const date = (r.date_time || '').slice(0, 10);
+        return (!from || date >= from) && (!to || date <= to);
+      }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+
+      let totalLoss = 0, totalFound = 0, lastDate = '';
+      all.forEach(r => {
+        const val = Math.abs(r.value || 0);
+        if (r.direction === 'in') totalFound += val; else totalLoss += val;
+        const d = r.date_time || r.created_at || '';
+        if (!lastDate || new Date(d).getTime() > new Date(lastDate).getTime()) lastDate = d;
+      });
+
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Adjustments</div><div class="calc-val lg">' + all.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val lg" style="color:var(--red);">' + App.fmtCurrency(totalLoss) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Found</div><div class="calc-val lg" style="color:var(--green);">' + App.fmtCurrency(totalFound) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
+        + '</div></div>';
+
+      let listHtml;
+      if (filtered.length === 0) {
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No adjustments in this range. Pick a wider range above.</div>';
+      } else {
+        const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
+          // Direction reads off the signed, colored Value (red loss / green
+          // found), so the Reason column carries the reason alone.
+          const valStr = r.direction === 'in'
+            ? '<span style="color:var(--green);">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
+            : '<span style="color:var(--red);">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
+          return '<tr class="adj-row" data-id="' + r.id + '" style="cursor:pointer;">'
+            + '<td><div class="val">' + this.fmtDateTime(r.date_time) + '</div></td>'
+            + '<td><div class="val">' + esc(r.product_name || '-') + '</div>'
+            + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
+            + '<td>' + (r.quantity != null ? r.quantity : '-') + ' ' + esc(r.unit || '') + '</td>'
+            + '<td>' + esc(r.reason || '-') + '</td>'
+            + '<td class="val">' + valStr + '</td>'
+            + '<td>' + esc(r.performed_by || '-') + '</td>'
+            + '<td><div class="row-actions">'
+            + (App.canEdit('ic-adjustments') ? '<button class="btn btn-ghost btn-sm adj-edit" data-id="' + r.id + '">Edit</button>' : '')
+            + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
+            + '</div></td></tr>';
+        }).join('');
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + App.showOlderBar('ic', 'adjustment', filtered, this.filterPreset !== 'all');
+      }
+      below = statsCard + this.filterRow() + listHtml;
     }
 
-    const { from, to } = this.effectiveRange();
-    const filtered = all.filter(r => {
-      const date = (r.date_time || '').slice(0, 10);
-      return (!from || date >= from) && (!to || date <= to);
-    }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
-
-    let totalLoss = 0, totalFound = 0, lastDate = '';
-    all.forEach(r => {
-      const val = Math.abs(r.value || 0);
-      if (r.direction === 'in') totalFound += val; else totalLoss += val;
-      const d = r.date_time || r.created_at || '';
-      if (!lastDate || new Date(d).getTime() > new Date(lastDate).getTime()) lastDate = d;
-    });
-
-    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Adjustments</div><div class="calc-val lg">' + all.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val lg" style="color:var(--red);">' + App.fmtCurrency(totalLoss) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Found</div><div class="calc-val lg" style="color:var(--green);">' + App.fmtCurrency(totalFound) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
-      + '</div></div>';
-
-    const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
-      const dirText = r.direction === 'in'
-        ? '<span style="color:var(--t2);">Found</span>'
-        : '<span style="color:var(--t2);">Loss</span>';
-      const valStr = r.direction === 'in'
-        ? '<span style="color:var(--green);">+' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>'
-        : '<span style="color:var(--red);">-' + App.fmtCurrency(Math.abs(r.value || 0)) + '</span>';
-      return '<tr class="adj-row" data-id="' + r.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDateTime(r.date_time) + '</div></td>'
-        + '<td><div class="val">' + esc(r.product_name || '-') + '</div>'
-        + (r.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.category) + '</div>' : '') + '</td>'
-        + '<td>' + (r.quantity != null ? r.quantity : '-') + ' ' + esc(r.unit || '') + '</td>'
-        + '<td>' + esc(r.reason || '-') + ' ' + dirText + '</td>'
-        + '<td class="val">' + valStr + '</td>'
-        + '<td>' + esc(r.performed_by || '-') + '</td>'
-        + '<td><div class="row-actions">'
-        + (App.canEdit('ic-adjustments') ? '<button class="btn btn-ghost btn-sm adj-edit" data-id="' + r.id + '">Edit</button>' : '')
-        + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
-        + '</div></td></tr>';
-    }).join('');
-    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No adjustments in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'adjustment', filtered, this.filterPreset !== 'all');
-
-    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + this.filterRow() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
+    App.applyCollapsed(this.container);
     this.wireList();
-    this.wireForm('adj-');
   },
 
   showHowTo() {
     App.showHelpModal('How the Adjustment Log Works', [
       { p: ['An adjustment documents stock that left or came back into inventory outside of a normal sale, like product damaged in storage, theft you confirmed, product that expired, or stock you found that was never counted. It keeps your counts clean while attributing the loss to a real cause. Without it, every broken bottle and dumped keg shows up as mystery shrinkage and looks like theft.'] },
-      { h: 'Logging An Adjustment', p: ['Set the date and time, pick the reason, and confirm the direction. Loss for product that left, Found for stock that came back. Pick the product, the quantity, and the unit. Draft is by the keg, bottle beer by the case, liquor and wine by the bottle. Bar Cop estimates the dollar value from the product cost as you go, so you see what the loss actually cost you in real money before you save it. Start Over clears the form if you want to begin fresh.'] },
+      { h: 'Logging Adjustments', p: ['Set the date, time, and who did it up top, then add a line for each adjustment off your sheet: pick the reason, confirm the direction (Loss for product that left, Found for stock that came back), then the product, quantity, and unit. Bar Cop shows the dollar value per line as you go, so you see what each loss actually cost you. Add Line for another, and Save All writes them in one shot. Start Over clears the form.'] },
       { h: 'Reasons And Direction', p: ['Damage, Theft, and Expiration default to a Loss. Found defaults to an increase. Other lets you set the direction yourself. Use the right reason, because a write-off labeled Theft feeds your Theft Risk picture while one labeled Damage does not. Honest reasons keep that signal clean.'] },
-      { h: 'A Real Example', p: ['A barback at The Anchor drops a full bottle of Hennessy on the way to the well and it shatters. Log it: reason Damage, direction Loss, product Hennessy, quantity one bottle. Bar Cop prices it off your cost, say a 750ml bottle that runs you about thirty dollars, and books a thirty dollar documented loss. Now when you run variance for the period, that thirty dollars is accounted for and does not get mistaken for product walking out the door.'] },
+      { h: 'A Real Example', p: ['A barback at The Anchor drops a full bottle of Hennessy on the way to the well and it shatters. Add a line: reason Damage, direction Loss, product Hennessy, quantity one bottle. Bar Cop prices it off your cost, say a 750ml bottle that runs you about thirty dollars, and books a thirty dollar documented loss. Now when you run variance for the period, that thirty dollars is accounted for and does not get mistaken for product walking out the door.'] },
       { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your last count or auto-subtract from variance. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail they can stand behind at tax time.'] },
       { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it, and edit or delete any entry to fix a mistake. The Worksheet button prints a clean grid you can carry into the storeroom during a damage or expiration walk-through, then enter the rows here after.'] }
     ]);
   },
 
-  // The Log an Adjustment form lives at the top of the landing page (collapsible).
-  logFormCard() {
+  // ── Batch entry builder (mirrors the Waste / Void-Comp logs) ───────────────
+  builderInner(useDraft) {
+    const active = this.activeShift();
+    const defaultBy = active ? (active.manager_id || '') : '';
+    const rowsHtml = (useDraft && this._draftRows && this._draftRows.length)
+      ? this._draftRows.map(r => this.lineHtml(r)).join('')
+      : this.lineHtml();
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Date / Time</label>'
+          + '<input type="datetime-local" id="ajb-when" value="' + esc(this.nowDateTime().slice(0, 16)) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:170px;"><label>Performed By</label>'
+          + '<select id="ajb-by">' + App.staffOptions(defaultBy, { placeholder: 'Select staff...' }) + '</select></div>'
+        + '<div class="f" style="flex:1;min-width:170px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<select id="ajb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
+      + '</div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th style="min-width:170px;">Product</th><th style="width:80px;">Qty</th><th style="width:100px;">Unit</th>'
+      + '<th style="min-width:130px;">Reason</th><th style="width:110px;">Direction</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
+      + '</tr></thead><tbody id="ajb-rows">' + rowsHtml + '</tbody></table></div>'
+      + '<button class="btn btn-ghost btn-sm" id="ajb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ajb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+  },
+
+  builderCard() {
     return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment')
       + '<div class="collapse-body">'
-      + this.formRows(null, 'adj-')
+      + this.builderInner(true)
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-adjustments" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="adj-save">Log Adjustment</button>'
-        + '<button class="btn btn-ghost" id="adj-startover">Start Over</button>'
-        + '<span id="adj-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+        + '<button class="btn btn-primary" id="ajb-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="ajb-startover">Start Over</button>'
+        + '<span id="ajb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
   },
 
-  // Shared field layout for both the inline log form and the edit popup. `idp`
-  // prefixes every field id ('adj-' inline, 'adje-' modal) so the popup never
-  // collides with the inline form behind it.
+  reasonOptions(selected) {
+    return this.REASONS.map(r => '<option' + (r === selected ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
+  },
+
+  // One adjustment line = one table row. Reason drives the default Direction;
+  // Product drives the Unit options; Product + Qty + Unit drive the Value cell.
+  lineHtml(row) {
+    row = row || {};
+    const cat = row.product_id ? (this.productById(row.product_id)?.category || '') : '';
+    const reason = row.reason || 'Damage';
+    const dir = row.direction || this._dirFor(reason);
+    const unitDefault = row.unit || (cat === 'Bottle Beer' ? 'cases' : cat === 'Draft Beer' ? 'kegs' : 'bottles');
+    return '<tr class="adj-line">'
+      + '<td><select class="form-input ajl-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
+      + '<td><input class="form-input ajl-qty" type="number" min="0" step="0.5" value="' + (row.quantity != null && row.quantity !== '' ? esc(String(row.quantity)) : '') + '" placeholder="0" style="width:100%;"/></td>'
+      + '<td><select class="form-input ajl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault) + '</select></td>'
+      + '<td><select class="form-input ajl-reason" style="width:100%;">' + this.reasonOptions(reason) + '</select></td>'
+      + '<td><select class="form-input ajl-dir" style="width:100%;"><option value="out"' + (dir === 'out' ? ' selected' : '') + '>Loss</option><option value="in"' + (dir === 'in' ? ' selected' : '') + '>Found</option></select></td>'
+      + '<td class="ajl-val val" style="font-size:12px;">-</td>'
+      + '<td><button class="btn btn-danger btn-sm ajl-del" type="button">Delete</button></td>'
+      + '</tr>';
+  },
+
+  addLine() {
+    const wrap = document.getElementById('ajb-rows');
+    if (wrap) wrap.insertAdjacentHTML('beforeend', this.lineHtml());
+  },
+  removeLine(line) {
+    const wrap = document.getElementById('ajb-rows');
+    if (!wrap || !line) return;
+    if (wrap.querySelectorAll('.adj-line').length <= 1) wrap.innerHTML = this.lineHtml();
+    else line.remove();
+  },
+
+  // Refresh a line's Value cell from its current product + qty + unit.
+  refreshLineCalc(line) {
+    if (!line) return;
+    const p = this.productById(line.querySelector('.ajl-prod')?.value || '');
+    const qty = parseFloat(line.querySelector('.ajl-qty')?.value);
+    const unit = line.querySelector('.ajl-unit')?.value || '';
+    const cell = line.querySelector('.ajl-val');
+    if (!cell) return;
+    const val = (p && qty > 0) ? this.costFor(p, qty, unit) : 0;
+    cell.textContent = val > 0 ? App.fmtCurrency(val) : '-';
+  },
+
+  // Per-line: Reason sets the default Direction; Product re-pops the Unit
+  // options; any of Product / Qty / Unit refreshes the Value.
+  onLineChange(ev) {
+    const line = ev.target.closest('.adj-line');
+    if (!line) return;
+    if (ev.target.classList.contains('ajl-reason')) {
+      const dirSel = line.querySelector('.ajl-dir');
+      if (dirSel) dirSel.value = this._dirFor(ev.target.value);
+    }
+    if (ev.target.classList.contains('ajl-prod')) {
+      const p = this.productById(ev.target.value);
+      const unitSel = line.querySelector('.ajl-unit');
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+    }
+    this.refreshLineCalc(line);
+  },
+
+  async saveBatch(after) {
+    const err = document.getElementById('ajb-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const dateTime = document.getElementById('ajb-when')?.value;
+    if (!dateTime) { fail('Date and time are required.'); return; }
+    const byId = document.getElementById('ajb-by')?.value || '';
+    if (!byId) { fail('Pick who logged the adjustment.'); return; }
+    const byName = (this.staffById(byId) || {}).name || '';
+    const witId = document.getElementById('ajb-witness')?.value || '';
+    const witName = witId ? ((this.staffById(witId) || {}).name || '') : '';
+    const notes = document.getElementById('ajb-notes')?.value.trim() || '';
+
+    const recs = [];
+    const rowsWrap = document.getElementById('ajb-rows');
+    for (const line of (rowsWrap ? [...rowsWrap.querySelectorAll('.adj-line')] : [])) {
+      const productId = line.querySelector('.ajl-prod')?.value || '';
+      const qtyRaw    = line.querySelector('.ajl-qty')?.value;
+      // Skip a line the manager added but never filled (reason/dir always have a
+      // default, so a blank line is one with no product and no quantity).
+      if (!productId && (qtyRaw === '' || qtyRaw == null)) continue;
+      if (!productId) { fail('Pick a product on every line, or remove the blank line.'); return; }
+      const product = this.productById(productId);
+      if (!product) { fail('A line has a product that no longer exists. Remove it.'); return; }
+      const quantity = parseFloat(qtyRaw);
+      if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity above zero on every line.'); return; }
+      const reason = line.querySelector('.ajl-reason')?.value || '';
+      if (!reason) { fail('Pick a reason on every line.'); return; }
+      const direction = line.querySelector('.ajl-dir')?.value || this._dirFor(reason);
+      const unit = line.querySelector('.ajl-unit')?.value || '';
+      const perUnitCost = this.perUnitCostFor(product, unit);
+      recs.push({
+        id: App.uid(), date_time: dateTime,
+        product_id: product.id, product_name: product.name, category: product.category || '',
+        quantity, unit, direction, reason,
+        unit_cost_at_adjustment: perUnitCost, value: quantity * perUnitCost,
+        performed_by_id: byId, performed_by: byName,
+        witnessed_by_id: witId, witnessed_by: witName,
+        notes, created_at: new Date().toISOString()
+      });
+    }
+    if (!recs.length) { fail('Fill in at least one line.'); return; }
+
+    const btn = document.getElementById('ajb-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const list = this.adjustments();
+    let ok = true;
+    for (const r of recs) { list.push(r); ok = (await App.putRecord('ic', 'adjustment', r)) && ok; }
+    if (ok) { this._draft = null; this._draftRows = null; (typeof after === 'function' ? after : () => this.renderList())(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
+  },
+
+  startOver() {
+    this.editId = null;
+    this._draft = null;
+    this._draftRows = null;
+    this.renderList();
+  },
+
+  wireList() {
+    this.container.onclick = ev => {
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.adj-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
+      if (ev.target.closest('#adj-export')) { App.exportPDF({ title: 'Adjustment Log', root: this.container }); return; }
+      if (ev.target.closest('#adj-print-blank')) { this.printBlank(); return; }
+      if (ev.target.closest('#ajb-add')) { this.addLine(); return; }
+      if (ev.target.closest('#ajb-save')) { this.saveBatch(); return; }
+      if (ev.target.closest('#ajb-startover')) { this.startOver(); return; }
+      const rm = ev.target.closest('.ajl-del');
+      if (rm) { this.removeLine(rm.closest('.adj-line')); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const edit = ev.target.closest('.adj-edit');
+      const del  = ev.target.closest('.adj-del');
+      const row  = ev.target.closest('.adj-row');
+      if (del)  { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
+      if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); return; }
+      if (row && App.canEdit('ic-adjustments')) this.openEdit(row.dataset.id);
+    };
+    // Per-line conditional handler (reason → direction, product → unit, recalc).
+    this.container.onchange = ev => this.onLineChange(ev);
+    document.getElementById('adj-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('adj-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+
+    // Hold the in-progress batch through leave/return.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      formRoot.querySelectorAll('.adj-line').forEach(line => this.refreshLineCalc(line));
+      const cap = () => {
+        this._draft = App.captureDraft(formRoot);
+        this._draftRows = [...formRoot.querySelectorAll('.adj-line')].map(line => ({
+          product_id: line.querySelector('.ajl-prod')?.value || '',
+          quantity:   line.querySelector('.ajl-qty')?.value || '',
+          unit:       line.querySelector('.ajl-unit')?.value || '',
+          reason:     line.querySelector('.ajl-reason')?.value || '',
+          direction:  line.querySelector('.ajl-dir')?.value || ''
+        }));
+      };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
+  },
+
+  // ── Edit a single past adjustment in a focused pop-up ───────────────────────
+  // Single-record field layout (with the live Estimated Value calc). `idp`
+  // ('adje-') prefixes every field id.
   formRows(r, idp) {
     const v = val => (val != null && val !== '') ? val : '';
     const initialProdId = r?.product_id || '';
@@ -210,8 +427,6 @@ S.InventoryAdjustments = {
     const initialUnit = r?.unit || (initialCat === 'Bottle Beer' ? 'cases' : initialCat === 'Draft Beer' ? 'kegs' : 'bottles');
     const initialReason = r?.reason || 'Damage';
     const initialDir = r?.direction || this._dirFor(initialReason);
-    const reasonOpts = this.REASONS.map(rs =>
-      '<option' + (rs === initialReason ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
 
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:210px;flex-shrink:0;"><label>Date / Time</label>'
@@ -225,7 +440,7 @@ S.InventoryAdjustments = {
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label>'
-          + '<select id="' + idp + 'reason">' + reasonOpts + '</select></div>'
+          + '<select id="' + idp + 'reason">' + this.reasonOptions(initialReason) + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Direction</label>'
           + '<select id="' + idp + 'dir">'
             + '<option value="out"' + (initialDir === 'out' ? ' selected' : '') + '>Loss (out)</option>'
@@ -244,26 +459,8 @@ S.InventoryAdjustments = {
         + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
   },
 
-  // Wire the always-open inline log form.
-  wireForm(idp) {
-    document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
-    document.getElementById('adj-startover')?.addEventListener('click', () => this.startOver());
-    this.wireFormFields(idp);
-    const head = this.container.querySelector('.card-collapse-head');
-    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
-    App.applyCollapsed(this.container);
-  },
-
-  // Reset the inline log form to a fresh starting state, keeping the form open.
-  startOver() {
-    const body = this.container.querySelector('.collapse-body');
-    if (body) body.innerHTML = this.formRows(null, 'adj-');
-    const err = document.getElementById('adj-err');
-    if (err) { err.textContent = ''; err.style.display = 'none'; }
-    this.wireFormFields('adj-');
-  },
-
-  // Reason → default direction, product → unit options, and live value recalc.
+  // Reason → default direction, product → unit options, and live value recalc,
+  // for the edit pop-up.
   wireFormFields(idp) {
     document.getElementById(idp + 'reason')?.addEventListener('change', e => {
       const dirSel = document.getElementById(idp + 'dir');
@@ -281,30 +478,107 @@ S.InventoryAdjustments = {
     this.recalc(idp);
   },
 
-  wireList() {
-    this.container.onclick = ev => {
-      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      const chip = ev.target.closest('.adj-range-chip');
-      if (chip) {
-        const v = chip.dataset.v;
-        if (v === 'custom') {
-          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
-          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
-        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
-        this.renderList();
-        return;
-      }
-      const row  = ev.target.closest('.adj-row');
-      const edit = ev.target.closest('.adj-edit');
-      const del  = ev.target.closest('.adj-del');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); }
-      else if (row && App.canEdit('ic-adjustments')) this.openEdit(row.dataset.id);
+  // Live calc for the edit pop-up: estimated value = qty × per-unit cost.
+  recalc(idp) {
+    const product = this.productById(document.getElementById(idp + 'prod')?.value);
+    const qty = parseFloat(document.getElementById(idp + 'qty')?.value) || 0;
+    const unit = document.getElementById(idp + 'unit')?.value || '';
+    const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+
+    if (!product || qty <= 0) {
+      set(idp + 'c-value', '-');
+      set(idp + 'c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
+      return;
+    }
+    let perUnitCost, unitLabel;
+    if (product.category === 'Bottle Beer' && product.case_size) {
+      if (unit === 'cases') { perUnitCost = App.unitCost(product) || 0; unitLabel = '/case'; }
+      else { perUnitCost = App.bottleCost(product) || 0; unitLabel = '/bottle'; }
+    } else {
+      perUnitCost = App.unitCost(product) || 0; unitLabel = '/unit';
+    }
+    const value = qty * perUnitCost;
+    set(idp + 'c-value', value > 0 ? App.fmtCurrency(value) : '-');
+    set(idp + 'c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
+  },
+
+  openEdit(id) {
+    if (!App.canEdit('ic-adjustments')) return;
+    const r = this.adjustments().find(x => x.id === id);
+    if (!r) return;
+    this.editId = id;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Adjustment</div>'
+      + this.formRows(r, 'adje-')
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="adje-save">Update Adjustment</button>'
+        + '<button class="btn btn-ghost" id="adje-cancel">Cancel</button>'
+        + '<span id="adje-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="adje-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'adj-edit-modal', maxWidth: 540, noClose: true });
+    document.getElementById('adje-save')?.addEventListener('click', () => this.saveEdit('adje-', 'adj-edit-modal'));
+    document.getElementById('adje-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('adj-edit-modal'); });
+    document.getElementById('adje-del')?.addEventListener('click', async () => {
+      if (!(await App.confirmDelete())) return;
+      await App.removeRecord('ic', 'adjustment', id);
+      this.editId = null;
+      App.closeModal('adj-edit-modal');
+      this.renderList();
+    });
+    this.wireFormFields('adje-');
+  },
+
+  async saveEdit(idp, modalId) {
+    const err = document.getElementById(idp + 'err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+
+    const dateTime = document.getElementById(idp + 'when')?.value;
+    if (!dateTime) { fail('Date and time are required.'); return; }
+    const productId = document.getElementById(idp + 'prod')?.value;
+    if (!productId) { fail('Pick a product.'); return; }
+    const product = this.productById(productId);
+    if (!product) { fail('Product not found.'); return; }
+    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
+    if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
+    const reason = document.getElementById(idp + 'reason')?.value;
+    if (!reason) { fail('Pick a reason.'); return; }
+    const direction = document.getElementById(idp + 'dir')?.value || this._dirFor(reason);
+    const unit = document.getElementById(idp + 'unit')?.value || '';
+    const performedById = document.getElementById(idp + 'by')?.value;
+    if (!performedById) { fail('Pick who logged the adjustment.'); return; }
+    const performedBy = (this.staffById(performedById) || {}).name || '';
+    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
+    const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
+    const perUnitCost = this.perUnitCostFor(product, unit);
+
+    const rec = {
+      id:                       this.editId,
+      date_time:                dateTime,
+      product_id:               product.id,
+      product_name:             product.name,
+      category:                 product.category || '',
+      quantity,
+      unit,
+      direction,
+      reason,
+      unit_cost_at_adjustment:  perUnitCost,
+      value:                    quantity * perUnitCost,
+      performed_by_id:          performedById,
+      performed_by:             performedBy,
+      witnessed_by_id:          witnessedById,
+      witnessed_by:             witnessedBy,
+      notes:                    document.getElementById(idp + 'notes')?.value.trim() || '',
+      updated_at:               new Date().toISOString()
     };
-    document.getElementById('adj-export')?.addEventListener('click', () => App.exportPDF({ title: 'Adjustment Log', root: this.container }));
-    document.getElementById('adj-print-blank')?.addEventListener('click', () => this.printBlank());
-    document.getElementById('adj-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('adj-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    const ex = this.adjustments().find(x => x.id === this.editId);
+    const saveRec = ex ? { ...ex, ...rec } : rec;
+
+    const btn = document.getElementById(idp + 'save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('ic', 'adjustment', saveRec);
+    this.editId = null;
+    if (ok) { if (modalId) App.closeModal(modalId); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update Adjustment'; } fail('Save failed. Try again.'); }
   },
 
   // ── Form options ────────────────────────────────────────────────────
@@ -331,130 +605,6 @@ S.InventoryAdjustments = {
     else if (productCategory === 'Draft Beer') opts = ['kegs'];
     else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
-  },
-
-  // Live calc: estimated value = qty × per-unit cost. For Bottle Beer cases we
-  // use the per-case cost; loose bottles use per-bottle.
-  recalc(idp) {
-    const product = this.productById(document.getElementById(idp + 'prod')?.value);
-    const qty = parseFloat(document.getElementById(idp + 'qty')?.value) || 0;
-    const unit = document.getElementById(idp + 'unit')?.value || '';
-    const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-
-    if (!product || qty <= 0) {
-      set(idp + 'c-value', '-');
-      set(idp + 'c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
-      return;
-    }
-    let perUnitCost, unitLabel;
-    if (product.category === 'Bottle Beer' && product.case_size) {
-      if (unit === 'cases') { perUnitCost = App.unitCost(product) || 0; unitLabel = '/case'; }
-      else { perUnitCost = App.bottleCost(product) || 0; unitLabel = '/bottle'; }
-    } else {
-      perUnitCost = App.unitCost(product) || 0; unitLabel = '/unit';
-    }
-    const value = qty * perUnitCost;
-    set(idp + 'c-value', value > 0 ? App.fmtCurrency(value) : '-');
-    set(idp + 'c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
-  },
-
-  // ── Edit popup (standard modal) ───────────────────────────────────────
-  openEdit(id) {
-    if (!App.canEdit('ic-adjustments')) return;
-    const r = this.adjustments().find(x => x.id === id);
-    if (!r) return;
-    this.editId = id;
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Adjustment</div>'
-      + this.formRows(r, 'adje-')
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="adje-save">Update Adjustment</button>'
-        + '<button class="btn btn-ghost" id="adje-cancel">Cancel</button>'
-        + '<span id="adje-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '<button class="btn btn-danger" id="adje-del" style="margin-left:auto;">Delete</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'adj-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('adje-save')?.addEventListener('click', () => this.save('adje-', 'adj-edit-modal'));
-    document.getElementById('adje-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('adj-edit-modal'); });
-    document.getElementById('adje-del')?.addEventListener('click', async () => {
-      if (!(await App.confirmDelete())) return;
-      await App.removeRecord('ic', 'adjustment', id);
-      this.editId = null;
-      App.closeModal('adj-edit-modal');
-      this.renderList();
-    });
-    this.wireFormFields('adje-');
-  },
-
-  async save(idp, modalId) {
-    const err = document.getElementById(idp + 'err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-
-    const dateTime = document.getElementById(idp + 'when')?.value;
-    if (!dateTime) { fail('Date and time are required.'); return; }
-    const productId = document.getElementById(idp + 'prod')?.value;
-    if (!productId) { fail('Pick a product.'); return; }
-    const product = this.productById(productId);
-    if (!product) { fail('Product not found.'); return; }
-    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
-    if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
-    const reason = document.getElementById(idp + 'reason')?.value;
-    if (!reason) { fail('Pick a reason.'); return; }
-    const direction = document.getElementById(idp + 'dir')?.value || this._dirFor(reason);
-    const unit = document.getElementById(idp + 'unit')?.value || '';
-    const performedById = document.getElementById(idp + 'by')?.value;
-    if (!performedById) { fail('Pick who logged the adjustment.'); return; }
-    const performedBy = (this.staffById(performedById) || {}).name || '';
-    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
-    const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
-
-    // Snapshot the per-unit cost (for the chosen unit) so the value stays honest
-    // even after future cost changes.
-    let perUnitCost;
-    if (product.category === 'Bottle Beer' && product.case_size) {
-      perUnitCost = (unit === 'cases') ? (App.unitCost(product) || 0) : (App.bottleCost(product) || 0);
-    } else {
-      perUnitCost = App.unitCost(product) || 0;
-    }
-    const value = quantity * perUnitCost;
-
-    const rec = {
-      id:                       this.editId || App.uid(),
-      date_time:                dateTime,
-      product_id:               product.id,
-      product_name:             product.name,
-      category:                 product.category || '',
-      quantity,
-      unit,
-      direction,
-      reason,
-      unit_cost_at_adjustment:  perUnitCost,
-      value,
-      performed_by_id:          performedById,
-      performed_by:             performedBy,
-      witnessed_by_id:          witnessedById,
-      witnessed_by:             witnessedBy,
-      notes:                    document.getElementById(idp + 'notes')?.value.trim() || ''
-    };
-    if (!this.editId) rec.created_at = new Date().toISOString();
-    else rec.updated_at = new Date().toISOString();
-
-    let saveRec = rec;
-    if (this.editId) {
-      const ex = this.adjustments().find(x => x.id === this.editId);
-      if (ex) saveRec = { ...ex, ...rec };
-    }
-
-    const btn = document.getElementById(idp + 'save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('ic', 'adjustment', saveRec);
-    this.editId = null;
-    if (ok) {
-      if (modalId) App.closeModal(modalId);
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = modalId ? 'Update Adjustment' : 'Log Adjustment'; }
-      fail('Save failed. Try again.');
-    }
   },
 
   async confirmDel(id) {
