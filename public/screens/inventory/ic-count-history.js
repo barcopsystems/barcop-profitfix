@@ -295,12 +295,10 @@ S.InventoryCountHistory = {
       + meta('Products', count.item_count || items.length)
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
       + meta('Locations', esc((count.locations || []).join(', ') || '-'))
+      + meta('Count Date', this.fmtDate(count.date))
       + '</div></div>'
-      + '<div class="no-print" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      + '<div>'
-      +   '<div class="sh" style="margin:0 0 8px;">' + esc(count.type || 'Inventory') + ' Count &middot; ' + this.fmtDate(count.date) + '</div>'
-      +   '<select id="ch-compare" class="il-copysel" style="max-width:240px;">' + cmpOpts + '</select>'
-      + '</div>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
+      + '<select id="ch-compare" class="il-copysel" style="max-width:240px;">' + cmpOpts + '</select>'
       + '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
       + bodyTable + bodyNote
       + '</div>';
