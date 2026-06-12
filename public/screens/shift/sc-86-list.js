@@ -264,14 +264,17 @@ S.Shift86List = {
 
   entryFormHTML() {
     return '<div class="card form-card no-print">'
-      + App.collapsibleCardTitle('sc-86-list', '86 An Item', App.helpButton('el-how'))
+      + App.collapsibleCardTitle('sc-86-list', '86 An Item')
       + '<div class="collapse-body">'
       + this.entryFields(null)
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary btn-lg" id="qa-go">86 It</button>'
+      + '</div></div>'
+      // Primary action + Start Over below the card (bottom-left), hidden with the
+      // card on collapse.
+      + '<div data-collapse-group="sc-86-list" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="qa-go">86 It</button>'
+        + '<button class="btn btn-ghost" id="qa-startover">Start Over</button>'
         + '<span id="qa-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>'
-      + '</div></div>';
+      + '</div>';
   },
 
   // ── Cross-reference panel ──────────────────────────────────────────────
@@ -421,7 +424,6 @@ S.Shift86List = {
 
   wireMain() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#el-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#el-export')) { App.exportPDF({ title: '86 List', root: this.container }); return; }
@@ -431,6 +433,7 @@ S.Shift86List = {
       const del = ev.target.closest('.ei-del');
       const re86 = ev.target.closest('.ei-re86');
       if (ev.target.closest('#qa-go')) this.save();
+      else if (ev.target.closest('#qa-startover')) this.startOver();
       else if (ev.target.closest('#qa-custom-toggle')) { ev.preventDefault(); this.toggleCustom(true); }
       else if (ev.target.closest('#qa-custom-cancel'))  { ev.preventDefault(); this.toggleCustom(false); }
       else if (back) this.markBack(back.dataset.id);
@@ -440,6 +443,15 @@ S.Shift86List = {
     };
 
     this.wireFormInputs();
+  },
+
+  // Reset the entry form to a fresh blank 86 (clears pickers, custom mode, the
+  // also-86 checks, reason/notes, and resets the date/time to now).
+  startOver() {
+    this.editId = null;
+    this.customMode = false;
+    this.alsoIds = {};
+    this.renderMain();
   },
 
   // Picker mutex (Menu vs Inventory) + cross-ref refresh. Shared by the landing
