@@ -2,16 +2,25 @@
 
 /* ── Shift Control — Reports (one page, three tabs) ───────────────────────────
    Shift | Cash | Operations on the Cash History layout: a plain underline tab
-   switcher, then per tab a stats card, a Filter heading, the controls-only
-   filter card with Export, and the breakdown data cards below. Read-only
-   aggregation of the Shift stores; Export PDF is auto-tagged by the active tab. */
+   switcher, then per tab a stats card, the range chips + Export (sitting where the
+   first breakdown's heading used to be — the accepted filter model, no filter box),
+   and the breakdown data cards below. Read-only aggregation of the Shift stores;
+   Export PDF is auto-tagged by the active tab. */
 
 S.ShiftReports = {
   tab: 'shift',
-  f: {},            // { from, to } for the active tab
+  filterPreset: 'last-4',  // active range chip, shared across the tabs
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
+  filterTo: '',
   TABS: [['shift', 'Shift'], ['cash', 'Cash'], ['operations', 'Operations']],
   DOW: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   PRIORITIES: ['Urgent', 'High', 'Normal', 'Low'],
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   // ── data ────────────────────────────────────────────────────────────────────
   shifts()     { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
@@ -23,9 +32,17 @@ S.ShiftReports = {
   maint()      { return ((App.shiftData && App.shiftData.sc_maintenance) || []); },
   checklists() { return ((App.shiftData && App.shiftData.sc_checklists) || []); },
 
+  // Effective window from the active range chip (recomputed off "today" each draw);
+  // Custom reads the From/To pickers; All clears it.
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
   inRange(dateStr) {
-    if (this.f.from && (dateStr || '') < this.f.from) return false;
-    if (this.f.to && (dateStr || '') > this.f.to) return false;
+    const { from, to } = this.effectiveRange();
+    const d = dateStr || '';
+    if (from && d < from) return false;
+    if (to && d > to) return false;
     return true;
   },
   dowOf(date) {
@@ -54,21 +71,12 @@ S.ShiftReports = {
     const parts = this.tab === 'shift' ? this.bodyShift()
       : this.tab === 'cash' ? this.bodyCash()
       : this.bodyOps();
-    const tabLabel = (this.TABS.find(t => t[0] === this.tab) || ['', ''])[1];
-    // Plain underline tab switcher (same as Cash History), then the standard
-    // stack: stats card, a Filter heading, the controls-only filter card with
-    // Export pushed right, then the breakdown data cards. No connected panel box.
-    let body;
-    if (parts.empty) {
-      body = parts.empty;
-    } else {
-      body = (parts.stats || '')
-        + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter ' + esc(tabLabel) + '</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="rpt-export">Export PDF</button></div></div>'
-        + '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-          + parts.controls
-        + '</div></div>'
-        + (parts.below || '');
-    }
+    // Plain underline tab switcher (same as Cash History), then the standard stack:
+    // stats card, the range chips + Export (which sit where the first breakdown's
+    // heading used to be — the accepted filter model, no filter box), then the
+    // breakdown data cards.
+    const body = parts.empty ? parts.empty
+      : ((parts.stats || '') + this.filterRow() + (parts.below || ''));
     this.container.innerHTML = '<div class="screen">' + this.tabBar() + body + '</div>';
     this.wire();
   },
@@ -76,14 +84,23 @@ S.ShiftReports = {
   wire() {
     this.container.onclick = ev => {
       const tab = ev.target.closest('.ch-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.f = {}; this.draw(); return; }
+      if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }   // keep the range across tabs
+      const chip = ev.target.closest('.rpt-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.draw();
+        return;
+      }
       if (ev.target.closest('#rpt-export')) { App.exportPDF({ title: 'Shift Reports', root: this.container }); return; }
       const go = ev.target.closest('[data-go]');
       if (go) { App.navigate(go.dataset.go); return; }
     };
-    const bind = (id, key) => { const el = document.getElementById(id); if (el) el.addEventListener('change', e => { this.f[key] = e.target.value || ''; this.draw(); }); };
-    bind('rpt-from', 'from'); bind('rpt-to', 'to');
-    document.getElementById('rpt-clear')?.addEventListener('click', () => { this.f = {}; this.draw(); });
+    document.getElementById('rpt-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.draw(); });
+    document.getElementById('rpt-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.draw(); });
   },
 
   // ── shared markup ───────────────────────────────────────────────────────────
@@ -92,12 +109,20 @@ S.ShiftReports = {
       + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
       + '</div>';
   },
-  dateInputs() {
-    return '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="rpt-from" value="' + esc(this.f.from || '') + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="rpt-to" value="' + esc(this.f.to || '') + '"/></div>';
-  },
-  clearBtn() {
-    return '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="rpt-clear" style="margin-bottom:2px;">Clear</button></div>';
+  // Range chips left, Export right, directly above the first data card (in place of
+  // its old heading); Custom reveals a bare From/To row. The accepted filter model.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'rpt-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="rpt-export">Export PDF</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="rpt-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="rpt-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
   statItem(label, val, cls) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
@@ -118,7 +143,7 @@ S.ShiftReports = {
     return this.dataCard(headers.map(h => '<th>' + h + '</th>').join(''), rows);
   },
   noRange(noun) {
-    return '<div style="font-size:13px;color:var(--t3);padding:6px 2px;">No ' + esc(noun) + ' in this range. Adjust or clear the dates.</div>';
+    return '<div style="font-size:13px;color:var(--t3);padding:6px 2px;">No ' + esc(noun) + ' in this range. Pick a wider range above.</div>';
   },
   emptyPanel(line1, line2, screen, btn) {
     return '<div style="padding:16px 4px;font-size:13px;color:var(--t3);line-height:1.6;">' + esc(line1) + ' ' + esc(line2)
@@ -130,8 +155,6 @@ S.ShiftReports = {
     const all = this.shifts();
     if (!all.length) return { empty: this.emptyPanel('No shifts logged yet.', 'Log a shift in Active Shift and this report will summarize revenue, covers, and check average by shift type and day of week.', 'sc-active-shift', 'Go to Active Shift') };
     const rows = all.filter(s => this.inRange(s.date));
-    const controls = this.dateInputs() + this.clearBtn();
-    if (!rows.length) return { controls, below: this.noRange('shifts') };
 
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);
     const totCov = rows.reduce((t, s) => t + (s.covers || 0), 0);
@@ -144,9 +167,12 @@ S.ShiftReports = {
       + this.statItem('Total Covers', totCov)
       + this.statItem('Avg Check', avgChk != null ? App.fmtCurrency(avgChk) : '-'));
 
-    const below = this.section('By Shift Type', this.shiftGroup(rows, s => s.shift_type || 'Unspecified'))
-      + this.section('By Day of Week', this.shiftGroup(rows, s => { const d = this.dowOf(s.date); return d >= 0 ? this.DOW[d] : 'Unknown'; }, this.DOW));
-    return { stats, controls, below };
+    // First breakdown carries no heading — the chips row sits in its place.
+    const below = rows.length
+      ? (this.shiftGroup(rows, s => s.shift_type || 'Unspecified')
+         + this.section('By Day of Week', this.shiftGroup(rows, s => { const d = this.dowOf(s.date); return d >= 0 ? this.DOW[d] : 'Unknown'; }, this.DOW)))
+      : this.noRange('shifts');
+    return { stats, below };
   },
 
   shiftGroup(rows, keyFn, order) {
@@ -181,7 +207,6 @@ S.ShiftReports = {
     }
     const drops = this.drops().filter(d => this.inRange(d.date));
     const vars = this.variances().filter(v => this.inRange(v.date));
-    const controls = this.dateInputs() + this.clearBtn();
 
     const dropTotal = drops.reduce((t, d) => t + (d.amount || 0), 0);
     const netVar = vars.reduce((t, v) => t + (v.variance || 0), 0);
@@ -194,9 +219,10 @@ S.ShiftReports = {
       + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : '')
       + this.statItem('Safe Balance', App.fmtCurrency(safeBal), 'good'));
 
-    const below = this.section('Cash Drops by Drawer', this.dropsByDrawer(drops))
+    // First breakdown carries no heading — the chips row sits in its place.
+    const below = this.dropsByDrawer(drops)
       + this.section('Variances by Cashier', this.variancesByCashier(vars));
-    return { stats, controls, below };
+    return { stats, below };
   },
 
   dropsByDrawer(drops) {
@@ -239,7 +265,6 @@ S.ShiftReports = {
     const items86 = this.list86().filter(r => this.inRange(r.date_86));
     const maint = this.maint().filter(r => this.inRange(r.date_reported));
     const checks = this.checklists().filter(r => this.inRange(r.date));
-    const controls = this.dateInputs() + this.clearBtn();
 
     const vcTotal = vc.reduce((t, r) => t + (r.amount || 0), 0);
     const openMaint = maint.filter(m => m.status !== 'Resolved').length;
@@ -251,12 +276,13 @@ S.ShiftReports = {
       + this.statItem('Open Maint.', openMaint, openMaint ? 'warn' : '')
       + this.statItem('Checklist Rate', checkRate != null ? checkRate + '%' : '-'));
 
-    let below = this.section('Voids &amp; Comps by Server', this.vcByServer(vc));
+    // First breakdown carries no heading — the chips row sits in its place.
+    let below = this.vcByServer(vc);
     if (vc.length) below += this.section('Voids &amp; Comps by Reason', this.vcByReason(vc));
     below += this.section('Most-86\'d Items', this.most86(items86))
       + this.section('Maintenance by Priority', this.maintByPriority(maint))
       + this.section('Checklist Completion', this.checklistCard(checks));
-    return { stats, controls, below };
+    return { stats, below };
   },
 
   avgCompletion(checks) {
