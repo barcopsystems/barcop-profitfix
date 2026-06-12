@@ -1051,4 +1051,15 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .rd-line.rd-flagged,.rd-flag-row.rd-flagged{background:var(--gold-tint);}
   .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:transparent;}
   .ing-tbl tbody td.rd-flag::before{content:none;}
+
+  /* Category-grouped tables (table-layout:fixed) on mobile: show the category
+     ONCE as a header band per card, and the product name as the card title,
+     instead of repeating "<Category> Products" as a label on every stacked row. */
+  .data-card .tbl[style*="table-layout:fixed"] thead{display:block;}
+  .data-card .tbl[style*="table-layout:fixed"] thead tr{display:block;}
+  .data-card .tbl[style*="table-layout:fixed"] thead th{display:none;}
+  .data-card .tbl[style*="table-layout:fixed"] thead th:first-child{display:block;text-align:left;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:11px 16px 8px;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child{display:block;text-align:left;padding:11px 16px 4px;}
+  .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child::before{content:none;}
+  .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child .val{font-weight:700;}
 }
