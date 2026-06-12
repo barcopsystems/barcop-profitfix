@@ -95,7 +95,8 @@ S.ShiftChecklists = {
     if (actions) actions.innerHTML = '';
     // Default the toggle to the checklist that fits the time of day, once.
     if (!this._typePicked) { this.TYPE = new Date().getHours() < 15 ? 'Opening' : 'Closing'; this._typePicked = true; }
-    this.startRun();
+    // Keep an in-progress checklist across navigation; only Start Over or Save resets it.
+    if (!this._run) this.startRun();
     this.renderMain();
   },
 
@@ -149,15 +150,13 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? 'var(--gold)' : 'var(--b1)') + ';'
-      + 'border-radius:4px;background:' + (it.done ? 'var(--gold)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
-      + (it.done ? '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l2.5 2.5 5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
-      + '</span>'
+      + '<input type="checkbox" class="cl-chk"' + (it.done ? ' checked' : '') + ' tabindex="-1" style="flex-shrink:0;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;pointer-events:none;"/>'
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
       + '</div>').join('');
 
     const runner = '<div class="card form-card">'
-      + '<div class="card-title">Checklists</div>'
+      + App.collapsibleCardTitle('sc-checklists', 'Checklists')
+      + '<div class="collapse-body">'
       + toggle
       + '<div class="form-row" style="gap:16px;">'
       + tplField
@@ -170,7 +169,8 @@ S.ShiftChecklists = {
       + '<div id="cl-items">' + itemRows + '</div>'
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '</div>'
-      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '</div>'
+      + '<div data-collapse-group="sc-checklists" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
       + '<button class="btn btn-ghost" id="cl-startover">Start Over</button>'
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -208,8 +208,11 @@ S.ShiftChecklists = {
     }
 
     this.container.innerHTML = '<div class="screen">' + runner + histSection + '</div>';
+    App.applyCollapsed(this.container);
     this._bindRunner();
     this.container.onclick = ev => {
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       const tog = ev.target.closest('.cl-toggle');
       if (tog) { this.TYPE = tog.dataset.type; this.startRun(); this.renderMain(); return; }
       const chip = ev.target.closest('.cl-range-chip');
@@ -246,6 +249,8 @@ S.ShiftChecklists = {
       this.renderMain();
     });
     document.getElementById('cl-tpl')?.addEventListener('change', e => { this._syncRun(); this.startRun(e.target.value); this.renderMain(); });
+    // Keep date / completed-by / notes in _run so stepping away mid-entry keeps them.
+    ['cl-date', 'cl-by', 'cl-notes'].forEach(id => document.getElementById(id)?.addEventListener('change', () => this._syncRun()));
     document.getElementById('cl-startover')?.addEventListener('click', () => { this.startRun(this._run.templateId); this.renderMain(); });
     document.getElementById('cl-worksheet')?.addEventListener('click', () => { this._syncRun(); this.worksheet(); });
     document.getElementById('cl-save')?.addEventListener('click', () => { this._syncRun(); this.save(); });
