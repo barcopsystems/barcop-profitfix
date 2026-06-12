@@ -296,6 +296,9 @@ S.InventoryLocations = {
       + '<div class="card-title">Add a Location</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Name Location</label>'
         + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"' + nameErr + '/></div>'
+      + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
+        + '<input type="checkbox" id="il-new-servicebar"' + (this._newServiceBar ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>'
+        + 'Service bar (a register is here)</label>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + counter
@@ -390,6 +393,7 @@ S.InventoryLocations = {
     };
     // Checkbox toggles accumulate into the running set so checks survive tab swaps.
     this.container.onchange = ev => {
+      if (ev.target.id === 'il-new-servicebar') { this._newServiceBar = ev.target.checked; return; }
       if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
         const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
       }
@@ -415,7 +419,7 @@ S.InventoryLocations = {
     if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { fail('A location with that name already exists.'); return; }
 
     const id = App.uid();
-    this.locations().push({ id, name, archived: false });
+    this.locations().push({ id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked });
     this._reconcileProducts(name, this.newChecked);   // assign every checked product
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -440,7 +444,7 @@ S.InventoryLocations = {
       return;
     }
     const id = App.uid();
-    this.locations().push({ id, name, archived: false });
+    this.locations().push({ id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked });
     this._reconcileProducts(name, this.newChecked);
     const savedCount = this.newChecked.size;
     await App.saveInventory();
@@ -448,6 +452,7 @@ S.InventoryLocations = {
     // Reset the box for the next location; show the saved feedback until they start one.
     this.pickerOpen = false;
     this._newName = '';
+    this._newServiceBar = false;
     this.newChecked = new Set();
     this._justSavedCount = savedCount;
     this.renderList();
@@ -485,6 +490,9 @@ S.InventoryLocations = {
     const nameCard = '<div class="card form-card">'
       + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
+      + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
+        + '<input type="checkbox" id="il-servicebar"' + (l.service_bar ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>'
+        + 'Service bar (a register is here)</label>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-editprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + cnt + ' product' + (cnt === 1 ? '' : 's') + ' ' + cntWord + '</span>'
@@ -635,6 +643,7 @@ S.InventoryLocations = {
     if (!l) { this.renderList(); return; }
     const old = l.name;
     l.name = name;
+    l.service_bar = !!document.getElementById('il-servicebar')?.checked;
     if (old !== name) {
       this.products().forEach(p => {
         if (p.primary_location === old)   p.primary_location = name;
