@@ -147,10 +147,14 @@ S.InventoryUsageReport = {
     // Period = a windowed stepper (‹ prev · current · next ›, like the Build
     // Schedule week selector), so a long count history never becomes a wall of
     // chips. No category filter — the Usage Data list groups by category instead.
-    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
-      + this.periodStepper(period)
-      + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>'
-      + '</div>';
+    // The History tab is all-periods, so it shows no period stepper.
+    const filterArea = this.tab === 'history'
+      ? '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 12px;">'
+        + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button></div>'
+      : '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+        + this.periodStepper(period)
+        + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>'
+        + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
