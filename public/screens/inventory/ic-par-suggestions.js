@@ -218,11 +218,11 @@ S.InventoryParSuggestions = {
       + stat('Added Stock', App.fmtCurrency(addedStock))
       + '</div></div>';
 
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button></div></div>';
-    const filterCard = '<div class="card no-print"><div class="form-row" style="align-items:flex-end;margin-bottom:0;flex-wrap:wrap;gap:14px;">'
-      + '<div class="f" style="width:280px;flex-shrink:0;"><label>Category</label><select id="ps-cat">' + catOpts + '</select></div>'
-      + '</div></div>';
+    // Category selector (left, il-copysel like Count History's compare row) and
+    // Export PDF (right) on one row — no card, no label.
+    const filterRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
+      + '<select id="ps-cat" class="il-copysel" style="max-width:240px;">' + catOpts + '</select>'
+      + '<button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button></div>';
 
     const trs = rows.map(r => {
       const p = r.product;
@@ -257,7 +257,7 @@ S.InventoryParSuggestions = {
         + '<th>Product</th><th>Current Par</th><th>Avg Weekly</th><th>Suggested Par</th><th>Status</th><th>Cash Impact</th><th></th>'
         + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + settingsCard + filterHeading + filterCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + settingsCard + filterRow + listCard + '</div>';
     this.wire();
   },
 
