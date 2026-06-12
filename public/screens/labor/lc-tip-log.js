@@ -166,21 +166,8 @@ S.LaborTipLog = {
     const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
     const defaultDate = x?.date || initialShift?.date || App.todayLocal();
     const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
-    // Tip-out edit row (edit pop-up, when the house uses tip-outs). An earner role
-    // gets Sales (tip-out recomputes at their role's %) AND a Received field (a
-    // bartender taking the bar share); a support role gets just Received.
-    const toPct = x ? App.tipOutPctFor(x.staff_id) : 0;
-    const role = x ? (App.tipRole(x.staff_id) || 'earner') : 'earner';
-    const receivedCell = '<div class="f" style="width:170px;flex-shrink:0;"><label>Tip-Out Received</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(x?.tip_out_received) + '"/></div></div>';
-    const tipoutRow = (App.tipOutEnabled() && x)
-      ? (role === 'support'
-          ? '<div class="form-row" style="gap:16px;">' + receivedCell + '</div>'
-          : '<div class="form-row" style="gap:16px;flex-wrap:wrap;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
-            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(x?.sales) + '"/></div></div>'
-            + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
-            + receivedCell + '</div>')
-      : '';
+    // Tip-out edit row (edit pop-up only, when the house uses tip-outs): built via
+    // tipoutRowHtml so it reshapes if the staff is changed to a different tip role.
 
     return '<div class="form-row data-row" style="gap:12px;">'
         + '<div class="f" style="flex:1.5 1 180px;min-width:0;"><label>Shift</label>'
@@ -196,7 +183,7 @@ S.LaborTipLog = {
         + '<div class="f" style="flex:0.8 1 100px;min-width:0;"><label>Total</label>'
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
-      + tipoutRow
+      + '<div id="' + p + 'tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
 
       // Manual mode reveals date + shift type (a shift pick derives them instead).
       + '<div id="' + p + 'manual-row" class="form-row" style="gap:16px;' + (isManual ? '' : 'display:none;') + '">'
@@ -234,6 +221,45 @@ S.LaborTipLog = {
     this.populateStaffList(initialShiftId, x, p);
     this.renderShiftSummary(initialShiftId, p);
     this.calc(p);
+  },
+
+  // The edit-modal tip-out row markup for a given staff: an earner gets Sales +
+  // a live Tip-Out preview + Received; a support role gets just Received. Built
+  // here so onStaffChange can rebuild it when the staff (and thus role) changes.
+  tipoutRowHtml(staffId, p, salesVal, receivedVal) {
+    p = p || 'tl-';
+    if (!App.tipOutEnabled() || !staffId) return '';
+    const v = val => (val != null && val !== '') ? val : '';
+    const toPct = App.tipOutPctFor(staffId);
+    const role = App.tipRole(staffId) || 'earner';
+    const receivedCell = '<div class="f" style="width:170px;flex-shrink:0;"><label>Tip-Out Received</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(receivedVal) + '"/></div></div>';
+    return role === 'support'
+      ? '<div class="form-row" style="gap:16px;">' + receivedCell + '</div>'
+      : '<div class="form-row" style="gap:16px;flex-wrap:wrap;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
+        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(salesVal) + '"/></div></div>'
+        + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
+        + receivedCell + '</div>';
+  },
+
+  // Rebuild the tip-out row from the currently selected staff (edit modal), keeping
+  // any sales/received already typed, and rewire the live tip-out preview.
+  refreshTipoutRow(p) {
+    p = p || 'tl-';
+    const wrap = document.getElementById(p + 'tipout-wrap');
+    if (!wrap) return;
+    const staffId = document.getElementById(p + 'staff')?.value || '';
+    const sales = document.getElementById(p + 'sales')?.value;
+    const received = document.getElementById(p + 'received')?.value;
+    wrap.innerHTML = this.tipoutRowHtml(staffId, p, sales, received);
+    const upd = () => {
+      const el = document.getElementById(p + 'c-tipout');
+      if (!el) return;
+      const s = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
+      el.textContent = s > 0 ? '-' + App.fmtCurrency(s * App.tipOutPctFor(staffId) / 100, 2) : '-';
+    };
+    document.getElementById(p + 'sales')?.addEventListener('input', upd);
+    upd();
   },
 
   renderList() {
@@ -944,6 +970,8 @@ S.LaborTipLog = {
     p = p || 'tl-';
     const staffId = document.getElementById(p + 'staff')?.value || '';
     const date = document.getElementById(p + 'date')?.value || '';
+    // Reshape the tip-out row to the newly selected staff's role (edit modal only).
+    if (existingRec && App.tipOutEnabled()) this.refreshTipoutRow(p);
     const hoursInp = document.getElementById(p + 'hours');
     if (!hoursInp) return;
     if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
