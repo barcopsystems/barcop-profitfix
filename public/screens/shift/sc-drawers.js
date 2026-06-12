@@ -1,13 +1,13 @@
 'use strict';
 
-/* ── Shift Control — Drawers / Registers (writes sc_drawers) ──────────────────
-   Reference table of every drawer or register in the operation. Cash Drop,
-   Variance Log, and any cash-related form pulls from here instead of asking
-   the operator to free-type a drawer name (which produced "Bar 1" / "Front
-   Bar" / "Main Bar" inconsistency across the same physical register).
-   default_opening_bank pre-fills the opening bank when Start a Shift picks
-   the drawer this shift runs on. Landing = inline add form (collapsible) over
-   the list; Edit opens on its own page. */
+/* ── Shift Control — Registers (writes sc_drawers) ────────────────────────────
+   Reference table of every register/till in the operation. Cash Drop, Variance
+   Log, and any cash-related form pulls from here instead of asking the operator
+   to free-type a name (which produced "Bar 1" / "Front Bar" / "Main Bar"
+   inconsistency across the same physical register). default_opening_bank
+   pre-fills the opening bank when Start a Shift picks the register this shift
+   runs on. Landing = inline add form (collapsible) over the list; Edit is a
+   pop-up. (Store stays sc_drawers; only the user-facing word is "Register".) */
 
 S.ShiftDrawers = {
   editId: null,
@@ -28,10 +28,10 @@ S.ShiftDrawers = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Drawers and Registers Work', [
-      { p: ['Every drawer or register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Drop and the Variance Log pull from this list, so every cash event lands on the same drawer name instead of "Bar 1" one night and "Front Bar" the next.'] },
-      { h: 'Adding a Drawer', p: ['Give it a clear name, tie it to a location if you want, and set a default opening bank if it normally opens with the same starting cash. That default pre-fills the opening bank when you start a shift on the drawer, so you are not retyping it every day.'] },
-      { h: 'Archiving', p: ['Retire a drawer you no longer use with Archive. It drops out of the dropdowns but stays on past records, so your history stays intact. Restore it any time to bring it back.'] }
+    App.showHelpModal('How Registers Work', [
+      { p: ['Every register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Drop and the Variance Log pull from this list, so every cash event lands on the same register name instead of "Bar 1" one night and "Front Bar" the next.'] },
+      { h: 'Adding a Register', p: ['Give it a clear name and set a default opening bank if it normally opens with the same starting cash. That default pre-fills the opening bank when you start a shift on the register, so you are not retyping it every day.'] },
+      { h: 'Archiving', p: ['Retire a register you no longer use with Archive. It drops out of the dropdowns but stays on past records, so your history stays intact. Restore it any time to bring it back.'] }
     ]);
   },
 
@@ -40,22 +40,10 @@ S.ShiftDrawers = {
   // inline form sitting behind it.
   fieldsHtml(d, p) {
     p = p || 'dr-';
-    const locations = ((App.inventoryData && App.inventoryData.ic_locations) || [])
-      .filter(l => !l.archived)
-      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    let locOpts = '<option value="">(none)</option>';
-    locations.forEach(l => {
-      locOpts += '<option value="' + esc(l.name) + '"' + (d?.location === l.name ? ' selected' : '') + '>' + esc(l.name) + '</option>';
-    });
-    if (d?.location && !locations.some(l => l.name === d.location)) {
-      locOpts += '<option value="' + esc(d.location) + '" selected>' + esc(d.location) + ' (unsaved)</option>';
-    }
     const v = val => (val != null && val !== '') ? val : '';
     return '<div class="form-row data-row" style="gap:16px;">'
-      + '<div class="f w-lg"><label>Drawer / Register Name</label>'
+      + '<div class="f w-lg"><label>Register Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
-      + '<div class="f" style="width:220px;min-width:0;"><label>Location</label>'
-      + '<select id="' + p + 'loc">' + locOpts + '</select></div>'
       + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
       + '</div>'
@@ -70,7 +58,7 @@ S.ShiftDrawers = {
     const archived = all.filter(d => d.active === false);
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-drawers', 'Add Drawer')
+      + App.collapsibleCardTitle('sc-drawers', 'Add Register')
       + '<div class="collapse-body">'
       + this.fieldsHtml(null)
       + '</div></div>'
@@ -82,11 +70,10 @@ S.ShiftDrawers = {
 
     let listHtml;
     if (all.length === 0) {
-      listHtml = '<div style="font-size:13px;color:var(--t3);padding:2px 2px 6px;">No drawers yet. Add your first one above. Cash Drop and Variance Log pull from this list so every cash event lands on the right drawer.</div>';
+      listHtml = '<div style="font-size:13px;color:var(--t3);padding:2px 2px 6px;">No registers yet. Add your first one above. Cash Drop and Variance Log pull from this list so every cash event lands on the right register.</div>';
     } else {
       const row = d => '<tr>'
         + '<td><div class="val">' + esc(d.name) + '</div></td>'
-        + '<td>' + esc(d.location || '-') + '</td>'
         + '<td>' + (d.default_opening_bank != null && d.default_opening_bank !== '' ? App.fmtCurrency(d.default_opening_bank) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '<td>' + esc(d.notes || '-') + '</td>'
         + '<td><div class="row-actions">'
@@ -94,10 +81,9 @@ S.ShiftDrawers = {
           + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      listHtml = '<div class="sh" style="margin-top:24px;">Drawers / Registers</div>'
-        + '<div class="card card-bleed data-card">'
+      listHtml = '<div class="card card-bleed data-card" style="margin-top:24px;">'
         + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Drawer / Register</th><th>Location</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
+        + '<th>Register Name</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
 
       if (archived.length) {
@@ -105,7 +91,6 @@ S.ShiftDrawers = {
           + '<div class="tbl-wrap"><table class="tbl"><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
-              + '<td>' + esc(d.location || '-') + '</td>'
               + '<td>' + (d.default_opening_bank != null && d.default_opening_bank !== '' ? App.fmtCurrency(d.default_opening_bank) : '-') + '</td>'
               + '<td>' + esc(d.notes || '-') + '</td>'
               + '<td><div class="row-actions">'
@@ -153,7 +138,7 @@ S.ShiftDrawers = {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
     this.editId = id;
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Drawer</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Register</div>'
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dre-save">Update</button>'
@@ -170,14 +155,13 @@ S.ShiftDrawers = {
     const err = document.getElementById('dre-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById('dre-name')?.value.trim();
-    if (!name) { fail('Drawer name required.'); return; }
+    if (!name) { fail('Register name required.'); return; }
     const dup = this.drawers().some(d => d.id !== id && (d.name || '').toLowerCase() === name.toLowerCase());
-    if (dup) { fail('A drawer with that name already exists.'); return; }
+    if (dup) { fail('A register with that name already exists.'); return; }
     const numOr = (eid, def) => { const n = parseFloat(document.getElementById(eid)?.value); return isNaN(n) ? def : n; };
     const d = this.drawers().find(x => x.id === id);
-    if (!d) { fail('Drawer not found.'); return; }
+    if (!d) { fail('Register not found.'); return; }
     d.name                 = name;
-    d.location             = document.getElementById('dre-loc')?.value.trim() || '';
     d.default_opening_bank = numOr('dre-bank', null);
     d.notes                = document.getElementById('dre-notes')?.value.trim() || '';
     const btn = document.getElementById('dre-save');
@@ -191,9 +175,9 @@ S.ShiftDrawers = {
     const err = document.getElementById('dr-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById('dr-name')?.value.trim();
-    if (!name) { fail('Drawer name required.'); return; }
+    if (!name) { fail('Register name required.'); return; }
     const dup = this.drawers().some(d => d.id !== this.editId && (d.name || '').toLowerCase() === name.toLowerCase());
-    if (dup) { fail('A drawer with that name already exists.'); return; }
+    if (dup) { fail('A register with that name already exists.'); return; }
 
     const numOr = (id, def) => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? def : n; };
 
@@ -201,7 +185,6 @@ S.ShiftDrawers = {
       const d = this.drawers().find(x => x.id === this.editId);
       if (d) {
         d.name                  = name;
-        d.location              = document.getElementById('dr-loc')?.value.trim() || '';
         d.default_opening_bank  = numOr('dr-bank', null);
         d.notes                 = document.getElementById('dr-notes')?.value.trim() || '';
       }
@@ -209,7 +192,6 @@ S.ShiftDrawers = {
       this.drawers().push({
         id:                    App.uid(),
         name,
-        location:              document.getElementById('dr-loc')?.value.trim() || '',
         default_opening_bank:  numOr('dr-bank', null),
         notes:                 document.getElementById('dr-notes')?.value.trim() || '',
         active:                true,
