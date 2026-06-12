@@ -602,12 +602,12 @@ S.InventoryVarianceReport = {
     if (items.length < 2) return '';
     const cells = items.reverse().map(it => {   // oldest → newest, left to right
       const col = Math.abs(it.pct) > 5 ? 'var(--amber)' : 'var(--t1)';
-      return '<div style="text-align:center;flex:0 0 auto;">'
+      return '<div style="text-align:center;">'
         + '<div style="font-size:16px;font-weight:700;color:' + col + ';white-space:nowrap;">' + it.pct.toFixed(1) + '%</div>'
         + '<div style="font-size:10px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(it.label) + '</div></div>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Overall Variance Trend</div>'
-      + '<div class="card"><div style="display:flex;justify-content:center;gap:18px;align-items:center;flex-wrap:wrap;">' + cells + '</div></div>';
+      + '<div class="card"><div class="qv-trend">' + cells + '</div></div>';
   },
 
   periodStepper() {
