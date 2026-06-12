@@ -19,6 +19,7 @@ S.Shift86List = {
   customMode: false,
   alsoIds: {},          // { itemKey: true } for dependents checked to also-86
   _pendingDelId: null,
+  _draft: null,         // in-memory inline-form draft (survives leave/return)
 
   categories() {
     return (S.InventoryProducts && S.InventoryProducts.CATEGORIES)
@@ -176,8 +177,9 @@ S.Shift86List = {
     this.container = container;
     if (actions) actions.innerHTML = '';   // Export / Worksheet live on the Currently 86'd card now
     this.editId = null;
-    this.customMode = false;
-    this.alsoIds = {};
+    // Keep the custom toggle + also-86 checks when returning to an unsaved draft;
+    // only a clean visit starts fresh.
+    if (!this._draft) { this.customMode = false; this.alsoIds = {}; }
     this.renderMain();
   },
 
@@ -443,6 +445,20 @@ S.Shift86List = {
     };
 
     this.wireFormInputs();
+
+    // Hold the in-progress 86 through leave/return: restore the id'd fields, re-
+    // reveal the custom panel if it was open, then capture on every input. The
+    // cross-ref panel recomputes right after this in renderMain.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) {
+        App.restoreDraft(formRoot, this._draft);
+        if (this.customMode) this.toggleCustom(true, true);
+      }
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // Reset the entry form to a fresh blank 86 (clears pickers, custom mode, the
@@ -451,6 +467,7 @@ S.Shift86List = {
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
+    this._draft = null;
     this.renderMain();
   },
 
@@ -604,7 +621,7 @@ S.Shift86List = {
     this.editId = null;
     this.customMode = false;
     this.alsoIds = {};
-    if (ok) { (typeof after === 'function' ? after : () => this.renderMain())(); }
+    if (ok) { this._draft = null; (typeof after === 'function' ? after : () => this.renderMain())(); }
     else {
       if (btn) { btn.disabled = false; btn.textContent = '86 It'; }
       fail('Save failed. Try again.');

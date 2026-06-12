@@ -12,6 +12,7 @@
 S.ShiftDrawers = {
   editId: null,
   _pendingDelId: null,
+  _draft: null,            // in-memory inline-form draft (survives leave/return)
 
   drawers() {
     if (!App.shiftData) App.shiftData = {};
@@ -125,6 +126,15 @@ S.ShiftDrawers = {
       else if (arch) this.setArchived(arch.dataset.id, true);
       else if (rest) this.setArchived(rest.dataset.id, false);
     };
+
+    // Hold the in-progress inline form through leave/return.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   async setArchived(id, archived) {
@@ -209,6 +219,7 @@ S.ShiftDrawers = {
     const ok = await App.saveShift();
     this.editId = null;
     if (ok) {
+      this._draft = null;
       this.renderList();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save'; }

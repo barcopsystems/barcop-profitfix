@@ -10,6 +10,7 @@
 
 S.ShiftMaintenance = {
   editId: null,
+  _draft: null,            // in-memory inline-form draft (survives leave/return)
   filterFrom: '',
   filterTo: '',
   filterLocation: '',
@@ -209,6 +210,15 @@ S.ShiftMaintenance = {
     document.getElementById('mt-f-location')?.addEventListener('change', e => { this.filterLocation = e.target.value || ''; this.renderList(); });
     document.getElementById('mt-f-assigned')?.addEventListener('change', e => { this.filterAssigned = e.target.value || ''; this.renderList(); });
     document.getElementById('mt-f-clear')?.addEventListener('click', () => { this.filterFrom = this.filterTo = this.filterLocation = this.filterAssigned = ''; this.renderList(); });
+
+    // Hold the in-progress inline form through leave/return.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // Paper-at-bar workflow: print a blank sheet to mark issues during the shift.
@@ -317,7 +327,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) this.renderList();
+    if (ok) { this._draft = null; this.renderList(); }
     else {
       const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Issue'; }

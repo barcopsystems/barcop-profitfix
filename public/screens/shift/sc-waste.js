@@ -17,6 +17,8 @@
 
 S.ShiftWaste = {
   editId: null,
+  _draft: null,            // in-memory header draft (survives leave/return)
+  _draftRows: null,        // in-memory line rows
   filterFrom: '',
   filterTo: '',
   filterShift: '',
@@ -106,11 +108,15 @@ S.ShiftWaste = {
   // ── Batch entry builder (mirrors the Void/Comp log) ─────────────────────────
   // The builder body (header + line table + Add Line), shared by the landing
   // card and the running-shift log pop-up. preset pre-fills date / shift.
-  builderInner(preset) {
+  builderInner(preset, useDraft) {
     const date = (preset && preset.date) || App.todayLocal();
     const shiftSel = (preset && preset.shift_type) || '';
     const shiftOpts = '<option value="">Select shift...</option>'
       + this.shiftTypes().map(t => '<option' + (shiftSel === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    // On the landing, rebuild the saved line rows from the draft; the pop-up starts blank.
+    const rowsHtml = (useDraft && this._draftRows && this._draftRows.length)
+      ? this._draftRows.map(r => this.lineHtml(r)).join('')
+      : this.lineHtml();
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="wlb-date" value="' + esc(date) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="wlb-shift">' + shiftOpts + '</select></div>'
@@ -120,7 +126,7 @@ S.ShiftWaste = {
       + '<table class="ing-tbl"><thead><tr>'
       + '<th style="min-width:200px;">Product</th><th style="width:90px;">Units</th><th style="width:70px;">Unit</th>'
       + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
-      + '</tr></thead><tbody id="wlb-rows">' + this.lineHtml() + '</tbody></table></div>'
+      + '</tr></thead><tbody id="wlb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wlb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
   },
@@ -129,7 +135,7 @@ S.ShiftWaste = {
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', App.helpButton('wl-how'))
       + '<div class="collapse-body">'
-      + this.builderInner(null)
+      + this.builderInner(null, true)
       + '<div class="card-actions"><button class="btn btn-primary" id="wlb-save">Save All</button>'
       + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div></div>';
@@ -137,13 +143,14 @@ S.ShiftWaste = {
 
   // One waste line = one table row. Product drives the Unit label; Product and
   // Units together drive the read-only Cost cell.
-  lineHtml() {
+  lineHtml(row) {
+    row = row || {};
     return '<tr class="wl-line">'
-      + '<td><select class="form-input wll-prod" style="width:100%;">' + this.productOptions('') + '</select></td>'
-      + '<td><input class="form-input wll-units" type="number" min="0" step="0.01" placeholder="0" style="width:100%;"/></td>'
+      + '<td><select class="form-input wll-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
+      + '<td><input class="form-input wll-units" type="number" min="0" step="0.01" value="' + (row.units != null && row.units !== '' ? esc(String(row.units)) : '') + '" placeholder="0" style="width:100%;"/></td>'
       + '<td class="wll-unit" style="color:var(--t2);font-size:12px;">-</td>'
       + '<td class="wll-cost val" style="font-size:12px;">-</td>'
-      + '<td><select class="form-input wll-reason" style="width:100%;">' + this.reasonOptions('') + '</select></td>'
+      + '<td><select class="form-input wll-reason" style="width:100%;">' + this.reasonOptions(row.reason || '') + '</select></td>'
       + '<td><button class="btn btn-danger btn-sm wll-del" type="button">Delete</button></td>'
       + '</tr>';
   },
@@ -220,7 +227,7 @@ S.ShiftWaste = {
     const list = this.records();
     let ok = true;
     for (const r of recs) { list.push(r); ok = (await App.putRecord('sc', 'waste', r)) && ok; }
-    if (ok) (typeof after === 'function' ? after : () => this.renderList())();
+    if (ok) { this._draft = null; this._draftRows = null; (typeof after === 'function' ? after : () => this.renderList())(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },
 
@@ -335,6 +342,24 @@ S.ShiftWaste = {
       this.filterFrom = this.filterTo = this.filterShift = this.filterRecordedBy = '';
       this.renderList();
     });
+
+    // Hold the in-progress batch through leave/return: restore the header, refresh
+    // each line's cost, then capture header + line rows on every input/change.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      formRoot.querySelectorAll('.wl-line').forEach(line => this.refreshLineCalc(line));
+      const cap = () => {
+        this._draft = App.captureDraft(formRoot);
+        this._draftRows = [...formRoot.querySelectorAll('.wl-line')].map(line => ({
+          product_id: line.querySelector('.wll-prod')?.value || '',
+          units:      line.querySelector('.wll-units')?.value || '',
+          reason:     line.querySelector('.wll-reason')?.value || ''
+        }));
+      };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // ── Edit a logged waste line in a focused pop-up ────────────────────────────

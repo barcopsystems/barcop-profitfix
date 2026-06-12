@@ -9,6 +9,7 @@
 
 S.ShiftWalkedTabs = {
   editId: null,
+  _draft: null,            // in-memory inline-form draft (survives leave/return)
   filterPreset: 'last-4',  // active range chip
   _prevPreset: 'last-4',
   filterFrom: '',          // custom range only
@@ -197,11 +198,22 @@ S.ShiftWalkedTabs = {
     };
     document.getElementById('wt-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('wt-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+
+    // Hold the in-progress inline form through leave/return: restore the draft,
+    // then capture on every input so a re-render rebuilds from it.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // Reset the inline log form to a fresh blank walked tab.
   startOver() {
     this.editId = null;
+    this._draft = null;
     this.renderList();
   },
 
@@ -300,7 +312,7 @@ S.ShiftWalkedTabs = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'walked_tab', saved);
     this.editId = null;
-    if (ok) this.renderList();
+    if (ok) { this._draft = null; this.renderList(); }
     else {
       if (btn) { btn.disabled = false; btn.textContent = 'Log Walked Tab'; }
       fail('Save failed. Try again.');

@@ -11,6 +11,8 @@ S.ShiftVoidComp = {
   editId: null,
   entryMode: 'manual',     // landing card: 'manual' = batch builder, 'import' = drop a POS export
   _modalMode: 'manual',    // active-shift log pop-up: same two modes
+  _draft: null,            // in-memory header draft (survives leave/return)
+  _draftRows: null,        // in-memory line rows
   filterFrom: '',
   filterTo: '',
   filterType: '',
@@ -274,6 +276,26 @@ S.ShiftVoidComp = {
       this.filterFrom = this.filterTo = this.filterType = this.filterServerId = '';
       this.renderList();
     });
+
+    // Hold the in-progress batch through leave/return (manual builder only; import
+    // mode has no form to hold). Restore the header, then capture header + line rows.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot && document.getElementById('vcb-rows')) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => {
+        this._draft = App.captureDraft(formRoot);
+        this._draftRows = [...formRoot.querySelectorAll('.vc-line')].map(line => ({
+          type:      line.querySelector('.vcl-type')?.value || 'Void',
+          item_key:  line.querySelector('.vcl-item')?.value || '',
+          amount:    line.querySelector('.vcl-amount')?.value || '',
+          units:     line.querySelector('.vcl-units')?.value || '',
+          server_id: line.querySelector('.vcl-server')?.value || '',
+          reason:    line.querySelector('.vcl-reason')?.value || ''
+        }));
+      };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // Per-line conditional handler for the batch builder, shared by the landing
@@ -444,10 +466,14 @@ S.ShiftVoidComp = {
   // Theft Risk all keep working unchanged.
   // The builder body (header + line table + Add Line), shared by the landing
   // card and the running-shift log pop-up. preset pre-fills date / shift.
-  builderInner(preset) {
+  builderInner(preset, useDraft) {
     const date = (preset && preset.date) || App.todayLocal();
     const shiftSel = (preset && preset.shift_type) || '';
     const shiftOpts = this.shiftTypes().map(t => '<option' + (shiftSel === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    // On the landing, rebuild the saved line rows from the draft; the pop-up starts blank.
+    const rowsHtml = (useDraft && this._draftRows && this._draftRows.length)
+      ? this._draftRows.map(r => this.lineHtml(r)).join('')
+      : this.lineHtml();
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label><input type="date" id="vcb-date" value="' + esc(date) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
@@ -458,7 +484,7 @@ S.ShiftVoidComp = {
       + '<th style="width:104px;">Type</th><th style="min-width:180px;">Item <span style="color:var(--t4);">(optional)</span></th>'
       + '<th style="width:108px;">Amount</th><th style="width:80px;">Units</th>'
       + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
-      + '</tr></thead><tbody id="vcb-rows">' + this.lineHtml() + '</tbody></table></div>'
+      + '</tr></thead><tbody id="vcb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vcb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
   },
@@ -480,7 +506,7 @@ S.ShiftVoidComp = {
   builderCard() {
     const body = this.entryMode === 'import'
       ? '<div id="vc-csv"></div><div id="vc-imp-result"></div>'
-      : this.builderInner(null)
+      : this.builderInner(null, true)
         + '<div class="card-actions"><button class="btn btn-primary" id="vcb-save">Save All</button>'
         + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
     return '<div class="card form-card">'
@@ -495,15 +521,17 @@ S.ShiftVoidComp = {
   // product reveals the Units input (else the cell shows a dash). The Item
   // picker omits Custom here to keep lines lean (use a row's Edit for a custom
   // item, a check number, or notes).
-  lineHtml() {
-    const typeOpts = ['Void', 'Comp'].map(t => '<option>' + t + '</option>').join('');
+  lineHtml(row) {
+    row = row || {};
+    const type = row.type || 'Void';
+    const typeOpts = ['Void', 'Comp'].map(t => '<option' + (t === type ? ' selected' : '') + '>' + t + '</option>').join('');
     return '<tr class="vc-line">'
       + '<td><select class="form-input vcl-type" style="width:100%;">' + typeOpts + '</select></td>'
-      + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions('', false) + '</select></td>'
-      + '<td><input class="form-input vcl-amount" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" placeholder="1" style="width:100%;"/></td>'
-      + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions('', { placeholder: 'Select staff...', audience: 'service' }) + '</select></td>'
-      + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions('Void', '') + '</select></td>'
+      + '<td><select class="form-input vcl-item" style="width:100%;">' + this.itemOptions(row.item_key || '', false) + '</select></td>'
+      + '<td><input class="form-input vcl-amount" type="number" min="0" step="0.01" value="' + (row.amount != null && row.amount !== '' ? esc(String(row.amount)) : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" value="' + (row.units != null && row.units !== '' ? esc(String(row.units)) : '') + '" placeholder="1" style="width:100%;"/></td>'
+      + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions(row.server_id || '', { placeholder: 'Select staff...', audience: 'service' }) + '</select></td>'
+      + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions(type, row.reason || '') + '</select></td>'
       + '<td><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
@@ -570,7 +598,7 @@ S.ShiftVoidComp = {
     const list = this.records();
     let ok = true;
     for (const r of recs) { list.push(r); ok = (await App.putRecord('sc', 'void_comp', r)) && ok; }
-    if (ok) (typeof after === 'function' ? after : () => this.renderList())();
+    if (ok) { this._draft = null; this._draftRows = null; (typeof after === 'function' ? after : () => this.renderList())(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },
 
