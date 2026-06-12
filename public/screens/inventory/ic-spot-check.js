@@ -207,15 +207,16 @@ S.InventorySpotCheck = {
   },
   locationOptions(selected) {
     const list = this.serviceBars().map(l => l.name).sort();
-    let h = '<option value="">Select bar...</option>';
+    let h = '<option value="">Select bar station...</option>';
     list.forEach(name => { h += '<option value="' + esc(name) + '"' + (selected === name ? ' selected' : '') + '>' + esc(name) + '</option>'; });
     return h;
   },
-  // Bar products, narrowed to the chosen location so the check stays scoped.
+  // Bar products at the chosen station. No station picked = no list yet, so only
+  // that station's bottles ever show (the operator picks the bar station first).
   productOptions(location) {
+    if (!location) return '<option value="">Select bar station first</option>';
     const bar = App.BAR_CATS;
-    let prods = this.products().filter(p => bar.includes(p.category));
-    if (location) prods = prods.filter(p => App.productLocations(p).includes(location));
+    const prods = this.products().filter(p => bar.includes(p.category) && App.productLocations(p).includes(location));
     const cats = bar.filter(c => prods.some(p => p.category === c));
     let h = '<option value="">Add a product to check...</option>';
     cats.forEach(cat => {
@@ -312,7 +313,7 @@ S.InventorySpotCheck = {
       + '<div class="form-row" style="gap:16px;">'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '" style="height:44px;"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar Station</label>'
         + '<select id="sp-loc" style="height:44px;">' + this.locationOptions(dft.location) + '</select></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
         + '<select id="sp-shift" style="height:44px;">' + shiftOpts + '</select></div>'
@@ -391,10 +392,15 @@ S.InventorySpotCheck = {
     document.getElementById('sp-add')?.addEventListener('change', e => {
       const pid = e.target.value;
       e.target.value = '';
-      if (!this.requireSetup()) return;   // no product added until Date + Bar are set
+      if (!this.requireSetup()) return;   // no product added until Date + Bar Station are set
       e.target.closest('.f')?.classList.remove('field-missing');
       const p = this.productById(pid);
       if (p) this.addLine(p);
+    });
+    // Clicking Add Products with no bar station picked flags the Bar Station cell
+    // red immediately (the product list is empty until a station is chosen).
+    document.getElementById('sp-add')?.addEventListener('mousedown', () => {
+      if (!document.getElementById('sp-loc')?.value) this.requireSetup();
     });
     document.getElementById('sp-date')?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('field-missing'));
     document.getElementById('sp-load-targets')?.addEventListener('click', () => {
