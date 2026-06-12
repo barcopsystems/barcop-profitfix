@@ -73,7 +73,7 @@ S.InventoryUsageReport = {
     App.showHelpModal('How the Usage Report Works', [
       { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you. Starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts. Every product is measured in its own stock unit, so liquor and wine show up in bottles, draft in kegs, and bottle beer in cases.'] },
       { h: 'The Math, Spelled Out', p: ['Take a single product across one period. You counted forty bottles of Tito\'s at the front bar to start. A Republic National delivery brought in two cases, so twenty four bottles in. At the next count you had eighteen bottles left. Usage is forty plus twenty four minus eighteen, which is forty six bottles poured through. Bar Cop runs that for every product and every period off your counts and deliveries.'] },
-      { h: 'Pick A Period', p: ['Tap a count period up top to choose which two counts to measure between, and tap a category to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
+      { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top, or tap a period, to choose which two counts to measure between, and pick a category from the dropdown to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
       { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
       { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] }
     ]);
@@ -135,20 +135,19 @@ S.InventoryUsageReport = {
       + this.statItem('Theo Sales', App.fmtCurrency(totSales))
       + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'));
 
-    // Count periods + category as gold-tint chips (Kyle prefers click buttons to
-    // dropdowns). Period chips left + Export right; category chips on a row below.
-    const periodChipItems = asc.slice(1).map((c, i) => ({
-      v: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date)
-    })).reverse();
+    // Period = a windowed stepper (‹ prev · current · next ›, like the Build
+    // Schedule week selector), so a long count history never becomes a wall of
+    // chips. Category = a compact il-copysel dropdown (like Dynamic Pars).
     const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const catChipItems = [{ v: '', label: 'All Categories' }].concat(cats.map(c => ({ v: c, label: c })));
+    const catSel = '<select id="ur-cat" class="il-copysel" style="max-width:200px;">'
+      + '<option value="">All Categories</option>'
+      + cats.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
+      + '</select>';
 
-    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + App.filterChips(period.endC.id, periodChipItems, 'ur-period-chip') + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button></div>'
-      + '</div>'
-      + '<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">'
-      + App.filterChips(this.catFilter || '', catChipItems, 'ur-cat-chip') + '</div>';
+    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' + this.periodStepper(period) + catSel + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>'
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
@@ -161,11 +160,59 @@ S.InventoryUsageReport = {
       if (ev.target.closest('#ur-export')) { App.exportPDF({ title: 'Usage Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
+      if (ev.target.closest('#ur-period-prev')) { this.stepPeriod(-1); return; }
+      if (ev.target.closest('#ur-period-next')) { this.stepPeriod(1); return; }
+      if (ev.target.closest('#ur-period-latest')) { this.endCountId = null; this.catFilter = ''; this.locFilter = ''; this.draw(); return; }
       const pchip = ev.target.closest('.ur-period-chip');
       if (pchip) { this.endCountId = pchip.dataset.v; this.catFilter = ''; this.locFilter = ''; this.draw(); return; }
-      const cchip = ev.target.closest('.ur-cat-chip');
-      if (cchip) { this.catFilter = cchip.dataset.v || ''; this.draw(); return; }
     };
+    document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value || ''; this.draw(); });
+  },
+
+  // Windowed period stepper: the selected period plus its older/newer neighbors,
+  // flanked by step arrows, the newest tagged NOW, with a Latest snap. Mirrors
+  // the Build Schedule week selector so a long count history stays compact.
+  periodStepper(period) {
+    const asc = this.countsAsc();
+    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date) }));
+    const len = periods.length;
+    let selIdx = periods.findIndex(p => p.endId === period.endC.id);
+    if (selIdx < 0) selIdx = len - 1;
+    const chip = idx => {
+      const p = periods[idx];
+      const on = idx === selIdx, isNewest = idx === len - 1;
+      return '<button type="button" class="ur-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + esc(p.label)
+        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    let chips = '';
+    for (let i = selIdx - 1; i <= selIdx + 1; i++) { if (i >= 0 && i < len) chips += chip(i); }
+    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
+    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="ur-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="ur-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
+      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="ur-period-latest" style="margin-left:4px;">Latest</button>' : '')
+      + '</div>';
+  },
+
+  // Step the selected period one older (-1) or newer (+1) through the count list.
+  stepPeriod(delta) {
+    const asc = this.countsAsc();
+    const ids = asc.slice(1).map(c => c.id);  // end-count ids, oldest → newest
+    if (ids.length === 0) return;
+    const period = this.currentPeriod();
+    let selIdx = period ? ids.indexOf(period.endC.id) : ids.length - 1;
+    if (selIdx < 0) selIdx = ids.length - 1;
+    const ni = selIdx + delta;
+    if (ni < 0 || ni >= ids.length) return;
+    this.endCountId = ids[ni];
+    this.catFilter = ''; this.locFilter = '';
+    this.draw();
   },
 
   tabBody(rows) {
