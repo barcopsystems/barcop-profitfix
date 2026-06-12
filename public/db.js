@@ -265,6 +265,7 @@ const DB = {
     'sc-86-list':'86-list',
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
+    'sc-waste':'waste',
     'sc-walked-tabs':'cash-mgmt',
     'sc-reports':'shift-reports',
     'sc-dashboard':'shift-dashboard','sc-help':'_always',
