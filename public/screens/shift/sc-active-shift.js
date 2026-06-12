@@ -1860,7 +1860,6 @@ S.ShiftActiveShift = {
           status:        Math.abs(c.variance) <= tol ? 'Within Tolerance' : c.variance < 0 ? 'Short' : 'Over',
           reason:        '',
           notes:         'Auto-logged from Shift Close wizard',
-          source:        'shift-close',
           source_id:     s.id,
           created_at:    new Date().toISOString()
         };
