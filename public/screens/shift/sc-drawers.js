@@ -70,12 +70,15 @@ S.ShiftDrawers = {
     const archived = all.filter(d => d.active === false);
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-drawers', 'Add Drawer', App.helpButton('dr-how'))
+      + App.collapsibleCardTitle('sc-drawers', 'Add Drawer')
       + '<div class="collapse-body">'
       + this.fieldsHtml(null)
-      + '<div class="card-actions"><button class="btn btn-primary" id="dr-save">Save</button>'
-      + '<span id="dr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
-      + '</div></div>';
+      + '</div></div>'
+      + '<div data-collapse-group="sc-drawers" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="dr-save">Save</button>'
+        + '<button class="btn btn-ghost" id="dr-startover">Start Over</button>'
+        + '<span id="dr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
 
     let listHtml;
     if (all.length === 0) {
@@ -115,10 +118,10 @@ S.ShiftDrawers = {
     this.container.innerHTML = '<div class="screen">' + formCard + listHtml + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      if (ev.target.closest('#dr-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
-      if (head) { App.toggleCollapse(head); return; }
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#dr-save')) { this.save(); return; }
+      if (ev.target.closest('#dr-startover')) { this._draft = null; this.renderList(); return; }
       const edit = ev.target.closest('.dr-edit');
       const arch = ev.target.closest('.dr-archive');
       const rest = ev.target.closest('.dr-restore');
