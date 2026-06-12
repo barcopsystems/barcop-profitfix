@@ -194,11 +194,11 @@ S.InventoryTransfers = {
       ? this._draftRows.map(r => this.lineHtml(r)).join('')
       : this.lineHtml();
     return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Date / Time</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Date / Time</label>'
           + '<input type="datetime-local" id="trb-when" value="' + esc(this.nowDateTime().slice(0, 16)) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:170px;"><label>Performed By</label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="trb-by">' + App.staffOptions(defaultBy, { placeholder: 'Select staff...' }) + '</select></div>'
-        + '<div class="f" style="flex:1;min-width:170px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="trb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
