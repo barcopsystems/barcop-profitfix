@@ -750,6 +750,23 @@ S.InventoryOrderSheet = {
     this._editVendor = null;
     this.renderMain();
   },
+  // Pure write-back for an edited order: collect the card's ing-tbl lines, write
+  // them onto the order record, and persist. The ONE canonical save for an order
+  // edit — the Order Sheet's Update button AND Order History's inline editor both
+  // come through here (two doors, one save). No render side effects; returns
+  // {ok:true} on success, {empty:true} when no valid line, {ok:false} on failure.
+  async saveOrderEdit(order, card) {
+    if (!order || !card) return { ok: false };
+    const lineItems = this.collectLines(card);
+    if (lineItems.length === 0) return { ok: false, empty: true };
+    order.line_items = lineItems;
+    order.item_count = lineItems.length;
+    order.total = lineItems.reduce((t, i) => t + i.extended, 0);
+    order.updated_at = new Date().toISOString();
+    const ok = await App.putRecord('ic', 'order', order);
+    return { ok: !!ok };
+  },
+
   async updateOrder(vendor) {
     const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
     if (!card) return;
@@ -759,18 +776,11 @@ S.InventoryOrderSheet = {
     const order = this.orders().find(o => o.id === card.dataset.orderId);
     if (!order) { fail('Could not find that order.'); return; }
 
-    const lineItems = this.collectLines(card);
-    if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
-
-    order.line_items = lineItems;
-    order.item_count = lineItems.length;
-    order.total = lineItems.reduce((t, i) => t + i.extended, 0);
-    order.updated_at = new Date().toISOString();
-
     const btn = actions ? actions.querySelector('.os-update') : null;
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('ic', 'order', order);
-    if (ok) {
+    const res = await this.saveOrderEdit(order, card);
+    if (res.empty) { if (btn) { btn.disabled = false; btn.textContent = 'Update Order'; } fail('Set an order quantity above zero first.'); return; }
+    if (res.ok) {
       this._editVendor = null;
       this.renderMain();
       this.scrollContentTop();
