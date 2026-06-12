@@ -16,9 +16,15 @@ S.ShiftChecklists = {
   TYPE: 'Opening',
   _typePicked: false,
   _run: null,
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterById: '',
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   defaultItems(type) {
     return type === 'Closing'
@@ -47,33 +53,33 @@ S.ShiftChecklists = {
     return open ? (open.manager_id || '') : '';
   },
 
-  // Completed By filter options, built from who has actually run this checklist.
-  filterByOptions() {
-    const map = {};
-    this.typeRuns().forEach(r => { if (r.completed_by) map[r.completed_by_id || r.completed_by] = r.completed_by; });
-    const keys = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b]));
-    return '<option value="">All staff</option>'
-      + keys.map(k => '<option value="' + esc(k) + '"' + (this.filterById === k ? ' selected' : '') + '>' + esc(map[k]) + '</option>').join('');
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
   },
-
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(r => {
       const date = r.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterById && (r.completed_by_id || r.completed_by || '') !== this.filterById) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
 
-  filterCard() {
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="cl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="cl-f-to" value="' + esc(this.filterTo) + '"/></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label><select id="cl-f-by">' + this.filterByOptions() + '</select></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="cl-f-clear">Clear</button></div>'
-      + '</div></div>';
+  // Range chips left, Export + Worksheet right, directly above the list.
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'cl-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="cl-worksheet">Worksheet</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="cl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="cl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   // Pull the in-progress runner fields into _run before any re-render.
@@ -143,15 +149,15 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? '#485C6A' : 'var(--b1)') + ';'
-      + 'border-radius:4px;background:' + (it.done ? '#485C6A' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
+      + '<span style="width:22px;height:22px;flex-shrink:0;border:1px solid ' + (it.done ? 'var(--gold)' : 'var(--b1)') + ';'
+      + 'border-radius:4px;background:' + (it.done ? 'var(--gold)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;">'
       + (it.done ? '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l2.5 2.5 5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
       + '</span>'
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
       + '</div>').join('');
 
     const runner = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Checklists</span>' + App.helpButton('cl-how') + '</div>'
+      + '<div class="card-title">Checklists</div>'
       + toggle
       + '<div class="form-row" style="gap:16px;">'
       + tplField
@@ -160,14 +166,15 @@ S.ShiftChecklists = {
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'
-      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:#485C6A;transition:width 0.2s;"></div></div></div>'
+      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
       + '<div id="cl-items">' + itemRows + '</div>'
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
-      + '<button class="btn btn-ghost" id="cl-reset">Reset</button>'
+      + '<button class="btn btn-ghost" id="cl-startover">Start Over</button>'
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
 
     const allRuns = [...this.typeRuns()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
     let histSection = '';
@@ -175,7 +182,7 @@ S.ShiftChecklists = {
       const filtered = this.applyFilters(allRuns);
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No runs match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No runs in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'checklist')).map(r => {
           const full = (r.done_count || 0) >= (r.total_count || 0) && (r.total_count || 0) > 0;
@@ -195,17 +202,27 @@ S.ShiftChecklists = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('sc', 'checklist', filtered, !!(this.filterFrom || this.filterTo || this.filterById));
+          + App.showOlderBar('sc', 'checklist', filtered, this.filterPreset !== 'all');
       }
-      histSection = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Checklists</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="cl-worksheet">Worksheet</button></div></div>' + this.filterCard() + listHtml;
+      histSection = this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + runner + histSection + '</div>';
     this._bindRunner();
     this.container.onclick = ev => {
       const tog = ev.target.closest('.cl-toggle');
-      if (tog) { this.TYPE = tog.dataset.type; this.filterFrom = this.filterTo = this.filterById = ''; this.startRun(); this.renderMain(); return; }
-      if (ev.target.closest('#cl-how')) { this.showHowTo(); return; }
+      if (tog) { this.TYPE = tog.dataset.type; this.startRun(); this.renderMain(); return; }
+      const chip = ev.target.closest('.cl-range-chip');
+      if (chip) {
+        this._syncRun();
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderMain();
+        return;
+      }
       if (ev.target.closest('#cl-export')) { App.exportPDF({ title: this.TYPE + ' Checklists', root: this.container }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.cl-hrow');
@@ -217,8 +234,6 @@ S.ShiftChecklists = {
     };
     document.getElementById('cl-f-from')?.addEventListener('change', e => { this._syncRun(); this.filterFrom = e.target.value || ''; this.renderMain(); });
     document.getElementById('cl-f-to')?.addEventListener('change',   e => { this._syncRun(); this.filterTo   = e.target.value || ''; this.renderMain(); });
-    document.getElementById('cl-f-by')?.addEventListener('change',   e => { this._syncRun(); this.filterById = e.target.value || ''; this.renderMain(); });
-    document.getElementById('cl-f-clear')?.addEventListener('click', () => { this._syncRun(); this.filterFrom = this.filterTo = this.filterById = ''; this.renderMain(); });
   },
 
   _bindRunner() {
@@ -231,7 +246,7 @@ S.ShiftChecklists = {
       this.renderMain();
     });
     document.getElementById('cl-tpl')?.addEventListener('change', e => { this._syncRun(); this.startRun(e.target.value); this.renderMain(); });
-    document.getElementById('cl-reset')?.addEventListener('click', () => { this.startRun(this._run.templateId); this.renderMain(); });
+    document.getElementById('cl-startover')?.addEventListener('click', () => { this.startRun(this._run.templateId); this.renderMain(); });
     document.getElementById('cl-worksheet')?.addEventListener('click', () => { this._syncRun(); this.worksheet(); });
     document.getElementById('cl-save')?.addEventListener('click', () => { this._syncRun(); this.save(); });
   },
@@ -274,19 +289,21 @@ S.ShiftChecklists = {
     if (!r) { this.renderMain(); return; }
     const itemRows = (r.items || []).map(it =>
       '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
-      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? '#485C6A' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
+      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--gold)' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</span>'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val">' + esc(r.completed_by || '-') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
-      + '</div>'
-      + itemRows
-      + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
+    // Stats in their own card at top; the run title is a heading outside/above the
+    // checklist card, with Export PDF aligned right on the same row.
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Completed By</div><div class="calc-val lg">' + esc(r.completed_by || '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Items Done</div><div class="calc-val lg">' + (r.done_count || 0) + ' of ' + (r.total_count || 0) + '</div></div>'
       + '</div></div>';
+    const headingRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">' + esc(r.template_name || (r.type || '') + ' Checklist') + ' &middot; ' + this.fmtDate(r.date) + '</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cl-print">Export PDF</button></div></div>';
+    const checklistCard = '<div class="card">' + itemRows
+      + (r.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;">Notes: ' + esc(r.notes) + '</div>' : '')
+      + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + headingRow + checklistCard + '</div>';
     this.container.onclick = ev => {
       if (ev.target.closest('#cl-print')) this.exportPDF(r);
     };
