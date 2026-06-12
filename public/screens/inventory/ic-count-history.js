@@ -228,7 +228,9 @@ S.InventoryCountHistory = {
     // shown as full cases / loose bottles / total cases. case_size comes from the
     // snapshot or the live product so older or seeded counts still resolve.
     const prodFor = id => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
-    const itemRows = items.map(it => {
+    // One count row. The category is the table header (the count groups by
+    // category), so there is no Category column here.
+    const rowHtml = it => {
       const p = prodFor(it.product_id);
       const caseSize = it.case_size_at_count || (p && p.case_size) || 0;
       // Full / Open / Total via the shared App.countCols so this reads exactly
@@ -240,14 +242,13 @@ S.InventoryCountHistory = {
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div>'
         + (it.notes ? '<div style="font-size:10px;color:var(--t3);">' + esc(it.notes) + '</div>' : '') + '</td>'
-        + '<td>' + esc(it.category || '-') + '</td>'
         + '<td>' + cols.full + '</td>'
         + '<td>' + cols.open + '</td>'
         + '<td class="val">' + cols.total + '</td>'
         + '<td>' + unitCostCol + '</td>'
         + '<td>' + (it.value != null ? App.fmtCurrency(it.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>';
-    }).join('');
+    };
 
     // Compare dropdown — the 10 most recent other counts, newest first.
     const others = [...asc].reverse().filter(c => c.id !== id).slice(0, 10);
@@ -284,9 +285,22 @@ S.InventoryCountHistory = {
             : 'Comparing against a more recent count, a positive change means this count held more on hand.')
         + '</div>';
     } else {
-      bodyTable = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Category</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th>'
-        + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>';
+      // Organize the count by category: one table per category, the category in
+      // the first column header, a shared fixed colgroup so columns stay aligned.
+      const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+      const byCat = {};
+      items.forEach(it => { const c = it.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(it); });
+      const cats = Object.keys(byCat).sort((a, b) => {
+        const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+        return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+      });
+      bodyTable = cats.map(c => {
+        const catItems = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:620px;">'
+          + '<colgroup><col style="width:240px;"/><col/><col/><col/><col/><col/></colgroup>'
+          + '<thead><tr><th>' + esc(c) + ' Products</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th></tr></thead>'
+          + '<tbody>' + catItems.map(rowHtml).join('') + '</tbody></table></div></div>';
+      }).join('');
     }
 
     this.container.innerHTML = '<div class="screen">'
