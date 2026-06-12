@@ -11,12 +11,17 @@
 S.ShiftMaintenance = {
   editId: null,
   _draft: null,            // in-memory inline-form draft (survives leave/return)
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterLocation: '',
-  filterAssigned: '',
   PRIORITIES: ['Urgent', 'High', 'Normal', 'Low'],
   STATUSES: ['Open', 'In Progress', 'Resolved'],
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   records() {
     if (!App.shiftData) App.shiftData = {};
@@ -97,30 +102,32 @@ S.ShiftMaintenance = {
     });
   },
 
-  filterCard() {
-    const locs = [...new Set(this.records().map(r => r.location).filter(Boolean))].sort();
-    const locOpts = '<option value="">All locations</option>'
-      + locs.map(l => '<option value="' + esc(l) + '"' + (this.filterLocation === l ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
-    const assignees = [...new Set(this.records().map(r => r.assigned_to).filter(Boolean))].sort();
-    const assignOpts = '<option value="">All assignees</option>'
-      + assignees.map(a => '<option value="' + esc(a) + '"' + (this.filterAssigned === a ? ' selected' : '') + '>' + esc(a) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Location</label><select id="mt-f-location">' + locOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Assigned To</label><select id="mt-f-assigned">' + assignOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mt-f-clear">Clear</button></div>'
-      + '</div></div>';
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  // Range chips left, Export + Worksheet right, directly above the list; Custom
+  // reveals a bare From/To row. The accepted filter model (no filter card).
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'mt-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="mt-print-blank">Worksheet</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(r => {
       const d = r.date_reported || '';
-      if (this.filterFrom && d < this.filterFrom) return false;
-      if (this.filterTo && d > this.filterTo) return false;
-      if (this.filterLocation && (r.location || '') !== this.filterLocation) return false;
-      if (this.filterAssigned && (r.assigned_to || '') !== this.filterAssigned) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
       return true;
     });
   },
@@ -136,12 +143,15 @@ S.ShiftMaintenance = {
     });
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-maintenance', 'Log Maintenance Issue', App.helpButton('mt-how'))
+      + App.collapsibleCardTitle('sc-maintenance', 'Log Maintenance Issue')
       + '<div class="collapse-body">'
       + this.formFields(null, 'mt-')
-      + '<div class="card-actions"><button class="btn btn-primary" id="mt-save">Save Issue</button>'
-      + '<span id="mt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
-      + '</div></div>';
+      + '</div></div>'
+      + '<div data-collapse-group="sc-maintenance" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="mt-save">Save Issue</button>'
+        + '<button class="btn btn-ghost" id="mt-startover">Start Over</button>'
+        + '<span id="mt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
 
     let below;
     if (all.length === 0) {
@@ -160,7 +170,7 @@ S.ShiftMaintenance = {
 
       let listHtml;
       if (!filtered.length) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No issues match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No issues in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'maintenance')).map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'
@@ -178,9 +188,9 @@ S.ShiftMaintenance = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('sc', 'maintenance', filtered, !!(this.filterFrom || this.filterTo || this.filterLocation || this.filterAssigned));
+          + App.showOlderBar('sc', 'maintenance', filtered, this.filterPreset !== 'all');
       }
-      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Maintenance Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mt-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="mt-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -190,12 +200,22 @@ S.ShiftMaintenance = {
 
   wireList() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#mt-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.mt-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#mt-export')) { App.exportPDF({ title: 'Maintenance Log', root: this.container }); return; }
       if (ev.target.closest('#mt-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#mt-save')) { this.saveNew(); return; }
+      if (ev.target.closest('#mt-startover')) { this.startOver(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
       const edit = ev.target.closest('.mt-edit');
       const del  = ev.target.closest('.mt-del');
@@ -205,11 +225,8 @@ S.ShiftMaintenance = {
       if (row && App.canEdit('sc-maintenance')) this.openEditModal(row.dataset.id);
     };
     this.wireResolvedAutofill('mt-');
-    document.getElementById('mt-f-from')?.addEventListener('change',     e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-to')?.addEventListener('change',       e => { this.filterTo = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-location')?.addEventListener('change', e => { this.filterLocation = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-assigned')?.addEventListener('change', e => { this.filterAssigned = e.target.value || ''; this.renderList(); });
-    document.getElementById('mt-f-clear')?.addEventListener('click', () => { this.filterFrom = this.filterTo = this.filterLocation = this.filterAssigned = ''; this.renderList(); });
+    document.getElementById('mt-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('mt-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
 
     // Hold the in-progress inline form through leave/return.
     const formRoot = this.container.querySelector('.collapse-body');
@@ -219,6 +236,13 @@ S.ShiftMaintenance = {
       formRoot.addEventListener('input', cap);
       formRoot.addEventListener('change', cap);
     }
+  },
+
+  // Reset the inline log form to a fresh blank issue.
+  startOver() {
+    this.editId = null;
+    this._draft = null;
+    this.renderList();
   },
 
   // Paper-at-bar workflow: print a blank sheet to mark issues during the shift.
