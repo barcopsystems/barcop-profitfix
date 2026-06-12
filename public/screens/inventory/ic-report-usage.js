@@ -73,8 +73,8 @@ S.InventoryUsageReport = {
     App.showHelpModal('How the Usage Report Works', [
       { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you. Starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts. Every product is measured in its own stock unit, so liquor and wine show up in bottles, draft in kegs, and bottle beer in cases.'] },
       { h: 'The Math, Spelled Out', p: ['Take a single product across one period. You counted forty bottles of Tito\'s at the front bar to start. A Republic National delivery brought in two cases, so twenty four bottles in. At the next count you had eighteen bottles left. Usage is forty plus twenty four minus eighteen, which is forty six bottles poured through. Bar Cop runs that for every product and every period off your counts and deliveries.'] },
-      { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top, or tap a period, to choose which two counts to measure between, and pick a category from the dropdown to narrow it down. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
-      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
+      { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top, or tap a period, to choose which two counts to measure between. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
+      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown, grouped by category, with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
       { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] }
     ]);
   },
@@ -137,15 +137,9 @@ S.InventoryUsageReport = {
 
     // Period = a windowed stepper (‹ prev · current · next ›, like the Build
     // Schedule week selector), so a long count history never becomes a wall of
-    // chips. Category = a compact il-copysel dropdown (like Dynamic Pars).
-    const cats = [...new Set(period.rows.map(r => r.category).filter(Boolean))].sort();
-    const catSel = '<select id="ur-cat" class="il-copysel" style="max-width:200px;">'
-      + '<option value="">All Categories</option>'
-      + cats.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
-      + '</select>';
-
+    // chips. No category filter — the Usage Data list groups by category instead.
     const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
-      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' + catSel + this.periodStepper(period) + '</div>'
+      + this.periodStepper(period)
       + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>'
       + '</div>';
 
@@ -164,9 +158,8 @@ S.InventoryUsageReport = {
       if (ev.target.closest('#ur-period-next')) { this.stepPeriod(1); return; }
       if (ev.target.closest('#ur-period-latest')) { this.endCountId = null; this.catFilter = ''; this.locFilter = ''; this.draw(); return; }
       const pchip = ev.target.closest('.ur-period-chip');
-      if (pchip) { this.endCountId = pchip.dataset.v; this.catFilter = ''; this.locFilter = ''; this.draw(); return; }
+      if (pchip) { this.endCountId = pchip.dataset.v; this.locFilter = ''; this.draw(); return; }
     };
-    document.getElementById('ur-cat')?.addEventListener('change', e => { this.catFilter = e.target.value || ''; this.draw(); });
   },
 
   // Windowed period stepper: the selected period plus its older/newer neighbors,
@@ -231,8 +224,9 @@ S.InventoryUsageReport = {
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
 
   tabUsage(rows) {
-    if (!rows.length) return this.dataCard('<th>Product</th><th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th><th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>', this.noRow(10));
-    const body = rows.map(r => '<tr>'
+    const headers = '<th>Product</th><th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th><th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>';
+    if (!rows.length) return this.dataCard(headers, this.noRow(10));
+    const rowHtml = r => '<tr>'
       + '<td><div class="val">' + esc(r.name) + '</div></td>'
       + '<td style="color:var(--t3);font-size:11px;">' + esc(App.unitAbbr(App.productUnit(r.product)) || '-') + '</td>'
       + '<td>' + this.num(r.starting) + '</td>'
@@ -243,8 +237,20 @@ S.InventoryUsageReport = {
       + '<td>' + this.cur(r.usageCost) + '</td>'
       + '<td>' + this.cur(r.theoSales) + '</td>'
       + '<td class="' + (r.theoProfit != null ? (r.theoProfit >= 0 ? 'pos' : 'neg') : '') + '">' + this.cur(r.theoProfit) + '</td>'
-      + '</tr>').join('');
-    return this.dataCard('<th>Product</th><th>Unit</th><th>Start</th><th>Purch</th><th>End</th><th>Used</th><th>Servings</th><th>Usage Cost</th><th>Theo Sales</th><th>Theo Profit</th>', body);
+      + '</tr>';
+    // Group the full list by category (CAT_ORDER first, extras after), products
+    // name-sorted within each, a category subheading before each block.
+    const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const byCat = {};
+    rows.forEach(r => { const c = r.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
+    return cats.map(c => {
+      const catRows = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return '<div class="sh" style="margin:24px 0 10px;">' + esc(c) + '</div>' + this.dataCard(headers, catRows.map(rowHtml).join(''));
+    }).join('');
   },
 
   tabTotals(rows) {
