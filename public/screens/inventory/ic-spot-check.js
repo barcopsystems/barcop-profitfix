@@ -389,13 +389,16 @@ S.InventorySpotCheck = {
       }
     });
     document.getElementById('sp-add')?.addEventListener('change', e => {
-      e.target.closest('.f')?.classList.remove('field-missing');
-      const p = this.productById(e.target.value);
-      if (p) this.addLine(p);
+      const pid = e.target.value;
       e.target.value = '';
+      if (!this.requireSetup()) return;   // no product added until Date + Bar are set
+      e.target.closest('.f')?.classList.remove('field-missing');
+      const p = this.productById(pid);
+      if (p) this.addLine(p);
     });
     document.getElementById('sp-date')?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('field-missing'));
     document.getElementById('sp-load-targets')?.addEventListener('click', () => {
+      if (!this.requireSetup()) return;
       const have = new Set([...this.container.querySelectorAll('.sp-line')].map(l => l.dataset.pid));
       this.lastTargets(document.getElementById('sp-loc')?.value || '').forEach(pid => {
         if (have.has(pid)) return;
@@ -548,6 +551,21 @@ S.InventorySpotCheck = {
   clearMissing() {
     this.container.querySelectorAll('.f.field-missing').forEach(f => f.classList.remove('field-missing'));
     this.container.querySelectorAll('.sp-line.sp-missing').forEach(l => l.classList.remove('sp-missing'));
+  },
+  // Block adding products until the required setup fields (Date + Bar) are filled,
+  // so the red flag lands right by the Add Products control instead of failing on
+  // Save at the bottom of a long list. Returns true when all are set.
+  requireSetup() {
+    let ok = true;
+    const need = id => {
+      const f = document.getElementById(id)?.closest('.f');
+      if (!document.getElementById(id)?.value) { f?.classList.add('field-missing'); ok = false; }
+      else f?.classList.remove('field-missing');
+    };
+    need('sp-date');
+    need('sp-loc');
+    if (!ok) this.expandSetup();
+    return ok;
   },
   // Make sure the Spot Check card is open so a flagged cell inside it is visible.
   expandSetup() {
