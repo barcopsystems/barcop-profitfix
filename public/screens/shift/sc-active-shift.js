@@ -58,13 +58,17 @@ S.ShiftActiveShift = {
 
   // ── Start a shift ───────────────────────────────────────────────────────────
   // ── Open the Floor — the visual shift opener ────────────────────────────────
-  // Tap a daypart, tap who's running it, tap the registers live tonight (each
+  // Tap a daypart, tap who's running it, tap the registers running this shift (each
   // shows its bank), set staff + tolerance, open. The live readout assembles the
   // shift as you go. State lives in this._openDraft; taps re-render, the bank /
   // tolerance inputs update the draft in place so focus survives typing.
   renderStart() {
     if (!this._openDraft) this._openDraft = this._freshDraft();
     const d = this._openDraft;
+    // Cash tolerance is read-only on the opener: always the current Shift Policies
+    // value for the picked daypart (changed via the Edit button -> Shift Policies),
+    // so it also refreshes after a round-trip to that page.
+    d.cash_tolerance = this._defaultToleranceFor(d.shift_type);
     const lbl = 'font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;';
     const types = this.shiftTypes();
     const activeDrawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(x => x.active !== false);
@@ -122,7 +126,7 @@ S.ShiftActiveShift = {
       + '<div style="margin-top:18px;"><div style="' + lbl + '">Running It</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + modChips + '</div></div>'
 
-      + '<div style="margin-top:18px;"><div style="' + lbl + '">Registers <span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">tap the ones running tonight, set each bank</span></div>'
+      + '<div style="margin-top:18px;"><div style="' + lbl + '">Registers <span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">tap the ones running this shift, set each bank</span></div>'
       + regsHtml + '</div>'
 
       + '<div style="margin-top:18px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;">'
@@ -132,7 +136,10 @@ S.ShiftActiveShift = {
       + '<span style="font-size:18px;font-weight:800;color:var(--t1);min-width:24px;text-align:center;">' + (parseInt(d.staff_on_floor) || 0) + '</span>'
       + '<button class="btn btn-ghost btn-sm" id="of-staff-plus" style="width:34px;">+</button></div></div>'
       + '<div><div style="' + lbl + '">Cash Tolerance</div>'
-      + '<div class="fw" style="width:130px;"><span class="pre">$</span><input class="pre" type="number" id="of-tol" min="0" step="0.5" inputmode="decimal" value="' + esc(String(d.cash_tolerance != null ? d.cash_tolerance : '')) + '" oninput="S.ShiftActiveShift.setTol(this.value)"/></div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<span style="font-size:18px;font-weight:800;color:var(--t1);">' + (d.cash_tolerance != null && d.cash_tolerance !== '' ? App.fmtCurrency(parseFloat(d.cash_tolerance)) : '-') + '</span>'
+      + '<button class="btn btn-ghost btn-sm" id="of-tol-edit">Edit</button>'
+      + '</div></div>'
       + '</div>'
 
       + '</div>'
@@ -149,6 +156,7 @@ S.ShiftActiveShift = {
       const mod = ev.target.closest('.of-mod');
       const tile = ev.target.closest('.reg-tile');
       if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
+      if (ev.target.closest('#of-tol-edit')) { App.navigate('sc-shift-policies'); return; }
       if (ev.target.closest('#rs-log')) { this.showShiftForm(null); return; }
       if (ev.target.closest('#rs-export')) { App.exportPDF({ title: 'Recent Shifts', root: this.container }); return; }
       const rsEdit = ev.target.closest('.rs-edit');
@@ -165,7 +173,7 @@ S.ShiftActiveShift = {
         } else { this.filterPreset = val; this._rsFrom = ''; this._rsTo = ''; }
         this._rsShow = this.RS_PAGE; this.renderStart(); return;
       }
-      if (chip) { d.shift_type = chip.dataset.type; d.cash_tolerance = this._defaultToleranceFor(d.shift_type); this.renderStart(); return; }
+      if (chip) { d.shift_type = chip.dataset.type; this.renderStart(); return; }
       if (mod) { d.manager_id = (d.manager_id === mod.dataset.mgr) ? '' : mod.dataset.mgr; this.renderStart(); return; }
       if (ev.target.closest('#of-staff-minus')) { d.staff_on_floor = Math.max(0, (parseInt(d.staff_on_floor) || 0) - 1); this.renderStart(); return; }
       if (ev.target.closest('#of-staff-plus')) { d.staff_on_floor = (parseInt(d.staff_on_floor) || 0) + 1; this.renderStart(); return; }
@@ -388,7 +396,7 @@ S.ShiftActiveShift = {
       { h: '1. Daypart', p: ['Tap the service you are opening: Brunch, Lunch, Dinner, or Late Night. Bar Cop pre-picks one by the time of day; tap another chip to change it. The daypart also sets this shift\'s cash tolerance.'] },
       { h: '2. Running It', p: ['Tap the manager on duty. The list is your managers and bartenders, the people who actually run a shift.'] },
       { h: '3. Registers', p: ['Every register you set up shows as a tile, turned on with its default bank. Tap a tile to turn it off if it is not running tonight, and type each register\'s starting cash right on the tile. Run one register or ten.'] },
-      { h: '4. Floor and Tolerance', p: ['Set how many are on the floor and confirm the cash tolerance, which is how far a drawer can be off before Bar Cop flags it. Then Open the Floor and the shift goes live.'] },
+      { h: '4. Floor and Tolerance', p: ['Set how many are on the floor. The cash tolerance, how far a drawer can be off before Bar Cop flags it, comes from the daypart you picked on your Shift Policies page and is shown here; tap Edit to change it there. Then Open the Floor and the shift goes live.'] },
       { h: 'Recent Shifts', p: ['Below the opener is every shift you have run. Log a Past Shift back-fills one you missed or ran before Bar Cop, Edit fixes any shift, and View opens its full recap. Creating, editing, and deleting shifts all happen here.'] },
       { h: 'Shift History', p: ['Shift History in the sidebar is the read-only record of every shift: filter it, open a recap, and export. The editing all happens here on Active Shift, so the history stays a clean reference. Shift revenue flows straight into Profit and Revenue Recovery, so keep it accurate.'] }
     ]);
@@ -449,10 +457,6 @@ S.ShiftActiveShift = {
     this._openDraft.drawers[id].bank = val;
     const ro = document.getElementById('of-readout');
     if (ro) ro.textContent = this._readoutText();
-  },
-
-  setTol(val) {
-    if (this._openDraft) this._openDraft.cash_tolerance = val;
   },
 
   // Pre-fill default tolerance for the picked shift type. Reads from
