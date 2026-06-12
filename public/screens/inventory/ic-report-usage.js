@@ -145,7 +145,7 @@ S.InventoryUsageReport = {
       + '</select>';
 
     const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
-      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' + this.periodStepper(period) + catSel + '</div>'
+      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' + catSel + this.periodStepper(period) + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="ur-export">Export PDF</button>'
       + '</div>';
 
