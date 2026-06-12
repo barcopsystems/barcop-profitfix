@@ -12,11 +12,12 @@
    standard re-judges every saved period consistently and never makes junk
    history. (See [[help-model]] context: the nav "i" carries directions.)
 
-   REPORT: a clean read-only view of one saved run — locked period (a dropdown of
-   saved runs for lookback), category selector, stats, and the Sales Variance /
-   Usage Variance / History tabs. The History tab is the variance trend across
-   saved periods. Switching the period dropdown loads THAT run's saved POS
-   alongside its usage, so the two never mismatch.
+   REPORT: a clean read-only view of one saved run — a two-period scroller over
+   the saved runs for lookback, stats, and the Sales Variance / Usage Variance /
+   History tabs. The Sales and Usage tabs group products by category (the category
+   in each table's first column header). The History tab is the variance trend
+   across saved periods. Stepping the scroller loads THAT run's saved POS alongside
+   its usage, so the two never mismatch.
 
    Usage Variance reads in each category's natural unit (liquor/wine in ounces +
    pours + bottles, draft in ounces + kegs, bottle beer bottle-to-bottle in
@@ -75,7 +76,7 @@ S.InventoryVarianceReport = {
         'Each category gets one number: the variance you will accept before it flags. Below the line is OK, above it flags. Set your own on the setup screen. Starting points:',
         'Liquor: flag over 2%. Wine by the glass: over 3%. Draft: over 10%. Misc mixers: over 10%. Food: over 5%.',
         'By the Bottle (bottle beer, wine by the bottle, champagne splits): flags the moment a single bottle is unaccounted, because it is bottle-in, bottle-out.' ] },
-      { h: 'History', p: ['Every run is saved against its count period, so the History tab shows your variance trend period over period and the Period dropdown lets you reopen any past run. Re-running a period replaces it, and because standards are never frozen into a saved run, tightening a standard re-judges your whole history consistently.'] }
+      { h: 'History', p: ['Every run is saved against its count period, so the History tab shows your variance trend period over period, and you can reopen any past run with the period scroller up top or by clicking a row in History. Re-running a period replaces it, and because standards are never frozen into a saved run, tightening a standard re-judges your whole history consistently.'] }
     ]);
   },
 
@@ -570,26 +571,20 @@ S.InventoryVarianceReport = {
       + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
       + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
 
-    const runOpts = this.runsSorted().map(r => '<option value="' + esc(r.id) + '"' + (r.id === this._viewRunId ? ' selected' : '') + '>'
-      + this.fmtDate(r.start_date) + ' → ' + this.fmtDate(r.end_date) + '</option>').join('');
-    const avail = this.availableCats();
-    const catOpts = '<option value="">All Categories</option>'
-      + avail.map(c => '<option value="' + esc(c) + '"' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button></div>';
+    // Period = a two-period scroller over the saved runs (no category filter; the
+    // Sales and Usage tables group by category instead). History is all-periods,
+    // so it shows no scroller.
+    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + this.runStepper()
+      + '<button class="btn btn-ghost btn-sm" id="vr-export">Export PDF</button>'
+      + '</div>';
     const runNewRow = '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-primary" id="vr-new">Run New Report</button></div>';
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Period</label><select id="vr-run">' + runOpts + '</select></div>'
-      + (avail.length ? '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select id="vr-cat">' + catOpts + '</select></div>' : '')
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vr-clear">Clear</button></div>'
-      + '</div></div>';
 
     let html;
     if (this.tab === 'history') {
       html = this.tabBar() + this.tabHistory() + runNewRow;
     } else {
-      html = this.tabBar() + statsCard + filterHeading + filterCard
+      html = this.tabBar() + statsCard + filterArea
         + (this.tab === 'usage' ? this.tabUsage() : this.tabSales()) + runNewRow;
     }
     this.container.innerHTML = '<div class="screen">' + html + '</div>';
@@ -597,9 +592,10 @@ S.InventoryVarianceReport = {
     this.container.querySelectorAll('.ch-tab').forEach(btn => btn.addEventListener('click', () => { this.tab = btn.dataset.tab; this.draw(); }));
     document.getElementById('vr-new')?.addEventListener('click', () => this.newReport());
     document.getElementById('vr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Variance Report' + (periodLabel ? ' ' + periodLabel : ''), root: this.container }));
-    document.getElementById('vr-run')?.addEventListener('change', e => { const r = this.runs().find(x => x.id === e.target.value); if (r) { this.loadRun(r); this.draw(); } });
-    document.getElementById('vr-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
-    document.getElementById('vr-clear')?.addEventListener('click', () => { this.catFilter = ''; this.draw(); });
+    document.getElementById('vr-period-prev')?.addEventListener('click', () => this.stepRun(-1));
+    document.getElementById('vr-period-next')?.addEventListener('click', () => this.stepRun(1));
+    document.getElementById('vr-period-latest')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); } });
+    this.container.querySelectorAll('.vr-run-chip').forEach(b => b.addEventListener('click', () => { const r = this.runs().find(x => x.id === b.dataset.v); if (r) { this.loadRun(r); this.draw(); } }));
     this.container.querySelectorAll('.vr-hist-row').forEach(row => row.addEventListener('click', () => {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
@@ -608,6 +604,49 @@ S.InventoryVarianceReport = {
       ev.stopPropagation();
       this.openInvestigation(b.dataset.pid, b.dataset.name);
     }));
+  },
+
+  // ── Period scroller (two saved runs at a time, like the Usage report) ───────
+  runStepper() {
+    const asc = this.runsSorted().slice().reverse();   // oldest → newest
+    const len = asc.length;
+    let selIdx = asc.findIndex(r => r.id === this._viewRunId);
+    if (selIdx < 0) selIdx = len - 1;
+    const chip = idx => {
+      const r = asc[idx];
+      const on = idx === selIdx, isNewest = idx === len - 1;
+      return '<button type="button" class="vr-run-chip btn btn-sm" data-v="' + esc(r.id) + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.fmtDate(r.start_date) + ' → ' + this.fmtDate(r.end_date)
+        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    // Always show two adjacent periods: the selected on the right with its older
+    // neighbor on the left, except at the oldest end.
+    let winStart = selIdx - 1;
+    if (winStart < 0) winStart = 0;
+    if (winStart > len - 2) winStart = Math.max(0, len - 2);
+    let chips = '';
+    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
+    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
+    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="vr-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="vr-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
+      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="vr-period-latest" style="margin-left:4px;">Latest</button>' : '')
+      + '</div>';
+  },
+  stepRun(delta) {
+    const ids = this.runsSorted().slice().reverse().map(r => r.id);  // oldest → newest
+    if (!ids.length) return;
+    let selIdx = ids.indexOf(this._viewRunId);
+    if (selIdx < 0) selIdx = ids.length - 1;
+    const ni = selIdx + delta;
+    if (ni < 0 || ni >= ids.length) return;
+    const r = this.runs().find(x => x.id === ids[ni]);
+    if (r) { this.loadRun(r); this.draw(); }
   },
 
   // ── History tab (variance trend across saved periods) ───────────────────────
@@ -646,7 +685,7 @@ S.InventoryVarianceReport = {
     const s = this.status(key, pct, unitVar);
     if (s.label === 'Flag' && pid) {
       return '<button type="button" class="vr-flag btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
-        + '" style="border-color:var(--gold);color:var(--gold);white-space:nowrap;">Flag</button>';
+        + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>';
     }
     return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
@@ -689,18 +728,18 @@ S.InventoryVarianceReport = {
   },
 
   tabSales() {
-    const headers = '<th>Product</th><th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
+    const restHeaders = '<th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
       + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>';
     const rows = this.salesRows();
     if (!rows.length) {
-      return this.dataCard(headers, '<tr><td colspan="8" style="color:var(--t3);padding:14px 8px;">'
+      return this.dataCard('<th>Product</th>' + restHeaders, '<tr><td colspan="8" style="color:var(--t3);padding:14px 8px;">'
         + 'No direct-pour products matched your POS for this period. Beer, wine, and liquor sold by the glass or bottle show here. Cocktails and plates are in Usage Variance.</td></tr>');
     }
     const dash = '<span style="color:var(--t4);">-</span>';
     const noData = '<span style="color:var(--t4);font-size:11px;" title="This product sells in more than one size. Map each size and include its quantity sold and sales amount so Bar Cop can compute the variance.">Not enough data to calculate</span>';
     const blended = ' <span style="font-size:8px;color:var(--t3);font-weight:700;letter-spacing:1px;" title="Sold in multiple sizes: theoretical sales is the ounces you used valued at the blended price-per-ounce your POS sold at.">BLENDED</span>';
     const profitCls = r => r.actualProfit != null ? (r.actualProfit >= 0 ? 'pos' : 'neg') : '';
-    const body = rows.map(r => {
+    const rowHtml = r => {
       if (r.insufficient) {
         return '<tr>'
           + '<td><div class="val">' + esc(r.name) + '</div></td>'
@@ -720,8 +759,20 @@ S.InventoryVarianceReport = {
         + '<td class="' + profitCls(r) + '">' + this.cur(r.actualProfit) + '</td>'
         + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar, r.pid, r.name) : '-') + '</td>'
         + '</tr>';
+    };
+    // Group by category (CAT_ORDER first, extras after), name-sorted within, the
+    // category in the first column header, a shared colgroup so columns line up.
+    const ORDER = this.CAT_ORDER;
+    const byCat = {};
+    rows.forEach(r => { const c = r.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
+    return cats.map(c => {
+      const catRows = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''), this.usageColgroup(8));
     }).join('');
-    return this.dataCard(headers, body);
   },
 
   // ── Usage Variance (category-aware) ─────────────────────────────────────────
@@ -776,7 +827,7 @@ S.InventoryVarianceReport = {
     return this.dataCard(headers.map(h => '<th>' + h + '</th>').join(''), body, this.usageColgroup(headers.length));
   },
 
-  usageTableLiquorWine(cat, rows) {
+  usageTableLiquorWine(cat, rows, label) {
     const body = rows.map(r => {
       const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
       const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
@@ -787,9 +838,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
   },
-  usageTableBottleWine(rows) {
+  usageTableBottleWine(rows, label) {
     const body = rows.map(r => {
       const bottlesSold = r.containerSizeOz ? r.ouncesSold / r.containerSizeOz : 0;
       const bottlesUsed = r.containersUsed;
@@ -801,9 +852,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', 'Status'], body);
   },
-  usageTableDraft(rows) {
+  usageTableDraft(rows, label) {
     const body = rows.map(r => {
       const ounceVar = r.ouncesUsed != null ? r.ouncesUsed - r.ouncesSold : null;
       const varPct = (ounceVar != null && r.ouncesUsed) ? ounceVar / r.ouncesUsed * 100 : null;
@@ -814,9 +865,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', 'Status'], body);
   },
-  usageTableBottleBeer(rows) {
+  usageTableBottleBeer(rows, label) {
     const body = rows.map(r => {
       const cs = r.caseSize || 1;
       const bottlesSold = r.containerSizeOz ? r.ouncesSold / r.containerSizeOz : 0;
@@ -833,9 +884,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Product', 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', 'Status'], body);
   },
-  usageTableMisc(rows) {
+  usageTableMisc(rows, label) {
     const body = rows.map(r => {
       const recipeQt = r.ouncesSold || 0;
       const countedQt = r.containersUsed;
@@ -847,11 +898,11 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(qtVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Mixer', 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', 'Status'], body);
   },
   foodUnit(name) { const m = /\(([^)]+)\)\s*$/.exec(name || ''); return m ? m[1].trim() : 'unit'; },
   foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
-  usageTableFood(rows) {
+  usageTableFood(rows, label) {
     const body = rows.map(r => {
       const recipeUse = r.ouncesSold || 0;
       const countedUse = r.containersUsed;
@@ -865,34 +916,30 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(useVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl(['Ingredient', 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
   },
   renderUsageCat(cat, rows) {
-    if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows);
-    if (cat === 'Draft Beer')  return this.usageTableDraft(rows);
-    if (cat === 'Misc')        return this.usageTableMisc(rows);
-    if (cat === 'Food')        return this.usageTableFood(rows);
+    const label = esc(cat) + ' Products';
+    if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows, label);
+    if (cat === 'Draft Beer')  return this.usageTableDraft(rows, label);
+    if (cat === 'Misc')        return this.usageTableMisc(rows, label);
+    if (cat === 'Food')        return this.usageTableFood(rows, label);
     if (cat === 'Wine') {
       const glass  = rows.filter(r => !r.byBottle);
       const bottle = rows.filter(r => r.byBottle);
-      let out = glass.length ? this.usageTableLiquorWine('Wine', glass) : '';
-      if (bottle.length) {
-        out += '<div style="font-weight:700;color:var(--t3);font-size:10px;letter-spacing:1.5px;margin:'
-          + (glass.length ? '16px' : '2px') + ' 0 8px;">BY THE BOTTLE</div>' + this.usageTableBottleWine(bottle);
-      }
+      let out = glass.length ? this.usageTableLiquorWine('Wine', glass, label) : '';
+      if (bottle.length) out += this.usageTableBottleWine(bottle, 'Wine (By the Bottle)');
       return out;
     }
-    return this.usageTableLiquorWine(cat, rows);
+    return this.usageTableLiquorWine(cat, rows, label);
   },
   tabUsage() {
     const avail = this.availableCats();
     if (!avail.length) return this.emptyMatch();
-    const cats = (this.catFilter && avail.includes(this.catFilter)) ? [this.catFilter] : avail;
-    const out = cats.map(cat => {
+    const out = avail.map(cat => {
       const rows = this.usageVarRows(cat);
       if (!rows.length) return '';
-      const heading = cats.length > 1 ? '<div class="sh" style="margin:24px 0 10px;">' + esc(cat) + '</div>' : '';
-      return heading + this.renderUsageCat(cat, rows);
+      return this.renderUsageCat(cat, rows);
     }).join('');
     return out || this.emptyMatch();
   },
