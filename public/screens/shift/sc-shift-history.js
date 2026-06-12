@@ -1,18 +1,17 @@
 'use strict';
 
 /* ── Shift Control — Shift History (writes sc_shifts) ─────────────────────────
-   The one home for every shift. Card 1 is the inline Log a Past Shift form
-   (collapsible), Card 2 is the filter + totals, Card 3 is the list. Live-closed
-   shifts from Active Shift and back-filled past shifts both land here. View
-   opens the full recap; Edit reopens the shift in the form. Mirrors the
-   Inventory Transfer Log layout. */
+   The read-only home for every shift, newest first: a stats strip, range chips
+   with Export, and the list. Live-closed shifts from Active Shift and back-filled
+   past shifts both land here. View opens the full recap (read-only — editing a
+   shift happens in Active Shift under Recent Shifts); the floating back button
+   returns to the list. */
 
 S.ShiftHistory = {
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
-  editId: null,
 
   shifts() {
     if (!App.shiftData) App.shiftData = {};
@@ -47,8 +46,17 @@ S.ShiftHistory = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    if (this._openDetailId) { const id = this._openDetailId; this._openDetailId = null; this.renderDetail(id); return; }
+    if (this._openDetailId) { const id = this._openDetailId; this._openDetailId = null; App.pushView(() => this.renderDetail(id)); return; }
     this.renderList();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Shift History Works', [
+      { p: ['Every shift you run lands here, newest first: the ones you close live in Active Shift and any you log after the fact. This is the read-only record. To change a shift, open it in Active Shift under Recent Shifts.'] },
+      { h: 'Reading the list', p: ['Each row shows the date, shift type, manager, revenue, covers, check average, and whether the shift is still Open or Closed. The stats strip up top totals revenue, covers, and check average for the range you have selected.'] },
+      { h: 'Setting the range', p: ['The chips pick the window: This Week, Last Week, This Month, Last 4 Weeks, or All. Custom opens a From and To picker. The totals and the list both update to match.'] },
+      { h: 'The recap', p: ['Click a shift to open its full recap: revenue and covers, the per-register cash reconciliation, tips, exceptions still open for the next shift, and the handoff notes. Save Handoff PDF prints that recap for the opener. The floating back arrow returns you to the list.'] }
+    ]);
   },
 
   // ── Stats strip (top, card background) ──────────────────────────────────────
@@ -155,8 +163,8 @@ S.ShiftHistory = {
       }
       const view = ev.target.closest('.sh-view');
       const row = ev.target.closest('.sh-row');
-      if (view) { ev.stopPropagation(); this.renderDetail(view.dataset.id); return; }
-      if (row) this.renderDetail(row.dataset.id);
+      if (view) { ev.stopPropagation(); const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
+      if (row) { const id = row.dataset.id; App.pushView(() => this.renderDetail(id)); }
     };
     document.getElementById('sh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Shift History', root: this.container }));
     document.getElementById('sh-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });

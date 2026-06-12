@@ -56,7 +56,7 @@ S.ShiftDrawers = {
       + '<input type="text" id="' + p + 'name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
       + '<div class="f" style="width:220px;min-width:0;"><label>Location</label>'
       + '<select id="' + p + 'loc">' + locOpts + '</select></div>'
-      + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank ' + tt('dr-bank') + '</label>'
+      + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'

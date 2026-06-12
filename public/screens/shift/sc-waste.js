@@ -106,7 +106,7 @@ S.ShiftWaste = {
       { h: 'Enter the whole shift at once', p: ['Set the date, shift, and who is recording up top, then add a line for each waste item off your sheet. Pick the product and how many units were lost. Bar Cop shows the unit and the cost as you go. Add Line for another, and Save All writes them in one shot.'] },
       { h: 'Units and cost', p: ['Units are in the product\'s own unit: bottles for liquor, wine, and case beer, ounces for a partial keg, the set unit for food. Cost is the product cost times units, the honest dollar weight of the waste.'] },
       { h: 'What it feeds', p: ['Logged waste is subtracted from used product in the Variance Report so it does not show up as theft signal, and it rolls into the Profit Audit shrinkage section. Large unexplained waste still moves the Theft Risk score, so log honestly.'] },
-      { h: 'Filter, Export, Worksheet', p: ['Filter by date or reason and the totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to mark waste by hand during the rush.'] }
+      { h: 'Filter, Export, Worksheet', p: ['Filter by date range and the waste totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to mark waste by hand during the rush.'] }
     ]);
   },
 

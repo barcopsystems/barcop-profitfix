@@ -3,10 +3,13 @@
 /* ── Shift Control — Help and FAQ ─────────────────────────────────────────────
    The in-app knowledge layer for Shift Control. One topic at a time on the same
    underline tab switcher used by Cash History and Reports, plus a live search
-   box that filters questions across every topic. Content tracks the current
-   Shift Control: Active Shift (live + past shifts), the Cash Board and Cash
-   History, the unified Checklists screen, the tabbed Reports, and how Shift
-   Control feeds Profit, Revenue, Inventory, and the Hub. */
+   box that filters questions across every topic. Per-screen step-by-step
+   directions live in each screen's nav "i" panel (showHowTo), so this FAQ stays
+   on orientation, the why, cross-system connections, and troubleshooting, not the
+   how-to. Content tracks the current Shift Control: Active Shift (live + past
+   shifts), Cash Control and Cash History, the unified Checklists screen, the
+   tabbed Reports, the combined Shift Policies setup page, and how Shift Control
+   feeds Profit, Revenue, Inventory, and the Hub. */
 
 S.ShiftHelp = {
   tab: 0,
@@ -30,18 +33,14 @@ S.ShiftHelp = {
         a: 'Open Active Shift. Below the open-the-floor card is Recent Shifts, where you can log a past shift or edit one that needs fixing. It writes the same shift record as a live shift, so a shift entered after the fact feeds every downstream number exactly the same way. Until a shift is logged, the weekly revenue total sums only the shifts that exist, so the number reads low.' }
     ]},
     { t: 'Shifts and Revenue', qa: [
-      { q: 'How do I run a shift live?',
-        a: 'Open Active Shift and tap through the opener: the daypart (Brunch, Lunch, Dinner, Late Night, or your custom types), the manager on duty, the registers live tonight, and each one opening bank. The registers come from your Drawers and Registers list under Setup. Open the floor and the shift is running. As the night runs, the in-shift tiles let you drop cash, log voids and comps, mark 86s, and log maintenance without leaving the screen, and the Shift Notes card timestamps anything the next manager should know. At close, run the Shift Close Wizard and the shift saves to Shift History with everything attached.' },
       { q: 'What are Shift Notes?',
         a: 'A timestamped notebook for things the closer or the next manager should know, captured as the shift runs instead of trying to remember at close. Delivery short on bourbon, VIP at 9pm, server went home sick, weather slowing us down. Each note records the time you added it, and the notes flow into the Shift Handoff so the next manager opens the night knowing what happened on the prior one.' },
       { q: 'What does the Shift Close Wizard do?',
-        a: 'Five steps in order: Revenue and Covers (bar, floor, and total covers), Cash Reconciliation (opening bank plus POS cash sales minus drops against the counted cash, which auto-creates a variance entry if it lands outside tolerance), Exception Review (open 86s, large voids and comps, open maintenance, closing checklist completion), Tip Reconciliation (POS tip total against logged tips, with an inline tip pool calculator), and Handoff Notes for the opener. Saving runs all the writes at once.' },
+        a: 'Five steps in order: Revenue and Covers (bar, floor, and total covers), Cash Reconciliation (opening bank plus POS cash sales minus drops against the counted cash, which auto-creates a variance entry if it lands outside tolerance), Exception Review (open 86s, large voids and comps, open maintenance, closing checklist completion), Tip Reconciliation (pick Tip Out, Tip Pool, or Skip and enter the tips inline, which log straight to Labor on close), and Handoff Notes for the opener. Saving runs all the writes at once.' },
       { q: 'Why does shift revenue matter so much?',
         a: 'It is the single source of weekly revenue for Bar Cop. Profit Recovery and Revenue Recovery both read the weekly sum of your logged shift revenue. You enter it once here and never re-type it. Covers feed the check-average calculation in Revenue Recovery and the Server Check screen. Get every shift logged and the weekly numbers downstream stay honest without manual override.' },
       { q: 'What does Shift History show?',
-        a: 'Every saved shift, newest first, read-only. Click any shift for the full detail page: profile (manager, registers, opening banks, staff on floor), revenue (bar, floor, covers, check average), cash reconciliation (opening bank, POS cash, drops, expected, counted, variance, status), tip reconciliation, the exception-review acknowledgments, every timestamped shift note from during service, and the closing handoff notes. Nothing buried behind a second click. Use it to spot the shift that ran outside the norm.' },
-      { q: 'How do I save a Shift Handoff?',
-        a: 'Open the shift in Shift History, or use the confirmation screen right after you run the close wizard, and Save Handoff PDF gives you a clean one-page handoff to keep or hand to the opener.' }
+        a: 'Every saved shift, newest first, read-only. Click any shift for the full detail page: profile (manager, registers, opening banks, staff on floor), revenue (bar, floor, covers, check average), cash reconciliation (opening bank, POS cash, drops, expected, counted, variance, status), tip reconciliation, the exception-review acknowledgments, every timestamped shift note from during service, and the closing handoff notes. Save Handoff PDF on the recap prints a clean one-page handoff for the opener. Use it to spot the shift that ran outside the norm.' }
     ]},
     { t: 'Cash Control', qa: [
       { q: 'Where do I enter cash activity?',
@@ -51,7 +50,7 @@ S.ShiftHelp = {
       { q: 'How does the Safe Log work?',
         a: 'A running ledger of cash moving in and out of the safe: drops in, banks issued and returned, deposits prepared, paid-outs. Every entry carries a running balance, so at any moment you know what the safe should hold. Count the safe against that balance at least daily. A safe that does not balance against the log is a problem the log surfaces immediately.' },
       { q: 'What is a variance, and where does it come from?',
-        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created automatically when you count a drawer in Active Shift (with the shift register and manager pre-filled), or entered by hand if needed. The tolerance lives under Setup, Cash Tolerances (default $10, with optional overrides per daypart and per shift). Anything outside tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
+        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created automatically when you reconcile a drawer in Active Shift (with the shift register and manager pre-filled), or entered by hand if needed. The tolerance lives under Setup, Shift Policies (default $10, with optional overrides per daypart and per shift). Anything outside tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
       { q: 'What do the variance colors mean?',
         a: 'Within tolerance is green. Short, meaning less cash than expected, is red. Over, meaning more cash than expected, is amber. A drawer that was never counted shows grey as Not Counted. The repeat-offender pattern feeds the Theft Risk Scorecard in Profit Recovery, so a bartender consistently short across shifts is a pattern Bar Cop surfaces without you tracking it on paper.' }
     ]},
@@ -61,7 +60,7 @@ S.ShiftHelp = {
       { q: 'What goes in the Void and Comp Log?',
         a: 'Every voided ticket and every comped item, logged by the dollar amount (a whole comped table is one line, not one per item). The item is optional, picked from the menu-and-inventory dropdown when you want the link or left off. The Reason carries the classification: customer-facing comps such as service recovery, goodwill, regular or VIP, and promo are loss and feed Theft Risk, while Staff Meal and Shift Drink are policy expense tracked as cost in Books and Year-End. Enter a whole shift at once in the batch builder, or edit a single row to add a check number or a note. The log feeds the Theft Risk Scorecard and the Profit Audit exception analysis.' },
       { q: 'What is the Comp Authorization Threshold?',
-        a: 'Under Setup, Comp Authorization sets the dollar amount above which a comp should have a manager in Authorized By (default $25). Saving a comp over the threshold with no manager pops a soft warning you can override, and every override is flagged in Theft Risk under unauthorized large comps. Set the threshold to 0 to turn the warning off.' },
+        a: 'Under Setup, Shift Policies, the Comp Auth Threshold sets the dollar amount above which a comp should have a manager in Authorized By (default $25). Saving a comp over the threshold with no manager pops a soft warning you can override, and every override is flagged in Theft Risk under unauthorized large comps. Set the threshold to 0 to turn the warning off.' },
       { q: 'What is the Maintenance Log for?',
         a: 'Broken equipment, facility issues, and operational problems that need attention. Each entry has a priority (Urgent, High, Normal, Low) and a status (Open, In Progress, Resolved). Assigned To suggests staff from your roster but takes free text for an outside vendor like an HVAC tech or a plumber. Urgent open items show up as alerts on the Hub Dashboard so a problem from Saturday night carries to Sunday manager until it gets resolved.' },
       { q: 'What is the Walked Tabs log?',
@@ -70,14 +69,10 @@ S.ShiftHelp = {
     { t: 'Checklists', qa: [
       { q: 'How do the checklists work?',
         a: 'One Checklists screen runs both routines. Toggle Opening or Closing up top (it starts on the one that fits the time of day), and the items come from a template you built or a built-in default. Tap items to check them off, then Save to record who completed it, the date, and the completion percentage. Completed runs land in the filterable history below, where View shows the per-item detail and Export PDF saves the record. Completion feeds the Reports Operations tab so you can see which shifts ran the open and close properly and which skipped steps.' },
-      { q: 'How do I build my own checklist?',
-        a: 'On Checklist Templates, create an Opening or Closing template. Add items in order, edit them, drag the handle to reorder, or load the default list as a starting point and modify it. Saved templates appear automatically in the Checklists screen for the next shift. Most operations end up with one template per routine and update them quarterly.' },
       { q: 'Why use checklists in Bar Cop instead of paper?',
         a: 'Three reasons. The digital list shows the same items in the same order to every manager, so quality does not drift by who is working. The completion data feeds the Reports Operations tab, so checklist quality becomes measurable instead of a maybe-it-happened. And a blank Worksheet still prints for the clipboard when you want to run it on paper and enter it after.' }
     ]},
     { t: 'Reports', qa: [
-      { q: 'Where are the reports?',
-        a: 'One Reports screen with three tabs: Shift, Cash, and Operations. Each tab has a date range and a stats strip up top, then the breakdown tables below, and an Export PDF that saves the tab you are on. Read-only aggregation of everything Shift Control captured.' },
       { q: 'What is on the Shift tab?',
         a: 'Revenue and covers broken down by shift type and by day of week over the date range you pick. Spot the patterns: which daypart produces the highest average check, which day underperforms, which shifts run hottest on covers. Same data the Revenue Audit uses, sliced for the operational decision.' },
       { q: 'What is on the Cash tab?',

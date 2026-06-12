@@ -49,7 +49,7 @@ S.ShiftWalkedTabs = {
       { p: ['A walked tab is real money out the door: a customer who leaves without paying, a mis-billed check, a lost ticket. Log it while it is fresh so the loss lands on the right server and shift instead of evaporating into the weekly total.'] },
       { h: 'Logging one', p: ['Pick the server who had the table, the amount, the reason, and the manager who absorbed the loss. The reason codes (Walked, Mis-bill, Refused to Pay, Lost Check, Other) let you tell a dine-and-dash from a billing mistake.'] },
       { h: 'What it feeds', p: ['The log attributes losses to the right server and shift and surfaces a server walk-rate trend over time. It also feeds Books shrinkage attribution.'] },
-      { h: 'Filter and Export', p: ['Filter by date, server, or reason and the totals update to match. Export PDF saves the filtered list.'] }
+      { h: 'Filter and Export', p: ['Use the range chips (This Week, Last Week, This Month, Last 4 Weeks, All) or a custom date range, and the entry count and total loss update to match. Export PDF saves the filtered list.'] }
     ]);
   },
 

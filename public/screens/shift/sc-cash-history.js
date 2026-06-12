@@ -45,6 +45,16 @@ S.ShiftCashHistory = {
     this.draw();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Cash History Works', [
+      { p: ['The read-only record of every cash move: drops, safe activity, and drawer variances. You log cash in Cash Control; it shows up here for review, filtering, and export. Nothing is entered or edited on this page.'] },
+      { h: 'The Three Tabs', p: ['Cash Drops lists every mid-shift drop with the drawer and who pulled it. Safe Log is the running ledger of safe activity with a balance after each move. Variances lists every drawer count against expected cash, with the over or short and the status.'] },
+      { h: 'Setting the range', p: ['The chips pick the window: This Week, Last Week, This Month, Last 4 Weeks, or All. Custom opens a From and To picker. The stats and the list both update to match, and the range carries across the tabs.'] },
+      { h: 'Reading variances', p: ['Within Tolerance is green, Short is red, Over is amber, and Not Counted is grey. A bartender who runs a few dollars short every shift is a pattern worth watching even when each count is inside tolerance.'] },
+      { h: 'Export', p: ['Export PDF saves the tab you are looking at, with the current range, for your records.'] }
+    ]);
+  },
+
   draw() {
     if (!(S.ShiftCashDrop.drops().length || S.ShiftSafeLog.chrono().length || S.ShiftVarianceLog.variances().length)) {
       const hasRegisters = ((App.shiftData && App.shiftData.sc_drawers) || []).some(d => d.active !== false);

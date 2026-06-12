@@ -117,7 +117,7 @@ S.ShiftVoidComp = {
       { h: 'The Reason carries the classification', p: ['On a comp, the reason tells Bar Cop whether it is a loss or a policy expense. Service Recovery, Customer Goodwill, Manager Comp, Regular / VIP, and Marketing / Promo are give-aways and feed Theft Risk. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and Year-End, not theft. Pick honestly and the theft score stays real.'] },
       { h: 'Linking a tracked item (Units)', p: ['Most comps need no item. But if you give away a tracked inventory product, a bottle of wine off the shelf, a six-pack, pick it under Item and set how many Units you gave away. The Inventory Variance Report subtracts that known comp from usage so it does not read as shrinkage.'] },
       { h: 'Import from a POS export', p: ['Switch to Import File and drop your POS voids/comps export, CSV or Excel. Map the columns once and Bar Cop remembers it. Amount is required; Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them. Servers match your roster by name, a row whose type mentions "comp" lands as a Comp and everything else as a Void. Each row lands as its own record, so the list, edits, Variance, and Theft Risk all keep working. Fill anything missing by editing the row after import.'] },
-      { h: 'Filter, Export, Worksheet', p: ['Filter by date, type, or server and the totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to tally voids and comps by hand during the rush.'] }
+      { h: 'Filter, Export, Worksheet', p: ['Filter by date range and the void and comp totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to tally voids and comps by hand during the rush.'] }
     ]);
   },
 

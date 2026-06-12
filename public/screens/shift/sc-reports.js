@@ -57,6 +57,16 @@ S.ShiftReports = {
     this.draw();
   },
 
+  showHowTo() {
+    App.showHelpModal('How Shift Reports Work', [
+      { p: ['Reports roll up everything your shifts generated so you can spot the patterns: which shifts make money, where the cash is leaking, and what keeps going wrong on the floor. Everything here is read-only, pulled straight from the shifts, drawers, and logs you already recorded.'] },
+      { h: 'The Three Tabs', p: ['Shift covers revenue, covers, and check average broken out by shift type and by day of week. Cash covers your drops by drawer and your variances by cashier, plus net over/short and the safe balance. Operations covers voids and comps by server and reason, your most-86\'d items, maintenance by priority, and checklist completion.'] },
+      { h: 'Setting the Range', p: ['The chips pick the window: This Week, Last Week, This Month, Last 4 Weeks, or All. Custom opens a From and To date picker. The range carries across all three tabs and every number on the page updates to match.'] },
+      { h: 'Reading the Numbers', p: ['The stats card up top is the headline for the tab. The breakdown tables below it show where those totals come from, so a repeat 86, a cashier who runs short, or a shift type that drags can stand right out.'] },
+      { h: 'Export', p: ['Export PDF saves the tab you are looking at, with the current range, for a manager review or your records.'] }
+    ]);
+  },
+
   draw() {
     if (!(this.shifts().length || this.drops().length || this.variances().length || this.voidComps().length || this.list86().length || this.maint().length || this.checklists().length)) {
       App.setupCard(this.container, {
