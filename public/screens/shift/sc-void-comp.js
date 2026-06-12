@@ -521,12 +521,13 @@ S.ShiftVoidComp = {
       : this.builderInner(null, true);
     // Manual mode: Save All + Start Over live below the card (bottom-left), hidden
     // with the card on collapse. Import mode has no Save (the importer confirms).
-    const belowBtns = isImport ? '' :
-      '<div data-collapse-group="sc-void-comp" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
-      + '<button class="btn btn-ghost" id="vcb-startover">Start Over</button>'
-      + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div>';
+    const belowBtns = isImport
+      ? '<div id="vc-imp-actions" data-collapse-group="sc-void-comp" style="margin:16px 0 24px;"></div>'
+      : '<div data-collapse-group="sc-void-comp" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="vcb-startover">Start Over</button>'
+        + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '</div>';
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps')
       + '<div class="collapse-body">'
@@ -663,6 +664,7 @@ S.ShiftVoidComp = {
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS voids and comps export here',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
+      actionsEl: elId === 'vc-csv' ? '#vc-imp-actions' : undefined,
       fields: [
         { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
         { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
