@@ -725,6 +725,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .seg-toggle{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
 @media(max-width:560px){.seg-toggle{flex-direction:column;align-items:stretch;}.seg-toggle>.btn{width:100%;}}
 
+/* Variance Quick-Check trend row: per-period numbers left-aligned + roomy on desktop; centered + tighter on a phone so the (cap-5) set stays one row. */
+.qv-trend{display:flex;gap:22px;align-items:center;flex-wrap:wrap;}
+.qv-trend > div{min-width:60px;}
+@media(max-width:560px){.qv-trend{justify-content:center;gap:14px;}.qv-trend > div{min-width:0;}}
+
 /* ══ SCORE ROWS ══ */
 .score-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
 .score-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--t3);width:20px;flex-shrink:0;text-align:center;padding-top:2px;}
