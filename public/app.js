@@ -3178,6 +3178,14 @@ const App = {
     // whatever delegation it needs inside its own render.
     if (content) { content.onclick = null; content.onchange = null; content.oninput = null; }
 
+    // Land at the top of a freshly navigated screen — the .content scroller
+    // persists across screens, so without this a return visit inherits the
+    // previous screen's scroll position (often well down the page).
+    const _scroller = (content && content.closest('.content')) || document.querySelector('.content');
+    if (_scroller) _scroller.scrollTop = 0;
+    if (content) content.scrollTop = 0;
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+
     // Revenue module screens
     if (this._activeModule === 'revenue') {
       const revTitles = {
