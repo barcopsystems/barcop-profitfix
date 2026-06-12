@@ -590,48 +590,24 @@ S.InventoryVarianceReport = {
     }
   },
 
-  // A fixed-footprint sparkline of overall variance % over the periods that have
-  // entered actuals (auto-scales to the data, stretches to fill, never scrolls or
-  // wraps no matter how many periods accrue). Latest value called out beside it.
+  // Overall variance % for the 5 most-recent periods that have entered actuals
+  // (capped at 5 so it stays one row on a phone, newest on the right).
   quickTrendStrip() {
     const asc = this.countsAsc();
-    const periods = asc.slice(1).map(c => ({ endId: c.id, label: this.fmtDate(c.date) }))
-      .reverse().slice(0, 12).reverse();   // up to 12 most recent, oldest → newest
+    const periods = asc.slice(1).map(c => ({ endId: c.id, label: this.fmtDate(c.date) })).reverse().slice(0, 5);
     const items = periods.map(p => {
       const ov = this.overallVarianceForPeriod(p.endId);
       return ov && ov.pct != null ? { label: p.label, pct: ov.pct } : null;
     }).filter(Boolean);
     if (items.length < 2) return '';
-
-    const n = items.length;
-    const vals = items.map(it => it.pct);
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (lo === hi) { lo -= 1; hi += 1; }
-    const padY = (hi - lo) * 0.15;
-    lo -= padY; hi += padY;
-    const xAt = i => (n === 1 ? 50 : (i / (n - 1)) * 100);
-    const yAt = v => 92 - ((v - lo) / (hi - lo)) * 84;   // map to [8,92], higher % sits higher
-    const pts = items.map((it, i) => xAt(i).toFixed(1) + ',' + yAt(it.pct).toFixed(1)).join(' ');
-    const zeroLine = (lo <= 0 && hi >= 0)
-      ? '<line x1="0" y1="' + yAt(0).toFixed(1) + '" x2="100" y2="' + yAt(0).toFixed(1) + '" stroke="var(--b1)" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>'
-      : '';
-    const last = items[n - 1].pct;
-    const lastCol = Math.abs(last) > 5 ? 'var(--amber)' : 'var(--t1)';
-
-    const svg = '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:54px;display:block;overflow:visible;">'
-      + zeroLine
-      + '<polyline points="' + pts + '" fill="none" stroke="var(--steel)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'
-      + '</svg>';
-
+    const cells = items.reverse().map(it => {   // oldest → newest, left to right
+      const col = Math.abs(it.pct) > 5 ? 'var(--amber)' : 'var(--t1)';
+      return '<div style="text-align:center;flex:0 0 auto;">'
+        + '<div style="font-size:16px;font-weight:700;color:' + col + ';white-space:nowrap;">' + it.pct.toFixed(1) + '%</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(it.label) + '</div></div>';
+    }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Overall Variance Trend</div>'
-      + '<div class="card"><div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;">'
-      + '<div style="flex:1 1 220px;min-width:0;">' + svg
-        + '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:5px;">'
-        + '<span>' + esc(items[0].label) + '</span><span>' + esc(items[n - 1].label) + '</span></div></div>'
-      + '<div style="text-align:right;min-width:90px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Latest</div>'
-        + '<div style="font-size:24px;font-weight:700;color:' + lastCol + ';">' + last.toFixed(1) + '%</div></div>'
-      + '</div></div>';
+      + '<div class="card"><div style="display:flex;justify-content:center;gap:18px;align-items:center;flex-wrap:wrap;">' + cells + '</div></div>';
   },
 
   periodStepper() {
