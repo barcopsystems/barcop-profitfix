@@ -94,7 +94,7 @@ S.HubGroupDashboard = {
         pourCost:  t.bar_pour_cost_pct ?? 22,
         foodCost:  t.food_cost_pct ?? 32,
         primeCost: t.prime_cost_pct ?? 60,
-        laborPct:  t.labor_pct ?? 29,
+        laborPct:  t.labor_cost_pct ?? 30,
         googleRating: t.google_rating ?? 4.3
       }
     };
