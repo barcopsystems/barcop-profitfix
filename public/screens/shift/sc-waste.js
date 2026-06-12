@@ -19,11 +19,16 @@ S.ShiftWaste = {
   editId: null,
   _draft: null,            // in-memory header draft (survives leave/return)
   _draftRows: null,        // in-memory line rows
-  filterFrom: '',
+  filterPreset: 'last-4',  // active range chip
+  _prevPreset: 'last-4',
+  filterFrom: '',          // custom range only
   filterTo: '',
-  filterShift: '',
-  filterRecordedBy: '',
   REASONS: ['Spill', 'Broken', 'Bad Pour / Customer Dissatisfied', 'Dumped / Tasted Bad', 'Expired / Past Date', 'Training', 'Other'],
+  RANGE_CHIPS: [
+    { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
+    { v: 'this-month', label: 'This Month' }, { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'all', label: 'All' }, { v: 'custom', label: 'Custom' }
+  ],
 
   records() {
     if (!App.shiftData) App.shiftData = {};
@@ -133,12 +138,15 @@ S.ShiftWaste = {
 
   builderCard() {
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', App.helpButton('wl-how'))
+      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill')
       + '<div class="collapse-body">'
       + this.builderInner(null, true)
-      + '<div class="card-actions"><button class="btn btn-primary" id="wlb-save">Save All</button>'
-      + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
-      + '</div></div>';
+      + '</div></div>'
+      + '<div data-collapse-group="sc-waste" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="wlb-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="wlb-startover">Start Over</button>'
+        + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
   },
 
   // One waste line = one table row. Product drives the Unit label; Product and
@@ -232,30 +240,30 @@ S.ShiftWaste = {
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────────
-  filterCard() {
-    const shiftOpts = '<option value="">All shifts</option>'
-      + this.shiftTypes().map(t => '<option value="' + esc(t) + '"' + (this.filterShift === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const byMap = {};
-    this.records().forEach(r => { const id = r.recorded_by_id || r.recorded_by || ''; if (id && !byMap[id]) byMap[id] = r.recorded_by || (App.staffById ? (App.staffById(r.recorded_by_id) || {}).name : '') || String(id); });
-    const byOpts = '<option value="">All staff</option>'
-      + Object.keys(byMap).map(id => '<option value="' + esc(id) + '"' + (this.filterRecordedBy === id ? ' selected' : '') + '>' + esc(byMap[id]) + '</option>').join('');
-    return '<div class="card no-print">'
-      + '<div class="form-row" style="gap:14px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>From</label><input type="date" id="wl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>To</label><input type="date" id="wl-f-to" value="' + esc(this.filterTo) + '"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift</label><select id="wl-f-shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wl-f-by">' + byOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="wl-f-clear">Clear</button></div>'
-      + '</div></div>';
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
+    return App.datePresetRange(this.filterPreset);
+  },
+  filterRow() {
+    const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'wl-range-chip');
+    const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div>'
+      + '</div>';
+    const custom = this.filterPreset !== 'custom' ? '' :
+      '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="wl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="wl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + '</div>';
+    return row + custom;
   },
 
   applyFilters(list) {
+    const { from, to } = this.effectiveRange();
     return list.filter(r => {
       const date = r.date || '';
-      if (this.filterFrom && date < this.filterFrom) return false;
-      if (this.filterTo && date > this.filterTo) return false;
-      if (this.filterShift && (r.shift_type || '') !== this.filterShift) return false;
-      if (this.filterRecordedBy && (r.recorded_by_id || r.recorded_by || '') !== this.filterRecordedBy) return false;
+      if (from && date < from) return false;
+      if (to && date > to) return false;
       return true;
     });
   },
@@ -282,7 +290,7 @@ S.ShiftWaste = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No entries match the filters.</div>';
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No waste in this range. Pick a wider range above.</div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'waste')).map(r => {
           const p = this.productById(r.product_id);
@@ -303,9 +311,9 @@ S.ShiftWaste = {
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
           + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-          + App.showOlderBar('sc', 'waste', filtered, !!(this.filterFrom || this.filterTo || this.filterShift || this.filterRecordedBy));
+          + App.showOlderBar('sc', 'waste', filtered, this.filterPreset !== 'all');
       }
-      below = statsCard + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Filter Waste and Spill Log</div><div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div></div>' + this.filterCard() + listHtml;
+      below = statsCard + this.filterRow() + listHtml;
     }
 
     this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
@@ -315,13 +323,23 @@ S.ShiftWaste = {
 
   wireList() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#wl-how')) { this.showHowTo(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.wl-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
       if (ev.target.closest('#wl-export')) { App.exportPDF({ title: 'Waste / Spill Log', root: this.container }); return; }
       if (ev.target.closest('#wl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#wlb-add')) { this.addLine(); return; }
       if (ev.target.closest('#wlb-save')) { this.saveBatch(); return; }
+      if (ev.target.closest('#wlb-startover')) { this.startOver(); return; }
       const rm = ev.target.closest('.wll-del');
       if (rm) { this.removeLine(rm.closest('.wl-line')); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
@@ -334,14 +352,8 @@ S.ShiftWaste = {
     };
     // Per-line: product drives the Unit label, product + units drive Cost.
     this.container.onchange = ev => this.onLineChange(ev);
-    document.getElementById('wl-f-from')?.addEventListener('change',   e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('wl-f-to')?.addEventListener('change',     e => { this.filterTo   = e.target.value || ''; this.renderList(); });
-    document.getElementById('wl-f-shift')?.addEventListener('change',  e => { this.filterShift = e.target.value || ''; this.renderList(); });
-    document.getElementById('wl-f-by')?.addEventListener('change',     e => { this.filterRecordedBy = e.target.value || ''; this.renderList(); });
-    document.getElementById('wl-f-clear')?.addEventListener('click', () => {
-      this.filterFrom = this.filterTo = this.filterShift = this.filterRecordedBy = '';
-      this.renderList();
-    });
+    document.getElementById('wl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('wl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
 
     // Hold the in-progress batch through leave/return: restore the header, refresh
     // each line's cost, then capture header + line rows on every input/change.
@@ -360,6 +372,14 @@ S.ShiftWaste = {
       formRoot.addEventListener('input', cap);
       formRoot.addEventListener('change', cap);
     }
+  },
+
+  // Reset the batch builder to a fresh blank line.
+  startOver() {
+    this.editId = null;
+    this._draft = null;
+    this._draftRows = null;
+    this.renderList();
   },
 
   // ── Edit a logged waste line in a focused pop-up ────────────────────────────
