@@ -173,10 +173,6 @@ S.InventoryParSuggestions = {
       return;
     }
 
-    const cats = this.categories();
-    const catOpts = '<option value="">All categories</option>'
-      + cats.map(c => '<option value="' + esc(c) + '"' + (this.filterCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-
     // Settings card (top card).
     const settingsCard = '<div class="card form-card"><div class="card-title">'
       + '<span>Dynamic Pars Settings</span></div>'
@@ -193,7 +189,6 @@ S.InventoryParSuggestions = {
     // intentionally kept; products already matching usage (or with no data, or
     // kept on purpose) stay off so the list is a clean to-do.
     const rows = this.products()
-      .filter(p => !this.filterCategory || p.category === this.filterCategory)
       .map(p => ({ product: p, ...this.computeSuggestion(p, settings) }))
       .filter(r => (r.status === 'Increase' || r.status === 'Reduce') && !this.isKept(r.product, r.avg_weekly))
       .sort((a, b) => {
@@ -218,13 +213,11 @@ S.InventoryParSuggestions = {
       + stat('Added Stock', App.fmtCurrency(addedStock))
       + '</div></div>';
 
-    // Category selector (left, il-copysel like Count History's compare row) and
-    // Export PDF (right) on one row — no card, no label.
-    const filterRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      + '<select id="ps-cat" class="il-copysel" style="max-width:240px;">' + catOpts + '</select>'
+    // Export only (the list groups by category, so no category filter).
+    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
       + '<button class="btn btn-ghost btn-sm" id="ps-export">Export PDF</button></div>';
 
-    const trs = rows.map(r => {
+    const rowHtml = r => {
       const p = r.product;
       const dollarDelta = (r.suggested - r.current) * (App.unitCost(p) || 0);
       const statusText = r.status === 'Increase'
@@ -233,12 +226,12 @@ S.InventoryParSuggestions = {
       const cashImpact = r.status === 'Reduce'
         ? '<span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(Math.max(0, -dollarDelta)) + ' freed</span>'
         : '<span style="color:var(--t3);">' + App.fmtCurrency(Math.max(0, dollarDelta)) + ' to stock</span>';
-      const conf = esc(p.category || '') + (r.weeks_analyzed ? ' &middot; ' + r.weeks_analyzed + ' wk' + (r.weeks_analyzed === 1 ? '' : 's') + ' of counts' : '');
+      const conf = r.weeks_analyzed ? r.weeks_analyzed + ' wk' + (r.weeks_analyzed === 1 ? '' : 's') + ' of counts' : '';
       const cycTxt = (r.cycle_days % 1 === 0) ? r.cycle_days.toString() : r.cycle_days.toFixed(1);
       const cycleLine = '<div style="font-size:10px;color:var(--t3);">' + cycTxt + '-day cycle' + (r.cycle_source === 'default' ? ' (default)' : '') + '</div>';
       return '<tr>'
         + '<td><div class="val">' + esc(p.name) + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);">' + conf + '</div></td>'
+        + (conf ? '<div style="font-size:10px;color:var(--t3);">' + conf + '</div>' : '') + '</td>'
         + '<td>' + this.qtyAbbr(p, r.current) + '</td>'
         + '<td>' + this.qtyAbbr(p, r.avg_weekly) + '</td>'
         + '<td>' + this.qtyAbbr(p, r.suggested) + cycleLine + '</td>'
@@ -249,15 +242,26 @@ S.InventoryParSuggestions = {
           + '<button class="btn btn-ghost btn-sm ps-keep" data-id="' + p.id + '" data-usage="' + (r.avg_weekly != null ? r.avg_weekly : '') + '">Keep</button>'
         + '</div></td>'
         + '</tr>';
-    }).join('');
+    };
 
+    // Group suggestions by category (one table per category, the category in the
+    // first header, a shared fixed colgroup so columns line up), preserving the
+    // Increase-first order within each.
+    const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const byCat = {};
+    rows.forEach(r => { const c = (r.product.category) || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
     const listCard = rows.length === 0
       ? '<div class="card"><div style="font-size:13px;color:var(--t3);padding:8px 0;">No pars need changing right now. Your pars match how you are actually selling.</div></div>'
-      : '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Current Par</th><th>Avg Weekly</th><th>Suggested Par</th><th>Status</th><th>Cash Impact</th><th></th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+      : cats.map(c => '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:820px;">'
+          + '<colgroup><col style="width:200px;"/><col/><col/><col/><col/><col/><col style="width:180px;"/></colgroup>'
+          + '<thead><tr><th>' + esc(c) + ' Products</th><th>Current Par</th><th>Avg Weekly</th><th>Suggested Par</th><th>Status</th><th>Cash Impact</th><th></th></tr></thead>'
+          + '<tbody>' + byCat[c].map(rowHtml).join('') + '</tbody></table></div></div>').join('');
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + settingsCard + filterRow + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + settingsCard + statsCard + exportRow + listCard + '</div>';
     this.wire();
   },
 
@@ -273,7 +277,6 @@ S.InventoryParSuggestions = {
     document.getElementById('ps-window')?.addEventListener('change', e => onChange(e.target.value, 'window_weeks'));
     document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(e.target.value, 'buffer_pct'));
     document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(e.target.value, 'cycle_days'));
-    document.getElementById('ps-cat')?.addEventListener('change',    e => { this.filterCategory = e.target.value || ''; this.draw(); });
     document.getElementById('ps-export')?.addEventListener('click', () => App.exportPDF({ title: 'Dynamic Pars', root: this.container }));
 
     // One deliberate Update per product: the operator weighs each suggestion on
