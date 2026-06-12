@@ -6,12 +6,19 @@
    trail and accountability record — variance math is NOT affected because
    product totals don't change on a transfer (only location does).
 
+   Entry is a BATCH builder (a shared header over a stack of line rows, Add Line,
+   one Save All) matching the Waste / Void-Comp logs, so a whole restock run goes
+   in on one submission. Each line saves as its own record. Edit a past one in a
+   focused pop-up.
+
    Each record: { id, date_time, from_location, to_location, product_id,
    product_name, category, quantity, unit, performed_by_id, performed_by,
    witnessed_by_id, witnessed_by, notes, created_at }. */
 
 S.InventoryTransfers = {
   editId: null,
+  _draft: null,            // in-memory header draft (survives leave/return)
+  _draftRows: null,        // in-memory line rows
   filterPreset: 'last-4',  // active range chip (weekly cadence)
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
@@ -90,6 +97,7 @@ S.InventoryTransfers = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    if (actions) actions.innerHTML = '';
     this.renderList();
   },
 
@@ -110,82 +118,266 @@ S.InventoryTransfers = {
     }
 
     const all = this.transfers();
+    const formCard = this.builderCard();
+
+    let below;
     if (all.length === 0) {
-      this.container.innerHTML = '<div class="screen">' + this.logFormCard()
-        + '<div style="font-size:13px;color:var(--t3);padding:14px 2px;">No transfers logged yet. Use the form above to log the first one.</div></div>';
-      this.wireForm('tr-');
-      return;
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No transfers logged yet. Use the form above to log the first one.</div>';
+    } else {
+      const { from, to } = this.effectiveRange();
+      const filtered = all.filter(t => {
+        const date = (t.date_time || '').slice(0, 10);
+        return (!from || date >= from) && (!to || date <= to);
+      }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
+
+      const lastDate = all.reduce((m, t) => {
+        const d = t.date_time || t.created_at || '';
+        return (!m || new Date(d).getTime() > new Date(m).getTime()) ? d : m;
+      }, '');
+      const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + all.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
+        + '</div></div>';
+
+      let listHtml;
+      if (filtered.length === 0) {
+        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No transfers in this range. Pick a wider range above.</div>';
+      } else {
+        const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
+          const p = this.productById(t.product_id);
+          return '<tr class="tr-row" data-id="' + t.id + '" style="cursor:pointer;">'
+            + '<td><div class="val">' + this.fmtDateTime(t.date_time) + '</div></td>'
+            + '<td>' + esc(t.from_location || '-') + ' <span style="color:var(--t3);">&rarr;</span> ' + esc(t.to_location || '-') + '</td>'
+            + '<td><div class="val">' + esc(t.product_name || (p ? p.name : '-')) + '</div>'
+            + (t.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(t.category) + '</div>' : '') + '</td>'
+            + '<td>' + (t.quantity != null ? t.quantity : '-') + ' ' + esc(t.unit || '') + '</td>'
+            + '<td>' + esc(t.performed_by || '-') + '</td>'
+            + '<td>' + esc(t.witnessed_by || '-') + '</td>'
+            + '<td><div class="row-actions">'
+            + (App.canEdit('ic-transfers') ? '<button class="btn btn-ghost btn-sm tr-edit" data-id="' + t.id + '">Edit</button>' : '')
+            + (App.canEdit('ic-transfers') ? '<button class="btn btn-danger btn-sm tr-del" data-id="' + t.id + '">Delete</button>' : '')
+            + '</div></td></tr>';
+        }).join('');
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>When</th><th>From &rarr; To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + App.showOlderBar('ic', 'transfer', filtered, this.filterPreset !== 'all');
+      }
+      below = statsCard + this.filterRow() + listHtml;
     }
 
-    const { from, to } = this.effectiveRange();
-    const filtered = all.filter(t => {
-      const date = (t.date_time || '').slice(0, 10);
-      return (!from || date >= from) && (!to || date <= to);
-    }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
-    const lastDate = all.reduce((m, t) => {
-      const d = t.date_time || t.created_at || '';
-      return (!m || new Date(d).getTime() > new Date(m).getTime()) ? d : m;
-    }, '');
-
-    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + all.length + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
-      + '</div></div>';
-
-    const rows = filtered.slice(0, App.listLimit('ic', 'transfer')).map(t => {
-      const p = this.productById(t.product_id);
-      return '<tr class="tr-row" data-id="' + t.id + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDateTime(t.date_time) + '</div></td>'
-        + '<td>' + esc(t.from_location || '-') + ' <span style="color:var(--t3);">&rarr;</span> ' + esc(t.to_location || '-') + '</td>'
-        + '<td><div class="val">' + esc(t.product_name || (p ? p.name : '-')) + '</div>'
-        + (t.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(t.category) + '</div>' : '') + '</td>'
-        + '<td>' + (t.quantity != null ? t.quantity : '-') + ' ' + esc(t.unit || '') + '</td>'
-        + '<td>' + esc(t.performed_by || '-') + '</td>'
-        + '<td>' + esc(t.witnessed_by || '-') + '</td>'
-        + '<td><div class="row-actions">'
-        + (App.canEdit('ic-transfers') ? '<button class="btn btn-ghost btn-sm tr-edit" data-id="' + t.id + '">Edit</button>' : '')
-        + (App.canEdit('ic-transfers') ? '<button class="btn btn-danger btn-sm tr-del" data-id="' + t.id + '">Delete</button>' : '')
-        + '</div></td></tr>';
-    }).join('');
-    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>When</th><th>From &rarr; To</th><th>Product</th><th>Quantity</th><th>By</th><th>Witnessed By</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No transfers in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
-      + App.showOlderBar('ic', 'transfer', filtered, this.filterPreset !== 'all');
-
-    this.container.innerHTML = '<div class="screen">' + statsCard + this.logFormCard() + this.filterRow() + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
+    App.applyCollapsed(this.container);
     this.wireList();
-    this.wireForm('tr-');
   },
 
   showHowTo() {
     App.showHelpModal('How the Transfer Log Works', [
       { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went. When a bottle goes missing from the front bar, the first question is whether it ever left the back. This log answers it.'] },
       { h: 'When You Run Multiple Locations', p: ['The Transfer Log earns its keep the moment your stock lives in more than one place. At The Anchor the well liquor is counted at the front bar and the service bar separately, with the backup cases in the stockroom. If a manager grabs three bottles of house tequila off the stockroom shelf and walks them to the service bar on a busy Friday, that move gets logged here so each location count still ties out.'] },
-      { h: 'Logging A Transfer', p: ['Fill in the date and time, pick the product and how much moved, set the From and To locations, and name who did it. Pick the right unit too. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move. Notes are optional but worth a line when the move is out of the ordinary. Start Over clears the form if you want to begin fresh.'] },
+      { h: 'Logging A Transfer Run', p: ['Set the date, time, and who did the move up top, then add a line for each product you moved: pick the product, how much, the unit, and the From and To locations. Each line can go a different direction, so a whole restock run enters on one form. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move, and a note if the move is out of the ordinary. Save All writes every line in one shot, and Start Over clears the form.'] },
       { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have in the building. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations, so logging one never throws off your numbers.'] },
-      { h: 'A Real Example', p: ['Say the front bar runs dry on Tito\'s in the middle of dinner service and your bartender pulls a fresh case from the stockroom. Log it: product Tito\'s, quantity one case if you moved it by the case or the loose bottle count if you broke one out, from Stockroom, to Front Bar, performed by whoever grabbed it. Now when you count the front bar at close and the stockroom on Sunday, both reconcile and nobody is left wondering where the vodka went.'] },
+      { h: 'A Real Example', p: ['Say the front bar runs dry on Tito\'s in the middle of dinner service and your bartender pulls a fresh case from the stockroom. Add a line: product Tito\'s, quantity one case if you moved it by the case or the loose bottle count if you broke one out, from Stockroom, to Front Bar. Now when you count the front bar at close and the stockroom on Sunday, both reconcile and nobody is left wondering where the vodka went.'] },
       { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it. Edit or delete any entry if you need to fix a mistake.'] },
       { h: 'Worksheet', p: ['The Worksheet button gives you a clean PDF grid to print and carry on the floor during a shift. Jot down moves as they happen, then enter them here after close. That beats trying to remember at the end of the night.'] }
     ]);
   },
 
-  // The Log a Transfer form lives at the top of the landing page (collapsible).
-  logFormCard() {
+  // ── Batch entry builder (mirrors the Waste / Void-Comp logs) ───────────────
+  // The builder body: a shared header (Date/Time, Performed By, Witnessed By)
+  // over a line table, Add Line, and a shared Notes. useDraft rebuilds the saved
+  // line rows on a re-render.
+  builderInner(useDraft) {
+    const active = this.activeShift();
+    const defaultBy = active ? (active.manager_id || '') : '';
+    const rowsHtml = (useDraft && this._draftRows && this._draftRows.length)
+      ? this._draftRows.map(r => this.lineHtml(r)).join('')
+      : this.lineHtml();
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Date / Time</label>'
+          + '<input type="datetime-local" id="trb-when" value="' + esc(this.nowDateTime().slice(0, 16)) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:170px;"><label>Performed By</label>'
+          + '<select id="trb-by">' + App.staffOptions(defaultBy, { placeholder: 'Select staff...' }) + '</select></div>'
+        + '<div class="f" style="flex:1;min-width:170px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<select id="trb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
+      + '</div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th style="min-width:180px;">Product</th><th style="width:90px;">Qty</th><th style="width:120px;">Unit</th>'
+      + '<th style="min-width:150px;">From</th><th style="min-width:150px;">To</th><th style="width:90px;"></th>'
+      + '</tr></thead><tbody id="trb-rows">' + rowsHtml + '</tbody></table></div>'
+      + '<button class="btn btn-ghost btn-sm" id="trb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="trb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+  },
+
+  builderCard() {
     return '<div class="card form-card no-print">'
       + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer')
       + '<div class="collapse-body">'
-      + this.formRows(null, 'tr-')
+      + this.builderInner(true)
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-transfers" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="tr-save">Log Transfer</button>'
-        + '<button class="btn btn-ghost" id="tr-startover">Start Over</button>'
-        + '<span id="tr-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+        + '<button class="btn btn-primary" id="trb-save">Save All</button>'
+        + '<button class="btn btn-ghost" id="trb-startover">Start Over</button>'
+        + '<span id="trb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
   },
 
-  // Shared two-row field layout for both the inline log form and the edit popup.
-  // `idp` prefixes every field id ('tr-' inline, 'tre-' modal) so the popup never
-  // collides with the always-open inline form behind it.
+  // One transfer line = one table row. Product drives the Unit options and, when
+  // From is still empty, the default From location.
+  lineHtml(row) {
+    row = row || {};
+    const cat = row.product_id ? (this.productById(row.product_id)?.category || '') : '';
+    const unitDefault = row.unit || (cat === 'Bottle Beer' ? 'cases' : cat === 'Draft Beer' ? 'kegs' : 'bottles');
+    return '<tr class="tr-line">'
+      + '<td><select class="form-input trl-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
+      + '<td><input class="form-input trl-qty" type="number" min="0" step="0.5" value="' + (row.quantity != null && row.quantity !== '' ? esc(String(row.quantity)) : '') + '" placeholder="0" style="width:100%;"/></td>'
+      + '<td><select class="form-input trl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault) + '</select></td>'
+      + '<td><select class="form-input trl-from" style="width:100%;">' + this.locationOptions(row.from_location || '') + '</select></td>'
+      + '<td><select class="form-input trl-to" style="width:100%;">' + this.locationOptions(row.to_location || '') + '</select></td>'
+      + '<td><button class="btn btn-danger btn-sm trl-del" type="button">Delete</button></td>'
+      + '</tr>';
+  },
+
+  addLine() {
+    const wrap = document.getElementById('trb-rows');
+    if (wrap) wrap.insertAdjacentHTML('beforeend', this.lineHtml());
+  },
+  removeLine(line) {
+    const wrap = document.getElementById('trb-rows');
+    if (!wrap || !line) return;
+    if (wrap.querySelectorAll('.tr-line').length <= 1) wrap.innerHTML = this.lineHtml();
+    else line.remove();
+  },
+
+  // Product picked on a line: repopulate that line's Unit options, and default
+  // the From location to the product's primary when From is still empty.
+  onLineChange(ev) {
+    const line = ev.target.closest('.tr-line');
+    if (!line || !ev.target.classList.contains('trl-prod')) return;
+    const p = this.productById(ev.target.value);
+    const unitSel = line.querySelector('.trl-unit');
+    if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+    const fromSel = line.querySelector('.trl-from');
+    if (fromSel && !fromSel.value && p && p.primary_location) fromSel.value = p.primary_location;
+  },
+
+  async saveBatch(after) {
+    const err = document.getElementById('trb-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const dateTime = document.getElementById('trb-when')?.value;
+    if (!dateTime) { fail('Date and time are required.'); return; }
+    const byId = document.getElementById('trb-by')?.value || '';
+    if (!byId) { fail('Pick who performed the transfer.'); return; }
+    const byName = (this.staffById(byId) || {}).name || '';
+    const witId = document.getElementById('trb-witness')?.value || '';
+    const witName = witId ? ((this.staffById(witId) || {}).name || '') : '';
+    const notes = document.getElementById('trb-notes')?.value.trim() || '';
+
+    const recs = [];
+    const rowsWrap = document.getElementById('trb-rows');
+    for (const line of (rowsWrap ? [...rowsWrap.querySelectorAll('.tr-line')] : [])) {
+      const productId = line.querySelector('.trl-prod')?.value || '';
+      const qtyRaw    = line.querySelector('.trl-qty')?.value;
+      const unit      = line.querySelector('.trl-unit')?.value || '';
+      const fromLoc   = line.querySelector('.trl-from')?.value || '';
+      const toLoc     = line.querySelector('.trl-to')?.value || '';
+      // Skip a line the manager added but never filled.
+      if (!productId && (qtyRaw === '' || qtyRaw == null) && !fromLoc && !toLoc) continue;
+      if (!productId) { fail('Pick a product on every line, or remove the blank line.'); return; }
+      const product = this.productById(productId);
+      if (!product) { fail('A line has a product that no longer exists. Remove it.'); return; }
+      const quantity = parseFloat(qtyRaw);
+      if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity above zero on every line.'); return; }
+      if (!fromLoc) { fail('Pick a From location on every line.'); return; }
+      if (!toLoc)   { fail('Pick a To location on every line.'); return; }
+      if (fromLoc === toLoc) { fail('From and To must be different on every line.'); return; }
+      recs.push({
+        id: App.uid(), date_time: dateTime,
+        from_location: fromLoc, to_location: toLoc,
+        product_id: product.id, product_name: product.name, category: product.category || '',
+        quantity, unit,
+        performed_by_id: byId, performed_by: byName,
+        witnessed_by_id: witId, witnessed_by: witName,
+        notes, created_at: new Date().toISOString()
+      });
+    }
+    if (!recs.length) { fail('Fill in at least one line.'); return; }
+
+    const btn = document.getElementById('trb-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const list = this.transfers();
+    let ok = true;
+    for (const r of recs) { list.push(r); ok = (await App.putRecord('ic', 'transfer', r)) && ok; }
+    if (ok) { this._draft = null; this._draftRows = null; (typeof after === 'function' ? after : () => this.renderList())(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
+  },
+
+  // Reset the batch builder to a fresh blank line.
+  startOver() {
+    this.editId = null;
+    this._draft = null;
+    this._draftRows = null;
+    this.renderList();
+  },
+
+  wireList() {
+    this.container.onclick = ev => {
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      const chip = ev.target.closest('.tr-range-chip');
+      if (chip) {
+        const v = chip.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderList();
+        return;
+      }
+      if (ev.target.closest('#tr-export')) { App.exportPDF({ title: 'Transfer Log', root: this.container }); return; }
+      if (ev.target.closest('#tr-print-blank')) { this.printBlank(); return; }
+      if (ev.target.closest('#trb-add')) { this.addLine(); return; }
+      if (ev.target.closest('#trb-save')) { this.saveBatch(); return; }
+      if (ev.target.closest('#trb-startover')) { this.startOver(); return; }
+      const rm = ev.target.closest('.trl-del');
+      if (rm) { this.removeLine(rm.closest('.tr-line')); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
+      const edit = ev.target.closest('.tr-edit');
+      const del  = ev.target.closest('.tr-del');
+      const row  = ev.target.closest('.tr-row');
+      if (del)  { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
+      if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); return; }
+      if (row && App.canEdit('ic-transfers')) this.openEdit(row.dataset.id);
+    };
+    // Per-line: product drives the Unit options + the From default.
+    this.container.onchange = ev => this.onLineChange(ev);
+    document.getElementById('tr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
+    document.getElementById('tr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+
+    // Hold the in-progress batch through leave/return: restore the header, then
+    // capture header + line rows on every input/change.
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => {
+        this._draft = App.captureDraft(formRoot);
+        this._draftRows = [...formRoot.querySelectorAll('.tr-line')].map(line => ({
+          product_id:    line.querySelector('.trl-prod')?.value || '',
+          quantity:      line.querySelector('.trl-qty')?.value || '',
+          unit:          line.querySelector('.trl-unit')?.value || '',
+          from_location: line.querySelector('.trl-from')?.value || '',
+          to_location:   line.querySelector('.trl-to')?.value || ''
+        }));
+      };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
+  },
+
+  // ── Edit a single past transfer in a focused pop-up ─────────────────────────
+  // Shared single-record field layout for the edit popup. `idp` ('tre-')
+  // prefixes every field id.
   formRows(t, idp) {
     const v = val => (val != null && val !== '') ? val : '';
     const active = this.activeShift();
@@ -224,26 +416,7 @@ S.InventoryTransfers = {
         + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
   },
 
-  // Wire the always-open inline log form.
-  wireForm(idp) {
-    document.getElementById(idp + 'save')?.addEventListener('click', () => this.save(idp, null));
-    document.getElementById('tr-startover')?.addEventListener('click', () => this.startOver());
-    this.wireProdChange(idp);
-    const head = this.container.querySelector('.card-collapse-head');
-    if (head) head.addEventListener('click', ev => { if (!ev.target.closest('.btn')) App.toggleCollapse(head); });
-    App.applyCollapsed(this.container);
-  },
-
-  // Reset the inline log form to a fresh starting state, keeping the form open.
-  startOver() {
-    const body = this.container.querySelector('.collapse-body');
-    if (body) body.innerHTML = this.formRows(null, 'tr-');
-    const err = document.getElementById('tr-err');
-    if (err) { err.textContent = ''; err.style.display = 'none'; }
-    this.wireProdChange('tr-');
-  },
-
-  // Product change: re-pop unit options + default From to the product's primary.
+  // Product change in the edit popup: re-pop unit options + default From.
   wireProdChange(idp) {
     document.getElementById(idp + 'prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
@@ -255,30 +428,81 @@ S.InventoryTransfers = {
     });
   },
 
-  wireList() {
-    this.container.onclick = ev => {
-      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
-      const chip = ev.target.closest('.tr-range-chip');
-      if (chip) {
-        const v = chip.dataset.v;
-        if (v === 'custom') {
-          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
-          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
-        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
-        this.renderList();
-        return;
-      }
-      const row  = ev.target.closest('.tr-row');
-      const edit = ev.target.closest('.tr-edit');
-      const del  = ev.target.closest('.tr-del');
-      if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
-      else if (edit) { ev.stopPropagation(); this.openEdit(edit.dataset.id); }
-      else if (row && App.canEdit('ic-transfers')) this.openEdit(row.dataset.id);
+  openEdit(id) {
+    if (!App.canEdit('ic-transfers')) return;
+    const t = this.transfers().find(x => x.id === id);
+    if (!t) return;
+    this.editId = id;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Transfer</div>'
+      + this.formRows(t, 'tre-')
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="tre-save">Update Transfer</button>'
+        + '<button class="btn btn-ghost" id="tre-cancel">Cancel</button>'
+        + '<span id="tre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="tre-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'tr-edit-modal', maxWidth: 540, noClose: true });
+    document.getElementById('tre-save')?.addEventListener('click', () => this.saveEdit('tre-', 'tr-edit-modal'));
+    document.getElementById('tre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tr-edit-modal'); });
+    document.getElementById('tre-del')?.addEventListener('click', async () => {
+      if (!(await App.confirmDelete())) return;
+      await App.removeRecord('ic', 'transfer', id);
+      this.editId = null;
+      App.closeModal('tr-edit-modal');
+      this.renderList();
+    });
+    this.wireProdChange('tre-');
+  },
+
+  async saveEdit(idp, modalId) {
+    const err = document.getElementById(idp + 'err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+
+    const dateTime = document.getElementById(idp + 'when')?.value;
+    if (!dateTime) { fail('Date and time are required.'); return; }
+    const productId = document.getElementById(idp + 'prod')?.value;
+    if (!productId) { fail('Pick a product.'); return; }
+    const product = this.productById(productId);
+    if (!product) { fail('Product not found.'); return; }
+    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
+    if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
+    const from = document.getElementById(idp + 'from')?.value;
+    const to   = document.getElementById(idp + 'to')?.value;
+    if (!from)       { fail('Pick a From location.'); return; }
+    if (!to)         { fail('Pick a To location.'); return; }
+    if (from === to) { fail('From and To must be different locations.'); return; }
+    const performedById = document.getElementById(idp + 'by')?.value;
+    if (!performedById) { fail('Pick who performed the transfer.'); return; }
+    const performedBy = (this.staffById(performedById) || {}).name || '';
+    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
+    const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
+
+    const rec = {
+      id:               this.editId,
+      date_time:        dateTime,
+      from_location:    from,
+      to_location:      to,
+      product_id:       product.id,
+      product_name:     product.name,
+      category:         product.category || '',
+      quantity,
+      unit:             document.getElementById(idp + 'unit')?.value || '',
+      performed_by_id:  performedById,
+      performed_by:     performedBy,
+      witnessed_by_id:  witnessedById,
+      witnessed_by:     witnessedBy,
+      notes:            document.getElementById(idp + 'notes')?.value.trim() || '',
+      updated_at:       new Date().toISOString()
     };
-    document.getElementById('tr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Transfer Log', root: this.container }));
-    document.getElementById('tr-print-blank')?.addEventListener('click', () => this.printBlank());
-    document.getElementById('tr-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
-    document.getElementById('tr-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
+    const ex = this.transfers().find(x => x.id === this.editId);
+    const saveRec = ex ? { ...ex, ...rec } : rec;
+
+    const btn = document.getElementById(idp + 'save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('ic', 'transfer', saveRec);
+    this.editId = null;
+    if (ok) { if (modalId) App.closeModal(modalId); this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update Transfer'; } fail('Save failed. Try again.'); }
   },
 
   // ── Form options ────────────────────────────────────────────────────
@@ -310,94 +534,6 @@ S.InventoryTransfers = {
     else if (productCategory === 'Draft Beer') opts = ['kegs'];
     else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
-  },
-
-  // ── Edit popup (standard modal) ───────────────────────────────────────
-  openEdit(id) {
-    if (!App.canEdit('ic-transfers')) return;
-    const t = this.transfers().find(x => x.id === id);
-    if (!t) return;
-    this.editId = id;
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Transfer</div>'
-      + this.formRows(t, 'tre-')
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tre-save">Update Transfer</button>'
-        + '<button class="btn btn-ghost" id="tre-cancel">Cancel</button>'
-        + '<span id="tre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '<button class="btn btn-danger" id="tre-del" style="margin-left:auto;">Delete</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'tr-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('tre-save')?.addEventListener('click', () => this.save('tre-', 'tr-edit-modal'));
-    document.getElementById('tre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tr-edit-modal'); });
-    document.getElementById('tre-del')?.addEventListener('click', async () => {
-      if (!(await App.confirmDelete())) return;
-      await App.removeRecord('ic', 'transfer', id);
-      this.editId = null;
-      App.closeModal('tr-edit-modal');
-      this.renderList();
-    });
-    this.wireProdChange('tre-');
-  },
-
-  async save(idp, modalId) {
-    const err = document.getElementById(idp + 'err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-
-    const dateTime = document.getElementById(idp + 'when')?.value;
-    if (!dateTime) { fail('Date and time are required.'); return; }
-    const productId = document.getElementById(idp + 'prod')?.value;
-    if (!productId) { fail('Pick a product.'); return; }
-    const product = this.productById(productId);
-    if (!product) { fail('Product not found.'); return; }
-    const quantity = parseFloat(document.getElementById(idp + 'qty')?.value);
-    if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
-    const from = document.getElementById(idp + 'from')?.value;
-    const to   = document.getElementById(idp + 'to')?.value;
-    if (!from)       { fail('Pick a From location.'); return; }
-    if (!to)         { fail('Pick a To location.'); return; }
-    if (from === to) { fail('From and To must be different locations.'); return; }
-    const performedById = document.getElementById(idp + 'by')?.value;
-    if (!performedById) { fail('Pick who performed the transfer.'); return; }
-    const performedBy = (this.staffById(performedById) || {}).name || '';
-    const witnessedById = document.getElementById(idp + 'witness')?.value || '';
-    const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';
-
-    const rec = {
-      id:               this.editId || App.uid(),
-      date_time:        dateTime,
-      from_location:    from,
-      to_location:      to,
-      product_id:       product.id,
-      product_name:     product.name,
-      category:         product.category || '',
-      quantity,
-      unit:             document.getElementById(idp + 'unit')?.value || '',
-      performed_by_id:  performedById,
-      performed_by:     performedBy,
-      witnessed_by_id:  witnessedById,
-      witnessed_by:     witnessedBy,
-      notes:            document.getElementById(idp + 'notes')?.value.trim() || ''
-    };
-    if (!this.editId) rec.created_at = new Date().toISOString();
-    else rec.updated_at = new Date().toISOString();
-
-    let saveRec = rec;
-    if (this.editId) {
-      const ex = this.transfers().find(x => x.id === this.editId);
-      if (ex) saveRec = { ...ex, ...rec };
-    }
-
-    const btn = document.getElementById(idp + 'save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('ic', 'transfer', saveRec);
-    this.editId = null;
-    if (ok) {
-      if (modalId) App.closeModal(modalId);
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = modalId ? 'Update Transfer' : 'Log Transfer'; }
-      fail('Save failed. Try again.');
-    }
   },
 
   async confirmDel(id) {
