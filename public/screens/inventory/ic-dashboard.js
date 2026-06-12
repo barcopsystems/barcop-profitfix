@@ -336,14 +336,14 @@ S.InventoryDashboard = {
       const vRows = vendors.map((v, i) => {
         const order = (S.InventoryOrderSheet && S.InventoryOrderSheet.openOrderForVendor) ? S.InventoryOrderSheet.openOrderForVendor(v.vendor) : null;
         const action = order
-          ? '<span class="ic-d-go" data-go="ic-order-sheet" style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;color:' + (order.status === 'Submitted' ? 'var(--green)' : 'var(--gold)') + ';">' + esc(order.status || 'Open') + '</span>'
+          ? '<span class="ic-d-go" data-go="ic-order-sheet" style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;color:' + (order.status === 'Submitted' ? 'var(--green)' : 'var(--gold)') + ';">Order ' + esc(order.status || 'Open') + '</span>'
           : '<button class="btn btn-ghost btn-sm ic-d-go" data-go="ic-order-sheet" style="margin:0;">Create Order</button>';
         return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'
           + (i < vendors.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(v.vendor) + '</div>'
           + '<div style="font-size:11px;color:var(--t3);">' + v.items + ' item' + (v.items === 1 ? '' : 's') + ' below par</div></div>'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(v.cost) + '</div>'
-          + action + '</div>';
+          + '<div style="width:130px;flex-shrink:0;display:flex;justify-content:center;">' + action + '</div></div>';
       }).join('');
       reorderHero = this.panelCard('Reorder Plan',
         '<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Bring everything to par: <strong style="color:var(--gold);font-size:15px;">' + App.fmtCurrency(reorderTotal) + '</strong></div>'
