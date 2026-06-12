@@ -466,13 +466,9 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Drawers / Registers</span>
       </div>
-      <div class="nav-item" data-screen="sc-comp-settings" id="nav-sc-comp-settings">
+      <div class="nav-item" data-screen="sc-shift-policies" id="nav-sc-shift-policies">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 8.5l1.5 1.5L11 7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Comp Authorization</span>
-      </div>
-      <div class="nav-item" data-screen="sc-cash-settings" id="nav-sc-cash-settings">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5.5v6M6.5 7.5h3.5a1 1 0 0 1 0 2H7a1 1 0 0 0 0 2h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Cash Tolerances</span>
+        <span class="nav-label">Shift Policies</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="sc-help" id="nav-sc-help">
