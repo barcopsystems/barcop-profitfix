@@ -493,7 +493,7 @@ S.InventoryTakeInventory = {
       .map(r => r.p.id + '@@' + r.location));
     const uncounted = uncountedSet.size;
     const warnBanner = uncounted > 0
-      ? '<div style="display:flex;align-items:flex-start;gap:10px;border:1px solid var(--amber);border-radius:6px;padding:11px 13px;margin-bottom:16px;">'
+      ? '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 13px;margin-bottom:16px;">'
         + '<span style="color:var(--amber);font-weight:800;font-size:14px;line-height:1.3;flex-shrink:0;">!</span>'
         + '<div style="font-size:12px;color:var(--t1);line-height:1.5;"><strong>' + uncounted + ' of ' + rows.length + ' products were not counted.</strong> They will be submitted as 0. If a shelf was full, go Back to Counting and enter it. The uncounted products are tagged below.</div>'
         + '</div>'
