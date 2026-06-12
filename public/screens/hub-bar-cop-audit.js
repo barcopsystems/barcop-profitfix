@@ -210,7 +210,6 @@ S.HubBarCopAudit = {
   // 2. Cash Integrity. Variance trend + drawer + drop + auth compliance.
   _scoreCashIntegrity() {
     const variances = (App.shiftData?.sc_variances)    || [];
-    const drawers   = (App.shiftData?.sc_drawers)      || [];
     const drops     = (App.shiftData?.sc_cash_drops)   || [];
     const voidComps = (App.shiftData?.sc_void_comps)   || [];
     const shifts    = (App.shiftData?.sc_shifts)       || [];
@@ -218,7 +217,9 @@ S.HubBarCopAudit = {
 
     const wkVar     = variances.filter(v => this._withinWindow(v.date, this.WINDOW_DAYS));
     const wkShifts  = shifts.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
-    const wkDrawers = drawers.filter(d => this._withinWindow(d.date, this.WINDOW_DAYS));
+    // A counted drawer is recorded as a variance record; sc_drawers is the
+    // register reference table (no date), so completion reads off the variances.
+    const wkDrawers = wkVar;
     const wkVoids   = voidComps.filter(v => this._withinWindow(v.date, this.WINDOW_DAYS));
 
     // Variance trend: total absolute variance / total revenue handled.
