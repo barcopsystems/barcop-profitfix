@@ -26,8 +26,11 @@ S.ShiftChecklistTemplates = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    this._resetForm();
-    this.renderList();
+    if (this.actions) this.actions.innerHTML = '';
+    if (this._type == null) this._type = 'Opening';
+    // Keep an in-progress template across navigation; only Save, Cancel, or Start Over resets it.
+    if (this.editId) this.renderForm();
+    else this.renderList();
   },
 
   _resetForm() {
@@ -46,6 +49,8 @@ S.ShiftChecklistTemplates = {
   },
 
   // ── The template form (used inline for new, on its own page for edit) ───────
+  // One card: name + type, then a divided Checklist Items section. Primary
+  // buttons live below the card.
   formBlock(isEdit) {
     const typeOpts = this.TYPES.map(ty => '<option' + (this._type === ty ? ' selected' : '') + '>' + ty + '</option>').join('');
     const itemRows = this._items.map((it, idx) =>
@@ -56,28 +61,30 @@ S.ShiftChecklistTemplates = {
       + '</div>').join('');
     const itemsBlock = this._items.length === 0
       ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No items yet. Add items below or load the default list.</div>'
-      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Drag the handle on the left to reorder. The checklist runs in this order.</div>' + itemRows;
+      : itemRows;
 
     return '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + (isEdit ? 'Edit' : 'New') + ' Checklist Template</span>' + App.helpButton('ct-how') + '</div>'
+      + '<div class="card-title">' + (isEdit ? 'Edit' : 'New') + ' Checklist Template</div>'
       + '<div class="form-row" style="gap:16px;">'
       + '<div class="f" style="width:260px;flex-shrink:0;"><label>Template Name</label>'
       + '<input type="text" id="ct-name" value="' + esc(this._name) + '" placeholder="e.g. Weekend Bar Open"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label><select id="ct-type">' + typeOpts + '</select></div>'
-      + '</div></div>'
-
-      + '<div class="card form-card"><div class="card-title">Checklist Items</div>'
+      + '</div>'
+      + '<div class="divider"></div>'
+      + '<div class="sh" style="margin-bottom:10px;">Checklist Items</div>'
       + '<div id="ct-items">' + itemsBlock + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">'
       + '<button class="btn btn-ghost btn-sm" id="ct-add-item">+ Add Item</button>'
       + '<button class="btn btn-ghost btn-sm" id="ct-load-default">Load default ' + this._type + ' items</button>'
       + '</div>'
-      + '<div class="card-actions">'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="ct-save">' + (isEdit ? 'Update Template' : 'Save Template') + '</button>'
-      + (isEdit ? '<button class="btn btn-ghost" id="ct-cancel">Cancel</button>' : '')
+      + (isEdit
+          ? '<button class="btn btn-ghost" id="ct-cancel">Cancel</button>'
+          : '<button class="btn btn-ghost" id="ct-startover">Start Over</button>')
       + '<span id="ct-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '</div>';
   },
 
   savedSection(type) {
@@ -138,10 +145,12 @@ S.ShiftChecklistTemplates = {
   },
 
   _bindForm(reRender) {
-    document.getElementById('ct-how')?.addEventListener('click', () => this.showHowTo());
     document.getElementById('ct-type')?.addEventListener('change', () => { this.syncItems(); reRender(); });
     document.getElementById('ct-add-item')?.addEventListener('click', () => { this.syncItems(); this._items.push(''); reRender(); });
     document.getElementById('ct-load-default')?.addEventListener('click', () => { this.syncItems(); this._items = this.defaultItems(this._type).slice(); reRender(); });
+    // Capture typing into state so stepping off the page keeps the in-progress template.
+    document.getElementById('ct-name')?.addEventListener('input', () => this.syncItems());
+    document.getElementById('ct-items')?.addEventListener('input', ev => { if (ev.target.classList.contains('ct-item-input')) this.syncItems(); });
     document.getElementById('ct-items')?.addEventListener('click', ev => {
       const rm = ev.target.closest('.ct-remove');
       if (!rm) return;
@@ -164,6 +173,7 @@ S.ShiftChecklistTemplates = {
       });
     }
     document.getElementById('ct-cancel')?.addEventListener('click', () => { this._resetForm(); this.renderList(); });
+    document.getElementById('ct-startover')?.addEventListener('click', () => { this._resetForm(); this.renderList(); });
     document.getElementById('ct-save')?.addEventListener('click', () => this.save());
   },
 
