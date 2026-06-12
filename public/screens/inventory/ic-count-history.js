@@ -262,11 +262,12 @@ S.InventoryCountHistory = {
     let bodyTable, bodyNote = '';
     if (compare) {
       const prodForCmp = pid => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === pid);
+      const catFor = (pid, it) => (it && it.category) || (prodForCmp(pid) || {}).category || 'Uncategorized';
       const map = {};
-      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)) }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
-      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)) }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
+      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
+      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
       const older = new Date(compare.created_at || compare.date) < new Date(count.created_at || count.date);
-      const cmpRows = Object.values(map).map(m => {
+      const cmpRowHtml = m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
         const u = m.unit ? ' ' + App.unitAbbr(m.unit) : '';
         return '<tr><td><div class="val">' + esc(m.name) + '</div></td>'
@@ -274,11 +275,24 @@ S.InventoryCountHistory = {
           + '<td>' + esc(a.toFixed(1) + u) + '</td>'
           + '<td class="' + (change < 0 ? 'neg' : change > 0 ? 'pos' : '') + '">' + (change > 0 ? '+' : '') + esc(change.toFixed(1) + u) + '</td>'
           + '</tr>';
+      };
+      // Group the comparison by category too, matching the count view: one table
+      // per category, the category in the first header, a shared colgroup.
+      const dateB = esc(this.fmtDate(compare.date)), dateA = esc(this.fmtDate(count.date));
+      const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+      const byCat = {};
+      Object.values(map).forEach(m => { const c = m.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(m); });
+      const cats = Object.keys(byCat).sort((x, y) => {
+        const ix = ORDER.indexOf(x), iy = ORDER.indexOf(y);
+        return ((ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy)) || x.localeCompare(y);
+      });
+      bodyTable = cats.map(c => {
+        const ms = byCat[c].slice().sort((x, y) => (x.name || '').localeCompare(y.name || ''));
+        return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
+          + '<colgroup><col style="width:260px;"/><col/><col/><col/></colgroup>'
+          + '<thead><tr><th>' + esc(c) + ' Products</th><th>' + dateB + '</th><th>' + dateA + '</th><th>Change</th></tr></thead>'
+          + '<tbody>' + ms.map(cmpRowHtml).join('') + '</tbody></table></div></div>';
       }).join('');
-      bodyTable = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>' + esc(this.fmtDate(compare.date)) + '</th>'
-        + '<th>' + esc(this.fmtDate(count.date)) + '</th><th>Change</th>'
-        + '</tr></thead><tbody>' + cmpRows + '</tbody></table></div></div>';
       bodyNote = '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
         + (older
             ? 'A negative change is product used between the two counts. A positive change is product received.'
