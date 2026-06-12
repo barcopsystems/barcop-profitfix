@@ -68,7 +68,7 @@ S.Help = {
         { q: 'What does Cash Reconciliation show?',
           a: 'A read-only diagnostic view of the cash data flowing in from Shift Control. Cash drops, drawer counts, expected vs counted cash per shift, the variance, and whether each shift landed inside or outside your tolerance. Entry happens in Shift Control. Cash Reconciliation here is the diagnosis view across shifts: patterns, repeat-offender shifts or cashiers, running total of variance for the period.' },
         { q: 'Where do I set the tolerance?',
-          a: 'In Shift Control under Setup, on the Cash Tolerances screen. Set an overall default plus optional per-shift-type overrides (a busy Late Night gets more slack than a quiet Lunch). Every Bar Cop screen that reads tolerance uses the same value through App.cashToleranceForShift, so there is one source of truth.' },
+          a: 'In Shift Control under Setup, on the Shift Policies page. Set an overall default plus optional per-shift-type overrides (a busy Late Night gets more slack than a quiet Lunch). Every Bar Cop screen that reads tolerance uses the same value through App.cashToleranceForShift, so there is one source of truth.' },
         { q: 'A drawer was two dollars short. Why is that not flagged?',
           a: 'Anything inside tolerance reads as OK. Anything outside is flagged. Pay attention to consistent small variances even inside tolerance: a bartender three dollars short every single shift is telling you something. The pattern matters more than any individual entry, and the Theft Risk Cash Variance signal reads that pattern.' }
       ]},
