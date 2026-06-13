@@ -1085,7 +1085,7 @@ S.ShiftActiveShift = {
     const tipChip = (m, label, sub) =>
       '<button class="aw-tipmode-chip" data-mode="' + m + '" style="flex:1;min-width:150px;text-align:left;padding:12px 14px;border-radius:10px;cursor:pointer;'
       + (mode === m ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : 'background:var(--input);border:1px solid var(--b1);') + '">'
-      + '<div style="font-size:13px;font-weight:700;color:' + (mode === m ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + label + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + sub + '</div></button>';
     const chooser = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">'
       + tipChip('tipout', 'Tip Out', 'Servers tip out a percent of sales')
