@@ -175,7 +175,7 @@ S.InventoryTransfers = {
     App.showHelpModal('How the Transfer Log Works', [
       { p: ['The Transfer Log records every time product moves from one of your locations to another, like stockroom to the front bar or walk-in to the kitchen line. It is an accountability trail, so you always know who moved what and where it went. When a bottle goes missing from the front bar, the first question is whether it ever left the back. This log answers it.'] },
       { h: 'When You Run Multiple Locations', p: ['The Transfer Log earns its keep the moment your stock lives in more than one place. At The Anchor the well liquor is counted at the front bar and the service bar separately, with the backup cases in the stockroom. If a manager grabs three bottles of house tequila off the stockroom shelf and walks them to the service bar on a busy Friday, that move gets logged here so each location count still ties out.'] },
-      { h: 'Logging A Transfer Run', p: ['Set the date, time, and who did the move up top, then add a line for each product you moved: pick the product, how much, the unit, and the From and To locations. Each line can go a different direction, so a whole restock run enters on one form. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move, and a note if the move is out of the ordinary. Save All writes every line in one shot, and Start Over clears the form.'] },
+      { h: 'Logging A Transfer Run', p: ['Set the date, time, and who did the move up top, then add a line for each product you moved: pick the product, how much, the unit, and the From and To locations. When you pick a product, Bar Cop fills From with its home location and limits the From list to where that product is actually stocked, while To offers every other location, so you are choosing from real options instead of the whole list. Each line can go a different direction, so a whole restock run enters on one form. Draft moves by the keg, bottle beer by the case, liquor and wine by the bottle. Add a witness when two people should sign off on a high-value move, and a note if the move is out of the ordinary. Save All writes every line in one shot, and Start Over clears the form.'] },
       { h: 'It Does Not Change Your Counts', p: ['A transfer only changes where product sits, not how much you have in the building. Your total on-hand, usage, and variance stay untouched. This log is purely about tracking movement between locations, so logging one never throws off your numbers.'] },
       { h: 'A Real Example', p: ['Say the front bar runs dry on Tito\'s in the middle of dinner service and your bartender pulls a fresh case from the stockroom. Add a line: product Tito\'s, quantity one case if you moved it by the case or the loose bottle count if you broke one out, from Stockroom, to Front Bar. Now when you count the front bar at close and the stockroom on Sunday, both reconcile and nobody is left wondering where the vodka went.'] },
       { h: 'Filtering And History', p: ['Every transfer you log drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it. Edit or delete any entry if you need to fix a mistake.'] },
@@ -233,8 +233,8 @@ S.InventoryTransfers = {
       + '<td><select class="form-input trl-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
       + '<td><input class="form-input trl-qty" type="number" min="0" step="0.5" value="' + (row.quantity != null && row.quantity !== '' ? esc(String(row.quantity)) : '') + '" placeholder="0" style="width:100%;"/></td>'
       + '<td><select class="form-input trl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault) + '</select></td>'
-      + '<td><select class="form-input trl-from" style="width:100%;">' + this.locationOptions(row.from_location || '') + '</select></td>'
-      + '<td><select class="form-input trl-to" style="width:100%;">' + this.locationOptions(row.to_location || '') + '</select></td>'
+      + '<td><select class="form-input trl-from" style="width:100%;">' + this.fromOptions(row.product_id ? this.productById(row.product_id) : null, row.from_location || '') + '</select></td>'
+      + '<td><select class="form-input trl-to" style="width:100%;">' + this.toOptions(row.from_location || '', row.to_location || '') + '</select></td>'
       + '<td><button class="btn btn-danger btn-sm trl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
@@ -250,16 +250,46 @@ S.InventoryTransfers = {
     else line.remove();
   },
 
-  // Product picked on a line: repopulate that line's Unit options, and default
-  // the From location to the product's primary when From is still empty.
+  // Product picked on a line: repopulate Unit, scope From to where the product is
+  // stocked and default it to the product's home (re-defaulting even if a stale
+  // location was filled for the previous product), and rebuild To to exclude that
+  // From. From change alone also rebuilds To.
   onLineChange(ev) {
     const line = ev.target.closest('.tr-line');
-    if (!line || !ev.target.classList.contains('trl-prod')) return;
-    const p = this.productById(ev.target.value);
-    const unitSel = line.querySelector('.trl-unit');
-    if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
-    const fromSel = line.querySelector('.trl-from');
-    if (fromSel && !fromSel.value && p && p.primary_location) fromSel.value = p.primary_location;
+    if (!line) return;
+    if (ev.target.classList.contains('trl-prod')) {
+      const p = this.productById(ev.target.value);
+      const unitSel = line.querySelector('.trl-unit');
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+      const newFrom = this.defaultFromFor(p);
+      const fromSel = line.querySelector('.trl-from');
+      if (fromSel) fromSel.innerHTML = this.fromOptions(p, newFrom);
+      const toSel = line.querySelector('.trl-to');
+      if (toSel) toSel.innerHTML = this.toOptions(newFrom, (toSel.value && toSel.value !== newFrom) ? toSel.value : '');
+      this._captureBatch();
+      return;
+    }
+    if (ev.target.classList.contains('trl-from')) {
+      const fromVal = ev.target.value;
+      const toSel = line.querySelector('.trl-to');
+      if (toSel) toSel.innerHTML = this.toOptions(fromVal, (toSel.value && toSel.value !== fromVal) ? toSel.value : '');
+      this._captureBatch();
+      return;
+    }
+  },
+
+  // Snapshot the batch builder (header + every line) for leave/return persistence.
+  _captureBatch() {
+    const formRoot = this.container.querySelector('.collapse-body');
+    if (!formRoot) return;
+    this._draft = App.captureDraft(formRoot);
+    this._draftRows = [...formRoot.querySelectorAll('.tr-line')].map(line => ({
+      product_id:    line.querySelector('.trl-prod')?.value || '',
+      quantity:      line.querySelector('.trl-qty')?.value || '',
+      unit:          line.querySelector('.trl-unit')?.value || '',
+      from_location: line.querySelector('.trl-from')?.value || '',
+      to_location:   line.querySelector('.trl-to')?.value || ''
+    }));
   },
 
   async saveBatch(after) {
@@ -360,18 +390,8 @@ S.InventoryTransfers = {
     const formRoot = this.container.querySelector('.collapse-body');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
-      const cap = () => {
-        this._draft = App.captureDraft(formRoot);
-        this._draftRows = [...formRoot.querySelectorAll('.tr-line')].map(line => ({
-          product_id:    line.querySelector('.trl-prod')?.value || '',
-          quantity:      line.querySelector('.trl-qty')?.value || '',
-          unit:          line.querySelector('.trl-unit')?.value || '',
-          from_location: line.querySelector('.trl-from')?.value || '',
-          to_location:   line.querySelector('.trl-to')?.value || ''
-        }));
-      };
-      formRoot.addEventListener('input', cap);
-      formRoot.addEventListener('change', cap);
+      formRoot.addEventListener('input', () => this._captureBatch());
+      formRoot.addEventListener('change', () => this._captureBatch());
     }
   },
 
@@ -404,9 +424,9 @@ S.InventoryTransfers = {
       + '</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
         + '<div class="f" style="flex:1;min-width:160px;"><label>From Location</label>'
-          + '<select id="' + idp + 'from">' + this.locationOptions(initialFrom) + '</select></div>'
+          + '<select id="' + idp + 'from">' + this.fromOptions(initialProdId ? this.productById(initialProdId) : null, initialFrom) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>To Location</label>'
-          + '<select id="' + idp + 'to">' + this.locationOptions(initialTo) + '</select></div>'
+          + '<select id="' + idp + 'to">' + this.toOptions(initialFrom, initialTo) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>Performed By</label>'
           + '<select id="' + idp + 'by">' + App.staffOptions(t?.performed_by_id || defaultManagerId, { placeholder: 'Select staff...' }) + '</select></div>'
         + '<div class="f" style="flex:1;min-width:160px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
@@ -416,15 +436,22 @@ S.InventoryTransfers = {
         + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
   },
 
-  // Product change in the edit popup: re-pop unit options + default From.
+  // Product change in the edit popup: re-pop unit, scope + re-default From, and
+  // rebuild To to exclude the From. From change alone also rebuilds To.
   wireProdChange(idp) {
     document.getElementById(idp + 'prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
-      if (!p) return;
       const unitSel = document.getElementById(idp + 'unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'units'));
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'units'));
+      const newFrom = this.defaultFromFor(p);
       const fromSel = document.getElementById(idp + 'from');
-      if (fromSel && !fromSel.value && p.primary_location) fromSel.value = p.primary_location;
+      if (fromSel) fromSel.innerHTML = this.fromOptions(p, newFrom);
+      const toSel = document.getElementById(idp + 'to');
+      if (toSel) toSel.innerHTML = this.toOptions(newFrom, (toSel.value && toSel.value !== newFrom) ? toSel.value : '');
+    });
+    document.getElementById(idp + 'from')?.addEventListener('change', e => {
+      const toSel = document.getElementById(idp + 'to');
+      if (toSel) toSel.innerHTML = this.toOptions(e.target.value, (toSel.value && toSel.value !== e.target.value) ? toSel.value : '');
     });
   },
 
@@ -506,6 +533,46 @@ S.InventoryTransfers = {
   },
 
   // ── Form options ────────────────────────────────────────────────────
+  // Locations a product is actually stocked in (drives the From dropdown). Falls
+  // back to all locations when the product has none placed yet, so the form is
+  // never stuck (the product still shows "Needs a location" on Set Locations).
+  fromLocationsFor(p) {
+    if (!p) return this.locations();
+    const names = (App.productLocations ? App.productLocations(p) : []) || [];
+    const stocked = this.locations().filter(l => names.includes(l.name));
+    return stocked.length ? stocked : this.locations();
+  },
+  // Best-guess source: the product's home (primary) location if it is stocked
+  // there, else the first place it is stocked. A product can live in several
+  // places, so this is only a default the operator can change.
+  defaultFromFor(p) {
+    if (!p) return '';
+    const names = (App.productLocations ? App.productLocations(p) : []) || [];
+    if (p.primary_location && names.includes(p.primary_location)) return p.primary_location;
+    return names.length ? names[0] : '';
+  },
+  // From options scoped to where the product is stocked (keeps a saved value that
+  // is no longer in scope so an edit never silently drops it).
+  fromOptions(p, selected) {
+    const locs = this.fromLocationsFor(p);
+    const names = locs.map(l => l.name);
+    let h = '<option value="">Select location...</option>';
+    if (selected && !names.includes(selected)) h += '<option value="' + esc(selected) + '" selected>' + esc(selected) + '</option>';
+    h += locs.map(l => '<option value="' + esc(l.name) + '"' + (l.name === selected ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    return h;
+  },
+  // To options = every location except the one chosen in From (you can move
+  // product anywhere, even a spot that does not stock it yet, but never to the
+  // same place you took it from).
+  toOptions(fromName, selected) {
+    const locs = this.locations().filter(l => l.name !== fromName);
+    const names = locs.map(l => l.name);
+    let h = '<option value="">Select location...</option>';
+    if (selected && selected !== fromName && !names.includes(selected)) h += '<option value="' + esc(selected) + '" selected>' + esc(selected) + '</option>';
+    h += locs.map(l => '<option value="' + esc(l.name) + '"' + (l.name === selected ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    return h;
+  },
+
   productOptions(selectedId) {
     const prods = this.products();
     if (!prods.length) return '<option value="">No products set up</option>';
