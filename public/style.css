@@ -770,6 +770,15 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ob-row > .f{flex:1 1 auto!important;width:100%!important;min-width:0!important;}
 }
 
+/* Build Schedule: desktop shows the 7-day grid, mobile swaps to the one-day-at-a-
+   time view (lc-build-schedule dayViewHTML). Self-contained + revertible: delete
+   this block (and the dayViewHTML method/wiring) to go back to scroll-only. */
+.bs-dayview{display:none;}
+@media (max-width:768px){
+  .bs-gridview{display:none;}
+  .bs-dayview{display:block;}
+}
+
 /* ══ AUTH ══ */
 .auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
 .auth-panel{width:400px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
