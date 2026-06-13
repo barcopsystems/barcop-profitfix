@@ -466,8 +466,7 @@ S.InventoryVendors = {
         + '<td>' + (r.new_cost != null ? App.fmtCurrency(r.new_cost) : '-') + '</td>'
         + '<td class="val">' + fmtDelta(r.old_cost, r.new_cost) + '</td>'
         + '</tr>').join('')
-      + '</tbody></table></div></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:8px;">Same data feeds Profit Recovery Vendor Watch and the Vendor Scorecard.</div>';
+      + '</tbody></table></div></div>';
   },
 
   async saveVendor() {
