@@ -198,11 +198,22 @@ S.InventoryVendors = {
       else if (del)   this.confirmDel(del.dataset.id);
     };
     App.applyCollapsed(this.container);
-    if (this.entryMode === 'import') this.mountImporter();
-    // Coming from a "Set Up" click: prefill the name into the (manual) add form.
-    else if (this._setupName) {
+    if (this.entryMode === 'import') { this.mountImporter(); return; }
+    // Manual mode: keep a half-typed vendor alive across re-renders and across
+    // leaving the screen and coming back (in-memory; clears on Save, Start Over,
+    // or a full reload). Restore the draft, then capture it on every edit.
+    if (this._draft) App.restoreDraft(this.container, this._draft);
+    const body = this.container.querySelector('.collapse-body');
+    if (body) {
+      const cap = () => { this._draft = App.captureDraft(this.container); };
+      body.addEventListener('input', cap);
+      body.addEventListener('change', cap);
+    }
+    // Coming from a "Set Up" click: prefill the name into the add form.
+    if (this._setupName) {
       const nameEl = document.getElementById('iv-name');
       if (nameEl) nameEl.value = this._setupName;
+      this._draft = App.captureDraft(this.container);
       document.getElementById('iv-rep')?.focus();
       this._setupName = null;
     }
@@ -213,6 +224,7 @@ S.InventoryVendors = {
   startSetup(name) {
     this.entryMode = 'manual';
     this._setupName = name;
+    this._draft = null;
     try { localStorage.removeItem(App._collapseKey('ic-vendors')); } catch (e) {}
     this.renderList();
   },
@@ -221,6 +233,7 @@ S.InventoryVendors = {
   // back to a clean form, the card stays open.
   startOver() {
     this._setupName = null;
+    this._draft = null;
     ['iv-name', 'iv-rep', 'iv-phone', 'iv-email', 'iv-days', 'iv-account', 'iv-notes'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
@@ -497,7 +510,7 @@ S.InventoryVendors = {
     const ok = await App.saveInventory();
     if (ok) {
       if (vendorId) this.openEdit(savedId);
-      else { this.editId = null; this.renderList(); }
+      else { this.editId = null; this._draft = null; this.renderList(); }
     } else {
       if (btn) { btn.disabled = false; btn.textContent = vendorId ? 'Update Vendor' : 'Save Vendor'; }
       fail('Save failed. Try again.');

@@ -138,8 +138,8 @@ S.PrepBatches = {
     App.showHelpModal('How Prep Batches Work', [
       { p: ['Prep batches are the things you make in-house from other products: a frozen margarita mix, simple syrup, a marinara base, a demi-glace. Build the recipe once here and any menu item can use the batch as an ingredient.'] },
       { h: 'Yield And Serving Size', p: ['Batch Yield is how much the whole batch makes, like a 1 gallon mix. Serving Size is how much one drink or plate pulls from it, like 5 oz per margarita. Bar Cop divides the two to get Servings Per Batch, then splits the batch cost across those servings for a Cost Per Serving.'] },
-      { h: 'Ingredients', p: ['Add each product that goes into the batch and how much. The batch category sets which products you can pick: a Cocktail Mix or Syrup pulls bar ingredients, a Sauce or Stock pulls kitchen ingredients. Line costs use each product’s current cost, so when an ingredient price changes the batch cost updates on its own.'] },
-      { h: 'Where It Flows', p: ['A batch’s Cost Per Serving feeds straight into any menu item recipe that uses it, so your recipe and menu costs stay honest without re-entering anything.'] }
+      { h: 'Ingredients', p: ['Add each product that goes into the batch and how much. The batch category sets which products you can pick: a Cocktail Mix or Syrup pulls bar ingredients, a Sauce or Stock pulls kitchen ingredients. Line costs use each product\'s current cost, so when an ingredient price changes the batch cost updates on its own.'] },
+      { h: 'Where It Flows', p: ['A batch\'s Cost Per Serving feeds straight into any menu item recipe that uses it, so your recipe and menu costs stay honest without re-entering anything.'] }
     ]);
   },
 

@@ -420,7 +420,7 @@ S.InventoryVarianceReport = {
       CSVMapper.mount(document.getElementById('vr-import'), {
         actionsEl: document.getElementById('vr-import-actions'),
         confirmLabel: 'Import POS Sales',
-        dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' – ' + this.fmtLong(period.endC.date) + ' POS sales file here',
+        dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
         fields: [
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item'] },
@@ -688,7 +688,7 @@ S.InventoryVarianceReport = {
     const sortedProds = this.allProducts().slice().sort((a, b) => a.name.localeCompare(b.name));
     const sortedMenu  = this.menuItems().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const sizeTargets = sortedProds.filter(p => Array.isArray(p.serving_sizes) && p.serving_sizes.length);
-    const sizeLabel = (p, s, oz) => p.name + ' — ' + (s.label ? s.label + ' ' : '') + '(' + (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz)';
+    const sizeLabel = (p, s, oz) => p.name + ' · ' + (s.label ? s.label + ' ' : '') + '(' + (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz)';
 
     let full = '';
     if (sortedMenu.length) full += '<optgroup label="Menu Items">'
