@@ -1045,6 +1045,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .dr-dragging td:last-child{border-bottom:1px solid var(--gold-tint-bord)!important;}
 
   /* Batch builders (Void/Comp, Waste) -> stacked full-width inputs per line. */
+  /* Drop the outer card frame that wraps the table on mobile — each line is already its own stacked box, so the wrapper just nests a box in a box and eats width. Desktop keeps the frame around the real table. */
+  .card:has(> .ing-tbl){border:none!important;background:transparent!important;border-radius:0!important;}
   .ing-tbl thead{display:none;}
   .ing-tbl tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:6px 12px 12px;margin:10px;}
   .ing-tbl tbody td{display:block;background:transparent;padding:6px 0;border:none;}
