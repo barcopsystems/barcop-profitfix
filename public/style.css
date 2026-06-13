@@ -1048,6 +1048,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   /* Drop the outer card frame that wraps the table on mobile — each line is already its own stacked box, so the wrapper just nests a box in a box and eats width. Desktop keeps the frame around the real table. */
   .card:has(> .ing-tbl){border:none!important;background:transparent!important;border-radius:0!important;}
   .ing-tbl thead{display:none;}
+  /* Linearize the table element itself (and tbody) so an inline table-layout:fixed + desktop column widths never size/inset the stacked rows on mobile. Without this the rows stay locked to the old column grid no matter their margin. */
+  .ing-tbl,.ing-tbl tbody{display:block;width:100%;}
   .ing-tbl tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:6px 12px 12px;margin:10px 0;}
   .ing-tbl tbody td{display:block;background:transparent;padding:6px 0;border:none;}
   .ing-tbl tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
