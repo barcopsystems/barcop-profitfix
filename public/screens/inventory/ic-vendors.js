@@ -13,6 +13,7 @@
 S.InventoryVendors = {
   editId: null,
   _pendingDelId: null,
+  entryMode: 'manual',     // 'manual' = type a vendor, 'import' = drop a vendor list file
   TERMS: ['', 'COD', 'Net 7', 'Net 15', 'Net 30', 'Net 60'],
 
   vendors() {
@@ -48,6 +49,7 @@ S.InventoryVendors = {
     App.showHelpModal('How Vendors Work', [
       { p: ['Vendors are the distributors and suppliers you order from. Set each one up here with a rep, contact info, and payment terms. Products link to a vendor by name, so once a vendor exists you can set it as the Primary Vendor on the products it delivers.'] },
       { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever contact details you have. Only the name is required. Payment terms and delivery days help you plan orders and spot a vendor who slips on either. Save and the vendor is ready to attach to products.'] },
+      { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, and account number all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
       { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds Profit Recovery Vendor Watch and the Vendor Scorecard, so a vendor quietly raising prices shows up before it eats your margin.'] }
     ]);
@@ -106,20 +108,42 @@ S.InventoryVendors = {
     this.wireList();
   },
 
+  // A segmented toggle swaps the card body between typing one vendor and dropping
+  // a whole vendor list, so the operator picks a lane instead of facing two boxes
+  // ([[unified-import-pattern]]). The import lane mounts the shared CSVMapper.
   addFormCard() {
-    return '<div class="card form-card">'
-      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
-      + '<div class="collapse-body">'
-      + this.formFieldsHTML(null)
-      + '</div></div>'
-      + '<div class="no-print" data-collapse-group="ic-vendors" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+    const segBtn = (mode, label) => {
+      const on = this.entryMode === mode;
+      return '<button type="button" class="btn btn-sm iv-mode" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    let modeBody, actionRow;
+    if (this.entryMode === 'import') {
+      modeBody = '<div id="iv-csv"></div><div id="iv-imp-result"></div>';
+      // Empty until a file is dropped; CSVMapper then renders its Import / Cancel
+      // row here (below the card) so there's no gap beforehand.
+      actionRow = '<div id="iv-imp-actions" class="no-print" data-collapse-group="ic-vendors" style="margin:16px 0 24px;"></div>';
+    } else {
+      modeBody = this.formFieldsHTML(null);
+      actionRow = '<div class="no-print" data-collapse-group="ic-vendors" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
         + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
+    }
+    return '<div class="card form-card">'
+      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
+      + '<div class="collapse-body">'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + modeBody
+      + '</div></div>'
+      + actionRow;
   },
 
   wireList() {
     this.container.onclick = ev => {
+      const mode = ev.target.closest('.iv-mode');
+      if (mode) { this.entryMode = mode.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       const save = ev.target.closest('#iv-save');
@@ -132,6 +156,93 @@ S.InventoryVendors = {
       else if (del)  this.confirmDel(del.dataset.id);
     };
     App.applyCollapsed(this.container);
+    if (this.entryMode === 'import') this.mountImporter();
+  },
+
+  // ── CSV / Excel vendor-list import (drag-drop + column mapping) ──────────────
+  mountImporter() {
+    const el = document.getElementById('iv-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your vendor list here',
+      dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, and account number come in too if your file has them.',
+      actionsEl: '#iv-imp-actions',
+      fields: [
+        { key: 'name',           label: 'Vendor Name',   required: true,  match: ['vendor', 'vendor name', 'name', 'supplier', 'distributor', 'company', 'company name'] },
+        { key: 'rep',            label: 'Rep Name',      required: false, match: ['rep', 'rep name', 'sales rep', 'salesperson', 'contact', 'contact name'] },
+        { key: 'phone',          label: 'Phone',         required: false, match: ['phone', 'phone number', 'telephone', 'tel', 'contact phone'] },
+        { key: 'email',          label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] },
+        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery', 'days', 'delivery day'] },
+        { key: 'payment_terms',  label: 'Terms',         required: false, match: ['terms', 'payment terms', 'net terms', 'payment'] },
+        { key: 'account_number', label: 'Account #',     required: false, match: ['account', 'account number', 'account #', 'acct', 'acct #', 'account no'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importVendors(rows)
+    });
+  },
+
+  // Map a free-text terms cell onto one of the known terms, else leave it blank
+  // (the edit form's Terms dropdown only offers the known set, so an unrecognized
+  // value would be silently unselectable).
+  normTerms(raw) {
+    const s = (raw || '').trim();
+    if (!s) return '';
+    const flat = x => String(x).toLowerCase().replace(/\s+/g, '');
+    const hit = this.TERMS.find(t => t && flat(t) === flat(s));
+    return hit || '';
+  },
+
+  async importVendors(rows) {
+    const existing = this.vendors();
+    const taken = new Set(existing.map(v => (v.name || '').trim().toLowerCase()));
+    const toAdd = [];
+    let dup = 0, blank = 0;
+    rows.forEach(r => {
+      const name = (r.name || '').trim();
+      if (!name) { blank++; return; }
+      const key = name.toLowerCase();
+      // Skip a name already on the list (or repeated in the file) so a re-drop
+      // never creates duplicate vendors.
+      if (taken.has(key)) { dup++; return; }
+      taken.add(key);
+      toAdd.push({
+        id:             App.uid(),
+        name,
+        rep:            (r.rep || '').trim(),
+        phone:          (r.phone || '').trim(),
+        email:          (r.email || '').trim(),
+        delivery_days:  (r.delivery_days || '').trim(),
+        payment_terms:  this.normTerms(r.payment_terms),
+        account_number: (r.account_number || '').trim(),
+        notes:          '',
+        imported:       true,
+        created_at:     new Date().toISOString()
+      });
+    });
+
+    const result = document.getElementById('iv-imp-result');
+    if (!toAdd.length) {
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (dup ? 'No new vendors imported. ' + dup + ' ' + (dup === 1 ? 'name was' : 'names were') + ' already on your list.'
+               : 'No vendors imported. No vendor names were found in the file.') + '</div>';
+      return;
+    }
+
+    this.vendors().push(...toAdd);
+    const ok = await App.saveInventory();
+    if (!ok) {
+      App.inventoryData.ic_vendors = existing.filter(v => !toAdd.includes(v));
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
+      return;
+    }
+    // Re-render so the new vendors show in the list below, then drop the summary
+    // into the freshly-mounted import result slot (stays in import mode).
+    this.renderList();
+    const res2 = document.getElementById('iv-imp-result');
+    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+      + 'Imported ' + toAdd.length + ' vendor' + (toAdd.length === 1 ? '' : 's') + '.'
+      + (dup ? ' Skipped ' + dup + ' already on your list.' : '')
+      + '</div>';
   },
 
   // ── Edit page (own page; same form + product/price cards; Cancel → landing) ──
