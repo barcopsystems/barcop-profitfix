@@ -485,14 +485,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card .tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
 .data-card .tbl tbody tr:last-child td{border-bottom:none;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
-/* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = gold-tint fill + gold border so the moving row stays clearly highlighted until dropped. */
-.dr-dragging td{background:var(--gold-tint)!important;box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord);}
-.dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
-.dr-dragging td:last-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset -1px 0 0 0 var(--gold-tint-bord);}
+/* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = the standard data-row fill + a dashed gold frame (matching the file drop boxes) so the moving row stays clearly highlighted until dropped. */
+.dr-dragging td{background:#0D181E!important;border-top:1.5px dashed var(--gold)!important;border-bottom:1.5px dashed var(--gold)!important;}
+.dr-dragging td:first-child{border-left:1.5px dashed var(--gold)!important;}
+.dr-dragging td:last-child{border-right:1.5px dashed var(--gold)!important;}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
 .vc-line td,.wl-line td,.tp-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fill-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td{background:#0D181E;}
-/* A flagged delivery line tints gold across the data row AND its detail sub-row, down to the divider. */
-.rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:var(--gold-tint);}
+/* A flagged delivery line keeps the standard data-row fill; the gold reason text + Flag button carry the flag, not a tinted row. */
+.rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 /* Order Sheet "Already Ordered" overflow (⋯) menu — floats over content so the row never grows taller. */
 .os-omenu{position:absolute;top:100%;right:0;margin-top:6px;z-index:60;min-width:152px;background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,0.45);}
@@ -1039,10 +1039,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .data-card .tbl tbody td .row-actions{justify-content:flex-end;}
   /* Drag handle reads as an empty box on mobile (the inline 32px width survives). Make it a clear full-width grip strip centered at the top of the stacked card. */
   .data-card .tbl tbody td.dr-handle{width:auto!important;justify-content:center!important;padding:8px;}
-  /* Selected/dragging row on mobile: frame the WHOLE card with one gold border (gold-tint fill comes from the base rule) instead of a gold line across every stacked cell. */
-  .dr-dragging td{box-shadow:none!important;border-left:1px solid var(--gold-tint-bord)!important;border-right:1px solid var(--gold-tint-bord)!important;border-bottom:none!important;}
-  .dr-dragging td:first-child{border-top:1px solid var(--gold-tint-bord)!important;}
-  .dr-dragging td:last-child{border-bottom:1px solid var(--gold-tint-bord)!important;}
+  /* Selected/dragging row on mobile: frame the WHOLE card with one dashed gold border (the #0D181E fill comes from the base rule) instead of a dashed line across every stacked cell. */
+  .dr-dragging td{border-top:none!important;border-bottom:none!important;border-left:1.5px dashed var(--gold)!important;border-right:1.5px dashed var(--gold)!important;}
+  .dr-dragging td:first-child{border-top:1.5px dashed var(--gold)!important;}
+  .dr-dragging td:last-child{border-bottom:1.5px dashed var(--gold)!important;}
 
   /* Batch builders (Void/Comp, Waste) -> stacked full-width inputs per line. */
   .ing-tbl thead{display:none;}
@@ -1052,9 +1052,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ing-tbl tbody td[data-label=""]::before{content:none;}
   .ing-tbl tbody td .form-input{width:100%;}
   .ing-tbl tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
-  /* Flagged delivery line on mobile: tint the whole stacked card (not the cells, which would box each field), and drop the stray colspan label on the detail cell. */
-  .rd-line.rd-flagged,.rd-flag-row.rd-flagged{background:var(--gold-tint);}
-  .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:transparent;}
+  /* Flagged delivery line on mobile reads like any other row (no tint); the gold reason text + Flag button carry the flag. Drop the stray colspan label on the detail cell. */
+  .rd-line.rd-flagged,.rd-flag-row.rd-flagged{background:transparent;}
+  .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
   .ing-tbl tbody td.rd-flag::before{content:none;}
 
   /* Category-grouped tables (table-layout:fixed) on mobile: drop the desktop
