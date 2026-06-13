@@ -66,7 +66,7 @@ S.InventoryReceiveDelivery = {
       { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road. When you select Republic National, Bar Cop checks for any open orders you placed with them and offers them in the Open Order picker.'] },
       { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, pick it from Open Order and every line pre-fills with what you ordered. That also arms the short-count check, since Bar Cop now knows what was supposed to show up. Bar Cop sets the order Received when you save, so it drops off your Order Sheet. No order on file means a walk-in delivery, so add the lines by hand.'] },
       { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master, so you are really just confirming it still matches. Bottle beer is received by the case, so the qty is cases and the price is per case. A delivery of Modelo Especial is entered as 4 cases at the per-case price, not 96 bottles. Everything else is in its own container unit: liquor and wine by the bottle, draft by the keg.'] },
-      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop flags the line in gold and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. Filing it lands the claim in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
+      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop calls it out on the line and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. Filing it lands the claim in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
       { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
     ]);
   },
@@ -101,7 +101,7 @@ S.InventoryReceiveDelivery = {
       + '<td><div class="row-actions">'
         + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;"></span>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>'
-        + '<span class="rd-flag-logged" style="display:none;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);white-space:nowrap;">Logged</span>'
+        + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;align-self:center;">Logged in Vendor Discrepancies</span>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
       + '</div></td>'
       + '</tr>';
@@ -167,6 +167,7 @@ S.InventoryReceiveDelivery = {
       + '</div>'
       + '<div style="margin-top:16px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
+      + '<button class="btn btn-ghost" id="rd-startover">Start Over</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
 
@@ -204,8 +205,10 @@ S.InventoryReceiveDelivery = {
     document.getElementById('rd-add')?.addEventListener('click', () => {
       lines.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq));
       this.recalcTotal();
+      this._capture();
     });
     document.getElementById('rd-save')?.addEventListener('click', () => this.save());
+    document.getElementById('rd-startover')?.addEventListener('click', () => this.startOver());
 
     this.container.onclick = null;
     this.recalcTotal();
@@ -253,6 +256,15 @@ S.InventoryReceiveDelivery = {
       lines.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq));
     }
     this.recalcTotal();
+    this._capture();
+  },
+
+  // Start Over: clear the in-progress delivery (header + every line) back to a
+  // blank form.
+  startOver() {
+    this._draft = null;
+    this._draftLines = null;
+    this.renderForm();
   },
 
   recalcLine(line) {
@@ -288,21 +300,17 @@ S.InventoryReceiveDelivery = {
     } else {
       line.dataset.shortCount = '';
     }
+    // Once a discrepancy is filed, the logged badge replaces the reason text and
+    // the Flag button, so only show the reason while the line is still unfiled.
+    const alreadyLogged = line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged';
+    const loggedBadge = line.querySelector('.rd-flag-logged');
     if (flag) {
-      if (messages.length > 0) { flag.style.display = ''; flag.textContent = messages.join(' '); }
+      if (!alreadyLogged && messages.length > 0) { flag.style.display = ''; flag.textContent = messages.join(' '); }
       else { flag.style.display = 'none'; flag.textContent = ''; }
     }
-    // Flagged lines tint gold across the data row so they stand out down a
-    // long delivery.
-    const flagged = messages.length > 0;
-    line.classList.toggle('rd-flagged', flagged);
-
-    // Show the Flag button when a real diff is detected AND the line has not
-    // already been flagged. The "Logged" badge takes over once filed.
-    const alreadyLogged = line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged';
-    if (flagBtn) {
-      flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
-    }
+    line.classList.toggle('rd-flagged', messages.length > 0);
+    if (flagBtn) flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
+    if (loggedBadge) loggedBadge.style.display = alreadyLogged ? '' : 'none';
   },
 
   recalcTotal() {
@@ -549,12 +557,10 @@ S.InventoryReceiveDelivery = {
       return;
     }
 
-    // Mark the line as logged so the Flag button hides and the badge shows.
+    // Mark the line as logged; recalcLine swaps the reason text + Flag button for
+    // the "Logged in Vendor Discrepancies" badge.
     line.dataset.discrepancyId = '1';
-    const flagBtn = line.querySelector('.rd-flag-btn');
-    const loggedBadge = line.querySelector('.rd-flag-logged');
-    if (flagBtn) flagBtn.style.display = 'none';
-    if (loggedBadge) loggedBadge.style.display = '';
+    this.recalcLine(line);
 
     if (closeFn) closeFn();
   },
