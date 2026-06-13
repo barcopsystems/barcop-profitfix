@@ -159,10 +159,10 @@ S.InventoryOrderSheet = {
     // in-row product picker on blank Add Item rows.
     this.container.querySelectorAll('.os-vcard').forEach(card => {
       card.addEventListener('input', ev => {
-        if (ev.target.classList.contains('os-qty')) this.recalcVendor(card);
+        if (ev.target.classList.contains('os-qty')) { this.recalcVendor(card); this._captureCard(card); }
       });
       card.addEventListener('change', ev => {
-        if (ev.target.classList.contains('os-prod')) this.onLineProductChange(ev.target);
+        if (ev.target.classList.contains('os-prod')) { this.onLineProductChange(ev.target); this._captureCard(card); }
       });
     });
 
@@ -200,6 +200,7 @@ S.InventoryOrderSheet = {
         const card = rm.closest('.os-vcard');
         rm.closest('.os-line').remove();
         this.recalcVendor(card);
+        this._captureCard(card);
         return;
       }
       if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
@@ -208,6 +209,7 @@ S.InventoryOrderSheet = {
       if (create) this.createOrder(create.dataset.vendor);
     };
 
+    this._restoreDrafts();
     this.container.querySelectorAll('.os-vcard').forEach(card => this.recalcVendor(card));
   },
 
@@ -302,6 +304,7 @@ S.InventoryOrderSheet = {
     if (!tbody) return;
     tbody.insertAdjacentHTML('beforeend', this.blankLineRowHTML(vendor, existingIds));
     this.recalcVendor(card);
+    this._captureCard(card);
   },
 
   // Operator picks a product in a blank row's select: fill the read-only cells,
@@ -358,6 +361,7 @@ S.InventoryOrderSheet = {
 
   // ── Custom Order reset + create ──────────────────────────────────────────
   closeCustomOrder() {
+    this._customDraft = null;
     const panel = this.container.querySelector('.os-custom');
     if (!panel) return;
     panel.dataset.vendor = '';
@@ -382,6 +386,7 @@ S.InventoryOrderSheet = {
     const actions = this.container.querySelector('.os-co-actions');
     if (!body) return;
     if (!vendorName) {
+      this._customDraft = null;
       body.style.display = 'none';
       if (actions) actions.style.display = 'none';
       return;
@@ -391,6 +396,7 @@ S.InventoryOrderSheet = {
     const tbody = panel.querySelector('.os-lines-tbody');
     if (tbody) tbody.innerHTML = this.blankLineRowHTML(vendorName, []);
     this.recalcVendor(panel);
+    this._captureCard(panel);
   },
 
   async createCustomOrder() {
@@ -655,6 +661,81 @@ S.InventoryOrderSheet = {
     if (tEl) tEl.textContent = App.fmtCurrency(total);
   },
 
+  // ── Draft persistence (suggested vendor cards + the custom order panel) ────
+  // Keep edited quantities and added lines alive across leaving the screen and
+  // coming back. In-memory: a full reload starts fresh, and creating the order
+  // clears that card's draft. Captured ONLY on real edits (not the initial
+  // render), so a fresh count still refreshes the suggestions for untouched
+  // vendors. The edit-a-placed-order card is its own door, never a draft.
+  _snapLines(card) {
+    return [...card.querySelectorAll('.os-line')].map(line => {
+      const inp = line.querySelector('.os-qty');
+      return { product_id: (inp && inp.dataset.productId) || line.dataset.productId || '', qty: (inp && inp.value) || '' };
+    });
+  },
+  _captureCard(card) {
+    if (!card) return;
+    if (card.classList.contains('os-custom')) {
+      this._customDraft = { vendor: card.dataset.vendor || '', lines: this._snapLines(card) };
+      return;
+    }
+    if (card.dataset.orderId) return;
+    const vendor = card.dataset.vendor;
+    if (!vendor) return;
+    if (!this._cardDrafts) this._cardDrafts = {};
+    this._cardDrafts[vendor] = this._snapLines(card);
+  },
+  // Rebuild one drafted line: a known product as a filled row (on-hand + par
+  // recomputed from the latest count), an empty pick as a blank Add Item row.
+  _restoreLineHTML(vendor, d, existingIds) {
+    const product = d.product_id ? this.productById(d.product_id) : null;
+    if (!product) return this.blankLineRowHTML(vendor, existingIds);
+    let onHand = null;
+    const counts = this.countsAsc();
+    if (counts.length) {
+      const it = (counts[counts.length - 1].items || []).find(i => i.product_id === d.product_id);
+      if (it) onHand = it.total != null ? it.total : null;
+    }
+    const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
+    return this.lineRowHTML(product, d.qty !== '' ? d.qty : 0, onHand, par);
+  },
+  _restoreDrafts() {
+    // Custom order panel.
+    if (this._customDraft && this._customDraft.vendor) {
+      const panel = this.container.querySelector('.os-custom');
+      if (panel) {
+        const sel = panel.querySelector('.os-co-vendor');
+        if (sel) sel.value = this._customDraft.vendor;
+        panel.dataset.vendor = this._customDraft.vendor;
+        const body = panel.querySelector('.os-co-body');
+        if (body) body.style.display = '';
+        const actions = this.container.querySelector('.os-co-actions');
+        if (actions) actions.style.display = 'flex';
+        const tbody = panel.querySelector('.os-lines-tbody');
+        if (tbody) {
+          const lines = this._customDraft.lines || [];
+          const ids = lines.map(d => d.product_id).filter(Boolean);
+          tbody.innerHTML = lines.length
+            ? lines.map(d => this._restoreLineHTML(this._customDraft.vendor, d, ids)).join('')
+            : this.blankLineRowHTML(this._customDraft.vendor, []);
+        }
+      }
+    }
+    // Suggested vendor cards (skip the custom panel + any edit-order card).
+    if (this._cardDrafts) {
+      this.container.querySelectorAll('.os-vcard').forEach(card => {
+        if (card.classList.contains('os-custom') || card.dataset.orderId) return;
+        const vendor = card.dataset.vendor;
+        const draft = vendor && this._cardDrafts[vendor];
+        if (!draft) return;
+        const tbody = card.querySelector('.os-lines-tbody');
+        if (!tbody) return;
+        const ids = draft.map(d => d.product_id).filter(Boolean);
+        tbody.innerHTML = draft.map(d => this._restoreLineHTML(vendor, d, ids)).join('');
+      });
+    }
+  },
+
   async createOrder(vendor) {
     const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
     if (!card) return;
@@ -681,6 +762,7 @@ S.InventoryOrderSheet = {
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
       this._created[vendor] = true;
+      if (this._cardDrafts) delete this._cardDrafts[vendor];
       this.renderMain();
       this.scrollContentTop();
     } else {
