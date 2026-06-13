@@ -210,13 +210,24 @@ S.InventoryReceiveDelivery = {
     this.container.onclick = null;
     this.recalcTotal();
 
+    // Persist a half-entered delivery across leaving and returning. The .screen
+    // wrapper is rebuilt every render, so this listener never stacks up.
+    const screenEl = this.container.querySelector('.screen');
+    if (screenEl) {
+      const cap = () => this._capture();
+      screenEl.addEventListener('input', cap);
+      screenEl.addEventListener('change', cap);
+    }
+
     // Deep-link from Order History "Log the Delivery": pre-load this order so the
     // operator lands on a ready-to-confirm form (vendor + order picked, every
-    // line filled in) instead of a blank one. Saving still runs the full price /
+    // line filled in). A deep-link is a fresh start, so it clears any stale draft;
+    // otherwise restore an in-progress delivery. Saving still runs the full price /
     // short-count verification and auto-marks the order Received.
     const pendingId = this._pendingOrderId;
     this._pendingOrderId = null;
     if (pendingId) {
+      this._draft = null; this._draftLines = null;
       const order = this.orders().find(o => o.id === pendingId);
       const vSel = document.getElementById('rd-vendor');
       if (order && vSel) {
@@ -227,6 +238,9 @@ S.InventoryReceiveDelivery = {
         const sc = this.container.closest('.content') || document.querySelector('.content');
         if (sc) sc.scrollTop = 0;
       }
+      this._capture();
+    } else if (this._draftLines && this._draftLines.length) {
+      this._restoreDraft();
     }
   },
 
@@ -309,6 +323,50 @@ S.InventoryReceiveDelivery = {
     set('rd-changes', changes);
     set('rd-shorts', shorts);
     set('rd-total', App.fmtCurrency(total));
+  },
+
+  // ── Draft persistence (header fields + every line row) ───────────────────
+  // Keep a half-entered delivery alive across leaving the screen and coming back.
+  // In-memory, so a full reload starts fresh; saving the delivery clears it.
+  _capture() {
+    this._draft = App.captureDraft(this.container);
+    this._draftLines = [...this.container.querySelectorAll('.rd-line')].map(line => ({
+      product_id:    line.querySelector('.rd-prod')?.value || '',
+      qty:           line.querySelector('.rd-qty')?.value || '',
+      price:         line.querySelector('.rd-price')?.value || '',
+      orderedQty:    line.dataset.orderedQty || '',
+      shortCount:    line.dataset.shortCount || '',
+      discrepancyId: line.dataset.discrepancyId || ''
+    }));
+  },
+  _restoreDraft() {
+    if (this._draft) App.restoreDraft(this.container, this._draft);
+    // Re-run the vendor change so the Open Order picker matches, then show the
+    // chosen order WITHOUT re-prefilling (that would overwrite the edited lines).
+    const vSel = document.getElementById('rd-vendor');
+    if (vSel && vSel.value) this.onVendorChange(vSel.value);
+    if (this._draft && this._draft['rd-order']) {
+      const oSel = document.getElementById('rd-order');
+      if (oSel) oSel.value = this._draft['rd-order'];
+    }
+    const linesEl = document.getElementById('rd-lines');
+    if (linesEl) {
+      linesEl.innerHTML = '';
+      this._draftLines.forEach(d => {
+        const lid = ++this._seq;
+        linesEl.insertAdjacentHTML('beforeend', this.lineHTML(lid));
+        const line = linesEl.querySelector('.rd-line[data-lid="' + lid + '"]');
+        if (!line) return;
+        const prodSel = line.querySelector('.rd-prod'); if (prodSel) prodSel.value = d.product_id || '';
+        const qtyInp = line.querySelector('.rd-qty');   if (qtyInp) qtyInp.value = d.qty || '';
+        const priceInp = line.querySelector('.rd-price'); if (priceInp) priceInp.value = d.price || '';
+        if (d.orderedQty)    line.dataset.orderedQty = d.orderedQty;
+        if (d.shortCount)    line.dataset.shortCount = d.shortCount;
+        if (d.discrepancyId) line.dataset.discrepancyId = d.discrepancyId;
+        this.recalcLine(line);
+      });
+    }
+    this.recalcTotal();
   },
 
   // ── Vendor + Open Order pickers ──────────────────────────────────────────
@@ -647,6 +705,7 @@ S.InventoryReceiveDelivery = {
     const ok = okDel && okCfg && okOrd;
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
+      this._draft = null; this._draftLines = null;
       const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number });
       this.renderDone(record, filed);
     } else {
