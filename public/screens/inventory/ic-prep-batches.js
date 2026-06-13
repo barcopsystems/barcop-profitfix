@@ -187,7 +187,7 @@ S.PrepBatches = {
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-prep-batches" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="pb-save">Save Batch</button>'
-        + '<button class="btn btn-ghost" id="pb-cancel">Clear</button>'
+        + '<button class="btn btn-ghost" id="pb-cancel">Start Over</button>'
         + '<span id="pb-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
