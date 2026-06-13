@@ -381,16 +381,29 @@ S.InventoryVendors = {
       return heading + '<div style="font-size:12px;color:var(--t3);">No products are linked to this vendor yet. '
         + 'Set the Primary Vendor field on a product in the Products screen.</div>';
     }
-    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Category</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
-      + '</tr></thead><tbody>'
-      + prods.map(p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
-          + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-          + '<td>' + esc(p.category || '-') + '</td>'
-          + '<td>' + esc(this.sizeLabel(p)) + '</td>'
-          + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>').join('')
-      + '</tbody></table></div></div>';
+    const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
+      + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
+      + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>';
+    // Group by category like the Count History view: one table per category, the
+    // category in the first header, a shared fixed colgroup so columns line up
+    // down the page (the Category column drops into the header).
+    const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const byCat = {};
+    prods.forEach(p => { const c = p.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(p); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
+    const tables = cats.map(c => {
+      const catProds = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
+        + '<colgroup><col style="width:240px;"/><col/><col/><col/></colgroup>'
+        + '<thead><tr><th>' + esc(c) + ' Products</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
+        + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div></div>';
+    }).join('');
+    return heading + tables;
   },
 
   renderPriceHistoryCard(prods) {
