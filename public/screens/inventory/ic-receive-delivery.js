@@ -64,7 +64,7 @@ S.InventoryReceiveDelivery = {
     App.showHelpModal('How Receiving a Delivery Works', [
       { p: ['Receiving a delivery logs what actually showed up against what you ordered and what you got charged. Match it to your invoice line by line, flag anything that is off, and Bar Cop keeps your costs current and your vendor honest. Do it the moment the driver is still on the dock, while you can still hand back a case or get a signature on a short count.'] },
       { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road. When you select Republic National, Bar Cop checks for any open orders you placed with them and offers them in the Open Order picker.'] },
-      { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, pick it from Open Order and every line pre-fills with what you ordered. That also arms the short-count check, since Bar Cop now knows what was supposed to show up. Bar Cop sets the order Received when you save, so it drops off your Order Sheet. No order on file means a walk-in delivery, so add the lines by hand.'] },
+      { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, it is waiting in the Open Order picker, newest first, and Bar Cop pre-fills the most recent one so you just confirm it against the invoice. That also arms the short-count check, since Bar Cop knows what was supposed to show up, and it marks the order Received when you save so it drops off your Order Sheet. If this delivery is not one of your Bar Cop orders, or the vendor has none on file, pick No matched order (walk-in delivery) and add the lines by hand. Either way the delivery records and feeds your stock, usage, and variance.'] },
       { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master, so you are really just confirming it still matches. Bottle beer is received by the case, so the qty is cases and the price is per case. A delivery of Modelo Especial is entered as 4 cases at the per-case price, not 96 bottles. Everything else is in its own container unit: liquor and wine by the bottle, draft by the keg.'] },
       { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop calls it out on the line and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. Filing it lands the claim in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
       { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
@@ -387,31 +387,52 @@ S.InventoryReceiveDelivery = {
     const orderRow = document.getElementById('rd-order-row');
     const orderSel = document.getElementById('rd-order');
     if (!orderRow || !orderSel) return;
+    const walkInOpt = '<option value="">No matched order (walk-in delivery)</option>';
+    if (!vendorName) {
+      // No vendor chosen yet — hide the picker entirely.
+      orderRow.style.display = 'none';
+      orderSel.innerHTML = walkInOpt;
+      return;
+    }
+    // Always show the picker once a vendor is chosen, so a vendor with no open
+    // orders still gets the walk-in cue (the box tells the operator to enter the
+    // lines below).
+    orderRow.style.display = '';
     const open = this.openOrdersForVendor(vendorName);
     if (open.length === 0) {
-      orderRow.style.display = 'none';
-      orderSel.innerHTML = '<option value="">No open orders for this vendor</option>';
-    } else {
-      orderRow.style.display = '';
-      const opts = ['<option value="">No matched order (walk-in delivery)</option>']
-        .concat(open.map(o => {
-          const label = (o.date || '') + '  ·  ' + (o.item_count || (o.line_items || []).length) + ' items  ·  ' + App.fmtCurrency(o.total || 0) + (o.status === 'Submitted' ? '  ·  Submitted' : '  ·  Open');
-          return '<option value="' + esc(o.id) + '">' + esc(label) + '</option>';
-        }));
-      orderSel.innerHTML = opts.join('');
+      orderSel.innerHTML = walkInOpt;
       orderSel.value = '';
+      this.onOrderPick('');   // clean single line for a manual walk-in
+      return;
     }
+    // Open orders lead (newest first); walk-in is the fallback at the bottom.
+    const opts = open.map(o => {
+      const label = (o.date || '') + '  ·  ' + (o.item_count || (o.line_items || []).length) + ' items  ·  ' + App.fmtCurrency(o.total || 0) + (o.status === 'Submitted' ? '  ·  Submitted' : '  ·  Open');
+      return '<option value="' + esc(o.id) + '">' + esc(label) + '</option>';
+    });
+    opts.push(walkInOpt);
+    orderSel.innerHTML = opts.join('');
+    // Default to the most recent open order and pre-fill it, so the pending
+    // order is front-and-center instead of hidden behind the walk-in option.
+    orderSel.value = open[0].id;
+    this.onOrderPick(open[0].id);
   },
 
   onOrderPick(orderId) {
+    const linesEl = document.getElementById('rd-lines');
     if (!orderId) {
-      // Operator cleared the order pick (walk-in). Keep the existing form
-      // lines so they do not lose typed-in data.
+      // Walk-in: this delivery is not one of the vendor's open orders, so reset
+      // to a clean single line for manual entry (nothing to pre-fill or
+      // short-count against).
+      if (linesEl) {
+        linesEl.innerHTML = '';
+        linesEl.insertAdjacentHTML('beforeend', this.lineHTML(++this._seq));
+      }
+      this.recalcTotal();
       return;
     }
     const order = this.orders().find(o => o.id === orderId);
     if (!order) return;
-    const linesEl = document.getElementById('rd-lines');
     if (!linesEl) return;
 
     // Replace the existing line(s) with one per order item, pre-filled.
