@@ -197,7 +197,10 @@ S.PrepBatches = {
     this.actions.innerHTML = '';
     this.editId = null;
     this._editingIncomplete = false;
-    this.initRows(null);
+    // Keep a half-built batch (header fields + ingredient rows) alive across
+    // leaving the screen and coming back; only Save or Start Over clears it.
+    if (this._draftRows) this.rows = this._draftRows.map(r => ({ ...r }));
+    else this.initRows(null);
 
     const batches = this.list();
 
@@ -246,6 +249,7 @@ S.PrepBatches = {
 
     this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
     this._scope = this.container;
+    if (this._draft) App.restoreDraft(this.container, this._draft);
     this.renderRows();
     this.calc();
     this._wireForm(this.container);
@@ -288,7 +292,7 @@ S.PrepBatches = {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#pb-save'))    { this.saveBatch(); return; }
-      if (ev.target.closest('#pb-cancel'))  { if (root === this.container) this.renderList(); else this.closeEdit(); return; }
+      if (ev.target.closest('#pb-cancel'))  { if (root === this.container) { this._draft = null; this._draftRows = null; this.renderList(); } else this.closeEdit(); return; }
       if (ev.target.closest('#pb-add-ing')) { this.addRow(); return; }
       const rm = ev.target.closest('.pb-rm-ing'); if (rm) { this.removeRow(parseInt(rm.dataset.i)); return; }
       const ed = ev.target.closest('.pb-edit'); if (ed) { this.openEditModal(ed.dataset.id); return; }
@@ -315,13 +319,13 @@ S.PrepBatches = {
         this.refreshFieldMissing();
         return;
       }
-      if (ev.target.id === 'pb-name') this.refreshFieldMissing();
+      if (ev.target.id === 'pb-name') { this.refreshFieldMissing(); this._syncDraft(); }
     };
     root.oninput = ev => {
       this._scope = root;
       if (ev.target.classList.contains('pb-ing-qty')) this.calc();
       if (['pb-yield', 'pb-serv'].includes(ev.target.id)) this.calc();
-      if (ev.target.id === 'pb-name') this.refreshFieldMissing();
+      if (ev.target.id === 'pb-name') { this.refreshFieldMissing(); this._syncDraft(); }
     };
   },
 
@@ -399,7 +403,7 @@ S.PrepBatches = {
     this.renderRows();
     this.calc();
   },
-  addRow() { this.rows.push({ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }); this.renderRows(); },
+  addRow() { this.rows.push({ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }); this.renderRows(); this._syncDraft(); },
   removeRow(idx) {
     if (this.rows.length <= 1) this.rows = [{ product_id: '', quantity: '', cost_per_unit: 0, total_cost: 0 }];
     else this.rows.splice(idx, 1);
@@ -426,12 +430,23 @@ S.PrepBatches = {
     set('pb-spb', out.servings_per_batch != null ? out.servings_per_batch.toFixed(1) + ' servings' : '-');
     set('pb-tc', out.total_cost > 0 ? App.fmtCurrency(out.total_cost) : '-');
     set('pb-cps', out.cost_per_serving > 0 ? App.fmtCurrency(out.cost_per_serving) : '-');
+    this._syncDraft();
+  },
+
+  // Snapshot the inline add form (header fields + ingredient rows) so a half-built
+  // batch survives leaving the screen and coming back. Only the inline form; the
+  // edit pop-up (this._scope = the modal) is left untouched.
+  _syncDraft() {
+    if (this._scope !== this.container) return;
+    this._draft = App.captureDraft(this.container);
+    this._draftRows = this.rows.map(r => ({ ...r }));
   },
 
   async saveBatch() {
     if (this._saving) return;
     this._saving = true;
     setTimeout(() => { this._saving = false; }, 1000);
+    const wasAdd = !this.editId;
 
     const name = this._el('pb-name')?.value.trim();
     const err = this._el('pb-err');
@@ -473,6 +488,7 @@ S.PrepBatches = {
     }
     await App.saveInventory();
     this.editId = null;
+    if (wasAdd) { this._draft = null; this._draftRows = null; }
     App.closeModal('pb-edit-modal');
     this.renderList();
   },

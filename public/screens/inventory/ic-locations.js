@@ -84,11 +84,11 @@ S.InventoryLocations = {
     this.actions = actions;
     actions.innerHTML = '';
     this.editId = null;
-    this.pickerOpen = false;
-    this._newName = '';
-    this._newNameError = false;
     this._justSavedCount = null;
-    this.newChecked = new Set();
+    // Keep a half-built location (typed name, service-bar flag, checked products,
+    // open picker) alive across leaving the screen and coming back. In-memory, so
+    // a full reload still starts fresh; saving the location clears it.
+    if (!this.newChecked) this.newChecked = new Set();
     this.renderList();
   },
 
