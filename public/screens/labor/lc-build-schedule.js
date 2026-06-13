@@ -365,9 +365,10 @@ S.LaborBuildSchedule = {
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button>'
       + '<button class="btn btn-ghost btn-sm" id="bs-worksheet">Worksheet</button></div></div>'
       + lastWeekNudge
-      + '<div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+      + '<div class="bs-gridview"><div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
-      + '<tbody>' + body + footer + '</tbody></table></div></div>'
+      + '<tbody>' + body + footer + '</tbody></table></div></div></div>'
+      + this.dayViewHTML(d, T)
       + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '');
 
     // Totals strip
@@ -411,6 +412,67 @@ S.LaborBuildSchedule = {
     return hr + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
   },
 
+  // ── Mobile day-view (revertible) ────────────────────────────────────────────
+  // Below the hamburger breakpoint the 7-day grid scrolls sideways, so a CSS
+  // toggle (.bs-gridview / .bs-dayview in style.css) swaps it for a one-day-at-a-
+  // time view: a day selector + every active staff member's shifts for that day,
+  // tap to add or edit. Reuses the grid's data + openShiftModal. To revert to
+  // scroll-only, remove this method, its call in the grid card, the day-view
+  // wiring in _wire(), and the .bs-dayview/.bs-gridview CSS block.
+  dayViewHTML(d, T) {
+    if (!this._mobileDay || this.DAYS.indexOf(this._mobileDay) < 0) {
+      const todayName = new Date(App.todayLocal() + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+      this._mobileDay = this.DAYS.indexOf(todayName) >= 0 ? todayName : this.DAYS[0];
+    }
+    const day = this._mobileDay;
+    const dd = this.dayDate(d.week_start, this.DAYS.indexOf(day));
+
+    const chips = this.DAYS.map(dy => {
+      const on = dy === day;
+      return '<button type="button" class="btn btn-sm bs-day-chip" data-day="' + esc(dy) + '" style="flex:1 1 0;min-width:0;padding:7px 2px;'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(dy) + '</button>';
+    }).join('');
+
+    const groups = {};
+    this.activeStaff().forEach(s => { const dep = this.deptOf(s.id); (groups[dep] = groups[dep] || []).push(s); });
+    const orderedDepts = this.DEPT_ORDER.filter(x => groups[x]).concat(Object.keys(groups).filter(x => this.DEPT_ORDER.indexOf(x) < 0));
+
+    let rows = '';
+    orderedDepts.forEach(dep => {
+      rows += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);padding:14px 0 4px;">' + esc(dep) + '</div>';
+      groups[dep].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
+        const sal = App.isSalaried(s);
+        let blocks = '';
+        this.shiftsFor(s.id, day).forEach(({ sh, i }) => {
+          const c = this.shiftCalc(sh);
+          const conflict = this.isConflict(sh, i);
+          const border = conflict ? 'var(--red)' : 'var(--gold-tint-bord)';
+          const blockBg = conflict ? 'var(--surface)' : 'var(--gold-tint)';
+          blocks += '<div class="bs-mblock" data-staff="' + esc(s.id) + '" data-day="' + esc(day) + '" data-idx="' + i + '" style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:5px 8px;background:' + blockBg + ';">'
+            + '<div style="font-size:12px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
+            + '<div style="font-size:9px;color:var(--t3);">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + (conflict ? ' · overlap' : '') + '</div></div>';
+        });
+        rows += '<div style="display:flex;align-items:flex-start;gap:12px;border-top:1px solid var(--b2);padding:9px 0;">'
+          + '<div style="flex:1;min-width:0;"><div style="font-size:13px;color:var(--t1);font-weight:600;">' + esc(s.name || '-') + '</div>'
+          + '<div style="font-size:10px;color:var(--t4);">' + esc(sal ? 'Salary' : (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '')) + '</div></div>'
+          + '<div style="display:flex;flex-direction:column;gap:4px;flex:0 0 132px;max-width:132px;">' + blocks
+          + '<button type="button" class="btn btn-ghost btn-sm bs-madd" data-staff="' + esc(s.id) + '" data-day="' + esc(day) + '">+ Add</button></div>'
+          + '</div>';
+      });
+    });
+
+    const ddTot = (T.byDay && T.byDay[day]) || { hours: 0, count: 0 };
+    const header = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;">'
+      + '<div style="font-size:13px;color:var(--t1);font-weight:700;">' + esc(day) + (dd ? ' <span style="color:var(--t4);font-weight:400;">' + esc(dd) + '</span>' : '') + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);">' + ddTot.hours.toFixed(1) + 'h · ' + ddTot.count + ' shift' + (ddTot.count === 1 ? '' : 's') + '</div></div>';
+
+    return '<div class="bs-dayview">'
+      + '<div style="display:flex;gap:5px;margin-bottom:12px;">' + chips + '</div>'
+      + '<div class="card">' + header + rows + '</div>'
+      + '</div>';
+  },
+
   _wire() {
     document.getElementById('bs-week-prev')?.addEventListener('click', () => this.shiftWeek(-7));
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
@@ -451,6 +513,11 @@ S.LaborBuildSchedule = {
         this.openShiftModal(cell.dataset.staff, cell.dataset.day, null);
       });
     });
+
+    // Mobile day-view: switch the day, or add/edit a shift (mirrors the grid).
+    this.container.querySelectorAll('.bs-day-chip').forEach(b => b.addEventListener('click', () => { this._mobileDay = b.dataset.day; this.draw(); }));
+    this.container.querySelectorAll('.bs-mblock').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.openShiftModal(b.dataset.staff, b.dataset.day, parseInt(b.dataset.idx, 10)); }));
+    this.container.querySelectorAll('.bs-madd').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.openShiftModal(b.dataset.staff, b.dataset.day, null); }));
 
     // Saved-template rows: load (click row or Load), or delete.
     this.container.querySelectorAll('.bs-tmpl-load').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); this.loadTemplate(b.dataset.id); }));
