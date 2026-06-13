@@ -546,12 +546,12 @@ S.LaborBuildSchedule = {
       + Array.from({ length: 12 }, (_, i) => { const hh = i + 1; return '<option value="' + hh + '"' + (String(hh) === h12 ? ' selected' : '') + '>' + hh + '</option>'; }).join('');
     const minOpts = ['00', '15', '30', '45'].map(m => '<option value="' + m + '"' + (m === mm ? ' selected' : '') + '>' + m + '</option>').join('');
     const apOpts = ['AM', 'PM'].map(a => '<option' + (a === ap ? ' selected' : '') + '>' + a + '</option>').join('');
-    return '<div class="f" style="flex-shrink:0;"><label>' + label + '</label>'
-      + '<div style="display:flex;gap:6px;align-items:center;">'
-      + '<select id="' + idp + '-h" style="width:62px;">' + hourOpts + '</select>'
-      + '<span style="color:var(--t3);">:</span>'
-      + '<select id="' + idp + '-m" style="width:62px;">' + minOpts + '</select>'
-      + '<select id="' + idp + '-ap" style="width:62px;">' + apOpts + '</select>'
+    return '<div class="f" style="flex:1 1 200px;min-width:0;margin-bottom:0;"><label>' + label + '</label>'
+      + '<div style="display:flex;gap:8px;align-items:center;">'
+      + '<select id="' + idp + '-h" style="flex:1;min-width:0;">' + hourOpts + '</select>'
+      + '<span style="color:var(--t3);flex-shrink:0;">:</span>'
+      + '<select id="' + idp + '-m" style="flex:1;min-width:0;">' + minOpts + '</select>'
+      + '<select id="' + idp + '-ap" style="flex:1;min-width:0;">' + apOpts + '</select>'
       + '</div></div>';
   },
   _readTime(idp) {
