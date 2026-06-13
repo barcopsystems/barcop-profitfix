@@ -14,7 +14,6 @@
 S.InventoryMoversReport = {
   tab: 'fast',
   endCountId: null,
-  catFilter: '',
 
   TABS: [['fast', 'Fast Movers'], ['slow', 'Slow Movers'], ['trend', 'Trend vs Prior'], ['vendor', 'Vendor Spend']],
 
@@ -59,14 +58,13 @@ S.InventoryMoversReport = {
     for (let i = 1; i < asc.length; i++) out.push({ startC: asc[i - 1], endC: asc[i] });
     return out;
   },
-  byCat(rows) { return this.catFilter ? rows.filter(r => r.category === this.catFilter) : rows; },
 
   showHowTo() {
     App.showHelpModal('How the Movement Report Works', [
       { p: ['Movement tells you what is flying off the shelf and what is collecting dust. Everything ranks by dollars, not raw units, so a 240-a-week bun does not outrank your scotch. Money is the fair comparison.'] },
-      { h: 'Pick A Period', p: ['Use Count Period to choose which two counts to measure between, and Category to focus on one group, like just liquor. Both apply to every view.'] },
-      { h: 'Fast And Slow', p: ['Fast Movers are your top products by usage dollars: where your money goes, what to never run out of, and what to watch for theft. Slow Movers are the bottom: cash tied up, spoilage risk, candidates to stop over-ordering or cut.'] },
-      { h: 'Trend And Vendor', p: ['Trend vs Prior shows how each product moved this period against the period before, biggest swing first, so you catch an item taking off or falling off early. Vendor Spend groups your usage cost by vendor, which is your leverage when you sit down to negotiate.'] }
+      { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top, or tap a period, to choose which two counts to measure between. Everything on the page recomputes for what you pick.'] },
+      { h: 'Fast And Slow', p: ['Fast Movers are your top products by usage dollars: where your money goes, what to never run out of, and what to watch for theft. Slow Movers are the bottom: cash tied up, spoilage risk, candidates to stop over-ordering or cut. Both rank across every category so the comparison stays fair.'] },
+      { h: 'Trend And Vendor', p: ['Trend vs Prior shows how each product moved this period against the period before, grouped by category with the biggest swing first, so you catch an item taking off or falling off early. Vendor Spend groups your usage cost by vendor, which is your leverage when you sit down to negotiate.'] }
     ]);
   },
 
@@ -82,9 +80,18 @@ S.InventoryMoversReport = {
   statsCard(items) {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
-  dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+  dataCard(headers, rowsHtml, fixedColgroup) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"'
+      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:600px;"' : '') + '>'
+      + (fixedColgroup || '') + '<thead><tr>'
       + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  // Trend tables group by category, so they share a fixed colgroup (Product wide,
+  // the four data columns equal) and line their columns up down the page.
+  trendColgroup() {
+    let cols = '<col style="width:200px;"/>';
+    for (let i = 1; i < 5; i++) cols += '<col/>';
+    return '<colgroup>' + cols + '</colgroup>';
   },
   note(text) {
     return '<div class="card"><div style="font-size:12px;color:var(--t3);padding:8px 0;">' + esc(text) + '</div></div>';
@@ -116,8 +123,7 @@ S.InventoryMoversReport = {
     const prior = idx > 0 ? pairs[idx - 1] : null;
 
     const allRows = this.computeForPair(cur.startC, cur.endC);
-    const fRows = this.byCat(allRows);
-    const moved = fRows.filter(r => r.usageCost > 0);
+    const moved = allRows.filter(r => r.usageCost > 0);
     const totalCost = moved.reduce((s, r) => s + r.usageCost, 0);
     const vendors = new Set(moved.map(r => (r.product && r.product.vendor) || 'Unassigned')).size;
     const statsCard = this.statsCard(
@@ -125,36 +131,80 @@ S.InventoryMoversReport = {
       + this.statItem('Products Moved', moved.length)
       + this.statItem('Vendors', vendors));
 
-    const periodOpts = pairs.map((p, i) =>
-      '<option value="' + p.endC.id + '"' + (i === idx ? ' selected' : '') + '>'
-      + this.fmtDate(p.startC.date) + ' &rarr; ' + this.fmtDate(p.endC.date) + '</option>').reverse().join('');
-    const cats = [...new Set(allRows.map(r => r.category).filter(Boolean))].sort();
-    const catOpts = '<option value="">All categories</option>'
-      + cats.map(c => '<option' + (this.catFilter === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-
-    const filterHeading = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="mv-export">Export PDF</button></div></div>';
-    const filterCard = '<div class="card no-print"><div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
-      + '<div class="f" style="width:230px;flex-shrink:0;"><label>Count Period</label><select id="mv-period">' + periodOpts + '</select></div>'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Category</label><select id="mv-cat">' + catOpts + '</select></div>'
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="mv-clear">Clear</button></div>'
-      + '</div></div>';
+    // Period = a windowed stepper (‹ prev · current · next ›, like the Build
+    // Schedule week selector / Usage Report), so a long count history never
+    // becomes a wall of chips. No category filter — Trend vs Prior groups by
+    // category instead, and the rankings compare across every category by design.
+    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + this.periodStepper(cur)
+      + '<button class="btn btn-ghost btn-sm" id="mv-export">Export PDF</button>'
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + this.tabBar() + statsCard + filterHeading + filterCard + this.body(cur, prior) + '</div>';
+      + this.tabBar() + statsCard + filterArea + this.body(cur, prior) + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#mv-export')) { App.exportPDF({ title: 'Movement Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
+      if (ev.target.closest('#mv-period-prev')) { this.stepPeriod(-1); return; }
+      if (ev.target.closest('#mv-period-next')) { this.stepPeriod(1); return; }
+      if (ev.target.closest('#mv-period-latest')) { this.endCountId = null; this.draw(); return; }
+      const pchip = ev.target.closest('.mv-period-chip');
+      if (pchip) { this.endCountId = pchip.dataset.v; this.draw(); return; }
     };
-    document.getElementById('mv-period')?.addEventListener('change', e => { this.endCountId = e.target.value; this.draw(); });
-    document.getElementById('mv-cat')?.addEventListener('change', e => { this.catFilter = e.target.value; this.draw(); });
-    document.getElementById('mv-clear')?.addEventListener('click', () => { this.catFilter = ''; this.draw(); });
+  },
+
+  // Windowed period stepper: the selected period plus an adjacent neighbor,
+  // flanked by step arrows, the newest tagged NOW, with a Latest snap. Mirrors
+  // the Build Schedule week selector / Usage Report so a long count history
+  // stays compact instead of becoming a wall of chips.
+  periodStepper(cur) {
+    const periods = this.pairs().map(p => ({ endId: p.endC.id, label: this.fmtDate(p.startC.date) + ' → ' + this.fmtDate(p.endC.date) }));
+    const len = periods.length;
+    let selIdx = periods.findIndex(p => p.endId === cur.endC.id);
+    if (selIdx < 0) selIdx = len - 1;
+    const chip = i => {
+      const p = periods[i];
+      const on = i === selIdx, isNewest = i === len - 1;
+      return '<button type="button" class="mv-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + esc(p.label)
+        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
+        + '</button>';
+    };
+    // Always show two adjacent periods: the selected sits on the right with its
+    // older neighbor on the left, except at the oldest end where it sits left.
+    let winStart = selIdx - 1;
+    if (winStart < 0) winStart = 0;
+    if (winStart > len - 2) winStart = Math.max(0, len - 2);
+    let chips = '';
+    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
+    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
+    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="mv-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
+      + chips
+      + '<button class="btn btn-ghost btn-sm" id="mv-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
+      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="mv-period-latest" style="margin-left:4px;">Latest</button>' : '')
+      + '</div>';
+  },
+
+  // Step the selected period one older (-1) or newer (+1) through the count list.
+  stepPeriod(delta) {
+    const ids = this.pairs().map(p => p.endC.id);  // end-count ids, oldest → newest
+    if (!ids.length) return;
+    let idx = ids.indexOf(this.endCountId);
+    if (idx < 0) idx = ids.length - 1;
+    const ni = idx + delta;
+    if (ni < 0 || ni >= ids.length) return;
+    this.endCountId = ids[ni];
+    this.draw();
   },
 
   body(cur, prior) {
-    const rows = this.byCat(this.computeForPair(cur.startC, cur.endC));
+    const rows = this.computeForPair(cur.startC, cur.endC);
     if (this.tab === 'trend')  return this.tabTrend(rows, prior);
     if (this.tab === 'vendor') return this.tabVendor(rows);
     if (this.tab === 'slow')   return this.tabRank(rows, false);
@@ -209,21 +259,22 @@ S.InventoryMoversReport = {
   },
 
   tabTrend(curRows, prior) {
+    const headers = '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
     if (!prior) return this.note('Trend needs a prior count period. Submit a third count to compare two periods.');
-    const priorRows = this.byCat(this.computeForPair(prior.startC, prior.endC));
+    const priorRows = this.computeForPair(prior.startC, prior.endC);
     const priorMap = {};
     priorRows.forEach(r => priorMap[r.pid] = r.used);
     const rows = curRows.map(r => {
       const prev = priorMap[r.pid];
       const change = prev != null ? r.used - prev : null;
       const changePct = prev ? change / prev * 100 : null;
-      return { name: r.name, unit: App.unitAbbr(App.productUnit(r.product)), prev: prev != null ? prev : null, cur: r.used, change, changePct };
-    }).sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
-    const headers = '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
-    if (!rows.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No products moved in this period and filter.</td></tr>');
+      return { name: r.name, category: r.category, unit: App.unitAbbr(App.productUnit(r.product)), prev: prev != null ? prev : null, cur: r.used, change, changePct };
+    });
+    if (!rows.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No products moved in this period.</td></tr>');
     // Direction shown by an arrow + sign; usage going up or down is an observation
     // to read, not inherently good or bad, so the value stays neutral (no color).
-    const body = rows.map(r => {
+    const restHeaders = '<th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
+    const rowHtml = r => {
       const arrow = r.change == null ? '' : r.change > 0.05 ? '&#9650; ' : r.change < -0.05 ? '&#9660; ' : '';
       const u = r.unit ? ' ' + r.unit : '';
       return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
@@ -232,7 +283,19 @@ S.InventoryMoversReport = {
         + '<td>' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
         + '<td>' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
         + '</tr>';
+    };
+    // Group by category (CAT_ORDER first, extras after), biggest swing first
+    // within each, the category name in the first header — mirrors Usage Data.
+    const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const byCat = {};
+    rows.forEach(r => { const c = r.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
+    return cats.map(c => {
+      const catRows = byCat[c].slice().sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
+      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''), this.trendColgroup());
     }).join('');
-    return this.dataCard(headers, body);
   }
 };
