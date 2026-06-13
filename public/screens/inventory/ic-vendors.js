@@ -50,7 +50,7 @@ S.InventoryVendors = {
       { p: ['Vendors are the distributors and suppliers you order from. Set each one up here with a rep, contact info, and payment terms. Products link to a vendor by name, so once a vendor exists you can set it as the Primary Vendor on the products it delivers.'] },
       { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever contact details you have. Only the name is required. Payment terms and delivery days help you plan orders and spot a vendor who slips on either. Save and the vendor is ready to attach to products.'] },
       { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, and account number all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
-      { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything.'] },
+      { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything. If a name is a typo or a vendor you do not actually order from, tap Delete to clear it off those products and drop it from the list.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
       { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds Profit Recovery Vendor Watch and the Vendor Scorecard, so a vendor quietly raising prices shows up before it eats your margin.'] }
     ]);
@@ -132,7 +132,10 @@ S.InventoryVendors = {
     const rows = pending.map(pv => '<tr>'
       + '<td><div class="val">' + esc(pv.name) + '</div></td>'
       + '<td>' + pv.count + ' product' + (pv.count === 1 ? '' : 's') + '</td>'
-      + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm iv-setup" data-name="' + esc(pv.name) + '">Set Up</button></div></td>'
+      + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm iv-setup" data-name="' + esc(pv.name) + '">Set Up</button>'
+        + '<button class="btn btn-ghost btn-sm iv-pdel" data-name="' + esc(pv.name) + '" style="color:var(--red);">Delete</button>'
+      + '</div></td>'
       + '</tr>').join('');
     return '<div class="sh" style="margin-top:24px;">Set Up From Your Products</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -160,6 +163,7 @@ S.InventoryVendors = {
       modeBody = this.formFieldsHTML(null);
       actionRow = '<div class="no-print" data-collapse-group="ic-vendors" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="iv-save">Save Vendor</button>'
+        + '<button class="btn btn-ghost" id="iv-startover">Start Over</button>'
         + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
     }
@@ -179,15 +183,19 @@ S.InventoryVendors = {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       const save  = ev.target.closest('#iv-save');
+      const reset = ev.target.closest('#iv-startover');
       const open  = ev.target.closest('.iv-open');
       const edit  = ev.target.closest('.iv-edit');
       const del   = ev.target.closest('.iv-del');
       const setup = ev.target.closest('.iv-setup');
-      if (setup)     this.startSetup(setup.dataset.name);
-      else if (save) this.saveVendor();
-      else if (open) this.openEdit(open.dataset.id);
-      else if (edit) this.openEdit(edit.dataset.id);
-      else if (del)  this.confirmDel(del.dataset.id);
+      const pdel  = ev.target.closest('.iv-pdel');
+      if (setup)      this.startSetup(setup.dataset.name);
+      else if (pdel)  this.deletePending(pdel.dataset.name);
+      else if (save)  this.saveVendor();
+      else if (reset) this.startOver();
+      else if (open)  this.openEdit(open.dataset.id);
+      else if (edit)  this.openEdit(edit.dataset.id);
+      else if (del)   this.confirmDel(del.dataset.id);
     };
     App.applyCollapsed(this.container);
     if (this.entryMode === 'import') this.mountImporter();
@@ -206,6 +214,38 @@ S.InventoryVendors = {
     this.entryMode = 'manual';
     this._setupName = name;
     try { localStorage.removeItem(App._collapseKey('ic-vendors')); } catch (e) {}
+    this.renderList();
+  },
+
+  // Start Over on the add form: empty every field (and any prefilled Set Up name)
+  // back to a clean form, the card stays open.
+  startOver() {
+    this._setupName = null;
+    ['iv-name', 'iv-rep', 'iv-phone', 'iv-email', 'iv-days', 'iv-account', 'iv-notes'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const terms = document.getElementById('iv-terms'); if (terms) terms.value = '';
+    const err = document.getElementById('iv-err'); if (err) { err.style.display = 'none'; err.textContent = ''; }
+    document.getElementById('iv-name')?.focus();
+  },
+
+  // Remove a pending product-vendor: it exists only because products carry the
+  // name, so removing it clears the vendor off those products. The products stay;
+  // only the vendor link is cleared, which drops the pending row.
+  async deletePending(name) {
+    const matches = this.products().filter(p => (p.vendor || '').trim() === name);
+    const n = matches.length;
+    const ok = await App.confirm({
+      title: 'Remove this vendor from your products?',
+      message: '"' + name + '" is on ' + n + ' product' + (n === 1 ? '' : 's') + '. Removing it clears the vendor on '
+        + (n === 1 ? 'that product' : 'those products') + '. The product' + (n === 1 ? '' : 's')
+        + ' stay; only the vendor link is cleared.',
+      confirmText: 'Remove Vendor',
+      danger: true
+    });
+    if (!ok) return;
+    matches.forEach(p => { p.vendor = ''; });
+    await App.saveInventory();
     this.renderList();
   },
 
