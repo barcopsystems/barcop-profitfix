@@ -50,6 +50,7 @@ S.InventoryVendors = {
       { p: ['Vendors are the distributors and suppliers you order from. Set each one up here with a rep, contact info, and payment terms. Products link to a vendor by name, so once a vendor exists you can set it as the Primary Vendor on the products it delivers.'] },
       { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever contact details you have. Only the name is required. Payment terms and delivery days help you plan orders and spot a vendor who slips on either. Save and the vendor is ready to attach to products.'] },
       { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, and account number all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
+      { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
       { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds Profit Recovery Vendor Watch and the Vendor Scorecard, so a vendor quietly raising prices shows up before it eats your margin.'] }
     ]);
@@ -104,8 +105,39 @@ S.InventoryVendors = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + this.pendingSectionHTML() + listSection + '</div>';
     this.wireList();
+  },
+
+  // Vendor names that sit on products but have no vendor record yet. Products
+  // reference a vendor by name, so a name on a product with no matching record is
+  // a "pending" vendor the operator can finish setting up. Grouped by name with a
+  // product count, most-used first. ([[two-doors-same-data]]: the name is the
+  // canonical identity; Set Up promotes it to a full record, no relinking needed.)
+  pendingVendors() {
+    const have = new Set(this.vendors().map(v => (v.name || '').trim().toLowerCase()));
+    const counts = {};
+    this.products().forEach(p => {
+      const name = (p.vendor || '').trim();
+      if (!name || have.has(name.toLowerCase())) return;
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return Object.keys(counts).map(name => ({ name, count: counts[name] }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  },
+
+  pendingSectionHTML() {
+    const pending = this.pendingVendors();
+    if (!pending.length) return '';
+    const rows = pending.map(pv => '<tr>'
+      + '<td><div class="val">' + esc(pv.name) + '</div></td>'
+      + '<td>' + pv.count + ' product' + (pv.count === 1 ? '' : 's') + '</td>'
+      + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm iv-setup" data-name="' + esc(pv.name) + '">Set Up</button></div></td>'
+      + '</tr>').join('');
+    return '<div class="sh" style="margin-top:24px;">Set Up From Your Products</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Vendor</th><th>On Products</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
   // A segmented toggle swaps the card body between typing one vendor and dropping
@@ -146,17 +178,35 @@ S.InventoryVendors = {
       if (mode) { this.entryMode = mode.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
-      const save = ev.target.closest('#iv-save');
-      const open = ev.target.closest('.iv-open');
-      const edit = ev.target.closest('.iv-edit');
-      const del  = ev.target.closest('.iv-del');
-      if (save)      this.saveVendor();
+      const save  = ev.target.closest('#iv-save');
+      const open  = ev.target.closest('.iv-open');
+      const edit  = ev.target.closest('.iv-edit');
+      const del   = ev.target.closest('.iv-del');
+      const setup = ev.target.closest('.iv-setup');
+      if (setup)     this.startSetup(setup.dataset.name);
+      else if (save) this.saveVendor();
       else if (open) this.openEdit(open.dataset.id);
       else if (edit) this.openEdit(edit.dataset.id);
       else if (del)  this.confirmDel(del.dataset.id);
     };
     App.applyCollapsed(this.container);
     if (this.entryMode === 'import') this.mountImporter();
+    // Coming from a "Set Up" click: prefill the name into the (manual) add form.
+    else if (this._setupName) {
+      const nameEl = document.getElementById('iv-name');
+      if (nameEl) nameEl.value = this._setupName;
+      document.getElementById('iv-rep')?.focus();
+      this._setupName = null;
+    }
+  },
+
+  // Set Up a pending product-vendor: open the manual add form with its name
+  // prefilled (force the card expanded), so the operator just adds the details.
+  startSetup(name) {
+    this.entryMode = 'manual';
+    this._setupName = name;
+    try { localStorage.removeItem(App._collapseKey('ic-vendors')); } catch (e) {}
+    this.renderList();
   },
 
   // ── CSV / Excel vendor-list import (drag-drop + column mapping) ──────────────
