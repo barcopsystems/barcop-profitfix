@@ -294,7 +294,8 @@ S.InventoryProducts = {
       { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
       { h: 'Other Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
-      { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] }
+      { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
+      { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] }
     ]);
   },
 
@@ -383,6 +384,7 @@ S.InventoryProducts = {
       const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
         + '<button class="btn btn-ghost btn-sm ip-sel-all">Select All</button>'
         + '<button class="btn btn-ghost btn-sm ip-sel-clear">Clear</button>'
+        + (selCount > 0 ? '<button class="btn btn-ghost btn-sm ip-sel-edit">Bulk Edit ' + selCount + ' Selected</button>' : '')
         + (selCount > 0 ? '<button class="btn btn-danger btn-sm ip-sel-del">Delete ' + selCount + ' Selected</button>' : '')
         + '</div>';
 
@@ -428,6 +430,7 @@ S.InventoryProducts = {
       const dismiss = ev.target.closest('.ip-alert-dismiss');
       const selAll  = ev.target.closest('.ip-sel-all');
       const selClr  = ev.target.closest('.ip-sel-clear');
+      const selEdit = ev.target.closest('.ip-sel-edit');
       const selDel  = ev.target.closest('.ip-sel-del');
       const selBox  = ev.target.closest('.ip-sel');
 
@@ -439,6 +442,7 @@ S.InventoryProducts = {
       if (dismiss) { ev.stopPropagation(); (this._dismissedAlerts = this._dismissedAlerts || new Set()).add(this.activeCat); this.renderLanding(); return; }
       if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.products().filter(p => (p.category || '') === this.activeCat).map(p => p.id)); this.renderLanding(); return; }
       if (selClr)  { ev.stopPropagation(); this._selected = new Set(); this.renderLanding(); return; }
+      if (selEdit) { ev.stopPropagation(); this.openBulkEdit(); return; }
       if (selDel)  { ev.stopPropagation(); this.confirmDel([...(this._selected || [])]); return; }
       if (selBox)  { const id = selBox.dataset.id; this._selected = this._selected || new Set(); if (this._selected.has(id)) this._selected.delete(id); else this._selected.add(id); this.renderLanding(); return; }
     };
@@ -989,6 +993,169 @@ S.InventoryProducts = {
     if (this._selected) ids.forEach(id => this._selected.delete(id));
     await App.saveInventory();
     this.renderLanding();
+  },
+
+  // ── Bulk edit (set the same field across many selected products) ─────────────
+  // After an upload you often need one value on a whole category (a 1.5 oz pour
+  // on every liquor, one vendor or location across a list). Selection is scoped
+  // to the active category tab, so the form shows that category's exact fields.
+  // Only fields whose Apply box is checked are written; everything else stays.
+
+  // The bulk-applicable fields per category (cost stays out — it is per-product).
+  bulkFieldDefs(cat, spec) {
+    const defs = [];
+    if (spec.sizeGroup || spec.showCaseSize) defs.push({ key: 'size', label: spec.sizeLabel || 'Size', type: 'size' });
+    if (spec.showPour)      defs.push({ key: 'pour', label: spec.pourLabel || 'Pour Size', type: 'oz' });
+    if (spec.showCaseSize)  defs.push({ key: 'case', label: 'Case Size', type: 'int', suffix: 'btl' });
+    if (spec.showUnitType)  defs.push({ key: 'unit', label: 'Unit Type', type: 'unit' });
+    if (spec.showMenuPrice) defs.push({ key: 'price', label: 'Menu Price', type: 'money' });
+    defs.push({ key: 'vendor',  label: 'Primary Vendor',   type: 'vendor' });
+    defs.push({ key: 'loc',     label: 'Primary Location', type: 'location' });
+    defs.push({ key: 'par',     label: 'Par' + (spec.parUnit ? ' (' + spec.parUnit + ')' : ''),     type: 'int' });
+    defs.push({ key: 'reorder', label: 'Reorder' + (spec.parUnit ? ' (' + spec.parUnit + ')' : ''), type: 'int' });
+    return defs;
+  },
+
+  bulkInputHTML(def, spec) {
+    const k = def.key;
+    if (def.type === 'size') {
+      return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup) + '</select>'
+        + '<div id="be-cw" style="display:none;margin-top:6px;"><div class="fw"><input class="suf be-input" type="number" id="be-coz" step="0.1" data-key="size"/><span class="suf">oz</span></div></div>';
+    }
+    if (def.type === 'oz')   return '<div class="fw"><input class="suf be-input" type="number" id="be-' + k + '" step="0.25" data-key="' + k + '"/><span class="suf">oz</span></div>';
+    if (def.type === 'money') return '<div class="fw"><span class="pre">$</span><input class="pre be-input" type="number" id="be-' + k + '" step="0.25" data-key="' + k + '" placeholder="0.00"/></div>';
+    if (def.type === 'int') {
+      return def.suffix
+        ? '<div class="fw"><input class="suf be-input" type="number" id="be-' + k + '" step="1" min="0" data-key="' + k + '"/><span class="suf">' + esc(def.suffix) + '</span></div>'
+        : '<input type="number" class="be-input" id="be-' + k + '" step="1" min="0" data-key="' + k + '"/>';
+    }
+    if (def.type === 'unit') {
+      let opts = '<option value="">Select unit...</option>';
+      this.UNIT_TYPES.forEach(u => { opts += '<option value="' + u + '">' + u + '</option>'; });
+      opts += '<option value="custom">Custom (type one)</option>';
+      return '<select id="be-unit" class="be-input" data-key="unit">' + opts + '</select>'
+        + '<div id="be-uw" style="display:none;margin-top:6px;"><input type="text" class="be-input" id="be-unit-custom" placeholder="gal, dozen, etc." data-key="unit"/></div>';
+    }
+    if (def.type === 'vendor')   return '<select id="be-vendor" class="be-input" data-key="vendor">' + this.vendorOpts(null) + '</select>';
+    if (def.type === 'location') return '<select id="be-loc" class="be-input" data-key="loc">' + this.locationOpts(null) + '</select>';
+    return '';
+  },
+
+  openBulkEdit() {
+    const ids = [...(this._selected || [])];
+    if (!ids.length) return;
+    const cat = this.activeCat;
+    const spec = this.FORM_SPEC[cat] || this.FORM_SPEC['Misc'];
+    const n = ids.length;
+    const fieldsHTML = this.bulkFieldDefs(cat, spec).map(def =>
+      '<div class="f">'
+      + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">'
+        + '<input type="checkbox" class="be-apply" data-key="' + def.key + '" style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/>'
+        + '<span>' + esc(def.label) + '</span>'
+      + '</label>'
+      + this.bulkInputHTML(def, spec)
+      + '</div>').join('');
+    const body = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Bulk Edit ' + n + ' ' + esc(cat) + ' Product' + (n === 1 ? '' : 's') + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 18px;">' + fieldsHTML + '</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="be-apply-btn">Apply to ' + n + ' Product' + (n === 1 ? '' : 's') + '</button>'
+        + '<button class="btn btn-ghost" id="be-cancel">Cancel</button>'
+        + '<span id="be-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>'
+    + '</div>';
+    App.openModal(body, { id: 'ip-bulk-modal', layer: 9000, maxWidth: 640, noClose: true });
+    this._wireBulk(cat, spec, ids);
+  },
+
+  _wireBulk(cat, spec, ids) {
+    document.getElementById('be-cancel')?.addEventListener('click', () => App.closeModal('ip-bulk-modal'));
+    document.getElementById('be-apply-btn')?.addEventListener('click', () => this.applyBulk(ids));
+    document.getElementById('be-size')?.addEventListener('change', e => {
+      const cw = document.getElementById('be-cw'); if (cw) cw.style.display = e.target.value === 'custom' ? '' : 'none';
+    });
+    document.getElementById('be-unit')?.addEventListener('change', e => {
+      const uw = document.getElementById('be-uw'); if (uw) uw.style.display = e.target.value === 'custom' ? '' : 'none';
+    });
+    // Touching a field auto-checks its Apply box (automate the obvious step).
+    document.querySelectorAll('.be-input').forEach(inp => {
+      inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+        const box = document.querySelector('.be-apply[data-key="' + inp.dataset.key + '"]');
+        if (box) box.checked = true;
+      });
+    });
+  },
+
+  async applyBulk(ids) {
+    const applied = {};
+    document.querySelectorAll('.be-apply').forEach(box => { if (box.checked) applied[box.dataset.key] = true; });
+    const err = document.getElementById('be-err');
+    if (!Object.keys(applied).length) {
+      if (err) { err.textContent = 'Turn on a field to apply, or Cancel.'; err.style.display = 'inline'; }
+      return;
+    }
+    const num = id => { const el = document.getElementById(id); if (!el) return null; const n = parseFloat(el.value); return isNaN(n) ? null : n; };
+    const intVal = id => { const el = document.getElementById(id); if (!el) return null; const n = parseInt(el.value); return isNaN(n) ? null : n; };
+    const getSize = () => {
+      const v = document.getElementById('be-size')?.value;
+      if (v === 'custom') return num('be-coz');
+      const n = parseFloat(v); return isNaN(n) ? null : n;
+    };
+    const getUnit = () => {
+      const v = document.getElementById('be-unit')?.value;
+      if (v === 'custom') return (document.getElementById('be-unit-custom')?.value || '').trim() || null;
+      return v || null;
+    };
+    const idSet = new Set(ids);
+    this.products().forEach(p => {
+      if (!idSet.has(p.id)) return;
+      if (applied.size)    p.container_size_oz = getSize();
+      if (applied.pour)    p.pour_size_oz = num('be-pour');
+      if (applied.case)    p.case_size = intVal('be-case');
+      if (applied.unit)    p.unit_type = getUnit();
+      if (applied.price)   p.menu_price = num('be-price');
+      if (applied.vendor)  p.vendor = (document.getElementById('be-vendor')?.value || '').trim();
+      if (applied.loc) {
+        const locVal = (document.getElementById('be-loc')?.value || '').trim();
+        const locSet = new Set(Array.isArray(p.locations) ? p.locations : []);
+        if (locVal) locSet.add(locVal);
+        p.locations = [...locSet];
+        let primary = locVal;
+        if (!primary || !p.locations.includes(primary)) primary = p.locations[0] || '';
+        p.primary_location = primary;
+      }
+      if (applied.par)     p.par_level = num('be-par');
+      if (applied.reorder) p.reorder_point = num('be-reorder');
+      this.recomputeDerived(p);
+    });
+    const btn = document.getElementById('be-apply-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
+    const ok = await App.saveInventory();
+    if (ok) {
+      App.closeModal('ip-bulk-modal');
+      this._selected = new Set();
+      this.renderLanding();
+    } else if (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Apply to ' + ids.length + ' Product' + (ids.length === 1 ? '' : 's'); }
+      err.textContent = 'Save failed. Try again.'; err.style.display = 'inline';
+    }
+  },
+
+  // Recompute a product's derived fields from its own values, matching save() and
+  // runImport() exactly (bottle beer divides the cost-per-case by case size; a
+  // non-pourable item has no pour, so its pour-based figures stay null).
+  recomputeDerived(p) {
+    const oz = p.container_size_oz || 0;
+    const pour = p.pour_size_oz || 0;
+    const price = p.menu_price || 0;
+    let effCost = p.unit_cost;
+    if (p.category === 'Bottle Beer' && p.case_size > 0 && p.unit_cost != null) effCost = p.unit_cost / p.case_size;
+    const pours = oz && pour ? oz / pour : null;
+    const cpp = pours && effCost != null && effCost > 0 ? effCost / pours : null;
+    const pct = cpp != null && price ? cpp / price * 100 : null;
+    p.pours_per_container = pours;
+    p.cost_per_pour = cpp;
+    p.pour_cost_pct = pct;
   },
 
   // ── Import (category-scoped CSV / Excel with column mapping) ──────────────
