@@ -274,8 +274,8 @@ const DB = {
     'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
     'cash-recon':'profit-recovery','theft-risk':'profit-recovery',
     'pour-test':'profit-recovery','yield-test':'profit-recovery',
-    'recipe-cost-analysis':'profit-recovery','vendor-watch':'profit-recovery',
-    'vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
+    'recipe-cost-analysis':'profit-recovery','vendor-tracker':'profit-recovery',
+    'vendor-watch':'profit-recovery','vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
     'reports':'profit-recovery','help':'_always',
     // Revenue Recovery
     'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
