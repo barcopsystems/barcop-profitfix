@@ -607,11 +607,11 @@ S.RevenueMenuItems = {
       + '<div class="sh" style="margin-top:4px;">' + (this.mode === 'food' ? 'Kitchen' : 'Bar') + ' Ingredients</div>'
       + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
+      + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
+        + '<div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">'
         + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="ri-cps">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="ri-cpct">-</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="ri-tgt-d">-</div></div>'
-      + '</div>';
+        + '</div></div>';
 
     this.renderRows();
     this.calcRecipe();
@@ -633,13 +633,13 @@ S.RevenueMenuItems = {
         const lineCost = qty * (basis.costPerUnit || 0);
         const costD = basis.costPerUnit > 0 ? App.fmtCurrency(basis.costPerUnit) : (r.id ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = lineCost > 0 ? App.fmtCurrency(lineCost) : '-';
-        return '<tr>'
-          + '<td style="min-width:220px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
+        return '<tr class="mi-ing-line">'
+          + '<td style="min-width:200px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
           + '<td style="width:90px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
-          + '<td style="width:80px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
-          + '<td style="width:100px;font-size:12px;">' + costD + '</td>'
-          + '<td style="width:100px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
-          + '<td style="width:36px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '" style="padding:4px 8px;">&times;</button></td>'
+          + '<td style="width:70px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
+          + '<td style="width:90px;font-size:12px;">' + costD + '</td>'
+          + '<td style="width:90px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
+          + '<td style="width:80px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '">Delete</button></td>'
           + '</tr>';
       }).join('') + '</tbody></table></div>';
 
