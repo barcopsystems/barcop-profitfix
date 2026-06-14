@@ -92,6 +92,17 @@ S.VendorTracker = {
       + theadHtml + '<tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
 
+  // Shared day-based range chips (the Scorecard's set) + an Export button, used
+  // on all three tabs. Filters by startDate(); 'all' = no cutoff. this.range is
+  // shared, so the window carries across tabs.
+  RANGES: [['30', 'Last 30 Days'], ['90', 'Last 90 Days'], ['180', 'Last 6 Months'], ['365', 'Last 12 Months'], ['all', 'All Time']],
+  rangeFilterRow(exportId) {
+    const chips = App.filterChips(this.range, this.RANGES.map(([v, label]) => ({ v, label })), 'vt-range-chip');
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + chips + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="' + exportId + '">Export PDF</button></div>';
+  },
+
   // ════════════════════════════════════════════════════════════════════
   //  SCORECARD TAB
   // ════════════════════════════════════════════════════════════════════
@@ -161,12 +172,7 @@ S.VendorTracker = {
       + this.statItem('Recovered', App.fmtCurrency(totalRecovered), 'good')
     );
 
-    const RANGE = [['30', 'Last 30 Days'], ['90', 'Last 90 Days'], ['180', 'Last 6 Months'], ['365', 'Last 12 Months'], ['all', 'All Time']];
-    const chips = App.filterChips(this.range, RANGE.map(([v, label]) => ({ v, label })), 'vt-range-chip');
-    const filterRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + chips + '</div>'
-      + '<button class="btn btn-ghost btn-sm" id="vt-sc-export">Export PDF</button>'
-      + '</div>';
+    const filterRow = this.rangeFilterRow('vt-sc-export');
 
     // Vendors ranked by total impact so the pain-causers surface first.
     const sorted = metrics.slice().sort((a, b) =>
@@ -234,19 +240,21 @@ S.VendorTracker = {
   },
 
   watchBody() {
-    const changes = this.priceChanges().map(c => {
+    const all = this.priceChanges().map(c => {
       const delta = c.new - c.old;
       const pct = c.old > 0 ? delta / c.old * 100 : 0;
       const au = this.annualUsage(c.product_id);
       return { ...c, delta, pct, annual: au != null ? delta * au : null };
     });
 
-    if (!changes.length) {
+    if (!all.length) {
       return '<div class="card"><div class="empty"><div class="empty-title">No vendor price changes yet</div>'
         + '<div class="empty-sub">Price changes are captured automatically when a delivery\'s invoice price differs from the product\'s current cost. Record deliveries in Inventory Control and any drift shows up here, with what it costs you per year.</div>'
         + '</div></div>';
     }
 
+    const start = this.startDate();
+    const changes = all.filter(c => !start || (c.date || '') >= start);
     const totalAnnual = changes.reduce((s, c) => s + (c.annual || 0), 0);
     const increases = changes.filter(c => c.delta > 0).length;
 
@@ -255,9 +263,7 @@ S.VendorTracker = {
       + this.statItem('Total Annual Impact', (totalAnnual > 0 ? '+' : '') + App.fmtCurrency(totalAnnual) + '/yr', totalAnnual > 0 ? 'warn' : (totalAnnual < 0 ? 'good' : ''))
     );
 
-    const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vt-w-export">Export PDF</button>'
-      + '</div>';
+    const filterRow = this.rangeFilterRow('vt-w-export');
 
     const rows = changes.map(c => '<tr>'
       + '<td>' + this.fmtDate(c.date) + '</td>'
@@ -268,13 +274,15 @@ S.VendorTracker = {
       + '<td class="' + (c.delta > 0 ? 'neg' : 'pos') + '">' + (c.delta > 0 ? '+' : '') + App.fmtPct(c.pct) + '</td>'
       + '<td class="' + (c.annual == null ? '' : c.annual > 0 ? 'neg' : 'pos') + '">'
         + (c.annual == null ? '<span style="color:var(--t4);">-</span>' : (c.annual > 0 ? '+' : '') + App.fmtCurrency(c.annual) + '/yr') + '</td>'
-      + '</tr>').join('');
+      + '</tr>').join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No price changes in this range. Pick a wider range above.</td></tr>';
 
     const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Product</th><th>Previous Cost</th><th>New Cost</th><th>Change %</th><th>Annual Impact</th></tr></thead>';
-    return stats + headRow + this.dataCard(thead, rows);
+    return stats + filterRow + this.dataCard(thead, rows);
   },
 
   wireWatch() {
+    this.container.querySelectorAll('.vt-range-chip').forEach(b =>
+      b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-w-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Price Changes', root: this.container }));
   },
@@ -289,7 +297,9 @@ S.VendorTracker = {
   },
 
   discrepanciesBody() {
-    const rows = this.discRecords().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const allRows = this.discRecords().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const start = this.startDate();
+    const rows = allRows.filter(r => !start || (r.date || '') >= start);
     const open = rows.filter(r => r.status !== 'Resolved');
     const openTotal = open.reduce((s, r) => s + (r.overcharge || 0), 0);
     const recovered = rows.filter(r => r.status === 'Resolved').reduce((s, r) => s + ((r.recovered_amount != null ? r.recovered_amount : r.overcharge) || 0), 0);
@@ -300,14 +310,15 @@ S.VendorTracker = {
       + this.statItem('Recovered', App.fmtCurrency(recovered), 'good')
     );
 
-    const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vt-disc-export">Export PDF</button>'
-      + '</div>';
+    const filterRow = this.rangeFilterRow('vt-disc-export');
 
     let body;
     if (!rows.length) {
-      body = '<div class="card"><div class="empty"><div class="empty-title">No discrepancies filed</div>'
-        + '<div class="empty-sub">When a delivery is short or a price is wrong, file it here. Every discrepancy you document is a credit you can request. Contact the rep within 24 hours; they age out fast.</div></div></div>';
+      body = allRows.length
+        ? '<div class="card"><div class="empty"><div class="empty-title">No discrepancies in this range</div>'
+          + '<div class="empty-sub">Pick a wider range above, or All Time, to see every claim.</div></div></div>'
+        : '<div class="card"><div class="empty"><div class="empty-title">No discrepancies filed</div>'
+          + '<div class="empty-sub">When a delivery is short or a price is wrong, file it here. Every discrepancy you document is a credit you can request. Contact the rep within 24 hours; they age out fast.</div></div></div>';
     } else {
       const trs = rows.slice(0, App.listLimit('core', 'vendor_discrepancy')).map(r => {
         const act = r.status === 'Open'
@@ -330,10 +341,12 @@ S.VendorTracker = {
       body = this.dataCard(thead, trs) + App.showOlderBar('core', 'vendor_discrepancy', rows, false);
     }
 
-    return stats + headRow + body;
+    return stats + filterRow + body;
   },
 
   wireDiscrepancies() {
+    this.container.querySelectorAll('.vt-range-chip').forEach(b =>
+      b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
     this.container.querySelectorAll('.vt-credit').forEach(b => b.addEventListener('click', () => this.requestCredit(b.dataset.id)));
