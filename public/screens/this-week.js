@@ -170,6 +170,13 @@ S.ThisWeek = {
     this.container = container;
     if (actions) actions.innerHTML = '';
     if (!this._weekEnd) this.loadWeek(this.currentWeekEnd());
+    // One-shot deep-link from Reports and History "Edit in This Week": load the
+    // requested saved week into the grid for editing, then clear the handoff.
+    if (this._focusWeekId) {
+      const fw = (App.data.weeks || []).find(x => x.id === this._focusWeekId);
+      this._focusWeekId = null;
+      if (fw) this.loadWeek(fw.period_end);
+    }
     this.draw();
   },
 
