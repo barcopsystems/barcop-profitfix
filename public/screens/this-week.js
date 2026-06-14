@@ -236,7 +236,7 @@ S.ThisWeek = {
       : '<button type="button" id="tw-add-catering" style="background:none;border:none;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;padding:0;">+ Add catering / events</button>';
     return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:14px 18px;border-bottom:1px solid var(--b2);font-size:13px;font-weight:600;color:var(--t1);">Confirm the Week</div>'
-      + '<table class="ing-tbl"><thead><tr>'
+      + '<table class="ing-tbl tw-grid"><thead><tr>'
       + '<th>Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th>Cost %</th><th>vs Target</th>'
       + '</tr></thead><tbody>'
       + this.lineRow('Bar', 'b', d.bar)
