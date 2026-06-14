@@ -46,6 +46,20 @@ S.TheftRisk = {
   },
   _totalFlags(d) { return d.voids.count + d.shorts.count + d.spots.count + d.largeComps.count + d.theft.count; },
 
+  // Recent flag events as a flat list, so the Hub alert and the Open-the-Floor
+  // warning read the same definition of a "flag" (one source). severe = confirmed
+  // theft or an over-threshold comp with no auth (the ones that should not hide).
+  recentFlags(fromStr) {
+    const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
+    const out = [];
+    this.voidComps().forEach(r => { if ((!r.authorized_by || !String(r.authorized_by).trim()) && inRange(r.date)) out.push({ date: String(r.date).slice(0, 10), severe: false }); });
+    this.variances().forEach(v => { if (v.status === 'Short' && inRange(v.date)) out.push({ date: String(v.date).slice(0, 10), severe: false }); });
+    this.spotChecks().forEach(c => { if (inRange(c.date)) (c.items || []).forEach(it => { if (it.flagged) out.push({ date: String(c.date).slice(0, 10), severe: false }); }); });
+    ((App.shiftData && App.shiftData.sc_void_comps) || []).forEach(r => { if (r.auth_threshold_override === true && inRange(r.date)) out.push({ date: String(r.date).slice(0, 10), severe: true }); });
+    this.adjustments().forEach(a => { const d = (a.date_time || '').slice(0, 10); if (a.reason === 'Theft' && inRange(d)) out.push({ date: d, severe: true }); });
+    return out;
+  },
+
   // ── Entry ─────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
