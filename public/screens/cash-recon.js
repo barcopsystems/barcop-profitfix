@@ -91,7 +91,7 @@ S.CashRecon = {
         + '</tr>';
     }).join('') || '<tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No drawer counts in this range. Pick a wider range above.</td></tr>';
 
-    return '<div class="sh" style="margin:22px 0 10px;">' + heading + '</div>'
+    return (heading ? '<div class="sh" style="margin:22px 0 10px;">' + heading + '</div>' : '')
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
       + this.COLGROUP
       + '<thead><tr><th>' + firstLabel + '</th><th>Counts</th><th>Short</th><th>Net Over / Short</th><th>Short Rate</th><th>Status</th></tr></thead>'
@@ -156,7 +156,7 @@ S.CashRecon = {
       + '</div>';
 
     // ── By Cashier + By Register (ranked worst-first by short rate) ──
-    const byCashier  = this.buildCard('By Cashier',  'Cashier',  this.aggregate(variances, v => v.cashier));
+    const byCashier  = this.buildCard('',  'Cashier',  this.aggregate(variances, v => v.cashier));
     const byRegister = this.buildCard('By Register', 'Register', this.aggregate(variances, v => v.drawer));
 
     this.container.innerHTML = '<div class="screen">' + statStrip + filterRow + custom + byCashier + byRegister + '</div>';
