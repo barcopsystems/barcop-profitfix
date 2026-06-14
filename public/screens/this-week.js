@@ -1,17 +1,17 @@
 'use strict';
 
-/* ── Profit Recovery — This Week (weekly confirm screen) ──────────────────────
-   Thin weekly entry: Period, Bar, Food. COGS auto-fills from Inventory Control;
-   Revenue auto-fills from Shift Control and Labor from Labor Control once those
-   modules are built. Every field is editable as an override. Saves to
-   App.data.weeks. Inventory counts and variance are owned by Inventory Control. */
+/* ── Profit Recovery — This Week (weekly confirm) ─────────────────────────────
+   The week is pulled in from Control (revenue from Shift, COGS from Inventory,
+   labor from Labor) and the operator confirms it. The page leads with the money
+   picture (total revenue, prime cost vs target, the one thing off target) and
+   collapses entry into a single confirm grid. Every field stays editable as an
+   override; "Pull from Control" re-pulls all of them at once. Saves to
+   App.data.weeks. */
 
 S.ThisWeek = {
   draft: null,
+  _showCatering: false,
   DRAFT_KEY: 'pf_draft',
-  // Bar / Kitchen category lists read from App canonical (see app.js BAR_CATS
-  // / KITCHEN_CATS) so the lists never drift across the three Profit Recovery
-  // screens that read them.
   get BAR_CATS()     { return App.BAR_CATS; },
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
@@ -49,7 +49,6 @@ S.ThisWeek = {
   hasShifts() {
     return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
   },
-  // sum bar/floor shift revenue for the 7-day week ending at periodEnd
   shiftRevenue(periodEnd) {
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
     if (!shifts.length || !periodEnd) return null;
@@ -71,7 +70,6 @@ S.ThisWeek = {
   hasLabor() {
     return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
   },
-  // sum logged labor cost for the 7-day week ending at periodEnd, split bar vs food
   laborCost(periodEnd) {
     if (!periodEnd) return null;
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
@@ -88,14 +86,13 @@ S.ThisWeek = {
       if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
       else food += a.cost || 0;
     });
-    // Salaried (exempt) staff cost a fixed weekly amount regardless of hours.
     const sal = App.salariedCost(start, periodEnd);
     bar += sal.bar; food += sal.food;
     if (sal.total > 0) any = true;
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
-  // ── Draft ─────────────────────────────────────────────────────────────────
+  // ── Draft (in-localStorage, survives navigate-away; cleared on Save / Start Over) ──
   loadDraft() {
     try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
@@ -107,19 +104,19 @@ S.ThisWeek = {
       period_end: periodEnd,
       bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
       food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
-      // Catering: optional third revenue stream for operators who do
-      // off-premise events. Operators who don't cater leave it blank — it
-      // adds zero to totals so it's invisible if unused.
       catering: { revenue: '', cogs: '', labor: '' },
-      // 3rd-party platform fees (DoorDash, UberEats, Toast Tabs, etc).
-      // Operating cost, NOT part of prime cost or COGS. Sits as its own line
-      // on Books and Year-End. Operators who don't do delivery leave blank.
       platform_fees: '',
       notes: ''
     };
   },
   saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
   clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} this.draft = null; },
+
+  cateringActive(d) {
+    if (this._showCatering) return true;
+    const c = d && d.catering;
+    return !!(c && (parseFloat(c.revenue) || parseFloat(c.cogs) || parseFloat(c.labor)));
+  },
 
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
@@ -129,101 +126,99 @@ S.ThisWeek = {
     this.draw();
   },
 
-  feedNote(kind) {
-    if (kind === 'cogs') {
-      return this.hasIC()
-        ? 'Auto-filled from Inventory Control. <a href="#" onclick="S.ThisWeek.pullCOGS();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No inventory counts yet, count in Inventory Control, or enter manually.';
-    }
-    if (kind === 'revenue') {
-      return this.hasShifts()
-        ? 'Auto-filled from Shift Control, the weekly sum of logged shift revenue. <a href="#" onclick="S.ThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No shifts logged in Shift Control yet, log shifts there, or enter manually.';
-    }
-    if (kind === 'labor') {
-      return this.hasLabor()
-        ? 'Auto-filled from Labor Control, logged hours costed and split Bar vs Food. <a href="#" onclick="S.ThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No hours logged in Labor Control yet, log hours there, or enter manually.';
-    }
-    return '';
+  showHowTo() {
+    App.showHelpModal('How This Week Works', [
+      { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control (the week\'s logged shifts summed), COGS from Inventory Control (the week\'s counts and deliveries), and labor from Labor Control (actual hours costed and split bar versus food). You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
+      { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, and how the week tracked versus your forecast, all live. The Watch line calls out the single category most over target this week so you know where the money is going before you read a single cell. Prime cost is the headline number in a healthy operation, and labor is folded into it.'] },
+      { h: 'The Confirm Grid', p: ['One row per revenue stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and fully editable. Cost percent and the dollars over or under target compute live as you tweak. If a shift was missed or a count was partial, type the right number straight into the cell.'] },
+      { h: 'Pull From Control', p: ['Re-runs the Control math and refills every auto cell at once, for when you have logged more since you opened the page. If you have edited a cell by hand and it does not match what Control computed, Bar Cop asks before overwriting, so a deliberate override is never lost silently.'] },
+      { h: 'Catering And Platform Fees', p: ['Catering is an optional fourth stream for off-premise events; add the row only if you cater. It rolls into total revenue and prime cost like Bar and Food. Third-party platform fees (DoorDash, UberEats, Toast Tabs) are an operating cost, not part of prime cost, and sit as their own line on Books and Year-End. Leave both blank if they do not apply.'] }
+    ]);
   },
 
-  moneyField(id, label, value, kind) {
-    return '<div class="f w-md"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">' + this.feedNote(kind) + '</div></div>';
-  },
-
-  // Catering: optional third revenue line. Renders the same shape as the Bar
-  // / Food cards but with no Pull Latest links (no Control source feeds
-  // catering numbers — the operator types them) and no target % comparison
-  // (catering margin varies too widely by event type to anchor a single target).
-  cateringCard(data) {
-    const inputRow = (id, label, value) =>
-      '<div class="f w-md"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">Operator entry. Leave blank if you do not cater.</div></div>';
-    return '<div class="card"><div class="card-title">Catering / Events (optional)</div>'
-      + '<div class="form-row">'
-      + inputRow('tw-cr', 'Catering Revenue', data.revenue)
-      + inputRow('tw-cl', 'Catering Labor',   data.labor)
-      + inputRow('tw-cc', 'Catering COGS',    data.cogs)
+  // ── Money hero ──────────────────────────────────────────────────────────────
+  heroCard(d) {
+    const periodCtl = '<div style="display:flex;align-items:center;gap:16px;font-weight:400;letter-spacing:0;text-transform:none;">'
+      + '<span style="display:flex;align-items:center;gap:7px;"><span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Week</span>'
+      + '<input type="number" id="tw-wk" value="' + esc(String(d.week_num)) + '" min="1" style="width:62px;" oninput="S.ThisWeek.onInput()"/></span>'
+      + '<span style="display:flex;align-items:center;gap:7px;"><span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Ending</span>'
+      + '<input type="date" id="tw-end" value="' + esc(d.period_end) + '" style="width:152px;" oninput="S.ThisWeek.onInput()"/></span>'
+      + '</div>';
+    return '<div class="card form-card" style="margin-bottom:14px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>This Week</span>' + periodCtl + '</div>'
+      + '<div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val lg" id="tw-totrev">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Prime Cost</div><div class="calc-val lg" id="tw-prime">-</div><div style="font-size:11px;color:var(--t3);margin-top:3px;" id="tw-prime-sub">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val lg" id="tw-fcgap">-</div></div>'
       + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Catering Cost %</div><div class="calc-val" id="tw-cpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Catering Labor %</div><div class="calc-val" id="tw-clpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Gross Contribution</div><div class="calc-val" id="tw-ccontrib">-</div></div>'
-      + '</div></div>';
+      + '<div id="tw-watch" style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);"></div>'
+      + '</div>';
   },
 
-  sectionCard(title, prefix, data) {
-    return '<div class="card"><div class="card-title">' + title + '</div>'
-      + '<div class="form-row">'
-      + this.moneyField('tw-' + prefix + 'r', title + ' Revenue ' + tt('bar-revenue'), data.revenue, 'revenue')
-      + this.moneyField('tw-' + prefix + 'l', title + ' Labor ' + tt('bar-labor'), data.labor, 'labor')
-      + this.moneyField('tw-' + prefix + 'c', title + ' COGS ' + tt('bar-cogs'), data.cogs, 'cogs')
+  // ── Confirm grid ────────────────────────────────────────────────────────────
+  cell(id, val) {
+    return '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" oninput="S.ThisWeek.onInput()"/></div>';
+  },
+  lineRow(label, p, data) {
+    return '<tr class="tw-line">'
+      + '<td><div class="val">' + label + '</div></td>'
+      + '<td>' + this.cell(p + 'r', data.revenue) + '</td>'
+      + '<td>' + this.cell(p + 'l', data.labor) + '</td>'
+      + '<td>' + this.cell(p + 'c', data.cogs) + '</td>'
+      + '<td id="tw-' + p + 'pct">-</td>'
+      + '<td id="tw-' + p + 'vd" style="text-align:right;">-</td>'
+      + '</tr>';
+  },
+  gridCard(d) {
+    const cateringOn = this.cateringActive(d);
+    const footerLeft = cateringOn
+      ? '<button type="button" id="tw-remove-catering" style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:0;">Remove catering</button>'
+      : '<button type="button" id="tw-add-catering" style="background:none;border:none;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;padding:0;">+ Add catering / events</button>';
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--b2);">'
+      + '<div style="font-size:13px;font-weight:600;color:var(--t1);">Confirm the week</div>'
+      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Pull from Control</button>'
       + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Cost %</div><div class="calc-val" id="tw-' + prefix + 'pct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">' + title + ' Labor %</div><div class="calc-val" id="tw-' + prefix + 'lpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target %</div><div class="calc-val" id="tw-' + prefix + 'vpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target $</div><div class="calc-val" id="tw-' + prefix + 'vdol">-</div></div>'
+      + '<table class="ing-tbl"><thead><tr>'
+      + '<th>Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th>Cost %</th><th>vs Target</th>'
+      + '</tr></thead><tbody>'
+      + this.lineRow('Bar', 'b', d.bar)
+      + this.lineRow('Food', 'f', d.food)
+      + (cateringOn ? this.lineRow('Catering', 'c', d.catering || { revenue: '', cogs: '', labor: '' }) : '')
+      + '</tbody></table>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-top:1px solid var(--b2);flex-wrap:wrap;">'
+      + footerLeft
+      + '<div style="display:flex;align-items:center;gap:9px;"><label style="font-size:11px;color:var(--t2);">3rd-party platform fees</label>'
+      + '<div class="fw" style="width:140px;"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
       + '</div></div>';
   },
 
   draw() {
     const d = this.draft;
     this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title">Period</div>'
-      + '<div class="form-row">'
-      + '<div class="f" style="width:100px;"><label>Week # ' + tt('tw-week-num') + '</label><input type="number" id="tw-wk" value="' + esc(String(d.week_num)) + '" min="1" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date ' + tt('tw-period-end') + '</label><input type="date" id="tw-end" value="' + esc(d.period_end) + '" oninput="S.ThisWeek.onInput()"/></div>'
-      + '</div></div>'
-      + this.sectionCard('Bar', 'b', d.bar)
-      + this.sectionCard('Food', 'f', d.food)
-      + this.cateringCard(d.catering || { revenue: '', cogs: '', labor: '' })
-      + '<div class="card"><div class="card-title">Other Operating Costs</div>'
-      + '<div class="form-row">'
-      + '<div class="f w-md"><label>3rd-Party Platform Fees</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div>'
-      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">DoorDash, UberEats, Toast Tabs, or any platform fee for the week. Sits as its own operating expense line on Books and Year-End.</div>'
-      + '</div></div></div>'
-      + '<div class="card"><div class="card-title">Review</div>'
-      + '<div class="calc" style="margin-bottom:14px;">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="tw-totrev">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Forecast</div><div class="calc-val" id="tw-fcst">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val" id="tw-fcgap">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Prime Cost %</div><div class="calc-val" id="tw-prime">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + (App.data.settings.targets?.prime_cost_pct ?? 60) + '%</div></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label><textarea id="tw-notes" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary btn-lg" id="tw-save">Save Week</button>'
+      + this.heroCard(d)
+      + this.gridCard(d)
+      + '<div class="card form-card" style="margin-bottom:8px;"><div class="f" style="margin:0;"><label>Notes (optional)</label>'
+      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div></div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="tw-save">Save Week</button>'
+      + '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
       + '<span id="tw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
-
-    document.getElementById('tw-save')?.addEventListener('click', () => this.saveWeek());
+      + '</div></div>';
+    this.wire();
     this.calc();
+  },
+
+  wire() {
+    document.getElementById('tw-save')?.addEventListener('click', () => this.saveWeek());
+    document.getElementById('tw-start-over')?.addEventListener('click', () => this.startOver());
+    document.getElementById('tw-pull')?.addEventListener('click', () => this.pullAll());
+    document.getElementById('tw-add-catering')?.addEventListener('click', () => {
+      this.collect(); this._showCatering = true; this.saveDraft(); this.draw();
+    });
+    document.getElementById('tw-remove-catering')?.addEventListener('click', () => {
+      this.collect(); this.draft.catering = { revenue: '', cogs: '', labor: '' }; this._showCatering = false; this.saveDraft(); this.draw();
+    });
   },
 
   onInput() {
@@ -239,14 +234,13 @@ S.ThisWeek = {
     d.bar.revenue = v('tw-br'); d.bar.cogs = v('tw-bc'); d.bar.labor = v('tw-bl');
     d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
     if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
-    d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl');
+    if (this.cateringActive(d)) { d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl'); }
     d.platform_fees = v('tw-pf');
     d.notes = v('tw-notes');
   },
 
-  // True when the operator has typed a value that meaningfully differs from
-  // what Control wants to pull in. 50-cent tolerance avoids false alarms on
-  // floating-point noise.
+  // True when the operator typed a value that meaningfully differs from what
+  // Control wants to pull in. 50-cent tolerance avoids floating-point noise.
   _isOverride(id, incoming) {
     const cur = parseFloat(document.getElementById(id)?.value);
     if (isNaN(cur) || cur === 0) return false;
@@ -258,106 +252,89 @@ S.ThisWeek = {
     return App.confirm({ title, message, confirmText: 'Overwrite', cancelText: 'Keep Mine' });
   },
 
-  async pullCOGS() {
+  // Re-pull every auto cell from Control at once.
+  async pullAll() {
+    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
+    const sr = this.shiftRevenue(pe);
+    const lc = this.laborCost(pe);
     const incoming = {};
+    if (sr) { incoming['tw-br'] = sr.bar; incoming['tw-fr'] = sr.food; }
+    if (lc) { incoming['tw-bl'] = lc.bar; incoming['tw-fl'] = lc.food; }
     if (bc != null) incoming['tw-bc'] = bc;
     if (fc != null) incoming['tw-fc'] = fc;
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    if (!Object.keys(incoming).length) {
+      await App.confirm({ title: 'Nothing to pull yet', message: 'No shifts, counts, or hours are logged in Control for this week yet. Log them in Inventory, Shift, and Labor Control, or enter the numbers here by hand.', confirmText: 'OK', cancelText: '' });
+      return;
+    }
+    const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
     if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your COGS numbers?',
-        'Your typed Bar or Food COGS don\'t match what Inventory Control just computed. Pulling latest will replace them.'
-      );
+      const ok = await this._confirmOverride('Overwrite your numbers?',
+        'Some cells you edited do not match what Control just computed. Pulling will replace them with the logged figures.');
       if (!ok) return;
     }
-    if (bc != null) { const el = document.getElementById('tw-bc'); if (el) el.value = bc.toFixed(2); }
-    if (fc != null) { const el = document.getElementById('tw-fc'); if (el) el.value = fc.toFixed(2); }
-    this.onInput();
-  },
-
-  async pullRevenue() {
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
-    const sr = this.shiftRevenue(pe);
-    if (!sr) return;
-    const incoming = { 'tw-br': sr.bar, 'tw-fr': sr.food };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your revenue numbers?',
-        'Your typed Bar or Food revenue don\'t match Shift Control. Pulling latest will replace them.'
-      );
-      if (!ok) return;
-    }
-    const br = document.getElementById('tw-br'); if (br) br.value = sr.bar.toFixed(2);
-    const fr = document.getElementById('tw-fr'); if (fr) fr.value = sr.food.toFixed(2);
-    this.onInput();
-  },
-
-  async pullLabor() {
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
-    const lc = this.laborCost(pe);
-    if (!lc) return;
-    const incoming = { 'tw-bl': lc.bar, 'tw-fl': lc.food };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await this._confirmOverride(
-        'Overwrite your labor numbers?',
-        'Your typed Bar or Food labor don\'t match Labor Control. Pulling latest will replace them.'
-      );
-      if (!ok) return;
-    }
-    const bl = document.getElementById('tw-bl'); if (bl) bl.value = lc.bar.toFixed(2);
-    const fl = document.getElementById('tw-fl'); if (fl) fl.value = lc.food.toFixed(2);
+    Object.entries(incoming).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = (Number(val) || 0).toFixed(2); });
     this.onInput();
   },
 
   calc() {
+    const d = this.draft;
     const num = id => parseFloat(document.getElementById(id)?.value) || 0;
-    const t = App.data.settings.targets || {};
-    const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    const t = (App.data.settings && App.data.settings.targets) || {};
+    const put = (id, str, color) => { const el = document.getElementById(id); if (!el) return; el.textContent = str; if (color !== undefined) el.style.color = color; };
 
-    const section = (prefix, target) => {
-      const rev = num('tw-' + prefix + 'r'), cogs = num('tw-' + prefix + 'c'), labor = num('tw-' + prefix + 'l');
+    const sections = [
+      { p: 'b', label: 'Bar pour cost', target: t.bar_pour_cost_pct ?? 22 },
+      { p: 'f', label: 'Food cost',     target: t.food_cost_pct ?? 32 }
+    ];
+    if (this.cateringActive(d)) sections.push({ p: 'c', label: 'Catering cost', target: null });
+
+    let totRev = 0, totCost = 0, worst = null;
+    sections.forEach(s => {
+      const rev = num('tw-' + s.p + 'r'), labor = num('tw-' + s.p + 'l'), cogs = num('tw-' + s.p + 'c');
+      totRev += rev; totCost += cogs + labor;
       const pct = rev > 0 ? cogs / rev * 100 : null;
-      const lpct = rev > 0 ? labor / rev * 100 : null;
-      const vp = pct != null ? pct - target : null;
-      const vd = pct != null ? ((pct - target) / 100) * rev : null;
-      set('tw-' + prefix + 'pct', pct != null ? App.fmtPct(pct) : '-', pct != null ? (pct > target ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'lpct', lpct != null ? App.fmtPct(lpct) : '-');
-      set('tw-' + prefix + 'vpct', vp != null ? (vp > 0 ? '+' : '') + App.fmtPct(vp) : '-', vp != null ? (vp > 0 ? 'warn' : 'good') : '');
-      set('tw-' + prefix + 'vdol', vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd) : '-', vd != null ? (vd > 0 ? 'warn' : 'good') : '');
-    };
-    section('b', t.bar_pour_cost_pct ?? 22);
-    section('f', t.food_cost_pct ?? 32);
+      if (s.target == null) {
+        put('tw-' + s.p + 'pct', pct != null ? App.fmtPct(pct) : '-', pct != null ? 'var(--t2)' : 'var(--t3)');
+        put('tw-' + s.p + 'vd', '-', 'var(--t3)');
+      } else {
+        const vd = pct != null ? ((pct - s.target) / 100) * rev : null;
+        const over = pct != null && pct > s.target;
+        put('tw-' + s.p + 'pct', pct != null ? App.fmtPct(pct) : '-', pct == null ? 'var(--t3)' : (over ? 'var(--red)' : 'var(--gold)'));
+        put('tw-' + s.p + 'vd', vd != null ? ((vd > 0 ? '+' : '') + App.fmtCurrency(vd)) : '-', vd == null ? 'var(--t3)' : (vd > 0 ? 'var(--red)' : 'var(--green)'));
+        if (over && (!worst || (pct - s.target) > worst.over)) worst = { label: s.label, pct, over: pct - s.target };
+      }
+    });
 
-    // Catering tile math: read-only display, doesn't anchor a target since
-    // catering margin varies too widely by event type.
-    const cr = num('tw-cr'), cc = num('tw-cc'), cl = num('tw-cl');
-    const cpct = cr > 0 ? cc / cr * 100 : null;
-    const clpct = cr > 0 ? cl / cr * 100 : null;
-    const ccontrib = cr - cc - cl;
-    set('tw-cpct',    cpct  != null ? App.fmtPct(cpct)  : '-');
-    set('tw-clpct',   clpct != null ? App.fmtPct(clpct) : '-');
-    set('tw-ccontrib', cr > 0 ? App.fmtCurrency(ccontrib) : '-', cr > 0 ? (ccontrib >= 0 ? 'good' : 'warn') : '');
+    const primeTarget = t.prime_cost_pct ?? 60;
+    const prime = totRev > 0 ? totCost / totRev * 100 : null;
+    put('tw-totrev', totRev > 0 ? App.fmtCurrency(totRev) : '-', 'var(--t1)');
+    put('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime == null ? 'var(--t3)' : (prime > primeTarget ? 'var(--red)' : 'var(--gold)'));
+    put('tw-prime-sub', 'target ' + primeTarget + '%' + (prime != null ? (prime > primeTarget ? ' · over' : ' · on target') : ''),
+      prime != null && prime > primeTarget ? 'var(--red)' : 'var(--t3)');
 
-    // Catering revenue rolls into Total Revenue; catering COGS + labor roll
-    // into prime cost since they're real product + payroll cost. Platform
-    // fees do NOT roll into prime — they're shown as a separate operating
-    // expense line on Books and Year-End.
-    const tRev = num('tw-br') + num('tw-fr') + cr;
-    const tCost = num('tw-bc') + num('tw-fc') + num('tw-bl') + num('tw-fl') + cc + cl;
-    const prime = tRev > 0 ? tCost / tRev * 100 : null;
-    const pTarget = t.prime_cost_pct ?? 60;
-    set('tw-totrev', tRev > 0 ? App.fmtCurrency(tRev) : '-');
-    // Forecast vs actual: read this week's forecast keyed by week_start
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
+    const pe = document.getElementById('tw-end')?.value || d.period_end;
     const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
     const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
-    set('tw-fcst', fcTotal > 0 ? App.fmtCurrency(fcTotal) : '-', fcTotal > 0 ? 'dim' : '');
-    const fcGap = fcTotal > 0 && tRev > 0 ? tRev - fcTotal : null;
-    set('tw-fcgap', fcGap != null ? (fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap) : '-', fcGap != null ? (fcGap >= 0 ? 'good' : 'warn') : '');
-    set('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime != null ? (prime > pTarget ? 'warn' : 'good') : '');
+    const fcGap = fcTotal > 0 && totRev > 0 ? totRev - fcTotal : null;
+    put('tw-fcgap', fcGap != null ? ((fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcGap >= 0 ? 'var(--green)' : 'var(--red)'));
+
+    const watchEl = document.getElementById('tw-watch');
+    if (watchEl) {
+      if (worst) watchEl.innerHTML = '<span style="color:var(--red);font-weight:700;">Watch:</span> ' + esc(worst.label) + ' is ' + App.fmtPct(worst.pct) + ', ' + worst.over.toFixed(1) + ' points over target this week.';
+      else if (totRev > 0) watchEl.innerHTML = '<span style="color:var(--gold);font-weight:700;">On target.</span> Bar and food cost are both within target this week.';
+      else watchEl.innerHTML = '<span style="color:var(--t3);">Enter or pull the week\'s numbers to see where you stand.</span>';
+    }
+  },
+
+  startOver() {
+    App.confirm({ title: 'Start over?', message: 'This clears the numbers entered for this week and re-pulls a fresh copy from Control.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
+      if (!ok) return;
+      this.clearDraft();
+      this._showCatering = false;
+      this.draft = this.loadDraft();
+      this.draw();
+    });
   },
 
   async saveWeek() {
@@ -410,6 +387,7 @@ S.ThisWeek = {
     const ok = await App.putRecord('core', 'week', week);
     if (ok) {
       this.clearDraft();
+      this._showCatering = false;
       if (App.updatePeriod) App.updatePeriod();
       App.markSetupDone('gs_p_week');
       App.navigate('dashboard');
