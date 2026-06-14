@@ -1,17 +1,26 @@
 'use strict';
 
-/* ── Fix Panel — the Fix Layer renderer (v2) ──────────────────────────────────
+/* ── Fix Panel — the Fix Layer renderer (v3, master/detail) ───────────────────
    Renders a Recovery module's gap-areas from the static FIX content. The Fix
    Layer is the connective spine of the platform: each fix-process step is a
    deep-link into the feature that performs it, never manual instruction text.
+
+   v3 replaced the accordion of collapsible gap cards with a master/detail flow:
+     • renderModule lands on a ranked LEAK BOARD (worst dollar leak first) plus a
+       stat strip and the recent-activity feed.
+     • Tapping a gap opens its FOCUSED fix page via App.pushView (floating-back to
+       the board). Everything for that one gap is visible at once: summary +
+       dollar context, Watch Out For (the gap's commonMistakes, now inline), the
+       fix process (each step a deep-link + checkbox), and Mark Implemented.
+   Shared by Profit / Revenue / Traffic Fix, so this rebuild lifts all three.
 
    Step kinds:
      action    — deep-link to the Control/Recovery feature that does the task
      result    — deep-link to where the app already shows the computed number
      reference — a downloadable PDF/Word document (policies, standards)
 
-   FixPanel.renderInto(el, moduleKey, focusId) — el container, module key,
-   optional gap-area id to auto-expand and scroll to. 100% static, zero API. */
+   Help lives in each Fix screen's nav-"i" (FixPanel.howToSections). 100% static,
+   zero API. */
 
 window.FixPanel = {
   RESOURCE_ROOT: 'assets/resources/',
@@ -72,8 +81,7 @@ window.FixPanel = {
   },
 
   // ── Card-internal section header. Title sits inside the card with a divider
-  // below it. Optional helpClass adds a "How this works" button on the right
-  // that the calling code wires to open a modal.
+  // below it.
   sectionHeader(title, helpClass) {
     const help = helpClass
       ? '<button class="' + helpClass + '" style="background:transparent;border:1px solid var(--b1);border-radius:3px;'
@@ -104,7 +112,7 @@ window.FixPanel = {
   // a gap shows a $/yr leak only when Recovery has a live weekly metric for it
   // (gapImpact non-null); gaps without one (e.g. Theft and Loss, Vendor Control)
   // show as a Review row, never an invented number. Rows keep .fp-fixarea +
-  // data-gap/data-module so wireFixAreas routes the click into the fix process.
+  // data-gap/data-module so the caller routes the click into the fix process.
   _fixAreasInner(moduleKey) {
     const gaps = this.gapAreas(moduleKey);
     if (!gaps.length) return '';
@@ -184,13 +192,6 @@ window.FixPanel = {
     return leakHtml + sep + restHtml;
   },
 
-  // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
-  // The module's running recovery from logged fixes. Lives at the top of the
-  // dashboard as the platform's headline number. Four states:
-  //   1) brand new (no audit, no fixes): 3-step explainer teaching the loop
-  //   2) audit ran, no fixes yet: opportunity $ + 2-step explainer
-  //   3) fixes logged, measured: recovered $ receipt
-  //   4) fixes logged, all still measuring: logged count + measuring count
   auditScreen(moduleKey) {
     return moduleKey === 'revenue' ? 'r-audit'
          : moduleKey === 'traffic' ? 't-audit'
@@ -211,7 +212,6 @@ window.FixPanel = {
   // Recovery dashboard hero set: the Scoreboard (what you have recovered) and
   // the ranked leak board (where you are leaking now), as two cards. Shared by
   // the Profit, Revenue, and Traffic dashboards — designed once, lifts all three.
-  // Help lives in each dashboard's nav-"i" showHowTo (no in-card help button).
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
     return this._scoreboardCard(moduleKey) + this._leakBoardCard(moduleKey);
@@ -269,7 +269,7 @@ window.FixPanel = {
       + body + '</div>';
   },
 
-  // ── "How this works" modal for the Recovery Scoreboard ─────────────────────
+  // ── "How this works" modal for the Recovery Scoreboard (dashboard helper) ──
   showRecoveryHelp() {
     const m = document.createElement('div');
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -287,7 +287,7 @@ window.FixPanel = {
       + p('Tracks what Bar Cop has actually put back in your register since each fix went in. This is realized to date, not a projection: your measured per-week improvement times the weeks that have passed since the fix. An "on pace for $X per year" run-rate may appear as a clearly labeled secondary line, never as money already earned. Your own weekly numbers, measured before and after each fix. No industry averages.')
       + sh('Fix Areas')
       + p('The current weekly status of each gap. The band (On Target, Watch, Over) and dollar figure read from the latest week of your data, scored against your target. The dollar is the annualized cost of being off target at this week\'s pace.')
-      + p('Once you check steps in The Fix Process for a gap, the row also shows your step progress. Once you mark the fix implemented, the progress hides and the Scoreboard up top is where to watch.')
+      + p('Once you check steps in a fix process for a gap, the row also shows your step progress. Once you mark the fix implemented, the progress hides and the Scoreboard up top is where to watch.')
       + sh('The Loop')
       + p('1. Run the audit. It scores your operation and lists every gap with a dollar figure on what it costs you per year.')
       + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
@@ -305,74 +305,8 @@ window.FixPanel = {
     box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
   },
 
-  // ── "How this works" modal for The Fix Process header ──────────────────────
-  // Per-gap: explains the gap-card workflow (step kinds, checkboxes, Mark
-  // Implemented) and surfaces the top 3 "Watch Out For" warnings from the
-  // gap's commonMistakes — operator wisdom that the app itself cannot prevent.
-  showProcessHelp(g) {
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">How The Fix Process Works</div>'
-      + '<button class="btn btn-ghost btn-sm fp-rec-close">Close</button>'
-      + '</div>';
-    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 10px;">' + t + '</div>';
-    const p  = t => '<p style="margin:0 0 10px;">' + t + '</p>';
-    const badge = (label, color, bg) => '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:1px;'
-      + 'text-transform:uppercase;padding:2px 6px;border-radius:3px;background:' + bg + ';color:' + color + ';margin-right:8px;">' + label + '</span>';
-
-    const mistakes = (g && Array.isArray(g.commonMistakes)) ? g.commonMistakes.slice(0, 3) : [];
-    const watchOut = mistakes.length
-      ? sh('Watch Out For')
-        + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:13px;color:var(--t2);line-height:1.65;">'
-            + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:8px;"></span>'
-            + '<span>' + esc(t) + '</span></div>').join('')
-      : '';
-
-    const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
-      + p('Each step below is a link into the part of Bar Cop that does the work. Three kinds:')
-      + '<div style="margin:0 0 8px;">' + badge('DO IT', 'var(--gold)', 'var(--gold-bg)') + 'opens the screen where the work happens.</div>'
-      + '<div style="margin:0 0 8px;">' + badge('SEE IT', 'var(--blue)', 'var(--blue-bg)') + 'opens where Bar Cop already shows the number.</div>'
-      + '<div style="margin:0 0 14px;">' + badge('DOCUMENT', 'var(--t3)', 'rgba(255,255,255,0.06)') + 'downloads a policy, standard, or template.</div>'
-      + p('Check the boxes as you go. Progress saves and shows on the dashboard.')
-      + p('When the whole process is in place, click Mark Implemented and lock in the date. Bar Cop measures the metric for 8 weeks before and after to show what the fix recovered.')
-      + watchOut
-      + '</div>';
-    box.innerHTML = head + body;
-    m.appendChild(box);
-    document.body.appendChild(m);
-    m.onclick = ev => { if (ev.target === m) m.remove(); };
-    box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
-  },
-
-  // Wire the Fix Areas rows and the Recovery card. Call after render.
-  wireFixAreas(container) {
-    if (!container) return;
-    container.querySelectorAll('.fp-fixarea').forEach(row => {
-      row.addEventListener('click', () => {
-        App._fixFocus = row.dataset.gap;
-        App.openScreen(this.fixScreen(row.dataset.module));
-      });
-    });
-    container.querySelectorAll('.fp-recovery-go').forEach(card => {
-      card.addEventListener('click', () => App.openScreen(card.dataset.screen));
-    });
-    container.querySelectorAll('.fp-step').forEach(step => {
-      step.addEventListener('click', () => App.openScreen(step.dataset.screen));
-    });
-    container.querySelectorAll('.fp-rec-help').forEach(btn => {
-      btn.addEventListener('click', ev => { ev.stopPropagation(); this.showRecoveryHelp(); });
-    });
-  },
-
   // Vertical fix-event markers for an annotated trend chart. xFn maps a week
-  // index to an x coordinate; top/bottom are the plot edges. The marker reads
-  // as "a fix landed here" without competing with the trend lines on every
-  // chart it appears in. Quiet by design: thin dashed gold line at low opacity
-  // gives the timeline reference, small gold dot near the bottom axis gives
-  // the anchor and the hover target. Title element shows label + date on hover.
+  // index to an x coordinate; top/bottom are the plot edges.
   markerSvg(markers, xFn, top, bottom) {
     if (!markers || !markers.length) return '';
     return markers.map(m => {
@@ -390,107 +324,111 @@ window.FixPanel = {
     }).join('');
   },
 
-  renderInto(el, moduleKey, focusId) {
-    if (!el) return;
-    el.dataset.fixModule = moduleKey;
-    if (focusId) {
-      App._fixOpen = App._fixOpen || {};
-      App._fixOpen[moduleKey] = focusId;
-    }
-    const gaps = this.gapAreas(moduleKey);
-    if (gaps.length === 0) {
-      el.innerHTML = '<div class="card"><div style="font-size:13px;color:var(--t3);">'
-        + 'Fix content for this module is on the way.</div></div>';
-      return;
-    }
-    el.innerHTML = gaps.map(g => this.gapCard(g, g.id === focusId)).join('');
-    this.wire(el);
-    if (focusId) {
-      const card = el.querySelector('.fp-gap[data-gap="' + focusId + '"]');
-      if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  // ════════════════════════════════════════════════════════════════════════
+  //  MASTER / DETAIL — the Fix screen (board landing → focused gap page)
+  // ════════════════════════════════════════════════════════════════════════
+
+  // Called by each Fix screen's render(). Lands on the board; if a focus gap was
+  // handed in (dashboard / audit / step-return deep-link via App._fixFocus), it
+  // pushes that gap's detail on top so floating-back returns to the board.
+  renderModule(container, moduleKey, focusId) {
+    this.boardLanding(container, moduleKey);
+    if (focusId && this.gapAreas(moduleKey).some(g => g.id === focusId)) {
+      App.pushView(() => this.renderGapDetail(container, moduleKey, focusId));
     }
   },
 
-  // ── One gap-area collapsible card ───────────────────────────────────────────
-  // Header shows a toned-down status line on the right (t3, mixed case) so the
-  // operator can scan all gaps at a glance: "4 of 6 steps", "Implemented · $X /yr",
-  // "$X /yr", or nothing. Same data the dashboard surfaces in color, here muted
-  // so it reads as reference instead of headline.
-  gapCard(g, expanded) {
+  boardLanding(container, moduleKey) {
+    const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
+    const gaps = this.gapAreas(moduleKey).filter(g => composite.indexOf(g.id) === -1);
+    const fixProgress = (App.data && App.data.fix_progress) || {};
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    const isLogged = log.some(e => e.gap_id === g.id);
+    let openLeaks = 0, inProgress = 0;
+    gaps.forEach(g => {
+      const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
+      if (imp && imp.band !== 'ok' && imp.dollars > 0) openLeaks++;
+      const logged = log.some(e => e.gap_id === g.id);
+      if (!logged && (fixProgress[g.id] || []).length > 0) inProgress++;
+    });
+    const recovered = window.Recovery ? (Recovery.moduleSummary(moduleKey).recovered || 0) : 0;
+
+    const stat = (label, val, cls) =>
+      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + val + '</div></div>';
+    const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
+      + stat('Open Leaks', String(openLeaks), openLeaks ? 'warn' : '')
+      + stat('In Progress', String(inProgress))
+      + stat('Recovered to Date', App.fmtCurrency(recovered, 0))
+      + '</div></div>';
+
+    const inner = this._fixAreasInner(moduleKey);
+    const boardCard = '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">Where You\'re Leaking</div>'
+      + (inner || '<div style="font-size:12px;color:var(--t3);">Run your audit to surface where you\'re leaking.</div>') + '</div>';
+
+    container.innerHTML = '<div class="screen">' + statStrip + boardCard + this.recentActivityCard(moduleKey) + '</div>';
+
+    container.querySelectorAll('.fp-fixarea').forEach(row => row.addEventListener('click', () => {
+      const gap = row.dataset.gap, mod = row.dataset.module;
+      if (mod === moduleKey) App.pushView(() => this.renderGapDetail(container, moduleKey, gap));
+      else { App._fixFocus = gap; App.openScreen(this.fixScreen(mod)); }
+    }));
+    container.querySelectorAll('.fp-activity').forEach(row => row.addEventListener('click', () =>
+      App.pushView(() => this.renderGapDetail(container, moduleKey, row.dataset.gap))));
+  },
+
+  // ── One gap's focused fix page (everything visible, no accordion) ───────────
+  renderGapDetail(container, moduleKey, gapId) {
+    const g = this.gapAreas(moduleKey).find(x => x.id === gapId);
+    if (!g) { this.boardLanding(container, moduleKey); return; }
+
+    const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
     const fixProgress = (App.data && App.data.fix_progress) || {};
     const stepsDone = (fixProgress[g.id] || []).length;
     const stepsTotal = (g.process && g.process.steps) ? g.process.steps.length : 0;
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const isLogged = log.some(e => e.gap_id === g.id);
 
-    let status = '';
-    if (isLogged) {
-      let recovered = 0;
-      log.filter(e => e.gap_id === g.id).forEach(e => {
-        const r = (window.Recovery) ? Recovery.compute(e) : null;
-        if (r && r.status === 'ok' && r.dollars > 0) recovered += r.dollars;
-      });
-      status = recovered > 0
-        ? 'Implemented · ' + App.fmtCurrency(recovered, 0) + ' recovered'
-        : 'Implemented';
-    } else if (stepsDone > 0 && stepsTotal > 0) {
-      status = stepsDone + ' of ' + stepsTotal + ' steps';
-    } else if (window.Recovery) {
-      const imp = Recovery.gapImpact(g.id);
-      if (imp && imp.dollars > 0) status = App.fmtCurrency(imp.dollars, 0) + ' /yr';
-    }
-
-    const statusHtml = status
-      ? '<div style="flex-shrink:0;font-size:11px;color:var(--t3);align-self:center;text-align:right;white-space:nowrap;">' + esc(status) + '</div>'
+    const BAND = { over: { label: 'Over', color: 'var(--red)' }, watch: { label: 'Watch', color: 'var(--amber)' }, ok: { label: 'On target', color: 'var(--gold)' } };
+    const b = imp ? (BAND[imp.band] || BAND.over) : null;
+    const dollarLine = (imp && imp.dollars > 0)
+      ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:26px;font-weight:600;color:' + b.color + ';line-height:1;">'
+          + App.fmtCurrency(imp.dollars, 0) + '<span style="font-size:11px;color:var(--t3);"> /yr at this week\'s pace</span></span>'
+          + '<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + b.color + ';margin-left:8px;">' + b.label + '</span>'
+      : '<span style="font-size:12px;color:var(--t3);">No live weekly dollar for this gap yet. Work the process and watch it against your own numbers.</span>';
+    const progLine = stepsTotal
+      ? '<span style="font-size:11px;color:var(--t3);margin-left:auto;align-self:center;white-space:nowrap;">' + stepsDone + ' of ' + stepsTotal + ' steps' + (isLogged ? ' &middot; Implemented' : '') + '</span>'
       : '';
 
-    return '<div class="card fp-gap" data-gap="' + esc(g.id) + '" style="padding:0;overflow:hidden;">'
-      + '<div class="fp-head" style="display:flex;align-items:flex-start;gap:14px;padding:18px 20px;cursor:pointer;">'
-      + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-size:13px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:1px;">' + esc(g.name) + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:5px;">' + esc(g.summary || '') + '</div>'
-      + '</div>'
-      + statusHtml
-      + '<span class="fp-chev" style="flex-shrink:0;font-size:14px;color:var(--t3);transform:rotate(' + (expanded ? '90' : '0') + 'deg);transition:transform 0.15s;align-self:center;">&#9656;</span>'
-      + '</div>'
-      + '<div class="fp-body" style="display:' + (expanded ? 'block' : 'none') + ';padding:0 20px 20px;border-top:1px solid var(--b2);">'
-      + this.processSection(g)
-      + this.implementSection(g)
-      + '</div></div>';
-  },
-
-  sh(text, subdued) {
-    return '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;'
-      + 'color:' + (subdued ? 'var(--t3)' : 'var(--gold)') + ';margin:20px 0 12px;">' + esc(text) + '</div>';
-  },
-
-  // ── Fix process — every step is a link ──────────────────────────────────────
-  // Each step renders with a checkbox the operator ticks as they work through
-  // it. Progress persists per-gap in App.data.fix_progress[gap_id] = [idx,...].
-  // Checked steps dim visually. Recovery math still measures at gap-area level,
-  // gated by the Mark Implemented date — the checklist is operator-facing only.
-  processSection(g) {
-    const p = g.process;
-    if (!p) return '';
-    const progress = (App.data && App.data.fix_progress && App.data.fix_progress[g.id]) || [];
-    const checked = new Set(progress);
-    const steps = (p.steps || []).map((s, i) => this.stepRow(s, g.module, i, g.id, checked.has(i))).join('');
-    const header = '<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 12px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);">The Fix Process</div>'
-      + '<button class="fp-proc-help" data-gap="' + esc(g.id) + '" style="background:transparent;border:1px solid var(--b1);border-radius:3px;'
-      + 'color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 9px;cursor:pointer;">How this works</button>'
+    const header = '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">' + esc(g.name) + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(g.summary || '') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + dollarLine + progLine + '</div>'
       + '</div>';
-    return header + steps;
+
+    const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes : [];
+    const watchOut = mistakes.length
+      ? '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">Watch Out For</div>'
+        + mistakes.map(t => '<div style="display:flex;gap:11px;padding:6px 0;font-size:13px;color:var(--t2);line-height:1.6;">'
+            + '<span style="flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
+        + '</div>'
+      : '';
+
+    const checked = new Set(fixProgress[g.id] || []);
+    const steps = ((g.process && g.process.steps) || []).map((s, i) => this.stepRow(s, g.module, i, g.id, checked.has(i))).join('');
+    const processCard = '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">The Fix Process</div>'
+      + (steps || '<div style="font-size:12px;color:var(--t3);">No steps for this gap.</div>') + '</div>';
+
+    container.innerHTML = '<div class="screen">' + header + watchOut + processCard + this.implementSection(g) + '</div>';
+    this.wireGapDetail(container, moduleKey, g.id);
   },
 
-  // Step row: checkbox + content. Numbered circle removed since row order
-  // carries the sequence and the checkbox carries the action.
+  // Step row: checkbox + content. Each step links into the feature that does it.
+  // Badge colors: DO IT gold (the action), SEE IT + DOCUMENT neutral (the label
+  // carries the distinction) — kills the old blue per the locked color system.
   stepRow(s, module, stepIdx, gapId, isChecked) {
     const kind = s.kind || 'action';
     const meta = {
-      action:    { label: 'DO IT',     color: 'var(--gold)',  bg: 'var(--gold-bg)' },
-      result:    { label: 'SEE IT',    color: 'var(--blue)',  bg: 'var(--blue-bg)' },
-      reference: { label: 'DOCUMENT',  color: 'var(--t3)',    bg: 'rgba(255,255,255,0.06)' }
+      action:    { label: 'DO IT',     color: 'var(--gold)', bg: 'var(--gold-bg)' },
+      result:    { label: 'SEE IT',    color: 'var(--t2)',   bg: 'rgba(255,255,255,0.06)' },
+      reference: { label: 'DOCUMENT',  color: 'var(--t3)',   bg: 'rgba(255,255,255,0.06)' }
     }[kind] || {};
     const label = esc(s.targetLabel || '');
 
@@ -521,7 +459,7 @@ window.FixPanel = {
 
     return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);">'
       + checkbox
-      + '<div style="flex:1;">'
+      + '<div style="flex:1;min-width:0;">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<span style="font-size:13px;font-weight:700;color:' + titleColor + ';">' + esc(s.title) + '</span>'
       + (meta.label ? '<span style="font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
@@ -533,11 +471,7 @@ window.FixPanel = {
       + '</div></div>';
   },
 
-  // ── Mark Fix Implemented — the action card ──────────────────────────────────
-  // Rendered as a prominent sub-card inside the expanded gap card. Gold border
-  // when nothing has been logged yet (draws the eye to the action). Neutral
-  // border once a fix has been logged. The "How this works" button opens the
-  // shared Recovery Scoreboard modal so all instruction lives there.
+  // ── Mark Fix Implemented — the action sub-card ──────────────────────────────
   implementSection(g) {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.gap_id === g.id)
@@ -545,9 +479,6 @@ window.FixPanel = {
     const inputStyle = 'background:var(--bg);border:1px solid var(--b1);border-radius:3px;'
       + 'color:#fff;font-size:13px;padding:7px 10px;width:100%;color-scheme:dark;';
 
-    // Banner state: all steps in The Fix Process have been checked but no
-    // implementation has been logged yet. Border goes solid gold and a banner
-    // sits above the form prompting the operator to lock in the date.
     const progress   = (App.data && App.data.fix_progress && App.data.fix_progress[g.id]) || [];
     const totalSteps = (g.process && g.process.steps) ? g.process.steps.length : 0;
     const allChecked = totalSteps > 0 && progress.length >= totalSteps;
@@ -603,7 +534,7 @@ window.FixPanel = {
         + 'All steps checked. Lock in the date so Bar Cop can start measuring.</div>'
       : '';
 
-    return '<div style="margin:20px 0;background:var(--panel);border:1px solid ' + borderColor + ';border-radius:4px;overflow:hidden;">'
+    return '<div style="margin:0 0 14px;background:var(--panel);border:1px solid ' + borderColor + ';border-radius:6px;overflow:hidden;">'
       + this.sectionHeader('Mark Fix Implemented')
       + logHtml
       + bannerHtml
@@ -611,10 +542,7 @@ window.FixPanel = {
       + '</div>';
   },
 
-  // ── Recent Activity card — module-scoped chronological feed of step checks
-  // Lives at the bottom of each Fix screen. Each row is clickable to re-open
-  // the gap at that step. Tones (t3 throughout) keep it as quiet reference —
-  // duplicates "X of N steps" from the gap-card status without screaming.
+  // ── Recent Activity card — module-scoped chronological feed of step checks ──
   _timeAgo(ts) {
     const diff = (Date.now() - new Date(ts).getTime()) / 1000;
     if (diff < 60)     return 'just now';
@@ -635,13 +563,13 @@ window.FixPanel = {
       return '<div class="card" style="padding:0;overflow:hidden;margin:18px 0;">'
         + titleBar
         + '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.6;">'
-        + 'No activity yet. Check off a step in any fix process above and it shows up here.</div>'
+        + 'No activity yet. Check off a step in any fix process and it shows up here.</div>'
         + '</div>';
     }
 
     const badges = {
       action:    { label: 'DO IT',    color: 'var(--gold)', bg: 'var(--gold-bg)' },
-      result:    { label: 'SEE IT',   color: 'var(--blue)', bg: 'var(--blue-bg)' },
+      result:    { label: 'SEE IT',   color: 'var(--t2)',   bg: 'rgba(255,255,255,0.06)' },
       reference: { label: 'DOCUMENT', color: 'var(--t3)',   bg: 'rgba(255,255,255,0.06)' }
     };
 
@@ -666,152 +594,108 @@ window.FixPanel = {
       + '</div>';
   },
 
-  wireActivityCard(container, moduleKey) {
+  // Wire the leak-board rows for any caller that renders the board on its own
+  // (the Recovery dashboards). Each row deep-links into its Fix screen.
+  wireFixAreas(container) {
     if (!container) return;
-    container.querySelectorAll('.fp-activity').forEach(row => {
+    container.querySelectorAll('.fp-fixarea').forEach(row => {
       row.addEventListener('click', () => {
-        const gapId = row.dataset.gap;
-        const mount = document.getElementById('fix-panel-mount');
-        if (mount) {
-          App._fixFocus = gapId;
-          this.renderInto(mount, moduleKey, gapId);
-        }
+        App._fixFocus = row.dataset.gap;
+        App.openScreen(this.fixScreen(row.dataset.module));
       });
+    });
+    container.querySelectorAll('.fp-recovery-go').forEach(card => {
+      card.addEventListener('click', () => App.openScreen(card.dataset.screen));
+    });
+    container.querySelectorAll('.fp-step').forEach(step => {
+      step.addEventListener('click', () => App.openScreen(step.dataset.screen));
+    });
+    container.querySelectorAll('.fp-rec-help').forEach(btn => {
+      btn.addEventListener('click', ev => { ev.stopPropagation(); this.showRecoveryHelp(); });
     });
   },
 
-  _refreshActivity(moduleKey) {
-    const mount = document.getElementById('recent-activity-mount');
-    if (!mount) return;
-    mount.innerHTML = this.recentActivityCard(moduleKey);
-    this.wireActivityCard(mount, moduleKey);
+  // ── Gap-detail wiring: step checkboxes, deep-links, Mark Implemented ────────
+  wireGapDetail(container, moduleKey, gapId) {
+    const reRender = () => this.renderGapDetail(container, moduleKey, gapId);
+
+    container.querySelectorAll('.fp-step-check').forEach(cb => cb.addEventListener('click', () => {
+      const gId = cb.dataset.gap;
+      const stepIdx = parseInt(cb.dataset.step, 10);
+      App.data.fix_progress = App.data.fix_progress || {};
+      const arr = App.data.fix_progress[gId] = App.data.fix_progress[gId] || [];
+      const at = arr.indexOf(stepIdx);
+      const wasChecked = at >= 0;
+      if (wasChecked) arr.splice(at, 1); else arr.push(stepIdx);
+      App.saveKey('fix_progress');
+
+      // Activity feed: push on check, remove the most recent matching entry on
+      // uncheck so the feed reflects current truth. Capped at 100 per module.
+      App.data.fix_activity = App.data.fix_activity || [];
+      if (wasChecked) {
+        for (let i = App.data.fix_activity.length - 1; i >= 0; i--) {
+          const a = App.data.fix_activity[i];
+          if (a.gap_id === gId && a.step_index === stepIdx) { App.data.fix_activity.splice(i, 1); break; }
+        }
+      } else {
+        const gap = this.gapAreas(moduleKey).find(x => x.id === gId);
+        const step = gap && gap.process && gap.process.steps && gap.process.steps[stepIdx];
+        if (gap && step) {
+          App.data.fix_activity.push({
+            id: App.uid(), module: moduleKey, gap_id: gId, gap_name: gap.name,
+            step_index: stepIdx, step_title: step.title || '', step_kind: step.kind || 'action',
+            ts: new Date().toISOString()
+          });
+          const all = App.data.fix_activity;
+          let moduleCount = all.filter(a => a.module === moduleKey).length;
+          for (let i = 0; i < all.length && moduleCount > 100; i++) {
+            if (all[i].module === moduleKey) { all.splice(i, 1); i--; moduleCount--; }
+          }
+        }
+      }
+      App.saveKey('fix_activity');
+      reRender();
+    }));
+
+    // Step deep-link: remember this gap so returning to the Fix screen reopens
+    // it (App._fixFocus is a one-shot the Fix screen consumes on render).
+    container.querySelectorAll('.fp-go').forEach(btn => btn.addEventListener('click', () => {
+      App._fixFocus = gapId;
+      App.openScreen(btn.dataset.target);
+    }));
+
+    container.querySelector('.fp-impl-save')?.addEventListener('click', () => {
+      const dateEl = container.querySelector('.fp-impl-date');
+      const date = dateEl ? dateEl.value : '';
+      if (!date) { if (dateEl) dateEl.style.borderColor = 'var(--red)'; return; }
+      const save = container.querySelector('.fp-impl-save');
+      App.putRecord('core', 'fix_log', {
+        id: App.uid(),
+        module: save.dataset.module,
+        gap_id: save.dataset.gap,
+        gap_name: save.dataset.name,
+        date: date,
+        logged_at: new Date().toISOString()
+      });
+      if (save.dataset.module === 'profit') App.markSetupDone('gs_p_fix');
+      reRender();
+    });
+
+    container.querySelectorAll('.fp-unlog').forEach(btn => btn.addEventListener('click', () => {
+      App.removeRecord('core', 'fix_log', btn.dataset.log);
+      reRender();
+    }));
   },
 
-  // ── Event wiring ────────────────────────────────────────────────────────────
-  // renderInto() can be called many times against the same el (e.g. every time
-  // a step checkbox is toggled). The per-element .fp-head listeners must be
-  // re-attached each call because innerHTML replacement destroyed the old head
-  // nodes. The delegated click listener on `el` itself MUST be attached only
-  // once — otherwise every render adds another copy, and stacking copies cancel
-  // each other out (toggle then immediately untoggle), making clicks feel dead.
-  wire(el) {
-    el.querySelectorAll('.fp-head').forEach(head => {
-      head.addEventListener('click', () => {
-        const card = head.closest('.fp-gap');
-        const body = card.querySelector('.fp-body');
-        const chev = head.querySelector('.fp-chev');
-        const open = body.style.display !== 'none';
-        body.style.display = open ? 'none' : 'block';
-        if (chev) chev.style.transform = 'rotate(' + (open ? '0' : '90') + 'deg)';
-        // Persist which gap is open per module so navigating away and back
-        // (e.g., clicking a step deep-link, then breadcrumb back) reopens it.
-        App._fixOpen = App._fixOpen || {};
-        App._fixOpen[el.dataset.fixModule] = open ? null : card.dataset.gap;
-      });
-    });
-    if (el.dataset.fpWired) return;
-    el.dataset.fpWired = '1';
-    el.addEventListener('click', ev => {
-      const procHelp = ev.target.closest('.fp-proc-help');
-      if (procHelp) {
-        ev.stopPropagation();
-        const gapId = procHelp.dataset.gap;
-        const moduleKey = el.dataset.fixModule;
-        const gap = (window.FIX && FIX[moduleKey] || []).find(x => x.id === gapId);
-        if (gap) this.showProcessHelp(gap);
-        return;
-      }
-      const stepCheck = ev.target.closest('.fp-step-check');
-      if (stepCheck) {
-        ev.stopPropagation();
-        const gapId = stepCheck.dataset.gap;
-        const stepIdx = parseInt(stepCheck.dataset.step, 10);
-        const moduleKey = el.dataset.fixModule;
-        App.data.fix_progress = App.data.fix_progress || {};
-        App.data.fix_progress[gapId] = App.data.fix_progress[gapId] || [];
-        const arr = App.data.fix_progress[gapId];
-        const at = arr.indexOf(stepIdx);
-        const wasChecked = at >= 0;
-        if (wasChecked) arr.splice(at, 1); else arr.push(stepIdx);
-        App.saveKey('fix_progress');
-        // Update the activity feed: push on check, remove the most recent
-        // matching entry on uncheck (so the feed reflects current truth).
-        App.data.fix_activity = App.data.fix_activity || [];
-        if (wasChecked) {
-          for (let i = App.data.fix_activity.length - 1; i >= 0; i--) {
-            const a = App.data.fix_activity[i];
-            if (a.gap_id === gapId && a.step_index === stepIdx) {
-              App.data.fix_activity.splice(i, 1);
-              break;
-            }
-          }
-        } else {
-          const gap = (window.FIX && FIX[moduleKey] || []).find(x => x.id === gapId);
-          const step = gap && gap.process && gap.process.steps && gap.process.steps[stepIdx];
-          if (gap && step) {
-            App.data.fix_activity.push({
-              id: App.uid(),
-              module: moduleKey,
-              gap_id: gapId,
-              gap_name: gap.name,
-              step_index: stepIdx,
-              step_title: step.title || '',
-              step_kind: step.kind || 'action',
-              ts: new Date().toISOString()
-            });
-            // Cap at 100 entries per module to keep the array bounded.
-            const all = App.data.fix_activity;
-            const moduleCount = all.filter(a => a.module === moduleKey).length;
-            if (moduleCount > 100) {
-              for (let i = 0; i < all.length && moduleCount - 100 > 0; i++) {
-                if (all[i].module === moduleKey) {
-                  all.splice(i, 1);
-                  i--;
-                  if (all.filter(a => a.module === moduleKey).length <= 100) break;
-                }
-              }
-            }
-          }
-        }
-        App.saveKey('fix_activity');
-        this.renderInto(el, moduleKey, gapId);
-        this._refreshActivity(moduleKey);
-        return;
-      }
-      const go = ev.target.closest('.fp-go');
-      const implSave = ev.target.closest('.fp-impl-save');
-      const unlog = ev.target.closest('.fp-unlog');
-      if (go) { App.openScreen(go.dataset.target); return; }
-      if (implSave) {
-        const gapId = implSave.dataset.gap;
-        const dateEl = el.querySelector('.fp-impl-date[data-gap="' + gapId + '"]');
-        const date = dateEl ? dateEl.value : '';
-        if (!date) {
-          if (dateEl) dateEl.style.borderColor = 'var(--red)';
-          return;
-        }
-        App.putRecord('core', 'fix_log', {
-          id: App.uid(),
-          module: implSave.dataset.module,
-          gap_id: gapId,
-          gap_name: implSave.dataset.name,
-          date: date,
-          logged_at: new Date().toISOString()
-        });
-        // Mark Implemented on a Profit gap counts as the Profit Fix
-        // Getting Started task. Revenue and Traffic Fix tasks don't exist
-        // in the current checklist, but if they're added later, extend here.
-        if (implSave.dataset.module === 'profit') App.markSetupDone('gs_p_fix');
-        this.renderInto(el, el.dataset.fixModule, gapId);
-        return;
-      }
-      if (unlog) {
-        const logId = unlog.dataset.log;
-        App.removeRecord('core', 'fix_log', logId);
-        const card = unlog.closest('.fp-gap');
-        this.renderInto(el, el.dataset.fixModule, card ? card.dataset.gap : null);
-        return;
-      }
-    });
+  // Nav-"i" help for the Fix screens. Used by each Fix screen's showHowTo.
+  howToSections(moduleKey) {
+    return [
+      { p: ['This is where you work your leaks. Bar Cop ranks every gap by what it is costing you, the biggest dollar first. Tap one to open its fix process.'] },
+      { h: 'Where You\'re Leaking', p: ['Each gap shows its weekly status and, where Bar Cop has a live weekly number for it, the dollars a year you are losing at this week\'s pace. Gaps without a live dollar, like theft and loss or vendors, show as a review row, never an invented number. Open Leaks, In Progress, and Recovered to Date up top are your running picture.'] },
+      { h: 'Working a Gap', p: ['Every step in a fix process is a link into the part of Bar Cop that does the work. DO IT opens the screen where the work happens, SEE IT opens where Bar Cop already shows the number, and DOCUMENT downloads a policy, standard, or template. Check the boxes as you go; your progress saves and shows up in Recent Activity.'] },
+      { h: 'Watch Out For', p: ['Each gap lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
+      { h: 'Mark Implemented', p: ['When the fix is in place, lock in the date. Bar Cop averages the eight weeks before and after to measure what the fix actually recovered, and the Recovery Scoreboard on your dashboard tracks it. A figure shows once two weeks of after-data land.'] },
+      { h: 'The Honest Rule', p: ['A dollar figure only shows when the math comes from real data Bar Cop already holds. A fix that cannot be dollarized honestly still gets logged; its recovery shows as the score moving, not invented dollars.'] }
+    ];
   }
 };
