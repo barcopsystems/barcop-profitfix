@@ -1,20 +1,18 @@
 'use strict';
 
-/* ── Profit Recovery — Theft Risk (auto-scored) ───────────────────────────────
-   The score is computed from operational data — Inventory spot checks
-   (ic_spot_checks), Shift voids/comps (sc_void_comps), cash variances
-   (sc_variances), unauthorized large comps, and confirmed theft from the
-   Adjustment Log. Five signals, averaged. The operator's subjective take lives
-   in a separate "Manager's Read" that is recorded and can raise a banner, but
-   does NOT silently reweight the data score ([[output-honesty]]).
+/* ── Profit Recovery — Theft Risk (a live leak detector, not a score) ─────────
+   The job is to CATCH theft on the shift it happens and investigate it, which
+   is what recovers money. No 0-100 score. The page shows what flagged TODAY and
+   over the LAST 7 DAYS from the data you already log — voids/comps without
+   manager auth, drawer shorts, flagged spot checks, large unauthorized comps,
+   and confirmed theft from the Adjustment Log — then lets you open and work a
+   Variance Investigation. The Theft & Loss Brief is the periodic 90-day review.
 
-   Layout: stat strip → one "Where the Risk Is" signal table → Manager's Read →
-   Save / Brief buttons → Variance Investigations (compact list, drill into one)
-   → Score history. Snapshots save to App.data.theft_scores. */
+   (Coming next: flags push to the Hub critical alerts + an Open-the-Floor
+   warning for the next manager, so this never becomes a page nobody opens.) */
 
 S.TheftRisk = {
   _manual: null,
-  // Manager's subjective read — recorded, never blended into the data score.
   MANAGER_LEVELS: ['Strong controls', 'Adequate controls', 'Some concern', 'Serious concern'],
   _levelElevated(level) { return level === 'Some concern' || level === 'Serious concern'; },
 
@@ -27,154 +25,94 @@ S.TheftRisk = {
   },
   variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
   adjustments() { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
-  products() {
-    return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
-  },
-  productById(id) {
-    return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
-  },
+  products() { return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false); },
+  productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
 
-  scoreClass(score) {
-    if (score == null) return 'dim';
-    return score <= 30 ? 'good' : score <= 60 ? '' : 'warn';
+  // ── Flag signals over a window (from `fromStr` through today) ────────────────
+  // Returns event count + dollar amount per signal. Used for both the Today
+  // column (fromStr = today) and the Last-7-Days column (fromStr = a week ago),
+  // and at 90 days for the Brief.
+  _signalData(fromStr) {
+    const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
+    const vc = this.voidComps().filter(r => (!r.authorized_by || !String(r.authorized_by).trim()) && inRange(r.date));
+    const shorts = this.variances().filter(v => v.status === 'Short' && inRange(v.date));
+    const spots = [];
+    this.spotChecks().forEach(c => { if (inRange(c.date)) (c.items || []).forEach(it => { if (it.flagged) spots.push(it); }); });
+    const largeComps = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.auth_threshold_override === true && inRange(r.date));
+    const theft = this.adjustments().filter(a => a.reason === 'Theft' && inRange((a.date_time || '').slice(0, 10)));
+    return {
+      voids:      { count: vc.length,         amount: vc.reduce((s, r) => s + (r.amount || 0), 0) },
+      shorts:     { count: shorts.length,     amount: Math.abs(shorts.reduce((s, v) => s + Math.min(0, v.variance || 0), 0)) },
+      spots:      { count: spots.length,      amount: spots.reduce((s, it) => s + Math.max(0, it.variance_dollar || 0), 0) },
+      largeComps: { count: largeComps.length, amount: largeComps.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) },
+      theft:      { count: theft.length,      amount: theft.reduce((s, a) => s + Math.abs(a.value || 0), 0) }
+    };
   },
-  ratingFor(score) {
-    if (score == null) return 'Not Enough Data';
-    return score <= 30 ? 'Low Risk: Strong Controls'
-         : score <= 60 ? 'Moderate Risk: Tighten Controls'
-         : 'High Risk: Immediate Action';
-  },
-
-  // ── Signals ─────────────────────────────────────────────────────────────────
-  MIN_POUR_ITEMS: 8,
-  MIN_VOIDS: 10,
-  MIN_VARIANCES: 5,
-
-  pourSignal() {
-    const items = [];
-    this.spotChecks().forEach(c => (c.items || []).forEach(it => items.push(it)));
-    if (items.length < this.MIN_POUR_ITEMS) return { score: null, checks: this.spotChecks().length, items: items.length, insufficient: true };
-    const flagged = items.filter(i => i.flagged).length;
-    const rate = flagged / items.length;
-    const varDollar = items.reduce((t, i) => t + Math.max(0, i.variance_dollar || 0), 0);
-    return { score: Math.min(100, Math.round(rate * 100)), checks: this.spotChecks().length, items: items.length, flagged, rate, varDollar };
-  },
-  voidSignal() {
-    const vc = this.voidComps();
-    if (vc.length < this.MIN_VOIDS) return { score: null, count: vc.length, insufficient: true };
-    const unauth = vc.filter(r => !r.authorized_by || !String(r.authorized_by).trim()).length;
-    const rate = unauth / vc.length;
-    const total = vc.reduce((t, r) => t + (r.amount || 0), 0);
-    return { score: Math.min(100, Math.round(rate * 100)), count: vc.length, unauth, rate, total };
-  },
-  cashSignal() {
-    const vars = this.variances();
-    if (vars.length < this.MIN_VARIANCES) return { score: null, count: vars.length, insufficient: true };
-    const shorts = vars.filter(v => v.status === 'Short');
-    const rate = shorts.length / vars.length;
-    const netShort = vars.reduce((t, v) => t + Math.min(0, v.variance || 0), 0);
-    return { score: Math.min(100, Math.round(rate * 100)), count: vars.length, shorts: shorts.length, rate, netShort };
-  },
-  unauthorizedLargeCompsSignal() {
-    const all = ((App.shiftData && App.shiftData.sc_void_comps) || []);
-    if (all.length === 0) return { score: null, count: 0, total: 0 };
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = App.ymdLocal(cutoff);
-    const flagged = all.filter(r => r.auth_threshold_override === true && (r.date || '') >= cutoffStr);
-    const total = flagged.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    return { score: flagged.length > 0 ? Math.min(100, flagged.length * 20) : 0, count: flagged.length, total };
-  },
-  theftConfirmedSignal() {
-    const all = this.adjustments();
-    if (all.length === 0) return { score: null, count: 0, totalValue: 0 };
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = App.ymdLocal(cutoff);
-    const recent = all.filter(a => {
-      if (a.reason !== 'Theft') return false;
-      return (a.date_time || '').slice(0, 10) >= cutoffStr;
-    });
-    const totalValue = recent.reduce((t, a) => t + Math.abs(a.value || 0), 0);
-    return { score: recent.length > 0 ? Math.min(100, recent.length * 25) : 0, count: recent.length, totalValue };
-  },
-
-  // The five signal results + the blended (averaged) auto-score in one place.
-  _signals() {
-    const pour = this.pourSignal(), voids = this.voidSignal(), cash = this.cashSignal();
-    const confirmed = this.theftConfirmedSignal();
-    const unauthComps = this.unauthorizedLargeCompsSignal();
-    const scores = [pour.score, voids.score, cash.score, confirmed.score, unauthComps.score].filter(s => s != null);
-    const autoScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
-    return { pour, voids, cash, confirmed, unauthComps, autoScore };
-  },
+  _totalFlags(d) { return d.voids.count + d.shorts.count + d.spots.count + d.largeComps.count + d.theft.count; },
 
   // ── Entry ─────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    if (actions) actions.innerHTML = '';   // header off; actions live in the page
+    if (actions) actions.innerHTML = '';
     const saved = (App.data && App.data.theft_manual) || {};
     this._manual = { level: saved.level || '', notes: saved.notes || '' };
     this.renderMain();
   },
 
+  _saveManual() {
+    App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
+    App.saveKey('theft_manual');
+  },
+
   renderMain() {
-    const { pour, voids, cash, confirmed, unauthComps, autoScore } = this._signals();
-    const overall = autoScore;
+    const today = App.todayLocal();
+    const wk = new Date(); wk.setDate(wk.getDate() - 6);
+    const weekStart = App.ymdLocal(wk);
+    const td = this._signalData(today);
+    const wkd = this._signalData(weekStart);
     const open = (App.data.variance_investigations || []).filter(i => i.status !== 'resolved');
+    const flagsWeek = this._totalFlags(wkd);
+    const flagsToday = this._totalFlags(td);
 
-    // ── Manager banner (only when the read is elevated) ──
-    const banner = this._levelElevated(this._manual.level)
-      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);"><strong>Manager flagged: ' + esc(this._manual.level) + '.</strong>' + (this._manual.notes ? ' ' + esc(this._manual.notes) : '') + '</div>'
-      : '';
+    // Banner: flags this week (the act-now cue) and/or an elevated manager read.
+    let banner = '';
+    if (flagsWeek > 0 || this._levelElevated(this._manual.level)) {
+      const bits = [];
+      if (flagsWeek > 0) bits.push('<strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Review below and open an investigation on anything that does not add up.');
+      if (this._levelElevated(this._manual.level)) bits.push('Manager flagged: ' + esc(this._manual.level) + '.');
+      banner = '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);">' + bits.join(' ') + '</div>';
+    }
 
-    // ── Stat strip ──
-    const stat = (label, valHtml, cls, sub) =>
+    // Stat strip (no score — counts + dollars that drive action).
+    const stat = (label, valHtml, cls) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + valHtml + '</div>'
-      + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
+      + '<div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + valHtml + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
-      + stat('Theft Risk Score', overall != null ? String(overall) : '-', this.scoreClass(overall), esc(this.ratingFor(overall)))
+      + stat('Flags Today', String(flagsToday), flagsToday > 0 ? 'warn' : '')
+      + stat('Flags This Week', String(flagsWeek), flagsWeek > 0 ? 'warn' : '')
+      + stat('Confirmed Theft (7d)', wkd.theft.amount ? App.fmtCurrency(wkd.theft.amount) : '-', wkd.theft.count ? 'warn' : '')
       + stat('Open Investigations', String(open.length))
-      + stat('Confirmed Theft (90d)', confirmed.totalValue ? App.fmtCurrency(confirmed.totalValue) : '-', confirmed.count ? 'warn' : '')
-      + stat('Unexplained Pour Variance', (pour.score != null && pour.varDollar) ? App.fmtCurrency(pour.varDollar) : '-')
       + '</div></div>';
 
-    // ── Signals table (replaces five cards) ──
-    const reads = {
-      pour: pour.score == null ? 'No spot checks logged yet'
-        : pour.flagged + ' of ' + pour.items + ' pours flagged, ' + App.fmtCurrency(pour.varDollar) + ' variance',
-      voids: voids.score == null ? 'No voids or comps logged yet'
-        : voids.unauth + ' of ' + voids.count + ' rung without manager auth, ' + App.fmtCurrency(voids.total) + ' total',
-      cash: cash.score == null ? 'No cash variances logged yet'
-        : cash.shorts + ' of ' + cash.count + ' counts short, ' + App.fmtCurrency(Math.abs(cash.netShort)) + ' net short',
-      unauth: unauthComps.score == null ? 'No void/comp records yet'
-        : (unauthComps.count === 0 ? 'No large comps over threshold without auth (90d)'
-           : unauthComps.count + ' large comps over threshold without auth, ' + App.fmtCurrency(unauthComps.total)),
-      confirmed: confirmed.score == null ? 'No adjustments logged yet'
-        : (confirmed.count === 0 ? 'No theft events logged in the last 90 days'
-           : confirmed.count + ' confirmed events, ' + App.fmtCurrency(confirmed.totalValue))
-    };
-    const sigRow = (name, sig, read, go) => {
-      const cls = this.scoreClass(sig.score);
-      const color = cls === 'warn' ? 'var(--red)' : cls === 'dim' ? 'var(--t3)' : 'var(--t1)';
-      return '<tr>'
-        + '<td><div class="val">' + name + '</div></td>'
-        + '<td style="color:' + color + ';font-weight:700;">' + (sig.score != null ? sig.score : '-') + '</td>'
-        + '<td style="color:var(--t2);">' + read + '</td>'
-        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm tr-review" data-go="' + go + '">Review</button></td>'
-        + '</tr>';
-    };
-    const signalsTable = '<div class="sh" style="margin:0 0 10px;">Where the Risk Is</div>'
+    // Flags table — Today + Last 7 Days per signal. Today colors red when > 0.
+    const fRow = (name, t, w, amt) => '<tr>'
+      + '<td><div class="val">' + name + '</div></td>'
+      + '<td style="color:' + (t > 0 ? 'var(--red)' : 'var(--t3)') + ';font-weight:700;">' + t + '</td>'
+      + '<td>' + w + '</td>'
+      + '<td>' + (amt ? App.fmtCurrency(amt) : '-') + '</td>'
+      + '</tr>';
+    const flagsTable = '<div class="sh" style="margin:0 0 10px;">What Flagged</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Signal</th><th>Score</th><th>What it shows</th><th class="no-print"></th></tr></thead><tbody>'
-      + sigRow('Pour Variance', pour, reads.pour, 'ic-spot-check')
-      + sigRow('Voids and Comps', voids, reads.voids, 'sc-void-comp')
-      + sigRow('Cash Variance', cash, reads.cash, 'sc-cash-history')
-      + sigRow('Unauthorized Large Comps', unauthComps, reads.unauth, 'sc-void-comp')
-      + sigRow('Confirmed Theft', confirmed, reads.confirmed, 'ic-adjustments')
+      + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th></tr></thead><tbody>'
+      + fRow('Voids/comps without manager auth', td.voids.count, wkd.voids.count, wkd.voids.amount)
+      + fRow('Cash drawer shorts', td.shorts.count, wkd.shorts.count, wkd.shorts.amount)
+      + fRow('Flagged spot checks', td.spots.count, wkd.spots.count, wkd.spots.amount)
+      + fRow('Large comps over threshold (no auth)', td.largeComps.count, wkd.largeComps.count, wkd.largeComps.amount)
+      + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
       + '</tbody></table></div></div>';
 
-    // ── Manager's Read ──
+    // Manager's Read — a standing concern note (auto-saved). Not a score.
     const levelOpts = '<option value="">No read yet</option>'
       + this.MANAGER_LEVELS.map(l => '<option' + (this._manual.level === l ? ' selected' : '') + '>' + l + '</option>').join('');
     const managerCard = '<div class="sh" style="margin:22px 0 10px;">Manager\'s Read</div>'
@@ -186,34 +124,27 @@ S.TheftRisk = {
       + '<textarea class="form-input notes-ta" id="tr-notes" rows="2" placeholder="What you see that the data does not: cameras, behavior, staffing, policy">' + esc(this._manual.notes) + '</textarea></div>'
       + '</div>';
 
-    // ── Buttons (bottom-left of the scorecard) ──
-    const btnRow = '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="tr-save">Save Scorecard</button>'
-      + '<button class="btn btn-ghost" id="tr-brief">Theft and Loss Brief</button>'
-      + '<span id="tr-msg" style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:1px;display:none;margin-left:8px;">Scorecard saved.</span>'
-      + '</div>';
+    // Brief button (bottom-left). No Save Scorecard — there is no score to save.
+    const btnRow = '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-ghost" id="tr-brief">Theft and Loss Brief</button></div>';
 
-    this.container.innerHTML = '<div class="screen">' + banner + statStrip + signalsTable + managerCard + btnRow
-      + this.investigationsSection() + this.historyCard() + '</div>';
+    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable + managerCard + btnRow
+      + this.investigationsSection() + '</div>';
 
-    // ── Wiring ──
-    this.container.querySelectorAll('.tr-review').forEach(b => b.addEventListener('click', () => App.openScreen(b.dataset.go)));
+    // Wiring
     document.getElementById('tr-manual')?.addEventListener('change', e => {
       this._manual.notes = document.getElementById('tr-notes')?.value || '';
       this._manual.level = e.target.value;
+      this._saveManual();
       this.renderMain();
     });
-    document.getElementById('tr-notes')?.addEventListener('input', e => { this._manual.notes = e.target.value; });
-    document.getElementById('tr-save')?.addEventListener('click', () => this.save());
+    document.getElementById('tr-notes')?.addEventListener('change', e => { this._manual.notes = e.target.value; this._saveManual(); });
     document.getElementById('tr-brief')?.addEventListener('click', () => this.printBrief());
 
-    // Investigations
     this.container.querySelector('.vi-open-btn')?.addEventListener('click', () => {
       const sel = this.container.querySelector('.vi-product-select');
       const productId = sel && sel.value;
       if (!productId) { if (sel) sel.style.borderColor = 'var(--red)'; return; }
       const p = this.productById(productId);
-      // Dedup: reuse an open investigation for this product instead of duplicating.
       const existing = (App.data.variance_investigations || []).find(i => i.product_id === productId && i.status !== 'resolved');
       if (existing) { App.pushView(() => this.renderInvestigation(existing.id)); return; }
       const inv = {
@@ -359,25 +290,8 @@ S.TheftRisk = {
     });
   },
 
-  // ── Score history ──────────────────────────────────────────────────────────
-  historyCard() {
-    const hist = (App.data.theft_scores || []).slice(-6).reverse();
-    if (!hist.length) return '';
-    const rows = hist.map(s => {
-      const ov = s.overall != null ? s.overall : s.total;
-      const cls = this.scoreClass(ov);
-      return '<tr><td>' + (s.date ? String(s.date).slice(0, 10) : '-') + '</td>'
-        + '<td class="' + (cls === 'good' ? 'pos' : cls === 'warn' ? 'neg' : '') + ' val">' + (ov != null ? ov : '-') + '</td>'
-        + '<td>' + esc(s.rating || '-') + '</td></tr>';
-    }).join('');
-    return '<div class="sh" style="margin:22px 0 10px;">Score History</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Score</th><th>Rating</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-  },
-
-  /* Guided Variance Investigation — the Fix System's variance process as a
-     trackable workflow on a flagged product. Step 5 is a controlled re-measure
-     that stays attached to THIS investigation, not a new spot-check flag. */
+  /* The Fix System's variance process as a trackable workflow. Step 5 is a
+     controlled re-measure that stays attached to THIS investigation. */
   VARIANCE_STEPS: [
     { title: 'Verify the count',
       detail: 'Check every storage location for a missed partial or a count error before chasing theft.' },
@@ -459,7 +373,7 @@ S.TheftRisk = {
     return { step2: step2Html, step3: step3Html };
   },
 
-  // Worksheet now PRINTS the six steps so it actually guides the investigation.
+  // Worksheet PRINTS the six steps so it actually guides the investigation.
   printBlankInvestigation() {
     App.printBlankSheet({
       title: 'Variance Investigation Worksheet',
@@ -474,21 +388,18 @@ S.TheftRisk = {
     });
   },
 
-  // ── Quarterly Theft & Loss Brief (PDF) ──────────────────────────────────────
+  // ── 90-Day Theft & Loss Brief (PDF) — the periodic owner/insurance review ──
   async printBrief() {
-    const { pour, voids, cash, confirmed, unauthComps, autoScore } = this._signals();
-    const overall = autoScore;
-
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = App.ymdLocal(cutoff);
+    const d = this._signalData(cutoffStr);
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = App.ymdLocal(cutoff);
-    const inWindow = (d) => d && String(d).slice(0, 10) >= cutoffStr;
-
+    const inWindow = (dt) => dt && String(dt).slice(0, 10) >= cutoffStr;
+    const recentSpots = this.spotChecks().filter(c => inWindow(c.date));
     const recentVCs = this.voidComps().filter(r => inWindow(r.date));
     const recentVars = this.variances().filter(v => inWindow(v.date));
-    const recentSpots = this.spotChecks().filter(c => inWindow(c.date));
     const recentAdj = this.adjustments().filter(a => inWindow((a.date_time || '').slice(0, 10)));
 
     const investigations = (App.data?.variance_investigations || []);
@@ -498,25 +409,21 @@ S.TheftRisk = {
     try { await App._ensurePDFLib(); }
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
-    const dash = (s) => s != null ? s : '-';
     const b = App._pdfBuilder('Theft & Loss Brief');
     b.header({ right: 'Theft & Loss Brief', meta: '90-day review, generated ' + today });
 
-    b.sectionTitle('Overall Risk Score');
-    b.heading((overall != null ? String(overall) : '-') + '   ' + this.ratingFor(overall), 18);
-    b.paragraph('Score is the average of the operational signals below.', { gray: 100, size: 9 });
+    b.sectionTitle('Loss Signals (90 Days)');
+    b.table(['Signal', 'Events', 'Amount'], [
+      ['Voids/comps without manager auth', String(d.voids.count), fmt$(d.voids.amount)],
+      ['Cash drawer shorts', String(d.shorts.count), fmt$(d.shorts.amount)],
+      ['Flagged spot checks', String(d.spots.count), fmt$(d.spots.amount)],
+      ['Large comps over threshold (no auth)', String(d.largeComps.count), fmt$(d.largeComps.amount)],
+      ['Confirmed theft (adjustment log)', String(d.theft.count), fmt$(d.theft.amount)]
+    ], { columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } } });
+
     if (this._manual.level) {
       b.paragraph("Manager's read: " + this._manual.level + (this._manual.notes ? ' - ' + this._manual.notes : ''), { gray: 100, size: 9 });
     }
-
-    b.sectionTitle('Signal Summary');
-    b.table(['Signal', 'Score', 'Detail'], [
-      ['Pour Variance (spot checks)', dash(pour.score), pour.flagged ? pour.flagged + ' of ' + pour.items + ' flagged' : '-'],
-      ['Voids & Comps (loss-bearing only)', dash(voids.score), voids.count ? voids.count + ' loss records, ' + fmt$(voids.total) : '-'],
-      ['Cash Variance', dash(cash.score), cash.count ? cash.shorts + ' shorts of ' + cash.count + ' counts, ' + fmt$(Math.abs(cash.netShort)) + ' net short' : '-'],
-      ['Unauthorized Large Comps', dash(unauthComps.score), unauthComps.count ? unauthComps.count + ' over threshold without auth, ' + fmt$(unauthComps.total) : '-'],
-      ['Confirmed Theft (adjustment log)', dash(confirmed.score), confirmed.count ? confirmed.count + ' events, ' + fmt$(confirmed.totalValue) : '-']
-    ], { columnStyles: { 1: { halign: 'right' } } });
 
     b.sectionTitle('90-Day Event Counts');
     b.table(null, [
@@ -540,39 +447,13 @@ S.TheftRisk = {
     await b.save('BarCop_TheftLossBrief_' + App._pdfDateStamp() + '.pdf');
   },
 
-  async save() {
-    const { pour, voids, cash, confirmed, unauthComps, autoScore } = this._signals();
-    const overall = autoScore;
-
-    App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
-    const scoreRec = {
-      id: App.uid(),
-      date: new Date().toISOString(),
-      auto_score: autoScore,
-      signals: { pour: pour.score, voids: voids.score, cash: cash.score, confirmed: confirmed.score, unauthComps: unauthComps.score },
-      manual_level: this._manual.level,
-      notes: this._manual.notes,
-      overall,
-      rating: this.ratingFor(overall)
-    };
-    App.data.last_theft_score_date = new Date().toISOString();
-
-    await App.saveKey('theft_manual');
-    await App.putRecord('core', 'theft_score', scoreRec);
-    await App.saveKey('last_theft_score_date');
-    const m = document.getElementById('tr-msg');
-    if (m) { m.style.display = 'inline'; setTimeout(() => { if (m) m.style.display = 'none'; }, 2500); }
-    this.renderMain();
-  },
-
   showHowTo() {
     App.showHelpModal('How Theft Risk Works', [
-      { p: ['A read-only score of how exposed you are to theft and loss, built from the operational data you already log. It does not accuse anyone; it points you at where the money is most likely leaking so you can investigate.'] },
-      { h: 'The Score', p: ['One number, 0 (strong controls) to 100 (high risk), averaged from the five signals below. Each signal only counts once it has enough samples to be meaningful, so a single bad night does not swing it. The number is pure data.'] },
-      { h: 'Where the Risk Is', p: ['The five signals: flagged pour variance from spot checks, voids and comps rung without a manager, drawer counts coming up short, large comps filed over your threshold without authorization, and confirmed theft from the Adjustment Log. Red is high, green is contained, grey means not enough data yet. Review jumps you to the screen that feeds each signal.'] },
-      { h: "Manager's Read", p: ['Data does not see cameras, body language, or a gut feeling about a shift. Record your own concern level and notes here. It is kept for the brief and the history and raises a banner when you flag concern, but it does NOT change the data score, because the score stays honest.'] },
-      { h: 'Variance Investigations', p: ['When a product shows unexplained variance, open an investigation and work the six steps in order. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings, then resolve and close. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open investigation instead of starting a new one. Print the Worksheet to work the steps on paper at the bar.'] },
-      { h: 'Save Scorecard and Brief', p: ['Save Scorecard snapshots today\'s score and your read into the history below. Theft and Loss Brief generates a one-page PDF for an owner, bookkeeper, or insurance review.'] }
+      { p: ['Theft Risk is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
+      { h: 'What Flagged', p: ['The five things worth a look: voids or comps rung without a manager, drawer counts coming up short, flagged spot checks, large comps filed over your threshold without authorization, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.'] },
+      { h: "Manager's Read", p: ['Data does not see cameras, body language, or a gut feeling about a shift. Record your concern level and notes here; it saves on its own, rides along in the Brief, and raises a banner when you flag concern. It is context, not a grade.'] },
+      { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings, then resolve and close. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
+      { h: 'Theft and Loss Brief', p: ['Generates a one-page 90-day PDF summary of every loss signal and your investigations, for an owner, bookkeeper, or insurance review. The 90-day window is right for a review document; the live page above stays on the last 7 days.'] }
     ]);
   }
 };
