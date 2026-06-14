@@ -481,6 +481,23 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    lighter. overflow:hidden clips the edge-to-edge table to the rounded corners. */
 .data-card{overflow:hidden;}
 .data-card .card-bleed-tbl{margin-top:-20px;margin-bottom:-20px;}
+
+/* ── Profit Fix (campaign tiles + guided step flow) ────────────────────────── */
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px;}
+.pf-tile{background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s,background .15s,transform .08s;}
+.pf-tile:hover{border-color:var(--gold-tint-bord);background:#0D181E;}
+.pf-tile:active{transform:scale(0.99);}
+.pf-tile.fixed{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
+.pf-progbar{height:6px;background:#0D181E;border-radius:4px;overflow:hidden;}
+.pf-progbar>span{display:block;height:100%;background:var(--gold);border-radius:4px;transition:width .4s ease;}
+.pf-step{border:1px solid var(--b-edge);border-radius:9px;margin-bottom:10px;background:var(--surface);transition:border-color .15s,background .15s;}
+.pf-step.cur{border-color:var(--gold);background:#0D181E;}
+.pf-step.up{cursor:pointer;}
+.pf-step.done{cursor:pointer;opacity:.6;}
+.pf-step.up:hover,.pf-step.done:hover{border-color:var(--gold-tint-bord);}
+.pf-check{flex-shrink:0;width:26px;height:26px;border-radius:50%;border:2px solid var(--b1);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color .12s,background .12s;}
+.pf-check.on{border-color:var(--gold);background:var(--gold);}
+.pf-srow{cursor:pointer;}
 .data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
 .data-card .tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
 .data-card .tbl tbody tr:last-child td{border-bottom:none;}
