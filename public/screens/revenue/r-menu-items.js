@@ -209,6 +209,7 @@ S.RevenueMenuItems = {
     this.mode = null;
     this.linkedProductId = '';
     this._editingIncomplete = false;
+    this._editReturn = null;
 
     // Always-on inline Add form with an Enter Manually / Import File segmented
     // toggle ([[unified-import-pattern]]). Manual = the shared formBodyHtml()
@@ -335,8 +336,12 @@ S.RevenueMenuItems = {
     return 'inventory';
   },
 
-  openEditor(item) {
+  openEditor(item, opts) {
     this._editItem = item || null;
+    // Optional return callback: a foreign door (Profit > Recipe Cost Analysis)
+    // opens this modal IN PLACE over its own page and re-renders itself on close
+    // instead of the Menu Items landing — so no cross-section jump.
+    this._editReturn = (opts && opts.onDone) || null;
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
     this.formType  = item ? this.classifyItem(item) : null;
     this.linkedProductId = item?.linked_product_id || '';
@@ -386,10 +391,13 @@ S.RevenueMenuItems = {
       + '<div id="mi-adaptive"></div>';
   },
 
-  // Close the edit modal and rebuild the landing — restores the inline add form.
+  // Close the edit modal and return to the calling page — the Menu Items landing
+  // by default (rebuilds the inline add form), or a foreign door's own re-render.
   cancelEditor() {
     App.closeModal('mi-editor');
-    this.renderLanding();
+    const back = this._editReturn;
+    this._editReturn = null;
+    if (back) back(); else this.renderLanding();
   },
 
   // Start Over on the inline add form = a clean, blank landing render.
@@ -762,7 +770,9 @@ S.RevenueMenuItems = {
     this.linkedProductId = '';
     this.formType = null;
     App.closeModal('mi-editor');
-    this.renderLanding();
+    const back = this._editReturn;
+    this._editReturn = null;
+    if (back) back(); else this.renderLanding();
   },
 
   // ── Import (CSVMapper drop-file behind the Import File toggle) ───────
