@@ -231,7 +231,7 @@ S.InventoryDeliveryHistory = {
         + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
-        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">Flag</button></td>'
+        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">File Discrepancy</button></td>'
         + '</tr>';
     }).join('');
 
