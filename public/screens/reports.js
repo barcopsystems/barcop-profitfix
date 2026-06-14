@@ -186,11 +186,12 @@ S.Reports = {
         + '<td>' + App.fmtCurrency(w.food?.revenue || 0) + '</td>'
         + '<td class="' + (w.food?.cost_pct > fT ? 'neg' : 'pos') + '">' + App.fmtPct(w.food?.cost_pct) + '</td>'
         + '<td class="' + (w.prime_cost_pct > pT ? 'neg' : 'pos') + '">' + App.fmtPct(w.prime_cost_pct) + '</td>'
-        + '<td class="' + (costGap > 0 ? 'neg' : costGap < 0 ? 'pos' : '') + '">' + gapStr + '</td></tr>';
-    }).join('') || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No weeks in this range. Pick a wider range above.</td></tr>';
-    const histCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:640px;">'
-      + '<colgroup><col style="width:13%"/><col style="width:9%"/><col style="width:14%"/><col style="width:12%"/><col style="width:14%"/><col style="width:13%"/><col style="width:10%"/><col style="width:15%"/></colgroup>'
-      + '<thead><tr><th>Period End</th><th>Week</th><th>Bar Sales</th><th>Bar Cost %</th><th>Food Sales</th><th>Food Cost %</th><th>Prime %</th><th>Cost vs Target $</th></tr></thead>'
+        + '<td class="' + (costGap > 0 ? 'neg' : costGap < 0 ? 'pos' : '') + '">' + gapStr + '</td>'
+        + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm pr-view" data-id="' + w.id + '">View</button></td></tr>';
+    }).join('') || '<tr><td colspan="9" style="color:var(--t3);padding:12px 8px;">No weeks in this range. Pick a wider range above.</td></tr>';
+    const histCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:700px;">'
+      + '<colgroup><col style="width:12%"/><col style="width:8%"/><col style="width:13%"/><col style="width:11%"/><col style="width:13%"/><col style="width:11%"/><col style="width:9%"/><col style="width:14%"/><col style="width:9%"/></colgroup>'
+      + '<thead><tr><th>Period End</th><th>Week</th><th>Bar Sales</th><th>Bar Cost %</th><th>Food Sales</th><th>Food Cost %</th><th>Prime %</th><th>Cost vs Target $</th><th></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div></div>';
 
     return statStrip + filterRow + custom + histCard + '<div id="pr-week-detail"></div>';
@@ -209,6 +210,7 @@ S.Reports = {
     document.getElementById('pr-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderMain(); });
     document.getElementById('pr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
     this.container.querySelectorAll('.pr-row').forEach(r => r.addEventListener('click', () => this.showWeekDetail(r.dataset.id)));
+    this.container.querySelectorAll('.pr-view').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.showWeekDetail(b.dataset.id); }));
   },
 
   showWeekDetail(id) {
