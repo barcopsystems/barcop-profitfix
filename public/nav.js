@@ -24,17 +24,9 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Recipe Cost Analysis</span>
       </div>
-      <div class="nav-item" data-screen="vendor-watch" id="nav-vendor-watch">
+      <div class="nav-item" data-screen="vendor-tracker" id="nav-vendor-tracker">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Vendor Watch</span>
-      </div>
-      <div class="nav-item" data-screen="vendor-scorecard" id="nav-vendor-scorecard">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 11.5V8M8.5 11.5V5.5M12 11.5V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        <span class="nav-label">Vendor Scorecard</span>
-      </div>
-      <div class="nav-item" data-screen="vendor-discrepancy" id="nav-vendor-discrepancy">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2h6l3.5 3.5V15H4V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v3.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.5M8.5 12.2v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        <span class="nav-label">Vendor Discrepancies</span>
+        <span class="nav-label">Vendor Tracker</span>
       </div>
       <div class="nav-section">Controls</div>
       <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
