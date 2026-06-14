@@ -698,7 +698,6 @@ S.InventoryProducts = {
   },
 
   _wireForm() {
-    document.getElementById('ip-back')?.addEventListener('click', () => { App.closeModal('ip-form-modal'); this.renderLanding(); });
     document.getElementById('ip-cancel')?.addEventListener('click', () => { App.closeModal('ip-form-modal'); this.renderLanding(); });
     document.getElementById('ip-save')?.addEventListener('click', () => this.save());
     document.getElementById('ip-name')?.focus();

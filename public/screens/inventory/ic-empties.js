@@ -303,9 +303,8 @@ S.InventoryEmpties = {
 
     const btn = document.getElementById('emb-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const list = this.empties();
     let ok = true;
-    for (const r of recs) { list.push(r); ok = (await App.putRecord('ic', 'empty', r)) && ok; }
+    for (const r of recs) { ok = (await App.putRecord('ic', 'empty', r)) && ok; }
     if (ok) { this._draft = null; this._draftRows = null; (typeof after === 'function' ? after : () => this.renderList())(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save All'; } fail('Save failed. Try again.'); }
   },

@@ -251,7 +251,9 @@ S.PrepBatches = {
     this._scope = this.container;
     if (this._draft) App.restoreDraft(this.container, this._draft);
     this.renderRows();
+    this._restoring = true;
     this.calc();
+    this._restoring = false;
     this._wireForm(this.container);
     App.applyCollapsed(this.container);
   },
@@ -437,7 +439,7 @@ S.PrepBatches = {
   // batch survives leaving the screen and coming back. Only the inline form; the
   // edit pop-up (this._scope = the modal) is left untouched.
   _syncDraft() {
-    if (this._scope !== this.container) return;
+    if (this._restoring || this._scope !== this.container) return;
     this._draft = App.captureDraft(this.container);
     this._draftRows = this.rows.map(r => ({ ...r }));
   },
