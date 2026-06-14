@@ -182,206 +182,220 @@ S.RevenueMenuItems = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    // External focus from Recipe Cost Analysis — drop into the right form for the item.
-    if (App._menuItemFocus) {
-      const focusId = App._menuItemFocus;
-      App._menuItemFocus = null;
-      const idx = this.items().findIndex(i => i.id === focusId);
-      if (idx >= 0) { this.showFormForIdx(idx); return; }
-    }
+    if (actions) actions.innerHTML = '';
     this.renderLanding();
+    // External focus (e.g. from Recipe Cost Analysis): open the editor modal in
+    // place over the landing — no full-screen swap, works the same from any door.
+    if (App._menuItemFocus) {
+      const it = this.items().find(i => i.id === App._menuItemFocus);
+      App._menuItemFocus = null;
+      if (it) this.openEditor(it);
+    }
   },
 
   // ── Landing: three cards + tabs + filtered table ─────────────────────
+  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages'],
+
   renderLanding() {
-    this.actions.innerHTML = '';
-    const impBtn = document.createElement('button');
-    impBtn.className = 'btn btn-ghost btn-sm';
-    impBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-right:5px;"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Import';
-    impBtn.addEventListener('click', () => this.showImport());
-    this.actions.appendChild(impBtn);
-
     const all = this.items();
-    const counts = {
-      plate:     all.filter(i => this.classifyItem(i) === 'plate').length,
-      cocktail:  all.filter(i => this.classifyItem(i) === 'cocktail').length,
-      inventory: all.filter(i => this.classifyItem(i) === 'inventory').length
-    };
+    const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
 
-    const card = (type, label, sub) => {
-      const n = counts[type] || 0;
-      return '<div class="mi-card" data-type="' + type + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px 22px 22px;cursor:pointer;text-align:center;transition:border-color 0.15s;">'
-        + '<div style="font-size:18px;font-weight:800;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">' + esc(label) + '</div>'
-        + '<div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">' + esc(sub) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">' + n + ' item' + (n === 1 ? '' : 's') + '</div>'
-        + '<span class="mi-card-add" data-type="' + type + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ Add ' + esc(label.split(' ')[0]) + '</span>'
-        + '</div>';
-    };
-
-    const cardsBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">'
-      + card('plate',     'Menu Plate Item',     'Appetizer, Entree, Dessert, Special')
-      + card('cocktail',  'Menu Cocktail Item',  'Built drink with ingredients')
-      + card('inventory', 'Menu Inventory Item', 'Beer, Wine, NA, direct pour')
+    const actionRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
+      + '<button class="btn btn-primary" id="mi-add">+ Add Menu Item</button>'
+      + '<button class="btn btn-ghost btn-sm" id="mi-import">Import</button>'
       + '</div>';
 
-    // Tabs
-    const tabBtn = (k, label) => {
-      const active = this.activeTab === k;
-      return '<button class="mi-tab" data-tab="' + k + '" style="background:none;border:none;'
-        + 'border-bottom:2px solid ' + (active ? 'var(--gold)' : 'transparent') + ';'
-        + 'color:' + (active ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;font-weight:700;'
-        + 'letter-spacing:0.5px;text-transform:uppercase;padding:10px 14px;cursor:pointer;">'
-        + esc(label) + ' &middot; ' + (counts[k] || 0)
-        + '</button>';
-    };
-    const tabsBlock = '<div style="display:flex;gap:2px;border-bottom:1px solid var(--b2);margin-bottom:14px;">'
-      + tabBtn('plate', 'Plate Items')
-      + tabBtn('cocktail', 'Cocktail Items')
-      + tabBtn('inventory', 'Inventory Items')
-      + '</div>';
-
-    // Filtered list for active tab
-    const itemsHere = all.filter(i => this.classifyItem(i) === this.activeTab);
-    const incomplete = itemsHere.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
-
-    let listHtml;
-    if (itemsHere.length === 0) {
-      const blurb = {
-        plate:     'No plate items yet. Click "Menu Plate Item" above to add your first one.',
-        cocktail:  'No cocktail items yet. Click "Menu Cocktail Item" above to add your first one.',
-        inventory: 'No inventory items yet. Click "Menu Inventory Item" above to add your first one.'
-      };
-      listHtml = '<div class="empty"><div class="empty-title">Nothing here yet</div>'
-        + '<div class="empty-sub">' + esc(blurb[this.activeTab] || '') + '</div></div>';
+    let body;
+    if (!all.length) {
+      body = '<div class="card form-card"><div class="empty">'
+        + '<div class="empty-title">No menu items yet</div>'
+        + '<div class="empty-sub">Add your cocktails, food, and direct-pour beer/wine. Each item carries its price and cost so Bar Cop can show your margins and flag what is bleeding.</div>'
+        + '<button class="btn btn-primary" id="mi-add-empty" style="margin-top:14px;">+ Add Your First Item</button>'
+        + '</div></div>';
     } else {
-      const rows = itemsHere.map((item) => {
-        const cost = App.menuItemCost(item) || 0;
-        const cm   = (item.price && cost) ? (item.price - cost) : null;
-        const pct  = (item.price && cost) ? (cost / item.price * 100).toFixed(1) : null;
-        const ok   = item.price && cost;
-        const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-        const hasLinked = !!item.linked_product_id;
-        const badgeStyle = 'font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;margin-left:6px;';
-        const tagBadge = hasRecipe
-          ? '<span style="' + badgeStyle + '">RECIPE</span>'
-          : (hasLinked ? '<span style="' + badgeStyle + '">LINKED</span>' : '');
-        const costFrom = hasRecipe ? '<div style="font-size:9px;color:var(--t3);">from recipe</div>'
-                       : (hasLinked ? '<div style="font-size:9px;color:var(--t3);">from linked product</div>' : '');
-        return '<tr class="' + (!ok ? 'row-incomplete' : '') + '">'
-          + '<td style="width:36px;"><input type="checkbox" class="ri-chk" data-id="' + item.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
-          + '<td style="font-weight:600;color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + tagBadge + (!ok ? ' <span style="font-size:10px;font-weight:700;color:var(--red);">INCOMPLETE</span>' : '') + '</td>'
-          + '<td>' + esc(item.category || '') + '</td>'
-          + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-          + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + costFrom + '</td>'
-          + '<td>' + (pct ? pct + '%' : '-') + '</td>'
-          + '<td>' + (cm ? App.fmtCurrency(cm) : '-') + '</td>'
-          + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
-          + '<td style="white-space:nowrap;">'
-          + '<button class="btn btn-ghost btn-sm ri-edit" data-id="' + item.id + '" style="margin-right:4px;">Edit</button>'
-          + '<button class="btn btn-danger btn-sm ri-del" data-id="' + item.id + '">Del</button>'
-          + '</td></tr>';
+      const cats = [...new Set(all.map(i => i.category || 'Uncategorized'))]
+        .sort((a, b) => {
+          const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+        });
+      const warn = incompleteN > 0
+        ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:16px;font-size:12px;color:var(--t1);">'
+          + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
+        : '';
+      const sections = cats.map(cat => {
+        const items = all.filter(i => (i.category || 'Uncategorized') === cat)
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        const rows = items.map(item => {
+          const cost = App.menuItemCost(item) || 0;
+          const cm   = (item.price && cost) ? (item.price - cost) : null;
+          const pct  = (item.price && cost) ? (cost / item.price * 100) : null;
+          const tgt  = item.target_cost_pct || (this.classifyItem(item) === 'plate' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
+          const ok   = item.price && cost;
+          const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+          const src  = hasRecipe ? 'from recipe' : (item.linked_product_id ? 'from linked product' : (item.cost ? 'manual cost' : ''));
+          return '<tr>'
+            + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
+            + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
+            + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
+            + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
+            + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
+            + '<td class="' + (pct != null ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
+            + '<td>' + (cm != null ? App.fmtCurrency(cm) : '-') + '</td>'
+            + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
+            + '<td><div class="row-actions">'
+            + '<button class="btn btn-ghost btn-sm mi-edit" data-id="' + esc(item.id) + '">Edit</button>'
+            + '<button class="btn btn-danger btn-sm mi-del" data-id="' + esc(item.id) + '">Delete</button>'
+            + '</div></td></tr>';
+        }).join('');
+        return '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + '</div>'
+          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
       }).join('');
-
-      listHtml = (incomplete > 0 ? '<div class="alert-bar"><div class="alert-text">' + incomplete + ' item' + (incomplete > 1 ? 's' : '') + ' missing price or cost. Incomplete items cannot be used in Menu Engineering.</div></div>' : '')
-        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="ri-sel-all">Select All</button>'
-        + '<button class="btn btn-danger btn-sm" id="ri-del-sel" style="display:none;">Delete Selected</button>'
-        + '<span id="ri-sel-count" style="font-size:11px;color:var(--t3);"></span>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        + '<th style="width:36px;"></th>'
-        + '<th>Item Name</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Contrib. Margin</th><th>Wkly Covers</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      body = warn + sections;
     }
 
-    this.container.innerHTML = '<div class="screen">'
-      + cardsBlock
-      + tabsBlock
-      + listHtml
-      + '</div>';
+    this.container.innerHTML = '<div class="screen">' + actionRow + body + '</div>';
 
-    // Wire cards + tabs + list actions
-    this.container.querySelectorAll('.mi-card, .mi-card-add').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        const type = el.dataset.type;
-        if (type) this.showForm(type, null);
-      });
-    });
-    this.container.querySelectorAll('.mi-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this.renderLanding(); })
-    );
-    this.container.querySelectorAll('.ri-edit').forEach(btn => {
-      btn.addEventListener('click', () => this.showFormForId(btn.dataset.id));
-    });
-    this.container.querySelectorAll('.ri-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
+    document.getElementById('mi-add')?.addEventListener('click', () => this.openEditor(null));
+    document.getElementById('mi-add-empty')?.addEventListener('click', () => this.openEditor(null));
+    document.getElementById('mi-import')?.addEventListener('click', () => this.showImport());
+    this.container.querySelectorAll('.mi-edit').forEach(b =>
+      b.addEventListener('click', () => this.openEditor(this.items().find(i => i.id === b.dataset.id) || null)));
+    this.container.querySelectorAll('.mi-del').forEach(b =>
+      b.addEventListener('click', async () => {
         const ok = await App.confirmDelete();
         if (!ok) return;
-        App.data.menu_items = this.items().filter(i => i.id !== btn.dataset.id);
+        App.data.menu_items = this.items().filter(i => i.id !== b.dataset.id);
         await App.saveKey('menu_items');
         this.renderLanding();
-      });
-    });
-
-    // Multi-select
-    const updateSel = () => {
-      const checked = this.container.querySelectorAll('.ri-chk:checked');
-      const delBtn  = document.getElementById('ri-del-sel');
-      const count   = document.getElementById('ri-sel-count');
-      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
-      if (count)  count.textContent    = checked.length ? checked.length + ' selected' : '';
-    };
-    document.getElementById('ri-sel-all')?.addEventListener('click', () => {
-      const all = this.container.querySelectorAll('.ri-chk');
-      const anyUnchecked = [...all].some(c => !c.checked);
-      all.forEach(c => { c.checked = anyUnchecked; });
-      updateSel();
-    });
-    this.container.addEventListener('change', e => { if (e.target.classList.contains('ri-chk')) updateSel(); });
-    document.getElementById('ri-del-sel')?.addEventListener('click', async () => {
-      const ids = [...this.container.querySelectorAll('.ri-chk:checked')].map(c => c.dataset.id);
-      if (!ids.length) return;
-      const ok = await App.confirmDelete(ids.length + ' item' + (ids.length > 1 ? 's' : ''));
-      if (!ok) return;
-      App.data.menu_items = this.items().filter(i => !ids.includes(i.id));
-      await App.saveKey('menu_items');
-      this.renderLanding();
-    });
+      }));
   },
 
-  // ── Form routing ──────────────────────────────────────────────────────
-  showFormForId(id) {
-    const idx = this.items().findIndex(i => i.id === id);
-    if (idx < 0) return;
-    this.showFormForIdx(idx);
-  },
-  showFormForIdx(idx) {
-    const item = this.items()[idx];
-    if (!item) return;
-    const type = this.classifyItem(item);
-    this.editIdx = idx;
-    this.showForm(type, item);
+  // ── Editor (ONE modal, adapts to the chosen category) ────────────────────
+  // Replaces the old three full-screen forms. Category drives the form:
+  // Cocktails + food get the recipe builder; Beer/Wine/NA link an inventory
+  // product. No "type" pre-choice, no No-Recipe toggle — add ingredients and
+  // cost auto-computes, leave them empty and the cost field is yours to type.
+  // This is the single edit door, opened here and (later) from Recipe Cost
+  // Analysis, so no cross-section jump.
+  typeForCategory(cat) {
+    if (!cat) return null;
+    if (cat === 'Cocktails') return 'cocktail';
+    if (this.PLATE_CATEGORIES.includes(cat)) return 'plate';
+    return 'inventory';
   },
 
-  showForm(type, item) {
-    this.formType = type;
-    this.editIdx  = item ? this.items().findIndex(i => i.id === item.id) : null;
-    this.recipeOptOut = false;
+  openEditor(item) {
+    this._editItem = item || null;
+    this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
+    this.formType  = item ? this.classifyItem(item) : null;
     this.linkedProductId = item?.linked_product_id || '';
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    this.mode = hasRecipe ? item.recipe.mode : (type === 'cocktail' ? 'single' : type === 'plate' ? 'food' : null);
+    this.mode = hasRecipe ? item.recipe.mode : null;
     this.rows = hasRecipe
       ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
       : [];
-    // Field-missing highlights fire ONLY when editing an incomplete record.
-    // Add-new and edit-of-complete both stay clean.
-    this._editingIncomplete = !!(item && this.missingFields(item, type).size > 0);
+    this._editingIncomplete = !!(item && this.formType && this.missingFields(item, this.formType).size > 0);
 
-    if (type === 'plate')     this.renderPlateForm(item);
-    if (type === 'cocktail')  this.renderCocktailForm(item);
-    if (type === 'inventory') this.renderInventoryForm(item);
+    const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
+    const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
+    const catOpts = '<option value="">Select category...</option>'
+      + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">' + (item ? 'Edit Menu Item' : 'Add Menu Item') + '</div>'
+      + '<div class="form-row">'
+      + '<div class="f" style="flex:2;min-width:220px;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '</div>'
+      + '<div id="mi-adaptive"></div>'
+      + '<div class="card-actions">'
+      + '<button class="btn btn-primary" id="ri-save">' + (item ? 'Update Item' : 'Save Item') + '</button>'
+      + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
+      + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+
+    App.openModal(html, { id: 'mi-editor', maxWidth: 680, noClose: true });
+    document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
+    document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
+    document.getElementById('ri-cancel')?.addEventListener('click', () => App.closeModal('mi-editor'));
+    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
+    this.renderAdaptive(item);
+    if (item) this.applyMissingFieldHighlights(item, this.formType);
+  },
+
+  onCategoryChange(cat) {
+    this.formType = this.typeForCategory(cat);
+    if (this.formType === 'inventory') { this.mode = null; this.rows = []; }
+    else if (this.formType) {
+      this.mode = this.formType === 'cocktail' ? 'single' : 'food';
+      if (!this.rows.length) this.rows = [{ source: 'product', id: '', quantity: '' }];
+    } else { this.mode = null; this.rows = []; }
+    this.renderAdaptive(this._editItem);
+    this.refreshFieldMissing();
+  },
+
+  renderAdaptive(item) {
+    const host = document.getElementById('mi-adaptive');
+    if (!host) return;
+    if (!this.formType) {
+      host.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
+      return;
+    }
+    if (this.formType === 'inventory') {
+      host.innerHTML = this.inventoryFields(item);
+      this.wireInventoryFields();
+      return;
+    }
+    host.innerHTML = this.recipeFields(item);
+    const target = item?.target_cost_pct || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
+    this.renderRecipeSection(item, target);
+    document.getElementById('ri-price')?.addEventListener('input', () => { this.refreshFieldMissing(); this.calcRecipe(); });
+    document.getElementById('ri-cost')?.addEventListener('input', () => this.refreshFieldMissing());
+  },
+
+  recipeFields(item) {
+    return '<div class="form-row">'
+      + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
+      + '</div>'
+      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
+      + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
+  },
+
+  inventoryFields(item) {
+    const linkedId = this.linkedProductId || item?.linked_product_id || '';
+    const linkedProd = linkedId ? this.prodById(linkedId) : null;
+    const autoCost = linkedProd ? (App.bottleCost ? (App.bottleCost(linkedProd) || linkedProd.unit_cost || 0) : (linkedProd.unit_cost || 0)) : 0;
+    return '<div class="form-row"><div class="f" style="flex:1;min-width:240px;"><label>Inventory Product</label>'
+      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select></div></div>'
+      + '<div class="form-row">'
+      + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:170px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
+      + '</div>'
+      + '<div class="form-row"><div class="f" style="width:170px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div></div>'
+      + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
+  },
+
+  wireInventoryFields() {
+    document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
+      this.linkedProductId = e.target.value || '';
+      const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
+      const costInp = document.getElementById('ri-cost');
+      if (costInp) {
+        const bc = p ? (App.bottleCost ? (App.bottleCost(p) || p.unit_cost || 0) : (p.unit_cost || 0)) : 0;
+        costInp.value = bc > 0 ? bc.toFixed(2) : '';
+      }
+      const nameInp = document.getElementById('ri-name');
+      if (nameInp && p) nameInp.value = p.name;
+      this.refreshFieldMissing();
+    });
+    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
+    document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
   },
 
   // ── Plate Form ────────────────────────────────────────────────────────
@@ -569,52 +583,31 @@ S.RevenueMenuItems = {
   },
 
   // ── Recipe section (used by Plate + Cocktail forms) ──────────────────
+  // Recipe builder (food + cocktail). Always shown for those categories — no
+  // opt-out toggle. Add ingredients and cost auto-computes (Cost field locks);
+  // add none and the Cost field above stays editable (calcRecipe handles it).
   renderRecipeSection(item, target) {
     const sec = document.getElementById('ri-recipe-section');
     if (!sec) return;
-    const hasRows = this.rows.length > 0 && this.mode;
-
-    if (!hasRows) {
-      // Operator opted out of recipe — show "+ Add recipe" link only
-      sec.innerHTML = '<div class="sh">Recipe</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">'
-          + 'No recipe attached. Cost uses the manual entry above.'
-        + '</div>'
-        + '<a href="#" id="ri-add-anyway" style="font-size:11px;color:var(--gold);">+ Add a recipe</a>';
-      document.getElementById('ri-add-anyway')?.addEventListener('click', ev => {
-        ev.preventDefault();
-        this.recipeOptOut = false;
-        this.mode = this.formType === 'cocktail' ? 'single' : 'food';
-        this.rows = [{ source: 'product', id: '', quantity: '' }];
-        this.renderRecipeSection(item, target);
-        this.refreshFieldMissing();
-      });
-      return;
-    }
-
-    const modeLabel = this.mode === 'food' ? 'Food Plate' : 'Single Drink';
+    if (!this.mode) this.mode = this.formType === 'cocktail' ? 'single' : 'food';
     const plateYieldField = this.mode === 'food'
-      ? '<div class="f" style="width:130px;flex-shrink:0;"><label>Plates Per Batch</label>'
-        + '<input type="number" id="ri-plate-yield" value="' + (item?.recipe?.plate_yield || 1) + '" min="1"/></div>'
+      ? '<div class="f" style="width:140px;"><label>Plates Per Batch</label>'
+        + '<input class="form-input" type="number" id="ri-plate-yield" value="' + (item?.recipe?.plate_yield || 1) + '" min="1"/></div>'
       : '';
 
-    sec.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">'
-        + '<div>'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe &middot; ' + modeLabel + '</div>'
-          + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Cost auto-computes from current product + prep batch prices.</div>'
-        + '</div>'
-        + '<div><button class="btn btn-ghost btn-sm" id="ri-remove-recipe">No Recipe</button></div>'
+    sec.innerHTML = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe</div>'
+        + '<div style="font-size:11px;color:var(--t3);">Add ingredients and cost computes automatically. Leave empty to enter cost by hand.</div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Target Cost %</label>'
-          + '<div class="fw"><input class="suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5"/><span class="suf">%</span></div></div>'
+      + '<div class="form-row" style="margin-bottom:12px;">'
+        + '<div class="f" style="width:130px;"><label>Target Cost %</label>'
+          + '<div class="fw"><input class="form-input suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5"/><span class="suf">%</span></div></div>'
         + plateYieldField
       + '</div>'
       + '<div class="sh" style="margin-top:4px;">' + (this.mode === 'food' ? 'Kitchen' : 'Bar') + ' Ingredients</div>'
       + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      + '<div class="calc" style="margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="ri-tc">-</div></div>'
+      + '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="ri-cps">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="ri-cpct">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim" id="ri-tgt-d">-</div></div>'
@@ -623,22 +616,6 @@ S.RevenueMenuItems = {
     this.renderRows();
     this.calcRecipe();
 
-    document.getElementById('ri-remove-recipe')?.addEventListener('click', async () => {
-      const ok = await App.confirm({
-        title: 'Skip the recipe?',
-        message: 'Cost will fall back to manual entry.',
-        confirmText: 'Skip recipe',
-        cancelText: 'Keep'
-      });
-      if (!ok) return;
-      this.rows = [];
-      this.mode = null;
-      this.recipeOptOut = true;
-      const costInp = document.getElementById('ri-cost');
-      if (costInp) { costInp.disabled = false; costInp.value = ''; }
-      this.renderRecipeSection(item, target);
-      this.refreshFieldMissing();
-    });
     document.getElementById('ri-add-ing')?.addEventListener('click', () => { this.addRow(); this.calcRecipe(); });
     document.getElementById('ri-target-pct')?.addEventListener('input', () => this.calcRecipe());
     document.getElementById('ri-plate-yield')?.addEventListener('input', () => this.calcRecipe());
@@ -693,14 +670,6 @@ S.RevenueMenuItems = {
   },
   removeRow(idx) {
     this.rows.splice(idx, 1);
-    if (!this.rows.length) {
-      this.mode = null;
-      const item = this.editIdx !== null ? this.items()[this.editIdx] : null;
-      const target = item?.target_cost_pct || (this.formType === 'cocktail' ? 22 : 32);
-      this.renderRecipeSection(item, target);
-      this.refreshFieldMissing();
-      return;
-    }
     this.renderRows();
     this.calcRecipe();
   },
@@ -762,6 +731,7 @@ S.RevenueMenuItems = {
     const notes = document.getElementById('ri-notes')?.value || '';
 
     if (!name) { fail('Item name required.'); return; }
+    if (!this.formType) { fail('Pick a category first.'); return; }
     if (!(price > 0)) { fail('Menu price required.'); return; }
 
     let category = '';
@@ -897,8 +867,7 @@ S.RevenueMenuItems = {
     this.mode = null;
     this.linkedProductId = '';
     this.formType = null;
-    // Land back on the tab matching what we just saved
-    this.activeTab = type;
+    App.closeModal('mi-editor');
     this.renderLanding();
   },
 
