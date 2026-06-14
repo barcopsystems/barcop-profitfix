@@ -12,10 +12,6 @@
    warning for the next manager, so this never becomes a page nobody opens.) */
 
 S.TheftRisk = {
-  _manual: null,
-  MANAGER_LEVELS: ['Strong controls', 'Adequate controls', 'Some concern', 'Serious concern'],
-  _levelElevated(level) { return level === 'Some concern' || level === 'Serious concern'; },
-
   spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
   voidComps() {
     return ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => {
@@ -55,14 +51,7 @@ S.TheftRisk = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
-    const saved = (App.data && App.data.theft_manual) || {};
-    this._manual = { level: saved.level || '', notes: saved.notes || '' };
     this.renderMain();
-  },
-
-  _saveManual() {
-    App.data.theft_manual = { level: this._manual.level, notes: this._manual.notes };
-    App.saveKey('theft_manual');
   },
 
   renderMain() {
@@ -75,14 +64,10 @@ S.TheftRisk = {
     const flagsWeek = this._totalFlags(wkd);
     const flagsToday = this._totalFlags(td);
 
-    // Banner: flags this week (the act-now cue) and/or an elevated manager read.
-    let banner = '';
-    if (flagsWeek > 0 || this._levelElevated(this._manual.level)) {
-      const bits = [];
-      if (flagsWeek > 0) bits.push('<strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Review below and open an investigation on anything that does not add up.');
-      if (this._levelElevated(this._manual.level)) bits.push('Manager flagged: ' + esc(this._manual.level) + '.');
-      banner = '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);">' + bits.join(' ') + '</div>';
-    }
+    // Banner: the act-now cue when there are flags in the last 7 days.
+    const banner = flagsWeek > 0
+      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);"><strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Review below and open an investigation on anything that does not add up.</div>'
+      : '';
 
     // Stat strip (no score — counts + dollars that drive action).
     const stat = (label, valHtml, cls) =>
@@ -112,32 +97,13 @@ S.TheftRisk = {
       + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
       + '</tbody></table></div></div>';
 
-    // Manager's Read — a standing concern note (auto-saved). Not a score.
-    const levelOpts = '<option value="">No read yet</option>'
-      + this.MANAGER_LEVELS.map(l => '<option' + (this._manual.level === l ? ' selected' : '') + '>' + l + '</option>').join('');
-    const managerCard = '<div class="sh" style="margin:22px 0 10px;">Manager\'s Read</div>'
-      + '<div class="card form-card">'
-      + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:240px;flex-shrink:0;"><label>Concern Level</label><select class="form-input" id="tr-manual">' + levelOpts + '</select></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:0;"><label>Notes</label>'
-      + '<textarea class="form-input notes-ta" id="tr-notes" rows="2" placeholder="What you see that the data does not: cameras, behavior, staffing, policy">' + esc(this._manual.notes) + '</textarea></div>'
-      + '</div>';
-
-    // Brief button (bottom-left). No Save Scorecard — there is no score to save.
+    // Brief button (bottom-left). No score, so nothing to save here.
     const btnRow = '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-ghost" id="tr-brief">Theft and Loss Brief</button></div>';
 
-    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable + managerCard + btnRow
+    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable + btnRow
       + this.investigationsSection() + '</div>';
 
     // Wiring
-    document.getElementById('tr-manual')?.addEventListener('change', e => {
-      this._manual.notes = document.getElementById('tr-notes')?.value || '';
-      this._manual.level = e.target.value;
-      this._saveManual();
-      this.renderMain();
-    });
-    document.getElementById('tr-notes')?.addEventListener('change', e => { this._manual.notes = e.target.value; this._saveManual(); });
     document.getElementById('tr-brief')?.addEventListener('click', () => this.printBrief());
 
     this.container.querySelector('.vi-open-btn')?.addEventListener('click', () => {
@@ -421,10 +387,6 @@ S.TheftRisk = {
       ['Confirmed theft (adjustment log)', String(d.theft.count), fmt$(d.theft.amount)]
     ], { columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } } });
 
-    if (this._manual.level) {
-      b.paragraph("Manager's read: " + this._manual.level + (this._manual.notes ? ' - ' + this._manual.notes : ''), { gray: 100, size: 9 });
-    }
-
     b.sectionTitle('90-Day Event Counts');
     b.table(null, [
       ['Spot checks run', String(recentSpots.length)],
@@ -451,7 +413,6 @@ S.TheftRisk = {
     App.showHelpModal('How Theft Risk Works', [
       { p: ['Theft Risk is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
       { h: 'What Flagged', p: ['The five things worth a look: voids or comps rung without a manager, drawer counts coming up short, flagged spot checks, large comps filed over your threshold without authorization, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.'] },
-      { h: "Manager's Read", p: ['Data does not see cameras, body language, or a gut feeling about a shift. Record your concern level and notes here; it saves on its own, rides along in the Brief, and raises a banner when you flag concern. It is context, not a grade.'] },
       { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings, then resolve and close. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
       { h: 'Theft and Loss Brief', p: ['Generates a one-page 90-day PDF summary of every loss signal and your investigations, for an owner, bookkeeper, or insurance review. The 90-day window is right for a review document; the live page above stays on the last 7 days.'] }
     ]);
