@@ -5,20 +5,67 @@
    ingredient prices in Inventory Control and ranked by cost percentage, so the
    items eating your margin sort to the top. Items still on a manual cost, and
    direct-pour items whose cost auto-flows from a linked product, show in their
-   own sections below.
+   own sections below. All three sections share one column layout so the numbers
+   line up straight down the page.
 
-   Not its own editor. "Open Item" reuses the canonical Menu Items editor
+   Not its own editor. "Edit" reuses the canonical Menu Items editor
    (S.RevenueMenuItems.openEditor) as a MODAL in place and re-renders this page
    on close — same store, no cross-section jump ([[two-doors-same-data]]). */
 
 S.RecipeCostAnalysis = {
-  rcaFilter: 'all',   // hero table lens: 'all' | 'over'
+  // Shared column structure so every section's columns line up across tables
+  // (table-layout:fixed + one colgroup is the only way separate tables align).
+  COLGROUP:
+    '<colgroup>'
+    + '<col style="width:22%;"><col style="width:12%;"><col style="width:9%;">'
+    + '<col style="width:10%;"><col style="width:11%;"><col style="width:9%;">'
+    + '<col style="width:8%;"><col style="width:11%;"><col style="width:8%;">'
+    + '</colgroup>',
+  THEAD:
+    '<thead><tr><th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th>'
+    + '<th>Margin</th><th>Cost %</th><th>Target</th><th>Status</th><th></th></tr></thead>',
 
   render(container, actions) {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
     this.draw();
+  },
+
+  // One row builder for all three sections, so every column sits in the same
+  // place. cost always comes from the canonical App.menuItemCost (recipe, linked
+  // product, or manual fallback). opts: { tgt, sub, tag }.
+  rcaRow(i, opts) {
+    opts = opts || {};
+    const cost = App.menuItemCost(i) || 0;
+    const pct  = (i.price > 0 && cost > 0) ? (cost / i.price * 100) : null;
+    const margin = (i.price && cost) ? (i.price - cost) : null;
+    const tgt = opts.tgt != null ? opts.tgt : (i.target_cost_pct || null);
+    const hasStatus = (tgt != null && pct != null);
+    const over = hasStatus && pct > tgt;
+    const tagS = opts.tag ? ' <span style="font-size:9px;color:var(--t3);">' + opts.tag + '</span>' : '';
+    const subS = opts.sub ? '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">' + opts.sub + '</div>' : '';
+    const statusS = hasStatus
+      ? (over ? '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--red);">Over by ' + (pct - tgt).toFixed(1) + '%</span>'
+              : '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">On target</span>')
+      : '<span style="color:var(--t3);">-</span>';
+    return '<tr>'
+      + '<td><div class="val">' + esc(i.name) + '</div>' + subS + '</td>'
+      + '<td>' + esc(i.category || '-') + '</td>'
+      + '<td>' + (i.price ? App.fmtCurrency(i.price) : '-') + '</td>'
+      + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + tagS + '</td>'
+      + '<td>' + (margin != null ? App.fmtCurrency(margin) : '-') + '</td>'
+      + '<td class="' + (over ? 'neg' : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
+      + '<td>' + (tgt != null ? tgt.toFixed(1) + '%' : '-') + '</td>'
+      + '<td>' + statusS + '</td>'
+      + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Edit</button></td>'
+      + '</tr>';
+  },
+
+  dataCard(rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl">'
+      + '<table class="tbl" style="table-layout:fixed;width:100%;min-width:1040px;">'
+      + this.COLGROUP + this.THEAD + '<tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
 
   draw() {
@@ -70,83 +117,30 @@ S.RecipeCostAnalysis = {
       + stat('Linked Items', String(linked.length), linked.length === 0 ? 'dim' : '')
       + '</div></div>';
 
-    // ── Hero: ranked recipe items, filterable All / Over Target ─────────
-    const filter = this.rcaFilter || 'all';
-    const shownRanked = filter === 'over' ? ranked.filter(r => r.over) : ranked;
+    // ── Items With Recipes (over-target first) ──────────────────────────
+    const rankedRows = ranked.map(r =>
+      this.rcaRow(r.item, { tgt: r.tgt, sub: r.item.recipe.mode === 'food' ? 'Food Plate' : 'Single Drink' })
+    ).join('') || '<tr><td colspan="9" style="color:var(--t3);text-align:center;padding:14px;">No menu items have recipes attached yet.</td></tr>';
 
-    const rankedRows = shownRanked.map(r => {
-      const i = r.item;
-      const modeLabel = i.recipe.mode === 'food' ? 'Food Plate' : 'Single Drink';
-      const cm = (i.price && r.cost) ? (i.price - r.cost) : null;
-      return '<tr>'
-        + '<td><div class="val">' + esc(i.name) + '</div>'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">' + modeLabel + '</div></td>'
-        + '<td>' + esc(i.category || '-') + '</td>'
-        + '<td>' + (i.price ? App.fmtCurrency(i.price) : '-') + '</td>'
-        + '<td>' + App.fmtCurrency(r.cost) + '</td>'
-        + '<td>' + (cm != null ? App.fmtCurrency(cm) : '-') + '</td>'
-        + '<td class="' + (r.over ? 'neg' : '') + '">' + (r.pct != null ? r.pct.toFixed(1) + '%' : '-') + '</td>'
-        + '<td>' + r.tgt.toFixed(1) + '%</td>'
-        + '<td>' + (r.over
-            ? '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--red);">Over by ' + r.gap.toFixed(1) + '%</span>'
-            : '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">On target</span>') + '</td>'
-        + '<td><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Open Item</button></td>'
-        + '</tr>';
-    }).join('') || '<tr><td colspan="9" style="color:var(--t3);text-align:center;padding:14px;">'
-        + (filter === 'over' ? 'No items are over target.' : 'No menu items have recipes attached yet.')
-        + '</td></tr>';
-
-    // Heading row: the .sh prints, the Export button + filter chips are no-print
-    // so they stay out of the exported PDF.
+    // The .sh prints; Export PDF is no-print so it stays out of the PDF.
     const heroHead = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">Items With Recipes</div>'
         + '<button class="btn btn-ghost btn-sm no-print" id="rca-export">Export PDF</button>'
-      + '</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
-        + App.filterChips(filter, [{ v: 'all', label: 'All' }, { v: 'over', label: 'Over Target' }], 'rca-filter-chip')
       + '</div>';
-
-    const rankedTable = heroHead
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th><th>Contrib. Margin</th><th>Cost %</th><th>Target</th><th>Status</th><th></th>'
-      + '</tr></thead><tbody>' + rankedRows + '</tbody></table></div></div>';
+    const rankedTable = heroHead + this.dataCard(rankedRows);
 
     // ── Missing a Recipe (items on a manual cost) ───────────────────────
     let noRecipeSection = '';
     if (noRecipe.length) {
-      const nrRows = noRecipe.map(i =>
-        '<tr>'
-        + '<td><div class="val">' + esc(i.name) + '</div></td>'
-        + '<td>' + esc(i.category || '-') + '</td>'
-        + '<td>' + (i.price ? App.fmtCurrency(i.price) : '-') + '</td>'
-        + '<td>' + (i.cost ? App.fmtCurrency(i.cost) : '-') + ' <span style="font-size:9px;color:var(--t3);">(manual)</span></td>'
-        + '<td><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Open Item</button></td>'
-        + '</tr>').join('');
-      noRecipeSection = '<div class="sh" style="margin-top:24px;">Missing a Recipe</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody>' + nrRows + '</tbody></table></div></div>';
+      const nrRows = noRecipe.map(i => this.rcaRow(i, { tag: '(manual)' })).join('');
+      noRecipeSection = '<div class="sh" style="margin-top:24px;">Missing a Recipe</div>' + this.dataCard(nrRows);
     }
 
-    // ── Linked Inventory items — Beer / Wine / NA, cost auto-flows ───────
+    // ── Linked Inventory items — Beer / Wine / NA, cost auto-flows ──────
     let linkedSection = '';
     if (linked.length) {
-      const lRows = linked.map(i => {
-        const cost = App.menuItemCost(i) || 0;
-        const pct  = (i.price > 0 && cost > 0) ? (cost / i.price * 100) : null;
-        return '<tr>'
-          + '<td><div class="val">' + esc(i.name) + '</div></td>'
-          + '<td>' + esc(i.category || '-') + '</td>'
-          + '<td>' + (i.price ? App.fmtCurrency(i.price) : '-') + '</td>'
-          + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + ' <span style="font-size:9px;color:var(--t3);">(linked)</span></td>'
-          + '<td>' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Open Item</button></td>'
-          + '</tr>';
-      }).join('');
-      linkedSection = '<div class="sh" style="margin-top:24px;">Linked Inventory Items</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th><th>Cost %</th><th></th>'
-        + '</tr></thead><tbody>' + lRows + '</tbody></table></div></div>';
+      const lRows = linked.map(i => this.rcaRow(i, { tag: '(linked)' })).join('');
+      linkedSection = '<div class="sh" style="margin-top:24px;">Linked Inventory Items</div>' + this.dataCard(lRows);
     }
 
     this.container.innerHTML = '<div class="screen">'
@@ -157,13 +151,8 @@ S.RecipeCostAnalysis = {
     document.getElementById('rca-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Recipe Cost Analysis', root: this.container }));
 
-    // Filter chips affect the ranked (recipe) table only.
-    this.container.querySelectorAll('.rca-filter-chip').forEach(b =>
-      b.addEventListener('click', () => { this.rcaFilter = b.dataset.v; this.draw(); }));
-
-    // Open the menu item's editor as a modal IN PLACE (the canonical Menu Items
-    // editor, reused), then re-render this page on close — no cross-section jump
-    // to Revenue. One store, multiple doors ([[two-doors-same-data]]).
+    // Edit opens the canonical Menu Items editor as a modal IN PLACE, then
+    // re-renders this page on close — no cross-section jump ([[two-doors-same-data]]).
     this.container.querySelectorAll('.rca-edit').forEach(btn => {
       btn.addEventListener('click', () => {
         const item = App.menuItems().find(i => i.id === btn.dataset.id);
@@ -178,10 +167,10 @@ S.RecipeCostAnalysis = {
     App.showHelpModal('How Recipe Cost Analysis Works', [
       { p: ['A read-only diagnostic. Every menu item with a recipe is costed from the live prices of its ingredients in Inventory Control, then ranked by cost percentage so the items eating your margin sort to the top.'] },
       { h: 'The Numbers Up Top', p: ['How many items are costed from a recipe, how many of those run over their target cost percentage (red when any do), how many still need a recipe, and how many pull their cost from a linked inventory product.'] },
-      { h: 'Items With Recipes', p: ['Cost per serving computes automatically from current product prices, so when a vendor raises a price these update on their own. Cost percent is the cost against the menu price, and over-target items are flagged. Use the All and Over Target chips to focus, and Export PDF to save the analysis.'] },
-      { h: 'Missing a Recipe', p: ['These items carry a hand-entered cost. Open one and add an ingredient recipe to switch it to live, ingredient-based costing that tracks your real prices.'] },
+      { h: 'Items With Recipes', p: ['Cost per serving computes automatically from current product prices, so when a vendor raises a price these update on their own. Cost percent is the cost against the menu price, and over-target items are flagged and sorted to the top. Export PDF saves the full analysis.'] },
+      { h: 'Missing a Recipe', p: ['These items carry a hand-entered cost. Edit one and add an ingredient recipe to switch it to live, ingredient-based costing that tracks your real prices.'] },
       { h: 'Linked Inventory Items', p: ['Direct-pour beer, wine, and NA beverages. Cost flows straight from the linked inventory product, no recipe needed, and it updates whenever that product price changes.'] },
-      { h: 'Open Item', p: ['Open Item opens the menu item editor right here as a popup, the same one used on the Menu Items screen. Edit the recipe or price, save, and this page updates in place.'] }
+      { h: 'Edit', p: ['Edit opens the menu item editor right here as a popup, the same one used on the Menu Items screen. Change the recipe or price, save, and this page updates in place.'] }
     ]);
   }
 };
