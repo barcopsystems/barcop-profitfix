@@ -19,7 +19,7 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-section">Costing</div>
+      <div class="nav-section">Cost and Loss</div>
       <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Recipe Cost Analysis</span>
@@ -28,18 +28,9 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Vendor Tracker</span>
       </div>
-      <div class="nav-section">Controls</div>
       <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Theft Risk</span>
-      </div>
-      <div class="nav-item" data-screen="pour-test" id="nav-pour-test">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6l-0.5 4H6l-0.5-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 6.5l-1.5 7a1 1 0 0 0 1 1.2h6a1 1 0 0 0 1-1.2L11 6.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 10.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Pour Test</span>
-      </div>
-      <div class="nav-item" data-screen="yield-test" id="nav-yield-test">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="9" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M3 9h11" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Yield Test</span>
       </div>
       <div class="nav-item" data-screen="cash-recon" id="nav-cash-recon">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -74,19 +65,15 @@ const Revenue = {
         <span class="nav-label">Revenue Fix</span>
       </div>
       <div class="nav-section">Weekly</div>
-      <div class="nav-item" data-screen="r-forecast" id="nav-r-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Revenue Forecast</span>
-      </div>
       <div class="nav-item" data-screen="r-this-week" id="nav-r-this-week">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-item" data-screen="r-server-check" id="nav-r-server-check">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Server Check</span>
+      <div class="nav-item" data-screen="r-forecast" id="nav-r-forecast">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Revenue Forecast</span>
       </div>
-      <div class="nav-section">Menu</div>
+      <div class="nav-section">Menu and Pricing</div>
       <div class="nav-item" data-screen="r-menu-items" id="nav-r-menu-items">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Menu Items</span>
@@ -95,20 +82,20 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Menu Engineering</span>
       </div>
-      <div class="nav-item" data-screen="r-pricing" id="nav-r-pricing">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 1.8v13.4M11.7 4.4H6.9a2.1 2.1 0 0 0 0 4.2h3.2a2.1 2.1 0 0 1 0 4.2H5.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Price Calculator</span>
-      </div>
       <div class="nav-item" data-screen="r-dog-test" id="nav-r-dog-test">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Dog Test Tracker</span>
       </div>
-      <div class="nav-section">Labor</div>
+      <div class="nav-section">Performance</div>
+      <div class="nav-item" data-screen="r-server-check" id="nav-r-server-check">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Server Check</span>
+      </div>
       <div class="nav-item" data-screen="r-rplh" id="nav-r-rplh">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">RPLH Tracker</span>
       </div>
-      <div class="nav-section">Revenue</div>
+      <div class="nav-section">Events</div>
       <div class="nav-item" data-screen="r-events" id="nav-r-events">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 10h6M5.5 12.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Events and Catering</span>
