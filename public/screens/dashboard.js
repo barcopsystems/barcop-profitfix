@@ -1,113 +1,93 @@
 'use strict';
 S.Dashboard = {
-  _dismissed: false,
+  showHowTo() {
+    App.showHelpModal('How the Profit Dashboard Works', [
+      { p: ['This is the Profit Recovery landing screen. It runs the recovery loop on one page: how much you have already recovered up top, where the operation is leaking right now in the middle, the trend below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, this screen shows a Get Started strip that points you at your first audit and the Control sections that feed Recovery.'] },
+      { h: 'Recovery Scoreboard', p: ['The headline number is what Bar Cop has measured you put back in the register since you marked each fix implemented. It is realized to date, not a projection: your measured weekly improvement times the weeks since the fix. An on-pace-for-the-year figure may show as a clearly labeled secondary line, never as banked cash. A figure appears once two weeks of after-data exist and firms up over the next six.'] },
+      { h: 'Where You Are Leaking', p: ['Your cost gaps, ranked largest dollar first so your eye lands on the biggest leak. The bar length and color carry the size: red is over target, amber is watch, gold is on target. Each dollar figure is the annual cost of running off target at this week\'s pace. Pour Cost and Food Cost carry a live dollar because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they show as a row you tap to review on their own screen. Labor is the third part of prime cost and is worked in Revenue Recovery, so its row routes there. Tap any row to open the fix process for that gap.'] },
+      { h: 'Eight-Week Trend', p: ['Bar pour cost, food cost, and prime cost over the last eight weeks, with a marker on the weeks you logged a fix so you can see the metric bend after the work went in. Bar Cop Outlook reads the trend back to you in plain operator language.'] },
+      { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, view reports, and open recipe cost analysis.'] }
+    ]);
+  },
+
   render(container, actions) {
-    actions.innerHTML = '';
-    const data = App.data;
-    const weeks = data.weeks || [];
-    const targets = data.settings.targets || {};
-    const latest = weeks.length > 0 ? weeks[weeks.length-1] : null;
+    if (actions) actions.innerHTML = '';
+    this.container = container;
+    const weeks  = (App.data && App.data.weeks)  || [];
+    const audits = (App.data && App.data.audits) || [];
+    if (weeks.length === 0 && audits.length === 0) this.renderDayOne(container);
+    else this.renderFull(container);
+  },
 
-    const barPct    = latest?.bar?.cost_pct ?? null;
-    const barTarget = targets.bar_pour_cost_pct ?? 22;
-    const barRev    = latest?.bar?.revenue ?? 0;
-
-    // Alert
-    let alertHtml = '';
-    if (latest && !this._dismissed) {
-      const diff = barPct != null ? barPct - barTarget : 0;
-      if (diff > 2) {
-        const wkImpact = (diff/100)*barRev;
-        alertHtml = '<div class="alert-bar" id="db-alert">'
-          +'<div class="alert-text">Pour cost is '+diff.toFixed(1)+' points above target. '
-          +App.fmtCurrency(wkImpact)+' this week, '+App.fmtCurrency(wkImpact*52)+' annualized.</div>'
-          +'<button class="alert-dismiss" id="db-dismiss">Close</button>'
-          +'</div>';
-      }
-    }
-
-    // Flagged recipes: count menu items whose recipe-computed cost is over
-    // their target_cost_pct (or the default per category).
-    const flagged = (data.menu_items||[]).filter(i => {
-      if (!i.recipe || !Array.isArray(i.recipe.ingredients) || !i.recipe.ingredients.length || !i.price) return false;
-      const cost = App.menuItemCost(i);
-      if (!cost) return false;
-      const pct = (cost / i.price) * 100;
-      const tgt = i.target_cost_pct || (i.recipe.mode === 'food' ? 32 : 22);
-      return pct > tgt;
-    }).length;
-
-    // Chart — annotated 8-week trend
-    const chartHtml = this.buildChart(weeks.slice(-8), targets);
-
-    // Priority Action Items — ranked by dollar impact from the latest Profit audit
-    const audits = data.audits || [];
-    const latestAudit = App.latestEvent(audits);
-    const actionItems = (latestAudit?.action_items || [])
-      .filter(it => it && it.action)
-      .slice()
-      .sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0))
-      .slice(0,5);
-
-    const actionRows = actionItems.length
-      ? actionItems.map((it,i) => {
-          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, 'profit') : null);
-          return '<div class="db-action" data-gap="' + esc(gid || '') + '" '
-          + 'style="display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;'
-          + (i < actionItems.length-1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-          + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold-bg);'
-          + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</div>'
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.5;">'+esc(it.action)+'</div>'
-          + (it.monthly_impact > 0
-              ? '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:600;color:var(--gold);">'
-                + App.fmtCurrency(it.monthly_impact,0) + '<span style="font-size:9px;"> /mo</span></div>'
-              : '')
-          + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-          + '</div>';
-        }).join('')
-      : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">'
-        + 'Run a Profit Audit and your highest-impact opportunities will be ranked here by dollar impact.</div>';
-    const actionHtml = '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + FixPanel.sectionHeader('Priority Action Items')
-      + actionRows
-      + '</div>';
-
-    // Setup nudging lives at the Hub level via the catch-up banner on the
-    // Hub Dashboard. Recovery dashboards stay purely operational.
-
+  // Populated dashboard: Scoreboard + leak board (shared) + trend + quick actions.
+  renderFull(container) {
+    const weeks   = (App.data && App.data.weeks) || [];
+    const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
     container.innerHTML = '<div class="screen">'
       + FixPanel.recoveryCard('profit')
-      + alertHtml
-      + chartHtml
-      + actionHtml
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + FixPanel.sectionHeader('Quick Actions')
-      + '<div class="qa" style="padding:18px 20px;">'
-      +'<button class="btn btn-primary" id="qa-week">Enter This Week</button>'
-      +'<button class="btn btn-ghost" id="qa-shift">Profit Audit</button>'
-      +'<button class="btn btn-ghost" id="qa-reports">View Reports</button>'
-      +(flagged>0?'<button class="btn btn-danger" id="qa-recipes">'+flagged+' Recipe'+(flagged>1?'s':'')+' Above Target</button>':'')
-      +'</div>'
-      +'</div>'
-      +'</div>';
-
-    document.getElementById('db-dismiss')?.addEventListener('click', () => {
-      this._dismissed = true;
-      document.getElementById('db-alert')?.remove();
-    });
-
-    document.getElementById('qa-week')?.addEventListener('click', ()=>App.navigate('this-week'));
-    document.getElementById('qa-shift')?.addEventListener('click', ()=>App.navigate('audit-tracker'));
-    document.getElementById('qa-reports')?.addEventListener('click', ()=>App.navigate('reports'));
-    document.getElementById('qa-recipes')?.addEventListener('click', ()=>App.navigate('recipe-cost-analysis'));
-    document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
-    container.querySelectorAll('.db-action').forEach(row => {
-      row.addEventListener('click', () => {
-        if (row.dataset.gap) App._fixFocus = row.dataset.gap;
-        App.navigate('profit-fix');
-      });
-    });
+      + this.buildChart(weeks.slice(-8), targets)
+      + this.quickActions()
+      + '</div>';
     FixPanel.wireFixAreas(container);
+    document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
+    this.wireQuick(container);
+  },
+
+  // Day one (no weeks, no audits): guided steps + placeholders, like Control. The
+  // Recovery day-one points at the first audit and the Control feeds, not a prereq
+  // checklist; the wow visuals switch on only once data backs them.
+  renderDayOne(container) {
+    const hasAudit = ((App.data && App.data.audits) || []).length > 0;
+    const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
+    const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
+    const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
+
+    const step = (done, num, label, go, cross) =>
+      '<div class="db-go" data-go="' + go + '"' + (cross ? ' data-cross="1"' : '') + ' style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
+      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
+
+    const strip = '<div class="card form-card" style="margin-bottom:14px;">'
+      + '<div class="card-title">Get Started</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Run your first Profit Audit for a baseline, and set up the Control sections that feed Recovery. As that data lands, this dashboard fills in with your recovered dollars and where the operation is leaking.</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      + step(hasAudit, 1, 'Run your first Profit Audit', 'audit-tracker', false)
+      + step(hasInv,   2, 'Set up Inventory Control', 'ic-dashboard', true)
+      + step(hasShift, 3, 'Set up Shift Control', 'sc-dashboard', true)
+      + step(hasLabor, 4, 'Set up Labor Control', 'lc-dashboard', true)
+      + '</div></div>';
+
+    const ph = (title, msg) => '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">' + title + '</div>'
+      + '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div></div>';
+
+    container.innerHTML = '<div class="screen">'
+      + strip
+      + ph('Recovery Scoreboard', 'Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.')
+      + ph('Where You Are Leaking', 'Your biggest cost gaps rank here once a week of data lands, largest dollar first, each one a tap into the fix process.')
+      + this.quickActions()
+      + '</div>';
+    this.wireQuick(container);
+  },
+
+  quickActions() {
+    const btn = (go, label) => '<button class="btn btn-primary db-qa" data-go="' + go + '" style="flex:1;min-width:150px;">' + label + '</button>';
+    return '<div style="margin-top:20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
+      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
+      + btn('this-week', 'Enter This Week')
+      + btn('audit-tracker', 'Run Profit Audit')
+      + btn('reports', 'View Reports')
+      + btn('recipe-cost-analysis', 'Recipe Cost')
+      + '</div></div>';
+  },
+
+  wireQuick(container) {
+    container.querySelectorAll('.db-qa').forEach(b =>
+      b.addEventListener('click', () => App.navigate(b.dataset.go)));
+    container.querySelectorAll('.db-go').forEach(b =>
+      b.addEventListener('click', () => {
+        if (b.dataset.cross) App.openScreen(b.dataset.go); else App.navigate(b.dataset.go);
+      }));
   },
 
   buildChart(weeks, targets) {
@@ -234,52 +214,49 @@ S.Dashboard = {
   },
 
   showInsights() {
-    if (App.demoBlock('AI Trend Insights')) return;
-    const weeks=(App.data.weeks||[]).slice(-8);
-    const showModal=(html)=>{
-      const m=document.createElement('div');
-      m.className='ins-modal';
-      m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-      const box=document.createElement('div');
-      box.style.cssText='background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;';
-      box.innerHTML=html;
-      m.appendChild(box);
-      document.body.appendChild(m);
-      m.onclick=ev=>{if(ev.target===m)m.remove();};
-      box.querySelector('.ins-close')?.addEventListener('click',()=>m.remove());
-    };
-    if(weeks.length<2){
-      showModal('<div style="text-align:center;"><div style="font-size:13px;color:var(--t1);margin-bottom:16px;">Enter at least 2 weeks of data to generate trend insights.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-      return;
-    }
-    const btn=document.getElementById('db-insights-btn');
-    if(btn){btn.disabled=true;btn.textContent='Analyzing...';}
-    const t=App.data.settings.targets||{};
-    const bT=t.bar_pour_cost_pct||22,fT=t.food_cost_pct||32,pT=t.prime_cost_pct||60;
-    const avg=arr=>{const v=arr.filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length:0;};
-    const bP=weeks.map(w=>w.bar?.cost_pct).filter(v=>v!=null);
-    const fP=weeks.map(w=>w.food?.cost_pct).filter(v=>v!=null);
-    const pP=weeks.map(w=>w.prime_cost_pct).filter(v=>v!=null);
-    const bR=weeks.map(w=>w.bar?.revenue).filter(v=>v!=null);
-    const aB=avg(bP).toFixed(1),aF=avg(fP).toFixed(1),aP=avg(pP).toFixed(1),aR=avg(bR);
-    const gap=((parseFloat(aB)-bT)/100*aR).toFixed(0);
-    const trend=bP.length>=3?(bP[bP.length-1]-bP[0]>1?'trending higher (worsening)':bP[0]-bP[bP.length-1]>1?'trending lower (improving)':'holding steady'):'early data';
-    const lines=['Bar Pour Cost %: '+weeks.map(w=>(w.bar?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+bT+'% avg:'+aB+'%)','Food Cost %: '+weeks.map(w=>(w.food?.cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+fT+'% avg:'+aF+'%)','Prime Cost %: '+weeks.map(w=>(w.prime_cost_pct||0).toFixed(1)+'%').join(', ')+' (target:'+pT+'% avg:'+aP+'%)','Bar Revenue: '+weeks.map(w=>'$'+Math.round(w.bar?.revenue||0)).join(', '),'Weekly gap vs bar target: $'+Math.abs(gap)+' '+(parseFloat(gap)>0?'over':'under'),'Pour cost trend: '+trend];
-    const prompt='You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with the most urgent cost issue, then revenue trend, then the single action that will matter most this week.';
-    fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})})
-    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-    .then(data=>{
-      if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
-      if(data.error){showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">API error: '+data.error.message+'</div><button class="btn btn-ghost ins-close">OK</button></div>');return;}
-      const text=data.content?.[0]?.text;
-      if(!text){showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">No response received. Try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');return;}
-      const header='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Trend Insights: Last '+weeks.length+' Weeks</div><button class="btn btn-ghost btn-sm ins-close">Close</button></div>';
-      const clean=text.replace(/—/g,', ').replace(/–/g,'-').replace(/ -- /g,', ').replace(/--/g,'-');
-      const body='<div style="font-size:13px;color:var(--t2);line-height:1.9;">'+clean.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'</div><div style="font-size:13px;color:var(--t2);line-height:1.9;margin-top:14px;">')+'</div>';
-      showModal(header+body);
-    }).catch(err=>{
-      if(btn){btn.disabled=false;btn.textContent='Trend Insights';}
-      showModal('<div><div style="font-size:13px;color:var(--red);margin-bottom:16px;">Connection error: '+err.message+'. Check your connection and try again.</div><button class="btn btn-ghost ins-close">OK</button></div>');
-    });
+    if (App.demoBlock && App.demoBlock('AI Trend Insights')) return;
+    const ID = 'db-insights';
+    const weeks = (App.data.weeks || []).slice(-8);
+    const wrap = inner => '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Trend Insights</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.85;">' + inner + '</div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" onclick="App.closeModal(\'' + ID + '\')">Close</button></div></div>';
+    const open = inner => App.openModal(wrap(inner), { id: ID, maxWidth: 600, noClose: true });
+
+    if (weeks.length < 2) { open('Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
+    open('Reading your last ' + weeks.length + ' weeks&hellip;');
+
+    const t = App.data.settings.targets || {};
+    const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
+    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+    const bP = weeks.map(w => w.bar?.cost_pct).filter(v => v != null);
+    const fP = weeks.map(w => w.food?.cost_pct).filter(v => v != null);
+    const pP = weeks.map(w => w.prime_cost_pct).filter(v => v != null);
+    const bR = weeks.map(w => w.bar?.revenue).filter(v => v != null);
+    const aB = avg(bP).toFixed(1), aF = avg(fP).toFixed(1), aP = avg(pP).toFixed(1), aR = avg(bR);
+    const gap = ((parseFloat(aB) - bT) / 100 * aR).toFixed(0);
+    const trend = bP.length >= 3 ? (bP[bP.length - 1] - bP[0] > 1 ? 'trending higher (worsening)' : bP[0] - bP[bP.length - 1] > 1 ? 'trending lower (improving)' : 'holding steady') : 'early data';
+    const lines = [
+      'Bar Pour Cost %: ' + weeks.map(w => (w.bar?.cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + bT + '% avg:' + aB + '%)',
+      'Food Cost %: ' + weeks.map(w => (w.food?.cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + fT + '% avg:' + aF + '%)',
+      'Prime Cost %: ' + weeks.map(w => (w.prime_cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + pT + '% avg:' + aP + '%)',
+      'Bar Revenue: ' + weeks.map(w => '$' + Math.round(w.bar?.revenue || 0)).join(', '),
+      'Weekly gap vs bar target: $' + Math.abs(gap) + ' ' + (parseFloat(gap) > 0 ? 'over' : 'under'),
+      'Pour cost trend: ' + trend
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with the most urgent cost issue, then revenue trend, then the single action that will matter most this week.';
+
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { open('Could not read the trend right now: ' + esc(data.error.message || 'try again.')); return; }
+        const text = data.content?.[0]?.text;
+        if (!text) { open('No response came back. Try again.'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        open('<p style="margin:0;">' + safe + '</p>');
+      })
+      .catch(err => open('Connection error: ' + esc(err.message) + '. Check your connection and try again.'));
   }
 };
