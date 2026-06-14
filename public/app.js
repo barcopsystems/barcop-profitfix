@@ -1219,16 +1219,17 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','The Hub'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
+  _PROTO_GLOBAL:   [['hub','The Hub'],['flowmap','Flow Map'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['dashboard', 'this-week', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
-    if (g === 'hub')   return this.showHub();
+    if (g === 'hub')     return this.showHub();
+    if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooks)       ? S.HubBooks.open()       : null;
     if (g === 'ops')   return (window.S && S.HubPermits)     ? S.HubPermits.open()     : null;
