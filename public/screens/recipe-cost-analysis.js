@@ -6,9 +6,9 @@
    surface in a secondary list so the operator can see where ingredient-
    level cost-out is still pending.
 
-   This is NOT an edit surface. All recipe editing happens on the single
-   Menu Items screen in Revenue Recovery. "Edit Item" buttons here bounce
-   to that screen with focus on the picked item. One direction, no loops. */
+   A diagnostic view, not its own editor. "Open Item" reuses the canonical
+   Menu Items editor (S.RevenueMenuItems.openEditor) as a MODAL in place and
+   re-renders this page on close — same store, no cross-section jump. */
 
 S.RecipeCostAnalysis = {
   render(container, actions) {
@@ -138,10 +138,15 @@ S.RecipeCostAnalysis = {
       + linkedSection
       + '</div>';
 
+    // Open the menu item's editor as a modal IN PLACE (the canonical Menu Items
+    // editor, reused), then re-render this page on close — no cross-section jump
+    // to Revenue. One store, multiple doors ([[two-doors-same-data]]).
     this.container.querySelectorAll('.rca-edit').forEach(btn => {
       btn.addEventListener('click', () => {
-        App._menuItemFocus = btn.dataset.id;
-        App.openScreen('r-menu-items');
+        const item = App.menuItems().find(i => i.id === btn.dataset.id);
+        if (item && S.RevenueMenuItems && S.RevenueMenuItems.openEditor) {
+          S.RevenueMenuItems.openEditor(item, { onDone: () => this.draw() });
+        }
       });
     });
   }
