@@ -234,22 +234,23 @@ S.ThisWeek = {
     const footerLeft = cateringOn
       ? '<button type="button" id="tw-remove-catering" style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:0;">Remove catering</button>'
       : '<button type="button" id="tw-add-catering" style="background:none;border:none;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;padding:0;">+ Add catering / events</button>';
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:14px 18px;border-bottom:1px solid var(--b2);font-size:13px;font-weight:600;color:var(--t1);">Confirm the Week</div>'
-      + '<table class="ing-tbl tw-grid"><thead><tr>'
-      + '<th>Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th>Cost %</th><th>vs Target</th>'
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Confirm the Week</div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
+      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:92px;">Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th style="width:80px;">Cost %</th><th style="width:112px;">vs Target</th>'
       + '</tr></thead><tbody>'
       + this.lineRow('Bar', 'b', d.bar)
       + this.lineRow('Food', 'f', d.food)
       + (cateringOn ? this.lineRow('Catering', 'c', d.catering || { revenue: '', cogs: '', labor: '' }) : '')
-      + '</tbody></table>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-top:1px solid var(--b2);flex-wrap:wrap;">'
+      + '</tbody></table></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
       + footerLeft
       + '<div style="display:flex;align-items:center;gap:9px;"><label style="font-size:11px;color:var(--t2);">3rd-party platform fees</label>'
       + '<div class="fw" style="width:150px;"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
       + '</div>'
-      + '<div style="padding:0 18px 16px;"><div class="f" style="margin:0;"><label>Notes (optional)</label>'
-      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div></div>'
+      + '<div class="f" style="margin:0;"><label>Notes (optional)</label>'
+      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
   },
 
