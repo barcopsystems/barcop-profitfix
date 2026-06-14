@@ -67,7 +67,8 @@ S.InventoryReceiveDelivery = {
       { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, it is waiting in the Open Order picker, newest first, and Bar Cop pre-fills the most recent one so you just confirm it against the invoice. That also arms the short-count check, since Bar Cop knows what was supposed to show up, and it marks the order Received when you save so it drops off your Order Sheet. If this delivery is not one of your Bar Cop orders, or the vendor has none on file, pick No matched order (walk-in delivery) and add the lines by hand. Either way the delivery records and feeds your stock, usage, and variance.'] },
       { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master, so you are really just confirming it still matches. Bottle beer is received by the case, so the qty is cases and the price is per case. A delivery of Modelo Especial is entered as 4 cases at the per-case price, not 96 bottles. Everything else is in its own container unit: liquor and wine by the bottle, draft by the keg.'] },
       { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop calls it out on the line and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. Filing it lands the claim in Profit Recovery under Vendor Discrepancies for credit follow-up.'] },
-      { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. Saved deliveries feed your on-hand stock, your usage and variance reports, and Vendor Watch.'] }
+      { h: 'Print a Worksheet', p: ['Use the Worksheet button up top to print a blank Delivery Inspection Sheet. Take it to the dock, check every line by hand as the truck unloads, and enter anything that came in off back here, or later from Delivery History.'] },
+      { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. Saved deliveries feed your on-hand stock, your usage and variance reports, and the Vendor Tracker.'] }
     ]);
   },
 
@@ -127,6 +128,7 @@ S.InventoryReceiveDelivery = {
 
     const detailsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button">Worksheet</button>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
@@ -209,6 +211,7 @@ S.InventoryReceiveDelivery = {
     });
     document.getElementById('rd-save')?.addEventListener('click', () => this.save());
     document.getElementById('rd-startover')?.addEventListener('click', () => this.startOver());
+    document.getElementById('rd-worksheet')?.addEventListener('click', () => this.printWorksheet());
 
     this.container.onclick = null;
     this.recalcTotal();
@@ -584,6 +587,22 @@ S.InventoryReceiveDelivery = {
     this.recalcLine(line);
 
     if (closeFn) closeFn();
+  },
+
+  // Blank Delivery Inspection Sheet to print and fill at the dock; the manager
+  // enters anything off after the fact via this screen or Delivery History.
+  printWorksheet() {
+    App.printBlankSheet({
+      title: 'Delivery Inspection Sheet',
+      subtitle: 'Check every line at the dock. Anything off, write it down and file it in Bar Cop after close.',
+      columns: [
+        { label: 'Vendor', width: '14%' }, { label: 'Product', width: '20%' },
+        { label: 'Ordered Qty', width: '10%' }, { label: 'Received Qty', width: '10%' },
+        { label: 'Agreed Price', width: '10%' }, { label: 'Invoiced Price', width: '10%' },
+        { label: 'Issue', width: '16%' }, { label: 'Receiver', width: '10%' }
+      ],
+      rows: 18
+    });
   },
 
   // ── Save ──────────────────────────────────────────────────────────────────
