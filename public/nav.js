@@ -19,15 +19,6 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-section">Products</div>
-      <div class="nav-item" data-screen="bar-products" id="nav-bar-products">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6l1 4H4.5l1-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5v8h8v-8" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Bar Products</span>
-      </div>
-      <div class="nav-item" data-screen="kitchen-products" id="nav-kitchen-products">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2H3v-2z" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12v6a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-6z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 10h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Kitchen Products</span>
-      </div>
       <div class="nav-section">Costing</div>
       <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
