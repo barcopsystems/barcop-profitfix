@@ -128,7 +128,6 @@ S.InventoryReceiveDelivery = {
 
     const detailsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button">Worksheet</button>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
@@ -171,6 +170,7 @@ S.InventoryReceiveDelivery = {
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
       + '<button class="btn btn-ghost" id="rd-startover">Start Over</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button" style="margin-left:auto;">Worksheet</button>'
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + detailsCard + linesCard + '</div>';
@@ -596,10 +596,10 @@ S.InventoryReceiveDelivery = {
       title: 'Delivery Inspection Sheet',
       subtitle: 'Check every line at the dock. Anything off, write it down and file it in Bar Cop after close.',
       columns: [
-        { label: 'Vendor', width: '14%' }, { label: 'Product', width: '20%' },
+        { label: 'Vendor', width: '13%' }, { label: 'Product', width: '17%' },
         { label: 'Ordered Qty', width: '10%' }, { label: 'Received Qty', width: '10%' },
-        { label: 'Agreed Price', width: '10%' }, { label: 'Invoiced Price', width: '10%' },
-        { label: 'Issue', width: '16%' }, { label: 'Receiver', width: '10%' }
+        { label: 'Agreed Price', width: '10%' }, { label: 'Invoiced Price', width: '11%' },
+        { label: 'Issue', width: '13%' }, { label: 'Receiver', width: '16%' }
       ],
       rows: 18
     });
