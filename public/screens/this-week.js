@@ -244,14 +244,23 @@ S.ThisWeek = {
       + this.lineRow('Food', 'f', d.food)
       + (cateringOn ? this.lineRow('Catering', 'c', d.catering || { revenue: '', cogs: '', labor: '' }) : '')
       + '</tbody></table></div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + footerLeft
-      + '<div style="display:flex;align-items:center;gap:9px;"><label style="font-size:11px;color:var(--t2);">3rd-party platform fees</label>'
-      + '<div class="fw" style="width:150px;"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '</div>'
+      + '<div style="margin-bottom:14px;">' + footerLeft + '</div>'
       + '<div class="f" style="margin:0;"><label>Notes (optional)</label>'
       + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
+  },
+
+  // Operating costs are below-the-line (not COGS or labor), so they sit in their
+  // own card and do NOT move the prime-cost numbers above. Captured weekly here
+  // because Books reads the per-week figure.
+  opexCard(d) {
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Operating Costs</div>'
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>3rd-Party Platform Fees</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
+      + '<div style="flex:1;min-width:220px;font-size:11px;color:var(--t3);line-height:1.5;align-self:center;">Flows to Books as an operating expense. It does not change the prime-cost numbers above.</div>'
+      + '</div></div>';
   },
 
   // ── Weekly history (filter chips + data-card table) ─────────────────────────
@@ -303,6 +312,7 @@ S.ThisWeek = {
       + this.heroStrip()
       + this.selectorRow()
       + this.gridCard(d)
+      + this.opexCard(d)
       + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="tw-save">' + (editing ? 'Update Week' : 'Save Week') + '</button>'
       + '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
