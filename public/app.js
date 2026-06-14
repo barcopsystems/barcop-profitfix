@@ -1226,7 +1226,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'reports', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3431,14 +3431,14 @@ const App = {
       'hub':           ['Recovery Hub', ''],
       'dashboard':     ['Dashboard', 'Profit Recovery'],
       'this-week':     ['This Week', 'Weekly Entry'],
-      'recipe-cost-analysis':['Recipe Cost Analysis', ''],
+      'profit-forecast':['Profit Forecast', ''],
+      'recipe-cost-analysis':['Recipe Summary', ''],
       'vendor-tracker': ['Vendor Tracker', ''],
       'vendor-watch':  ['Vendor Tracker', ''],
       'vendor-scorecard': ['Vendor Tracker', ''],
       'vendor-discrepancy': ['Vendor Tracker', ''],
-      'theft-risk':    ['Theft Risk Scorecard', ''],
-      'cash-recon':    ['Cash Reconciliation', ''],
-      'reports':       ['Reports & History', ''],
+      'theft-risk':    ['Loss Prevention', ''],
+      'cash-recon':    ['Over and Short', ''],
       'help':          ['Help and FAQ', ''],
       'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
       'profit-fix':    ['Profit Fix', 'Fix Process and Guidance']
@@ -3448,6 +3448,7 @@ const App = {
       'hub':           S.Hub,
       'dashboard':     S.Dashboard,
       'this-week':     S.ThisWeek,
+      'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
       'vendor-tracker': S.VendorTracker,
       'vendor-watch':  S.VendorTracker,
@@ -3455,7 +3456,6 @@ const App = {
       'vendor-discrepancy': S.VendorTracker,
       'theft-risk':    S.TheftRisk,
       'cash-recon':    S.CashRecon,
-      'reports':       S.Reports,
       'help':          S.Help,
       'audit-tracker': S.AuditTracker,
       'profit-fix':    S.ProfitFix
@@ -3490,7 +3490,7 @@ const App = {
     // here (no duplicate topbar button): the four Inventory reports, plus the
     // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
     // lc-callout-log needs no export).
-    'reports': 1, 'r-reports': 1, 't-reports': 1
+    'r-reports': 1, 't-reports': 1
   },
   _exportBtn(id, actions) {
     if (!this._REPORT_SCREENS[id] || !actions) return;
