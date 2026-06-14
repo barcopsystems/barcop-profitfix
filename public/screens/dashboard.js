@@ -76,8 +76,8 @@ S.Dashboard = {
       + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
       + btn('this-week', 'Enter This Week')
       + btn('audit-tracker', 'Run Profit Audit')
-      + btn('reports', 'View Reports')
-      + btn('recipe-cost-analysis', 'Recipe Cost')
+      + btn('profit-forecast', 'Profit Forecast')
+      + btn('recipe-cost-analysis', 'Recipe Summary')
       + '</div></div>';
   },
 
