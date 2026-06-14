@@ -793,6 +793,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b2);white-space:nowrap;}
 .ing-tbl td{padding:8px 10px;border-bottom:1px solid var(--row-div);vertical-align:middle;color:var(--t2);}
 .ing-tbl tr:last-child td{border-bottom:none;}
+.tw-grid th,.tw-grid td{padding:14px 18px;}
 
 /* ══ PROG BAR ══ */
 .prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
