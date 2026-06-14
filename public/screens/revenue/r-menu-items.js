@@ -23,6 +23,7 @@ S.RevenueMenuItems = {
   linkedProductId:  '',          // for inventory items
   recipeOptOut:     false,
   _saving:          false,
+  entryMode:        'manual',    // inline add-form lane: 'manual' | 'import'
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
@@ -210,24 +211,39 @@ S.RevenueMenuItems = {
     this.linkedProductId = '';
     this._editingIncomplete = false;
 
-    // Always-on inline Add form (card + Save/Start Over below it), sharing one
-    // formBodyHtml() builder with the edit modal so the two surfaces never
-    // drift. Wrapped so openEditor can remove the whole thing (card + buttons)
-    // before opening the modal — the ri-* ids are identical, so only one form
-    // can be in the DOM at a time.
-    const addWrap = '<div id="mi-add-wrap">'
-      + '<div class="card form-card" style="margin-bottom:0;">'
-        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-          + '<span>Add Menu Item</span>'
-          + '<button class="btn btn-ghost btn-sm no-print" id="mi-import">Import File</button>'
-        + '</div>'
-        + this.formBodyHtml(null)
-      + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+    // Always-on inline Add form with an Enter Manually / Import File segmented
+    // toggle ([[unified-import-pattern]]). Manual = the shared formBodyHtml()
+    // builder (the same one the edit modal uses, so they never drift); Import =
+    // the shared CSVMapper drop-file. Wrapped so openEditor can remove the whole
+    // thing (card + buttons) before opening the modal — the ri-* ids are
+    // identical, so only one form is ever in the DOM at a time.
+    const segBtn = (mode, label) => {
+      const on = this.entryMode === mode;
+      return '<button type="button" class="btn btn-sm mi-mode" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    let modeBody, actionRow;
+    if (this.entryMode === 'import') {
+      modeBody  = '<div id="mi-csv"></div><div id="mi-imp-result"></div>';
+      // Empty until a file is dropped; CSVMapper renders its Import / Cancel row
+      // here (below the card) so there is no gap beforehand.
+      actionRow = '<div id="mi-imp-actions" class="no-print" style="margin:16px 0 24px;"></div>';
+    } else {
+      modeBody  = this.formBodyHtml(null);
+      actionRow = '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
         + '<button class="btn btn-ghost" id="ri-start-over">Start Over</button>'
         + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+    }
+    const addWrap = '<div id="mi-add-wrap">'
+      + '<div class="card form-card" style="margin-bottom:0;">'
+        + '<div class="card-title">Add Menu Item</div>'
+        + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+        + modeBody
       + '</div>'
+      + actionRow
     + '</div>';
 
     let body;
@@ -278,13 +294,20 @@ S.RevenueMenuItems = {
 
     this.container.innerHTML = '<div class="screen">' + addWrap + body + '</div>';
 
-    // Add-form wiring (always-on inline form)
-    document.getElementById('mi-import')?.addEventListener('click', () => this.showImport());
-    document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
-    document.getElementById('ri-save')?.addEventListener('click', () => this._save(null));
-    document.getElementById('ri-start-over')?.addEventListener('click', () => this.resetAddForm());
-    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
-    this.renderAdaptive(null);
+    // Toggle wiring (both lanes)
+    this.container.querySelectorAll('.mi-mode').forEach(b =>
+      b.addEventListener('click', () => this.setEntryMode(b.dataset.mode)));
+
+    if (this.entryMode === 'import') {
+      this.mountImporter();
+    } else {
+      // Add-form wiring (always-on inline manual form)
+      document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
+      document.getElementById('ri-save')?.addEventListener('click', () => this._save(null));
+      document.getElementById('ri-start-over')?.addEventListener('click', () => this.resetAddForm());
+      document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
+      this.renderAdaptive(null);
+    }
 
     // List wiring (edit opens the modal)
     this.container.querySelectorAll('.mi-edit').forEach(b =>
@@ -372,6 +395,12 @@ S.RevenueMenuItems = {
 
   // Start Over on the inline add form = a clean, blank landing render.
   resetAddForm() {
+    this.renderLanding();
+  },
+
+  // Flip the inline add form between typing one item and dropping a file.
+  setEntryMode(mode) {
+    this.entryMode = mode === 'import' ? 'import' : 'manual';
     this.renderLanding();
   },
 
@@ -921,72 +950,66 @@ S.RevenueMenuItems = {
     this.renderLanding();
   },
 
-  // ── Import (CSV/Excel) ───────────────────────────────────────────────
-  showImport() {
-    this.actions.innerHTML = '';
-    this.container.innerHTML = '<div class="screen"><div class="card">'
-      + '<div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" id="rmi-imp-back">&#8592; Back to Menu Items</button></div>'
-      + '<div class="card-title">Import Menu Items from File</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px;">Upload a CSV or Excel file with your menu items. Bar Cop reads your columns and maps them. Items import without recipes attached; you can edit each item afterwards to build recipes or link inventory products.</div>'
-      + '<details style="margin-bottom:16px;"><summary style="font-size:11px;color:var(--t3);cursor:pointer;font-weight:700;letter-spacing:0.5px;">What should my file look like?</summary>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;margin-top:8px;padding:10px 12px;background:var(--input);border-radius:3px;">'
-      + '<strong style="color:var(--t1);">First row must be column headers.</strong> One row per item.<br><br>'
-      + '<strong style="color:var(--t1);">Columns Bar Cop recognizes:</strong><br>'
-      + '&bull; <strong>Name / Item / Product / Description</strong> required<br>'
-      + '&bull; <strong>Category / Type / Group</strong> optional<br>'
-      + '&bull; <strong>Price / Menu Price / Sell Price</strong> optional<br>'
-      + '&bull; <strong>Cost / Item Cost / COGS</strong> optional<br>'
-      + '&bull; <strong>Covers / Weekly Covers / Volume / Qty</strong> optional<br><br>'
-      + '<strong style="color:var(--t1);">Accepted formats:</strong> CSV, Excel (.xlsx, .xls)'
-      + '</div></details>'
-      + '<input type="file" id="rmi-imp-file" accept=".csv,.xlsx,.xls" style="background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t2);padding:6px;font-size:11px;cursor:pointer;width:100%;margin-bottom:12px;"/>'
-      + '<div id="rmi-imp-status" style="font-size:12px;color:var(--t2);margin-bottom:12px;display:none;"></div>'
-      + '<div style="display:flex;gap:10px;">'
-      + '<button class="btn btn-primary" id="rmi-imp-btn">Import Items</button>'
-      + '<button class="btn btn-ghost" id="rmi-imp-cancel">Cancel</button>'
-      + '</div></div></div>';
-
-    const back = () => this.renderLanding();
-    document.getElementById('rmi-imp-back')?.addEventListener('click', back);
-    document.getElementById('rmi-imp-cancel')?.addEventListener('click', back);
-    document.getElementById('rmi-imp-btn')?.addEventListener('click', async () => {
-      const file = document.getElementById('rmi-imp-file')?.files?.[0];
-      const status = document.getElementById('rmi-imp-status');
-      if (!file) { if (status) { status.style.display = 'block'; status.textContent = 'Select a file first.'; } return; }
-      if (status) { status.style.display = 'block'; status.textContent = 'Reading file...'; }
-      const text = await file.text();
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      if (lines.length < 2) { status.textContent = 'File appears empty.'; return; }
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-      const nameIdx  = headers.findIndex(h => ['name', 'item', 'product', 'description'].some(k => h.includes(k)));
-      const catIdx   = headers.findIndex(h => ['category', 'type', 'group'].some(k => h.includes(k)));
-      const priceIdx = headers.findIndex(h => ['price', 'menu price', 'sell'].some(k => h.includes(k)));
-      const costIdx  = headers.findIndex(h => ['cost', 'cogs'].some(k => h.includes(k)));
-      const covIdx   = headers.findIndex(h => ['cover', 'volume', 'qty', 'count'].some(k => h.includes(k)));
-      if (nameIdx < 0) { status.textContent = 'Could not find a Name column. Make sure row 1 has headers.'; return; }
-      const imported = [];
-      lines.slice(1).forEach(line => {
-        const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
-        const name = cols[nameIdx];
-        if (!name) return;
-        imported.push({
-          id: App.uid(), name,
-          category:      catIdx  >= 0 ? cols[catIdx]  : '',
-          price:         priceIdx >= 0 ? parseFloat(cols[priceIdx]) || 0 : 0,
-          cost:          costIdx  >= 0 ? parseFloat(cols[costIdx])  || 0 : 0,
-          weekly_covers: covIdx   >= 0 ? parseFloat(cols[covIdx])   || 0 : 0,
-          notes:         '',
-          recipe:        null,
-          linked_product_id: '',
-          created_at:    new Date().toISOString(),
-          updated_at:    new Date().toISOString()
-        });
-      });
-      this.items().push(...imported);
-      await App.saveKey('menu_items');
-      App.markSetupDone('gs_r_menu');
-      status.textContent = imported.length + ' items imported.';
-      setTimeout(() => this.renderLanding(), 1000);
+  // ── Import (CSVMapper drop-file behind the Import File toggle) ───────
+  mountImporter() {
+    const el = document.getElementById('mi-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your menu items file here',
+      dropSub: 'Needs a column for item name. Category, price, cost, and weekly covers come in too if your file has them. Items import without recipes; edit an item afterward to build its recipe or link an inventory product.',
+      actionsEl: '#mi-imp-actions',
+      fields: [
+        { key: 'name',     label: 'Item Name',    required: true,  match: ['name', 'item', 'item name', 'product', 'description', 'menu item'] },
+        { key: 'category', label: 'Category',     required: false, match: ['category', 'type', 'group', 'section'] },
+        { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail'] },
+        { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost'] },
+        { key: 'covers',   label: 'Weekly Covers',required: false, match: ['covers', 'cover', 'weekly covers', 'volume', 'qty', 'quantity', 'count', 'sold'] }
+      ],
+      confirmLabel: 'Import',
+      onComplete: rows => this.importItems(rows)
     });
+  },
+
+  async importItems(rows) {
+    const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+    const toAdd = [];
+    rows.forEach(r => {
+      const name = (r.name || '').trim();
+      if (!name) return;
+      toAdd.push({
+        id:                 App.uid(),
+        name,
+        category:           (r.category || '').trim(),
+        price:              num(r.price),
+        cost:               num(r.cost),
+        weekly_covers:      num(r.covers),
+        prev_weekly_covers: null,
+        weekly_covers_updated_at: null,
+        notes:              '',
+        recipe:             null,
+        linked_product_id:  '',
+        pour_size_oz:       null,
+        target_cost_pct:    null,
+        created_at:         new Date().toISOString(),
+        updated_at:         new Date().toISOString()
+      });
+    });
+
+    const result = document.getElementById('mi-imp-result');
+    if (!toAdd.length) {
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items imported. No item names were found in the file.</div>';
+      return;
+    }
+
+    this.items().push(...toAdd);
+    await App.saveKey('menu_items');
+    App.markSetupDone('gs_r_menu');
+    // Re-render so the new items show in the list below (stays in import mode),
+    // then drop the summary into the freshly-mounted result slot.
+    this.renderLanding();
+    const res2 = document.getElementById('mi-imp-result');
+    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+      + 'Imported ' + toAdd.length + ' item' + (toAdd.length === 1 ? '' : 's') + '. Edit any item to set its price, cost, or recipe.'
+      + '</div>';
   }
 };
