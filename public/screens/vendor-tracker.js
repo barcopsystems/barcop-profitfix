@@ -244,7 +244,7 @@ S.VendorTracker = {
     if (!changes.length) {
       return '<div class="card"><div class="empty"><div class="empty-title">No vendor price changes yet</div>'
         + '<div class="empty-sub">Price changes are captured automatically when a delivery\'s invoice price differs from the product\'s current cost. Record deliveries in Inventory Control and any drift shows up here, with what it costs you per year.</div>'
-        + '<button class="btn btn-primary" id="vt-receive" style="margin-top:14px;">Receive a Delivery</button></div></div>';
+        + '</div></div>';
     }
 
     const totalAnnual = changes.reduce((s, c) => s + (c.annual || 0), 0);
@@ -256,7 +256,6 @@ S.VendorTracker = {
     );
 
     const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vt-receive">Receive Delivery</button>'
       + '<button class="btn btn-ghost btn-sm" id="vt-w-export">Export PDF</button>'
       + '</div>';
 
@@ -276,7 +275,6 @@ S.VendorTracker = {
   },
 
   wireWatch() {
-    document.getElementById('vt-receive')?.addEventListener('click', () => App.openScreen('ic-receive-delivery'));
     document.getElementById('vt-w-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Price Changes', root: this.container }));
   },
@@ -303,8 +301,7 @@ S.VendorTracker = {
     );
 
     const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="vt-file">+ File Manual Discrepancy</button>'
-      + '<button class="btn btn-ghost btn-sm" id="vt-worksheet">Worksheet</button>'
+      + '<button class="btn btn-ghost btn-sm" id="vt-disc-export">Export PDF</button>'
       + '</div>';
 
     let body;
@@ -337,102 +334,12 @@ S.VendorTracker = {
   },
 
   wireDiscrepancies() {
-    document.getElementById('vt-file')?.addEventListener('click', () => this.openFileModal());
-    document.getElementById('vt-worksheet')?.addEventListener('click', () => this.printBlank());
+    document.getElementById('vt-disc-export')?.addEventListener('click',
+      () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
     this.container.querySelectorAll('.vt-credit').forEach(b => b.addEventListener('click', () => this.requestCredit(b.dataset.id)));
     this.container.querySelectorAll('.vt-resolve').forEach(b => b.addEventListener('click', () => this.markResolved(b.dataset.id)));
     this.container.querySelectorAll('.vt-del').forEach(b => b.addEventListener('click', () => this.removeDiscrepancy(b.dataset.id)));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
-  },
-
-  // ── File a manual discrepancy (popup) ────────────────────────────────
-  openFileModal() {
-    const vendors = this.vendors().map(v => v && v.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
-    const vendorList = '<option value="">Select vendor...</option>' + vendors.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
-    const typeOpts = App.VENDOR_DISCREPANCY_TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
-
-    const html = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">File a Manual Discrepancy</div>'
-      + '<div class="form-row">'
-        + '<div class="f" style="width:150px;"><label>Delivery Date</label><input class="form-input" type="date" id="vd-date"/></div>'
-        + '<div class="f" style="width:220px;"><label>Vendor</label><select class="form-input" id="vd-vendor">' + vendorList + '</select></div>'
-        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input class="form-input" type="text" id="vd-ref" placeholder="Optional"/></div>'
-        + '<div class="f" style="width:180px;"><label>Type</label><select class="form-input" id="vd-type">' + typeOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row">'
-        + '<div class="f" style="width:220px;"><label>Product</label><select class="form-input" id="vd-product"><option value="">Pick vendor first...</option></select></div>'
-        + '<div class="f" style="width:90px;"><label>Units</label><input class="form-input" type="number" id="vd-units" step="1" placeholder="0"/></div>'
-        + '<div class="f" style="width:120px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="vd-agreed" step="0.01"/></div></div>'
-        + '<div class="f" style="width:120px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="vd-invoiced" step="0.01"/></div></div>'
-        + '<div class="f" style="width:140px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="vd-overcharge" step="0.01"/></div></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="vd-notes" placeholder="What was wrong, and who you contacted"/></div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="vd-file-save">File Discrepancy</button>'
-        + '<button class="btn btn-ghost" id="vd-file-cancel">Cancel</button>'
-        + '<span id="vd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-
-    App.openModal(html, { id: 'vd-file-modal', maxWidth: 720, noClose: true });
-    const dateInp = document.getElementById('vd-date');
-    if (dateInp && !dateInp.value) dateInp.value = App.todayLocal();
-
-    // Live overcharge from (invoiced - agreed) x units until typed directly.
-    const recompute = () => {
-      const oc = document.getElementById('vd-overcharge');
-      if (!oc || oc._touched) return;
-      const u = parseFloat(document.getElementById('vd-units')?.value) || 0;
-      const a = parseFloat(document.getElementById('vd-agreed')?.value);
-      const i = parseFloat(document.getElementById('vd-invoiced')?.value);
-      if (!isNaN(a) && !isNaN(i) && u) oc.value = ((i - a) * u).toFixed(2);
-    };
-    ['vd-units', 'vd-agreed', 'vd-invoiced'].forEach(id => document.getElementById(id)?.addEventListener('input', recompute));
-    document.getElementById('vd-overcharge')?.addEventListener('input', e => { e.target._touched = true; });
-    document.getElementById('vd-vendor')?.addEventListener('change', () => this.rebuildProductOptions());
-    document.getElementById('vd-product')?.addEventListener('change', e => {
-      const p = this.products().find(x => x.id === e.target.value);
-      const ag = document.getElementById('vd-agreed');
-      if (p && ag && !ag.value) ag.value = (parseFloat(p.unit_cost) || 0).toFixed(2);
-    });
-    document.getElementById('vd-file-save')?.addEventListener('click', () => this.fileDiscrepancy());
-    document.getElementById('vd-file-cancel')?.addEventListener('click', () => App.closeModal('vd-file-modal'));
-  },
-
-  rebuildProductOptions() {
-    const vendorName = document.getElementById('vd-vendor')?.value || '';
-    const sel = document.getElementById('vd-product');
-    if (!sel) return;
-    if (!vendorName) { sel.innerHTML = '<option value="">Pick vendor first...</option>'; return; }
-    const prods = this.products().filter(p => (p.vendor || '') === vendorName && p.active !== false)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    sel.innerHTML = prods.length
-      ? '<option value="">Select product...</option>' + prods.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
-      : '<option value="">No products on file for this vendor</option>';
-  },
-
-  fileDiscrepancy() {
-    const val = id => document.getElementById(id)?.value.trim() || '';
-    const num = id => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; };
-    const err = document.getElementById('vd-err');
-    const fail = msg => { if (err) { err.textContent = msg; err.style.display = 'inline'; } };
-
-    const date = val('vd-date'), vendor = val('vd-vendor'), overcharge = num('vd-overcharge');
-    if (!date)   return fail('Enter the delivery date.');
-    if (!vendor) return fail('Enter the vendor.');
-    if (overcharge == null) return fail('Enter the overcharge or loss amount.');
-
-    const productId = val('vd-product');
-    const product = productId ? this.products().find(p => p.id === productId) : null;
-    const rec = {
-      id: App.uid(), date, vendor,
-      reference: val('vd-ref'), type: val('vd-type') || 'Other',
-      product_id: productId, sku: (product?.name) || '',
-      units: num('vd-units'), agreed_price: num('vd-agreed'), invoiced_price: num('vd-invoiced'),
-      overcharge, notes: val('vd-notes'),
-      status: 'Open', source: 'manual',
-      filed_at: new Date().toISOString(), resolved_at: null
-    };
-    App.putRecord('core', 'vendor_discrepancy', rec).then(() => { App.closeModal('vd-file-modal'); this.draw(); });
   },
 
   // ── Request Credit (mailto to the rep, then flip to Credit Requested) ─
@@ -506,27 +413,13 @@ S.VendorTracker = {
     App.removeRecord('core', 'vendor_discrepancy', id).then(() => this.draw());
   },
 
-  printBlank() {
-    App.printBlankSheet({
-      title: 'Delivery Inspection Sheet',
-      subtitle: 'Check every line at the dock. Anything off, write it down. Manager files each discrepancy in Bar Cop after close.',
-      columns: [
-        { label: 'Vendor', width: '14%' }, { label: 'Product', width: '20%' },
-        { label: 'Ordered Qty', width: '10%' }, { label: 'Received Qty', width: '10%' },
-        { label: 'Agreed Price', width: '10%' }, { label: 'Invoiced Price', width: '10%' },
-        { label: 'Issue', width: '16%' }, { label: 'Receiver', width: '10%' }
-      ],
-      rows: 18
-    });
-  },
-
   // ── Help ──────────────────────────────────────────────────────────────
   showHowTo() {
     App.showHelpModal('How Vendor Tracker Works', [
       { p: ['One place to keep your vendors honest. Three tabs read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log where you chase credits.'] },
       { h: 'Scorecard', p: ['Each vendor rolled up over the range you pick: total spend, net price drift, short counts, open and recovered credits, and average days to a credit. Vendors causing the most pain sort to the top, with a status read of High, Watch, or Clean. Take this into your quarterly vendor review and ask for a price match on every line that drifted up. Export PDF saves the rollup.'] },
       { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory Control, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
-      { h: 'Discrepancies', p: ['File a short count, an overcharge, or a substitution. Most get filed right from Receive Delivery; use File Manual Discrepancy for the ones that turn up later. Request Credit drafts an email to your rep and flips the status; Mark Resolved records what you actually got back. Print the Worksheet to inspect deliveries at the dock by hand.'] }
+      { h: 'Discrepancies', p: ['Every credit claim you are owed, open and resolved. Claims get FILED over in Inventory: flag the line at the dock in Receive Delivery, or open a saved delivery in Delivery History and flag it there if the problem turned up later. This tab is where you WORK them: Request Credit drafts an email to your rep and flips the status, Mark Resolved records what you actually got back, and Export PDF saves the list for a claim.'] }
     ]);
   }
 };
