@@ -276,7 +276,6 @@ const DB = {
     'pour-test':'profit-recovery','yield-test':'profit-recovery',
     'recipe-cost-analysis':'profit-recovery','vendor-watch':'profit-recovery',
     'vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
-    'bar-products':'profit-recovery','kitchen-products':'profit-recovery',
     'reports':'profit-recovery','help':'_always',
     // Revenue Recovery
     'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
