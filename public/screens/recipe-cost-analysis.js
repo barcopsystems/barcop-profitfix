@@ -164,7 +164,7 @@ S.RecipeCostAnalysis = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Recipe Cost Analysis Works', [
+    App.showHelpModal('How Recipe Summary Works', [
       { p: ['A read-only diagnostic. Every menu item with a recipe is costed from the live prices of its ingredients in Inventory Control, then ranked by cost percentage so the items eating your margin sort to the top.'] },
       { h: 'The Numbers Up Top', p: ['How many items are costed from a recipe, how many of those run over their target cost percentage (red when any do), how many still need a recipe, and how many pull their cost from a linked inventory product.'] },
       { h: 'Items With Recipes', p: ['Cost per serving computes automatically from current product prices, so when a vendor raises a price these update on their own. Cost percent is the cost against the menu price, and over-target items are flagged and sorted to the top. Export PDF saves the full analysis.'] },
