@@ -97,104 +97,91 @@ window.FixPanel = {
       + '</div>';
   },
 
+  // The ranked "leak board": each gap-area as one entry, the dollar-bearing
+  // leaks rendered as proportional bars (largest dollar first) and the rest as
+  // compact tap-to-review rows. Composite gaps (prime cost = pour + food + labor)
+  // are excluded so the same dollars are never shown twice. Honest by construction:
+  // a gap shows a $/yr leak only when Recovery has a live weekly metric for it
+  // (gapImpact non-null); gaps without one (e.g. Theft and Loss, Vendor Control)
+  // show as a Review row, never an invented number. Rows keep .fp-fixarea +
+  // data-gap/data-module so wireFixAreas routes the click into the fix process.
   _fixAreasInner(moduleKey) {
     const gaps = this.gapAreas(moduleKey);
     if (!gaps.length) return '';
-    const BANDS = {
-      ok:    { label: 'On Target', color: 'var(--gold)' },
-      watch: { label: 'Watch',     color: 'var(--w)' },
-      over:  { label: 'Over',      color: 'var(--red)' }
-    };
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const fixProgress = (App.data && App.data.fix_progress) || {};
-    const rows = gaps.map((g, i) => {
+    const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
+
+    const entryFor = (g, module, opts) => {
       const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
-      const isLogged = log.some(e => e.gap_id === g.id);
-      const stepsDone = (fixProgress[g.id] || []).length;
-      const stepsTotal = (g.process && g.process.steps) ? g.process.steps.length : 0;
-      const showProgress = !isLogged && stepsTotal > 0 && stepsDone > 0;
-      let impHtml = '';
-      if (imp && BANDS[imp.band]) {
-        const bm = BANDS[imp.band];
-        impHtml = '<div style="flex-shrink:0;text-align:right;">'
-          + '<div style="display:flex;align-items:baseline;justify-content:flex-end;gap:10px;white-space:nowrap;">'
-          + '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:' + bm.color + ';">' + bm.label + '</span>'
-          + (imp.dollars > 0
-              ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:600;color:' + bm.color + ';line-height:1;">'
-                + App.fmtCurrency(imp.dollars) + '<span style="font-size:9px;"> /yr</span></span>'
-              : '')
-          + '</div>'
-          + (showProgress
-              ? '<div style="font-size:10px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:0.04em;">'
-                + stepsDone + ' of ' + stepsTotal + ' steps</div>'
-              : '')
-          + '</div>';
-      } else if (showProgress) {
-        impHtml = '<div style="flex-shrink:0;text-align:right;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.04em;">'
-          + stepsDone + ' of ' + stepsTotal + ' steps</div>';
-      }
-      // Last visible row in the card has no border-bottom. If we're appending
-      // a Labor row below for Profit, every gap row keeps its border-bottom
-      // and the Labor row becomes the bottomless one.
-      const hasLabor = moduleKey === 'profit';
-      const isLastVisible = !hasLabor && (i === gaps.length - 1);
-      return '<div class="fp-fixarea" data-gap="' + esc(g.id) + '" data-module="' + esc(moduleKey) + '" '
-        + 'style="display:flex;align-items:center;gap:24px;padding:13px 20px;cursor:pointer;'
-        + (isLastVisible ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">' + esc(g.name) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(g.summary || '') + '</div>'
-        + '</div>'
-        + impHtml
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>';
-    }).join('');
+      return {
+        id: g.id, module: module, name: g.name, summary: g.summary || '',
+        band: imp ? imp.band : null,
+        dollars: imp ? (imp.dollars || 0) : 0,
+        hasMetric: !!imp,
+        logged: log.some(e => e.gap_id === g.id),
+        stepsDone: (fixProgress[g.id] || []).length,
+        stepsTotal: (g.process && g.process.steps) ? g.process.steps.length : 0,
+        crossNote: (opts && opts.crossNote) || ''
+      };
+    };
 
-    // Profit dashboard surfaces Labor as the third part of prime cost. The
-    // labor fix process lives in Revenue Recovery, so clicking routes there.
-    // Diagnosis stays on Profit; the workflow lives where it belongs.
-    let extraRow = '';
-    if (moduleKey === 'profit' && window.Recovery && window.FIX && FIX.revenue) {
-      const laborImp = Recovery.gapImpact('labor-scheduling');
-      const laborLogged = log.some(e => e.gap_id === 'labor-scheduling');
-      const laborSteps = (fixProgress['labor-scheduling'] || []).length;
-      const laborGap = FIX.revenue.find(x => x.id === 'labor-scheduling');
-      const laborStepsTotal = (laborGap && laborGap.process && laborGap.process.steps) ? laborGap.process.steps.length : 0;
-      const showLaborProgress = !laborLogged && laborStepsTotal > 0 && laborSteps > 0;
+    const entries = gaps
+      .filter(g => composite.indexOf(g.id) === -1)
+      .map(g => entryFor(g, moduleKey));
 
-      let labImp = '';
-      if (laborImp && BANDS[laborImp.band]) {
-        const bm = BANDS[laborImp.band];
-        labImp = '<div style="flex-shrink:0;text-align:right;">'
-          + '<div style="display:flex;align-items:baseline;justify-content:flex-end;gap:10px;white-space:nowrap;">'
-          + '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:' + bm.color + ';">' + bm.label + '</span>'
-          + (laborImp.dollars > 0
-              ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:600;color:' + bm.color + ';line-height:1;">'
-                + App.fmtCurrency(laborImp.dollars) + '<span style="font-size:9px;"> /yr</span></span>'
-              : '')
-          + '</div>'
-          + (showLaborProgress
-              ? '<div style="font-size:10px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:0.04em;">'
-                + laborSteps + ' of ' + laborStepsTotal + ' steps</div>'
-              : '')
-          + '</div>';
-      } else if (showLaborProgress) {
-        labImp = '<div style="flex-shrink:0;text-align:right;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.04em;">'
-          + laborSteps + ' of ' + laborStepsTotal + ' steps</div>';
-      }
-
-      extraRow = '<div class="fp-fixarea" data-gap="labor-scheduling" data-module="revenue" '
-        + 'style="display:flex;align-items:center;gap:24px;padding:13px 20px;cursor:pointer;">'
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;">Labor</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">Bar, kitchen, and floor staff as a share of revenue. The third part of prime cost, worked in Revenue Recovery.</div>'
-        + '</div>'
-        + labImp
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-        + '</div>';
+    // Labor is the third part of prime cost; its fix process lives in Revenue
+    // Recovery, so on the Profit board it is appended as a cross-module entry.
+    if (moduleKey === 'profit' && window.FIX && FIX.revenue) {
+      const lg = FIX.revenue.find(x => x.id === 'labor-scheduling');
+      if (lg) entries.push(entryFor(lg, 'revenue', { crossNote: 'in Revenue Recovery' }));
     }
 
-    return this.sectionHeader('Fix Areas') + rows + extraRow;
+    const BAND = {
+      over:  { label: 'Over',      color: 'var(--red)',   bar: 'var(--red)' },
+      watch: { label: 'Watch',     color: 'var(--amber)', bar: 'var(--amber)' },
+      ok:    { label: 'On target', color: 'var(--gold)',  bar: 'var(--gold)' }
+    };
+
+    const leaking = entries.filter(e => e.hasMetric && e.dollars > 0).sort((a, b) => b.dollars - a.dollars);
+    const rest    = entries.filter(e => !(e.hasMetric && e.dollars > 0));
+    const maxD    = leaking.length ? leaking[0].dollars : 0;
+
+    const steps = e => (e.stepsDone > 0 && !e.logged)
+      ? '<span style="font-size:10px;color:var(--gold);margin-left:8px;">' + e.stepsDone + ' of ' + e.stepsTotal + ' fix steps</span>' : '';
+
+    const leakRow = e => {
+      const b = BAND[e.band] || BAND.over;
+      const w = maxD > 0 ? Math.max(6, Math.round(e.dollars / maxD * 100)) : 6;
+      return '<div class="fp-fixarea" data-gap="' + esc(e.id) + '" data-module="' + esc(e.module) + '" style="cursor:pointer;padding:11px 0;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">'
+        + '<div style="display:flex;align-items:center;gap:9px;min-width:0;">'
+        + '<span style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(e.name) + '</span>'
+        + '<span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + b.color + ';">' + b.label + '</span>'
+        + (e.crossNote ? '<span style="font-size:10px;color:var(--t3);">' + esc(e.crossNote) + '</span>' : '')
+        + '</div>'
+        + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:600;color:' + b.color + ';line-height:1;">'
+        + App.fmtCurrency(e.dollars, 0) + '<span style="font-size:10px;color:var(--t3);"> /yr</span></div>'
+        + '</div>'
+        + '<div style="height:7px;background:#0D181E;border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + w + '%;background:' + b.bar + ';border-radius:4px;"></div></div>'
+        + (steps(e) ? '<div style="margin-top:5px;">' + steps(e).replace('margin-left:8px;', '') + '</div>' : '')
+        + '</div>';
+    };
+
+    const flatRow = e => {
+      const onTarget = e.band === 'ok';
+      const right = onTarget
+        ? '<span style="font-size:11px;font-weight:700;color:var(--gold);">On target</span>'
+        : '<span style="font-size:11px;color:var(--t3);">' + (e.crossNote ? esc(e.crossNote) : 'Review') + ' &rsaquo;</span>';
+      return '<div class="fp-fixarea" data-gap="' + esc(e.id) + '" data-module="' + esc(e.module) + '" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;">'
+        + '<div style="min-width:0;"><span style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(e.name) + '</span>' + steps(e) + '</div>'
+        + right + '</div>';
+    };
+
+    const leakHtml = leaking.map(leakRow).join('');
+    const restHtml = rest.map(flatRow).join('');
+    const sep = (leakHtml && restHtml) ? '<div style="height:1px;background:var(--b2);margin:8px 0;"></div>' : '';
+    return leakHtml + sep + restHtml;
   },
 
   // ── Compact "Recovery Scoreboard" slice for a Recovery dashboard ────────────
@@ -221,64 +208,65 @@ window.FixPanel = {
       + '</div>';
   },
 
-  // Combined Recovery Scoreboard + Fix Areas card. Scoreboard sits at the top
-  // (states 1-4 below), then a "Fix Areas" sub-header divides, then the gap
-  // rows. One title bar, one "How this works" button covering the whole flow.
+  // Recovery dashboard hero set: the Scoreboard (what you have recovered) and
+  // the ranked leak board (where you are leaking now), as two cards. Shared by
+  // the Profit, Revenue, and Traffic dashboards — designed once, lifts all three.
+  // Help lives in each dashboard's nav-"i" showHowTo (no in-card help button).
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
+    return this._scoreboardCard(moduleKey) + this._leakBoardCard(moduleKey);
+  },
+
+  _leakBoardCard(moduleKey) {
+    const inner = this._fixAreasInner(moduleKey);
+    if (!inner) return '';
+    return '<div class="card form-card" style="margin-bottom:14px;">'
+      + '<div class="card-title">Where you\'re leaking now</div>'
+      + inner + '</div>';
+  },
+
+  // The Scoreboard: realized-to-date recovered dollars once fixes are measured,
+  // or the loop teach (run audit, pick a gap, mark implemented) before then.
+  _scoreboardCard(moduleKey) {
     const s = Recovery.moduleSummary(moduleKey);
     const fixScreen = this.fixScreen(moduleKey);
-    const titleBar = this.sectionHeader('Recovery Scoreboard', 'fp-rec-help');
+    let body = '';
 
-    // ── Scoreboard portion (state-dependent) ─────────────────────────────────
-    let scoreboardHtml = '';
     if (s.logged === 0) {
       const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
       const audits = (App.data && App.data[auditKey]) || [];
       const latest = audits[audits.length - 1];
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
-      const annual  = monthly * 12;
+      const annual = monthly * 12;
       const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
-
-      if (annual > 0) {
-        // State 2 — audit done, no fixes yet.
-        scoreboardHtml = '<div style="padding:18px 20px;border-bottom:1px solid var(--b2);">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
-          + App.fmtCurrency(annual, 0)
-          + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / yr opportunity</span></div>'
-          + '</div>'
-          + this._stepRow(1, 'Pick a gap, work the fix', fixScreen, false)
-          + this._stepRow(2, 'Mark implemented', fixScreen, true);
-      } else {
-        // State 1 — brand new, three steps.
-        scoreboardHtml = this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
-          + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
-          + this._stepRow(3, 'Mark implemented', fixScreen, true);
-      }
+      body = annual > 0
+        ? '<div style="padding:6px 0 14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--gold);">'
+            + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;"> /yr opportunity</span></div>'
+            + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">from your latest audit. Work a fix and lock in the date to start measuring what you recover.</div></div>'
+            + '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
+            + this._stepRow(1, 'Pick a gap, work the fix', fixScreen, false)
+            + this._stepRow(2, 'Mark implemented', fixScreen, true) + '</div>'
+        : '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
+            + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
+            + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
+            + this._stepRow(3, 'Mark implemented', fixScreen, true) + '</div>';
     } else if (s.withFigure > 0) {
-      // State 3 — recovered $ receipt.
-      scoreboardHtml = '<div style="padding:18px 20px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:600;line-height:1;color:var(--gold);">'
-        + App.fmtCurrency(s.recovered, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">across '
-        + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
-        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '</div>'
-        + '</div>';
+      body = '<div style="padding:2px 0;">'
+        + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--gold);">' + App.fmtCurrency(s.recovered, 0) + '</span>'
+        + '<span style="font-size:13px;color:var(--t2);">recovered to date</span></div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:7px;">across ' + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
+        + (s.measuring > 0 ? ' &middot; ' + s.measuring + ' still measuring' : '')
+        + (s.annualRunRate > 0 ? ' &middot; on pace for ' + App.fmtCurrency(s.annualRunRate, 0) + '/yr' : '') + '</div></div>';
     } else {
-      // State 4 — logged, no figure yet.
-      scoreboardHtml = '<div style="padding:18px 20px;font-size:13px;color:var(--t2);line-height:1.6;">'
+      body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;padding:2px 0;">'
         + s.logged + ' fix' + (s.logged === 1 ? '' : 'es') + ' logged'
-        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring' : '') + '.</div>';
+        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring. A recovered figure shows once two weeks of after-data land.' : '.') + '</div>';
     }
 
-    // ── Fix Areas portion ────────────────────────────────────────────────────
-    const fixAreasHtml = this._fixAreasInner(moduleKey);
-
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + titleBar
-      + scoreboardHtml
-      + fixAreasHtml
-      + '</div>';
+    return '<div class="card form-card" style="margin-bottom:14px;">'
+      + '<div class="card-title">Recovery Scoreboard</div>'
+      + body + '</div>';
   },
 
   // ── "How this works" modal for the Recovery Scoreboard ─────────────────────
