@@ -186,7 +186,7 @@ S.ThisWeek = {
       { h: 'The Week Selector', p: ['The chips step you week to week, the current week is tagged NOW. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
       { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Pull From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
-      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
+      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
 
@@ -288,7 +288,15 @@ S.ThisWeek = {
       : '';
 
     const rows = all.length
-      ? all.map(w => '<tr>'
+      ? all.map(w => {
+          // Cost vs Target $: real dollars this week ran over (or under) the bar
+          // and food cost targets combined. Computable from data every saved week
+          // carries.
+          const barGap  = ((w.bar?.cost_pct  - bT) / 100) * (w.bar?.revenue  || 0);
+          const foodGap = ((w.food?.cost_pct - fT) / 100) * (w.food?.revenue || 0);
+          const costGap = (isFinite(barGap) ? barGap : 0) + (isFinite(foodGap) ? foodGap : 0);
+          const gapStr  = (costGap > 0 ? '+' : costGap < 0 ? '-' : '') + App.fmtCurrency(Math.abs(costGap));
+          return '<tr>'
           + '<td><div class="val">' + this.fmtDate(w.period_end) + '</div></td>'
           + '<td>Week ' + (w.week_num != null ? w.week_num : '-') + '</td>'
           + '<td>' + App.fmtCurrency(w.bar?.revenue || 0) + '</td>'
@@ -296,11 +304,13 @@ S.ThisWeek = {
           + '<td>' + App.fmtCurrency(w.food?.revenue || 0) + '</td>'
           + '<td class="' + cls(w.food?.cost_pct, fT) + '">' + App.fmtPct(w.food?.cost_pct) + '</td>'
           + '<td class="' + cls(w.prime_cost_pct, pT) + '">' + App.fmtPct(w.prime_cost_pct) + '</td>'
+          + '<td class="' + (costGap > 0 ? 'neg' : costGap < 0 ? 'pos' : '') + '">' + gapStr + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm tw-edit" data-id="' + esc(w.id) + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm tw-del" data-id="' + esc(w.id) + '">Delete</button>'
-          + '</div></td></tr>').join('')
-      : '<tr><td colspan="8" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Pick a wider range above.</td></tr>';
+          + '</div></td></tr>';
+        }).join('')
+      : '<tr><td colspan="9" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Pick a wider range above.</td></tr>';
 
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'tw-range-chip') + '</div>'
@@ -308,7 +318,7 @@ S.ThisWeek = {
       + '</div>'
       + customRow
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Bar %</th><th>Food Rev</th><th>Food %</th><th>Prime %</th><th></th>'
+      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Bar %</th><th>Food Rev</th><th>Food %</th><th>Prime %</th><th>Cost vs Tgt $</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
