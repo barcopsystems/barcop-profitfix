@@ -217,7 +217,7 @@ S.ThisWeek = {
 
   // ── Confirm grid card ───────────────────────────────────────────────────────
   cell(id, val) {
-    return '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" style="height:40px;" oninput="S.ThisWeek.onInput()"/></div>';
+    return '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" style="width:100%;" oninput="S.ThisWeek.onInput()"/></div>';
   },
   lineRow(label, p, data) {
     return '<tr class="tw-line">'
@@ -246,7 +246,7 @@ S.ThisWeek = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-top:1px solid var(--b2);flex-wrap:wrap;">'
       + footerLeft
       + '<div style="display:flex;align-items:center;gap:9px;"><label style="font-size:11px;color:var(--t2);">3rd-party platform fees</label>'
-      + '<div class="fw" style="width:150px;"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" style="height:40px;" oninput="S.ThisWeek.onInput()"/></div></div>'
+      + '<div class="fw" style="width:150px;"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
       + '</div>'
       + '<div style="padding:0 18px 16px;"><div class="f" style="margin:0;"><label>Notes (optional)</label>'
       + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div></div>'
@@ -348,7 +348,12 @@ S.ThisWeek = {
     if (!w) return;
     this.loadWeek(w.period_end);
     this.draw();
-    if (this.container) this.container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Jump back to the confirm grid at the top — the app scrolls its .content
+    // element, so scrolling the container itself would not move the view.
+    const el = App._activeContentEl ? App._activeContentEl() : null;
+    if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
+    else if (el) el.scrollTop = 0;
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   deleteWeek(id) {
