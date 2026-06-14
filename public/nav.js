@@ -19,10 +19,14 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-section">Cost and Loss</div>
+      <div class="nav-item" data-screen="profit-forecast" id="nav-profit-forecast">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 12l4-4 3 3 6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.5 4h3.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Profit Forecast</span>
+      </div>
+      <div class="nav-section">Leaks</div>
       <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Recipe Cost Analysis</span>
+        <span class="nav-label">Recipe Summary</span>
       </div>
       <div class="nav-item" data-screen="vendor-tracker" id="nav-vendor-tracker">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -30,16 +34,11 @@ const ProfitNav = {
       </div>
       <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Theft Risk</span>
+        <span class="nav-label">Loss Prevention</span>
       </div>
       <div class="nav-item" data-screen="cash-recon" id="nav-cash-recon">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Cash Reconciliation</span>
-      </div>
-      <div class="nav-section">History</div>
-      <div class="nav-item" data-screen="reports" id="nav-reports">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Reports and History</span>
+        <span class="nav-label">Over and Short</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="help" id="nav-help">
