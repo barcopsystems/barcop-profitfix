@@ -1,9 +1,9 @@
 'use strict';
 
 /* ── Fix Layer content — Profit Recovery ──────────────────────────────────────
-   Static fix content for the Profit gap-areas (Section 9). Rendered by
-   FixPanel inside Profit Recovery's Help & FAQ. Zero API cost (Rule 23).
-   Source: the Profit Fix System. */
+   Static fix content for the Profit gap-areas (Section 9). Rendered by the
+   Profit Fix screen (S.ProfitFix) as the campaign of leak tiles + step flows.
+   Zero API cost (Rule 23). Source: the Profit Fix System. */
 
 window.FIX = window.FIX || {};
 
@@ -63,10 +63,10 @@ FIX.profit = [
           detail: 'Download the Theft and Loss Prevention Policy, set the cash, comp, and product rules, and have every staff member sign it at hire. It protects the business and every honest employee.' },
         { kind: 'action', target: 'sc-void-comp', targetLabel: 'Void and Comp Log',
           title: 'Log voids, comps, and no-sales by employee with category',
-          detail: 'In Shift Control, log every void and comp against the employee who rang it. Each comp carries a Reason that classifies it: customer-facing reasons (service recovery, goodwill, regular or VIP, promo) are loss and feed the Theft Risk score, while Staff Meal and Shift Drink are policy expense tracked as a cost line in the books. Picking the honest reason keeps the theft score real and keeps staff drinks out of the guest-comp number.' },
+          detail: 'In Shift Control, log every void and comp against the employee who rang it. Each comp carries a Reason that classifies it: customer-facing reasons (service recovery, goodwill, regular or VIP, promo) are loss and show up in Loss Prevention, while Staff Meal and Shift Drink are policy expense tracked as a cost line in the books. Picking the honest reason keeps the loss signals real and keeps staff drinks out of the guest-comp number.' },
         { kind: 'action', target: 'sc-shift-policies', targetLabel: 'Shift Policies',
           title: 'Set a Comp Auth Threshold and enforce it',
-          detail: 'In Shift Control under Setup, open Shift Policies and set the Comp Auth Threshold above which a manager must sign off (defaults to $25). Saving a comp over the threshold without a manager pops a soft warning the operator can override, and every override flags in Theft Risk under Unauthorized Large Comps. The bartender comping a $40 round of drinks without manager involvement is one of the most common bar-theft patterns and this is how Bar Cop catches it.' },
+          detail: 'In Shift Control under Setup, open Shift Policies and set the Comp Auth Threshold above which a manager must sign off (defaults to $25). Saving a comp over the threshold without a manager pops a soft warning the operator can override, and every override flags in Loss Prevention as a large comp cleared over your threshold without authorization. The bartender comping a $40 round of drinks without manager involvement is one of the most common bar-theft patterns and this is how Bar Cop catches it.' },
         { kind: 'action', target: 'sc-cash-control', targetLabel: 'Cash Control',
           title: 'Reconcile every cash drawer',
           detail: 'In Cash Control, count each drawer against expected POS cash at end of shift and log the over or short. Consistent shorts and consistent overs are both signals.' },
@@ -76,9 +76,9 @@ FIX.profit = [
         { kind: 'action', target: 'ic-spot-check', targetLabel: 'Spot Check',
           title: 'Run unannounced shift audits',
           detail: 'Use Spot Check for a fast pre and post shift count on your high-risk products, on different shifts at varied times. The audit is a deterrent as much as a detection tool.' },
-        { kind: 'result', target: 'theft-risk', targetLabel: 'Theft Risk',
-          title: 'Review the theft signals weekly',
-          detail: 'The Theft Risk scorecard pulls voids and comps, cash variance, and spot-check flags into one auto-scored read. Review it every week and watch the trend.' },
+        { kind: 'result', target: 'theft-risk', targetLabel: 'Loss Prevention',
+          title: 'Review the loss signals weekly',
+          detail: 'Loss Prevention pulls unauthorized voids and comps, drawer shorts, flagged spot checks, and confirmed theft into one live read of what flagged today and over the last 7 days, with a dollar amount on each. It is a catch-it-now detector, not a lagging score. Review it every week, and the worst flags also push to the Hub and to Open the Floor so they find you.' },
         { kind: 'reference', target: 'Employee_Corrective_Action_Template.docx', targetLabel: 'Employee Corrective Action Template',
           title: 'Escalate a documented pattern',
           detail: 'One incident is a data point. Two on the same employee within 30 days is a pattern. Document incidents in writing as you see them, and use the Corrective Action Template once the pattern is clear.' }
@@ -124,13 +124,13 @@ FIX.profit = [
           detail: 'Weigh a few plates of a dish during service and compare against the portion spec on the recipe card. A line cook over-portioning fries by 20 percent on a 200-cover night runs through 40 extra pounds a week, real food cost no other screen catches. When a cook runs heavy, coach the portion on the spot and pair it with the Portion Control Audit below.' },
         { kind: 'reference', target: 'Portion_Control_Audit.pdf', targetLabel: 'Portion Control Audit',
           title: 'Run portion control audits',
-          detail: 'Use the Portion Control Audit form on at least two stations a week at varied times, checked against the portion spec on each recipe card. Pair the paper form with Yield Test for the digital trail. Over-portioning is a standards gap, so treat findings as training.' },
+          detail: 'Use the Portion Control Audit form on at least two stations a week at varied times, checked against the portion spec on each recipe card. Over-portioning is a standards gap, so treat findings as training, not discipline.' },
         { kind: 'result', target: 'this-week', targetLabel: 'This Week',
           title: 'Review the trend with the kitchen manager',
           detail: 'Each week, open This Week with the kitchen manager. The weekly history shows food cost against target and the dollar gap. Cross-reference it against the Waste and Spill Log entries and the portion audit findings from the past week, and set one specific action with a named owner.' },
-        { kind: 'action', target: 'recipe-cost-analysis', targetLabel: 'Recipe Cost Analysis',
+        { kind: 'action', target: 'recipe-cost-analysis', targetLabel: 'Recipe Summary',
           title: 'Reprice the items above target',
-          detail: 'When food cost is above target, open Recipe Cost Analysis to see exactly which items are pulling cost up. Open Item from there to reprice on the Menu Items screen. A surgical increase on those items is less visible to guests than an across-the-board raise.' }
+          detail: 'When food cost is above target, open Recipe Summary to see exactly which items are pulling cost up, sorted over-target first. Edit one right there to fix its recipe or reprice it in place. A surgical increase on the few items above target is less visible to guests than an across-the-board raise.' }
       ]
     },
 
@@ -161,15 +161,18 @@ FIX.profit = [
         { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
           title: 'Check the invoiced prices as you receive',
           detail: 'As you receive, Bar Cop compares each invoiced price against the last price you paid and flags anything that moved. Note any substitution before you sign. A lower-tier product billed at the premium price is an overcharge, not a substitution.' },
-        { kind: 'action', target: 'vendor-discrepancy', targetLabel: 'Vendor Discrepancies',
-          title: 'File a discrepancy on any variance',
-          detail: 'When a delivery is short or a price is wrong, open Vendor Discrepancies and file it: vendor, type, product, agreed price, invoiced price, and the total overcharge. Get it to your rep within 24 hours, discrepancies age out fast. The screen tracks each one from open to credit requested to resolved, and totals what is still owed to you.' },
-        { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Watch',
+        { kind: 'action', target: 'ic-receive-delivery', targetLabel: 'Receive Delivery',
+          title: 'Flag any short count or wrong price at the dock',
+          detail: 'When a line comes up short, damaged, or billed wrong, Flag it right on the Receive Delivery line before the driver leaves. The flag files the claim with that delivery attached. If the problem turns up later, an invoice that arrives after or a keg that pours flat, open the delivery in Delivery History and flag the line there. Catch it at the door; a short count you sign for is a loss you already accepted.' },
+        { kind: 'action', target: 'vendor-discrepancy', targetLabel: 'Vendor Tracker',
+          title: 'Chase the credit you are owed',
+          detail: 'Open Vendor Tracker\'s Discrepancies tab to work every claim you flagged. Request Credit drafts the email to your rep and flips the status, Mark Resolved records what you actually got back, and the tab totals what is still owed you. Get to the rep within 24 hours, claims age out fast.' },
+        { kind: 'result', target: 'vendor-watch', targetLabel: 'Vendor Tracker',
           title: 'Read the line-by-line price drift Bar Cop is tracking',
-          detail: 'Vendor Watch reads every delivery you receive and surfaces which product prices have drifted up and what that drift costs you per year. There is no price tracker to keep by hand. Check it once a month.' },
-        { kind: 'result', target: 'vendor-scorecard', targetLabel: 'Vendor Scorecard',
+          detail: 'Vendor Tracker\'s Price Changes tab reads every delivery you receive and surfaces which product prices have drifted up and what that drift costs you per year. There is no price tracker to keep by hand. Check it once a month.' },
+        { kind: 'result', target: 'vendor-scorecard', targetLabel: 'Vendor Tracker',
           title: 'Bring the per-vendor rollup to a quarterly review',
-          detail: 'Once a quarter, open Vendor Scorecard for the per-vendor rollup: total spend, net price drift, short counts, open and recovered overcharges, days to credit, and a status tier (HIGH, WATCH, CLEAN). Export PDF and take it into the rep meeting. Ask for a price match or an explanation on every HIGH and WATCH line, and talk volume terms. A documented status tier is hard for a rep to wave off.' },
+          detail: 'Once a quarter, open Vendor Tracker\'s Scorecard tab for the per-vendor rollup: total spend, net price drift, short counts, open and recovered overcharges, days to credit, and a status (High, Watch, Clean). Export PDF and take it into the rep meeting. Ask for a price match or an explanation on every High and Watch line, and talk volume terms. A documented status is hard for a rep to wave off.' },
         { kind: 'reference', target: 'Vendor_Agreement_Terms_Checklist.docx', targetLabel: 'Vendor Agreement Terms Checklist',
           title: 'Confirm the terms in writing',
           detail: 'Within 48 hours of the review, download the Vendor Agreement Terms Checklist, fill in the pricing, substitution policy, and delivery terms you agreed to, and send it to your rep. When a price dispute happens and your only record is a phone call, you have no dispute.' }
