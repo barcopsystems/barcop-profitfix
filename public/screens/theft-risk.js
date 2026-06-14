@@ -250,12 +250,14 @@ S.TheftRisk = {
       productOpts += '</optgroup>';
     });
 
-    let h = '<div class="sh" style="margin:22px 0 10px;">Variance Investigations</div>'
+    let h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Variance Investigations</div>'
+      + '<button class="btn btn-ghost btn-sm no-print vi-print-blank">Worksheet</button>'
+      + '</div>'
       + '<div class="card form-card">'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:0;">'
       + '<div class="f" style="width:300px;"><label>Open an Investigation</label><select class="form-input vi-product-select">' + productOpts + '</select></div>'
       + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
-      + '<button class="btn btn-ghost btn-sm vi-print-blank" style="margin-left:auto;">Worksheet</button>'
       + '</div></div>';
 
     if (open.length) {
@@ -378,17 +380,17 @@ S.TheftRisk = {
      that stays attached to THIS investigation, not a new spot-check flag. */
   VARIANCE_STEPS: [
     { title: 'Verify the count',
-      detail: 'Pull the product count sheets across the full period and check every storage location for a missed partial or a unit-of-measure error. Rule out a counting mistake before chasing theft.' },
+      detail: 'Check every storage location for a missed partial or a count error before chasing theft.' },
     { title: 'Calculate theoretical usage',
-      detail: 'POS sales by drink type times recipe ounces, compared against the actual ounce movement from the count.' },
+      detail: 'Compare POS pours sold against the actual ounce movement from the count.' },
     { title: 'Identify the shifts',
-      detail: 'Use the opening and closing counts to find which shifts the variance landed on.' },
+      detail: 'Use opening and closing counts to pin which shifts the variance landed on.' },
     { title: 'Talk to the staff who worked those shifts',
-      detail: 'You are running this; the people to ask are whoever was on the bar those shifts. Ask what they saw: breakage, heavy comps, a busy rush, anything unusual.' },
+      detail: 'Ask what they saw: breakage, heavy comps, a rush, anything unusual.' },
     { title: 'Re-measure under tighter control',
-      detail: 'Do one unannounced re-count of just this product across a single suspect shift, logged as part of this investigation. If the variance shows up again on that shift you have narrowed it down. This stays attached to this investigation, it does not open a new one.' },
+      detail: 'Unannounced re-count of just this product on one suspect shift, logged here as part of this investigation.' },
     { title: 'Document the finding',
-      detail: 'Write down the finding and the resolution before closing, even when it is inconclusive.' }
+      detail: 'Write the finding and resolution before closing, even if inconclusive.' }
   ],
 
   _inv(id) { return (App.data.variance_investigations || []).find(x => x.id === id); },
@@ -421,11 +423,11 @@ S.TheftRisk = {
         const actualPours = used * pp;
         const cost = (App.unitCost ? App.unitCost(p) : (p.unit_cost || 0)) || 0;
         const actualDollars = used * cost;
-        step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+        step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;">'
           + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Live Data &middot; ' + esc(start.date) + ' to ' + esc(end.date) + '</div>'
           + '<div>Used: <strong>' + used.toFixed(2) + ' containers</strong> (' + actualPours.toFixed(1) + ' pours, ' + App.fmtCurrency(actualDollars) + ')</div>'
           + '<div style="color:var(--t3);margin-top:4px;">Starting count ' + (si.total || 0).toFixed(2) + ' + purchases ' + purch.toFixed(2) + ' - ending count ' + (ei.total || 0).toFixed(2) + '</div>'
-          + '<div style="color:var(--t3);margin-top:4px;">Compare against your POS pours sold for the same window. The Variance Report in Inventory Control has the full POS-match math when you upload sales data.</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Compare against your POS pours sold for the same window.</div>'
           + '</div>';
       } else {
         step2Html = '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">This product was not counted on both of the last two inventories. Run a count in Inventory Control to populate the math here.</div>';
@@ -451,7 +453,7 @@ S.TheftRisk = {
           + '<span style="width:80px;text-align:right;">' + flag + '</span>'
           + '</div>';
       }).join('');
-      step3Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--gold);border-radius:3px;">'
+      step3Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;">'
         + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Recent Spot Checks for This Product</div>' + rows + '</div>';
     }
     return { step2: step2Html, step3: step3Html };
