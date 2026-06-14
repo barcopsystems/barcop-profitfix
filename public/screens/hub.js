@@ -317,11 +317,11 @@ S.Hub = {
     const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
     const setupTotal = setupTasks.length;
     const catchupBanner = (setupTotal > 0 && setupDone < setupTotal)
-      ? '<div class="hub-catchup" style="background:rgba(219,171,70,0.10);border:1px solid rgba(219,171,70,0.35);border-radius:6px;padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
+      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t1);">Setup</div>'
         + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">'
         +   setupDone + ' of ' + setupTotal + ' setup tasks done. '
-        +   '<span style="color:var(--gold);font-weight:700;">Continue setup</span>'
+        +   '<span style="color:var(--t1);font-weight:700;">Continue setup</span>'
         + '</div>'
         + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
         + '</div>'
