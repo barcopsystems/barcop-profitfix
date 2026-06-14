@@ -69,6 +69,7 @@ S.InventoryDeliveryHistory = {
         'Open any delivery with View to see every line: product, container, quantity received, unit price, any price change against your old cost, and the extended total. Bottle beer shows in cases, so a delivery of Modelo reads in cases the way you order it and pay for it, not loose bottles.',
         'If a line shows a price change, the old price is right there next to what you just paid. If a count came up short, that line tells you what you were billed for versus what hit the floor, which is your starting point for a credit.'
       ] },
+      { h: 'File a Discrepancy Later', p: ['Not every problem shows up at the dock. The invoice lands later with a price you did not agree to, a case turns out short or damaged when you open it, a keg pours flat. Open the delivery and hit Flag on that line. Bar Cop files the credit claim pre-filled from the line and tied to this delivery, and it lands in the Vendor Tracker under Discrepancies for follow-up.'] },
       { h: 'Export', p: ['Use Export PDF to save a clean PDF of any delivery for your records, your accountant at month end, or a credit claim you are filing with the vendor. When you are disputing a short count, a printed line-item record with the invoice number on it ends the argument fast.'] }
     ]);
   },
@@ -211,7 +212,7 @@ S.InventoryDeliveryHistory = {
     const meta = (label, val) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
-    const itemRows = items.map(it => {
+    const itemRows = items.map((it, i) => {
       const isCase = it.display_unit === 'case';
       const p = ((App.inventoryData && App.inventoryData.ic_products) || []).find(pr => pr.id === it.product_id);
       const ab = p ? App.unitAbbr(App.productUnit(p)) : '';
@@ -230,6 +231,7 @@ S.InventoryDeliveryHistory = {
         + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
+        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">Flag</button></td>'
         + '</tr>';
     }).join('');
 
@@ -246,11 +248,103 @@ S.InventoryDeliveryHistory = {
       + '<div class="sh" style="margin:0;">' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</div>'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button></div></div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Product</th><th>Container</th><th>Qty</th><th>Unit Price</th><th>Price Change</th><th>Extended</th>'
+      + '<th>Product</th><th>Container</th><th>Qty</th><th>Unit Price</th><th>Price Change</th><th>Extended</th><th class="no-print"></th>'
       + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>'
       + '</div>';
 
-    this.container.onclick = null;
+    this.container.onclick = ev => {
+      const fl = ev.target.closest('.dh-flag');
+      if (fl) { const it = items[parseInt(fl.dataset.idx, 10)]; if (it) this.openLineDiscrepancy(d, it); }
+    };
     document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Delivery History', root: this.container }));
+  },
+
+  // ── File a discrepancy against a saved delivery line (after the fact) ──────
+  // The dock catches short counts + price changes live in Receive Delivery; this
+  // is the path for issues found later (invoice came after, damage found when a
+  // case was opened, a quality failure). Pre-filled from the saved line, tied to
+  // the delivery via delivery_id, and the claim lands in Vendor Tracker for
+  // credit follow-up ([[two-doors-same-data]]).
+  openLineDiscrepancy(d, it) {
+    const product = ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === it.product_id);
+    const productName = it.name || product?.name || '';
+    const agreedPrice = it.prev_price != null ? it.prev_price : (product?.unit_cost != null ? product.unit_cost : null);
+    const invoicedPrice = it.price_per_unit != null ? it.price_per_unit : null;
+    const qty = it.qty != null ? it.qty : 0;
+    const suggestedType = it.price_changed ? 'Price Overcharge' : 'Other';
+    let overcharge = 0;
+    if (it.price_changed && agreedPrice != null && invoicedPrice != null && qty) overcharge = Math.max(0, (invoicedPrice - agreedPrice) * qty);
+    const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
+    const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
+
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">File Discrepancy</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Files a credit claim to Vendor Tracker for follow-up, tied to this delivery. Adjust if needed.</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:160px;"><label>Date</label><input class="form-input" type="date" id="dhd-date" value="' + esc(d.date || App.todayLocal()) + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:160px;"><label>Vendor</label><input class="form-input" type="text" id="dhd-vendor" value="' + esc(d.vendor || '') + '" readonly/></div>'
+        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input class="form-input" type="text" id="dhd-ref" value="' + esc(d.invoice_number || '') + '"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label><input class="form-input" type="text" id="dhd-product" value="' + esc(productName) + '"/></div>'
+        + '<div class="f" style="width:180px;"><label>Type</label><select class="form-input" id="dhd-type">' + typeOpts + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;">'
+        + '<div class="f" style="width:100px;"><label>Units</label><input class="form-input" type="number" id="dhd-units" step="1" value="' + qty + '"/></div>'
+        + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-invoiced" step="0.01" value="' + (invoicedPrice != null ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
+      + '</div>'
+      + '<div class="f" style="margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="dhd-notes" placeholder="What was wrong, and who you contacted"/></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="dhd-file">File Discrepancy</button>'
+        + '<button class="btn btn-ghost" id="dhd-cancel">Cancel</button>'
+        + '<span id="dhd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'dh-disc-modal', maxWidth: 640, noClose: true });
+
+    const recompute = () => {
+      const oc = document.getElementById('dhd-overcharge');
+      if (!oc || oc._touched) return;
+      const u = parseFloat(document.getElementById('dhd-units')?.value) || 0;
+      const a = parseFloat(document.getElementById('dhd-agreed')?.value);
+      const iv = parseFloat(document.getElementById('dhd-invoiced')?.value);
+      if (!isNaN(a) && !isNaN(iv) && u) oc.value = Math.max(0, (iv - a) * u).toFixed(2);
+    };
+    ['dhd-units', 'dhd-agreed', 'dhd-invoiced'].forEach(id => document.getElementById(id)?.addEventListener('input', recompute));
+    document.getElementById('dhd-overcharge')?.addEventListener('input', e => { e.target._touched = true; });
+    document.getElementById('dhd-cancel')?.addEventListener('click', () => App.closeModal('dh-disc-modal'));
+    document.getElementById('dhd-file')?.addEventListener('click', () => this.saveLineDiscrepancy(d));
+  },
+
+  async saveLineDiscrepancy(d) {
+    const errEl = document.getElementById('dhd-err');
+    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
+    const date = document.getElementById('dhd-date')?.value;
+    const vendor = (document.getElementById('dhd-vendor')?.value || d.vendor || '').trim();
+    if (!date) { fail('Date is required.'); return; }
+    if (!vendor) { fail('Vendor is required.'); return; }
+    const rec = {
+      id:             App.uid(),
+      date,
+      vendor,
+      reference:      document.getElementById('dhd-ref')?.value.trim() || '',
+      type:           document.getElementById('dhd-type')?.value || 'Other',
+      sku:            document.getElementById('dhd-product')?.value.trim() || '',
+      units:          parseFloat(document.getElementById('dhd-units')?.value) || 0,
+      agreed_price:   parseFloat(document.getElementById('dhd-agreed')?.value) || 0,
+      invoiced_price: parseFloat(document.getElementById('dhd-invoiced')?.value) || 0,
+      overcharge:     parseFloat(document.getElementById('dhd-overcharge')?.value) || 0,
+      notes:          document.getElementById('dhd-notes')?.value.trim() || '',
+      status:         'Open',
+      source:         'delivery-history',
+      delivery_id:    d.id,
+      created_at:     new Date().toISOString()
+    };
+    const ok = await App.putRecord('core', 'vendor_discrepancy', rec);
+    if (!ok) { fail('Could not save the discrepancy. Try again.'); return; }
+    // Reflect it on the delivery record so Delivery History shows the flag.
+    if (!d.has_discrepancy) { d.has_discrepancy = true; await App.putRecord('ic', 'delivery', d); }
+    App.closeModal('dh-disc-modal');
+    this.renderDetail(d.id);
   }
 };
