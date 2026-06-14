@@ -1226,7 +1226,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3939,11 +3939,16 @@ const App = {
     const availH = pageH - y - footerReserve - 14;
     const headerRowH = 20;
     const minBodyRowH = 26;
-    const nRows = Math.max(1, Math.floor((availH - headerRowH) / minBodyRowH));
+    // Optional pre-filled rows (e.g. a guided worksheet that prints the steps
+    // into the grid). When omitted, the sheet fills the page with blank rows.
+    const preRows = (Array.isArray(opts.bodyRows) && opts.bodyRows.length) ? opts.bodyRows : null;
+    const nRows = preRows ? preRows.length : Math.max(1, Math.floor((availH - headerRowH) / minBodyRowH));
     const bodyRowH = (availH - headerRowH) / nRows;
 
     const head = [cols.map(c => this._pdfSafe(c.label || ''))];
-    const body = Array.from({ length: nRows }, () => cols.map(() => ''));
+    const body = preRows
+      ? preRows.map(r => cols.map((c, i) => this._pdfSafe(String(r[i] != null ? r[i] : ''))))
+      : Array.from({ length: nRows }, () => cols.map(() => ''));
     doc.autoTable({
       startY: y,
       head, body,
