@@ -118,8 +118,7 @@ S.ProfitForecast = {
         + '<td' + (o.bold ? ' style="font-weight:600;"' : '') + (o.curCls ? ' class="' + o.curCls + '"' : '') + '>' + cur + '</td>'
         + '<td' + (o.bold ? ' style="font-weight:600;"' : '') + (o.tgtCls ? ' class="' + o.tgtCls + '"' : '') + '>' + tgt + '</td></tr>';
     };
-    const breakdown = '<div class="sh" style="margin:4px 0 10px;">The Numbers</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
+    const breakdown = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
       + '<colgroup><col style="width:40%"/><col style="width:30%"/><col style="width:30%"/></colgroup>'
       + '<thead><tr><th>Line</th><th>At Current Pace</th><th>At Your Targets</th></tr></thead><tbody>'
       + bRow('Projected Sales', money(sales), money(sales))
@@ -128,16 +127,17 @@ S.ProfitForecast = {
       + bRow(profitLabel, money(profitCur), money(profitTgt), { bold: true, curCls: profitCur < 0 ? 'neg' : '', tgtCls: profitTgt < 0 ? 'neg' : '' })
       + '</tbody></table></div></div>';
 
-    // ── Assumptions + disclaimer (the legal/honesty line) ──
-    const opexNudge = rr.opexLogged ? '' :
-      '<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5;">No operating costs logged yet, so this shows profit before operating costs. Add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.</div>';
-    const assumptions = '<div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5;">'
-      + 'Projected from your last ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ': about ' + money(rr.avgWeeklyRev) + ' a week in sales at a ' + pctTxt(rr.primePctCurrent) + ' prime cost'
-      + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex + rr.avgWeeklyPF) + ' a week in operating costs' : '')
-      + '. An estimate to plan against, not a guarantee or financial advice.</div>'
-      + opexNudge;
+    // ── Heads Up: assumptions + disclaimer (standard opaque gold-tint box) ──
+    const assumeTxt = 'Projected from your last ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ': about ' + money(rr.avgWeeklyRev) + ' a week in sales at a ' + pctTxt(rr.primePctCurrent) + ' prime cost'
+      + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex + rr.avgWeeklyPF) + ' a week in operating costs.' : '.')
+      + (rr.opexLogged ? '' : ' No operating costs are logged yet, so this shows profit before operating costs; add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.')
+      + ' These are projections in whole dollars built from your own averages, an estimate to plan against, not a guarantee or financial advice.';
+    const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">' + assumeTxt + '</div>'
+      + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + statStrip + chipRow + breakdown + assumptions + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statStrip + chipRow + breakdown + headsUp + '</div>';
 
     this.container.querySelectorAll('.pf-horizon-chip').forEach(b => b.addEventListener('click', () => { this.horizon = b.dataset.v; this.renderMain(); }));
     document.getElementById('pf-export')?.addEventListener('click', () => App.exportPDF({ title: 'Profit Forecast', root: this.container }));
