@@ -200,18 +200,39 @@ S.RevenueMenuItems = {
     const all = this.items();
     const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
 
-    const actionRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<button class="btn btn-primary" id="mi-add">+ Add Menu Item</button>'
-      + '<button class="btn btn-ghost btn-sm" id="mi-import">Import</button>'
-      + '</div>';
+    // Inline add form is always-on at the top (edit happens in the modal), so
+    // the add state starts blank on every landing render.
+    this._editItem = null;
+    this.editIdx = null;
+    this.formType = null;
+    this.rows = [];
+    this.mode = null;
+    this.linkedProductId = '';
+    this._editingIncomplete = false;
+
+    // Always-on inline Add form (card + Save/Start Over below it), sharing one
+    // formBodyHtml() builder with the edit modal so the two surfaces never
+    // drift. Wrapped so openEditor can remove the whole thing (card + buttons)
+    // before opening the modal — the ri-* ids are identical, so only one form
+    // can be in the DOM at a time.
+    const addWrap = '<div id="mi-add-wrap">'
+      + '<div class="card form-card" style="margin-bottom:0;">'
+        + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+          + '<span>Add Menu Item</span>'
+          + '<button class="btn btn-ghost btn-sm no-print" id="mi-import">Import File</button>'
+        + '</div>'
+        + this.formBodyHtml(null)
+      + '</div>'
+      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
+        + '<button class="btn btn-ghost" id="ri-start-over">Start Over</button>'
+        + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>'
+    + '</div>';
 
     let body;
     if (!all.length) {
-      body = '<div class="card form-card"><div class="empty">'
-        + '<div class="empty-title">No menu items yet</div>'
-        + '<div class="empty-sub">Add your cocktails, food, and direct-pour beer/wine. Each item carries its price and cost so Bar Cop can show your margins and flag what is bleeding.</div>'
-        + '<button class="btn btn-primary" id="mi-add-empty" style="margin-top:14px;">+ Add Your First Item</button>'
-        + '</div></div>';
+      body = '<div style="color:var(--t3);font-size:13px;margin-top:4px;">No menu items yet. Use the form above to add your first one.</div>';
     } else {
       const cats = [...new Set(all.map(i => i.category || 'Uncategorized'))]
         .sort((a, b) => {
@@ -255,11 +276,17 @@ S.RevenueMenuItems = {
       body = warn + sections;
     }
 
-    this.container.innerHTML = '<div class="screen">' + actionRow + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + addWrap + body + '</div>';
 
-    document.getElementById('mi-add')?.addEventListener('click', () => this.openEditor(null));
-    document.getElementById('mi-add-empty')?.addEventListener('click', () => this.openEditor(null));
+    // Add-form wiring (always-on inline form)
     document.getElementById('mi-import')?.addEventListener('click', () => this.showImport());
+    document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
+    document.getElementById('ri-save')?.addEventListener('click', () => this._save(null));
+    document.getElementById('ri-start-over')?.addEventListener('click', () => this.resetAddForm());
+    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
+    this.renderAdaptive(null);
+
+    // List wiring (edit opens the modal)
     this.container.querySelectorAll('.mi-edit').forEach(b =>
       b.addEventListener('click', () => this.openEditor(this.items().find(i => i.id === b.dataset.id) || null)));
     this.container.querySelectorAll('.mi-del').forEach(b =>
@@ -298,18 +325,14 @@ S.RevenueMenuItems = {
       : [];
     this._editingIncomplete = !!(item && this.formType && this.missingFields(item, this.formType).size > 0);
 
-    const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
-    const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
-    const catOpts = '<option value="">Select category...</option>'
-      + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    // Remove the inline add form (card + buttons) so its ri-* / mi-adaptive ids
+    // don't collide with the modal's. cancelEditor()/_save() rebuild it (blank)
+    // via renderLanding() when the modal closes.
+    document.getElementById('mi-add-wrap')?.remove();
 
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (item ? 'Edit Menu Item' : 'Add Menu Item') + '</div>'
-      + '<div class="form-row">'
-      + '<div class="f" style="flex:2;min-width:220px;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
-      + '</div>'
-      + '<div id="mi-adaptive"></div>'
+      + this.formBodyHtml(item)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ri-save">' + (item ? 'Update Item' : 'Save Item') + '</button>'
       + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
@@ -319,10 +342,37 @@ S.RevenueMenuItems = {
     App.openModal(html, { id: 'mi-editor', maxWidth: 680, noClose: true });
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
-    document.getElementById('ri-cancel')?.addEventListener('click', () => App.closeModal('mi-editor'));
+    document.getElementById('ri-cancel')?.addEventListener('click', () => this.cancelEditor());
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     this.renderAdaptive(item);
     if (item) this.applyMissingFieldHighlights(item, this.formType);
+  },
+
+  // Shared form body (Name + Category + the adaptive section) injected by BOTH
+  // the inline add form on the landing AND the edit modal, so the two never
+  // drift. The ri-* / mi-adaptive ids are identical, so only ONE of the two
+  // forms is ever in the DOM at once (openEditor removes the inline form first).
+  formBodyHtml(item) {
+    const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
+    const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
+    const catOpts = '<option value="">Select category...</option>'
+      + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    return '<div class="form-row">'
+      + '<div class="f" style="flex:2;min-width:220px;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '</div>'
+      + '<div id="mi-adaptive"></div>';
+  },
+
+  // Close the edit modal and rebuild the landing — restores the inline add form.
+  cancelEditor() {
+    App.closeModal('mi-editor');
+    this.renderLanding();
+  },
+
+  // Start Over on the inline add form = a clean, blank landing render.
+  resetAddForm() {
+    this.renderLanding();
   },
 
   onCategoryChange(cat) {
