@@ -1226,7 +1226,7 @@ const App = {
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'r-menu-items', 'recipe-cost-analysis', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3434,9 +3434,10 @@ const App = {
       'dashboard':     ['Dashboard', 'Profit Recovery'],
       'this-week':     ['This Week', 'Weekly Entry'],
       'recipe-cost-analysis':['Recipe Cost Analysis', ''],
-      'vendor-watch':  ['Vendor Watch', ''],
-      'vendor-scorecard': ['Vendor Scorecard', ''],
-      'vendor-discrepancy': ['Vendor Discrepancies', ''],
+      'vendor-tracker': ['Vendor Tracker', ''],
+      'vendor-watch':  ['Vendor Tracker', ''],
+      'vendor-scorecard': ['Vendor Tracker', ''],
+      'vendor-discrepancy': ['Vendor Tracker', ''],
       'theft-risk':    ['Theft Risk Scorecard', ''],
       'pour-test':     ['Pour Test', 'Per-Bartender Pour Accuracy'],
       'yield-test':    ['Yield Test', 'Per-Cook Portion Accuracy'],
@@ -3452,9 +3453,10 @@ const App = {
       'dashboard':     S.Dashboard,
       'this-week':     S.ThisWeek,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
-      'vendor-watch':  S.VendorWatch,
-      'vendor-scorecard': S.VendorScorecard,
-      'vendor-discrepancy': S.VendorDiscrepancy,
+      'vendor-tracker': S.VendorTracker,
+      'vendor-watch':  S.VendorTracker,
+      'vendor-scorecard': S.VendorTracker,
+      'vendor-discrepancy': S.VendorTracker,
       'theft-risk':    S.TheftRisk,
       'pour-test':     S.PourTest,
       'yield-test':    S.YieldTest,
@@ -3468,6 +3470,14 @@ const App = {
     const [title, sub] = titles[id] || [id, ''];
     document.getElementById('topbar-title').textContent = title;
     document.getElementById('topbar-sub').textContent = sub;
+
+    // The three legacy vendor ids deep-link straight into the merged Vendor
+    // Tracker on the matching tab; the nav uses 'vendor-tracker' (lands Scorecard).
+    if (S.VendorTracker) {
+      if (id === 'vendor-watch') S.VendorTracker.tab = 'watch';
+      else if (id === 'vendor-discrepancy') S.VendorTracker.tab = 'discrepancies';
+      else if (id === 'vendor-scorecard' || id === 'vendor-tracker') S.VendorTracker.tab = 'scorecard';
+    }
 
     const screen = screens[id];
     if (screen) { this._activeScreenObj = screen; screen.render(content, actions); }
