@@ -1,24 +1,36 @@
 'use strict';
 
-/* ── Profit Recovery — This Week (weekly confirm) ─────────────────────────────
-   The week is pulled in from Control (revenue from Shift, COGS from Inventory,
-   labor from Labor) and the operator confirms it. The page leads with the money
-   picture (total revenue, prime cost vs target, the one thing off target) and
-   collapses entry into a single confirm grid. Every field stays editable as an
-   override; "Pull from Control" re-pulls all of them at once. Saves to
-   App.data.weeks. */
+/* ── Profit Recovery — This Week (weekly confirm + history) ───────────────────
+   Matches the Control entry-page standard (Build Schedule / Log Hours / Receive
+   Delivery): a stat strip up top, a week-chip selector row (chips left, page
+   actions right), the confirm grid, Save + Start Over below the card, then a
+   filter-chip row and a view/edit history table. The week is pulled in from
+   Control (revenue from Shift, COGS from Inventory, labor from Labor) and the
+   operator confirms it. Stepping the selector to a saved week loads it for edit;
+   Save updates that record. Saves to App.data.weeks. */
 
 S.ThisWeek = {
   draft: null,
+  _weekEnd: null,
+  _editId: null,
   _showCatering: false,
+  _msg: '',
   DRAFT_KEY: 'pf_draft',
+  filterPreset: 'last-12',
+  _prevPreset: 'last-12',
+  filterFrom: '',
+  filterTo: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' },
+    { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' },
+    { v: 'all', label: 'All' },
+    { v: 'custom', label: 'Custom' }
+  ],
   get BAR_CATS()     { return App.BAR_CATS; },
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
   // ── Inventory Control COGS feed ───────────────────────────────────────────
-  hasIC() {
-    return (((App.inventoryData && App.inventoryData.ic_counts) || []).length) >= 2;
-  },
   icCOGS(cats) {
     const counts = [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
@@ -45,10 +57,7 @@ S.ThisWeek = {
     return any ? cogs : null;
   },
 
-  // ── Shift Control revenue feed ────────────────────────────────────────────
-  hasShifts() {
-    return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
-  },
+  // ── Shift Control revenue feed (7-day week ending periodEnd) ──────────────
   shiftRevenue(periodEnd) {
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
     if (!shifts.length || !periodEnd) return null;
@@ -66,10 +75,7 @@ S.ThisWeek = {
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
-  // ── Labor Control labor feed ──────────────────────────────────────────────
-  hasLabor() {
-    return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
-  },
+  // ── Labor Control labor feed (7-day week ending periodEnd) ────────────────
   laborCost(periodEnd) {
     if (!periodEnd) return null;
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
@@ -92,15 +98,19 @@ S.ThisWeek = {
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
-  // ── Draft (in-localStorage, survives navigate-away; cleared on Save / Start Over) ──
-  loadDraft() {
-    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) return JSON.parse(r); } catch (e) {}
+  // ── Dates ───────────────────────────────────────────────────────────────
+  currentWeekEnd() { return App.nextSunday ? App.nextSunday() : App.todayLocal(); },
+  addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  fmtChip(ymd) { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
+  fmtDate(ymd) { if (!ymd) return '-'; const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? esc(ymd) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); },
+  savedWeek(periodEnd) { return (App.data.weeks || []).find(w => w.period_end === periodEnd) || null; },
+
+  // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
+  freshDraft(periodEnd) {
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
-    const periodEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
     const sr = this.shiftRevenue(periodEnd);
     const lc = this.laborCost(periodEnd);
     return {
-      week_num: App.nextWeekNum ? App.nextWeekNum() : 1,
       period_end: periodEnd,
       bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
       food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
@@ -109,8 +119,39 @@ S.ThisWeek = {
       notes: ''
     };
   },
-  saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
-  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} this.draft = null; },
+  draftFromWeek(w) {
+    const s = v => (v == null || v === '' ? '' : Number(v).toFixed(2));
+    return {
+      period_end: w.period_end,
+      bar:  { revenue: s(w.bar?.revenue),  labor: s(w.bar?.labor),  cogs: s(w.bar?.cogs) },
+      food: { revenue: s(w.food?.revenue), labor: s(w.food?.labor), cogs: s(w.food?.cogs) },
+      catering: { revenue: s(w.catering?.revenue), cogs: s(w.catering?.cogs), labor: s(w.catering?.labor) },
+      platform_fees: s(w.platform_fees),
+      notes: w.notes || ''
+    };
+  },
+  saveDraft() { if (this._editId) return; try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify({ weekEnd: this._weekEnd, draft: this.draft })); } catch (e) {} },
+  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} },
+  readDraft(weekEnd) {
+    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) { const o = JSON.parse(r); if (o && o.weekEnd === weekEnd && o.draft) return o.draft; } } catch (e) {}
+    return null;
+  },
+
+  // Load a week into the grid: saved → editable (carry its id), else a fresh
+  // Control pull (with the current-week localStorage draft restored if present).
+  loadWeek(weekEnd) {
+    this._weekEnd = weekEnd;
+    this._showCatering = false;
+    const saved = this.savedWeek(weekEnd);
+    if (saved) {
+      this.draft = this.draftFromWeek(saved);
+      this._editId = saved.id;
+    } else {
+      this._editId = null;
+      const dr = (weekEnd === this.currentWeekEnd()) ? this.readDraft(weekEnd) : null;
+      this.draft = dr || this.freshDraft(weekEnd);
+    }
+  },
 
   cateringActive(d) {
     if (this._showCatering) return true;
@@ -118,46 +159,65 @@ S.ThisWeek = {
     return !!(c && (parseFloat(c.revenue) || parseFloat(c.cogs) || parseFloat(c.labor)));
   },
 
+  // ── History filter range ──────────────────────────────────────────────────
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom || '', to: this.filterTo || '' };
+    return App.datePresetRange(this.filterPreset);
+  },
+
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    if (!this.draft) this.draft = this.loadDraft();
+    if (!this._weekEnd) this.loadWeek(this.currentWeekEnd());
     this.draw();
   },
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
-      { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control (the week\'s logged shifts summed), COGS from Inventory Control (the week\'s counts and deliveries), and labor from Labor Control (actual hours costed and split bar versus food). You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
-      { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, and how the week tracked versus your forecast, all live. The Watch line calls out the single category most over target this week so you know where the money is going before you read a single cell. Prime cost is the headline number in a healthy operation, and labor is folded into it.'] },
-      { h: 'The Confirm Grid', p: ['One row per revenue stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and fully editable. Cost percent and the dollars over or under target compute live as you tweak. If a shift was missed or a count was partial, type the right number straight into the cell.'] },
-      { h: 'Pull From Control', p: ['Re-runs the Control math and refills every auto cell at once, for when you have logged more since you opened the page. If you have edited a cell by hand and it does not match what Control computed, Bar Cop asks before overwriting, so a deliberate override is never lost silently.'] },
-      { h: 'Catering And Platform Fees', p: ['Catering is an optional fourth stream for off-premise events; add the row only if you cater. It rolls into total revenue and prime cost like Bar and Food. Third-party platform fees (DoorDash, UberEats, Toast Tabs) are an operating cost, not part of prime cost, and sit as their own line on Books and Year-End. Leave both blank if they do not apply.'] }
+      { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
+      { h: 'The Week Selector', p: ['The chips step you week to week, the current week is tagged NOW. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
+      { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
+      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Pull From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
 
-  // ── Money hero ──────────────────────────────────────────────────────────────
-  heroCard(d) {
-    const periodCtl = '<div style="display:flex;align-items:center;gap:16px;font-weight:400;letter-spacing:0;text-transform:none;">'
-      + '<span style="display:flex;align-items:center;gap:7px;"><span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Week</span>'
-      + '<input type="number" id="tw-wk" value="' + esc(String(d.week_num)) + '" min="1" style="width:62px;" oninput="S.ThisWeek.onInput()"/></span>'
-      + '<span style="display:flex;align-items:center;gap:7px;"><span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Ending</span>'
-      + '<input type="date" id="tw-end" value="' + esc(d.period_end) + '" style="width:152px;" oninput="S.ThisWeek.onInput()"/></span>'
-      + '</div>';
-    return '<div class="card form-card" style="margin-bottom:14px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>This Week</span>' + periodCtl + '</div>'
-      + '<div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
+  // ── Stat strip (the selected week's money picture) ──────────────────────────
+  heroStrip() {
+    return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
       + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val lg" id="tw-totrev">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">Prime Cost</div><div class="calc-val lg" id="tw-prime">-</div><div style="font-size:11px;color:var(--t3);margin-top:3px;" id="tw-prime-sub">-</div></div>'
       + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val lg" id="tw-fcgap">-</div></div>'
-      + '</div>'
-      + '<div id="tw-watch" style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);"></div>'
-      + '</div>';
+      + '<div class="calc-item"><div class="calc-label">Over Target</div><div class="calc-val lg" id="tw-over">-</div></div>'
+      + '</div></div>';
   },
 
-  // ── Confirm grid ────────────────────────────────────────────────────────────
+  // ── Week-chip selector row (chips left, page actions right) ─────────────────
+  selectorRow() {
+    const ends = [this.addDays(this._weekEnd, -7), this._weekEnd, this.addDays(this._weekEnd, 7)];
+    const now = this.currentWeekEnd();
+    const chip = end => {
+      const active = end === this._weekEnd;
+      return '<button class="tw-wk-chip btn btn-sm" data-end="' + end + '" style="'
+        + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.fmtChip(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    };
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
+      + ends.map(chip).join('')
+      + '<button class="btn btn-ghost btn-sm tw-wk-next" aria-label="Next week">&rsaquo;</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Pull from Control</button>'
+      + '</div></div>';
+  },
+
+  // ── Confirm grid card ───────────────────────────────────────────────────────
   cell(id, val) {
-    return '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" oninput="S.ThisWeek.onInput()"/></div>';
+    return '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" style="height:40px;" oninput="S.ThisWeek.onInput()"/></div>';
   },
   lineRow(label, p, data) {
     return '<tr class="tw-line">'
@@ -174,11 +234,8 @@ S.ThisWeek = {
     const footerLeft = cateringOn
       ? '<button type="button" id="tw-remove-catering" style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:0;">Remove catering</button>'
       : '<button type="button" id="tw-add-catering" style="background:none;border:none;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;padding:0;">+ Add catering / events</button>';
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--b2);">'
-      + '<div style="font-size:13px;font-weight:600;color:var(--t1);">Confirm the week</div>'
-      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Pull from Control</button>'
-      + '</div>'
+    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:14px 18px;border-bottom:1px solid var(--b2);font-size:13px;font-weight:600;color:var(--t1);">Confirm the Week</div>'
       + '<table class="ing-tbl"><thead><tr>'
       + '<th>Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th>Cost %</th><th>vs Target</th>'
       + '</tr></thead><tbody>'
@@ -189,22 +246,71 @@ S.ThisWeek = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-top:1px solid var(--b2);flex-wrap:wrap;">'
       + footerLeft
       + '<div style="display:flex;align-items:center;gap:9px;"><label style="font-size:11px;color:var(--t2);">3rd-party platform fees</label>'
-      + '<div class="fw" style="width:140px;"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '</div></div>';
+      + '<div class="fw" style="width:150px;"><span class="pre">$</span><input class="pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" style="height:40px;" oninput="S.ThisWeek.onInput()"/></div></div>'
+      + '</div>'
+      + '<div style="padding:0 18px 16px;"><div class="f" style="margin:0;"><label>Notes (optional)</label>'
+      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div></div>'
+      + '</div>';
+  },
+
+  // ── Weekly history (filter chips + data-card table) ─────────────────────────
+  historyBlock() {
+    const r = this.effectiveRange();
+    const all = (App.data.weeks || []).slice()
+      .filter(w => w.period_end)
+      .filter(w => (!r.from || w.period_end >= r.from) && (!r.to || w.period_end <= r.to))
+      .sort((a, b) => (b.period_end || '').localeCompare(a.period_end || ''));
+    const t = App.data.settings.targets || {};
+    const bT = t.bar_pour_cost_pct ?? 22, fT = t.food_cost_pct ?? 32, pT = t.prime_cost_pct ?? 60;
+    const cls = (v, tgt) => v == null ? '' : (v > tgt ? 'neg' : 'pos');
+
+    const customRow = this.filterPreset === 'custom'
+      ? '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">'
+        + '<div class="f" style="width:180px;"><label>From</label><input type="date" id="tw-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:180px;"><label>To</label><input type="date" id="tw-to" value="' + esc(this.filterTo) + '"/></div></div>'
+      : '';
+
+    const rows = all.length
+      ? all.map(w => '<tr>'
+          + '<td><div class="val">' + this.fmtDate(w.period_end) + '</div></td>'
+          + '<td>Week ' + (w.week_num != null ? w.week_num : '-') + '</td>'
+          + '<td>' + App.fmtCurrency(w.bar?.revenue || 0) + '</td>'
+          + '<td class="' + cls(w.bar?.cost_pct, bT) + '">' + App.fmtPct(w.bar?.cost_pct) + '</td>'
+          + '<td>' + App.fmtCurrency(w.food?.revenue || 0) + '</td>'
+          + '<td class="' + cls(w.food?.cost_pct, fT) + '">' + App.fmtPct(w.food?.cost_pct) + '</td>'
+          + '<td class="' + cls(w.prime_cost_pct, pT) + '">' + App.fmtPct(w.prime_cost_pct) + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm tw-edit" data-id="' + esc(w.id) + '">Edit</button>'
+          + '<button class="btn btn-danger btn-sm tw-del" data-id="' + esc(w.id) + '">Delete</button>'
+          + '</div></td></tr>').join('')
+      : '<tr><td colspan="8" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Pick a wider range above.</td></tr>';
+
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'tw-range-chip') + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="tw-export">Export PDF</button>'
+      + '</div>'
+      + customRow
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Bar %</th><th>Food Rev</th><th>Food %</th><th>Prime %</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
   draw() {
     const d = this.draft;
+    const editing = !!this._editId;
     this.container.innerHTML = '<div class="screen">'
-      + this.heroCard(d)
+      + this.heroStrip()
+      + this.selectorRow()
       + this.gridCard(d)
-      + '<div class="card form-card" style="margin-bottom:8px;"><div class="f" style="margin:0;"><label>Notes (optional)</label>'
-      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div></div>'
-      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="tw-save">Save Week</button>'
+      + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="tw-save">' + (editing ? 'Update Week' : 'Save Week') + '</button>'
       + '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
       + '<span id="tw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
+      + '<span id="tw-msg" style="color:var(--gold);font-size:12px;font-weight:700;margin-left:8px;display:' + (this._msg ? 'inline' : 'none') + ';">' + esc(this._msg) + '</span>'
+      + '</div>'
+      + this.historyBlock()
+      + '</div>';
+    this._msg = '';
     this.wire();
     this.calc();
   },
@@ -213,24 +319,53 @@ S.ThisWeek = {
     document.getElementById('tw-save')?.addEventListener('click', () => this.saveWeek());
     document.getElementById('tw-start-over')?.addEventListener('click', () => this.startOver());
     document.getElementById('tw-pull')?.addEventListener('click', () => this.pullAll());
-    document.getElementById('tw-add-catering')?.addEventListener('click', () => {
-      this.collect(); this._showCatering = true; this.saveDraft(); this.draw();
-    });
-    document.getElementById('tw-remove-catering')?.addEventListener('click', () => {
-      this.collect(); this.draft.catering = { revenue: '', cogs: '', labor: '' }; this._showCatering = false; this.saveDraft(); this.draw();
+    document.getElementById('tw-add-catering')?.addEventListener('click', () => { this.collect(); this._showCatering = true; this.saveDraft(); this.draw(); });
+    document.getElementById('tw-remove-catering')?.addEventListener('click', () => { this.collect(); this.draft.catering = { revenue: '', cogs: '', labor: '' }; this._showCatering = false; this.saveDraft(); this.draw(); });
+    this.container.querySelectorAll('.tw-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeek(b.dataset.end)));
+    this.container.querySelector('.tw-wk-prev')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, -7)));
+    this.container.querySelector('.tw-wk-next')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, 7)));
+    this.container.querySelectorAll('.tw-range-chip').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.v;
+      if (v === 'custom') { this.filterPreset = (this.filterPreset === 'custom') ? this._prevPreset : 'custom'; }
+      else { this._prevPreset = v; this.filterPreset = v; }
+      this.draw();
+    }));
+    document.getElementById('tw-from')?.addEventListener('change', e => { this.filterFrom = e.target.value; this.draw(); });
+    document.getElementById('tw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
+    document.getElementById('tw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
+    this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
+    this.container.querySelectorAll('.tw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
+  },
+
+  gotoWeek(weekEnd) {
+    if (!this._editId) { this.collect(); this.saveDraft(); }
+    this.loadWeek(weekEnd);
+    this.draw();
+  },
+
+  editWeek(id) {
+    const w = (App.data.weeks || []).find(x => x.id === id);
+    if (!w) return;
+    this.loadWeek(w.period_end);
+    this.draw();
+    if (this.container) this.container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  deleteWeek(id) {
+    App.confirmDelete().then(ok => {
+      if (!ok) return;
+      App.removeRecord('core', 'week', id).then(() => {
+        if (this._editId === id) this.loadWeek(this._weekEnd);
+        this.draw();
+      });
     });
   },
 
-  onInput() {
-    this.collect();
-    this.saveDraft();
-    this.calc();
-  },
+  onInput() { this.collect(); this.saveDraft(); this.calc(); },
 
   collect() {
     const v = id => document.getElementById(id)?.value ?? '';
     const d = this.draft;
-    d.week_num = v('tw-wk'); d.period_end = v('tw-end');
     d.bar.revenue = v('tw-br'); d.bar.cogs = v('tw-bc'); d.bar.labor = v('tw-bl');
     d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
     if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
@@ -239,8 +374,6 @@ S.ThisWeek = {
     d.notes = v('tw-notes');
   },
 
-  // True when the operator typed a value that meaningfully differs from what
-  // Control wants to pull in. 50-cent tolerance avoids floating-point noise.
   _isOverride(id, incoming) {
     const cur = parseFloat(document.getElementById(id)?.value);
     if (isNaN(cur) || cur === 0) return false;
@@ -248,13 +381,9 @@ S.ThisWeek = {
     if (isNaN(inc)) return false;
     return Math.abs(cur - inc) > 0.5;
   },
-  async _confirmOverride(title, message) {
-    return App.confirm({ title, message, confirmText: 'Overwrite', cancelText: 'Keep Mine' });
-  },
 
-  // Re-pull every auto cell from Control at once.
   async pullAll() {
-    const pe = document.getElementById('tw-end')?.value || this.draft.period_end;
+    const pe = this._weekEnd;
     const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
     const sr = this.shiftRevenue(pe);
     const lc = this.laborCost(pe);
@@ -269,8 +398,7 @@ S.ThisWeek = {
     }
     const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
     if (conflicted) {
-      const ok = await this._confirmOverride('Overwrite your numbers?',
-        'Some cells you edited do not match what Control just computed. Pulling will replace them with the logged figures.');
+      const ok = await App.confirm({ title: 'Overwrite your numbers?', message: 'Some cells you edited do not match what Control just computed. Pulling will replace them with the logged figures.', confirmText: 'Overwrite', cancelText: 'Keep Mine' });
       if (!ok) return;
     }
     Object.entries(incoming).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = (Number(val) || 0).toFixed(2); });
@@ -284,12 +412,12 @@ S.ThisWeek = {
     const put = (id, str, color) => { const el = document.getElementById(id); if (!el) return; el.textContent = str; if (color !== undefined) el.style.color = color; };
 
     const sections = [
-      { p: 'b', label: 'Bar pour cost', target: t.bar_pour_cost_pct ?? 22 },
-      { p: 'f', label: 'Food cost',     target: t.food_cost_pct ?? 32 }
+      { p: 'b', target: t.bar_pour_cost_pct ?? 22 },
+      { p: 'f', target: t.food_cost_pct ?? 32 }
     ];
-    if (this.cateringActive(d)) sections.push({ p: 'c', label: 'Catering cost', target: null });
+    if (this.cateringActive(d)) sections.push({ p: 'c', target: null });
 
-    let totRev = 0, totCost = 0, worst = null;
+    let totRev = 0, totCost = 0, overTarget = 0;
     sections.forEach(s => {
       const rev = num('tw-' + s.p + 'r'), labor = num('tw-' + s.p + 'l'), cogs = num('tw-' + s.p + 'c');
       totRev += rev; totCost += cogs + labor;
@@ -300,9 +428,9 @@ S.ThisWeek = {
       } else {
         const vd = pct != null ? ((pct - s.target) / 100) * rev : null;
         const over = pct != null && pct > s.target;
+        if (vd != null && vd > 0) overTarget += vd;
         put('tw-' + s.p + 'pct', pct != null ? App.fmtPct(pct) : '-', pct == null ? 'var(--t3)' : (over ? 'var(--red)' : 'var(--gold)'));
         put('tw-' + s.p + 'vd', vd != null ? ((vd > 0 ? '+' : '') + App.fmtCurrency(vd)) : '-', vd == null ? 'var(--t3)' : (vd > 0 ? 'var(--red)' : 'var(--green)'));
-        if (over && (!worst || (pct - s.target) > worst.over)) worst = { label: s.label, pct, over: pct - s.target };
       }
     });
 
@@ -310,29 +438,20 @@ S.ThisWeek = {
     const prime = totRev > 0 ? totCost / totRev * 100 : null;
     put('tw-totrev', totRev > 0 ? App.fmtCurrency(totRev) : '-', 'var(--t1)');
     put('tw-prime', prime != null ? App.fmtPct(prime) : '-', prime == null ? 'var(--t3)' : (prime > primeTarget ? 'var(--red)' : 'var(--gold)'));
-    put('tw-prime-sub', 'target ' + primeTarget + '%' + (prime != null ? (prime > primeTarget ? ' · over' : ' · on target') : ''),
-      prime != null && prime > primeTarget ? 'var(--red)' : 'var(--t3)');
+    put('tw-prime-sub', 'target ' + primeTarget + '%' + (prime != null ? (prime > primeTarget ? ' · over' : ' · on target') : ''), prime != null && prime > primeTarget ? 'var(--red)' : 'var(--t3)');
+    put('tw-over', totRev > 0 ? App.fmtCurrency(overTarget) : '-', overTarget > 0 ? 'var(--red)' : 'var(--gold)');
 
-    const pe = document.getElementById('tw-end')?.value || d.period_end;
-    const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
+    const fc = (this._weekEnd && App.forecastForWeek) ? App.forecastForWeek(this._weekEnd) : null;
     const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
     const fcGap = fcTotal > 0 && totRev > 0 ? totRev - fcTotal : null;
     put('tw-fcgap', fcGap != null ? ((fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcGap >= 0 ? 'var(--green)' : 'var(--red)'));
-
-    const watchEl = document.getElementById('tw-watch');
-    if (watchEl) {
-      if (worst) watchEl.innerHTML = '<span style="color:var(--red);font-weight:700;">Watch:</span> ' + esc(worst.label) + ' is ' + App.fmtPct(worst.pct) + ', ' + worst.over.toFixed(1) + ' points over target this week.';
-      else if (totRev > 0) watchEl.innerHTML = '<span style="color:var(--gold);font-weight:700;">On target.</span> Bar and food cost are both within target this week.';
-      else watchEl.innerHTML = '<span style="color:var(--t3);">Enter or pull the week\'s numbers to see where you stand.</span>';
-    }
   },
 
   startOver() {
-    App.confirm({ title: 'Start over?', message: 'This clears the numbers entered for this week and re-pulls a fresh copy from Control.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
+    App.confirm({ title: 'Start over?', message: this._editId ? 'This drops your unsaved changes to this week and reloads what is saved.' : 'This clears the numbers entered for this week and re-pulls a fresh copy from Control.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
       if (!ok) return;
-      this.clearDraft();
-      this._showCatering = false;
-      this.draft = this.loadDraft();
+      if (!this._editId) this.clearDraft();
+      this.loadWeek(this._weekEnd);
       this.draw();
     });
   },
@@ -357,42 +476,33 @@ S.ThisWeek = {
     const bPct = bRev > 0 ? bCogs / bRev * 100 : 0;
     const fPct = fRev > 0 ? fCogs / fRev * 100 : 0;
 
+    const existing = this._editId ? (App.data.weeks || []).find(w => w.id === this._editId) : null;
     const week = {
-      id: App.uid(),
-      week_num: parseInt(d.week_num) || 1,
-      period_end: d.period_end,
+      id: this._editId || App.uid(),
+      week_num: existing ? existing.week_num : (App.nextWeekNum ? App.nextWeekNum() : 1),
+      period_end: this._weekEnd,
       saved_at: new Date().toISOString(),
-      bar: {
-        revenue: bRev, cogs: bCogs, labor: bLab, cost_pct: bPct,
-        labor_pct: bRev > 0 ? bLab / bRev * 100 : 0,
-        vs_target_pct: bPct - bTarget, vs_target_dollar: ((bPct - bTarget) / 100) * bRev
-      },
-      food: {
-        revenue: fRev, cogs: fCogs, labor: fLab, cost_pct: fPct,
-        labor_pct: fRev > 0 ? fLab / fRev * 100 : 0,
-        vs_target_pct: fPct - fTarget, vs_target_dollar: ((fPct - fTarget) / 100) * fRev
-      },
-      catering: {
-        revenue: cRev, cogs: cCogs, labor: cLab,
-        cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0,
-        labor_pct: cRev > 0 ? cLab / cRev * 100 : 0
-      },
+      bar: { revenue: bRev, cogs: bCogs, labor: bLab, cost_pct: bPct, labor_pct: bRev > 0 ? bLab / bRev * 100 : 0, vs_target_pct: bPct - bTarget, vs_target_dollar: ((bPct - bTarget) / 100) * bRev },
+      food: { revenue: fRev, cogs: fCogs, labor: fLab, cost_pct: fPct, labor_pct: fRev > 0 ? fLab / fRev * 100 : 0, vs_target_pct: fPct - fTarget, vs_target_dollar: ((fPct - fTarget) / 100) * fRev },
+      catering: { revenue: cRev, cogs: cCogs, labor: cLab, cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0, labor_pct: cRev > 0 ? cLab / cRev * 100 : 0 },
       platform_fees: pFees,
       prime_cost_pct: tRev > 0 ? tCost / tRev * 100 : 0,
       notes: d.notes || ''
     };
 
     const btn = document.getElementById('tw-save');
+    const wasEditing = !!this._editId;
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('core', 'week', week);
     if (ok) {
-      this.clearDraft();
-      this._showCatering = false;
+      if (!wasEditing) this.clearDraft();
       if (App.updatePeriod) App.updatePeriod();
       App.markSetupDone('gs_p_week');
-      App.navigate('dashboard');
+      this._msg = wasEditing ? 'Week updated.' : 'Week saved.';
+      this.loadWeek(this._weekEnd);   // reload the now-saved week (becomes editable)
+      this.draw();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
+      if (btn) { btn.disabled = false; btn.textContent = wasEditing ? 'Update Week' : 'Save Week'; }
       if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
     }
   }
