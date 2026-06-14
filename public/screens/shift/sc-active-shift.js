@@ -56,6 +56,28 @@ S.ShiftActiveShift = {
     else this.renderStart();
   },
 
+  // Dismissible theft-flag warning for the manager opening the floor. Reads the
+  // same recent-flags list as the Hub alert (S.TheftRisk.recentFlags). Severe
+  // flags ignore the dismiss (acknowledge-but-don't-hide); the rest clear once
+  // dismissed (a date stamp in App.data.theft_flags_ack) until a newer flag.
+  _theftFlagWarning() {
+    if (!(window.S && S.TheftRisk && S.TheftRisk.recentFlags)) return '';
+    const wk = new Date(); wk.setDate(wk.getDate() - 6);
+    const flags = S.TheftRisk.recentFlags(App.ymdLocal(wk));
+    if (!flags.length) return '';
+    const ack = (App.data && App.data.theft_flags_ack) || '';
+    const active = flags.filter(f => f.severe || f.date > ack);
+    if (!active.length) return '';
+    const severe = active.filter(f => f.severe).length;
+    return '<div class="no-print" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:200px;font-size:13px;color:var(--t1);"><strong>' + active.length + ' theft flag' + (active.length === 1 ? '' : 's') + ' from recent shifts'
+      + (severe ? ', ' + severe + ' to act on now' : '') + '.</strong> Worth a look before you open.</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm" id="of-theft-review">Review</button>'
+      + '<button class="btn btn-ghost btn-sm" id="of-theft-dismiss">Dismiss</button>'
+      + '</div></div>';
+  },
+
   // ── Start a shift ───────────────────────────────────────────────────────────
   // ── Open the Floor — the visual shift opener ────────────────────────────────
   // Tap a daypart, tap who's running it, tap the registers running this shift (each
@@ -114,7 +136,7 @@ S.ShiftActiveShift = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen"><div class="card form-card no-print">'
+    this.container.innerHTML = '<div class="screen">' + this._theftFlagWarning() + '<div class="card form-card no-print">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--t1);letter-spacing:0.3px;">Open the Floor</div>'
       + '<div id="of-readout" style="font-size:13px;color:var(--gold);font-weight:600;margin-top:4px;min-height:18px;">' + esc(this._readoutText()) + '</div>'
@@ -157,6 +179,8 @@ S.ShiftActiveShift = {
       const tile = ev.target.closest('.reg-tile');
       if (ev.target.closest('#of-add-drawers')) { App.navigate('sc-drawers'); return; }
       if (ev.target.closest('#of-tol-edit')) { App.navigate('sc-shift-policies'); return; }
+      if (ev.target.closest('#of-theft-review')) { App.openScreen('theft-risk'); return; }
+      if (ev.target.closest('#of-theft-dismiss')) { App.data.theft_flags_ack = App.todayLocal(); App.saveKey('theft_flags_ack'); this.renderStart(); return; }
       if (ev.target.closest('#rs-log')) { this.showShiftForm(null); return; }
       if (ev.target.closest('#rs-export')) { App.exportPDF({ title: 'Recent Shifts', root: this.container }); return; }
       const rsEdit = ev.target.closest('.rs-edit');
