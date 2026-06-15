@@ -488,7 +488,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .pf-tile:hover{border-color:var(--gold-tint-bord);background:#0D181E;}
 .pf-tile:active{transform:scale(0.99);}
 .pf-tile.fixed{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
-.pf-tile.sel{border-color:var(--gold);background:var(--gold-tint);}
+.pf-tile.sel{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
 .pf-2pane{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
 .pf-rail{flex:0 0 300px;min-width:260px;display:flex;flex-direction:column;gap:10px;}
 .pf-detail{flex:1 1 440px;min-width:0;}
