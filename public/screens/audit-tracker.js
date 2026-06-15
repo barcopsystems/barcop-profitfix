@@ -489,17 +489,9 @@ S.AuditTracker = {
       + (gradeChip ? '<div style="margin-top:8px;">' + gradeChip + '</div>' : '')
       + '</div>'
       + '<div style="text-align:right;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Score</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);">' + (d.INDUSTRY_AVG != null ? 'Bar Cop Benchmark: ' + d.INDUSTRY_AVG + '  |  ' : '') + 'Target: ' + (d.TARGET_SCORE||65) + '</div>'
+      + '<div style="width:240px;max-width:100%;margin-left:auto;">' + App.scoreBar(audit.overall_score||0) + '</div>'
       + '</div>'
-      + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
-      +   '<div style="flex:1;min-width:240px;">'
-      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
-      +     App.scoreBar(audit.overall_score||0)
-      +   '</div>'
-      +   '<div id="at-outlook-mount" style="flex-shrink:0;"></div>'
       + '</div></div>';
 
     // Total recoverable — the money hero, as a standard stat strip (calc-val lg).
@@ -515,10 +507,11 @@ S.AuditTracker = {
 
     // Single-page layout: ranked action items, then the scored sections (each
     // with its metric readout + findings rendered inline via findingsBlock).
-    const actionsCard = actionItems
-      ? '<div class="sh" style="margin:24px 0 10px;">Action Items, Ranked by Impact</div>'
-        + '<div class="card" style="margin-bottom:16px;">' + actionItems + '</div>'
-      : '';
+    const actionsCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">' + (actionItems ? 'Action Items, Ranked by Impact' : '') + '</div>'
+      + '<div id="at-outlook-mount"></div>'
+      + '</div>'
+      + (actionItems ? '<div class="card" style="margin-bottom:16px;">' + actionItems + '</div>' : '');
 
     this.container.innerHTML = '<div class="screen">'
       + heroCard
