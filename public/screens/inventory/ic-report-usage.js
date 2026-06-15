@@ -180,7 +180,7 @@ S.InventoryUsageReport = {
   // the Build Schedule week selector so a long count history stays compact.
   periodStepper(period) {
     const asc = this.countsAsc();
-    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date) }));
+    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' - ' +this.fmtDate(c.date) }));
     const len = periods.length;
     let selIdx = periods.findIndex(p => p.endId === period.endC.id);
     if (selIdx < 0) selIdx = len - 1;
@@ -298,7 +298,7 @@ S.InventoryUsageReport = {
     }
     if (!pairs.length) return this.dataCard(headers, this.noRow(4));
     const body = pairs.reverse().map(p => '<tr>'
-      + '<td><div class="val">' + this.fmtDate(p.start.date) + ' &rarr; ' + this.fmtDate(p.end.date) + '</div></td>'
+      + '<td><div class="val">' + this.fmtDate(p.start.date) + ' - ' +this.fmtDate(p.end.date) + '</div></td>'
       + '<td>' + p.count + '</td>'
       + '<td>' + App.fmtCurrency(p.cost) + '</td>'
       + '<td class="' + (p.profit >= 0 ? 'pos' : 'neg') + '">' + App.fmtCurrency(p.profit) + '</td></tr>').join('');
