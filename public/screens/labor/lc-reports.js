@@ -66,12 +66,12 @@ S.LaborReports = {
       return '<button type="button" class="ws-week-chip btn btn-sm" data-ws="' + w + '" style="'
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekLabel(w)
+        + App.dateRangeLabel(w, App.periodEndFor(w))
         + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
         + '</button>';
     };
     let chips = '';
-    for (let i = -1; i <= 1; i++) chips += chip(this.addDays(ws, i * 7));
+    for (let i = -1; i <= 0; i++) chips += chip(this.addDays(ws, i * 7));
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
