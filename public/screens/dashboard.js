@@ -27,13 +27,12 @@ S.Dashboard = {
     const weeks   = (App.data && App.data.weeks) || [];
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
     const leak = FixPanel.leakRowsText('profit');
-    const leakPanel = '<div class="card form-card" style="height:100%;"><div class="card-title">Where You\'re Leaking Now</div>'
-      + (leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>')
-      + '</div>';
+    const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>';
     container.innerHTML = '<div class="screen">'
       + FixPanel._scoreboardCard('profit')
-      + this.row(leakPanel, this.buildChart(weeks.slice(-8), targets))
-      + this.row(this.weekPanel(weeks, targets), this.auditPanel())
+      + this.row(this.shPanel('Where You\'re Leaking Now', leakBody), this.shPanel('8-Week Trend', this.buildChart(weeks.slice(-8), targets), insightsBtn))
+      + this.row(this.shPanel('This Week', this.weekPanel(weeks, targets)), this.shPanel('Profit Audit', this.auditPanel()))
       + this.quickActions()
       + '</div>';
     FixPanel.wireFixAreas(container);
@@ -48,12 +47,19 @@ S.Dashboard = {
       + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
   },
 
+  // Heading-outside panel (Control-dashboard style): .sh title above a flex card.
+  shPanel(title, bodyHtml, titleRight) {
+    const head = titleRight
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + titleRight + '</div>'
+      : '<div class="sh" style="margin:0 0 10px;">' + title + '</div>';
+    return head + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
+  },
+
   // This Week panel — the latest confirmed week's headline numbers + a way in.
   weekPanel(weeks, targets) {
     const w = weeks[weeks.length - 1];
-    if (!w) return '<div class="card form-card" style="height:100%;"><div class="card-title">This Week</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a week in This Week and its numbers show here.</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div>';
+    if (!w) return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a week in This Week and its numbers show here.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button>';
     const rev = (w.bar && w.bar.revenue || 0) + (w.food && w.food.revenue || 0) + (w.catering && w.catering.revenue || 0);
     const prime = w.prime_cost_pct;
     const pT = targets.prime_cost_pct || 60;
@@ -62,32 +68,29 @@ S.Dashboard = {
     const r = (label, val, col) => '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--row-div);">'
       + '<span style="font-size:12px;color:var(--t3);">' + label + '</span>'
       + '<span style="font-size:14px;font-weight:600;color:' + (col || 'var(--t1)') + ';">' + val + '</span></div>';
-    return '<div class="card form-card" style="height:100%;"><div class="card-title">This Week</div>'
-      + (period ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">' + period + '</div>' : '')
+    return (period ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">' + period + '</div>' : '')
       + r('Total Revenue', App.fmtCurrency(rev, 0))
       + r('Prime Cost', prime != null ? prime.toFixed(1) + '% (target ' + pT + '%)' : 'Not entered', over ? 'var(--red)' : (prime != null ? 'var(--green)' : 'var(--t3)'))
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div></div>';
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div>';
   },
 
   // Profit Audit panel — latest score + next-audit timing + a way in.
   auditPanel() {
     const audits = ((App.data && App.data.audits) || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0];
-    if (!latest) return '<div class="card form-card" style="height:100%;"><div class="card-title">Profit Audit</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">Run Profit Audit</button></div>';
+    if (!latest) return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">Run Profit Audit</button>';
     const score = latest.overall_score || 0;
     const col = App.scoreColor(score);
     const daysSince = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const daysLeft = Math.max(0, 30 - daysSince);
     const timing = daysLeft > 0 ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') : 'Ready to run a new audit';
-    return '<div class="card form-card" style="height:100%;"><div class="card-title">Profit Audit</div>'
-      + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
+    return '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'
       + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(App.scoreLabel(score)) + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div></div></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + timing + '</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">View Audit</button></div>';
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">View Audit</button>';
   },
 
   // Day one (no weeks, no audits): guided steps + placeholders, like Control. The
@@ -114,18 +117,18 @@ S.Dashboard = {
       + step(hasLabor, 4, 'Set up Labor Control', 'lc-dashboard', true)
       + '</div></div>';
 
-    const ph = (title, msg) => '<div class="card form-card" style="height:100%;"><div class="card-title">' + title + '</div>'
-      + '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div></div>';
+    const ph = (msg) => '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
 
     container.innerHTML = '<div class="screen">'
       + strip
-      + '<div style="margin-bottom:16px;">' + ph('Recovery Scoreboard', 'Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
+      + '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Recovery Scoreboard</div>'
+        + ph('Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
       + this.row(
-          ph('Where You\'re Leaking Now', 'Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.'),
-          ph('8-Week Trend', 'Bar, food, and prime cost over the last eight weeks plot here once you have logged a couple of weeks.'))
+          this.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
+          this.shPanel('8-Week Trend', ph('Bar Cop plots your prime cost against target here once you have logged a couple of weeks.')))
       + this.row(
-          ph('This Week', 'The latest confirmed week shows here. Enter your numbers in This Week to start.'),
-          ph('Profit Audit', 'Your latest Profit Audit score lands here once you run one.'))
+          this.shPanel('This Week', ph('The latest confirmed week shows here. Enter your numbers in This Week to start.')),
+          this.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
       + this.quickActions()
       + '</div>';
     this.wireQuick(container);
@@ -152,127 +155,53 @@ S.Dashboard = {
       }));
   },
 
+  // Compact single-metric trend — prime cost % over the last 8 weeks with a
+  // target line. One metric reads cleanly at half-width (the old 3-line chart
+  // was unreadable that small). Neutral line + dots; the current value is
+  // colored by over/under target. Returns inner HTML (shPanel wraps the card).
   buildChart(weeks, targets) {
-    if (weeks.length < 2) return '<div class="chart-card" style="height:100%;padding:24px 24px 20px;">'
-      +'<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Trend</div>'
-      +'<div style="text-align:center;padding:24px 0 8px;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see trend</div></div>';
+    const vals = weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null);
+    const present = vals.filter(v => v != null);
+    if (present.length < 2) return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Log at least 2 weeks to see the trend</div>';
 
-    const W=800, H=220, PAD={t:28,r:60,b:40,l:48};
+    const W=320, H=148, PAD={t:18,r:14,b:24,l:30};
     const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
-
-    const barS  = weeks.map(w=>w.bar?.cost_pct??null);
-    const foodS = weeks.map(w=>w.food?.cost_pct??null);
-    const priS  = weeks.map(w=>w.prime_cost_pct??null);
-    const allV  = [...barS,...foodS,...priS].filter(v=>v!=null);
-    if (allV.length===0) return '';
-
-    const minY = Math.max(0, Math.floor(Math.min(...allV) - 4));
-    const maxY = Math.ceil(Math.max(...allV) + 6);
+    const tgt = targets.prime_cost_pct || 60;
+    const minY = Math.max(0, Math.floor(Math.min(Math.min(...present), tgt) - 3));
+    const maxY = Math.ceil(Math.max(Math.max(...present), tgt) + 3);
     const xs = i => PAD.l + (weeks.length > 1 ? (i/(weeks.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY))*ch;
-
-    // Smooth bezier path
-    const smoothPath = pts => {
+    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
+    const smooth = pts => {
       const valid = pts.map((v,i)=>v!=null?{x:xs(i),y:ys(v)}:null).filter(Boolean);
-      if (valid.length < 2) return valid.length===1?`M${valid[0].x},${valid[0].y}`:'';
-      let d = `M${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      return d;
-    };
-
-    // Area fill path (close back to bottom)
-    const areaPath = pts => {
-      const valid = pts.map((v,i)=>v!=null?{x:xs(i),y:ys(v),orig:v}:null).filter(Boolean);
       if (valid.length < 2) return '';
-      let d = `M${valid[0].x.toFixed(1)},${ys(minY).toFixed(1)} L${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      d += ` L${valid[valid.length-1].x.toFixed(1)},${ys(minY).toFixed(1)} Z`;
+      let d = 'M'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
+      for (let i=1;i<valid.length;i++){ const cp=(valid[i].x-valid[i-1].x)*0.35;
+        d += ' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1); }
       return d;
     };
-
-    const pourTarget = targets.bar_pour_cost_pct || 22;
-    const primeTarget = targets.prime_cost_pct || 60;
-    const tPx = ys(pourTarget);
-
-    // Y-axis ticks — 4 evenly spaced
-    const range = maxY - minY;
-    const tickStep = range <= 12 ? 2 : range <= 24 ? 4 : 8;
-    const ticks = [];
-    for (let v = Math.ceil(minY/tickStep)*tickStep; v <= maxY; v += tickStep) ticks.push(v);
-
-    // X labels
-    const xLabels = weeks.map((w,i) => {
-      const lbl = w.period_end ? w.period_end.slice(5).replace('-','/') : 'Wk'+w.week_num;
-      return `<text x="${xs(i).toFixed(1)}" y="${H-8}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${lbl}</text>`;
-    }).join('');
-
-    // Value labels on bar cost dots
-    const barLabels = barS.map((v,i) => {
-      if (v==null) return '';
-      const x = xs(i), y = ys(v);
-      const above = y > PAD.t + 16;
-      return `<text x="${x.toFixed(1)}" y="${(above ? y-10 : y+18).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="Barlow Condensed,sans-serif" font-size="11" font-weight="700">${v.toFixed(1)}%</text>`;
-    }).join('');
-
-    const barPath  = smoothPath(barS);
-    const foodPath = smoothPath(foodS);
-    const priPath  = smoothPath(priS);
-    const barArea  = areaPath(barS);
-
-    const uid = 'ag'+Math.random().toString(36).slice(2,6);
-
+    let lastIdx = vals.length-1; while (lastIdx >= 0 && vals[lastIdx] == null) lastIdx--;
+    const lastV = vals[lastIdx];
+    const valCol = lastV > tgt ? 'var(--red)' : 'var(--green)';
+    const tPx = ys(tgt);
+    const xl = i => { const w = weeks[i]; return (w && w.period_end) ? w.period_end.slice(5).replace('-','/') : ''; };
     const fixMarks = (window.Recovery) ? Recovery.chartMarkers(weeks, 'profit') : [];
-    const fixMarkers = (window.FixPanel && fixMarks.length)
-      ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
-    const fixLegend = fixMarks.length
-      ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:#DBAB46;display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
-      : '';
+    const fixMarkers = (window.FixPanel && fixMarks.length) ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
+    const dots = vals.map((v,i)=> v!=null ? '<circle cx="'+xs(i).toFixed(1)+'" cy="'+ys(v).toFixed(1)+'" r="3" fill="#0A1520" stroke="rgba(255,255,255,0.55)" stroke-width="1.6"/>' : '').join('');
 
-    return `<div class="chart-card" style="height:100%;padding:20px 24px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:14px;">
-          <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
-          <button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>
-        </div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap;">
-          <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
-            <span style="width:20px;height:2px;background:#DBAB46;display:inline-block;border-radius:1px;"></span>Bar Pour Cost</span>
-          <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
-            <span style="width:20px;height:2px;background:rgba(255,255,255,0.4);display:inline-block;border-radius:1px;"></span>Food Cost</span>
-          <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);">
-            <span style="width:20px;height:2px;background:rgba(255,255,255,0.2);display:inline-block;border-radius:1px;"></span>Prime Cost</span>
-          ${fixLegend}
-        </div>
-      </div>
-      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">
-        <defs>
-          <linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/>
-            <stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/>
-          </linearGradient>
-        </defs>
-        ${ticks.map(v=>`
-          <line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-          <text x="${PAD.l-8}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${v}%</text>
-        `).join('')}
-        <line x1="${PAD.l}" y1="${tPx.toFixed(1)}" x2="${W-PAD.r}" y2="${tPx.toFixed(1)}" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>
-        <text x="${W-PAD.r+6}" y="${(tPx+4).toFixed(1)}" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>
-        ${fixMarkers}
-        ${barArea ? `<path d="${barArea}" fill="url(#${uid})"/>` : ''}
-        ${priPath ? `<path d="${priPath}" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
-        ${foodPath ? `<path d="${foodPath}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linejoin="round"/>` : ''}
-        ${barPath ? `<path d="${barPath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
-        ${barS.map((v,i) => v!=null ? `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>` : '').join('')}
-        ${barLabels}
-        ${xLabels}
-      </svg>
-    </div>`;
+    return '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Prime Cost %</div>'
+      + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
+      + '<line x1="'+PAD.l+'" y1="'+ys(minY).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(minY).toFixed(1)+'" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>'
+      + '<text x="'+(PAD.l-6)+'" y="'+(ys(minY)+3).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="9" font-weight="600">'+minY+'%</text>'
+      + '<text x="'+(PAD.l-6)+'" y="'+(ys(maxY)+3).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="9" font-weight="600">'+maxY+'%</text>'
+      + '<line x1="'+PAD.l+'" y1="'+tPx.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+tPx.toFixed(1)+'" stroke="rgba(255,255,255,0.28)" stroke-width="1" stroke-dasharray="4,4"/>'
+      + '<text x="'+(W-PAD.r)+'" y="'+(tPx-4).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.4)" font-family="Barlow,sans-serif" font-size="8" font-weight="700">TARGET '+tgt+'%</text>'
+      + fixMarkers
+      + '<path d="'+smooth(vals)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      + dots
+      + (lastV != null ? '<text x="'+xs(lastIdx).toFixed(1)+'" y="'+(ys(lastV)-9).toFixed(1)+'" text-anchor="middle" fill="'+valCol+'" font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="700">'+lastV.toFixed(1)+'%</text>' : '')
+      + '<text x="'+xs(0).toFixed(1)+'" y="'+(H-6)+'" text-anchor="start" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="8" font-weight="600">'+xl(0)+'</text>'
+      + '<text x="'+xs(weeks.length-1).toFixed(1)+'" y="'+(H-6)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="8" font-weight="600">'+xl(weeks.length-1)+'</text>'
+      + '</svg>';
   },
 
   showInsights() {
