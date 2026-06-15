@@ -312,15 +312,13 @@ S.AuditTracker = {
       const bar   = Math.min(100, Math.max(0, score||0));
       const color = App.scoreColor(score);
       const rows  = items.filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
-        '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
-        + '<td style="padding:7px 0;font-size:11px;color:var(--t3);width:55%;">' + label + '</td>'
-        + '<td style="padding:7px 0;font-size:11px;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';font-weight:600;">' + val + '</td>'
-        + '</tr>'
+        '<tr><td>' + label + '</td>'
+        + '<td style="color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';">' + val + '</td></tr>'
       ).join('');
       const sigRows = (signals||[]).map(sig => {
         const sc = (sig.score||'').toUpperCase();
-        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'rgba(255,200,0,0.7)':'var(--gold)';
-        return '<div style="border:1px solid var(--b2);border-radius:4px;padding:12px;margin-top:10px;">'
+        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'var(--amber)':'var(--t3)';
+        return '<div style="border:1px solid var(--b-edge);border-radius:8px;padding:12px;margin-top:10px;">'
           + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
           + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
           + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
@@ -344,11 +342,11 @@ S.AuditTracker = {
           ? ''
           : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
       return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--b2);">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
         + scoreBlock + '</div>'
-        + (rows ? '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>' : '')
+        + (rows ? '<div class="at-metrics"><table class="at-mtbl">' + rows + '</table></div>' : '')
         + sigRows
         + findingsBlock(num)
         + '</div>';
@@ -456,11 +454,20 @@ S.AuditTracker = {
         + '</div>';
     }).join('');
 
-    // Total recoverable
-    const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
+    // Data Quality tier badge — app colors only: gold-tint when full coverage,
+    // neutral otherwise (never solid bright gold or off-palette yellow).
+    const grade = audit.grade || '';
+    const gradeChip = grade
+      ? (() => { const full = grade.includes('3') || grade.toLowerCase().includes('full');
+          return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;'
+            + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
+                    : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(grade) + '</span>'; })()
+      : '';
 
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card" style="margin-bottom:16px;">'
+    // Score hero (.form-card) — name + meta + tier on the left, the big Profit
+    // Score on the right; below, the score label + scale bar with the Bar Cop
+    // Outlook mounting next to it.
+    const heroCard = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Recovery Audit</div>'
@@ -470,7 +477,7 @@ S.AuditTracker = {
         + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '')
         + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '')
         + '</div>'
-      + (audit.grade ? '<div style="margin-top:8px;"><span style="background:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'var(--gold)':audit.grade.includes('2')||audit.grade.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (audit.grade.includes('3')||audit.grade.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:2px;">' + esc(audit.grade) + '</span></div>' : '')
+      + (gradeChip ? '<div style="margin-top:8px;">' + gradeChip + '</div>' : '')
       + '</div>'
       + '<div style="text-align:right;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Score</div>'
@@ -484,24 +491,31 @@ S.AuditTracker = {
       +     App.scoreBar(audit.overall_score||0)
       +   '</div>'
       +   '<div id="at-outlook-mount" style="flex-shrink:0;"></div>'
-      + '</div>'
-      + (totalMonthly > 0 ? '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Total Recoverable Per Month</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly) + '</div></div>'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Annualized</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + App.fmtCurrency(totalMonthly*12) + '</div></div>'
-        + (d.WEEKLY_GAP_AMT ? '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Weekly Gap</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:32px;font-weight:700;color:var(--gold);">' + esc(String(d.WEEKLY_GAP_AMT)) + '</div></div>' : '')
-        + '</div>' : '')
-      + '</div>'
+      + '</div></div>';
 
-      // Single-page layout: action items + sections inline, findings rendered
-      // under each section via findingsBlock. No Scores/Findings tab split.
-      + (actionItems ? '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Action Items, Ranked by Impact</div>'
-        + actionItems + '</div>' : '')
+    // Total recoverable — the money hero, as a standard stat strip (calc-val lg).
+    const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
+    const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg good">' + val + '</div></div>';
+    const recoverStrip = totalMonthly > 0
+      ? '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:36px;align-items:center;flex-wrap:wrap;">'
+        + calcItem('Total Recoverable Per Month', App.fmtCurrency(totalMonthly))
+        + calcItem('Annualized', App.fmtCurrency(totalMonthly*12))
+        + (d.WEEKLY_GAP_AMT ? calcItem('Weekly Gap', esc(String(d.WEEKLY_GAP_AMT))) : '')
+        + '</div></div>'
+      : '';
+
+    // Single-page layout: ranked action items, then the scored sections (each
+    // with its metric readout + findings rendered inline via findingsBlock).
+    const actionsCard = actionItems
+      ? '<div class="sh" style="margin:24px 0 10px;">Action Items, Ranked by Impact</div>'
+        + '<div class="card" style="margin-bottom:16px;">' + actionItems + '</div>'
+      : '';
+
+    this.container.innerHTML = '<div class="screen">'
+      + heroCard
+      + recoverStrip
+      + actionsCard
       + sections
-
       + '</div>';
 
     // Bar Cop Outlook mounts into the audit detail header next to the score.
