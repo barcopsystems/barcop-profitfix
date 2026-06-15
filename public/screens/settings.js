@@ -2436,7 +2436,7 @@ S.HubSettings = {
 
     // ── Variance Investigations ──
     App.data.variance_investigations = [
-      { id:uid(), sku:"Tito's Handmade Vodka", opened_date:dateStr(38),
+      { id:uid(), product_id:findProdId("Tito's Handmade Vodka"), sku:"Tito's Handmade Vodka", opened_date:dateStr(38),
         status:'resolved', resolved_date:dateStr(24),
         steps:[
           { done:true, finding:'Count sheets pulled. One 1L bottle was missed in the back well on the period-open count.' },
@@ -2447,7 +2447,7 @@ S.HubSettings = {
           { done:true, finding:'Closed as a counting error plus one unlogged spill. No theft indicated.' },
         ],
         resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage gets recorded from here on.' },
-      { id:uid(), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
+      { id:uid(), product_id:findProdId('Espolòn Tequila Blanco'), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
         status:'open',
         steps:[
           { done:true, finding:'Count sheets pulled. No obvious missed bottles this time.' },
