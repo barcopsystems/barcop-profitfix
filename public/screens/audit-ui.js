@@ -275,5 +275,56 @@ const AuditUI = {
   attachOutlook(pfx, audit, module) {
     const m = document.getElementById(pfx + '-outlook-mount');
     if (m && window.AuditOutlook) AuditOutlook.attach(m, audit, module, { compact: true });
+  },
+
+  // ── Intake-form helpers (shared by all three audit intakes) ────────────────
+  // Generic banded form card.
+  formCard(title, bodyHtml) {
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>' + bodyHtml + '</div>';
+  },
+
+  // A $ baseline input (sales/revenue), matching the standard form field.
+  moneyField(id, label, ph, val) {
+    return '<div class="f" style="width:220px;"><label>' + esc(label) + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"/></div></div>';
+  },
+
+  // "What Bar Cop already has" pills — ALWAYS shown; gold-tint + green check when
+  // the data exists, greyed otherwise. checks = [{label, ok}].
+  intakePills(checks) {
+    return checks.map(c => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 11px;border-radius:20px;margin:0 6px 7px 0;'
+      + (c.ok ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">'
+      + (c.ok ? '<span style="color:var(--green);font-weight:800;">&#10003;</span>' : '')
+      + esc(c.label) + '</span>').join('');
+  },
+
+  // Sub-heading + note + pills block (the "what Bar Cop already has" section).
+  intakeHasBlock(heading, note, checks) {
+    return '<div class="sh" style="margin:18px 0 8px;">' + esc(heading) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">' + note + '</div>'
+      + '<div>' + AuditUI.intakePills(checks) + '</div>';
+  },
+
+  // One intake question row (label left, grey-chevron select right).
+  // options = [[value,label],...]; current = the saved value (or '').
+  intakeQRow(pfx, label, id, options, current) {
+    const all = [['', 'Select Answer']].concat(options);
+    const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(current == null ? '' : current) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 2px;border-bottom:1px solid var(--row-div);">'
+      + '<span style="font-size:13px;color:var(--t1);">' + esc(label) + '</span>'
+      + '<select class="at-qsel" id="' + pfx + '-q-' + id + '" style="min-width:175px;flex-shrink:0;">' + opts + '</select>'
+      + '</div>';
+  },
+
+  // Generate + Back row below the cards (standard placement) + status + note.
+  intakeSubmit(pfx, canRun, daysLeft, note) {
+    return '<div style="margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + (canRun
+          ? '<button class="btn btn-primary" id="' + pfx + '-iz-submit">Generate Audit</button>'
+          : '<button class="btn btn-primary" id="' + pfx + '-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
+      + '<button class="btn btn-ghost" id="' + pfx + '-iz-cancel">Back</button>'
+      + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:24px;">' + (canRun ? (note || 'Analysis takes 60 to 90 seconds.') : 'Review and update your inputs now. The next audit can run in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ', and your changes save when you generate it.') + '</div>';
   }
 };
