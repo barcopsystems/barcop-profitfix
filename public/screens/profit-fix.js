@@ -263,7 +263,7 @@ S.ProfitFix = {
       + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div>'
       + this.measureLine(this.gap(this._workGap)) + '</div>';
 
-    const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">How recovery builds over time</button></div>';
+    const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">See Your Recovery Timeline</button></div>';
 
     const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
     const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
