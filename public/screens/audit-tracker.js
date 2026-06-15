@@ -39,7 +39,26 @@ S.AuditTracker = {
         vsLine = '<div style="font-size:12px;margin-top:8px;"><span style="color:' + (diff>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + (diff>=0?'+':'') + diff + ' pts</span><span style="color:var(--t3);"> vs last audit (' + prev.overall_score + ' to ' + latest.overall_score + ')</span></div>';
       }
 
-      const heroCard = '<div class="card form-card" style="margin-bottom:16px;">'
+      const sections = latest.sections || {};
+      // Section rows, folded into the latest-audit card below. Score and Change
+      // columns right-aligned; a section with no score shows N/A.
+      const secRows = (App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections)).map(name => {
+        const score = sections[name];
+        if (score == null) {
+          return '<tr><td><div class="val">' + esc(name) + '</div></td><td></td>'
+            + '<td style="text-align:right;color:var(--t3);font-weight:700;">N/A</td>'
+            + '<td style="text-align:right;color:var(--t4);font-size:11px;">Not enough data</td></tr>';
+        }
+        const ps   = prev?.sections?.[name];
+        const diff = ps != null ? score - ps : null;
+        const bar  = Math.min(100, Math.max(0, score));
+        return '<tr><td><div class="val">' + esc(name) + '</div></td>'
+          + '<td style="width:130px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
+          + '<td style="text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';">' + score + '</td>'
+          + '<td style="text-align:right;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</td></tr>';
+      }).join('');
+
+      latestCard = '<div class="card data-card" style="margin-bottom:16px;">'
         + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
@@ -49,30 +68,10 @@ S.AuditTracker = {
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
         + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
         + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
-        + '</div></div></div>';
-
-      const sections = latest.sections || {};
-      // All five sections always listed; a section with no score shows N/A.
-      const secRows = (App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections)).map(name => {
-        const score = sections[name];
-        if (score == null) {
-          return '<tr><td><div class="val">' + esc(name) + '</div></td><td></td>'
-            + '<td style="color:var(--t3);font-weight:700;">N/A</td>'
-            + '<td style="color:var(--t4);font-size:11px;">Not enough data</td></tr>';
-        }
-        const ps   = prev?.sections?.[name];
-        const diff = ps != null ? score - ps : null;
-        const bar  = Math.min(100, Math.max(0, score));
-        return '<tr><td><div class="val">' + esc(name) + '</div></td>'
-          + '<td style="width:130px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';">' + score + '</td>'
-          + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</td></tr>';
-      }).join('');
-      const sectionCard = '<div class="sh" style="margin:24px 0 10px;">Section Breakdown</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Section</th><th></th><th>Score</th><th>Change</th></tr></thead><tbody>' + secRows + '</tbody></table></div></div>';
-
-      latestCard = heroCard + sectionCard;
+        + '</div></div>'
+        + '<div class="card-bleed-tbl" style="margin-top:16px;margin-bottom:-20px;"><table class="tbl"><thead><tr>'
+        + '<th>Section</th><th></th><th style="text-align:right;">Score</th><th style="text-align:right;">Change</th></tr></thead><tbody>' + secRows + '</tbody></table></div>'
+        + '</div>';
     }
 
     let historyCard = '';
@@ -121,29 +120,45 @@ S.AuditTracker = {
       App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
-  // Fixed-width, left-aligned bars (one per audit), capped to the last 12 = a
-  // year. Bars stay neutral (#233039); only the score number carries the tier
-  // color (App.scoreColor), with a dashed target line. Shows from a single
-  // audit and clusters left when sparse. The inner block is width:max-content
-  // with min-width:100% so the target line spans the full card when there are
-  // few bars, and the whole row scrolls horizontally once 12 outgrow the card.
+  // A 12-month track (one column per month, capped at a year). Bars stay
+  // neutral (#1E2B34); only the score number carries the tier color
+  // (App.scoreColor), with a dashed target line. Months with no audit yet show
+  // as empty slots with a dimmed label, so the operator sees the year ahead
+  // fill in. Shows from a single audit. Scrolls horizontally on a narrow card.
   renderScoreChart(audits) {
     const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-12);
+    if (!sorted.length) return '';
     const CH = 130, USABLE = CH - 24;
     const last   = sorted[sorted.length-1] || {};
     const target = (last.raw && last.raw.TARGET_SCORE) || last.TARGET_SCORE || 65;
     const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const moLabel = d => { const m = parseInt((d||'').slice(5,7),10); return (m>=1&&m<=12) ? MO[m-1] : ''; };
     const clamp = s => Math.max(0, Math.min(100, s));
-    const bars = sorted.map(a => {
-      const s = a.overall_score||0;
+    const ym = d => { const p = (d||'').slice(0,7).split('-'); return { y:+p[0], m:+p[1] }; };
+    // 12 month columns starting at the oldest shown audit; later months without
+    // an audit render as empty slots so the year-ahead is visible.
+    const start = ym(sorted[0].date);
+    const cols = [];
+    for (let k = 0; k < 12; k++) {
+      let mi = start.m - 1 + k;
+      const y = start.y + Math.floor(mi / 12);
+      mi = ((mi % 12) + 12) % 12;
+      cols.push({ y, m: mi + 1, label: MO[mi], audit: null });
+    }
+    sorted.forEach(a => {
+      const p = ym(a.date);
+      const idx = (p.y - start.y) * 12 + (p.m - start.m);
+      if (idx >= 0 && idx < 12) cols[idx].audit = a;
+    });
+    const bars = cols.map(c => {
+      if (!c.audit) return '<div style="flex:0 0 40px;height:100%;"></div>';
+      const s = c.audit.overall_score || 0;
       const h = Math.round(clamp(s)/100*USABLE);
       return '<div style="flex:0 0 40px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
         + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;line-height:1;margin-bottom:5px;color:' + App.scoreColor(s) + ';">' + s + '</span>'
-        + '<div style="width:100%;height:' + h + 'px;background:#233039;border-radius:3px 3px 0 0;"></div>'
+        + '<div style="width:100%;height:' + h + 'px;background:#1E2B34;border-radius:3px 3px 0 0;"></div>'
         + '</div>';
     }).join('');
-    const dates = sorted.map(a => '<div style="flex:0 0 40px;text-align:center;font-size:10px;color:var(--t3);font-weight:600;">' + moLabel(a.date) + '</div>').join('');
+    const dates = cols.map(c => '<div style="flex:0 0 40px;text-align:center;font-size:10px;font-weight:600;color:' + (c.audit ? 'var(--t3)' : 'var(--t4)') + ';">' + c.label + '</div>').join('');
     const tgt = Math.round(clamp(target)/100*USABLE);
     return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:18px;">Profit Score History</div>'
@@ -397,8 +412,6 @@ S.AuditTracker = {
         ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
         ['Invoice vs PO Matching',  d.S4_INVOICE_VS_PO],
         ['Price Verification',      d.S4_PRICE_VERIFY],
-        ['Annual Bid Process',      d.S4_ANNUAL_BIDS],
-        ['Backup Vendors',          d.S4_BACKUP_VENDORS],
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S4_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
         ['Credits Recovered',       d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
         ['Credit Recovery Rate',    d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : '', (d.S4_CREDIT_RECOVERY_PCT != null && d.S4_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
@@ -626,8 +639,6 @@ S.AuditTracker = {
         ['Monthly Vendor Spend',   cur(d.S4_VENDOR_SPEND_MONTHLY)],
         ['Invoice vs PO Matching', d.S4_INVOICE_VS_PO],
         ['Price Verification',     d.S4_PRICE_VERIFY],
-        ['Annual Bid Process',     d.S4_ANNUAL_BIDS],
-        ['Backup Vendors',         d.S4_BACKUP_VENDORS],
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : ''],
         ['Credits Recovered',      d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
         ['Credit Recovery Rate',   d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : ''],
@@ -811,7 +822,6 @@ S.AuditTracker = {
       + qRow('Manager approval on voids and comps?','void_approval', [['false','No'],['true','Yes']])
       + qRow('Drawer reconciled every shift?',      'drawer_recon',  [['false','No'],['true','Yes']])
       + qRow('Invoices matched to orders?',         'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']])
-      + qRow('Backup vendors identified?',          'backup_vendors',[['No','No'],['Yes','Yes']])
       + '</div>';
 
     // Run + Back, below the cards (standard placement).
