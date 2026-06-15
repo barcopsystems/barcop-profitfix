@@ -445,7 +445,7 @@ S.AuditTracker = {
       const btn = gid
         ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This &#9656;</button>'
         : '';
-      return '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
+      return '<div class="at-arow" style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
         + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
         + (a.monthly_impact ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:4px;">+' + App.fmtCurrency(a.monthly_impact) + '/month opportunity</div>' : '')
@@ -485,7 +485,7 @@ S.AuditTracker = {
       + '<div style="font-size:11px;color:var(--t3);">' + (d.INDUSTRY_AVG != null ? 'Bar Cop Benchmark: ' + d.INDUSTRY_AVG + '  |  ' : '') + 'Target: ' + (d.TARGET_SCORE||65) + '</div>'
       + '</div>'
       + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
+      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
       +   '<div style="flex:1;min-width:240px;">'
       +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
       +     App.scoreBar(audit.overall_score||0)
@@ -497,8 +497,8 @@ S.AuditTracker = {
     const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg good">' + val + '</div></div>';
     const recoverStrip = totalMonthly > 0
-      ? '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:36px;align-items:center;flex-wrap:wrap;">'
-        + calcItem('Total Recoverable Per Month', App.fmtCurrency(totalMonthly))
+      ? '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + calcItem('Recoverable / Month', App.fmtCurrency(totalMonthly))
         + calcItem('Annualized', App.fmtCurrency(totalMonthly*12))
         + (d.WEEKLY_GAP_AMT ? calcItem('Weekly Gap', esc(String(d.WEEKLY_GAP_AMT))) : '')
         + '</div></div>'
