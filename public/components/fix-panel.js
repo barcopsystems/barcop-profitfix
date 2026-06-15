@@ -192,6 +192,45 @@ window.FixPanel = {
     return leakHtml + sep + restHtml;
   },
 
+  // Text-only leak rows for the Recovery DASHBOARD "Where You're Leaking Now"
+  // panel (no bars — Kyle's call). Same entries as the Fix-screen leak board,
+  // but each row is name + band + the honest readout: a $/yr figure where
+  // Recovery has a live weekly metric, "Review" otherwise, "On target" when ok.
+  // Leaking-with-a-dollar first (largest first), then review rows, then on-target.
+  // Rows keep .fp-fixarea + data-gap/data-module so wireFixAreas routes the tap.
+  leakRowsText(moduleKey) {
+    const gaps = this.gapAreas(moduleKey);
+    if (!gaps.length) return '';
+    const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
+    const entryFor = (g, module, crossNote) => {
+      const imp = window.Recovery ? Recovery.gapImpact(g.id) : null;
+      return { id:g.id, module, name:g.name, band: imp?imp.band:null,
+        dollars: imp?(imp.dollars||0):0, hasMetric:!!imp, crossNote: crossNote||'' };
+    };
+    const entries = gaps.filter(g => composite.indexOf(g.id) === -1).map(g => entryFor(g, moduleKey));
+    if (moduleKey === 'profit' && window.FIX && FIX.revenue) {
+      const lg = FIX.revenue.find(x => x.id === 'labor-scheduling');
+      if (lg) entries.push(entryFor(lg, 'revenue', 'in Revenue Recovery'));
+    }
+    const BAND = { over:{label:'Over',color:'var(--red)'}, watch:{label:'Watch',color:'var(--amber)'}, ok:{label:'On target',color:'var(--gold)'} };
+    const rank = e => (e.band === 'ok') ? 2 : (e.hasMetric && e.dollars > 0) ? 0 : 1;
+    entries.sort((a,b) => rank(a) - rank(b) || b.dollars - a.dollars);
+    return entries.map((e,i) => {
+      const b = BAND[e.band] || BAND.over;
+      const last = i === entries.length - 1;
+      const right = (e.hasMetric && e.dollars > 0)
+        ? '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;color:' + b.color + ';white-space:nowrap;">' + App.fmtCurrency(e.dollars, 0) + '<span style="font-size:10px;color:var(--t3);"> /yr</span></span>'
+        : (e.band === 'ok'
+            ? '<span style="font-size:11px;font-weight:700;color:var(--gold);">On target</span>'
+            : '<span style="font-size:11px;color:var(--t3);">' + (e.crossNote ? esc(e.crossNote) : 'Review') + ' &rsaquo;</span>');
+      const tag = (e.hasMetric && e.dollars > 0)
+        ? '<span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + b.color + ';">' + b.label + '</span>' : '';
+      return '<div class="fp-fixarea" data-gap="' + esc(e.id) + '" data-module="' + esc(e.module) + '" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (last ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
+        + '<div style="display:flex;align-items:center;gap:9px;min-width:0;"><span style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(e.name) + '</span>' + tag + '</div>'
+        + right + '</div>';
+    }).join('');
+  },
+
   auditScreen(moduleKey) {
     return moduleKey === 'revenue' ? 'r-audit'
          : moduleKey === 'traffic' ? 't-audit'
