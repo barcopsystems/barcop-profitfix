@@ -68,6 +68,43 @@ S.ProfitFix = {
     });
     return latest;
   },
+  // Earliest record for a signal (when the work first happened).
+  firstActivity(signal) {
+    if (signal && signal.indexOf('view:') === 0) return this.lastActivity(signal);
+    const arr = (this.SIGNALS[signal] || (() => []))();
+    let earliest = null;
+    arr.forEach(r => {
+      const d = r.period_end || r.date || (r.run_at ? String(r.run_at).slice(0, 10) : '') || (r.created_at ? String(r.created_at).slice(0, 10) : '');
+      if (d) { const ds = String(d).slice(0, 10); if (!earliest || ds < earliest) earliest = ds; }
+    });
+    return earliest;
+  },
+  // The day the system started: the first real (data, not view) tracked action
+  // for the gap. Auto-derived, never asked for.
+  firstAction(g) {
+    const t = this.TRACK[g.id] || {};
+    let first = null;
+    Object.keys(t).forEach(k => {
+      const cfg = t[k];
+      if (cfg.kind !== 'recur' || (cfg.signal && cfg.signal.indexOf('view:') === 0)) return;
+      const d = this.firstActivity(cfg.signal);
+      if (d && (!first || d < first)) first = d;
+    });
+    return first;
+  },
+  // Auto-start: the moment a gap has its first tracked action, log the start
+  // date (= that action) so Bar Cop measures from there. No manual button.
+  _autoStart() {
+    if (!App.data) return;
+    if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
+    this.gaps().forEach(g => {
+      if (this.fixLog().some(e => e.gap_id === g.id)) return;
+      const start = this.firstAction(g);
+      if (!start) return;
+      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'profit', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true });
+      if (App.markSetupDone) App.markSetupDone('gs_p_fix');
+    });
+  },
   daysSince(d) {
     if (!d) return null;
     const a = new Date(d + 'T00:00:00').getTime();
@@ -188,6 +225,7 @@ S.ProfitFix = {
     this.container = container;
     const focus = App._fixFocus || null;
     App._fixFocus = null;
+    this._autoStart();
     this.renderLanding();
     if (focus && this.gap(focus)) App.pushView(() => this.enterWorkspace(focus));
   },
@@ -320,46 +358,26 @@ S.ProfitFix = {
   },
 
   measureCard(g, h, logged) {
-    const inputStyle = 'background:var(--bg);border:1px solid var(--b1);border-radius:4px;color:#fff;font-size:13px;padding:8px 10px;width:100%;color-scheme:dark;';
     if (logged) {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
       let line = '', good = false;
       if (r.status === 'ok') {
         const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
         if (r.dollars != null && r.dollars > 0) { good = true; line = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '. ' + r.label + ' ' + move + '.' + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.'); }
-        else line = r.label + ' has not improved since this fix. ' + move + '.';
-      } else if (r.status === 'pending') line = 'Measuring. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since you put it in place.';
-      else if (r.status === 'no-baseline') line = 'No weeks logged before this date to measure recovery against.';
+        else line = r.label + ' has held steady since you started, ' + move + '.';
+      } else if (r.status === 'pending') line = 'Measuring what this system wins back. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since you started.';
+      else if (r.status === 'no-baseline') line = 'Measuring from here. There are no weeks logged before you started to compare against, so there is nothing to call recovered yet.';
+      else line = 'Bar Cop tracks this system from the day you started it.';
       return '<div class="card form-card" style="margin-top:6px;border-color:var(--gold-tint-bord);background:var(--gold-tint);">'
-        + '<div class="card-title" style="color:var(--gold);">In Place Since ' + esc(logged.date) + '</div>'
-        + (line ? '<div style="font-size:12px;color:' + (good ? 'var(--gold)' : 'var(--t2)') + ';line-height:1.6;">' + esc(line) + '</div>' : '')
-        + '<div class="card-actions"><button class="btn btn-ghost btn-sm pf-unlog" data-log="' + esc(logged.id) + '">Remove date</button></div></div>';
+        + '<div class="card-title" style="color:var(--gold);">Running Since ' + esc(logged.date) + '</div>'
+        + '<div style="font-size:12px;color:' + (good ? 'var(--gold)' : 'var(--t2)') + ';line-height:1.6;">' + esc(line) + '</div></div>';
     }
-    const ready = h.state === 'running';
-    const lead = ready
-      ? 'This system is up and running. Lock in the date you put it in place and Bar Cop measures what it wins back, the eight weeks before against the eight weeks after.'
-      : 'Get every watched step on track, then lock in the date you put the system in place so Bar Cop can measure what it recovers.';
-    return '<div class="card form-card" style="margin-top:6px;' + (ready ? 'border-color:var(--gold);' : '') + '"><div class="card-title">Lock In the Start Date</div>'
-      + '<div style="font-size:12px;color:' + (ready ? 'var(--gold)' : 'var(--t3)') + ';line-height:1.55;margin-bottom:12px;font-weight:' + (ready ? '700' : '400') + ';">' + lead + '</div>'
-      + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">'
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>In Place On</label><input type="date" class="pf-impl-date" style="' + inputStyle + '"/></div>'
-      + '<button class="btn ' + (ready ? 'btn-primary' : 'btn-ghost') + ' pf-mark" data-gap="' + esc(g.id) + '" data-name="' + esc(g.name) + '">Lock In the Date</button>'
-      + '</div></div>';
+    return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Not Started Yet</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.55;">Do the first step above and Bar Cop starts this system on its own, from the day you do it. Nothing to set, no date to pick.</div></div>';
   },
 
   wireWorkspace() {
-    const c = this.container;
-    c.querySelectorAll('.pf-go').forEach(btn => btn.addEventListener('click', () => { App._fixFocus = this._workGap; App.openScreen(btn.dataset.target); }));
-    c.querySelector('.pf-mark')?.addEventListener('click', (ev) => {
-      const dateEl = c.querySelector('.pf-impl-date');
-      const date = dateEl ? dateEl.value : '';
-      if (!date) { if (dateEl) dateEl.style.borderColor = 'var(--red)'; return; }
-      const btn = ev.currentTarget;
-      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'profit', gap_id: btn.dataset.gap, gap_name: btn.dataset.name, date: date, logged_at: new Date().toISOString() });
-      App.markSetupDone && App.markSetupDone('gs_p_fix');
-      this.renderWorkspace();
-    });
-    c.querySelectorAll('.pf-unlog').forEach(btn => btn.addEventListener('click', () => { App.removeRecord('core', 'fix_log', btn.dataset.log); this.renderWorkspace(); }));
+    this.container.querySelectorAll('.pf-go').forEach(btn => btn.addEventListener('click', () => { App._fixFocus = this._workGap; App.openScreen(btn.dataset.target); }));
   },
 
   showHowTo() {
@@ -369,7 +387,7 @@ S.ProfitFix = {
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp. Even the weekly reviews count, because opening the screen leaves a record, and steps like repricing read your live numbers (any menu item still over target) or open vendor claims still owed. This is the honest answer to whether the system is being worked, not just claimed.'] },
       { h: 'Guidance Steps', p: ['The handful of things Bar Cop genuinely cannot see, a signed paper policy, the jigger pour-test on the floor, are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
       { h: 'Watch Out For', p: ['Each leak lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
-      { h: 'Lock In the Start Date', p: ['Once a system is running, lock in the date you put it in place. Bar Cop averages the eight weeks before against the eight weeks after to measure what it actually recovered, and tracks it on your dashboard. A figure shows once two weeks of after-data land.'] }
+      { h: 'It Starts On Its Own', p: ['There is no start button. The moment you do the first tracked step, Bar Cop logs that day and starts measuring from there. If you have already been doing the work in Control, the system is running the first time you open it. From the start day it averages the eight weeks before against the eight weeks after to measure what it wins back. If there is no history before you started, there is nothing to call recovered yet, and that is the honest answer.'] }
     ]);
   }
 };
