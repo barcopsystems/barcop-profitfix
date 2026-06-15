@@ -193,28 +193,11 @@ function computeProfitAudit(appData, controlData, extracted) {
   const s2MonthlyGap = (voidCompPct != null && voidCompPct > VOID_COMP_BENCHMARK_PCT && monthlyBarRev != null && monthlyFoodRev != null)
     ? round0(((voidCompPct - VOID_COMP_BENCHMARK_PCT) / 100) * (monthlyBarRev + monthlyFoodRev))
     : 0;
-  // Score off the actual void/comp rate vs benchmark.
-  let s2;
-  if (voidCompPct != null) {
-    const over = voidCompPct - VOID_COMP_BENCHMARK_PCT;
-    s2 = over <= 0 ? 85 : over <= 1 ? 65 : over <= 2 ? 45 : 25;
-  } else {
-    s2 = 50;   // no void/comp data — insufficient to grade behavior
-  }
-  // Unauthorized voids are a behavior signal — they drag the score down.
-  if (voidsNoApprovalPct != null) {
-    if (voidsNoApprovalPct > 25) s2 -= 15;
-    else if (voidsNoApprovalPct > 10) s2 -= 8;
-  }
-  // Cash short rate (shorts as a share of reconciliations) — behavior signal.
-  // Control data first, then an uploaded cash report.
+  // Cash short rate inputs (Control first, then an uploaded cash report) and the
+  // discount / no-sale inputs are read up front so the gradeable check can see
+  // them before scoring.
   const shortCount = num(cd.cash_short_count) != null ? cd.cash_short_count : num(extracted.cash_short_count);
   const reconCount = num(cd.cash_reconciliations) > 0 ? cd.cash_reconciliations : num(extracted.cash_recon_count);
-  if (shortCount != null && reconCount > 0) {
-    const shortRate = shortCount / reconCount;
-    if (shortRate > 0.30) s2 -= 10;
-    else if (shortRate > 0.15) s2 -= 5;
-  }
   // ── Discount abuse + no-sale drawer opens (expands S2) ──
   // Excessive discounts and no-sale register opens are theft vectors the
   // void/comp + cash-variance view misses. Honest from a POS exception report
@@ -227,16 +210,46 @@ function computeProfitAudit(appData, controlData, extracted) {
   const discountCount = num(cd.discount_count) != null ? num(cd.discount_count) : num(extracted.discount_count);
   const noSaleCount = num(cd.no_sale_count) != null ? num(cd.no_sale_count) : num(extracted.no_sale_count);
   const discountPct = (discountTotal != null && periodTotalRev > 0) ? round1((discountTotal / periodTotalRev) * 100) : null;
-  if (discountPct != null) {
-    const over = discountPct - DISCOUNT_BENCHMARK_PCT;
-    if (over > 2) s2 -= 10;
-    else if (over > 0) s2 -= 5;
+
+  // S2 is gradeable only when there is real loss-behavior data to read OR a
+  // documented control to credit. With nothing at all it is N/A (null) — the
+  // same as the cost sections — never a manufactured mid-score. (Mirrors S4.)
+  const haveS2 = voidCompPct != null || discountPct != null
+    || (shortCount != null && reconCount > 0)
+    || voidsNoApprovalPct != null || noSaleCount != null
+    || haveApprovalPolicy || haveCashRecon || haveShiftChecks;
+  let s2 = null;
+  if (haveS2) {
+    // Base off the actual void/comp rate vs benchmark when present.
+    if (voidCompPct != null) {
+      const over = voidCompPct - VOID_COMP_BENCHMARK_PCT;
+      s2 = over <= 0 ? 85 : over <= 1 ? 65 : over <= 2 ? 45 : 25;
+    } else {
+      s2 = 50;   // controls/other signals on file but no void/comp rate to grade
+    }
+    // Unauthorized voids are a behavior signal — they drag the score down.
+    if (voidsNoApprovalPct != null) {
+      if (voidsNoApprovalPct > 25) s2 -= 15;
+      else if (voidsNoApprovalPct > 10) s2 -= 8;
+    }
+    // Cash short rate (shorts as a share of reconciliations) — behavior signal.
+    if (shortCount != null && reconCount > 0) {
+      const shortRate = shortCount / reconCount;
+      if (shortRate > 0.30) s2 -= 10;
+      else if (shortRate > 0.15) s2 -= 5;
+    }
+    // Discount % over benchmark — a measured result.
+    if (discountPct != null) {
+      const over = discountPct - DISCOUNT_BENCHMARK_PCT;
+      if (over > 2) s2 -= 10;
+      else if (over > 0) s2 -= 5;
+    }
+    // Modest, capped credit for controls that genuinely reduce risk — never
+    // enough to rescue a bad rate.
+    if (haveApprovalPolicy) s2 += 5;
+    if (haveCashRecon) s2 += 5;
+    s2 = clampScore(s2);
   }
-  // Modest, capped credit for controls that genuinely reduce risk — never
-  // enough to rescue a bad rate.
-  if (haveApprovalPolicy) s2 += 5;
-  if (haveCashRecon) s2 += 5;
-  s2 = clampScore(s2);
 
   // ── S3 — Food Cost Control ──
   // Results-based: credit only when counts actually happen. "Never" earns nothing.
