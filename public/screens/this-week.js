@@ -111,14 +111,9 @@ S.ThisWeek = {
     const ends = (App.data.weeks || []).map(w => w.period_end).filter(Boolean).sort();
     return ends.length ? ends[ends.length - 1] : null;
   },
-  // "Jun 15 - Jun 21" for the 7-day week ending on `end`.
-  weekRangeLabel(end) {
-    const e = new Date(end + 'T00:00:00');
-    if (isNaN(e.getTime())) return end;
-    const s = new Date(e); s.setDate(s.getDate() - 6);
-    const f = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return f(s) + ' - ' + f(e);
-  },
+  // "Jun 15 - Jun 21" for the 7-day week ending on `end` (Sunday). Uses the
+  // shared App.dateRangeLabel so the format matches every other week selector.
+  weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },
 
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
   freshDraft(periodEnd) {
