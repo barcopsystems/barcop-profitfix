@@ -11,14 +11,20 @@
    METRICS and returns status 'untracked'. The fix still logs, it just carries
    no dollar figure, and recovery for it shows as the module score moving.
 
-   Maturing window: BEFORE is up to 8 weeks immediately before the fix date,
-   fixed the moment the fix is logged. AFTER is every week since, capped at 8,
-   so it grows. A figure surfaces once 2 weeks of after-data exist and is
-   flagged preliminary until the after-window reaches 8 weeks. */
+   Baseline model (2026): a system starts on the operator's first tracked action
+   (auto, no manual date), so a real new user has no "before" history to compare
+   against. Instead the BASELINE is the operator's OWN first few operating weeks,
+   and recovery measures how far the recent weeks have moved against that starting
+   point. Positive = tightened up; negative = slipping below where they started.
+   No figure until there is a baseline plus a measurement week (roughly the first
+   month); it firms up as the measurement window fills. */
 
 window.Recovery = {
-  WINDOW: 8,
-  MIN_AFTER: 2,
+  WINDOW: 8,            // recent measurement weeks averaged for current performance
+  MIN_AFTER: 2,        // retained for callers; superseded by the baseline model
+  BASELINE_WEEKS: 3,   // the operator's first N operating weeks set the baseline
+  MIN_MEASURE: 1,      // weeks past the baseline needed before any figure
+  MATURE_MEASURE: 4,   // measurement weeks before the figure reads "mature"
 
   _avg(arr) {
     const v = arr.filter(x => x != null && !isNaN(x));
@@ -143,50 +149,59 @@ window.Recovery = {
   },
 
   /* Compute the recovery result for one fix_log entry. Returns one of:
-     { status:'untracked' }                          no dollar metric for this gap-area
-     { status:'no-baseline' }                         no weeks before the fix date
-     { status:'pending', weeksAfter }                 fewer than 2 weeks of after-data
+     { status:'untracked' }                            no dollar metric for this gap-area
+     { status:'building', weeksIn, baselineWeeks }     not enough operating weeks yet
      { status:'ok', label, before, after, improvement, fmt, dollars, weeksAfter, mature }
-       dollars may be null, positive (recovered) or negative (regressed). */
+       before = your baseline (first weeks) avg, after = recent weeks avg.
+       dollars may be null, positive (recovered) or negative (slipping below start). */
   compute(entry) {
     const m = entry && this.METRICS[entry.gap_id];
     if (!m || !entry.date) return { status: 'untracked' };
 
-    const weeks = this._series(m.series)
-      .filter(w => w.period_end)
+    // The weeks the operator has run SINCE the system started, earliest first.
+    // The baseline is their own first weeks, not a pre-start history a new user
+    // never has.
+    const operating = this._series(m.series)
+      .filter(w => w.period_end && w.period_end >= entry.date && m.value(w) != null)
       .slice()
       .sort((a, b) => a.period_end.localeCompare(b.period_end));
 
-    const beforeW = weeks.filter(w => w.period_end < entry.date).slice(-this.WINDOW);
-    const afterW  = weeks.filter(w => w.period_end >= entry.date).slice(0, this.WINDOW);
+    const B = this.BASELINE_WEEKS;
+    if (operating.length < B + this.MIN_MEASURE) {
+      return { status: 'building', weeksIn: operating.length, baselineWeeks: B };
+    }
 
-    const bAvg = this._avg(beforeW.map(m.value));
-    const aAvg = this._avg(afterW.map(m.value));
-    const aN   = afterW.map(m.value).filter(v => v != null && !isNaN(v)).length;
+    const baselineW = operating.slice(0, B);
+    const measureW  = operating.slice(B).slice(-this.WINDOW);   // recent measurement weeks
 
-    if (bAvg == null) return { status: 'no-baseline' };
-    if (aN < this.MIN_AFTER) return { status: 'pending', weeksAfter: aN };
+    const bAvg = this._avg(baselineW.map(m.value));
+    const cAvg = this._avg(measureW.map(m.value));
+    const mN   = measureW.length;
+    if (bAvg == null || cAvg == null || mN < this.MIN_MEASURE) {
+      return { status: 'building', weeksIn: operating.length, baselineWeeks: B };
+    }
 
-    const improvement = m.lowerBetter ? (bAvg - aAvg) : (aAvg - bAvg);
-    const baseAvg = this._avg(afterW.map(m.base));
-    // `dollars` is REALIZED-to-date: the weekly improvement times the number of
-    // weeks since the fix landed. `dollarsAnnual` is the forward run-rate (x52),
-    // for a clearly-labeled "on pace for" figure only — never as banked cash.
+    // Positive = better than your starting weeks; negative = slipping below them.
+    const improvement = m.lowerBetter ? (bAvg - cAvg) : (cAvg - bAvg);
+    const baseAvg = this._avg(measureW.map(m.base));
+    // `dollars` is REALIZED-to-date vs your starting point (weekly improvement
+    // times measurement weeks); can be negative. `dollarsAnnual` is the forward
+    // run-rate (x52), a clearly-labeled "on pace for" figure only.
     let dollars = null, dollarsAnnual = null;
     if (baseAvg != null) {
       const perWeek = (m.baseKind === 'pts') ? (improvement / 100) * baseAvg : improvement * baseAvg;
-      dollars = perWeek * aN;
+      dollars = perWeek * mN;
       dollarsAnnual = perWeek * 52;
     }
     return {
       status: 'ok',
       label: m.label,
-      before: bAvg, after: aAvg, improvement,
+      before: bAvg, after: cAvg, improvement,
       fmt: m.fmt,
-      dollars,            // realized to date
+      dollars,            // realized to date vs baseline
       dollarsAnnual,      // forward run-rate, labeled as such
-      weeksAfter: aN,
-      mature: aN >= this.WINDOW
+      weeksAfter: mN,
+      mature: mN >= this.MATURE_MEASURE
     };
   },
 
@@ -210,7 +225,7 @@ window.Recovery = {
       if (this.COMPOSITE_GAPS.indexOf(e.gap_id) !== -1) return;   // skip composite (double-count)
       const r = this.compute(e);
       if (r.status === 'ok' && r.dollars != null && r.dollars > 0) { recovered += r.dollars; annual += (r.dollarsAnnual || 0); withFigure++; }
-      else if (r.status === 'pending') measuring++;
+      else if (r.status === 'building') measuring++;
     });
     return { logged: mine.length, recovered: recovered, annualRunRate: Math.round(annual), withFigure: withFigure, measuring: measuring };
   },
