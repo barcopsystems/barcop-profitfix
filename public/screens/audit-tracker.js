@@ -40,25 +40,40 @@ S.AuditTracker = {
       }
 
       const sections = latest.sections || {};
-      // Section rows, folded into the latest-audit card below. Score and Change
-      // columns right-aligned; a section with no score shows N/A.
-      const secRows = (App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections)).map(name => {
+      const secNames = App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections);
+      // Section breakdown, folded into the latest-audit card as a compact row
+      // list: the bar sits right beside the score, and each section reads as one
+      // row on mobile (not the generic per-cell table-stacking).
+      const secRows = secNames.map((name, i) => {
+        const bb = i === secNames.length - 1 ? '' : 'border-bottom:1px solid var(--row-div);';
         const score = sections[name];
         if (score == null) {
-          return '<tr><td><div class="val">' + esc(name) + '</div></td><td></td>'
-            + '<td style="text-align:right;color:var(--t3);font-weight:700;">N/A</td>'
-            + '<td style="text-align:right;color:var(--t4);font-size:11px;">Not enough data</td></tr>';
+          return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
+            + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
+            + '<div style="width:80px;flex-shrink:0;"></div>'
+            + '<div style="width:42px;text-align:right;flex-shrink:0;color:var(--t3);font-weight:700;">N/A</div>'
+            + '<div style="width:48px;flex-shrink:0;"></div>'
+            + '</div>';
         }
         const ps   = prev?.sections?.[name];
         const diff = ps != null ? score - ps : null;
         const bar  = Math.min(100, Math.max(0, score));
-        return '<tr><td><div class="val">' + esc(name) + '</div></td>'
-          + '<td style="width:130px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
-          + '<td style="text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';">' + score + '</td>'
-          + '<td style="text-align:right;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</td></tr>';
+        const col  = App.scoreColor(score);
+        return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
+          + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
+          + '<div style="width:80px;flex-shrink:0;background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>'
+          + '<div style="width:42px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + score + '</div>'
+          + '<div style="width:48px;text-align:right;flex-shrink:0;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</div>'
+          + '</div>';
       }).join('');
+      const secHeader = '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;border-top:1px solid var(--b2);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">'
+        + '<div style="flex:1;min-width:0;">Section</div>'
+        + '<div style="width:80px;flex-shrink:0;"></div>'
+        + '<div style="width:42px;text-align:right;flex-shrink:0;">Score</div>'
+        + '<div style="width:48px;text-align:right;flex-shrink:0;">Change</div>'
+        + '</div>';
 
-      latestCard = '<div class="card data-card" style="margin-bottom:16px;">'
+      latestCard = '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
         + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
@@ -69,8 +84,7 @@ S.AuditTracker = {
         + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
         + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
         + '</div></div>'
-        + '<div class="card-bleed-tbl" style="margin-top:16px;margin-bottom:-20px;"><table class="tbl"><thead><tr>'
-        + '<th>Section</th><th></th><th style="text-align:right;">Score</th><th style="text-align:right;">Change</th></tr></thead><tbody>' + secRows + '</tbody></table></div>'
+        + '<div style="margin:16px -20px -20px;">' + secHeader + secRows + '</div>'
         + '</div>';
     }
 
