@@ -106,10 +106,10 @@ S.AuditTracker = {
 
 
 
-    // Score history chart — capped to the last 4 audits inside renderScoreChart
-    // so it never clutters. Comparison + per-section sparklines dropped; the
-    // section Change column and this chart already carry the trend.
-    const scoreChart = audits.length >= 2 ? this.renderScoreChart(audits, 'at') : '';
+    // Score history bars — one per audit, capped to the last 12 (a year) inside
+    // renderScoreChart. Shows from a single audit. Comparison + per-section
+    // sparklines dropped; the section Change column and this carry the trend.
+    const scoreChart = audits.length >= 1 ? this.renderScoreChart(audits) : '';
 
     this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
 
@@ -121,61 +121,43 @@ S.AuditTracker = {
       App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
-  renderScoreChart(audits, prefix) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-4);
-    const W=700, H=180, PAD={t:24,r:20,b:36,l:40};
-    const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
-    const scores = sorted.map(a => a.overall_score||0);
-    const minY = Math.max(0, Math.min(...scores) - 10);
-    const maxY = Math.min(100, Math.max(...scores) + 10);
-    const xs = i => PAD.l + (sorted.length > 1 ? (i/(sorted.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
-
-    const smoothPath = pts => {
-      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
-      if (valid.length < 2) return valid.length===1 ? `M${valid[0].x},${valid[0].y}` : '';
-      let d = `M${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      return d;
-    };
-    const areaPath = pts => {
-      const valid = pts.map((v,i) => v!=null ? {x:xs(i),y:ys(v)} : null).filter(Boolean);
-      if (valid.length < 2) return '';
-      let d = `M${valid[0].x.toFixed(1)},${ys(minY).toFixed(1)} L${valid[0].x.toFixed(1)},${valid[0].y.toFixed(1)}`;
-      for (let i=1; i<valid.length; i++) {
-        const cp = (valid[i].x - valid[i-1].x) * 0.35;
-        d += ` C${(valid[i-1].x+cp).toFixed(1)},${valid[i-1].y.toFixed(1)} ${(valid[i].x-cp).toFixed(1)},${valid[i].y.toFixed(1)} ${valid[i].x.toFixed(1)},${valid[i].y.toFixed(1)}`;
-      }
-      d += ` L${valid[valid.length-1].x.toFixed(1)},${ys(minY).toFixed(1)} Z`;
-      return d;
-    };
-
-    const ticks = [minY, Math.round((minY+maxY)/2), maxY].filter((v,i,a) => a.indexOf(v)===i);
-    const uid = prefix + 'sc' + Math.random().toString(36).slice(2,6);
-    const linePath  = smoothPath(scores);
-    const fillPath  = areaPath(scores);
-    const xLabels   = sorted.map((a,i) =>
-      `<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${(a.date||'').slice(0,7)}</text>`
-    ).join('');
-    const dots = sorted.map((a,i) => {
-      const v = a.overall_score||0;
-      const col = App.scoreHex(v);
-      return `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="5" fill="#0A1520" stroke="${col}" stroke-width="2.5"/>
-        <text x="${xs(i).toFixed(1)}" y="${(ys(v)-10).toFixed(1)}" text-anchor="middle" fill="${col}" font-family="'Barlow Condensed',sans-serif" font-size="13" font-weight="700">${v}</text>`;
+  // Fixed-width, left-aligned bars (one per audit), capped to the last 12 = a
+  // year. Bars stay neutral (#233039); only the score number carries the tier
+  // color (App.scoreColor), with a dashed target line. Shows from a single
+  // audit and clusters left when sparse. The inner block is width:max-content
+  // with min-width:100% so the target line spans the full card when there are
+  // few bars, and the whole row scrolls horizontally once 12 outgrow the card.
+  renderScoreChart(audits) {
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-12);
+    const CH = 130, USABLE = CH - 24;
+    const last   = sorted[sorted.length-1] || {};
+    const target = (last.raw && last.raw.TARGET_SCORE) || last.TARGET_SCORE || 65;
+    const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const moLabel = d => { const m = parseInt((d||'').slice(5,7),10); return (m>=1&&m<=12) ? MO[m-1] : ''; };
+    const clamp = s => Math.max(0, Math.min(100, s));
+    const bars = sorted.map(a => {
+      const s = a.overall_score||0;
+      const h = Math.round(clamp(s)/100*USABLE);
+      return '<div style="flex:0 0 40px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
+        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;line-height:1;margin-bottom:5px;color:' + App.scoreColor(s) + ';">' + s + '</span>'
+        + '<div style="width:100%;height:' + h + 'px;background:#233039;border-radius:3px 3px 0 0;"></div>'
+        + '</div>';
     }).join('');
-
+    const dates = sorted.map(a => '<div style="flex:0 0 40px;text-align:center;font-size:10px;color:var(--t3);font-weight:600;">' + moLabel(a.date) + '</div>').join('');
+    const tgt = Math.round(clamp(target)/100*USABLE);
     return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Profit Score History</div>'
-      + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">`
-      + `<defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>`
-      + ticks.map(v => `<line x1="${PAD.l}" y1="${ys(v).toFixed(1)}" x2="${W-PAD.r}" y2="${ys(v).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="${PAD.l-6}" y="${(ys(v)+4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">${Math.round(v)}</text>`).join('')
-      + (fillPath ? `<path d="${fillPath}" fill="url(#${uid})"/>` : '')
-      + (linePath ? `<path d="${linePath}" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')
-      + dots + xLabels
-      + '</svg></div>';
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:18px;">Profit Score History</div>'
+      + '<div style="overflow-x:auto;">'
+      +   '<div style="width:max-content;min-width:100%;">'
+      +     '<div style="position:relative;height:' + CH + 'px;border-bottom:1px solid var(--b2);display:flex;align-items:flex-end;gap:12px;">'
+      +       '<div style="position:absolute;left:0;right:0;bottom:' + tgt + 'px;border-top:1px dashed rgba(255,255,255,0.25);">'
+      +         '<span style="position:absolute;right:0;top:-7px;font-size:9px;color:var(--t3);background:var(--surface);padding:0 5px;letter-spacing:1px;text-transform:uppercase;">Target ' + target + '</span>'
+      +       '</div>'
+      +       bars
+      +     '</div>'
+      +     '<div style="display:flex;gap:12px;margin-top:8px;">' + dates + '</div>'
+      +   '</div>'
+      + '</div></div>';
   },
 
   renderComparison(curr, prev) {
