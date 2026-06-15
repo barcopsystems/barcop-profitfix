@@ -2,11 +2,12 @@
 S.Dashboard = {
   showHowTo() {
     App.showHelpModal('How the Profit Dashboard Works', [
-      { p: ['This is the Profit Recovery landing screen. It runs the recovery loop on one page: how much you have already recovered up top, where the operation is leaking right now in the middle, the trend below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, this screen shows a Get Started strip that points you at your first audit and the Control sections that feed Recovery.'] },
-      { h: 'Recovery Scoreboard', p: ['The headline number is what Bar Cop has measured you put back in the register since you marked each fix implemented. It is realized to date, not a projection: your measured weekly improvement times the weeks since the fix. An on-pace-for-the-year figure may show as a clearly labeled secondary line, never as banked cash. A figure appears once two weeks of after-data exist and firms up over the next six.'] },
-      { h: 'Where You Are Leaking', p: ['Your cost gaps, ranked largest dollar first so your eye lands on the biggest leak. The bar length and color carry the size: red is over target, amber is watch, gold is on target. Each dollar figure is the annual cost of running off target at this week\'s pace. Pour Cost and Food Cost carry a live dollar because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they show as a row you tap to review on their own screen. Labor is the third part of prime cost and is worked in Revenue Recovery, so its row routes there. Tap any row to open the fix process for that gap.'] },
-      { h: 'Eight-Week Trend', p: ['Bar pour cost, food cost, and prime cost over the last eight weeks, with a marker on the weeks you logged a fix so you can see the metric bend after the work went in. Bar Cop Outlook reads the trend back to you in plain operator language.'] },
-      { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, view reports, and open recipe cost analysis.'] }
+      { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and the trend just under it, this week and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
+      { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
+      { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Labor is the third part of prime cost and is worked in Revenue Recovery, so its row routes there. Tap any row to open its fix process.'] },
+      { h: 'Eight-Week Trend', p: ['Bar pour cost, food cost, and prime cost over the last eight weeks, with a marker on the weeks you logged a fix so you can see the metric bend after the work went in.'] },
+      { h: 'This Week and Profit Audit', p: ['This Week shows the latest confirmed week\'s revenue and prime cost against target. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
+      { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
     ]);
   },
 
@@ -19,18 +20,74 @@ S.Dashboard = {
     else this.renderFull(container);
   },
 
-  // Populated dashboard: Scoreboard + leak board (shared) + trend + quick actions.
+  // Populated dashboard: Recovery Scoreboard hero, a diagnosis row (Where You're
+  // Leaking Now as text + the 8-week trend), a standard row (This Week + Profit
+  // Audit), then Quick Actions. Same skeleton clones to Revenue and Traffic.
   renderFull(container) {
     const weeks   = (App.data && App.data.weeks) || [];
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
+    const leak = FixPanel.leakRowsText('profit');
+    const leakPanel = '<div class="card form-card" style="height:100%;"><div class="card-title">Where You\'re Leaking Now</div>'
+      + (leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>')
+      + '</div>';
     container.innerHTML = '<div class="screen">'
-      + FixPanel.recoveryCard('profit')
-      + this.buildChart(weeks.slice(-8), targets)
+      + FixPanel._scoreboardCard('profit')
+      + this.row(leakPanel, this.buildChart(weeks.slice(-8), targets))
+      + this.row(this.weekPanel(weeks, targets), this.auditPanel())
       + this.quickActions()
       + '</div>';
     FixPanel.wireFixAreas(container);
     document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
     this.wireQuick(container);
+  },
+
+  // Equal-height two-column row (the Control-dashboard pattern).
+  row(a, b) {
+    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
+      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
+      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
+  },
+
+  // This Week panel — the latest confirmed week's headline numbers + a way in.
+  weekPanel(weeks, targets) {
+    const w = weeks[weeks.length - 1];
+    if (!w) return '<div class="card form-card" style="height:100%;"><div class="card-title">This Week</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a week in This Week and its numbers show here.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div>';
+    const rev = (w.bar && w.bar.revenue || 0) + (w.food && w.food.revenue || 0) + (w.catering && w.catering.revenue || 0);
+    const prime = w.prime_cost_pct;
+    const pT = targets.prime_cost_pct || 60;
+    const over = prime != null && prime > pT;
+    const period = w.period_end ? 'Week ending ' + w.period_end.slice(5).replace('-', '/') : '';
+    const r = (label, val, col) => '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--row-div);">'
+      + '<span style="font-size:12px;color:var(--t3);">' + label + '</span>'
+      + '<span style="font-size:14px;font-weight:600;color:' + (col || 'var(--t1)') + ';">' + val + '</span></div>';
+    return '<div class="card form-card" style="height:100%;"><div class="card-title">This Week</div>'
+      + (period ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">' + period + '</div>' : '')
+      + r('Total Revenue', App.fmtCurrency(rev, 0))
+      + r('Prime Cost', prime != null ? prime.toFixed(1) + '% (target ' + pT + '%)' : 'Not entered', over ? 'var(--red)' : (prime != null ? 'var(--green)' : 'var(--t3)'))
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div></div>';
+  },
+
+  // Profit Audit panel — latest score + next-audit timing + a way in.
+  auditPanel() {
+    const audits = ((App.data && App.data.audits) || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const latest = audits[0];
+    if (!latest) return '<div class="card form-card" style="height:100%;"><div class="card-title">Profit Audit</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">Run Profit Audit</button></div>';
+    const score = latest.overall_score || 0;
+    const col = App.scoreColor(score);
+    const daysSince = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
+    const daysLeft = Math.max(0, 30 - daysSince);
+    const timing = daysLeft > 0 ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') : 'Ready to run a new audit';
+    return '<div class="card form-card" style="height:100%;"><div class="card-title">Profit Audit</div>'
+      + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'
+      + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(App.scoreLabel(score)) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + timing + '</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">View Audit</button></div>';
   },
 
   // Day one (no weeks, no audits): guided steps + placeholders, like Control. The
@@ -57,13 +114,18 @@ S.Dashboard = {
       + step(hasLabor, 4, 'Set up Labor Control', 'lc-dashboard', true)
       + '</div></div>';
 
-    const ph = (title, msg) => '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">' + title + '</div>'
+    const ph = (title, msg) => '<div class="card form-card" style="height:100%;"><div class="card-title">' + title + '</div>'
       + '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div></div>';
 
     container.innerHTML = '<div class="screen">'
       + strip
-      + ph('Recovery Scoreboard', 'Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.')
-      + ph('Where You Are Leaking', 'Your biggest cost gaps rank here once a week of data lands, largest dollar first, each one a tap into the fix process.')
+      + '<div style="margin-bottom:16px;">' + ph('Recovery Scoreboard', 'Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
+      + this.row(
+          ph('Where You\'re Leaking Now', 'Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.'),
+          ph('8-Week Trend', 'Bar, food, and prime cost over the last eight weeks plot here once you have logged a couple of weeks.'))
+      + this.row(
+          ph('This Week', 'The latest confirmed week shows here. Enter your numbers in This Week to start.'),
+          ph('Profit Audit', 'Your latest Profit Audit score lands here once you run one.'))
       + this.quickActions()
       + '</div>';
     this.wireQuick(container);
@@ -91,7 +153,7 @@ S.Dashboard = {
   },
 
   buildChart(weeks, targets) {
-    if (weeks.length < 2) return '<div class="chart-card" style="padding:24px 24px 20px;">'
+    if (weeks.length < 2) return '<div class="chart-card" style="height:100%;padding:24px 24px 20px;">'
       +'<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:32px;">8-Week Trend</div>'
       +'<div style="text-align:center;padding:24px 0 8px;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see trend</div></div>';
 
@@ -172,7 +234,7 @@ S.Dashboard = {
       ? '<span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);"><span style="width:8px;height:8px;border-radius:50%;background:#DBAB46;display:inline-block;border:0.5px solid rgba(0,0,0,0.35);"></span>Fix Logged</span>'
       : '';
 
-    return `<div class="chart-card" style="padding:20px 24px 16px;">
+    return `<div class="chart-card" style="height:100%;padding:20px 24px 16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:14px;">
           <div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">8-Week Trend</div>
