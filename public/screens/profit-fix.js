@@ -269,9 +269,12 @@ S.ProfitFix = {
         + '</div></div></div>';
     }).join('');
 
-    this.container.innerHTML = '<div class="screen">' + header + '<div class="pf-grid">' + tiles + '</div></div>';
+    const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">How recovery builds over time</button></div>';
+    this.container.innerHTML = '<div class="screen">' + header + timelineLink + '<div class="pf-grid">' + tiles + '</div></div>';
     this.container.querySelectorAll('.pf-tile').forEach(t =>
       t.addEventListener('click', () => App.pushView(() => this.enterWorkspace(t.dataset.gap))));
+    this.container.querySelector('.pf-timeline')?.addEventListener('click', () =>
+      App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'profit'); }));
   },
 
   // ── Workspace ───────────────────────────────────────────────────────────────
