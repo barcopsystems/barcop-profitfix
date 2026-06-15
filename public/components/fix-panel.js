@@ -236,13 +236,15 @@ window.FixPanel = {
          : 'audit-tracker';
   },
 
-  _stepRow(num, title, target, isLast) {
+  _stepRow(num, title, target, isLast, done) {
+    const circle = done
+      ? '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</div>'
+      : '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>';
     return '<div class="fp-step" data-screen="' + esc(target) + '" '
       + 'style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;'
       + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-      + '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);'
-      + 'color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>'
-      + '<div style="flex:1;min-width:0;font-size:12px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:var(--t1);">' + esc(title) + '</div>'
+      + circle
+      + '<div style="flex:1;min-width:0;font-size:12px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:' + (done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(title) + '</div>'
       + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
       + '</div>';
   },
@@ -277,17 +279,19 @@ window.FixPanel = {
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual = monthly * 12;
       const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
-      body = annual > 0
+      const hasAudit = !!latest;
+      // A dollarized opportunity headline when the latest audit surfaced gaps
+      // with a number on them; otherwise just the loop.
+      const oppHtml = annual > 0
         ? '<div style="padding:6px 0 14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--gold);">'
             + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;"> /yr opportunity</span></div>'
-            + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">from your latest audit. Work a fix and lock in the date to start measuring what you recover.</div></div>'
-            + '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
-            + this._stepRow(1, 'Pick a gap, work the fix', fixScreen, false)
-            + this._stepRow(2, 'Mark implemented', fixScreen, true) + '</div>'
-        : '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
-            + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false)
-            + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false)
-            + this._stepRow(3, 'Mark implemented', fixScreen, true) + '</div>';
+            + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">from your latest audit. Pick a gap below and work the fix; Bar Cop measures what you recover as you log your weeks.</div></div>'
+        : '';
+      body = oppHtml
+        + '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
+        + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false, hasAudit)
+        + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false, false)
+        + this._stepRow(3, 'Bar Cop tracks what you recover', fixScreen, true, false) + '</div>';
     } else if (s.withFigure > 0) {
       body = '<div style="padding:2px 0;">'
         + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
