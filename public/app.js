@@ -3819,6 +3819,14 @@ const App = {
     return this.ymdLocal(d);
   },
 
+  // "Jun 8 - Jun 14" for a date range (single date when start is missing or equal
+  // to end). The one source for every week-range chip label so the format stays
+  // identical across This Week, Build Schedule, Log Hours, Overtime, and Reports.
+  dateRangeLabel(start, end) {
+    const f = ymd => { const d = new Date((ymd || '') + 'T00:00:00'); return isNaN(d.getTime()) ? (ymd || '') : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    return (start && end && start !== end) ? f(start) + ' - ' + f(end) : f(end || start);
+  },
+
   // Return the saved revenue_forecasts record for a given week_start (Monday),
   // or null. Accepts either a week_start or any in-week date.
   forecastForWeek(dateStr) {
