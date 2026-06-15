@@ -305,8 +305,7 @@ S.ProfitFix = {
 
     // Each section is ONE card of rows (divider-separated), not a card per step.
     const systemCard = watchedHtml
-      ? '<div class="sh" style="margin:4px 0 12px;">The System</div>'
-        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + watchedHtml + '</div>'
+      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + watchedHtml + '</div>'
       : '';
     const guideCard = guideHtml
       ? '<div class="sh" style="margin:0 0 12px;">Guidance</div>'
@@ -357,7 +356,9 @@ S.ProfitFix = {
     if (!g) return '';
     const logged = this.loggedDate(g.id);
     const nm = '<span style="color:var(--t1);font-weight:600;">' + esc(g.name) + '</span>';
-    let body, tone = 'var(--t3)';
+    const gold = v => '<span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(v, 0) + '</span>';
+    const red  = v => '<span style="color:var(--red);font-weight:700;">' + App.fmtCurrency(v, 0) + '</span>';
+    let body;
     if (!logged) {
       body = ' is not started yet. Do its first step and Bar Cop starts measuring from that day.';
     } else {
@@ -367,18 +368,16 @@ S.ProfitFix = {
         const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
         body = since + 'Building your baseline, ' + wk + ' of about ' + need + ' weeks logged. The recovery number turns on around your first month.';
       } else if (r.status === 'ok' && r.dollars != null && r.dollars > 0) {
-        tone = 'var(--gold)';
-        body = since + 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '.';
+        body = since + 'Recovered about ' + gold(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + gold(r.dollarsAnnual) + ' a year' : '') + '.';
       } else if (r.status === 'ok' && r.dollars != null && r.dollars < 0) {
-        tone = 'var(--red)';
-        body = since + 'Slipping, about ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below where you started. Get the watched steps back on track.';
+        body = since + 'Slipping, about ' + red(Math.abs(r.dollars)) + ' below where you started. Get the watched steps back on track.';
       } else if (r.status === 'ok') {
         body = since + 'Holding steady at your starting level.';
       } else {
         body = since + 'Tracked and running. The win shows up in your other numbers.';
       }
     }
-    return '<div style="margin-top:11px;padding-top:11px;border-top:1px solid var(--b2);font-size:12px;line-height:1.55;color:' + tone + ';">' + nm + body + '</div>';
+    return '<div style="margin-top:11px;padding-top:11px;border-top:1px solid var(--b2);font-size:12px;line-height:1.55;color:var(--t2);">' + nm + body + '</div>';
   },
 
   wireWorkspace() {
