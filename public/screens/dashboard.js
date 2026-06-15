@@ -2,11 +2,11 @@
 S.Dashboard = {
   showHowTo() {
     App.showHelpModal('How the Profit Dashboard Works', [
-      { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and the trend just under it, this week and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
+      { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and your costs against target just under it, your profit forecast and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
       { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
       { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Tap any row to open its fix process. Labor is part of prime cost but is worked in Revenue Recovery, so it lives on that dashboard, not here.'] },
-      { h: 'Eight-Week Trend', p: ['Bar pour cost, food cost, and prime cost over the last eight weeks, with a marker on the weeks you logged a fix so you can see the metric bend after the work went in.'] },
-      { h: 'This Week and Profit Audit', p: ['This Week shows the latest confirmed week\'s revenue and prime cost against target. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
+      { h: 'Cost vs Target', p: ['Your bar pour cost, food cost, and prime cost from your latest confirmed week, each against its own target. Green is at or under target, red is over. Tap Insights for a written read on where the numbers are heading.'] },
+      { h: 'Profit Forecast and Profit Audit', p: ['Profit Forecast projects your profit out twelve months at your recent pace, plus what hitting your cost targets is worth. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
       { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
     ]);
   },
@@ -28,11 +28,11 @@ S.Dashboard = {
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
     const leak = FixPanel.leakRowsText('profit');
     const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Trend Insights</button>';
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Insights</button>';
     container.innerHTML = '<div class="screen">'
       + FixPanel._scoreboardCard('profit')
-      + this.row(this.shPanel('Where You\'re Leaking Now', leakBody), this.shPanel('8-Week Trend', this.buildChart(weeks.slice(-8), targets), insightsBtn))
-      + this.row(this.shPanel('This Week', this.weekPanel(weeks, targets)), this.shPanel('Profit Audit', this.auditPanel()))
+      + this.row(this.shPanel('Where You\'re Leaking Now', leakBody), this.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets), insightsBtn))
+      + this.row(this.shPanel('Profit Forecast', this.forecastPanel()), this.shPanel('Profit Audit', this.auditPanel()))
       + this.quickActions()
       + '</div>';
     FixPanel.wireFixAreas(container);
@@ -57,23 +57,32 @@ S.Dashboard = {
     return head + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
   },
 
-  // This Week panel — the latest confirmed week's headline numbers + a way in.
-  weekPanel(weeks, targets) {
-    const w = weeks[weeks.length - 1];
-    if (!w) return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a week in This Week and its numbers show here.</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button>';
-    const rev = (w.bar && w.bar.revenue || 0) + (w.food && w.food.revenue || 0) + (w.catering && w.catering.revenue || 0);
-    const prime = w.prime_cost_pct;
-    const pT = targets.prime_cost_pct || 60;
-    const over = prime != null && prime > pT;
-    const period = w.period_end ? 'Week ending ' + w.period_end.slice(5).replace('-', '/') : '';
-    const r = (label, val, col) => '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--row-div);">'
-      + '<span style="font-size:12px;color:var(--t3);">' + label + '</span>'
-      + '<span style="font-size:14px;font-weight:600;color:' + (col || 'var(--t1)') + ';">' + val + '</span></div>';
-    return (period ? '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;">' + period + '</div>' : '')
-      + r('Total Revenue', App.fmtCurrency(rev, 0))
-      + r('Prime Cost', prime != null ? prime.toFixed(1) + '% (target ' + pT + '%)' : 'Not entered', over ? 'var(--red)' : (prime != null ? 'var(--green)' : 'var(--t3)'))
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="this-week">Open This Week</button></div>';
+  // Profit Forecast panel — profit projected forward twelve months, plus what
+  // hitting your cost targets is worth. Reuses the Profit Forecast engine so the
+  // dashboard and the full screen never disagree. Forward-looking complement to
+  // the backward Scoreboard and the Audit score beside it.
+  forecastPanel() {
+    const PF = S.ProfitForecast;
+    const placeholder = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a few weeks in This Week and Bar Cop projects your profit forward, at your recent pace and at your cost targets.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button>';
+    if (!PF) return placeholder;
+    const rr = PF.runRates();
+    if (rr.nW < PF.MIN_WEEKS) return placeholder;
+    const targetP = (PF.targets().prime_cost_pct ?? 60) / 100;
+    const sales     = rr.avgWeeklyRev * 52;
+    const opexTot   = (rr.avgWeeklyOpex + rr.avgWeeklyPF) * 52;
+    const profitCur = sales - sales * rr.primePctCurrent - opexTot;
+    const profitTgt = sales - sales * targetP - opexTot;
+    const swing     = Math.max(0, profitTgt - profitCur);
+    const label = rr.opexLogged ? 'Projected Operating Profit, next 12 months' : 'Profit Before Operating Costs, next 12 months';
+    const money = n => App.fmtCurrency(n, 0);
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:5px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:40px;font-weight:700;line-height:1;color:' + (profitCur < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + money(profitCur) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;">at your recent pace</div>'
+      + (swing > 0
+          ? '<div style="font-size:13px;font-weight:600;color:var(--gold);margin-top:12px;">+' + money(swing) + ' if you hit your cost targets</div>'
+          : '<div style="font-size:13px;font-weight:600;color:var(--green);margin-top:12px;">You are at or above your cost targets</div>')
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button></div>';
   },
 
   // Profit Audit panel — latest score + next-audit timing + a way in.
@@ -127,9 +136,9 @@ S.Dashboard = {
         + ph('Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
       + this.row(
           this.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
-          this.shPanel('8-Week Trend', ph('Bar Cop plots your prime cost against target here once you have logged a couple of weeks.')))
+          this.shPanel('Cost vs Target', ph('Your bar pour, food, and prime cost against target show here once you confirm a week.')))
       + this.row(
-          this.shPanel('This Week', ph('The latest confirmed week shows here. Enter your numbers in This Week to start.')),
+          this.shPanel('Profit Forecast', ph('Your profit projected forward shows here once you have a few weeks confirmed in This Week.')),
           this.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
       + this.quickActions()
       + '</div>';
@@ -157,46 +166,29 @@ S.Dashboard = {
       }));
   },
 
-  // 8-week trend as SMALL MULTIPLES — one compact sparkline per metric (Bar Pour
-  // Cost, Food Cost, Prime Cost), each with its current value colored by over/
-  // under its own target. Three readable mini-charts beat one cramped 3-line
-  // chart at half-width, and keep all three metrics (matching Trend Insights).
-  // Returns inner HTML (shPanel wraps the card).
-  buildChart(weeks, targets) {
+  // Cost vs Target — your latest confirmed week's bar pour cost, food cost, and
+  // prime cost, each as a plain percentage colored by over/under its own target
+  // (red over, green at or under). No chart; the written read lives behind the
+  // Insights button. Returns inner HTML (shPanel wraps the card).
+  costPanel(weeks, targets) {
     const metrics = [
       { label: 'Bar Pour Cost', vals: weeks.map(w => (w && w.bar)  ? (w.bar.cost_pct  != null ? w.bar.cost_pct  : null) : null), tgt: targets.bar_pour_cost_pct || 22 },
       { label: 'Food Cost',     vals: weeks.map(w => (w && w.food) ? (w.food.cost_pct != null ? w.food.cost_pct : null) : null), tgt: targets.food_cost_pct || 32 },
       { label: 'Prime Cost',    vals: weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null),                   tgt: targets.prime_cost_pct || 60 }
     ];
-    if (!metrics.some(m => m.vals.filter(v => v != null).length >= 2)) {
-      return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Log at least 2 weeks to see the trend</div>';
+    if (!metrics.some(m => m.vals.some(v => v != null))) {
+      return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Confirm a week to see your costs</div>';
     }
-
-    const spark = (vals, dotCol) => {
-      const W = 96, H = 30, P = 3;
-      const present = vals.filter(v => v != null);
-      if (present.length < 2) return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '"></svg>';
-      const min = Math.min(...present), max = Math.max(...present), rng = (max - min) || 1;
-      const xs = i => P + (vals.length > 1 ? (i / (vals.length - 1)) * (W - P * 2) : (W - P * 2) / 2);
-      const ys = v => H - P - ((v - min) / rng) * (H - P * 2);
-      const pts = vals.map((v, i) => v != null ? xs(i).toFixed(1) + ',' + ys(v).toFixed(1) : null).filter(Boolean);
-      let li = vals.length - 1; while (li >= 0 && vals[li] == null) li--;
-      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" style="display:block;flex-shrink:0;">'
-        + '<polyline points="' + pts.join(' ') + '" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>'
-        + (li >= 0 ? '<circle cx="' + xs(li).toFixed(1) + '" cy="' + ys(vals[li]).toFixed(1) + '" r="2.6" fill="#0A1520" stroke="' + dotCol + '" stroke-width="1.6"/>' : '')
-        + '</svg>';
-    };
 
     return metrics.map((m, i) => {
       let li = m.vals.length - 1; while (li >= 0 && m.vals[li] == null) li--;
       const lastV = li >= 0 ? m.vals[li] : null;
       const col = (lastV != null && lastV > m.tgt) ? 'var(--red)' : (lastV != null ? 'var(--green)' : 'var(--t3)');
       const last = i === metrics.length - 1;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;' + (last ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;' + (last ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
         + '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--t1);">' + m.label + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">target ' + m.tgt + '%</div></div>'
-        + spark(m.vals, col)
-        + '<div style="width:56px;text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:' + col + ';">' + (lastV != null ? lastV.toFixed(1) + '%' : 'n/a') + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';">' + (lastV != null ? lastV.toFixed(1) + '%' : 'n/a') + '</div>'
         + '</div>';
     }).join('');
   },
