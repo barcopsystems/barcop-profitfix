@@ -1282,6 +1282,9 @@ const App = {
     // showApp isn't called (which would briefly flash a module shell).
     if (id === 'settings') { S.HubSettings.open(); return; }
     if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
+    // Hub Accounting deliverables a fix step can deep-link to.
+    if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
+    if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
     const mod = this._moduleOf(id);
     // Show the app shell if we're not already in it (e.g., coming from a Hub
     // overlay modal, where the app shell is hidden). showApp also closes any
