@@ -330,7 +330,6 @@ S.RevenueAudit = {
   // pattern: revenue baseline + "what Bar Cop already has" + code-mapped upload
   // slots + practice questions (Select Answer = no score impact), no notes.
   renderIntake() {
-    const s = App.data.settings || {};
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     // Form viewable anytime; the 30-day cadence gates only Generate.
@@ -339,104 +338,54 @@ S.RevenueAudit = {
     const canRun = _since >= 30;
     const daysLeft = canRun ? 0 : 30 - _since;
 
-    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Revenue Audit</div>';
-    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name || 'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
-      + '</div>';
-
     const cd = this.buildControlData();
     const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
     const checks = [
-      { label: 'Check Average',   ok: cd && cd.check_average != null },
-      { label: 'Labor % / RPLH',  ok: cd && (cd.labor_pct_blended != null || cd.rplh_blended != null) },
-      { label: 'Menu Mix',        ok: costedMenu.length >= 4 },
-      { label: 'Server Spread',   ok: (App.data.revenue_server_checks || []).length >= 3 },
-      { label: 'Events',          ok: (App.data.revenue_events || []).length > 0 }
+      { label: 'Check Average',  ok: cd && cd.check_average != null },
+      { label: 'Labor and RPLH', ok: cd && (cd.labor_pct_blended != null || cd.rplh_blended != null) },
+      { label: 'Menu Mix',       ok: costedMenu.length >= 4 },
+      { label: 'Server Spread',  ok: (App.data.revenue_server_checks || []).length >= 3 },
+      { label: 'Events',         ok: (App.data.revenue_events || []).length > 0 }
     ];
-    const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
-      + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
-      + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>')
-      + esc(c.label) + '</span>';
-    const haveControl = cd && cd.sources && cd.sources.length;
-    const controlCard = haveControl
-      ? '<div class="card" style="margin-bottom:16px;"><div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">What Bar Cop already has</div>'
-        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">These come from your Bar Cop data as verified ground truth. Uploads only fill what is not checked, or add deeper detail.</div>'
-        + '<div>' + checks.map(chip).join('') + '</div></div>'
-      : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">Bar Cop has no Revenue data yet for this bar, so this first audit reads from the reports you upload below. As you log shifts, schedules, menu, and servers in Bar Cop, those numbers flow in automatically.</div></div>';
 
-    const revLabel = (txt) => '<label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:6px;">' + txt + '</label>';
-    const revInput = (id, ph, val) => '<div style="display:flex;align-items:center;background:var(--input);border:1px solid var(--b1);border-radius:4px;overflow:hidden;"><span style="padding:0 10px;color:var(--t3);font-size:13px;">$</span><input type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '" style="background:transparent;border:none;color:var(--t1);font-size:13px;padding:8px 10px 8px 0;width:100%;outline:none;"/></div>';
-    const revCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">'
-      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Annual Revenue</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="ra-how-btn">How this works</button>'
+    const salesCard = AuditUI.formCard('Annual Sales',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + AuditUI.moneyField('ra-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
+      + AuditUI.moneyField('ra-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
       + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6;">Enter your annual revenue. This sets the dollar baselines for every gap. Enter at least one figure. A bar with no kitchen can leave Food Revenue blank.</div>'
-      + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
-      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Bar Revenue') + revInput('ra-iz-bar-rev', '618000', d.barRev) + '</div>'
-      + '<div style="flex:1;min-width:200px;">' + revLabel('Annual Food Revenue (leave blank if none)') + revInput('ra-iz-food-rev', '372000', d.foodRev) + '</div>'
-      + '</div></div>';
+      + AuditUI.intakeHasBlock('What Bar Cop Already Has', 'Highlighted areas pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.', checks));
 
-    const uploadCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Your Reports</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional. Anything Bar Cop already has from your Control systems is used automatically. Drop in any of the reports below to score a section Bar Cop cannot see yet, or for deeper detail. One drop zone takes them all.</div>'
+    const uploadCard = AuditUI.formCard('Your Reports',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional. Drop in a report to score a section Bar Cop cannot see yet. One drop zone takes them all.</div>'
       + FileDrop.render('ra-drop', { items: [
           { t: 'POS Sales Summary',          s: 'Scores Check Average (revenue, covers, blended check average).' },
           { t: 'Server Sales Report',        s: 'Scores Server Performance (check average by server, spread, top and bottom).', hi: true },
           { t: 'Menu Sales Mix and Pricing', s: 'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing).' },
           { t: 'Labor Schedule or Payroll',  s: 'Scores Labor Efficiency (labor percent, RPLH, overtime).' },
           { t: 'Event and Catering Records', s: 'Scores Events and Private Dining (event revenue, frequency).' }
-        ] })
-      + '</div>';
+        ] }));
 
     const pr = d.practices || {};
-    const qRow = (label, id, options) => {
-      const all = [['', 'Select Answer']].concat(options);
-      const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
-      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
-        + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(label) + '</div>'
-        + '<select id="ra-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:150px;">' + opts + '</select></div>';
-    };
-    const questionsCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Few Quick Questions</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These shape your scores and usually are not in your reports. Anything left on Select Answer has no effect. They carry over to your next audit.</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0 28px;">'
-      + qRow('Pre-shift briefing held?',                'pre_shift',          [['never','Never'],['sometimes','Sometimes'],['every','Every shift']])
-      + qRow('Server upsell standard taught and tracked?','upsell_standard',  [['false','No'],['true','Yes']])
-      + qRow('Private dining package with a spend minimum?','private_dining_min',[['false','No'],['true','Yes']])
-      + qRow('Menu repriced or engineered in last 6 months?','menu_engineered',[['false','No'],['true','Yes']])
-      + qRow('When did you last raise menu prices?',    'last_price_increase',[['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']])
-      + qRow('Labor scheduled to a sales forecast?',    'labor_to_forecast',  [['false','No'],['true','Yes']])
-      + '</div></div>';
+    const questionsCard = AuditUI.formCard('A Few Quick Questions',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your scores and are not in your reports. Answer what applies; the rest carry over to next time.</div>'
+      + AuditUI.intakeQRow('ra', 'Pre-shift briefing held?', 'pre_shift', [['never','Never'],['sometimes','Sometimes'],['every','Every shift']], pr.pre_shift)
+      + AuditUI.intakeQRow('ra', 'Server upsell standard taught and tracked?', 'upsell_standard', [['false','No'],['true','Yes']], pr.upsell_standard)
+      + AuditUI.intakeQRow('ra', 'Private dining package with a spend minimum?', 'private_dining_min', [['false','No'],['true','Yes']], pr.private_dining_min)
+      + AuditUI.intakeQRow('ra', 'Menu repriced or engineered in last 6 months?', 'menu_engineered', [['false','No'],['true','Yes']], pr.menu_engineered)
+      + AuditUI.intakeQRow('ra', 'When did you last raise menu prices?', 'last_price_increase', [['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']], pr.last_price_increase)
+      + AuditUI.intakeQRow('ra', 'Labor scheduled to a sales forecast?', 'labor_to_forecast', [['false','No'],['true','Yes']], pr.labor_to_forecast));
 
-    const submitCard = '<div class="card">'
-      + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
-      + (canRun
-          ? '<button class="btn btn-primary" id="ra-iz-submit">Generate Audit</button>'
-          : '<button class="btn btn-primary" id="ra-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
-      + '<div id="ra-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
-      + '<div style="flex:1;"></div>'
-      + '<button class="btn btn-ghost" id="ra-iz-cancel">' + (canRun ? 'Cancel' : 'Back') + '</button></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.') + '</div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + revCard + controlCard + uploadCard + questionsCard + submitCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('ra', canRun, daysLeft) + '</div>';
     FileDrop.attach('ra-drop');
 
-    document.getElementById('ra-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Revenue Audit Works', [
-      { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
-      { h: 'What Bar Cop already has', p: ['If you log weekly numbers, schedules, menu items, and servers in Bar Cop, those feed the audit automatically. A new operation reads from what you enter and upload here instead.'] },
-      { h: 'The steps', p: ['1. Enter your annual revenue (the dollar baseline).', '2. Upload any reports for a section Bar Cop cannot see yet (a POS sales summary covers Check Average, a server sales report covers Server Performance, and so on).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in over time.'] },
-      { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
-    ]));
     document.getElementById('ra-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ra-iz-submit')?.addEventListener('click', () => {
       const barRev = parseFloat(document.getElementById('ra-iz-bar-rev')?.value) || 0;
       const foodRev = parseFloat(document.getElementById('ra-iz-food-rev')?.value) || 0;
       if (barRev === 0 && foodRev === 0) {
         const st = document.getElementById('ra-iz-status');
-        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one revenue figure to run the audit.'; }
+        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one sales figure to run the audit.'; }
         return;
       }
       this._intakeDraft.barRev = document.getElementById('ra-iz-bar-rev')?.value || '';
@@ -452,6 +401,15 @@ S.RevenueAudit = {
       };
       this.generateAudit();
     });
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Revenue Audit Works', [
+      { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
+      { h: 'What Bar Cop already has', p: ['If you log weekly numbers, schedules, menu items, and servers in Bar Cop, those feed the audit automatically. A new operation reads from what you enter and upload here instead.'] },
+      { h: 'The steps', p: ['1. Enter your annual sales (the dollar baseline).', '2. Upload any reports for a section Bar Cop cannot see yet (a POS sales summary covers Check Average, a server sales report covers Server Performance, and so on).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in over time.'] },
+      { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
+    ]);
   },
 
   async generateAudit() {
