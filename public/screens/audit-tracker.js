@@ -20,140 +20,98 @@ S.AuditTracker = {
     const canRunAudit  = daysSince >= 30;
     const daysLeft     = canRunAudit ? 0 : 30 - daysSince;
 
-    const requestCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div style="flex:1;min-width:200px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Profit Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:500px;">One profit audit every 30 days. Upload your POS reports and data files. Your scored audit appears on screen once the analysis finishes, usually within a minute or two. Print or save it as a PDF from your browser.</div>'
-      + '</div>'
-      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
-      +   '<button class="btn btn-primary" id="at-new-btn">' + (canRunAudit ? (latest ? 'Generate New Audit' : 'Generate First Audit') : 'Review / Update Inputs') + '</button>'
-      +   (canRunAudit ? '' : '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>')
+    const requestCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Profit Audit</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
+      + '<div style="font-size:12px;color:var(--t3);max-width:520px;line-height:1.6;">One audit every 30 days. It scores from your Control data plus anything you upload, and the result shows on screen in a minute or two.</div>'
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'
+      + '<button class="btn btn-primary" id="at-new-btn">' + (canRunAudit ? (latest ? 'Generate New Audit' : 'Generate First Audit') : 'Review / Update Inputs') + '</button>'
+      + (canRunAudit ? '' : '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>')
       + '</div></div></div>';
 
     let latestCard = '';
     if (latest) {
-      const prev = audits[1] || null;
+      const prev       = audits[1] || null;
       const scoreColor = App.scoreColor(latest.overall_score);
       const scoreLabel = App.scoreLabel(latest.overall_score);
-
-      let progressBanner = '';
+      let vsLine = '';
       if (prev) {
         const diff = (latest.overall_score||0) - (prev.overall_score||0);
-        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</div>'
-          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
-          + '</div>';
+        vsLine = '<div style="font-size:12px;margin-top:8px;"><span style="color:' + (diff>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + (diff>=0?'+':'') + diff + ' pts</span><span style="color:var(--t3);"> vs last audit (' + prev.overall_score + ' to ' + latest.overall_score + ')</span></div>';
       }
 
+      const heroCard = '<div class="card form-card" style="margin-bottom:16px;">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
+        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
+        + vsLine + '</div>'
+        + '<div style="text-align:right;">'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
+        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
+        + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
+        + '</div></div></div>';
+
       const sections = latest.sections || {};
-      // List ALL five sections. A section with no score this period shows N/A
-      // (Not enough data) rather than vanishing, so the operator sees the full
-      // picture and knows what to add to light it up next time.
-      const sectionRows = (App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections)).map(name => {
+      // All five sections always listed; a section with no score shows N/A.
+      const secRows = (App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections)).map(name => {
         const score = sections[name];
         if (score == null) {
-          return '<tr>'
-            + '<td style="color:var(--t2);padding:8px 12px;">' + esc(name) + '</td>'
-            + '<td style="padding:8px 12px;width:140px;"></td>'
-            + '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);padding:8px 12px;">N/A</td>'
-            + '<td style="font-size:11px;color:var(--t4);padding:8px 12px;">Not enough data</td>'
-            + '</tr>';
+          return '<tr><td><div class="val">' + esc(name) + '</div></td><td></td>'
+            + '<td style="color:var(--t3);font-weight:700;">N/A</td>'
+            + '<td style="color:var(--t4);font-size:11px;">Not enough data</td></tr>';
         }
         const ps   = prev?.sections?.[name];
         const diff = ps != null ? score - ps : null;
         const bar  = Math.min(100, Math.max(0, score));
-        return '<tr>'
-          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
-          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+bar+'%;background:'+App.scoreColor(score)+';border-radius:3px;"></div></div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:'+App.scoreColor(score)+';padding:8px 12px;">' + score + '</td>'
-          + (diff != null ? '<td style="font-size:12px;color:'+(diff>=0?'var(--gold)':'var(--red)')+';padding:8px 12px;">'+(diff>=0?'+':'')+diff+'</td>' : '<td></td>')
-          + '</tr>';
+        return '<tr><td><div class="val">' + esc(name) + '</div></td>'
+          + '<td style="width:130px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
+          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';">' + score + '</td>'
+          + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</td></tr>';
       }).join('');
+      const sectionCard = '<div class="sh" style="margin:24px 0 10px;">Section Breakdown</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Section</th><th></th><th>Score</th><th>Change</th></tr></thead><tbody>' + secRows + '</tbody></table></div></div>';
 
-      // Top Action Items by Impact lives on the full audit view (where the
-      // Fix This buttons route into the Fix Process). Keeping it off the
-      // preview card makes the preview a faster score-only scan and gives the
-      // operator a reason to click through.
-      latestCard = '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
-        + '<div>'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Profit Audit</div>'
-        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
-        + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
-        + '</div>'
-        + '</div>'
-        + progressBanner
-        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
-          + '<thead><tr>'
-          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
-          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
-          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
-          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
-          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
-        + '</div>';
+      latestCard = heroCard + sectionCard;
     }
 
     let historyCard = '';
     if (audits.length > 1) {
+      const tierChip = (tier) => {
+        if (!tier) return '';
+        const full = tier.includes('3') || tier.toLowerCase().includes('full');
+        return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:20px;'
+          + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
+                  : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(tier) + '</span>';
+      };
       const rows = audits.slice(0, App.listLimit('core', 'audit')).map((a,i) => {
         const p    = audits[i+1];
         const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
-        const tier = a.grade || '';
-        const tierBadge = tier
-          ? '<span style="background:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'var(--gold)':tier.includes('2')||tier.toLowerCase().includes('standard')?'rgba(255,200,0,0.3)':'var(--b1)') + ';color:' + (tier.includes('3')||tier.toLowerCase().includes('full')?'#000':'var(--t2)') + ';font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;">' + esc(tier) + '</span>'
-          : '';
-        return '<tr>'
-          + '<td>' + (a.date||'').slice(0,10) + '</td>'
+        return '<tr><td><div class="val">' + (a.date||'').slice(0,10) + '</div></td>'
           + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
-          + (diff != null ? '<td style="color:' + (diff>=0?'var(--gold)':'var(--red)') + ';">' + (diff>=0?'+':'') + diff + ' pts</td>' : '<td></td>')
-          + '<td>' + tierBadge + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm at-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
-          + '</tr>';
+          + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff+' pts':'') + '</td>'
+          + '<td>' + tierChip(a.grade) + '</td>'
+          + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm at-view-btn" data-idx="' + i + '">View</button></td></tr>';
       }).join('');
-      historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Full history kept. Print any audit to save as PDF.</div>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('core', 'audit', audits, false)
-        + '</div>';
+      historyCard = '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + App.showOlderBar('core', 'audit', audits, false);
     }
 
     const emptyState = !latest
-      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
-        + '<div class="empty-sub">Generate your first Profit Audit above. Upload your POS reports and the scored audit appears once the analysis finishes.</div></div>'
+      ? '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px;">No audits yet</div>'
+        + '<div style="font-size:12px;color:var(--t3);">Generate your first Profit Audit above. It scores from your Control data plus anything you upload.</div></div></div>'
       : '';
 
 
 
-    // Score History Chart (2+ audits)
-    let scoreChart = '';
-    if (audits.length >= 2) {
-      scoreChart = this.renderScoreChart(audits, 'at');
-    }
+    // Score history chart — capped to the last 4 audits inside renderScoreChart
+    // so it never clutters. Comparison + per-section sparklines dropped; the
+    // section Change column and this chart already carry the trend.
+    const scoreChart = audits.length >= 2 ? this.renderScoreChart(audits, 'at') : '';
 
-    // Score Comparison (2 audits)
-    let comparison = '';
-    if (audits.length >= 2) {
-      comparison = this.renderComparison(audits[0], audits[1]);
-    }
-
-    // Section Trend sparklines (3+ audits)
-    let sparklines = '';
-    if (audits.length >= 3) {
-      sparklines = this.renderSparklines(audits);
-    }
-
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + comparison + historyCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
 
     document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.at-view-btn').forEach(btn => {
@@ -164,7 +122,7 @@ S.AuditTracker = {
   },
 
   renderScoreChart(audits, prefix) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
+    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-4);
     const W=700, H=180, PAD={t:24,r:20,b:36,l:40};
     const cw = W-PAD.l-PAD.r, ch = H-PAD.t-PAD.b;
     const scores = sorted.map(a => a.overall_score||0);
