@@ -66,14 +66,15 @@ S.AuditTracker = {
           + '<div style="width:48px;text-align:right;flex-shrink:0;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</div>'
           + '</div>';
       }).join('');
-      const secHeader = '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;border-top:1px solid var(--b2);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">'
+      const secHeader = '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;border-top:1px solid var(--b2);border-bottom:1px solid var(--row-div);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">'
         + '<div style="flex:1;min-width:0;">Section</div>'
         + '<div style="width:80px;flex-shrink:0;"></div>'
         + '<div style="width:42px;text-align:right;flex-shrink:0;">Score</div>'
         + '<div style="width:48px;text-align:right;flex-shrink:0;">Change</div>'
         + '</div>';
 
-      latestCard = '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
+      latestCard = '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button></div>'
+        + '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
         + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
@@ -82,7 +83,6 @@ S.AuditTracker = {
         + '<div style="text-align:right;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
         + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
-        + '<button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button>'
         + '</div></div>'
         + '<div style="margin:16px -20px -20px;">' + secHeader + secRows + '</div>'
         + '</div>';
@@ -496,7 +496,7 @@ S.AuditTracker = {
       + '</div>'
       + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
       +   '<div style="flex:1;min-width:240px;">'
-      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
+      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(App.scoreLabel(audit.overall_score||0)) + ' Profit Score</div>'
       +     App.scoreBar(audit.overall_score||0)
       +   '</div>'
       +   '<div id="at-outlook-mount" style="flex-shrink:0;"></div>'
