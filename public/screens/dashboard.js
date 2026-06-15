@@ -4,7 +4,7 @@ S.Dashboard = {
     App.showHelpModal('How the Profit Dashboard Works', [
       { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and the trend just under it, this week and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
       { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
-      { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Labor is the third part of prime cost and is worked in Revenue Recovery, so its row routes there. Tap any row to open its fix process.'] },
+      { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Tap any row to open its fix process. Labor is part of prime cost but is worked in Revenue Recovery, so it lives on that dashboard, not here.'] },
       { h: 'Eight-Week Trend', p: ['Bar pour cost, food cost, and prime cost over the last eight weeks, with a marker on the weeks you logged a fix so you can see the metric bend after the work went in.'] },
       { h: 'This Week and Profit Audit', p: ['This Week shows the latest confirmed week\'s revenue and prime cost against target. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
       { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
@@ -48,10 +48,12 @@ S.Dashboard = {
   },
 
   // Heading-outside panel (Control-dashboard style): .sh title above a flex card.
+  // The heading is a fixed-height single-line row so titles line up across the
+  // row and the cards below start at the same Y; flex:1 + the row's align-items
+  // stretch then make both cards equal height.
   shPanel(title, bodyHtml, titleRight) {
-    const head = titleRight
-      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + titleRight + '</div>'
-      : '<div class="sh" style="margin:0 0 10px;">' + title + '</div>';
+    const sh = '<div class="sh" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>';
+    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:22px;margin:0 0 10px;">' + sh + (titleRight || '') + '</div>';
     return head + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
   },
 
@@ -155,53 +157,48 @@ S.Dashboard = {
       }));
   },
 
-  // Compact single-metric trend — prime cost % over the last 8 weeks with a
-  // target line. One metric reads cleanly at half-width (the old 3-line chart
-  // was unreadable that small). Neutral line + dots; the current value is
-  // colored by over/under target. Returns inner HTML (shPanel wraps the card).
+  // 8-week trend as SMALL MULTIPLES — one compact sparkline per metric (Bar Pour
+  // Cost, Food Cost, Prime Cost), each with its current value colored by over/
+  // under its own target. Three readable mini-charts beat one cramped 3-line
+  // chart at half-width, and keep all three metrics (matching Trend Insights).
+  // Returns inner HTML (shPanel wraps the card).
   buildChart(weeks, targets) {
-    const vals = weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null);
-    const present = vals.filter(v => v != null);
-    if (present.length < 2) return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Log at least 2 weeks to see the trend</div>';
+    const metrics = [
+      { label: 'Bar Pour Cost', vals: weeks.map(w => (w && w.bar)  ? (w.bar.cost_pct  != null ? w.bar.cost_pct  : null) : null), tgt: targets.bar_pour_cost_pct || 22 },
+      { label: 'Food Cost',     vals: weeks.map(w => (w && w.food) ? (w.food.cost_pct != null ? w.food.cost_pct : null) : null), tgt: targets.food_cost_pct || 32 },
+      { label: 'Prime Cost',    vals: weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null),                   tgt: targets.prime_cost_pct || 60 }
+    ];
+    if (!metrics.some(m => m.vals.filter(v => v != null).length >= 2)) {
+      return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Log at least 2 weeks to see the trend</div>';
+    }
 
-    const W=320, H=148, PAD={t:18,r:14,b:24,l:30};
-    const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
-    const tgt = targets.prime_cost_pct || 60;
-    const minY = Math.max(0, Math.floor(Math.min(Math.min(...present), tgt) - 3));
-    const maxY = Math.ceil(Math.max(Math.max(...present), tgt) + 3);
-    const xs = i => PAD.l + (weeks.length > 1 ? (i/(weeks.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
-    const smooth = pts => {
-      const valid = pts.map((v,i)=>v!=null?{x:xs(i),y:ys(v)}:null).filter(Boolean);
-      if (valid.length < 2) return '';
-      let d = 'M'+valid[0].x.toFixed(1)+','+valid[0].y.toFixed(1);
-      for (let i=1;i<valid.length;i++){ const cp=(valid[i].x-valid[i-1].x)*0.35;
-        d += ' C'+(valid[i-1].x+cp).toFixed(1)+','+valid[i-1].y.toFixed(1)+' '+(valid[i].x-cp).toFixed(1)+','+valid[i].y.toFixed(1)+' '+valid[i].x.toFixed(1)+','+valid[i].y.toFixed(1); }
-      return d;
+    const spark = (vals, dotCol) => {
+      const W = 96, H = 30, P = 3;
+      const present = vals.filter(v => v != null);
+      if (present.length < 2) return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '"></svg>';
+      const min = Math.min(...present), max = Math.max(...present), rng = (max - min) || 1;
+      const xs = i => P + (vals.length > 1 ? (i / (vals.length - 1)) * (W - P * 2) : (W - P * 2) / 2);
+      const ys = v => H - P - ((v - min) / rng) * (H - P * 2);
+      const pts = vals.map((v, i) => v != null ? xs(i).toFixed(1) + ',' + ys(v).toFixed(1) : null).filter(Boolean);
+      let li = vals.length - 1; while (li >= 0 && vals[li] == null) li--;
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" style="display:block;flex-shrink:0;">'
+        + '<polyline points="' + pts.join(' ') + '" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>'
+        + (li >= 0 ? '<circle cx="' + xs(li).toFixed(1) + '" cy="' + ys(vals[li]).toFixed(1) + '" r="2.6" fill="#0A1520" stroke="' + dotCol + '" stroke-width="1.6"/>' : '')
+        + '</svg>';
     };
-    let lastIdx = vals.length-1; while (lastIdx >= 0 && vals[lastIdx] == null) lastIdx--;
-    const lastV = vals[lastIdx];
-    const valCol = lastV > tgt ? 'var(--red)' : 'var(--green)';
-    const tPx = ys(tgt);
-    const xl = i => { const w = weeks[i]; return (w && w.period_end) ? w.period_end.slice(5).replace('-','/') : ''; };
-    const fixMarks = (window.Recovery) ? Recovery.chartMarkers(weeks, 'profit') : [];
-    const fixMarkers = (window.FixPanel && fixMarks.length) ? FixPanel.markerSvg(fixMarks, xs, PAD.t, PAD.t + ch) : '';
-    const dots = vals.map((v,i)=> v!=null ? '<circle cx="'+xs(i).toFixed(1)+'" cy="'+ys(v).toFixed(1)+'" r="3" fill="#0A1520" stroke="rgba(255,255,255,0.55)" stroke-width="1.6"/>' : '').join('');
 
-    return '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Prime Cost %</div>'
-      + '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
-      + '<line x1="'+PAD.l+'" y1="'+ys(minY).toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+ys(minY).toFixed(1)+'" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>'
-      + '<text x="'+(PAD.l-6)+'" y="'+(ys(minY)+3).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="9" font-weight="600">'+minY+'%</text>'
-      + '<text x="'+(PAD.l-6)+'" y="'+(ys(maxY)+3).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="9" font-weight="600">'+maxY+'%</text>'
-      + '<line x1="'+PAD.l+'" y1="'+tPx.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+tPx.toFixed(1)+'" stroke="rgba(255,255,255,0.28)" stroke-width="1" stroke-dasharray="4,4"/>'
-      + '<text x="'+(W-PAD.r)+'" y="'+(tPx-4).toFixed(1)+'" text-anchor="end" fill="rgba(255,255,255,0.4)" font-family="Barlow,sans-serif" font-size="8" font-weight="700">TARGET '+tgt+'%</text>'
-      + fixMarkers
-      + '<path d="'+smooth(vals)+'" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
-      + dots
-      + (lastV != null ? '<text x="'+xs(lastIdx).toFixed(1)+'" y="'+(ys(lastV)-9).toFixed(1)+'" text-anchor="middle" fill="'+valCol+'" font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="700">'+lastV.toFixed(1)+'%</text>' : '')
-      + '<text x="'+xs(0).toFixed(1)+'" y="'+(H-6)+'" text-anchor="start" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="8" font-weight="600">'+xl(0)+'</text>'
-      + '<text x="'+xs(weeks.length-1).toFixed(1)+'" y="'+(H-6)+'" text-anchor="end" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="8" font-weight="600">'+xl(weeks.length-1)+'</text>'
-      + '</svg>';
+    return metrics.map((m, i) => {
+      let li = m.vals.length - 1; while (li >= 0 && m.vals[li] == null) li--;
+      const lastV = li >= 0 ? m.vals[li] : null;
+      const col = (lastV != null && lastV > m.tgt) ? 'var(--red)' : (lastV != null ? 'var(--green)' : 'var(--t3)');
+      const last = i === metrics.length - 1;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;' + (last ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
+        + '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--t1);">' + m.label + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);">target ' + m.tgt + '%</div></div>'
+        + spark(m.vals, col)
+        + '<div style="width:56px;text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:' + col + ';">' + (lastV != null ? lastV.toFixed(1) + '%' : 'n/a') + '</div>'
+        + '</div>';
+    }).join('');
   },
 
   showInsights() {
