@@ -101,7 +101,10 @@ S.TheftRisk = {
       + '<td>' + w + '</td>'
       + '<td>' + (amt ? App.fmtCurrency(amt) : '-') + '</td>'
       + '</tr>';
-    const flagsTable = '<div class="sh" style="margin:0 0 10px;">What Flagged</div>'
+    const flagsTable = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 10px;">'
+      + '<div class="sh" style="margin:0;">What Flagged</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="tr-brief">Theft and Loss Brief</button>'
+      + '</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th></tr></thead><tbody>'
       + fRow('Voids/comps without manager auth', td.voids.count, wkd.voids.count, wkd.voids.amount)
@@ -111,10 +114,7 @@ S.TheftRisk = {
       + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
       + '</tbody></table></div></div>';
 
-    // Brief button (bottom-left). No score, so nothing to save here.
-    const btnRow = '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-ghost" id="tr-brief">Theft and Loss Brief</button></div>';
-
-    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable + btnRow
+    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable
       + this.investigationsSection() + '</div>';
 
     // Wiring
