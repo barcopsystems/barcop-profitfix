@@ -551,12 +551,12 @@ S.LaborLogHours = {
       return '<button type="button" class="lo-fill-week-chip btn btn-sm" data-ws="' + w + '" style="'
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekLabel(w)
+        + App.dateRangeLabel(w, App.periodEndFor(w))
         + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
         + '</button>';
     };
     let chips = '';
-    for (let i = -1; i <= 1; i++) chips += chip(step(ws, i));
+    for (let i = -1; i <= 0; i++) chips += chip(step(ws, i));
     return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + chips
