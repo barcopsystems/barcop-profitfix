@@ -195,7 +195,8 @@ S.ThisWeek = {
       { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
-      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Pull From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Load From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Operating Costs', p: ['Third-party platform fees, delivery commissions and the like, are an operating cost, not COGS or labor, so they sit in their own box and do not move the prime cost numbers above. Bar Cop captures the weekly figure here and Books reads it as an operating expense toward your true profit.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
@@ -229,7 +230,7 @@ S.ThisWeek = {
       + (sel !== now ? '<button class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>' : '')
       + '</div>'
       + '<div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Pull from Control</button>'
+      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Load from Control</button>'
       + '</div></div>';
   },
 
@@ -263,8 +264,8 @@ S.ThisWeek = {
       + (cateringOn ? this.lineRow('Catering', 'c', d.catering || { revenue: '', cogs: '', labor: '' }) : '')
       + '</tbody></table></div>'
       + '<div style="margin-bottom:14px;">' + footerLeft + '</div>'
-      + '<div class="f" style="margin:0;"><label>Notes (optional)</label>'
-      + '<textarea id="tw-notes" class="notes-ta" rows="2" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + '<div class="f" style="margin:0;"><label>Notes</label>'
+      + '<textarea id="tw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
   },
 
@@ -277,7 +278,6 @@ S.ThisWeek = {
       + '<div class="form-row" style="align-items:flex-end;gap:18px;">'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>3rd-Party Platform Fees</label>'
       + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '<div style="flex:1;min-width:220px;font-size:11px;color:var(--t3);line-height:1.5;align-self:center;">Flows to Books as an operating expense. It does not change the prime-cost numbers above.</div>'
       + '</div></div>';
   },
 
@@ -443,7 +443,7 @@ S.ThisWeek = {
     }
     const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
     if (conflicted) {
-      const ok = await App.confirm({ title: 'Overwrite your numbers?', message: 'Some cells you edited do not match what Control just computed. Pulling will replace them with the logged figures.', confirmText: 'Overwrite', cancelText: 'Keep Mine' });
+      const ok = await App.confirm({ title: 'Overwrite your numbers?', message: 'Some cells you edited do not match what Control just computed. Loading will replace them with the logged figures.', confirmText: 'Overwrite', cancelText: 'Keep Mine' });
       if (!ok) return;
     }
     Object.entries(incoming).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = (Number(val) || 0).toFixed(2); });
