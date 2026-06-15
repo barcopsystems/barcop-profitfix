@@ -1247,21 +1247,26 @@ S.Hub = {
       screen: 'vendor-watch', mod: 'profit'
     });
 
-    // 6. Theft flags — recent leak signals from Theft Risk (last 7 days). Severe
-    // (confirmed theft / over-threshold comp without auth) makes it critical.
+    // 6. Loss Prevention flags (last 7 days), in two honest tiers so red stays
+    // reserved for the real thing. Severe (confirmed theft / over-threshold comp
+    // without auth) is Critical and reads as theft to act on; softer signals
+    // (unauthorized voids, drawer shorts, flagged spot checks) are Watch, worded
+    // as items to review rather than theft.
     if (window.S && S.TheftRisk && S.TheftRisk.recentFlags) {
       const wk7 = new Date(); wk7.setDate(wk7.getDate() - 6);
       const flags = S.TheftRisk.recentFlags(iso(wk7));
-      if (flags.length) {
-        const severe = flags.filter(f => f.severe).length;
-        out.push({
-          sev: severe > 0 ? 'bad' : 'warn',
-          text: flags.length + ' theft flag' + (flags.length === 1 ? '' : 's') + ' in the last 7 days'
-            + (severe > 0 ? ', including ' + severe + ' to act on now' : '')
-            + '. Review and investigate anything that does not add up.',
-          screen: 'theft-risk', mod: 'profit'
-        });
-      }
+      const severe = flags.filter(f => f.severe).length;
+      const soft = flags.length - severe;
+      if (severe > 0) out.push({
+        sev: 'bad',
+        text: severe + ' theft flag' + (severe === 1 ? '' : 's') + ' in the last 7 days that need action now. Investigate them in Loss Prevention.',
+        screen: 'theft-risk', mod: 'profit'
+      });
+      if (soft > 0) out.push({
+        sev: 'warn',
+        text: soft + ' item' + (soft === 1 ? '' : 's') + ' flagged for review in Loss Prevention over the last 7 days. Check anything that does not add up.',
+        screen: 'theft-risk', mod: 'profit'
+      });
     }
 
     return out;
