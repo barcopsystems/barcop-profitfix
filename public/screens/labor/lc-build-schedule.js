@@ -108,12 +108,12 @@ S.LaborBuildSchedule = {
       return '<button type="button" class="bs-week-chip btn btn-sm" data-ws="' + ws + '" style="'
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekLabel(ws)
+        + App.dateRangeLabel(ws, App.periodEndFor(ws))
         + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
         + '</button>';
     };
     let chips = '';
-    for (let i = -1; i <= 1; i++) chips += chip(this.addWeeks(sel, i));
+    for (let i = -1; i <= 0; i++) chips += chip(this.addWeeks(sel, i));
     return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
       + chips
