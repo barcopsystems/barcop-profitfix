@@ -226,12 +226,16 @@ S.ProfitFix = {
     const focus = App._fixFocus || null;
     App._fixFocus = null;
     this._autoStart();
-    this.renderLanding();
-    if (focus && this.gap(focus)) App.pushView(() => this.enterWorkspace(focus));
+    const gaps = this.gaps();
+    if (focus && this.gap(focus)) this._workGap = focus;
+    else if (!this._workGap || !this.gap(this._workGap)) this._workGap = gaps.length ? gaps[0].id : null;
+    this.renderPage();
   },
 
-  // ── Landing: campaign header + system tiles ─────────────────────────────────
-  renderLanding() {
+  // ── One master-detail page: the campaign header full width, a left rail of
+  //    systems, and the selected system's fix detail on the right. Selecting a
+  //    system swaps the detail in place; the page is never left. ───────────────
+  renderPage() {
     const gaps = this.gaps();
     const total = gaps.length;
     const healths = gaps.map(g => this.health(g));
@@ -253,62 +257,47 @@ S.ProfitFix = {
       + '<span style="margin-left:auto;font-size:13px;color:var(--t2);">Recovered to date <span style="color:var(--gold);font-weight:700;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;">' + App.fmtCurrency(recovered, 0) + '</span></span>'
       + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div></div>';
 
-    const tiles = gaps.map((g, gi) => {
-      const h = healths[gi];
-      const logged = !!this.loggedDate(g.id);
-      const rec = logged ? this.recoveredFor(g.id) : 0;
-      const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
-        + (h.watched ? '<span style="color:var(--t3);"> &middot; ' + h.good + ' of ' + h.watched + ' on track</span>' : '')
-        + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
-      return '<div class="pf-tile' + (h.state === 'running' ? ' fixed' : '') + '" data-gap="' + esc(g.id) + '">'
-        + '<div style="display:flex;align-items:center;gap:14px;">'
-        + this.ring(h.good, h.watched, 48, h.state === 'running')
-        + '<div style="min-width:0;flex:1;">'
-        + '<div style="font-size:14px;font-weight:600;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
-        + '<div style="font-size:12px;margin-top:4px;line-height:1.4;">' + statusLine + '</div>'
-        + '</div></div></div>';
-    }).join('');
-
     const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">How recovery builds over time</button></div>';
-    this.container.innerHTML = '<div class="screen">' + header + timelineLink + '<div class="pf-grid">' + tiles + '</div></div>';
+
+    const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
+    const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
+
+    this.container.innerHTML = '<div class="screen">' + header + timelineLink
+      + '<div class="pf-2pane"><div class="pf-rail">' + rail + '</div>'
+      + '<div class="pf-detail">' + detail + '</div></div></div>';
+
     this.container.querySelectorAll('.pf-tile').forEach(t =>
-      t.addEventListener('click', () => App.pushView(() => this.enterWorkspace(t.dataset.gap))));
+      t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
     this.container.querySelector('.pf-timeline')?.addEventListener('click', () =>
       App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'profit'); }));
+    this.wireWorkspace();
   },
 
-  // ── Workspace ───────────────────────────────────────────────────────────────
-  enterWorkspace(gapId) {
-    const g = this.gap(gapId);
-    if (!g) { this.renderLanding(); return; }
-    this._workGap = gapId;
-    this.renderWorkspace();
+  // One system button in the left rail. The selected one is highlighted gold.
+  railTile(g, h) {
+    const logged = !!this.loggedDate(g.id);
+    const rec = logged ? this.recoveredFor(g.id) : 0;
+    const sel = g.id === this._workGap;
+    const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
+      + (h.watched ? '<span style="color:var(--t3);"> &middot; ' + h.good + ' of ' + h.watched + ' on track</span>' : '')
+      + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
+    return '<div class="pf-tile' + (sel ? ' sel' : (h.state === 'running' ? ' fixed' : '')) + '" data-gap="' + esc(g.id) + '">'
+      + '<div style="display:flex;align-items:center;gap:12px;">'
+      + this.ring(h.good, h.watched, 44, h.state === 'running')
+      + '<div style="min-width:0;flex:1;">'
+      + '<div style="font-size:14px;font-weight:600;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
+      + '<div style="font-size:12px;margin-top:4px;line-height:1.4;">' + statusLine + '</div>'
+      + '</div></div></div>';
   },
 
-  renderWorkspace() {
-    const g = this.gap(this._workGap);
-    if (!g) { this.renderLanding(); return; }
+  // ── Detail pane: the selected system's fix. The rail button carries the name,
+  //    ring, and health, so the detail leads with the mistakes to avoid, then the
+  //    watched system steps, the guidance steps, and the recovery readout. ──────
+  detailHtml(g) {
+    if (!g) return '';
     const steps = this.steps(g);
     const h = this.health(g);
     const logged = this.loggedDate(g.id);
-
-    // The headline issue: the worst watched step, named.
-    const watched = steps.map((s, i) => ({ s, i, st: this.stepStatus(g.id, i) })).filter(x => x.st.kind !== 'guide');
-    const rank = st => st.kind === 'recur' && st.state === 'behind' ? 0 : st.kind === 'recur' && st.never ? 1 : st.kind === 'setup' && !st.good ? 2 : st.kind === 'state' && !st.good ? 2.5 : st.kind === 'recur' && st.state === 'slipping' ? 3 : 9;
-    const worst = watched.slice().sort((a, b) => rank(a.st) - rank(b.st))[0];
-    const issue = (h.state === 'running')
-      ? 'Every watched step is on track. Keep it running.'
-      : worst ? esc(worst.s.title) + ': ' + worst.st.label.toLowerCase() + (worst.st.sub ? ' (' + esc(worst.st.sub) + ')' : '') + '.' : '';
-
-    const hero = '<div class="card form-card" style="margin-bottom:14px;border-left:3px solid ' + this.healthColor(h.state) + ';">'
-      + '<div style="display:flex;align-items:center;gap:18px;">'
-      + this.ring(h.good, h.watched, 72, h.state === 'running')
-      + '<div style="min-width:0;flex:1;">'
-      + '<div style="font-size:17px;font-weight:700;color:var(--t1);">' + esc(g.name) + '</div>'
-      + '<div style="font-size:13px;margin:4px 0 6px;"><span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
-      + (h.watched ? '<span style="color:var(--t3);"> &middot; ' + h.good + ' of ' + h.watched + ' watched steps on track</span>' : '') + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.55;">' + issue + '</div>'
-      + '</div></div></div>';
 
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
@@ -325,8 +314,7 @@ S.ProfitFix = {
     const body = (watchedHtml ? '<div class="sh" style="margin:4px 0 12px;">The System</div>' + watchedHtml : '')
       + (guideHtml ? '<div class="sh" style="margin:18px 0 12px;">Guidance</div>' + guideHtml : '');
 
-    this.container.innerHTML = '<div class="screen">' + hero + watchOut + body + this.measureCard(g, h, logged) + '</div>';
-    this.wireWorkspace();
+    return watchOut + body + this.measureCard(g, h, logged);
   },
 
   stepRow(g, s, i) {
@@ -401,7 +389,7 @@ S.ProfitFix = {
   showHowTo() {
     App.showHelpModal('How the Profit Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you put in place and then keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is actually happening.'] },
-      { h: 'Your Profit Systems', p: ['Each tile is one leak with its own system. The ring and the status read off live data: how many of the watched steps are on track. A system reads Running only while the work keeps flowing, and drops back to Slipping or At risk on its own the moment it lapses.'] },
+      { h: 'Your Profit Systems', p: ['Each system in the left list is one leak. The ring and status read off live data: how many of the watched steps are on track. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads Running only while the work keeps flowing, and drops back to Slipping or At risk on its own the moment it lapses.'] },
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp. Even the weekly reviews count, because opening the screen leaves a record, and steps like repricing read your live numbers (any menu item still over target) or open vendor claims still owed. This is the honest answer to whether the system is being worked, not just claimed.'] },
       { h: 'Guidance Steps', p: ['The handful of things Bar Cop genuinely cannot see, a signed paper policy, the jigger pour-test on the floor, are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
       { h: 'Watch Out For', p: ['Each leak lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
