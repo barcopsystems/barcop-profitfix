@@ -42,11 +42,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Estimating partial bottles by eye instead of measuring them. A back bar with 40 open bottles builds a real error into every calculation.',
-      'Letting the count slip when a manager is out. The system dies from a missed cycle, not a bad number. Write the process down so it lives in paper, not people.',
-      'Starting a variance investigation with a conversation instead of the data. Verify the count first. Many spikes turn out to be a counting error, not a person.',
-      'Counting purchases as invoices paid rather than product physically received in the period. One delivery on the wrong side of a count date throws the number off by a full case.',
-      'Ignoring draft yield. The Profit Audit compares units sold against what your kegs should have poured. Losing more than 12 to 15 percent to foam and over-pour means the lines, the temperature, the pressure, or the pour are off. A keg that should pour 124 pints and only rings up 100 is a quarter of every keg gone.'
+      'A product set up wrong in Inventory. If a bottle\'s size, pour, or cost is off, every pour cost built on it is off while the count itself looks fine.',
+      'Counts that drift to a different day or time each week, so what you begin and end with never line up against a clean seven days.',
+      'A delivery logged on the invoice date instead of the day it landed. One delivery on the wrong side of a count moves the number by a full case.',
+      'Reading a variance spike as theft before re-checking the count. As often as not it is a missed back-bar bottle, not a person.'
     ]
   },
 
@@ -86,13 +85,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Waiting until you are certain before documenting. By the time you are certain, the paper trail that makes action possible is gone.',
-      'Acting on a single incident with no documentation. It creates legal exposure and rarely survives a dispute with an employee who denies it.',
-      'Skipping the delivery inspection when the truck arrives mid-service. That is exactly when short counts happen and are hardest to dispute later.',
-      'Having no written comp authorization policy. A comp that needs no manager sign-off is an unauthorized expense you approved by silence.',
-      'Treating all comps the same. A manager comp for service recovery and a bartender comp for a regular are different things and must be tracked separately.',
-      'Ignoring discounts and no-sale opens. The Profit Audit reads both off your POS exception report. Discounts running above 2 percent of sales, or a stack of no-sale drawer opens, are theft vectors that never show as voids or comps. Require manager authorization on discounts and a logged reason for every no-sale.',
-      'Using behavioral indicators to accuse someone. They direct attention. They are not evidence.'
+      'Comps logged under the wrong reason. Staff Meal and Shift Drink are policy expense, everything else is loss, and the wrong pick skews what Loss Prevention shows you.',
+      'Voids and comps rung without naming the employee, so the same server\'s pattern never collects in one place.',
+      'Overriding the comp threshold and then never opening the flag it raised. The override lands in Loss Prevention whether or not anyone reads it.',
+      'Watching only for drawer shorts. A drawer that comes up consistently over is as much a signal as one that comes up short.'
     ]
   },
 
@@ -135,12 +131,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Treating portion audit findings as a disciplinary issue. Over-portioning is almost always a standards gap, not a character gap.',
-      'Logging waste without reason codes. A count of what was thrown away tells you nothing about why it happened or what to change.',
-      'Raising prices across the board when food cost spikes. A surgical increase on the specific items above target is less visible and more effective.',
-      'Building recipe cards once and never updating them. A card built at January prices is wrong by March, and the gap widens with every price move since.',
-      'Having no written portion standards posted at stations. A verbal instruction given on day one is a memory that fades and drifts.',
-      'Costing proteins at purchase price without a yield adjustment. Every protein on the menu is understated until you cost on true cost per usable pound.'
+      'Waste logged with no reason code. Bar Cop subtracts logged waste from variance, but a number with no reason behind it tells you nothing to change.',
+      'Product costs left stale in Inventory. Recipe cost reads off current product prices, so a cost you never updated quietly understates every plate that uses it.',
+      'Raising prices across the board when only a few items are over. Recipe Summary sorts the over-target items first so you can lift just those.',
+      'A menu item with no recipe attached. With nothing to cost against, it carries no food cost into the number and your cost reads better than it is.'
     ]
   },
 
@@ -180,12 +174,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Paying invoices without comparing them to the order line by line. Every invoice you sign unchecked is a price you accepted by default.',
-      'Accepting a substitution without adjusting the invoice price. A lower-tier product at the premium price is an overcharge for the difference.',
-      'Assuming distributor prices are fixed and never shopping them. Most categories have negotiable elements and respond to documented competition.',
-      'Signing the delivery receipt before counting the cases. A short count not caught at the door is a loss you already accepted.',
-      'Running vendor relationships on verbal terms with nothing in writing. When a dispute happens, a phone conversation is not documentation.',
-      'Treating overcharge recovery as a one-time audit rather than an ongoing job at every delivery.'
+      'Signing for a delivery before counting it against the order. A short count you sign for is a loss you already accepted, even if Bar Cop can flag it.',
+      'Not flagging a short or a wrong price at the dock. The flag is what files the claim and ties it to that delivery, and chasing it later is harder.',
+      'Filing a discrepancy and never working it. Vendor Tracker totals what is still owed you, but the credit only comes back if you Request Credit and stay on the rep.',
+      'A substitution waved through at the premium price. A lower-tier product billed at the higher price is an overcharge, not a swap.'
     ]
   },
 
@@ -222,10 +214,10 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Reading prime cost monthly instead of weekly. A 30-day lag means 30 days of loss before you see it, and 30 more before you know the fix worked.',
-      'Treating prime cost as a finance metric. It belongs in the weekly management meeting, not the monthly P&L review.',
-      'Acting on a single week\'s spike before checking the data. A miscoded payroll run or a one-time bulk purchase produces a false spike.',
-      'Excluding payroll taxes and benefits from labor. Real labor cost runs 10 to 15% above wages alone, and a wages-only number understates the problem every week.'
+      'Reading a week you never confirmed. Prime cost is only as honest as the sales, labor, and COGS behind it, so confirm the week in This Week first.',
+      'Judging a week that is only half logged. Until the shifts and counts are in, a full period of COGS against partial sales reads high on its own.',
+      'Taking one week\'s spike as a trend. A bulk buy or a payroll correction throws a single week, and This Week shows whether it is holding or drifting.',
+      'Waiting for month-end to look. A 30-day lag is 30 days of loss before you see it, and 30 more before you know a fix worked.'
     ]
   }
 
