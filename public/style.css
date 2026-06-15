@@ -485,7 +485,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* ── Profit Fix (campaign tiles + guided step flow) ────────────────────────── */
 .pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px;}
 .pf-tile{background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s,background .15s,transform .08s;}
-.pf-tile:hover{border-color:var(--gold-tint-bord);background:#0D181E;}
 .pf-tile:active{transform:scale(0.99);}
 .pf-tile.fixed{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
 .pf-tile.sel{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
