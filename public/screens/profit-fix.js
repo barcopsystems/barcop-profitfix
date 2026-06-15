@@ -360,17 +360,32 @@ S.ProfitFix = {
   measureCard(g, h, logged) {
     if (logged) {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
-      let line = '', good = false;
-      if (r.status === 'ok') {
-        const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
-        if (r.dollars != null && r.dollars > 0) { good = true; line = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '. ' + r.label + ' ' + move + '.' + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.'); }
-        else line = r.label + ' has held steady since you started, ' + move + '.';
-      } else if (r.status === 'pending') line = 'Measuring what this system wins back. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since you started.';
-      else if (r.status === 'no-baseline') line = 'Measuring from here. There are no weeks logged before you started to compare against, so there is nothing to call recovered yet.';
-      else line = 'Bar Cop tracks this system from the day you started it.';
+      let line = '', tone = 'var(--t2)';
+      if (r.status === 'building') {
+        const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
+        line = 'Building your baseline. ' + wk + ' of about ' + need + ' weeks of operating logged. Your recovery number turns on once Bar Cop has a few weeks to measure against, around your first month, then it firms up from there.';
+        tone = 'var(--t3)';
+      } else if (r.status === 'untracked') {
+        line = 'This system does not turn into a clean dollar figure on its own, so there is no recovery number to show. It is still tracked and running, and the win shows up in your other numbers.';
+        tone = 'var(--t3)';
+      } else if (r.status === 'ok') {
+        const move = r.label + ' ' + r.fmt(r.before) + ' to ' + r.fmt(r.after);
+        const prelim = r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' in.';
+        if (r.dollars != null && r.dollars > 0) {
+          tone = 'var(--gold)';
+          line = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '. ' + move + '.' + prelim;
+        } else if (r.dollars != null && r.dollars < 0) {
+          tone = 'var(--red)';
+          line = 'Slipping. You are about ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below where you started. ' + move + '. Get the watched steps back on track.' + prelim;
+        } else {
+          line = 'Holding steady at your starting level. ' + move + '.' + prelim;
+        }
+      } else {
+        line = 'Bar Cop tracks this system from the day you started it.';
+      }
       return '<div class="card form-card" style="margin-top:6px;border-color:var(--gold-tint-bord);background:var(--gold-tint);">'
         + '<div class="card-title" style="color:var(--gold);">Running Since ' + esc(logged.date) + '</div>'
-        + '<div style="font-size:12px;color:' + (good ? 'var(--gold)' : 'var(--t2)') + ';line-height:1.6;">' + esc(line) + '</div></div>';
+        + '<div style="font-size:12px;color:' + tone + ';line-height:1.6;">' + esc(line) + '</div></div>';
     }
     return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Not Started Yet</div>'
       + '<div style="font-size:12px;color:var(--t3);line-height:1.55;">Do the first step above and Bar Cop starts this system on its own, from the day you do it. Nothing to set, no date to pick.</div></div>';
