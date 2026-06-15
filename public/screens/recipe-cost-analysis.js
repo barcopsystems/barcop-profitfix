@@ -74,7 +74,7 @@ S.RecipeCostAnalysis = {
     // ── Day-one / prerequisite empty state ──────────────────────────────
     if (!items.length) {
       App.setupCard(this.container, {
-        title: 'Recipe Cost Analysis',
+        title: 'Recipe Summary',
         lead: 'This page ranks every plate and drink by recipe cost percentage and flags what is running over target. Set up your menu first, then come back.',
         steps: [
           { title: 'Add your menu items', desc: 'Build your cocktails and food with prices and recipes, and link your beer, wine, and NA pours so cost flows in automatically.', btn: 'Go to Menu Items', screen: 'r-menu-items', done: false }
@@ -149,7 +149,7 @@ S.RecipeCostAnalysis = {
 
     // Export the whole analysis (DOM-walk; no-print chrome excluded).
     document.getElementById('rca-export')?.addEventListener('click',
-      () => App.exportPDF({ title: 'Recipe Cost Analysis', root: this.container }));
+      () => App.exportPDF({ title: 'Recipe Summary', root: this.container }));
 
     // Edit opens the canonical Menu Items editor as a modal IN PLACE, then
     // re-renders this page on close — no cross-section jump ([[two-doors-same-data]]).
