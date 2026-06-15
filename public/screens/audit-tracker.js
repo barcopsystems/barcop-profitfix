@@ -845,7 +845,7 @@ S.AuditTracker = {
       const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 2px;border-bottom:1px solid var(--row-div);">'
         + '<span style="font-size:13px;color:var(--t1);">' + esc(label) + '</span>'
-        + '<select id="at-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);font-size:12px;padding:7px 10px;min-width:175px;flex-shrink:0;outline:none;">' + opts + '</select>'
+        + '<select class="at-qsel" id="at-q-' + id + '" style="min-width:175px;flex-shrink:0;">' + opts + '</select>'
         + '</div>';
     };
     const questionsCard = '<div class="card form-card" style="margin-bottom:16px;">'
