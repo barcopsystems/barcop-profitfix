@@ -78,74 +78,97 @@ S.RecoveryTimeline = {
       + '<div class="card-title" style="color:var(--gold);">You Are Here</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + here + '</div></div>';
 
-    // ── Cost-trend chart ──
-    const chart = this.chartCard(weeks, start, B);
+    // ── Recovery-number journey chart ──
+    const chart = this.chartCard(start, moduleKey);
 
     container.innerHTML = '<div class="screen">'
       + strip + hereCard + chart + '</div>';
   },
 
-  chartCard(weeks, start, B) {
-    // Zoom to the recovery window: from the day the system started through now.
-    // That is the stretch the recovery number actually measures, so showing only
-    // it keeps the story readable (where you started, where you are) instead of
-    // cramming a year of pre-start history into a sliver on the right.
-    let data, baseN, titleText;
-    if (start) {
-      const win = weeks.filter(w => w.period_end >= start);
-      data = win.map(w => ({ d: w.period_end, v: w.prime_cost_pct }));
-      baseN = Math.min(B, data.length);
-      titleText = 'Prime Cost Since You Started';
-    } else {
-      data = weeks.slice(-12).map(w => ({ d: w.period_end, v: w.prime_cost_pct }));
-      baseN = 0;
-      titleText = 'Prime Cost, Recent Weeks';
-    }
-    const title = '<div class="sh" style="margin:6px 0 10px;">' + titleText + '</div>';
-    if (data.length < 2) {
-      return title + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Your trend fills in here as you confirm weeks in This Week. Once you have a couple of weeks, you will see where you started and where you are now against your target.</div></div>';
-    }
+  // The cumulative recovery number, week by week, for a module: each measured
+  // week's gap-vs-baseline dollars, summed across the module's dollarizing cost
+  // gaps and accumulated. Empty until a gap clears its baseline (about the first
+  // month) which is the whole point: no number during setup, then it builds.
+  recoverySeries(moduleKey) {
+    if (!window.Recovery) return { points: [], firstMeasure: null };
+    const R = window.Recovery;
+    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    const mine = log.filter(e => e.module === moduleKey && e.date
+      && R.COMPOSITE_GAPS.indexOf(e.gap_id) === -1 && R.METRICS[e.gap_id]);
+    const byWeek = {};
+    const B = R.BASELINE_WEEKS;
+    mine.forEach(e => {
+      const m = R.METRICS[e.gap_id];
+      const op = R._series(m.series)
+        .filter(w => w.period_end && w.period_end >= e.date && m.value(w) != null)
+        .slice().sort((a, b) => a.period_end.localeCompare(b.period_end));
+      if (op.length <= B) return;                       // this gap still building
+      const bAvg = R._avg(op.slice(0, B).map(m.value));
+      if (bAvg == null) return;
+      op.slice(B).forEach(w => {
+        const v = m.value(w), base = m.base(w);
+        if (v == null || base == null) return;
+        const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
+        const d = (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
+        byWeek[w.period_end] = (byWeek[w.period_end] || 0) + d;
+      });
+    });
+    const dates = Object.keys(byWeek).sort();
+    let cum = 0;
+    const points = dates.map(d => { cum += byWeek[d]; return { d: d, v: cum }; });
+    return { points: points, firstMeasure: dates[0] || null };
+  },
 
-    const target = (App.data.settings && App.data.settings.targets && App.data.settings.targets.prime_cost_pct) ?? 60;
-    const vals = data.map(p => p.v).concat([target]);
-    const ymin = Math.floor(Math.min.apply(null, vals) - 2);
-    const ymax = Math.ceil(Math.max.apply(null, vals) + 2);
-    const W = 680, H = 230, padL = 40, padR = 16, padT = 24, padB = 26;
+  chartCard(start, moduleKey) {
+    const title = '<div class="sh" style="margin:6px 0 10px;">Your Recovery Number Over Time</div>';
+    const series = this.recoverySeries(moduleKey);
+    if (!series.points.length) {
+      return title + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No recovery number yet. You are building your baseline. Around day 30, once you have a few solid weeks of real data, your first number lands here, up or down, and it builds from there on your actual numbers.</div></div>';
+    }
+    // $0 through setup and the baseline; the number turns on at the first measured
+    // week. Anchor at the start so the climb reads from zero.
+    const firstMeasure = series.firstMeasure;
+    const pts = [{ d: start || firstMeasure, v: 0 }].concat(series.points);
+    const now = pts[pts.length - 1];
+
+    const dvals = pts.map(p => p.v).concat([0]);
+    let lo = Math.min.apply(null, dvals), hi = Math.max.apply(null, dvals);
+    const padv = Math.max((hi - lo) * 0.18, 50);
+    lo -= padv; hi += padv;
+
+    const W = 680, H = 230, padL = 56, padR = 16, padT = 22, padB = 26;
     const plotW = W - padL - padR, plotH = H - padT - padB;
-    const n = data.length;
-    const x = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-    const y = v => padT + (1 - (v - ymin) / (ymax - ymin || 1)) * plotH;
+    const t0 = new Date(pts[0].d + 'T00:00:00').getTime();
+    const span = Math.max(new Date(now.d + 'T00:00:00').getTime() - t0, 1);
+    const x = d => padL + ((new Date(d + 'T00:00:00').getTime() - t0) / span) * plotW;
+    const y = v => padT + (1 - (v - lo) / ((hi - lo) || 1)) * plotH;
 
-    // Baseline band — your own first weeks, the starting point recovery measures
-    // against. One label, far left, so nothing overlaps.
-    let baseBand = '';
-    if (baseN >= 1) {
-      const x0 = x(0), x1 = x(Math.min(baseN, n) - 1), bw = Math.max(x1 - x0, 3);
-      baseBand = '<rect x="' + x0.toFixed(1) + '" y="' + padT + '" width="' + bw.toFixed(1) + '" height="' + plotH + '" fill="rgba(73,100,119,0.16)"/>'
-        + '<text x="' + (x0 + bw / 2).toFixed(1) + '" y="' + (padT - 8).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" letter-spacing="0.5" fill="' + RT_STEEL + '">BASELINE</text>';
-    }
-    // Target line
-    const tY = y(target).toFixed(1);
-    const targetLine = '<line x1="' + padL + '" y1="' + tY + '" x2="' + (W - padR) + '" y2="' + tY + '" stroke="' + RT_STEEL + '" stroke-width="1" stroke-dasharray="4,4"/>'
-      + '<text x="' + (W - padR) + '" y="' + (parseFloat(tY) - 4).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">target ' + target + '%</text>';
-    // The line itself — clean, no per-week dots.
-    const path = data.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
-    const line = '<path d="' + path + '" fill="none" stroke="' + RT_GOLD + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
-    // Only two dots: where you started, and where you are now (with the value).
-    const sx = x(0), sy = y(data[0].v), nx = x(n - 1), ny = y(data[n - 1].v);
-    const startDot = '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="3" fill="' + RT_GOLD + '"/>';
-    const nowDot = '<circle cx="' + nx.toFixed(1) + '" cy="' + ny.toFixed(1) + '" r="4" fill="' + RT_GOLD + '"/>'
-      + '<text x="' + (nx - 6).toFixed(1) + '" y="' + (ny - 9).toFixed(1) + '" text-anchor="end" font-size="11" font-weight="700" fill="' + RT_GOLD + '">' + data[n - 1].v.toFixed(1) + '%</text>';
-    // X labels: start date on the left, "Now" on the right.
+    // Building zone — setup plus the baseline weeks, before any number.
+    const bx0 = x(pts[0].d), bx1 = x(firstMeasure);
+    const buildZone = (bx1 - bx0 > 3)
+      ? '<rect x="' + bx0.toFixed(1) + '" y="' + padT + '" width="' + (bx1 - bx0).toFixed(1) + '" height="' + plotH + '" fill="rgba(73,100,119,0.14)"/>'
+        + '<text x="' + ((bx0 + bx1) / 2).toFixed(1) + '" y="' + (padT - 8).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" letter-spacing="0.5" fill="' + RT_STEEL + '">BUILDING</text>'
+      : '';
+    // Zero baseline line.
+    const zY = y(0).toFixed(1);
+    const zeroLine = '<line x1="' + padL + '" y1="' + zY + '" x2="' + (W - padR) + '" y2="' + zY + '" stroke="' + RT_GRID + '" stroke-width="1"/>'
+      + '<text x="' + (padL - 6) + '" y="' + (parseFloat(zY) + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">$0</text>';
+    // Recovery line — gold when ending positive, red when net below the start.
+    const col = now.v >= 0 ? RT_GOLD : RT_RED;
+    const path = pts.map((p, i) => (i ? 'L' : 'M') + x(p.d).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+    const line = '<path d="' + path + '" fill="none" stroke="' + col + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    // Now point + value.
+    const nx = x(now.d), ny = y(now.v);
+    const nowFmt = (now.v < 0 ? '-$' : '$') + Math.abs(Math.round(now.v)).toLocaleString();
+    const nowDot = '<circle cx="' + nx.toFixed(1) + '" cy="' + ny.toFixed(1) + '" r="4" fill="' + col + '"/>'
+      + '<text x="' + (nx - 6).toFixed(1) + '" y="' + (ny - 9).toFixed(1) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + col + '">' + nowFmt + '</text>';
+    // X labels — start date left, Now right.
     const fmtD = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-    const xLabels = '<text x="' + sx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="start" font-size="9" fill="' + RT_DIM + '">' + fmtD(data[0].d) + '</text>'
+    const xLabels = '<text x="' + bx0.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="start" font-size="9" fill="' + RT_DIM + '">' + fmtD(pts[0].d) + '</text>'
       + '<text x="' + nx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">Now</text>';
-    // Y labels
-    const yLabels = '<text x="' + (padL - 6) + '" y="' + (y(ymax) + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">' + ymax + '%</text>'
-      + '<text x="' + (padL - 6) + '" y="' + (y(ymin) + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">' + ymin + '%</text>';
 
     const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;">'
-      + baseBand + targetLine + line + startDot + nowDot + xLabels + yLabels + '</svg>';
+      + buildZone + zeroLine + line + nowDot + xLabels + '</svg>';
     return title + '<div class="card" style="padding:16px;">' + svg + '</div>';
   }
 };
