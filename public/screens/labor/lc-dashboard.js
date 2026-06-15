@@ -112,20 +112,21 @@ S.LaborDashboard = {
     const totalStaff = this.staff().length;
     const activeStaff = this.staff().filter(s => s.status !== 'Inactive').length;
     const hasStaff = totalStaff > 0;
+    const hasSchedule = this.schedules().length > 0;
 
-    const step = (done, label, screen, current) =>
-      '<div class="ld-act" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:170px;padding:10px 12px;border:1px solid ' + (current ? 'var(--gold)' : 'var(--b2)') + ';border-radius:6px;background:var(--input);">'
-      + '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
-      + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : '') + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:' + (current ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</span></div>';
+    const step = (done, num, label, screen) =>
+      '<div class="ld-act" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
+      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
 
     const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps and this dashboard fills in with your labor cost, overtime risk, and coverage alerts.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this dashboard fills in with your labor cost, overtime risk, and coverage alerts.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasPos, '1. Add positions', 'lc-positions', !hasPos)
-      + step(hasStaff, '2. Add your staff', 'lc-staff-roster', hasPos && !hasStaff)
-      + step(false, '3. Log hours', 'lc-log-hours', hasPos && hasStaff)
+      + step(hasPos,      1, 'Add positions',      'lc-positions')
+      + step(hasStaff,    2, 'Add your staff',     'lc-staff-roster')
+      + step(hasSchedule, 3, 'Build the schedule', 'lc-build-schedule')
+      + step(false,       4, 'Log hours',          'lc-log-hours')
       + '</div></div>';
 
     const cards =
