@@ -19,6 +19,7 @@
 
 const PF_GOLD  = '#DBAB46';
 const PF_GREEN = '#518A79';   // matches --green / the "Running" status text
+const PF_GREY  = '#6E7C86';   // neutral progress-ring arc (de-emphasized)
 const PF_TRACK = '#0D181E';
 const PF_DIM   = '#1B2630';
 const PF_TXT   = '#C9D3DA';
@@ -206,10 +207,9 @@ S.ProfitFix = {
     const circ = 2 * Math.PI * r;
     const pct = total > 0 ? Math.min(1, done / total) : 0;
     const off = circ * (1 - pct);
-    const accent = full ? PF_GREEN : PF_GOLD;   // a completed (running) ring + check is green, like the status text
-    const prog = pct > 0 ? accent : PF_DIM;
+    const prog = pct > 0 ? PF_GREY : PF_DIM;   // progress arc and the full ring are neutral grey; only the check is green
     const center = full
-      ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + accent + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
+      ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + PF_GREEN + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<text x="' + cx + '" y="' + (cy + size * 0.135) + '" text-anchor="middle" font-size="' + (size * 0.30) + '" font-weight="700" fill="' + PF_TXT + '" font-family="\'Barlow Condensed\',sans-serif">' + done + '/' + total + '</text>';
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="flex-shrink:0;">'
       + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + PF_TRACK + '" stroke-width="' + sw + '"/>'
