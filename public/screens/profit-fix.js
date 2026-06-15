@@ -29,11 +29,11 @@ S.ProfitFix = {
   // listed are guidance (no status, not counted). maxDays = the window a watched
   // step stays On track; up to 2x is Slipping; beyond is Behind.
   TRACK: {
-    'pour-cost':      { 0: { kind: 'setup', key: 'yields' },          1: { kind: 'recur', signal: 'count', maxDays: 9,  every: 'every week' } },
-    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 4, every: 'every shift' }, 2: { kind: 'setup', key: 'comp_threshold' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 3, every: 'every shift' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' } },
-    'food-cost':      { 0: { kind: 'setup', key: 'recipes' },         1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'waste', maxDays: 4, every: 'every shift' } },
-    'vendor-control': { 1: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' } },
-    'prime-cost':     { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } }
+    'pour-cost':      { 0: { kind: 'setup', key: 'yields' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'variancereport', maxDays: 12, every: 'every week' }, 5: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
+    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 4, every: 'every shift' }, 2: { kind: 'setup', key: 'comp_threshold' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 3, every: 'every shift' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' }, 6: { kind: 'recur', signal: 'view:theft-risk', maxDays: 9, every: 'every week' } },
+    'food-cost':      { 0: { kind: 'setup', key: 'recipes' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'waste', maxDays: 4, every: 'every shift' }, 7: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 8: { kind: 'state', key: 'reprice' } },
+    'vendor-control': { 0: { kind: 'recur', signal: 'order', maxDays: 14, every: 'every order you place' }, 1: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 4: { kind: 'state', key: 'chase' }, 5: { kind: 'recur', signal: 'view:vendor-tracker', maxDays: 35, every: 'once a month' }, 6: { kind: 'recur', signal: 'view:vendor-tracker', maxDays: 95, every: 'once a quarter' } },
+    'prime-cost':     { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 1: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' } }
   },
 
   gaps() { return (window.FIX && Array.isArray(FIX.profit)) ? FIX.profit : []; },
@@ -50,14 +50,20 @@ S.ProfitFix = {
     drawer:    () => (App.shiftData     && App.shiftData.sc_variances)        || [],
     delivery:  () => (App.inventoryData && App.inventoryData.ic_deliveries)   || [],
     spotcheck: () => (App.inventoryData && App.inventoryData.ic_spot_checks)  || [],
+    variancereport: () => (App.inventoryData && App.inventoryData.ic_variance_runs) || [],
+    order:     () => (App.inventoryData && App.inventoryData.ic_orders)       || [],
     waste:     () => (App.shiftData     && App.shiftData.sc_waste)            || [],
     week:      () => (App.data          && App.data.weeks)                    || []
   },
   lastActivity(signal) {
+    if (signal && signal.indexOf('view:') === 0) {
+      const v = (App.data && App.data.fix_views) || {};
+      return v[signal.slice(5)] || null;
+    }
     const arr = (this.SIGNALS[signal] || (() => []))();
     let latest = null;
     arr.forEach(r => {
-      const d = r.period_end || r.date || (r.created_at ? String(r.created_at).slice(0, 10) : '');
+      const d = r.period_end || r.date || (r.run_at ? String(r.run_at).slice(0, 10) : '') || (r.created_at ? String(r.created_at).slice(0, 10) : '');
       if (d && (!latest || d > latest)) latest = String(d).slice(0, 10);
     });
     return latest;
@@ -82,6 +88,24 @@ S.ProfitFix = {
     return false;
   },
 
+  // State checks: "good" means no outstanding work right now.
+  repriceOver() {
+    const items = (App.data && App.data.menu_items) || [];
+    let over = 0;
+    items.forEach(i => {
+      const hasRecipe = i.recipe && Array.isArray(i.recipe.ingredients) && i.recipe.ingredients.length > 0;
+      if (!hasRecipe || !(i.price > 0)) return;
+      const cost = (App.menuItemCost ? App.menuItemCost(i) : 0) || 0;
+      const tgt = i.target_cost_pct || (App.MENU_TARGET_COST_PCT ? (i.recipe.mode === 'food' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail) : 0) || 0;
+      if (tgt > 0 && (cost / i.price * 100) > tgt) over++;
+    });
+    return over;
+  },
+  chaseOpen() {
+    const d = (App.data && App.data.vendor_discrepancies) || [];
+    return d.filter(x => x && x.status !== 'Resolved').length;
+  },
+
   // Status for one step → {kind, good, label, color, sub} or {kind:'guide'}.
   stepStatus(gapId, idx) {
     const t = (this.TRACK[gapId] || {})[idx];
@@ -89,6 +113,14 @@ S.ProfitFix = {
     if (t.kind === 'setup') {
       const ok = this.setupState(t.key);
       return { kind: 'setup', good: ok, label: ok ? 'In place' : 'Set this up', color: ok ? 'var(--green)' : 'var(--amber)' };
+    }
+    if (t.kind === 'state') {
+      const n = t.key === 'reprice' ? this.repriceOver() : t.key === 'chase' ? this.chaseOpen() : 0;
+      const good = n === 0;
+      let label, sub;
+      if (t.key === 'reprice') { label = good ? 'All at target' : n + (n === 1 ? ' item over target' : ' items over target'); sub = good ? '' : 'Reprice or re-cost them'; }
+      else { label = good ? 'No open claims' : n + (n === 1 ? ' open claim' : ' open claims'); sub = good ? '' : 'Chase the credit'; }
+      return { kind: 'state', good, state: good ? 'clear' : 'open', label, color: good ? 'var(--green)' : 'var(--amber)', sub };
     }
     const last = this.lastActivity(t.signal);
     const ds = this.daysSince(last);
@@ -105,9 +137,10 @@ S.ProfitFix = {
     const watched = this.steps(g).map((s, i) => this.stepStatus(g.id, i)).filter(st => st.kind !== 'guide');
     if (!watched.length) return { state: 'guide', label: 'Guidance', good: 0, watched: 0 };
     const good = watched.filter(st => st.good).length;
-    const untouched = watched.every(st => (st.kind === 'recur' ? st.never : !st.good));
+    const rs = watched.filter(st => st.kind === 'recur' || st.kind === 'setup');
+    const untouched = rs.length > 0 && rs.every(st => (st.kind === 'recur' ? st.never : !st.good));
     const anyBad = watched.some(st => (st.kind === 'recur' && (st.state === 'behind' || st.never)) || (st.kind === 'setup' && !st.good));
-    const anySlip = watched.some(st => st.kind === 'recur' && st.state === 'slipping');
+    const anySlip = watched.some(st => (st.kind === 'recur' && st.state === 'slipping') || (st.kind === 'state' && !st.good));
     let state, label;
     if (untouched)      { state = 'new';     label = 'Not started'; }
     else if (anyBad)    { state = 'atrisk';  label = 'At risk'; }
@@ -220,7 +253,7 @@ S.ProfitFix = {
 
     // The headline issue: the worst watched step, named.
     const watched = steps.map((s, i) => ({ s, i, st: this.stepStatus(g.id, i) })).filter(x => x.st.kind !== 'guide');
-    const rank = st => st.kind === 'recur' && st.state === 'behind' ? 0 : st.kind === 'recur' && st.never ? 1 : st.kind === 'setup' && !st.good ? 2 : st.kind === 'recur' && st.state === 'slipping' ? 3 : 9;
+    const rank = st => st.kind === 'recur' && st.state === 'behind' ? 0 : st.kind === 'recur' && st.never ? 1 : st.kind === 'setup' && !st.good ? 2 : st.kind === 'state' && !st.good ? 2.5 : st.kind === 'recur' && st.state === 'slipping' ? 3 : 9;
     const worst = watched.slice().sort((a, b) => rank(a.st) - rank(b.st))[0];
     const issue = (h.state === 'running')
       ? 'Every watched step is on track. Keep it running.'
@@ -245,11 +278,13 @@ S.ProfitFix = {
         + '</div>'
       : '';
 
-    const stepsHtml = steps.map((s, i) => this.stepRow(g, s, i)).join('');
+    const rows = steps.map((s, i) => ({ s, i, guide: this.stepStatus(g.id, i).kind === 'guide' }));
+    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+    const body = (watchedHtml ? '<div class="sh" style="margin:4px 0 12px;">The System</div>' + watchedHtml : '')
+      + (guideHtml ? '<div class="sh" style="margin:18px 0 12px;">Guidance</div>' + guideHtml : '');
 
-    this.container.innerHTML = '<div class="screen">' + hero + watchOut
-      + '<div class="sh" style="margin:4px 0 12px;">The System</div>' + stepsHtml
-      + this.measureCard(g, h, logged) + '</div>';
+    this.container.innerHTML = '<div class="screen">' + hero + watchOut + body + this.measureCard(g, h, logged) + '</div>';
     this.wireWorkspace();
   },
 
@@ -331,8 +366,8 @@ S.ProfitFix = {
     App.showHelpModal('How the Profit Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you put in place and then keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is actually happening.'] },
       { h: 'Your Profit Systems', p: ['Each tile is one leak with its own system. The ring and the status read off live data: how many of the watched steps are on track. A system reads Running only while the work keeps flowing, and drops back to Slipping or At risk on its own the moment it lapses.'] },
-      { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status. On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp, so this is the honest answer to whether the system is being worked, not just claimed.'] },
-      { h: 'Guidance Steps', p: ['Policies, coaching, and reviews Bar Cop genuinely cannot see are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
+      { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp. Even the weekly reviews count, because opening the screen leaves a record, and steps like repricing read your live numbers (any menu item still over target) or open vendor claims still owed. This is the honest answer to whether the system is being worked, not just claimed.'] },
+      { h: 'Guidance Steps', p: ['The handful of things Bar Cop genuinely cannot see, a signed paper policy, the jigger pour-test on the floor, are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
       { h: 'Watch Out For', p: ['Each leak lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
       { h: 'Lock In the Start Date', p: ['Once a system is running, lock in the date you put it in place. Bar Cop averages the eight weeks before against the eight weeks after to measure what it actually recovered, and tracks it on your dashboard. A figure shows once two weeks of after-data land.'] }
     ]);
