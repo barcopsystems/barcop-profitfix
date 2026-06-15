@@ -316,7 +316,7 @@ S.ProfitFix = {
     const body = (watchedHtml ? '<div class="sh" style="margin:4px 0 12px;">The System</div>' + watchedHtml : '')
       + (guideHtml ? '<div class="sh" style="margin:18px 0 12px;">Guidance</div>' + guideHtml : '');
 
-    return watchOut + body + this.measureCard(g, h, logged);
+    return body + this.measureCard(g, h, logged) + watchOut;
   },
 
   stepRow(g, s, i) {
