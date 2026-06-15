@@ -18,6 +18,7 @@
    Verification map lives here; the fix content stays in fix-profit.js. */
 
 const PF_GOLD  = '#DBAB46';
+const PF_GREEN = '#518A79';   // matches --green / the "Running" status text
 const PF_TRACK = '#0D181E';
 const PF_DIM   = '#1B2630';
 const PF_TXT   = '#C9D3DA';
@@ -202,9 +203,10 @@ S.ProfitFix = {
     const circ = 2 * Math.PI * r;
     const pct = total > 0 ? Math.min(1, done / total) : 0;
     const off = circ * (1 - pct);
-    const prog = pct > 0 ? PF_GOLD : PF_DIM;
+    const accent = full ? PF_GREEN : PF_GOLD;   // a completed (running) ring + check is green, like the status text
+    const prog = pct > 0 ? accent : PF_DIM;
     const center = full
-      ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + PF_GOLD + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
+      ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + accent + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<text x="' + cx + '" y="' + (cy + size * 0.135) + '" text-anchor="middle" font-size="' + (size * 0.30) + '" font-weight="700" fill="' + PF_TXT + '" font-family="\'Barlow Condensed\',sans-serif">' + done + '/' + total + '</text>';
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="flex-shrink:0;">'
       + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + PF_TRACK + '" stroke-width="' + sw + '"/>'
@@ -281,7 +283,7 @@ S.ProfitFix = {
     const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
       + (h.watched ? '<span style="color:var(--t3);"> &middot; ' + h.good + ' of ' + h.watched + ' on track</span>' : '')
       + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
-    return '<div class="pf-tile' + (sel ? ' sel' : (h.state === 'running' ? ' fixed' : '')) + '" data-gap="' + esc(g.id) + '">'
+    return '<div class="pf-tile' + (sel ? ' sel' : '') + '" data-gap="' + esc(g.id) + '">'
       + '<div style="display:flex;align-items:center;gap:12px;">'
       + this.ring(h.good, h.watched, 44, h.state === 'running')
       + '<div style="min-width:0;flex:1;">'
