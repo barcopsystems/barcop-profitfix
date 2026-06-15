@@ -1396,6 +1396,18 @@ const App = {
   _afterNavigate(id) {
     const title = document.getElementById('topbar-title')?.textContent || id;
     this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
+    const v = this._VIEW_STAMP[id]; if (v) this.stampFixView(v);
+  },
+
+  // Profit Fix view-tracking: stamp the day a "review/read this screen" target
+  // was opened, so the Fix steps that are reviews (not records) can verify
+  // against it. Keyed to the screen the operator actually lands on.
+  _VIEW_STAMP: { 'dashboard': 'dashboard', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker' },
+  stampFixView(key) {
+    if (!this.data) return;
+    this.data.fix_views = this.data.fix_views || {};
+    const t = this.todayLocal();
+    if (this.data.fix_views[key] !== t) { this.data.fix_views[key] = t; this.saveKey('fix_views'); }
   },
 
   showAuth() {
