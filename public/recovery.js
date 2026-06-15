@@ -171,34 +171,44 @@ window.Recovery = {
       return { status: 'building', weeksIn: operating.length, baselineWeeks: B };
     }
 
-    const baselineW = operating.slice(0, B);
-    const measureW  = operating.slice(B).slice(-this.WINDOW);   // recent measurement weeks
+    const baselineW    = operating.slice(0, B);
+    const allMeasure   = operating.slice(B);                 // every week since the baseline
+    const recentMeasure = allMeasure.slice(-this.WINDOW);    // recent weeks, for the current rate
 
     const bAvg = this._avg(baselineW.map(m.value));
-    const cAvg = this._avg(measureW.map(m.value));
-    const mN   = measureW.length;
+    const cAvg = this._avg(recentMeasure.map(m.value));      // current sustained performance
+    const mN   = allMeasure.length;
     if (bAvg == null || cAvg == null || mN < this.MIN_MEASURE) {
       return { status: 'building', weeksIn: operating.length, baselineWeeks: B };
     }
 
-    // Positive = better than your starting weeks; negative = slipping below them.
+    // REALIZED-to-date = the sum of each measurement week's actual gap vs the
+    // baseline, times that week's revenue base. Honest and cumulative: early
+    // weeks still loose credit little, later tightened weeks credit more, a bad
+    // week subtracts, and it grows the longer you hold the gain. Can be negative
+    // (net slipping below your starting point).
+    let dollars = 0, counted = 0;
+    allMeasure.forEach(w => {
+      const v = m.value(w), base = m.base(w);
+      if (v == null || base == null) return;
+      const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
+      dollars += (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
+      counted++;
+    });
+    if (!counted) dollars = null;
+
+    // Forward run-rate from the CURRENT sustained rate, a labeled "on pace for".
     const improvement = m.lowerBetter ? (bAvg - cAvg) : (cAvg - bAvg);
-    const baseAvg = this._avg(measureW.map(m.base));
-    // `dollars` is REALIZED-to-date vs your starting point (weekly improvement
-    // times measurement weeks); can be negative. `dollarsAnnual` is the forward
-    // run-rate (x52), a clearly-labeled "on pace for" figure only.
-    let dollars = null, dollarsAnnual = null;
-    if (baseAvg != null) {
-      const perWeek = (m.baseKind === 'pts') ? (improvement / 100) * baseAvg : improvement * baseAvg;
-      dollars = perWeek * mN;
-      dollarsAnnual = perWeek * 52;
-    }
+    const recentBase = this._avg(recentMeasure.map(m.base));
+    const perWeek = (recentBase != null) ? ((m.baseKind === 'pts') ? (improvement / 100) * recentBase : improvement * recentBase) : null;
+    const dollarsAnnual = (perWeek != null) ? perWeek * 52 : null;
+
     return {
       status: 'ok',
       label: m.label,
       before: bAvg, after: cAvg, improvement,
       fmt: m.fmt,
-      dollars,            // realized to date vs baseline
+      dollars,            // realized to date vs baseline, cumulative
       dollarsAnnual,      // forward run-rate, labeled as such
       weeksAfter: mN,
       mature: mN >= this.MATURE_MEASURE
