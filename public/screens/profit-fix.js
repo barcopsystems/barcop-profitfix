@@ -257,7 +257,8 @@ S.ProfitFix = {
       + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--t1);">' + running + '<span style="color:var(--t3);font-size:20px;"> / ' + total + '</span></span>'
       + '<span style="font-size:13px;color:var(--t2);">systems running' + subLine + '</span>'
       + '<span style="margin-left:auto;font-size:13px;color:var(--t2);">Recovered to date <span style="color:var(--gold);font-weight:700;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;">' + App.fmtCurrency(recovered, 0) + '</span></span>'
-      + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div></div>';
+      + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div>'
+      + this.measureLine(this.gap(this._workGap)) + '</div>';
 
     const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">How recovery builds over time</button></div>';
 
@@ -298,25 +299,29 @@ S.ProfitFix = {
   detailHtml(g) {
     if (!g) return '';
     const steps = this.steps(g);
-    const h = this.health(g);
-    const logged = this.loggedDate(g.id);
+    const rows = steps.map((s, i) => ({ s, i, guide: this.stepStatus(g.id, i).kind === 'guide' }));
+    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+
+    // Each section is ONE card of rows (divider-separated), not a card per step.
+    const systemCard = watchedHtml
+      ? '<div class="sh" style="margin:4px 0 12px;">The System</div>'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + watchedHtml + '</div>'
+      : '';
+    const guideCard = guideHtml
+      ? '<div class="sh" style="margin:0 0 12px;">Guidance</div>'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + guideHtml + '</div>'
+      : '';
 
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
-      ? '<div class="card" style="margin-bottom:14px;border-left:3px solid var(--red);">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--red);margin-bottom:9px;">Watch Out For</div>'
-        + mistakes.map(t => '<div style="display:flex;gap:10px;padding:4px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
+      ? '<div class="sh" style="margin:0 0 12px;">Watch Out For</div><div class="card">'
+        + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
             + '<span style="flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
         + '</div>'
       : '';
 
-    const rows = steps.map((s, i) => ({ s, i, guide: this.stepStatus(g.id, i).kind === 'guide' }));
-    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
-    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
-    const body = (watchedHtml ? '<div class="sh" style="margin:4px 0 12px;">The System</div>' + watchedHtml : '')
-      + (guideHtml ? '<div class="sh" style="margin:18px 0 12px;">Guidance</div>' + guideHtml : '');
-
-    return body + this.measureCard(g, h, logged) + watchOut;
+    return systemCard + guideCard + watchOut;
   },
 
   stepRow(g, s, i) {
@@ -331,57 +336,49 @@ S.ProfitFix = {
       action = '<button class="btn btn-ghost btn-sm pf-go" data-target="' + esc(s.target) + '" style="display:inline-flex;align-items:center;gap:6px;">' + this.stepIcon(kind) + verb + (label ? ': ' + label : '') + '</button>';
     }
 
-    let statusHtml, border;
-    if (st.kind === 'guide') {
-      border = 'var(--b-edge)';
-      statusHtml = '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);">Guidance</span>';
-    } else {
-      border = st.color;
-      statusHtml = '<span style="font-size:12px;font-weight:700;color:' + st.color + ';">' + st.label + '</span>'
-        + (st.sub ? '<span style="font-size:11px;color:var(--t3);"> &middot; ' + esc(st.sub) + '</span>' : '');
-    }
+    // Guidance rows sit in their own card, so no per-row label; watched rows lead
+    // with their live status as colored text (no badge, no colored border).
+    const statusHtml = (st.kind === 'guide') ? ''
+      : '<div style="margin-bottom:5px;font-size:12px;font-weight:700;color:' + st.color + ';">' + st.label
+        + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
 
-    return '<div class="pf-step" style="border-left:3px solid ' + border + ';"><div style="padding:14px 16px;">'
-      + '<div style="margin-bottom:5px;">' + statusHtml + '</div>'
+    return '<div class="pf-line">'
+      + statusHtml
       + '<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--t3);">' + this.stepIcon(kind) + '</span>'
       + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span></div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:6px 0 0;">' + esc(s.detail || '') + '</div>'
       + (action ? '<div style="margin-top:11px;">' + action + '</div>' : '')
-      + '</div></div>';
+      + '</div>';
   },
 
-  measureCard(g, h, logged) {
-    if (logged) {
+  // The selected system's recovery readout, shown as one line under the campaign
+  // progress bar (not as a card in the detail pane).
+  measureLine(g) {
+    if (!g) return '';
+    const logged = this.loggedDate(g.id);
+    const nm = '<span style="color:var(--t1);font-weight:600;">' + esc(g.name) + '</span>';
+    let body, tone = 'var(--t3)';
+    if (!logged) {
+      body = ' is not started yet. Do its first step and Bar Cop starts measuring from that day.';
+    } else {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
-      let line = '', tone = 'var(--t2)';
+      const since = ' running since ' + esc(logged.date) + '. ';
       if (r.status === 'building') {
         const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
-        line = 'Building your baseline. ' + wk + ' of about ' + need + ' weeks of operating logged. Your recovery number turns on once Bar Cop has a few weeks to measure against, around your first month, then it firms up from there.';
-        tone = 'var(--t3)';
-      } else if (r.status === 'untracked') {
-        line = 'This system does not turn into a clean dollar figure on its own, so there is no recovery number to show. It is still tracked and running, and the win shows up in your other numbers.';
-        tone = 'var(--t3)';
+        body = since + 'Building your baseline, ' + wk + ' of about ' + need + ' weeks logged. The recovery number turns on around your first month.';
+      } else if (r.status === 'ok' && r.dollars != null && r.dollars > 0) {
+        tone = 'var(--gold)';
+        body = since + 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '.';
+      } else if (r.status === 'ok' && r.dollars != null && r.dollars < 0) {
+        tone = 'var(--red)';
+        body = since + 'Slipping, about ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below where you started. Get the watched steps back on track.';
       } else if (r.status === 'ok') {
-        const move = r.label + ' ' + r.fmt(r.before) + ' to ' + r.fmt(r.after);
-        const prelim = r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' in.';
-        if (r.dollars != null && r.dollars > 0) {
-          tone = 'var(--gold)';
-          line = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '') + '. ' + move + '.' + prelim;
-        } else if (r.dollars != null && r.dollars < 0) {
-          tone = 'var(--red)';
-          line = 'Slipping. You are about ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below where you started. ' + move + '. Get the watched steps back on track.' + prelim;
-        } else {
-          line = 'Holding steady at your starting level. ' + move + '.' + prelim;
-        }
+        body = since + 'Holding steady at your starting level.';
       } else {
-        line = 'Bar Cop tracks this system from the day you started it.';
+        body = since + 'Tracked and running. The win shows up in your other numbers.';
       }
-      return '<div class="card form-card" style="margin-top:6px;border-color:var(--gold-tint-bord);background:var(--gold-tint);">'
-        + '<div class="card-title" style="color:var(--gold);">Running Since ' + esc(logged.date) + '</div>'
-        + '<div style="font-size:12px;color:' + tone + ';line-height:1.6;">' + esc(line) + '</div></div>';
     }
-    return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Not Started Yet</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.55;">Do the first step above and Bar Cop starts this system on its own, from the day you do it. Nothing to set, no date to pick.</div></div>';
+    return '<div style="margin-top:11px;padding-top:11px;border-top:1px solid var(--b2);font-size:12px;line-height:1.55;color:' + tone + ';">' + nm + body + '</div>';
   },
 
   wireWorkspace() {
@@ -394,8 +391,8 @@ S.ProfitFix = {
       { h: 'Your Profit Systems', p: ['Each system in the left list is one leak. The ring and status read off live data: how many of the watched steps are on track. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads Running only while the work keeps flowing, and drops back to Slipping or At risk on its own the moment it lapses.'] },
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp. Even the weekly reviews count, because opening the screen leaves a record, and steps like repricing read your live numbers (any menu item still over target) or open vendor claims still owed. This is the honest answer to whether the system is being worked, not just claimed.'] },
       { h: 'Guidance Steps', p: ['The handful of things Bar Cop genuinely cannot see, a signed paper policy, the jigger pour-test on the floor, are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
-      { h: 'Watch Out For', p: ['Each leak lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
-      { h: 'It Starts On Its Own', p: ['There is no start button. The moment you do the first tracked step, Bar Cop logs that day and starts measuring from there. If you have already been doing the work in Control, the system is running the first time you open it. From the start day it averages the eight weeks before against the eight weeks after to measure what it wins back. If there is no history before you started, there is nothing to call recovered yet, and that is the honest answer.'] }
+      { h: 'Watch Out For', p: ['At the bottom of each system are the mistakes that quietly break its numbers, the things Bar Cop itself cannot catch for you. Worth a read before you chase a number that looks off.'] },
+      { h: 'It Starts On Its Own', p: ['There is no start button. The moment you do the first tracked step, Bar Cop logs that day and measures from there. If you have already been doing the work in Control, the system is running the first time you open it. It takes your own first few weeks as the baseline and compares the weeks since against it, so the recovery number reads against where you started, not a guess. Early on there is not enough logged to call anything recovered, and Bar Cop says so plainly instead of inventing a figure.'] }
     ]);
   }
 };
