@@ -392,11 +392,11 @@ S.HubSettings = {
     // Recipes are built further down, once ic_products exists — see
     // "── Recipes" after the Inventory Control block.
 
-    // ── 12 Weeks of Data — derived from the locked Anchor profile ──
+    // ── 52 Weeks of Data — derived from the locked Anchor profile ──
     // Every figure traces to window.ANCHOR so Profit, Revenue and the Control
-    // modules all describe one operation. Week 1 is oldest, week 12 most recent.
+    // modules all describe one operation. Week 1 is oldest, week 52 most recent.
     const weeks = window.ANCHOR.weeks.map(a => {
-      const endDate = dateStr((12 - a.wk) * 7);
+      const endDate = dateStr(window.ANCHOR.endAgo(a));
       const bar_count = bp.map(p => {
         const used = +(Math.random()*3+0.5).toFixed(2);
         return { product_id:p.id, beg_inv:+(Math.random()*2+0.5).toFixed(1), purchases:+(Math.random()*4+1).toFixed(0), end_inv:+(Math.random()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
@@ -770,7 +770,7 @@ S.HubSettings = {
 
     // ════════════════════════════════════════════════════════════════════
     //  REVENUE RECOVERY — the Anchor's revenue side, all traced to
-    //  window.ANCHOR: twelve weekly records, the menu, server checks,
+    //  window.ANCHOR: fifty-two weekly records, the menu, server checks,
     //  events, dog tests and the price-change log.
     // ════════════════════════════════════════════════════════════════════
     App.data.revenue_settings = App.data.revenue_settings || {};
@@ -786,7 +786,7 @@ S.HubSettings = {
       const dep   = window.ANCHOR.laborDepts(a);
       const hours = a.bar_labor/16 + dep.kitchen/15 + dep.floor/14;
       return {
-        id:uid(), week_num:a.wk, period_end:dateStr((12 - a.wk) * 7),
+        id:uid(), week_num:a.wk, period_end:dateStr(window.ANCHOR.endAgo(a)),
         bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
         total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
         labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
@@ -1045,8 +1045,13 @@ S.HubSettings = {
       email_open_rate:      [18,19,20,21,22,24,25,26,27,27,28,28],
       loyalty_members:      [0,0,0,0,0,0,60,140,220,300,370,420],
     };
-    App.data.traffic_weeks = window.ANCHOR.weeks.map((a, i) => ({
-      id: Date.now() + i, week_num: a.wk, period_end: dateStr((12 - a.wk) * 7),
+    // The traffic metrics above are a 12-week hand-authored series (separate from
+    // the 52-week P&L arc). Map them onto the most recent 12 weeks so recent
+    // traffic reads full and older weeks stay realistically empty until the
+    // Traffic sweep extends the series to a full year.
+    const twN = tw.google_rating.length;
+    App.data.traffic_weeks = window.ANCHOR.weeks.slice(-twN).map((a, i) => ({
+      id: Date.now() + i, week_num: a.wk, period_end: dateStr(window.ANCHOR.endAgo(a)),
       saved_at: new Date().toISOString(),
       google_rating: tw.google_rating[i], google_total: tw.google_total[i],
       new_reviews: tw.new_reviews[i], response_rate: tw.response_rate[i],
@@ -2099,7 +2104,7 @@ S.HubSettings = {
     const scShifts = [];
     const scDays   = [];   // one entry per operating day, drives the checklists
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
+      const baseAgo = ANCHS.endAgo(a);
       let barLeft = a.bar_rev, foodLeft = a.food_rev, covLeft = a.covers;
       dayW.forEach((w, di) => {
         const last     = di === dayW.length - 1;
@@ -2109,7 +2114,7 @@ S.HubSettings = {
         barLeft -= dayBar; foodLeft -= dayFloor; covLeft -= dayCov;
         const date    = dateStr(baseAgo + 6 - di);
         const weekend = di >= 5;
-        const isLastWeek = a.wk === 12;
+        const isLastWeek = a.wk === ANCHS.weeks.length;
         // daypart: [type, revenue share, staff on floor]. Dinner is the anchor.
         const parts = weekend
           ? [['Brunch', 0.35, 7], ['Dinner', 0.45, 9], ['Late Night', 0.20, 5]]
@@ -2125,7 +2130,7 @@ S.HubSettings = {
           // low-revenue Friday during a thunderstorm reads as bad luck, not bad
           // ops. Salted onto the Dinner service of a couple of days.
           const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'live music' : '';
-          const weatherTag = (a.wk === 10 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
+          const weatherTag = (a.wk === ANCHS.weeks.length - 3 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
           const sIdx = scShifts.length;
           const cashRecon = seedCashRecon(p[0], bar + floor, sIdx);
           scShifts.push({
@@ -2178,8 +2183,8 @@ S.HubSettings = {
     // Drawer reconciliations — variance tightens after the fix week.
     const scVariances = [];
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
+      const baseAgo = ANCHS.endAgo(a);
+      const improving = !a.loose;
       [1, 4].forEach((dayOff, vi) => {
         const exp = 600 + Math.round(Math.random() * 350);
         const variance = improving
@@ -2245,8 +2250,8 @@ S.HubSettings = {
     const scVoidComps = [];
     let vcVi = 0, vcCi = 0;
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
+      const baseAgo = ANCHS.endAgo(a);
+      const improving = !a.loose;
       const voidN = improving ? 1 : 3;
       const compN = improving ? 1 : 2;
       let vcDay = 1;
@@ -2289,7 +2294,7 @@ S.HubSettings = {
     const scCashDrops = [];
     const scSafeLog = [];
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
+      const baseAgo = ANCHS.endAgo(a);
       const dropId = uid();
       const safeId = uid();
       const dropDate = dateStr(baseAgo + 1);
@@ -2652,8 +2657,8 @@ S.HubSettings = {
     const wtReasons = ['Walked', 'Mis-bill', 'Lost Check', 'Refused to Pay', 'Other'];
     const scWalkedTabs = [];
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
-      const improving = a.wk >= ANCHS.fix_week;
+      const baseAgo = ANCHS.endAgo(a);
+      const improving = !a.loose;
       const n = improving ? 1 : 2;   // walked tabs taper after the fix lands
       for (let k = 0; k < n; k++) {
         const server = wtServers[(a.wk + k) % wtServers.length];
@@ -2705,7 +2710,7 @@ S.HubSettings = {
     const scWaste = [];
     let wsI = 0;
     ANCHS.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
+      const baseAgo = ANCHS.endAgo(a);
       const count = (a.wk % 2 === 0) ? 2 : 3;
       for (let j = 0; j < count; j++) {
         const s = WASTE_SC[wsI % WASTE_SC.length]; wsI++;
@@ -2766,7 +2771,7 @@ S.HubSettings = {
       });
     };
     ANCHL.weeks.forEach(a => {
-      const baseAgo = (12 - a.wk) * 7;
+      const baseAgo = ANCHS.endAgo(a);
       lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
       lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
