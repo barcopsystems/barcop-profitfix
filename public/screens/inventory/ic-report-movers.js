@@ -160,7 +160,7 @@ S.InventoryMoversReport = {
   // the Build Schedule week selector / Usage Report so a long count history
   // stays compact instead of becoming a wall of chips.
   periodStepper(cur) {
-    const periods = this.pairs().map(p => ({ endId: p.endC.id, label: this.fmtDate(p.startC.date) + ' → ' + this.fmtDate(p.endC.date) }));
+    const periods = this.pairs().map(p => ({ endId: p.endC.id, label: this.fmtDate(p.startC.date) + ' - ' +this.fmtDate(p.endC.date) }));
     const len = periods.length;
     let selIdx = periods.findIndex(p => p.endId === cur.endC.id);
     if (selIdx < 0) selIdx = len - 1;
