@@ -812,14 +812,14 @@ S.AuditTracker = {
       + esc(c.label) + '</span>';
 
     // Card 1 — annual sales (the dollar baseline) + what Bar Cop already covers.
-    const salesField = (id, label, ph, val) => '<div class="f" style="flex:1;min-width:200px;"><label>' + label + '</label>'
+    const salesField = (id, label, ph, val) => '<div class="f" style="width:220px;"><label>' + label + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '"/></div></div>';
     const salesCard = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Annual Sales</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
       + '<div class="form-row" style="gap:16px;">'
       + salesField('at-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
-      + salesField('at-iz-food-rev', 'Annual Food Sales (leave blank if none)', '372000', d.foodRev)
+      + salesField('at-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
       + '</div>'
       + '<div class="sh" style="margin:18px 0 8px;">What Bar Cop Already Has</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Highlighted sections pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.</div>'
