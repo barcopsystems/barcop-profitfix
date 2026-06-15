@@ -526,6 +526,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .il-copysel{appearance:none;-webkit-appearance:none;background-color:transparent;border:1px solid var(--b1);border-radius:var(--r);color:var(--t2);font-family:'Barlow',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:5px 26px 5px 12px;line-height:1;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23889aa6' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;}
 .il-copysel:focus{outline:none;border-color:var(--focus);}
 .il-copysel option{font-weight:400;letter-spacing:0;text-transform:none;color:var(--t1);background:var(--surface);}
+/* Recessed select with the soft-grey chevron (matches .f select), for selects outside a .f field. */
+.at-qsel{appearance:none;-webkit-appearance:none;color-scheme:dark;cursor:pointer;background-color:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);font-family:'Barlow',sans-serif;font-size:12px;padding:7px 26px 7px 10px;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+.at-qsel:focus{border-color:var(--focus);}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
    Scoped to .page so the rest of the app (.screen) is byte-for-byte unchanged.
