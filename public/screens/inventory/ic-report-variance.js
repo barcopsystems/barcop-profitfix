@@ -612,7 +612,7 @@ S.InventoryVarianceReport = {
 
   periodStepper() {
     const asc = this.countsAsc();
-    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' → ' + this.fmtDate(c.date) }));
+    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' - ' +this.fmtDate(c.date) }));
     const len = periods.length;
     const cur = this.currentPeriod();
     let selIdx = periods.findIndex(p => p.endId === (cur ? cur.endC.id : null));
@@ -782,7 +782,7 @@ S.InventoryVarianceReport = {
   // ── REPORT (read-only results) ──────────────────────────────────────────────
   renderReport() {
     const run = this.runs().find(r => r.id === this._viewRunId);
-    const periodLabel = run ? (this.fmtDate(run.start_date) + ' → ' + this.fmtDate(run.end_date)) : '';
+    const periodLabel = run ? (this.fmtDate(run.start_date) + ' - ' +this.fmtDate(run.end_date)) : '';
 
     // Stats headline (current run, current standards).
     const unmatched = this.unmatchedPos().length;
@@ -844,7 +844,7 @@ S.InventoryVarianceReport = {
       return '<button type="button" class="vr-run-chip btn btn-sm" data-v="' + esc(r.id) + '" style="'
         + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.fmtDate(r.start_date) + ' → ' + this.fmtDate(r.end_date)
+        + this.fmtDate(r.start_date) + ' - ' +this.fmtDate(r.end_date)
         + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
         + '</button>';
     };
@@ -884,7 +884,7 @@ S.InventoryVarianceReport = {
       const sv = r.total_sales_variance;
       const cls = sv > 0 ? 'neg' : (sv < 0 ? 'pos' : '');
       return '<tr class="vr-hist-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
-        + '<td><div class="val">' + this.fmtDate(r.start_date) + ' &rarr; ' + this.fmtDate(r.end_date) + '</div></td>'
+        + '<td><div class="val">' + this.fmtDate(r.start_date) + ' - ' +this.fmtDate(r.end_date) + '</div></td>'
         + '<td>' + (r.item_count != null ? r.item_count : '-') + '</td>'
         + '<td class="' + cls + '">' + (sv != null ? App.fmtCurrency(sv) : '-') + '</td>'
         + '<td style="color:var(--t3);font-size:11px;">' + this.fmtDate((r.run_at || '').slice(0, 10)) + '</td>'
