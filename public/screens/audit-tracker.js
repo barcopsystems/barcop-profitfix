@@ -10,274 +10,24 @@ S.AuditTracker = {
 
   renderMain() {
     this.actions.innerHTML = '';
-    const audits       = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    const latest       = audits[0] || null;
-    // 30-day rolling: next audit is available 30 days after the last one
-    // ran, independent of the calendar month. First audit is always available.
-    const daysSince    = latest && latest.date
-      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000)
-      : Infinity;
-    const canRunAudit  = daysSince >= 30;
-    const daysLeft     = canRunAudit ? 0 : 30 - daysSince;
-
-    const requestCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Profit Audit</div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-      + '<div style="font-size:12px;color:var(--t3);max-width:520px;line-height:1.6;">One audit every 30 days. It scores from your Control data plus anything you upload, and the result shows on screen in a minute or two.</div>'
-      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'
-      + '<button class="btn btn-primary" id="at-new-btn">' + (canRunAudit ? (latest ? 'Generate New Audit' : 'Generate First Audit') : 'Review / Update Inputs') + '</button>'
-      + (canRunAudit ? '' : '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>')
-      + '</div></div></div>';
-
-    let latestCard = '';
-    if (latest) {
-      const prev       = audits[1] || null;
-      const scoreColor = App.scoreColor(latest.overall_score);
-      const scoreLabel = App.scoreLabel(latest.overall_score);
-      let vsLine = '';
-      if (prev) {
-        const diff = (latest.overall_score||0) - (prev.overall_score||0);
-        vsLine = '<div style="font-size:12px;margin-top:8px;"><span style="color:' + (diff>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + (diff>=0?'+':'') + diff + ' pts</span><span style="color:var(--t3);"> vs last audit (' + prev.overall_score + ' to ' + latest.overall_score + ')</span></div>';
-      }
-
-      const sections = latest.sections || {};
-      const secNames = App.AUDIT_PROFIT_SECTION_NAMES || Object.keys(sections);
-      // Section breakdown, folded into the latest-audit card as a compact row
-      // list: the bar sits right beside the score, and each section reads as one
-      // row on mobile (not the generic per-cell table-stacking).
-      const secRows = secNames.map((name, i) => {
-        const bb = i === secNames.length - 1 ? '' : 'border-bottom:1px solid var(--row-div);';
-        const score = sections[name];
-        if (score == null) {
-          return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
-            + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
-            + '<div style="width:80px;flex-shrink:0;"></div>'
-            + '<div style="width:42px;text-align:right;flex-shrink:0;color:var(--t3);font-weight:700;">N/A</div>'
-            + '<div style="width:48px;flex-shrink:0;"></div>'
-            + '</div>';
-        }
-        const ps   = prev?.sections?.[name];
-        const diff = ps != null ? score - ps : null;
-        const bar  = Math.min(100, Math.max(0, score));
-        const col  = App.scoreColor(score);
-        return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
-          + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
-          + '<div style="width:80px;flex-shrink:0;background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>'
-          + '<div style="width:42px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + score + '</div>'
-          + '<div style="width:48px;text-align:right;flex-shrink:0;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</div>'
-          + '</div>';
-      }).join('');
-      const secHeader = '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;border-top:1px solid var(--b2);border-bottom:1px solid var(--row-div);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">'
-        + '<div style="flex:1;min-width:0;">Section</div>'
-        + '<div style="width:80px;flex-shrink:0;"></div>'
-        + '<div style="width:42px;text-align:right;flex-shrink:0;">Score</div>'
-        + '<div style="width:48px;text-align:right;flex-shrink:0;">Change</div>'
-        + '</div>';
-
-      latestCard = '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm at-view-btn" data-idx="0">View Full Audit</button></div>'
-        + '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
-        + vsLine + '</div>'
-        + '<div style="text-align:right;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
-        + '</div></div>'
-        + '<div style="margin:16px -20px -20px;">' + secHeader + secRows + '</div>'
-        + '</div>';
-    }
-
-    let historyCard = '';
-    if (audits.length > 1) {
-      const tierChip = (tier) => {
-        if (!tier) return '';
-        const full = tier.includes('3') || tier.toLowerCase().includes('full');
-        return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:20px;'
-          + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
-                  : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(tier) + '</span>';
-      };
-      const rows = audits.slice(0, App.listLimit('core', 'audit')).map((a,i) => {
-        const p    = audits[i+1];
-        const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
-        return '<tr><td><div class="val">' + (a.date||'').slice(0,10) + '</div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
-          + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff+' pts':'') + '</td>'
-          + '<td>' + tierChip(a.grade) + '</td>'
-          + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm at-view-btn" data-idx="' + i + '">View</button></td></tr>';
-      }).join('');
-      historyCard = '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-        + App.showOlderBar('core', 'audit', audits, false);
-    }
-
-    const emptyState = !latest
-      ? '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px;">No audits yet</div>'
-        + '<div style="font-size:12px;color:var(--t3);">Generate your first Profit Audit above. It scores from your Control data plus anything you upload.</div></div></div>'
-      : '';
-
-
-
-    // Score history bars — one per audit, capped to the last 12 (a year) inside
-    // renderScoreChart. Shows from a single audit. Comparison + per-section
-    // sparklines dropped; the section Change column and this carry the trend.
-    const scoreChart = audits.length >= 1 ? this.renderScoreChart(audits) : '';
-
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
-
+    const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    const latest = audits[0] || null;
+    const daysSince = latest && latest.date
+      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
+    const canRun = daysSince >= 30;
+    const daysLeft = canRun ? 0 : 30 - daysSince;
+    const desc = 'One audit every 30 days. It scores from your Control data plus anything you upload, and the result shows on screen in a minute or two.';
+    this.container.innerHTML = '<div class="screen">'
+      + AuditUI.requestCard('at', 'Profit Audit', desc, canRun, !!latest, daysLeft)
+      + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())
+      + (latest ? AuditUI.scoreChart(audits, 'Profit Score History') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
+      + '</div>';
     document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
-    this.container.querySelectorAll('.at-view-btn').forEach(btn => {
-      btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx)));
-    });
+    this.container.querySelectorAll('.at-view-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
       App.handleShowOlder(e.target, () => this.renderMain()));
-  },
-
-  // A 12-month track (one column per month, capped at a year). Bars stay
-  // neutral (#1E2B34); only the score number carries the tier color
-  // (App.scoreColor), with a dashed target line. Months with no audit yet show
-  // as empty slots with a dimmed label, so the operator sees the year ahead
-  // fill in. Shows from a single audit. Scrolls horizontally on a narrow card.
-  renderScoreChart(audits) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-12);
-    if (!sorted.length) return '';
-    const CH = 130, USABLE = CH - 24;
-    const last   = sorted[sorted.length-1] || {};
-    const target = (last.raw && last.raw.TARGET_SCORE) || last.TARGET_SCORE || 65;
-    const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const clamp = s => Math.max(0, Math.min(100, s));
-    const ym = d => { const p = (d||'').slice(0,7).split('-'); return { y:+p[0], m:+p[1] }; };
-    // 12 month columns starting at the oldest shown audit; later months without
-    // an audit render as empty slots so the year-ahead is visible.
-    const start = ym(sorted[0].date);
-    const cols = [];
-    for (let k = 0; k < 12; k++) {
-      let mi = start.m - 1 + k;
-      const y = start.y + Math.floor(mi / 12);
-      mi = ((mi % 12) + 12) % 12;
-      cols.push({ y, m: mi + 1, label: MO[mi], audit: null });
-    }
-    sorted.forEach(a => {
-      const p = ym(a.date);
-      const idx = (p.y - start.y) * 12 + (p.m - start.m);
-      if (idx >= 0 && idx < 12) cols[idx].audit = a;
-    });
-    const bars = cols.map(c => {
-      if (!c.audit) return '<div style="flex:0 0 40px;height:100%;"></div>';
-      const s = c.audit.overall_score || 0;
-      const h = Math.round(clamp(s)/100*USABLE);
-      return '<div style="flex:0 0 40px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
-        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;line-height:1;margin-bottom:5px;color:' + App.scoreColor(s) + ';">' + s + '</span>'
-        + '<div style="width:100%;height:' + h + 'px;background:#1E2B34;border-radius:3px 3px 0 0;"></div>'
-        + '</div>';
-    }).join('');
-    const dates = cols.map(c => '<div style="flex:0 0 40px;text-align:center;font-size:10px;font-weight:600;color:' + (c.audit ? 'var(--t3)' : 'var(--t4)') + ';">' + c.label + '</div>').join('');
-    const tgt = Math.round(clamp(target)/100*USABLE);
-    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:18px;">Profit Score History</div>'
-      + '<div style="overflow-x:auto;">'
-      +   '<div style="width:max-content;min-width:100%;">'
-      +     '<div style="position:relative;height:' + CH + 'px;border-bottom:1px solid var(--b2);display:flex;align-items:flex-end;gap:12px;">'
-      +       '<div style="position:absolute;left:0;right:0;bottom:' + tgt + 'px;border-top:1px dashed rgba(255,255,255,0.25);">'
-      +         '<span style="position:absolute;right:0;top:-7px;font-size:9px;color:var(--t3);background:var(--surface);padding:0 5px;letter-spacing:1px;text-transform:uppercase;">Target ' + target + '</span>'
-      +       '</div>'
-      +       bars
-      +     '</div>'
-      +     '<div style="display:flex;gap:12px;margin-top:8px;">' + dates + '</div>'
-      +   '</div>'
-      + '</div></div>';
-  },
-
-  renderComparison(curr, prev) {
-    const cs = curr.sections || {};
-    const ps = prev.sections || {};
-    const allNames = [...new Set([...Object.keys(cs), ...Object.keys(ps)])];
-    const rows = allNames.map(name => {
-      const cv = cs[name] ?? null;
-      const pv = ps[name] ?? null;
-      const diff = (cv != null && pv != null) ? cv - pv : null;
-      const arrow = diff == null ? '' : diff > 0
-        ? '<span style="color:var(--gold);font-weight:700;">&#9650; +' + diff + '</span>'
-        : diff < 0
-        ? '<span style="color:var(--red);font-weight:700;">&#9660; ' + diff + '</span>'
-        : '<span style="color:var(--t3);">&#8212;</span>';
-      const col = (v) => v==null?'':App.scoreColor(v);
-      return '<tr>'
-        + '<td style="padding:9px 12px;font-size:12px;color:var(--t2);">' + esc(name) + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(pv) + ';">' + (pv??'--') + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:' + col(cv) + ';">' + (cv??'--') + '</td>'
-        + '<td style="padding:9px 12px;text-align:center;font-size:13px;">' + arrow + '</td>'
-        + '</tr>';
-    }).join('');
-    const overallDiff = (curr.overall_score||0) - (prev.overall_score||0);
-    return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Audit Comparison</div>'
-      + '<div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">'
-      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((prev.date||'').slice(0,7)) + (prev.grade?' &nbsp;&middot;&nbsp;' + esc(prev.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(prev.overall_score||0) + ';">' + (prev.overall_score||0) + '</div></div>'
-      + '<div style="display:flex;align-items:center;padding:0 8px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + (overallDiff>=0?'var(--gold)':'var(--red)') + ';">' + (overallDiff>=0?'+':'') + overallDiff + ' pts</div></div>'
-      + '<div><div style="font-size:10px;color:var(--t3);margin-bottom:2px;">' + esc((curr.date||'').slice(0,7)) + (curr.grade?' &nbsp;&middot;&nbsp;' + esc(curr.grade):'') + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:' + App.scoreColor(curr.overall_score||0) + ';">' + (curr.overall_score||0) + '</div></div>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th style="text-align:left;">Section</th><th style="text-align:center;">' + esc((prev.date||'').slice(0,7)) + '</th><th style="text-align:center;">' + esc((curr.date||'').slice(0,7)) + '</th><th style="text-align:center;">Change</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '</div>';
-  },
-
-  renderSparklines(audits) {
-    const sorted = audits.slice().sort((a,b) => new Date(a.date||0) - new Date(b.date||0)).slice(-6);
-    const latest = sorted[sorted.length-1];
-    const allNames = Object.keys(latest.sections||{});
-    if (!allNames.length) return '';
-    const W=120, H=40, PAD=4;
-
-    const spark = (values) => {
-      const valid = values.filter(v => v != null);
-      if (valid.length < 2) return '';
-      const minV = Math.min(...valid), maxV = Math.max(...valid);
-      const range = maxV - minV || 1;
-      const pts = values.map((v,i) => {
-        if (v == null) return null;
-        const x = PAD + (i/(values.length-1))*(W-PAD*2);
-        const y = H - PAD - ((v-minV)/range)*(H-PAD*2);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      }).filter(Boolean);
-      return pts.length >= 2 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#DBAB46" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
-    };
-
-    const tiles = allNames.map(name => {
-      const values = sorted.map(a => (a.sections||{})[name] ?? null);
-      const curr   = values[values.length-1] ?? 0;
-      const prev   = values.slice(0,-1).reverse().find(v => v != null) ?? null;
-      const diff   = prev != null ? curr - prev : null;
-      const col    = App.scoreColor(curr);
-      return '<div style="flex:1;min-width:140px;background:var(--input);border:1px solid var(--b2);border-radius:4px;padding:10px 12px;">'
-        + '<div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:4px;letter-spacing:0.5px;">' + esc(name) + '</div>'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:700;color:' + col + ';line-height:1;">' + curr + '</div>'
-        + (diff != null ? '<div style="font-size:11px;font-weight:700;color:' + (diff>0?'var(--gold)':diff<0?'var(--red)':'var(--t3)') + ';">' + (diff>0?'+':'') + diff + '</div>' : '')
-        + '</div>'
-        + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">`
-        + `<line x1="4" y1="${(H/2).toFixed(1)}" x2="${W-4}" y2="${(H/2).toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`
-        + spark(values)
-        + (values[values.length-1] != null ? (() => {
-            const valid = values.filter(v=>v!=null);
-            const minV=Math.min(...valid), maxV=Math.max(...valid), range=maxV-minV||1;
-            const lx = PAD + ((values.length-1)/(values.length-1))*(W-PAD*2);
-            const ly = H - PAD - ((values[values.length-1]-minV)/range)*(H-PAD*2);
-            return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>`;
-          })() : '')
-        + '</svg>'
-        + '</div>';
-    }).join('');
-
-    return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Section Trends  <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;color:var(--t3);">Last ' + sorted.length + ' audits</span></div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:10px;">' + tiles + '</div>'
-      + '</div>';
   },
 
   viewAudit(idx) {
@@ -301,67 +51,6 @@ S.AuditTracker = {
 
 
     const d = audit.raw || audit;
-    const scoreColor = App.scoreColor(audit.overall_score||0);
-
-    // Findings text for a section. S1-S5 store evidence + gap + tool +
-    // narrative + finding in flat fields per the audit data shape; S6 stores
-    // the equivalent inside each signal object so its findings render via
-    // sigRows already. This helper pulls the S1-S5 findings text inline so
-    // operators see scores and findings on the same page (no Findings tab).
-    const findingsBlock = (num) => {
-      if (num === 6) return '';
-      const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
-      const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
-      if (!texts.length) return '';
-      return '<div style="margin-top:14px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
-        + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
-        + '</div>';
-    };
-
-    const sectionBlock = (num, name, score, items, signals) => {
-      const bar   = Math.min(100, Math.max(0, score||0));
-      const color = App.scoreColor(score);
-      const rows  = items.filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
-        '<tr><td>' + label + '</td>'
-        + '<td style="color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';">' + val + '</td></tr>'
-      ).join('');
-      const sigRows = (signals||[]).map(sig => {
-        const sc = (sig.score||'').toUpperCase();
-        const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'var(--amber)':'var(--t3)';
-        return '<div style="border:1px solid var(--b-edge);border-radius:8px;padding:12px;margin-top:10px;">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-          + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></div>'
-          + '<div style="font-size:11px;font-weight:700;color:var(--t1);">' + esc(sig.label||'') + '</div>'
-          + '<div style="margin-left:auto;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + dot + ';">' + esc(sig.score||'') + '</div>'
-          + '</div>'
-          + (sig.evidence ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">' + esc(sig.evidence) + '</div>' : '')
-          + (sig.gap      ? '<div style="font-size:11px;color:var(--t2);margin-bottom:4px;">' + esc(sig.gap) + '</div>' : '')
-          + (sig.tool     ? '<div style="font-size:11px;color:var(--gold);">' + esc(sig.tool) + '</div>' : '')
-          + '</div>';
-      }).join('');
-      // score === null on a DATA section means N/A (not enough data) — show a
-      // clear N/A badge, never a red "0". The Risk Signals section also passes
-      // null but supplies a signals array, so it shows no badge at all.
-      const isSignals = signals && signals.length;
-      const scoreBlock = score != null
-        ? '<div style="text-align:right;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
-          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
-          + '</div>'
-        : isSignals
-          ? ''
-          : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
-        + scoreBlock + '</div>'
-        + (rows ? '<div class="at-metrics"><table class="at-mtbl">' + rows + '</table></div>' : '')
-        + sigRows
-        + findingsBlock(num)
-        + '</div>';
-    };
 
     const pct = (v,t) => v ? v+'%' + (t?' (Target: '+t+'%)':'') : '';
     const cur = v => v ? App.fmtCurrency(v) : '';
@@ -370,9 +59,6 @@ S.AuditTracker = {
 
     const gap = (v) => v > 0 ? [cur(v), 'warn'] : v < 0 ? [cur(Math.abs(v)) + ' under target', 'good'] : [''];
     const [s1gap]  = gap(d.S1_MONTHLY_GAP);
-    const [s2gap]  = gap(d.S2_MONTHLY_GAP);
-    const [s3gap]  = gap(d.S3_MONTHLY_GAP);
-    const [s5gap]  = gap(d.S5_PRIME_COST_PCT - (d.S5_TARGET_PCT||60) > 0 ? d.S5_COMBINED_COGS_GAP : 0);
 
     const signals6 = [
       {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
@@ -383,7 +69,7 @@ S.AuditTracker = {
 
     const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
     const sections = [
-      sectionBlock(1, NAMES[0], d.S1_SCORE, [
+      AuditUI.sectionBlock(1, NAMES[0], d.S1_SCORE, [
         ['Bar Pour Cost %',         pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT), d.S1_BAR_COST_PCT > d.S1_TARGET_PCT ? 'warn' : 'good'],
         ['Monthly Bar Revenue',     cur(d.S1_BAR_REV_MONTHLY)],
         ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
@@ -395,8 +81,8 @@ S.AuditTracker = {
         ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
         ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(2, NAMES[1], d.S2_SCORE, [
+      ], null, d),
+      AuditUI.sectionBlock(2, NAMES[1], d.S2_SCORE, [
         ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
         ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
         ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
@@ -408,8 +94,8 @@ S.AuditTracker = {
         ['Void Approval Required',  d.S2_VOID_APPROVAL],
         ['Spillage Log',            d.S2_SPILLAGE_LOG],
         ['Monthly Gap',             cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(3, NAMES[2], d.S3_SCORE, [
+      ], null, d),
+      AuditUI.sectionBlock(3, NAMES[2], d.S3_SCORE, [
         ['Food Cost %',             pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT), d.S3_FOOD_COST_PCT > d.S3_TARGET_PCT ? 'warn' : 'good'],
         ['Monthly Food Revenue',    cur(d.S3_FOOD_REV_MONTHLY)],
         ['Food Variance %',         pct(d.S3_FOOD_VAR_PCT), d.S3_FOOD_VAR_PCT > 3 ? 'warn' : ''],
@@ -419,8 +105,8 @@ S.AuditTracker = {
         ['Waste Log',               d.S3_WASTE_LOG],
         ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
-      ]),
-      sectionBlock(4, NAMES[3], d.S4_SCORE, [
+      ], null, d),
+      AuditUI.sectionBlock(4, NAMES[3], d.S4_SCORE, [
         ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
         ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
         ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
@@ -431,8 +117,8 @@ S.AuditTracker = {
         ['Credit Recovery Rate',    d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : '', (d.S4_CREDIT_RECOVERY_PCT != null && d.S4_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
         ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
         ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
-      ]),
-      sectionBlock(5, NAMES[4], d.S5_SCORE, [
+      ], null, d),
+      AuditUI.sectionBlock(5, NAMES[4], d.S5_SCORE, [
         ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
         ['Total COGS Period',       cur(d.S5_TOTAL_COGS_PERIOD)],
         ['Labor Period',            cur(d.S5_LABOR_PERIOD)],
@@ -444,94 +130,20 @@ S.AuditTracker = {
         ['RPLH Tracked',            d.S5_RPLH_TRACKED],
         ['Labor by Department',     d.S5_LABOR_BY_DEPT],
         ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
-      ]),
-      ...(signals6.length ? [sectionBlock(6, 'Operational Risk Signals', null, [], signals6)] : []),
+      ], null, d),
+      ...(signals6.length ? [AuditUI.sectionBlock(6, 'Operational Risk Signals', null, [], signals6, d)] : []),
     ].join('');
 
-    const actionItems = (audit.action_items || []).map((a,i) => {
-      const txt = a.action || a || '';
-      const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, 'profit') : null);
-      const btn = gid
-        ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This</button>'
-        : '';
-      return '<div class="at-arow" style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
-        + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
-        + (a.monthly_impact ? '<div style="font-size:12px;margin-top:4px;"><span style="color:var(--gold);font-weight:700;">+' + App.fmtCurrency(a.monthly_impact) + '</span><span style="color:var(--t3);">/month opportunity</span></div>' : '')
-        + '</div>'
-        + btn
-        + '</div>';
-    }).join('');
-
-    // Data Quality tier badge — app colors only: gold-tint when full coverage,
-    // neutral otherwise (never solid bright gold or off-palette yellow).
-    const grade = audit.grade || '';
-    const gradeChip = grade
-      ? (() => { const full = grade.includes('3') || grade.toLowerCase().includes('full');
-          return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;'
-            + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
-                    : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(grade) + '</span>'; })()
-      : '';
-
-    // Score hero (.form-card) — name + meta + tier on the left, the big Profit
-    // Score on the right; below, the score label + scale bar with the Bar Cop
-    // Outlook mounting next to it.
-    const heroCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Profit Recovery Audit</div>'
-      + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
-        + (audit.date||'').slice(0,10)
-        + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '')
-        + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '')
-        + '</div>'
-      + (gradeChip ? '<div style="margin-top:8px;">' + gradeChip + '</div>' : '')
-      + '</div>'
-      + '<div style="text-align:right;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="width:270px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score||0) + '</div>'
-      + '</div>'
-      + '</div></div>';
-
-    // Total recoverable — the money hero, as a standard stat strip (calc-val lg).
-    const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
-    const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg good">' + val + '</div></div>';
-    const recoverStrip = totalMonthly > 0
-      ? '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + calcItem('Recoverable / Month', App.fmtCurrency(totalMonthly))
-        + calcItem('Annualized', App.fmtCurrency(totalMonthly*12))
-        + (d.WEEKLY_GAP_AMT ? calcItem('Weekly Gap', esc(String(d.WEEKLY_GAP_AMT))) : '')
-        + '</div></div>'
-      : '';
-
-    // Single-page layout: ranked action items, then the scored sections (each
-    // with its metric readout + findings rendered inline via findingsBlock).
-    const actionsCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">' + (actionItems ? 'Action Items, Ranked by Impact' : '') + '</div>'
-      + '<div id="at-outlook-mount"></div>'
-      + '</div>'
-      + (actionItems ? '<div class="card" style="margin-bottom:16px;">' + actionItems + '</div>' : '');
-
     this.container.innerHTML = '<div class="screen">'
-      + heroCard
-      + recoverStrip
-      + actionsCard
+      + AuditUI.viewHero(audit, 'Profit Recovery Audit')
+      + AuditUI.recoverStrip(audit)
+      + AuditUI.actionsArea(audit, 'profit', 'at')
       + sections
       + '</div>';
 
-    // Bar Cop Outlook mounts into the audit detail header next to the score.
-    // Shared helper handles click + cache + render across all 4 audits.
-    const outlookMount = document.getElementById('at-outlook-mount');
-    if (outlookMount && window.AuditOutlook) {
-      AuditOutlook.attach(outlookMount, audit, 'profit', { compact: true });
-    }
-
+    AuditUI.attachOutlook('at', audit, 'profit');
     this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        App._fixFocus = btn.dataset.gap;
-        App.navigate('profit-fix');
-      });
+      btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('profit-fix'); });
     });
   },
 
@@ -755,7 +367,6 @@ S.AuditTracker = {
   // is optional because an operator running Control already has the data, and
   // the slots map 1:1 to the sections computeProfitAudit scores.
   renderIntake() {
-    const s = App.data.settings || {};
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     // The form is always viewable so the operator can review/update inputs. The
@@ -777,70 +388,37 @@ S.AuditTracker = {
       { label: 'Vendor Drift',    ok: cd && cd.deliveries_logged > 0 },
       { label: 'Payroll / Labor', ok: cd && cd.labor_hours > 0 }
     ];
-    const pill = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 11px;border-radius:20px;margin:0 6px 7px 0;'
-      + (c.ok ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">'
-      + (c.ok ? '<span style="color:var(--green);font-weight:800;">&#10003;</span>' : '')
-      + esc(c.label) + '</span>';
 
-    // Card 1 — annual sales (the dollar baseline) + what Bar Cop already covers.
-    const salesField = (id, label, ph, val) => '<div class="f" style="width:220px;"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" placeholder="' + ph + '" value="' + esc(val || '') + '"/></div></div>';
-    const salesCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Annual Sales</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
+    const salesCard = AuditUI.formCard('Annual Sales',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + salesField('at-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
-      + salesField('at-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
+      + AuditUI.moneyField('at-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
+      + AuditUI.moneyField('at-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
       + '</div>'
-      + '<div class="sh" style="margin:18px 0 8px;">What Bar Cop Already Has</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">Highlighted sections pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.</div>'
-      + '<div>' + checks.map(pill).join('') + '</div></div>';
+      + AuditUI.intakeHasBlock('What Bar Cop Already Has', 'Highlighted sections pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.', checks));
 
-    const uploadCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Your Reports</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional. Drop in a report to score a section Bar Cop cannot see yet. One drop zone takes them all.</div>'
+    const uploadCard = AuditUI.formCard('Your Reports',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional. Drop in a report to score a section Bar Cop cannot see yet. One drop zone takes them all.</div>'
       + FileDrop.render('at-drop', { items: [
           { t: 'Profit and Loss or Monthly Sales Summary', s: 'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report).' },
           { t: 'Voids, Comps and Cash Report',             s: 'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance).' },
           { t: 'Invoices and Vendor Pricing',              s: 'Scores Vendor Control (invoice matching, price drift).' },
           { t: 'Recipe Costing Sheet',                     s: 'Adds repricing opportunities ranked by dollar impact, and recipe coverage.', hi: true },
           { t: 'Inventory Count Sheets (Bar and Kitchen)', s: 'Adds per-product pour and food cost variance.' }
-        ] })
-      + '</div>';
+        ] }));
 
-    // Operating-practice questions, one clean row each. Answers persist and
-    // pre-fill the next audit so the operator updates what changed.
+    // Operating-practice questions. Answers persist and pre-fill the next audit.
     const pr = d.practices || {};
-    const qRow = (label, id, options) => {
-      const all = [['', 'Select Answer']].concat(options);
-      const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 2px;border-bottom:1px solid var(--row-div);">'
-        + '<span style="font-size:13px;color:var(--t1);">' + esc(label) + '</span>'
-        + '<select class="at-qsel" id="at-q-' + id + '" style="min-width:175px;flex-shrink:0;">' + opts + '</select>'
-        + '</div>';
-    };
-    const questionsCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">A Few Quick Questions</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your scores and are not in your reports. Answer what applies; the rest carry over to next time.</div>'
-      + qRow('How do you pour spirits?',            'pour_method',   [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']])
-      + qRow('Are your recipes costed?',            'recipes_costed',[['none','None'],['some','Some'],['all','All']])
-      + qRow('How often do you count inventory?',   'inv_freq',      [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']])
-      + qRow('Manager approval on voids and comps?','void_approval', [['false','No'],['true','Yes']])
-      + qRow('Drawer reconciled every shift?',      'drawer_recon',  [['false','No'],['true','Yes']])
-      + qRow('Invoices matched to orders?',         'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']])
-      + '</div>';
+    const questionsCard = AuditUI.formCard('A Few Quick Questions',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your scores and are not in your reports. Answer what applies; the rest carry over to next time.</div>'
+      + AuditUI.intakeQRow('at', 'How do you pour spirits?', 'pour_method', [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']], pr.pour_method)
+      + AuditUI.intakeQRow('at', 'Are your recipes costed?', 'recipes_costed', [['none','None'],['some','Some'],['all','All']], pr.recipes_costed)
+      + AuditUI.intakeQRow('at', 'How often do you count inventory?', 'inv_freq', [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']], pr.inv_freq)
+      + AuditUI.intakeQRow('at', 'Manager approval on voids and comps?', 'void_approval', [['false','No'],['true','Yes']], pr.void_approval)
+      + AuditUI.intakeQRow('at', 'Drawer reconciled every shift?', 'drawer_recon', [['false','No'],['true','Yes']], pr.drawer_recon)
+      + AuditUI.intakeQRow('at', 'Invoices matched to orders?', 'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']], pr.invoice_vs_po));
 
-    // Run + Back, below the cards (standard placement).
-    const buttons = '<div style="margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + (canRun
-          ? '<button class="btn btn-primary" id="at-iz-submit">Generate Audit</button>'
-          : '<button class="btn btn-primary" id="at-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
-      + '<button class="btn btn-ghost" id="at-iz-cancel">Back</button>'
-      + '<span id="at-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:24px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'Review and update your inputs now. The next audit can run in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ', and your changes save when you generate it.') + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + buttons + '</div>';
+    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('at', canRun, daysLeft) + '</div>';
     FileDrop.attach('at-drop');
 
     document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
