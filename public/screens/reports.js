@@ -9,6 +9,7 @@
 
 S.Reports = {
   _openQboModal(){
+    if (App.stampFixView) App.stampFixView('weekly-pnl');
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
     App.openHubFullPage('Weekly P&L Brief', (mount) => {
       if (App.setHubTopbarActions) App.setHubTopbarActions('');
