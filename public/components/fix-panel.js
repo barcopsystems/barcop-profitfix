@@ -207,11 +207,10 @@ window.FixPanel = {
       return { id:g.id, module, name:g.name, band: imp?imp.band:null,
         dollars: imp?(imp.dollars||0):0, hasMetric:!!imp, crossNote: crossNote||'' };
     };
+    // Labor is part of prime cost but its fix lives in Revenue Recovery, so it is
+    // NOT shown on the Profit leak panel (it has its own row on the Revenue
+    // dashboard). Composite gaps (prime cost) are excluded so dollars never double.
     const entries = gaps.filter(g => composite.indexOf(g.id) === -1).map(g => entryFor(g, moduleKey));
-    if (moduleKey === 'profit' && window.FIX && FIX.revenue) {
-      const lg = FIX.revenue.find(x => x.id === 'labor-scheduling');
-      if (lg) entries.push(entryFor(lg, 'revenue', 'in Revenue Recovery'));
-    }
     const BAND = { over:{label:'Over',color:'var(--red)'}, watch:{label:'Watch',color:'var(--amber)'}, ok:{label:'On target',color:'var(--gold)'} };
     const rank = e => (e.band === 'ok') ? 2 : (e.hasMetric && e.dollars > 0) ? 0 : 1;
     entries.sort((a,b) => rank(a) - rank(b) || b.dollars - a.dollars);
