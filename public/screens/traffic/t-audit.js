@@ -336,7 +336,6 @@ S.TrafficAudit = {
   // Settings), saved back to Operation Links, and read live (PageSpeed, Google
   // Places, Yelp). Screenshots are optional fallback. No revenue, no notes.
   renderIntake() {
-    const s = App.data.settings || {};
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
@@ -346,58 +345,31 @@ S.TrafficAudit = {
     const canRun = _since >= 30;
     const daysLeft = canRun ? 0 : 30 - _since;
 
-    const header = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Traffic Audit</div>';
-    const barInfo = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Audit For</div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(s.bar_name || 'Your Bar') + '</div>'
-      + (s.city_state ? '<div style="font-size:11px;color:var(--t3);">' + esc(s.city_state) + '</div>' : '')
-      + '</div>';
-
-    // What Bar Cop already has from weekly traffic metrics.
+    // From weekly traffic numbers (Bar Cop does not auto-collect this — it only
+    // has what the operator logged in This Week).
     const tw = (App.data.traffic_weeks || []).slice(-4);
     const has = (fn) => tw.some(w => w[fn] != null);
     const checks = [
-      { label: 'Google Rating',  ok: has('google_rating') },
-      { label: 'Review Response',ok: has('response_rate') },
+      { label: 'Google Rating',   ok: has('google_rating') },
+      { label: 'Review Response', ok: has('response_rate') },
       { label: 'Website Sessions',ok: has('monthly_sessions') },
-      { label: 'Social Posts',   ok: has('social_posts_month') },
-      { label: 'Email',          ok: has('email_list_size') || has('email_open_rate') }
+      { label: 'Social Posts',    ok: has('social_posts_month') },
+      { label: 'Email',           ok: has('email_list_size') || has('email_open_rate') }
     ];
-    const chip = (c) => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;margin:0 6px 6px 0;'
-      + (c.ok ? 'background:var(--gold-bg);border:1px solid rgba(219,171,70,0.35);color:var(--t1);font-weight:700;' : 'background:var(--input);border:1px solid var(--b2);color:var(--t3);') + '">'
-      + (c.ok ? '<span style="color:var(--gold);font-weight:800;">&#10003;</span>' : '<span style="color:var(--t4);font-weight:800;">&middot;</span>') + esc(c.label) + '</span>';
-    // Only claim "already has" when weekly traffic numbers actually exist.
-    // Unlike the Control modules, Bar Cop does not auto-collect this — it only
-    // has what the operator logged in This Week.
-    const haveWeekly = checks.some(c => c.ok);
-    const controlCard = haveWeekly
-      ? '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:4px;">From your weekly traffic numbers</div>'
-        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">These come from what you logged in This Week. Your links below add live data; screenshots fill anything links cannot reach.</div>'
-        + '<div>' + checks.filter(c => c.ok).map(chip).join('') + '</div></div>'
-      : '<div class="card" style="margin-bottom:16px;"><div style="font-size:12px;color:var(--t2);line-height:1.6;">No weekly traffic numbers logged yet, so this audit reads entirely from the links and screenshots below. As you log weekly traffic in This Week, those numbers feed future audits automatically.</div></div>';
 
-    // Inline link fields — pre-filled from Operation Links, saved on Generate.
-    const linkRow = (key, label, ph) => '<div style="margin-bottom:10px;">'
-      + '<label style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--t3);display:block;margin-bottom:4px;">' + esc(label) + '</label>'
-      + '<input type="url" id="ta-link-' + key + '" value="' + esc(urls[key] || '') + '" placeholder="' + ph + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:8px 10px;width:100%;outline:none;"/></div>';
-    // Only the Website link drives a live score (PageSpeed). The rest live in
-    // Settings (Operation Links) for the quick-access card. Google and Yelp
-    // ratings come from screenshots below, not a live read.
-    const linkPlatforms = (App.TRAFFIC_PLATFORMS || []).filter(p => p.urlKey === 'website');
-    const linksCard = '<div class="card" style="margin-bottom:16px;">' + header + barInfo
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">'
-      +   '<div style="font-size:16px;font-weight:800;color:var(--t1);">Your Website</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="ta-how-btn">How this works</button>'
-      + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">Your website is the one link Bar Cop reads live for your score: speed, mobile, SEO, and best practices. If it is saved in Settings it is already filled in. Everything else, including your Google and Yelp ratings, comes from a screenshot below.</div>'
-      + '<div style="max-width:480px;">'
-      + linkPlatforms.map(p => linkRow(p.urlKey, p.label, p.placeholder || '')).join('')
-      + '</div></div>';
+    // Only the Website link drives a live score (PageSpeed); everything else is
+    // a screenshot. Pre-filled from Operation Links, saved on Generate.
+    const wp = (App.TRAFFIC_PLATFORMS || []).find(p => p.urlKey === 'website') || {};
+    const linkField = '<div class="f" style="width:100%;max-width:480px;"><label>' + esc(wp.label || 'Website URL') + '</label>'
+      + '<input class="form-input" type="url" id="ta-link-website" value="' + esc(urls.website || '') + '" placeholder="' + esc(wp.placeholder || 'https://yourbar.com') + '"/></div>';
 
-    const screenshotsCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">Screenshots</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">All optional, but these are where most of your score comes from. Drop in a screenshot for anything your website link cannot reach: your Google and Yelp ratings, data behind a login, and your social and delivery pages. One drop zone takes them all.</div>'
+    const websiteCard = AuditUI.formCard('Your Website',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">The one link Bar Cop reads live for your score: speed, mobile, SEO, and best practices. Everything else, including your Google and Yelp ratings, comes from a screenshot below.</div>'
+      + linkField
+      + AuditUI.intakeHasBlock('From Your Weekly Traffic Numbers', 'Highlighted areas come from what you logged in This Week. The greyed ones fill in as you log them, or from a screenshot below.', checks));
+
+    const screenshotsCard = AuditUI.formCard('Screenshots',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional, but this is where most of your score comes from. Drop in a screenshot for anything your website link cannot reach. One drop zone takes them all.</div>'
       + FileDrop.render('ta-drop', { items: [
           { t: 'Google Review Page (rating, reviews)',      s: 'Your Google rating, review count, response rate, and recency. This is how Bar Cop scores your Google reviews.', hi: true },
           { t: 'Yelp Listing (rating, reviews)',            s: 'Your Yelp rating and review count for cross-platform reputation.', hi: true },
@@ -407,52 +379,34 @@ S.TrafficAudit = {
           { t: 'Instagram Profile',                         s: 'Follower count, post frequency, content.' },
           { t: 'Delivery Platform Dashboard',               s: 'Rating, photos, menu completeness, promos.' },
           { t: 'Email Platform',                            s: 'List size, send frequency, open rate.' }
-        ] })
-      + '</div>';
+        ] }));
 
     const pr = d.practices || {};
-    const qRow = (label, id, options) => {
-      const all = [['', 'Select Answer']].concat(options);
-      const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(pr[id] || '') === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
-      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
-        + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(label) + '</div>'
-        + '<select id="ta-q-' + id + '" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;padding:6px 8px;min-width:120px;">' + opts + '</select></div>';
-    };
-    const questionsCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:4px;">A Few Quick Questions</div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:8px;line-height:1.6;">These are not in your reports. Select Answer = no effect on the score.</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 28px;">'
-      + qRow('Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false', 'No'], ['true', 'Yes']])
-      + qRow('Loyalty or rewards program?', 'loyalty', [['false', 'No'], ['true', 'Yes']])
-      + qRow('Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false', 'No'], ['true', 'Yes']])
-      + qRow('Review generation system asking guests for reviews?', 'review_generation', [['false', 'No'], ['true', 'Yes']])
-      + '</div></div>';
+    const questionsCard = AuditUI.formCard('A Few Quick Questions',
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These are not in your reports. Answer what applies; the rest carry over to next time.</div>'
+      + AuditUI.intakeQRow('ta', 'Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false','No'],['true','Yes']], pr.growth_mechanism)
+      + AuditUI.intakeQRow('ta', 'Loyalty or rewards program?', 'loyalty', [['false','No'],['true','Yes']], pr.loyalty)
+      + AuditUI.intakeQRow('ta', 'Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false','No'],['true','Yes']], pr.delivery_markup)
+      + AuditUI.intakeQRow('ta', 'Review generation system asking guests for reviews?', 'review_generation', [['false','No'],['true','Yes']], pr.review_generation));
 
-    const submitCard = '<div class="card">'
-      + '<div class="card-actions" style="display:flex;align-items:center;gap:8px;">'
-      + (canRun
-          ? '<button class="btn btn-primary" id="ta-iz-submit">Generate Audit</button>'
-          : '<button class="btn btn-primary" id="ta-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
-      + '<div id="ta-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></div>'
-      + '<div style="flex:1;"></div>'
-      + '<button class="btn btn-ghost" id="ta-iz-cancel">' + (canRun ? 'Cancel' : 'Back') + '</button></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">' + (canRun ? 'Analysis takes 60 to 90 seconds.' : 'You can review and update your links and inputs now. The next audit can be generated in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.') + '</div></div>';
-
-    this.container.innerHTML = '<div class="screen">' + linksCard + controlCard + screenshotsCard + questionsCard + submitCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + websiteCard + screenshotsCard + questionsCard + AuditUI.intakeSubmit('ta', canRun, daysLeft) + '</div>';
     FileDrop.attach('ta-drop');
 
-    document.getElementById('ta-how-btn')?.addEventListener('click', () => App.showHelpModal('How the Traffic Audit Works', [
-      { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
-      { h: 'Reads live from a link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once in Settings and it is ready every audit.'] },
-      { h: 'Needs a screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email all sit behind a login or carry data a link cannot reach. Upload a screenshot in the Screenshots section to score those.'] },
-      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the few quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
-    ]));
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
       const val = id => (document.getElementById('ta-q-' + id) || {}).value || '';
       this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty'), delivery_markup: val('delivery_markup'), review_generation: val('review_generation') };
       this.generateAudit();
     });
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Traffic Audit Works', [
+      { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
+      { h: 'Reads live from a link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once in Settings and it is ready every audit.'] },
+      { h: 'Needs a screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email all sit behind a login or carry data a link cannot reach. Upload a screenshot in the Screenshots section to score those.'] },
+      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the few quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
+    ]);
   },
 
   async generateAudit() {
