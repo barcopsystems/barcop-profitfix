@@ -302,7 +302,7 @@ S.AuditTracker = {
       const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
       const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
       if (!texts.length) return '';
-      return '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+      return '<div style="margin-top:14px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
         + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
         + '</div>';
@@ -342,7 +342,7 @@ S.AuditTracker = {
           ? ''
           : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
       return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--b2);">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
         + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
         + scoreBlock + '</div>'
@@ -443,7 +443,7 @@ S.AuditTracker = {
       const txt = a.action || a || '';
       const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, 'profit') : null);
       const btn = gid
-        ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This &#9656;</button>'
+        ? '<button class="at-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This</button>'
         : '';
       return '<div class="at-arow" style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
