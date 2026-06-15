@@ -490,7 +490,7 @@ S.AuditTracker = {
       + '</div>'
       + '<div style="text-align:right;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="width:270px;max-width:100%;margin-left:auto;">' + App.scoreBar(audit.overall_score||0) + '</div>'
+      + '<div style="width:270px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score||0) + '</div>'
       + '</div>'
       + '</div></div>';
 
