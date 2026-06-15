@@ -179,7 +179,7 @@ S.ThisWeek = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    if (!this._weekEnd) this.loadWeek(this.mostRecentSavedEnd() || this.currentWeekEnd());
+    if (!this._weekEnd) this.loadWeek(this.currentWeekEnd());
     // One-shot deep-link from Reports and History "Edit in This Week": load the
     // requested saved week into the grid for editing, then clear the handoff.
     if (this._focusWeekId) {
@@ -193,7 +193,7 @@ S.ThisWeek = {
   showHowTo() {
     App.showHelpModal('How This Week Works', [
       { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
-      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on your most recently completed week, the one with full numbers. Step forward with the arrow to reach the in-progress current week, tagged NOW, which only shows what has happened so far. Latest snaps you straight back to your most recent week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
+      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
       { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Pull From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
@@ -215,7 +215,6 @@ S.ThisWeek = {
     const now = this.currentWeekEnd();
     const sel = this._weekEnd;
     const older = this.addDays(sel, -7);
-    const home = this.mostRecentSavedEnd() || now;   // where This Week opens; Latest snaps back here
     const fwdDisabled = sel >= now;   // never step past the in-progress current week
     const chip = (end, active) =>
       '<button class="tw-wk-chip btn btn-sm" data-end="' + end + '" style="'
@@ -227,7 +226,7 @@ S.ThisWeek = {
       + '<button class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
       + chip(older, false) + chip(sel, true)
       + '<button class="btn btn-ghost btn-sm tw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
-      + (sel !== home ? '<button class="btn btn-ghost btn-sm tw-wk-latest" style="margin-left:4px;">Latest</button>' : '')
+      + (sel !== now ? '<button class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>' : '')
       + '</div>'
       + '<div style="display:flex;gap:8px;">'
       + '<button class="btn btn-ghost btn-sm" id="tw-pull">Pull from Control</button>'
@@ -364,7 +363,7 @@ S.ThisWeek = {
     this.container.querySelectorAll('.tw-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeek(b.dataset.end)));
     this.container.querySelector('.tw-wk-prev')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, -7)));
     this.container.querySelector('.tw-wk-next')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, 7)));
-    this.container.querySelector('.tw-wk-latest')?.addEventListener('click', () => this.gotoWeek(this.mostRecentSavedEnd() || this.currentWeekEnd()));
+    this.container.querySelector('.tw-wk-now')?.addEventListener('click', () => this.gotoWeek(this.currentWeekEnd()));
     this.container.querySelectorAll('.tw-range-chip').forEach(b => b.addEventListener('click', () => {
       const v = b.dataset.v;
       if (v === 'custom') { this.filterPreset = (this.filterPreset === 'custom') ? this._prevPreset : 'custom'; }
