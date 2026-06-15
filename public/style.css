@@ -508,13 +508,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-card .tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
 .data-card .tbl tbody tr:last-child td{border-bottom:none;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
-/* Profit Audit detail — section metric readout: a recessed panel of #0D181E data rows (label left, value right). */
-.at-metrics{border:1px solid var(--b-edge);border-radius:8px;overflow:hidden;}
+/* Profit Audit detail — section metric readout: a recessed panel of #0D181E data rows (label left, value right). No outer frame; the fill + internal dividers carry it. */
+.at-metrics{border-radius:8px;overflow:hidden;}
 .at-mtbl{width:100%;border-collapse:collapse;}
 .at-mtbl td{background:#0D181E;border-bottom:1px solid var(--row-div);padding:10px 14px;font-size:11px;vertical-align:top;}
 .at-mtbl tr:last-child td{border-bottom:none;}
 .at-mtbl td:first-child{color:var(--t3);width:54%;}
 .at-mtbl td:last-child{color:var(--t1);font-weight:600;text-align:right;}
+/* No trailing divider under the last ranked action item in the card. */
+.at-arow:last-child{border-bottom:none!important;}
 /* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = the standard gold-tint selection look: gold-tint fill + a solid gold-tint frame. Drawn with inset box-shadow (not real borders) so the full frame, top included, renders through the table's collapsed borders. */
 .dr-dragging td{background:var(--gold-tint)!important;box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord);}
 .dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
