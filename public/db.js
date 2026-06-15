@@ -642,7 +642,17 @@ const DB = {
   async writeInventoryData(data) { return await this._writeControl('ic_data', 'pf_ic_data', data); },
   async readLaborData()          { return await this._readControl('lc_data', 'pf_lc_data'); },
   async writeLaborData(data)     { return await this._writeControl('lc_data', 'pf_lc_data', data); },
-  async readShiftData()          { return await this._readControl('sc_data', 'pf_sc_data'); },
+  async readShiftData() {
+    const d = await this._readControl('sc_data', 'pf_sc_data');
+    // The comp authorization threshold defaults to $25 so the control is active
+    // (and reads "In place" in Profit Fix) out of the box, matching the Shift
+    // Policies copy. An explicit 0 means the operator turned it off, so keep it.
+    if (d && typeof d === 'object') {
+      d.settings = d.settings || {};
+      if (d.settings.comp_auth_threshold == null) d.settings.comp_auth_threshold = 25;
+    }
+    return d;
+  },
   async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
 
   // ── Event-log stores (row per record) ────────────────────────────────────
