@@ -425,7 +425,7 @@ S.TheftRisk = {
 
   showHowTo() {
     App.showHelpModal('How Loss Prevention Works', [
-      { p: ['Theft Risk is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
+      { p: ['Loss Prevention is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
       { h: 'What Flagged', p: ['The five things worth a look: voids or comps rung without a manager, drawer counts coming up short, flagged spot checks, large comps filed over your threshold without authorization, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.'] },
       { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings, then resolve and close. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
       { h: 'Theft and Loss Brief', p: ['Generates a one-page 90-day PDF summary of every loss signal and your investigations, for an owner, bookkeeper, or insurance review. The 90-day window is right for a review document; the live page above stays on the last 7 days.'] }
