@@ -252,7 +252,7 @@ S.ProfitFix = {
 
     let sub = [];
     if (slipping) sub.push(slipping + ' slipping');
-    if (atrisk) sub.push(atrisk + ' at risk');
+    if (atrisk) sub.push(atrisk + ' behind');
     const subLine = sub.length ? '<span style="color:var(--t3);"> &middot; ' + sub.join(', ') + '</span>' : '';
 
     const header = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Your Profit Systems</div>'
