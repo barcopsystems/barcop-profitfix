@@ -104,19 +104,19 @@ S.ShiftDashboard = {
     const hasRegisters = this.drawers().filter(d => d.active !== false).length > 0;
     const hasTemplates = this.templates().length > 0;
 
-    const step = (done, label, screen, current) =>
-      '<div class="sd-act" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:170px;padding:10px 12px;border:1px solid ' + (current ? 'var(--gold)' : 'var(--b2)') + ';border-radius:6px;background:var(--input);">'
-      + '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
-      + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : '') + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:' + (current ? 'var(--gold)' : 'var(--t1)') + ';">' + label + '</span></div>';
+    const step = (done, num, label, screen) =>
+      '<div class="sd-act" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
+      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
 
     const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps and this dashboard fills in with your shift revenue, cash variance, and open operational items.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this dashboard fills in with your shift revenue, cash variance, and open operational items.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasRegisters, '1. Set up registers', 'sc-drawers', !hasRegisters)
-      + step(hasTemplates, '2. Build checklists', 'sc-checklist-templates', hasRegisters && !hasTemplates)
-      + step(false, '3. Open the floor', 'sc-active-shift', hasRegisters && hasTemplates)
+      + step(hasRegisters, 1, 'Set up registers',   'sc-drawers')
+      + step(hasTemplates, 2, 'Build checklists',   'sc-checklist-templates')
+      + step(false,        3, 'Set shift policies', 'sc-shift-policies')
+      + step(false,        4, 'Open the floor',     'sc-active-shift')
       + '</div></div>';
 
     const cards =
