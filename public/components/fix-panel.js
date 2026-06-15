@@ -492,20 +492,20 @@ window.FixPanel = {
         const r = (window.Recovery) ? Recovery.compute(e) : { status: 'untracked' };
         let result = '', good = false;
         if (r.status === 'ok') {
-          const move = r.fmt(r.before) + ' to ' + r.fmt(r.after);
+          const move = r.label + ' ' + r.fmt(r.before) + ' to ' + r.fmt(r.after);
+          const prelim = r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' in.';
           if (r.dollars != null && r.dollars > 0) {
             good = true;
             result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far'
               + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '')
-              + '. ' + r.label + ' ' + move + '.'
-              + (r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data so far.');
+              + '. ' + move + '.' + prelim;
+          } else if (r.dollars != null && r.dollars < 0) {
+            result = 'Slipping. About ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below your starting point. ' + move + '.' + prelim;
           } else {
-            result = r.label + ' has not improved since this fix. ' + move + '.';
+            result = 'Holding at your starting level. ' + move + '.' + prelim;
           }
-        } else if (r.status === 'pending') {
-          result = 'Measuring. ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' of data since this fix.';
-        } else if (r.status === 'no-baseline') {
-          result = 'No weeks logged before this date to measure recovery against.';
+        } else if (r.status === 'building') {
+          result = 'Building your baseline. ' + (r.weeksIn || 0) + ' week' + ((r.weeksIn || 0) === 1 ? '' : 's') + ' in. Your recovery figure turns on once there are a few weeks to measure against.';
         }
         return '<div style="padding:12px 20px;border-bottom:1px solid var(--b2);">'
           + '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);">'
