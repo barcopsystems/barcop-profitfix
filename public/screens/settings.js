@@ -2397,42 +2397,30 @@ S.HubSettings = {
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
-    // Profit and Revenue fixes landed around weeks 5-7, which is where those
-    // trends break in the right direction. Traffic fixes follow the same arc
-    // so all five tracked Traffic metrics (website, gbp, social, email-loyalty,
-    // delivery) produce dollar figures on the Scoreboard. The Reviews fix is
-    // intentionally kept untracked (Reviews is absent from Recovery.METRICS by
-    // design — Rule 14a, too indirect to dollarize cleanly) so the demo also
-    // shows operators how an untracked fix renders.
+    // Each system STARTS when the operator first works it, which for The Anchor
+    // is the beginning of the logged history (week 1, ~77 days back). Recovery is
+    // then COMPUTED honestly by the engine: those first weeks are the baseline (a
+    // loose start), and the improving arc that follows shows up as real recovered
+    // dollars, exactly as a live user's would. No backdated "fix landed here"
+    // fantasy. Reviews stays untracked (absent from Recovery.METRICS by design,
+    // too indirect to dollarize) so the demo also shows how an untracked fix renders.
+    const fxStart = dateStr(77), fxStartISO = daysAgoISO(77);
     App.data.fix_log = (App.data.fix_log || [])
       .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
       .concat([
-      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',
-        date:dateStr(24), logged_at:daysAgoISO(24) },
-      { id:uid(), module:'revenue', gap_id:'check-average', gap_name:'Check Average and Upsell',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'revenue', gap_id:'rplh', gap_name:'Labor Productivity (RPLH)',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
-      { id:uid(), module:'traffic', gap_id:'gbp', gap_name:'Google Business Profile',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'traffic', gap_id:'website', gap_name:'Website',
-        date:dateStr(45), logged_at:daysAgoISO(45) },
-      { id:uid(), module:'traffic', gap_id:'social', gap_name:'Social Media',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email and Loyalty',
-        date:dateStr(38), logged_at:daysAgoISO(38) },
-      { id:uid(), module:'traffic', gap_id:'delivery', gap_name:'Delivery Platforms',
-        date:dateStr(31), logged_at:daysAgoISO(31) },
-      { id:uid(), module:'traffic', gap_id:'reviews', gap_name:'Reviews',
-        date:dateStr(30), logged_at:daysAgoISO(30) },
+      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',           date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',           date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',          date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',      date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'revenue', gap_id:'check-average',    gap_name:'Check Average and Upsell',  date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling', date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business Profile', date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email and Loyalty',       date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'delivery',      gap_name:'Delivery Platforms',      date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'reviews',       gap_name:'Reviews',                 date:fxStart, logged_at:fxStartISO },
     ]);
 
     // ── Variance Investigations ──
