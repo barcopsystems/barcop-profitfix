@@ -730,6 +730,8 @@ theft_score=${theft.length?(theft[theft.length-1]&&theft[theft.length-1].total)|
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
 ${reconSummary?'RECONS:\n'+reconSummary:''}
 ${controlBlock}
+TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain floor action. Never invent a Bar Cop worksheet, policy, report, or feature, and never tell the operator to set something in their POS without also naming the Bar Cop tool that tracks it. Real Bar Cop tools: Profit Fix, This Week, Profit Forecast, Vendor Tracker (Scorecard / Price Changes / Discrepancies), Recipe Summary, Loss Prevention, Over and Short, Void and Comps, Waste and Spills, Cash Control, Shift Policies (comp authorization threshold), Take Inventory, Spot Check, Receive Delivery, Variance Report, Order Sheet, Build Schedule, Overtime Watch. Plain floor actions (jigger every pour, count at close, require a manager sign-off) are fine.
+
 Return this exact JSON structure with all values calculated (not 0):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"PFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":63,"TARGET_SCORE":65,
 "OVERALL_SCORE":[calculated],
@@ -824,6 +826,8 @@ monthly_covers_est=${avgCovers?Math.round(avgCovers*4.33):0} | monthly_rev_est=$
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
 ${serverRoster?'SERVERS:\n'+serverRoster:''}
 ${controlBlock}
+TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain floor action. Never invent a Bar Cop worksheet, sheet, script pack, report, or feature. Real Bar Cop tools: Revenue Fix, This Week, Revenue Forecast, Menu Items, Menu Engineering, Dog Test Tracker, Server Check, RPLH Tracker, Events and Catering, and cross-module Loss Prevention, Shift Policies (comps), Build Schedule, Overtime Watch. Plain floor actions (run a daily pre-shift, set an upsell standard, reprice a plate) are fine.
+
 Return this exact JSON (all values calculated):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"RFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":61,"TARGET_SCORE":65,
 "OVERALL_SCORE":[calc weighted avg],
@@ -894,6 +898,8 @@ avg_response_rate=${avgRR?avgRR.toFixed(1)+'%':'not tracked'} | avg_monthly_sess
 avg_bounce_rate=${avgBR?avgBR.toFixed(1)+'%':'not tracked'} | avg_ig_followers=${avgIGF?Math.round(avgIGF):'not tracked'}
 avg_ig_posts_mo=${avgIGP?avgIGP.toFixed(1):'not tracked'}
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
+
+TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain real-world action. Never invent a Bar Cop worksheet, report, or feature. Real Bar Cop tools: Traffic Fix, This Week, Google Business Profile, Review Tracker, Search and SEO, Website Scorecard, Social Media, Delivery Platforms, Email and Loyalty, VIP Regulars, Slow-Night Initiatives, Holiday and Events, Group Inquiries. Plain real-world actions (respond to a review, post photos, fix NAP, run a delivery promo) are fine.
 
 Return this exact JSON (all values calculated):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"TFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":58,"TARGET_SCORE":65,
