@@ -5,7 +5,7 @@ S.Dashboard = {
       { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and your costs against target just under it, your profit forecast and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
       { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
       { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Tap any row to open its fix process. Labor is part of prime cost but is worked in Revenue Recovery, so it lives on that dashboard, not here.'] },
-      { h: 'Cost vs Target', p: ['Your bar pour cost, food cost, and prime cost from your latest confirmed week, each against its own target. Green is at or under target, red is over. Tap Insights for a written read on where the numbers are heading.'] },
+      { h: 'Cost vs Target', p: ['Your bar pour cost, food cost, and prime cost from your latest confirmed week, each against its own target. Green is at or under target, red is over. Tap Bar Cop Insights for a written read on where the numbers are heading.'] },
       { h: 'Profit Forecast and Profit Audit', p: ['Profit Forecast projects your profit out twelve months at your recent pace, plus what hitting your cost targets is worth. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
       { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
     ]);
@@ -28,7 +28,7 @@ S.Dashboard = {
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
     const leak = FixPanel.leakRowsText('profit');
     const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Insights</button>';
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>';
     container.innerHTML = '<div class="screen">'
       + FixPanel._scoreboardCard('profit')
       + this.row(this.shPanel('Where You\'re Leaking Now', leakBody), this.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets), insightsBtn))
@@ -194,11 +194,11 @@ S.Dashboard = {
   },
 
   showInsights() {
-    if (App.demoBlock && App.demoBlock('AI Trend Insights')) return;
+    if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
     const ID = 'db-insights';
     const weeks = (App.data.weeks || []).slice(-8);
     const wrap = inner => '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">Trend Insights</div>'
+      + '<div class="card-title">Bar Cop Insights</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.85;">' + inner + '</div>'
       + '<div class="card-actions"><button class="btn btn-ghost" onclick="App.closeModal(\'' + ID + '\')">Close</button></div></div>';
     const open = inner => App.openModal(wrap(inner), { id: ID, maxWidth: 600, noClose: true });
@@ -208,23 +208,50 @@ S.Dashboard = {
 
     const t = App.data.settings.targets || {};
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
-    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
-    const bP = weeks.map(w => w.bar?.cost_pct).filter(v => v != null);
-    const fP = weeks.map(w => w.food?.cost_pct).filter(v => v != null);
-    const pP = weeks.map(w => w.prime_cost_pct).filter(v => v != null);
+    const r1 = n => (Math.round(n * 10) / 10).toFixed(1);
+    const direction = v => {
+      if (v.length < 3) return 'not enough weeks to call a trend';
+      const d = v[v.length - 1] - v[0];
+      return d > 0.5 ? 'rising, getting worse' : d < -0.5 ? 'falling, improving' : 'holding steady';
+    };
+    // One fact line per metric, all computed here so the written read cannot
+    // drift off the numbers the operator sees on screen. "Current week" is the
+    // same latest value shown on the Cost vs Target card.
+    const metricFact = (name, raw, tgt) => {
+      const v = raw.filter(x => x != null);
+      if (!v.length) return name + ': no weeks logged yet.';
+      const cur = v[v.length - 1], avg = v.reduce((s, x) => s + x, 0) / v.length;
+      const lo = Math.min(...v), hi = Math.max(...v), over = cur - tgt;
+      const overTxt = over > 0.05 ? r1(over) + ' points OVER target' : over < -0.05 ? r1(-over) + ' points under target' : 'right on target';
+      return name + ': current week ' + r1(cur) + '%, target ' + tgt + '%, ' + overTxt + '. '
+        + 'Last ' + v.length + ' weeks ran ' + r1(lo) + '% to ' + r1(hi) + '%, averaging ' + r1(avg) + '%, '
+        + v.filter(x => x > tgt).length + ' of ' + v.length + ' weeks over target. Direction: ' + direction(v) + '.';
+    };
+    const bP = weeks.map(w => w.bar?.cost_pct);
+    const fP = weeks.map(w => w.food?.cost_pct);
+    const pP = weeks.map(w => w.prime_cost_pct);
     const bR = weeks.map(w => w.bar?.revenue).filter(v => v != null);
-    const aB = avg(bP).toFixed(1), aF = avg(fP).toFixed(1), aP = avg(pP).toFixed(1), aR = avg(bR);
-    const gap = ((parseFloat(aB) - bT) / 100 * aR).toFixed(0);
-    const trend = bP.length >= 3 ? (bP[bP.length - 1] - bP[0] > 1 ? 'trending higher (worsening)' : bP[0] - bP[bP.length - 1] > 1 ? 'trending lower (improving)' : 'holding steady') : 'early data';
-    const lines = [
-      'Bar Pour Cost %: ' + weeks.map(w => (w.bar?.cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + bT + '% avg:' + aB + '%)',
-      'Food Cost %: ' + weeks.map(w => (w.food?.cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + fT + '% avg:' + aF + '%)',
-      'Prime Cost %: ' + weeks.map(w => (w.prime_cost_pct || 0).toFixed(1) + '%').join(', ') + ' (target:' + pT + '% avg:' + aP + '%)',
-      'Bar Revenue: ' + weeks.map(w => '$' + Math.round(w.bar?.revenue || 0)).join(', '),
-      'Weekly gap vs bar target: $' + Math.abs(gap) + ' ' + (parseFloat(gap) > 0 ? 'over' : 'under'),
-      'Pour cost trend: ' + trend
+    const aR = bR.length ? bR.reduce((s, x) => s + x, 0) / bR.length : 0;
+    const curB = bP.filter(v => v != null).slice(-1)[0];
+    const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
+    const facts = [
+      metricFact('Bar pour cost', bP, bT),
+      metricFact('Food cost', fP, fT),
+      metricFact('Prime cost', pP, pT),
+      'Bar revenue is averaging about $' + Math.round(aR) + ' a week.',
+      barOver > 0
+        ? 'At this bar pour cost, the overage is costing about $' + barOver + ' a week.'
+        : 'Bar pour cost is at or under target, so there is no pour overage to chase right now.'
     ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n' + lines.join('\n') + '\n\nLead with the most urgent cost issue, then revenue trend, then the single action that will matter most this week.';
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief, blunt read for a fellow owner. The facts below are already computed from this operator\'s own weekly numbers.\n\n'
+      + 'STRICT RULES, follow exactly:\n'
+      + '- Use only the facts below. Do not invent numbers, streaks, or week counts.\n'
+      + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it. If current bar pour cost is 22.8%, do not say it is above 23% or stuck high.\n'
+      + '- Respect the stated direction. If a metric is falling and improving, do not call it stuck or rising. If it is on or under target, say so plainly.\n'
+      + '- State over or under target exactly as given.\n'
+      + '- No emdashes, no dashes used as punctuation, no bullet points, no headers, no AI phrasing. Plain operator sentences.\n\n'
+      + 'FACTS:\n' + facts.join('\n')
+      + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
 
     fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
