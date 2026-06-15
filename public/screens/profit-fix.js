@@ -122,7 +122,7 @@ S.ProfitFix = {
       const m = (App.data && App.data.menu_items) || [];
       return m.some(x => x.recipe && Array.isArray(x.recipe.ingredients) && x.recipe.ingredients.length > 0);
     }
-    if (key === 'comp_threshold') return (parseFloat(App.data && App.data.settings && App.data.settings.comp_auth_threshold) || 0) > 0;
+    if (key === 'comp_threshold') return (parseFloat(App.shiftData && App.shiftData.settings && App.shiftData.settings.comp_auth_threshold) || 0) > 0;
     return false;
   },
 
@@ -177,14 +177,17 @@ S.ProfitFix = {
     const good = watched.filter(st => st.good).length;
     const rs = watched.filter(st => st.kind === 'recur' || st.kind === 'setup');
     const untouched = rs.length > 0 && rs.every(st => (st.kind === 'recur' ? st.never : !st.good));
-    const anyBad = watched.some(st => (st.kind === 'recur' && (st.state === 'behind' || st.never)) || (st.kind === 'setup' && !st.good));
-    const anySlip = watched.some(st => (st.kind === 'recur' && st.state === 'slipping') || (st.kind === 'state' && !st.good));
+    const behind = watched.filter(st => (st.kind === 'recur' && (st.state === 'behind' || st.never)) || (st.kind === 'setup' && !st.good)).length;
+    const slipping = watched.filter(st => (st.kind === 'recur' && st.state === 'slipping') || (st.kind === 'state' && !st.good)).length;
+    // The label names the cause so it connects to the steps: a system reads
+    // On track only while every watched step is current, otherwise it says
+    // exactly how many are behind or slipping (fix them and it climbs back).
     let state, label;
-    if (untouched)      { state = 'new';     label = 'Not started'; }
-    else if (anyBad)    { state = 'atrisk';  label = 'At risk'; }
-    else if (anySlip)   { state = 'slipping'; label = 'Slipping'; }
-    else                { state = 'running'; label = 'Running'; }
-    return { state, label, good, watched: watched.length };
+    if (untouched)         { state = 'new';      label = 'Not started'; }
+    else if (behind > 0)   { state = 'atrisk';   label = behind + (behind === 1 ? ' step behind' : ' steps behind'); }
+    else if (slipping > 0) { state = 'slipping'; label = slipping + (slipping === 1 ? ' step slipping' : ' steps slipping'); }
+    else                   { state = 'running';  label = 'On track'; }
+    return { state, label, good, watched: watched.length, behind, slipping };
   },
   healthColor(state) {
     return state === 'running' ? 'var(--green)' : state === 'slipping' ? 'var(--amber)' : state === 'atrisk' ? 'var(--red)' : 'var(--t3)';
@@ -282,7 +285,6 @@ S.ProfitFix = {
     const rec = logged ? this.recoveredFor(g.id) : 0;
     const sel = g.id === this._workGap;
     const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
-      + (h.watched ? '<span style="color:var(--t3);"> &middot; ' + h.good + ' of ' + h.watched + ' on track</span>' : '')
       + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
     return '<div class="pf-tile' + (sel ? ' sel' : '') + '" data-gap="' + esc(g.id) + '">'
       + '<div style="display:flex;align-items:center;gap:12px;">'
@@ -387,7 +389,7 @@ S.ProfitFix = {
   showHowTo() {
     App.showHelpModal('How the Profit Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you put in place and then keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is actually happening.'] },
-      { h: 'Your Profit Systems', p: ['Each system in the left list is one leak. The ring and status read off live data: how many of the watched steps are on track. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads Running only while the work keeps flowing, and drops back to Slipping or At risk on its own the moment it lapses.'] },
+      { h: 'Your Profit Systems', p: ['Each system in the left list is one leak. The ring and status read off live data: how many of the watched steps are on track. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads On track only while every watched step is current; the moment one lapses it tells you exactly how many steps are slipping or behind, so you know what to get back on.'] },
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. You cannot fake a counted drawer or a logged comp. Even the weekly reviews count, because opening the screen leaves a record, and steps like repricing read your live numbers (any menu item still over target) or open vendor claims still owed. This is the honest answer to whether the system is being worked, not just claimed.'] },
       { h: 'Guidance Steps', p: ['The handful of things Bar Cop genuinely cannot see, a signed paper policy, the jigger pour-test on the floor, are marked Guidance. They still matter, but they are never counted as proof, so nobody passes a system by clicking a box.'] },
       { h: 'Watch Out For', p: ['At the bottom of each system are the mistakes that quietly break its numbers, the things Bar Cop itself cannot catch for you. Worth a read before you chase a number that looks off.'] },
