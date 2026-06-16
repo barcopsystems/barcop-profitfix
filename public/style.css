@@ -232,17 +232,19 @@ input,select,textarea{color-scheme:dark;}
    arrow pops, the current location is highlighted. Strict palette: darkest
    panel, card-surface rows, the sidebar's navy for hover + selected. */
 .mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
-.mnav-title{flex:1;text-align:center;font-size:13px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mnav-title{flex:1;text-align:center;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--t2);font-size:22px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
 .mnav-back:hover,.mnav-x:hover{background:var(--c3);color:var(--w);}
 .mnav-back-sp{width:34px;flex-shrink:0;}
-.mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:24px;}
-.mnav-glabel{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:17px 18px 6px;}
-.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;font-size:14px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);background:var(--surface);transition:background .1s;}
+.mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:28px;background:var(--surface);}
+.mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}
+.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;font-size:14px;color:var(--t1);cursor:pointer;background:var(--surface);transition:background .1s;}
 .mnav-row:hover,.mnav-row:active{background:var(--c3);color:var(--w);}
 .mnav-row.on{background:var(--nav-act);color:var(--w);}
-.mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;}
+.mnav-page{padding-left:34px;}
+.mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;transition:transform .15s ease;}
 .mnav-row:hover .mnav-chev,.mnav-row.on .mnav-chev{color:var(--w);}
+.mnav-row.open .mnav-acc-chev{transform:rotate(90deg);}
 
 /* Footer */
 .sidebar-footer{
