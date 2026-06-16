@@ -65,7 +65,6 @@ S.Hub = {
         + '<span class="nav-label">' + name + '</span></div>';
     return ''
       + '<div class="nav-section">Accounting</div>'
-      + row('books-home', 'Overview', 'grid')
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
       + row('year-end', 'Year-End Review', 'calendar')
@@ -83,11 +82,11 @@ S.Hub = {
   // + Account (User Accounts) + Support. Opened from the top-nav gear.
   _settingsSidebarHTML() {
     const ic = {
-      grid:    '<rect x="2" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/>',
       getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       profile: '<path d="M3 7.5V14h11V7.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 4h13l1 3.5H1L2 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 14v-3.5h4V14" stroke="currentColor" stroke-width="1.2" fill="none"/>',
       target:  '<circle cx="8.5" cy="8.5" r="6.3" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="3.4" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/>',
       user:    '<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      team:    '<circle cx="6" cy="6.5" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.4 1.9-4 4.2-4s4.2 1.6 4.2 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="12" cy="6" r="1.9" stroke="currentColor" stroke-width="1.2"/><path d="M11.4 10.1c1.8.3 3.1 1.7 3.1 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
     };
@@ -95,15 +94,18 @@ S.Hub = {
       '<div class="nav-item" data-hub-action="' + action + '">'
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
         + '<span class="nav-label">' + name + '</span></div>';
+    // Getting Started (and its Setup heading) drop off once setup is complete,
+    // the same way the old grab-bag hid it. Team Members is admin-only.
+    const setupDone = !!(App.isSetupComplete && App.isSetupComplete());
+    const isAdmin   = !!(window.DB && DB.isAdmin && DB.isAdmin());
     return ''
-      + '<div class="nav-section">Setup</div>'
-      + row('settings-home', 'Overview', 'grid')
-      + row('getting-started', 'Getting Started', 'getStart')
+      + (setupDone ? '' : '<div class="nav-section">Setup</div>' + row('getting-started', 'Getting Started', 'getStart'))
       + '<div class="nav-section">Settings</div>'
       + row('settings-profile', 'Business Profile', 'profile')
       + row('settings-targets', 'Recovery Targets', 'target')
       + '<div class="nav-section">Account</div>'
-      + row('user-accounts', 'User Accounts', 'user')
+      + row('user-account', 'Your Account', 'user')
+      + (isAdmin ? row('user-team', 'Team Members', 'team') : '')
       + '<div class="nav-section">Support</div>'
       + row('help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
@@ -993,6 +995,8 @@ S.Hub = {
       else if (action === 'settings-profile')   S.HubSettings.open('business-profile');
       else if (action === 'settings-targets')   S.HubSettings.open('recovery-targets');
       else if (action === 'settings')           S.HubSettings.open();
+      else if (action === 'user-account')       S.HubUserAccounts.open('account');
+      else if (action === 'user-team')          S.HubUserAccounts.open('team');
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'audit-history')      S.HubBarCopAudit?.openHistory?.();
