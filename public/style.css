@@ -695,6 +695,20 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    for them. */
 .app.topbar-hidden .topbar{display:none;}
 
+/* ══ UNIFIED MOBILE NAV DRAWER (App.openMobileNav) ══
+   The single grouped menu the top-nav burger opens on mobile: all top-level
+   destinations + the current section's pages + Support. Built/torn down per
+   open; desktop never sees it (the burger is hidden above 768px). */
+.tn-mnav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;}
+.tn-mnav{position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;}
+.tn-mnav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;}
+.tn-mnav-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);}
+.tn-mnav-body{overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch;}
+.tn-mnav-grp{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:17px 18px 5px;}
+.tn-mnav-item{padding:11px 18px;font-size:14px;color:var(--t1);cursor:pointer;}
+.tn-mnav-item:hover,.tn-mnav-item:active{background:var(--c3);color:var(--w);}
+.tn-mnav-item.cur{color:var(--gold);font-weight:600;}
+
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
