@@ -51,17 +51,27 @@ S.HubUserAccounts = {
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "USER ACCOUNTS | Back to Dashboard".
-  async open() {
+  // Split across two Settings-sidebar pages so the long Team / permissions card
+  // does not push everything down one scroll: 'account' = Your Account, 'team'
+  // = Team Members (admin only). No group = both (backward compatible).
+  async open(group) {
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
-    App.openHubFullPage('User Accounts', (mount) => {
+    const meta = {
+      account: { title: 'Your Account',  action: 'user-account' },
+      team:    { title: 'Team Members',  action: 'user-team' }
+    };
+    const g = meta[group] ? group : 'account';
+    App.openHubFullPage(meta[g].title, (mount) => {
       this.container = mount;
-      this.render(mount);
-    }, 'user-accounts');
+      this.render(mount, g);
+    }, meta[g].action);
   },
 
-  render(container) {
+  render(container, group) {
     const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
     const isAdmin = (window.DB && DB.isAdmin && DB.isAdmin());
+    const showTeam    = group !== 'account' && isAdmin;
+    const showAccount = group !== 'team' || !showTeam;   // non-admin 'team' falls back to account
 
     const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 12px;">' + txt + '</div>';
     const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
@@ -99,7 +109,7 @@ S.HubUserAccounts = {
           + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>')
       + '</div>';
 
-    const teamCard = isAdmin ? '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
+    const teamCard = showTeam ? '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
       +   '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Team</div>'
       + '</div>'
@@ -118,15 +128,14 @@ S.HubUserAccounts = {
 
     container.innerHTML =
       '<div class="screen">'
-      + accountCard
-      + teamCard
+      + (showAccount ? accountCard : '')
+      + (showTeam ? teamCard : '')
       + '</div>';
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
-    this.renderSubscription();
-    this._teamRoleChange();  // initialize perms grid visibility
-    if (isAdmin) this._teamRefresh();
+    if (showAccount) this.renderSubscription();
+    if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
   renderPermsGrid(currentPerms, mode) {
