@@ -1671,7 +1671,8 @@ const App = {
       const pr = PAGE_REMAP[key] || {};
       const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; return it; };
       const items = [];
-      if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, go: homeFn });
+      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home', settings: 'settings-home' })[key] || '';
+      if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
       sgs.forEach(g => {
         if (g.pages.length === 1) {
           items.push(mkPage(g.pages[0]));
@@ -1716,7 +1717,7 @@ const App = {
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:312px;max-width:88vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
+    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:var(--sidebar-w);max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
     const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
@@ -1789,7 +1790,7 @@ const App = {
             const sub = document.createElement('div');
             sub.style.display = it.open ? 'block' : 'none';
             it.pages.forEach(p => {
-              const pr = mkRow(p.label, 'page', false);
+              const pr = mkRow(p.label, 'page', !!p.id && p.id === activeId);
               pr.addEventListener('click', () => fire(p.go));
               sub.appendChild(pr);
             });
@@ -1804,7 +1805,7 @@ const App = {
             bodyEl.appendChild(head);
             bodyEl.appendChild(sub);
           } else {
-            const row = mkRow(it.label, '', false, it.icon);
+            const row = mkRow(it.label, '', !!it.id && it.id === activeId, it.icon);
             row.addEventListener('click', () => fire(it.go));
             bodyEl.appendChild(row);
           }
