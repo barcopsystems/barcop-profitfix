@@ -60,6 +60,11 @@ S.VendorTracker = {
       return;
     }
 
+    // Stamp the specific tab being viewed so the monthly Price Changes review and
+    // the quarterly Scorecard review verify independently (one tab visit must not
+    // satisfy both Profit Fix vendor steps).
+    if (App.stampFixView) App.stampFixView('vendor-tracker:' + this.tab);
+
     const tabBar = '<div class="ch-tabs no-print">'
       + [['scorecard', 'Scorecard'], ['watch', 'Price Changes'], ['discrepancies', 'Discrepancies']]
         .map(([k, l]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-vtab="' + k + '">' + l + '</button>').join('')
