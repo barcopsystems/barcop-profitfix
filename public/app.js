@@ -1175,20 +1175,23 @@ const App = {
     } else {
       nav.innerHTML = ProfitNav.html();
     }
-    // Inventory trial: render this sidebar in the mobile drawer's style (group-
+    // Mobile-style sidebar sections: render in the mobile drawer's style (group-
     // icon accordion headers, icon-less nested links, open drop-down lit). A
     // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
-    nav.classList.toggle('nav-mstyle', module === 'inventory');
+    const MSTYLE_SECTIONS = ['inventory', 'labor'];
+    const mstyle = MSTYLE_SECTIONS.indexOf(module) !== -1;
+    nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
-    if (module === 'inventory') {
+    if (mstyle) {
+      const dashScreen = this._SECTION_DASH[module];
       const firstSec = nav.querySelector('.nav-section');
-      if (firstSec && !nav.querySelector('#nav-ic-dashboard')) {
+      if (dashScreen && firstSec && !nav.querySelector('#nav-' + dashScreen)) {
         const dleaf = document.createElement('div');
         dleaf.className = 'nav-item nav-leaf';
-        dleaf.id = 'nav-ic-dashboard';
-        dleaf.dataset.screen = 'ic-dashboard';
+        dleaf.id = 'nav-' + dashScreen;
+        dleaf.dataset.screen = dashScreen;
         dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
