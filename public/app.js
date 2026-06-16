@@ -1446,10 +1446,10 @@ const App = {
     const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
-    // The live active page — used to auto-expand the section + sub-group you are in.
-    const liveNav = onHub ? document.querySelector('.hub-app .sidebar-nav') : document.getElementById('sidebar-nav');
-    const activeEl = liveNav ? liveNav.querySelector('.nav-item.active') : null;
-    const activeId = activeEl ? (activeEl.dataset.screen || activeEl.dataset.hubAction || '') : '';
+    // Per-section memory: the LAST sub-group (drop-down) the operator opened in
+    // each section stays open + highlighted until they open a different one. The
+    // menu does NOT track or highlight the last visited page.
+    if (!App._mnavOpenGroups) App._mnavOpenGroups = {};
 
     // Parse a section's sidebar HTML into its sub-groups, each with its pages, so
     // the mobile menu keeps the COUNTS / ORDERING / … structure and is never one
@@ -1534,39 +1534,73 @@ const App = {
       bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       dash:'<rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/>'
     };
+    // Group (drop-down) icons, keyed by the section's ORIGINAL sub-group name.
+    // Only the accordion HEADERS use these; the links nested under them stay
+    // icon-less, and single-page groups render as leaves with their page icon.
+    const GIC = {
+      'Analysis':'<circle cx="7" cy="7" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Weekly':'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Leaks':'<path d="M8.5 2.2C8.5 2.2 4 7.4 4 10.4a4.5 4.5 0 0 0 9 0C13 7.4 8.5 2.2 8.5 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+      'Menu and Pricing':'<path d="M7.8 2.2H3.2a1 1 0 0 0-1 1v4.6a1 1 0 0 0 .3.7l6 6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4l-6-6a1 1 0 0 0-.7-.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" fill="currentColor"/>',
+      'Performance':'<path d="M2 12l4-4 3 3 5.5-6M11 5h3.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      'History':'<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
+      'Digital Presence':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      'Social and Delivery':'<path d="M3 4.2a1.4 1.4 0 0 1 1.4-1.4h8.2A1.4 1.4 0 0 1 14 4.2v5a1.4 1.4 0 0 1-1.4 1.4H7l-3.4 2.8V10.6h-.2A1.4 1.4 0 0 1 3 9.2v-5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+      'Audit':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      'By Recovery System':'<path d="M8.5 2L2 5.3l6.5 3.3L15 5.3 8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2 8.7l6.5 3.3L15 8.7M2 12l6.5 3.3L15 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
+      'Counts':'<rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 7.5h5M6 10.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Ordering':'<path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/>',
+      'Receiving':'<rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/>',
+      'Operations':'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Reports':'<rect x="3" y="2" width="11" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 11V8M8.5 11V6M11 11v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Setup':'<path d="M10.8 2.6a3.4 3.4 0 0 0-4 4.4l-4.3 4.3 2.2 2.2 4.3-4.3a3.4 3.4 0 0 0 4.4-4l-2 2-1.5-.4-.4-1.5 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+      'Scheduling':'<rect x="2" y="3" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6 10h2M9.5 10h1.5M6 12.5h2M9.5 12.5h1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      'Tips':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v7M6.7 6.8h3a1 1 0 0 1 0 2H7.2a1 1 0 0 0 0 2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      'Payroll':'<rect x="2" y="4.5" width="13" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6.5v4M12.5 6.5v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      'Shifts':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Cash':'<rect x="2" y="5" width="13" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M8.5 7.3v2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.2"/>',
+      'Checklists':'<path d="M7 4.5h7.5M7 8.5h7.5M7 12.5h7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 4l1 1 1.6-1.9M2.5 8l1 1 1.6-1.9M2.5 12l1 1 1.6-1.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+      'Accounting':'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      'Settings':'<path d="M3 5h5M11.5 5h2.5M3 12h2.5M10 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.5" cy="5" r="1.7" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="12" r="1.7" stroke="currentColor" stroke-width="1.3"/>',
+      'Account':'<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      'Bookings':'<rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 10h6M5.5 12h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+    };
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
+    // Mobile-only label remaps (do NOT touch the desktop sidebars).
+    const GROUP_REMAP = { audit: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' } };
+    const PAGE_REMAP  = { audit: { 'Bar Cop Audit': 'Run/View Audit' } };
     // A section node lists its sub-groups as single-open ACCORDIONS (they expand
-    // inline) plus any leaf pages. Leaf pages keep their icons; the accordion
-    // sub-group headers and the links inside them carry no icon.
-    const sectionNode = (label, key, homeFn, homeLabel) => {
+    // inline) plus any leaf pages. Leaf rows (Dashboard, single-page groups, Help)
+    // keep their icons; the accordion sub-group HEADERS now carry a group icon
+    // too. The only rows with no icon are the final links nested under a drop-down.
+    const sectionNode = (label, key, homeFn, homeLabel, panelTitle) => {
       const sgs = groupsOf(() => navHtml(key));
+      const gr = GROUP_REMAP[key] || {};
+      const pr = PAGE_REMAP[key] || {};
+      const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; return it; };
       const items = [];
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, go: homeFn });
       sgs.forEach(g => {
-        const gActive = !!activeId && g.pages.some(p => (p.screen || p.action) === activeId);
         if (g.pages.length === 1) {
-          items.push(pageItem(g.pages[0]));
+          items.push(mkPage(g.pages[0]));
         } else {
-          items.push({ label: g.group, pages: g.pages.map(pageItem), open: gActive });
+          items.push({ label: gr[g.group] || g.group, groupKey: g.group, icon: GIC[g.group] || '', pages: g.pages.map(mkPage), open: App._mnavOpenGroups[key] === g.group });
         }
       });
-      const node = { title: label, items: items };
-      node._contains = !!activeId && sgs.some(g => g.pages.some(p => (p.screen || p.action) === activeId));
-      return node;
+      return { title: panelTitle || label, items: items, _key: key };
     };
-    const drill = (label, key, homeFn, homeLabel, icon) => {
-      const node = sectionNode(label, key, homeFn, homeLabel);
-      return { label: label, key: key, icon: icon, node: node, contains: node._contains };
+    const drill = (label, key, homeFn, homeLabel, icon, panelTitle) => {
+      return { label: label, key: key, icon: icon, node: sectionNode(label, key, homeFn, homeLabel, panelTitle) };
     };
 
-    const root = { title: 'Menu', groups: [
+    const root = { title: 'Bar Cop Menu', groups: [
       { label: 'Go to', items: [
         { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
         { label: 'Blueprint', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Dashboard', IC.books),
-        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Dashboard', IC.settings)
+        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Dashboard', IC.settings, 'App Settings')
       ]},
       { label: 'Control', items: [
         drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', IC.inventory),
@@ -1606,12 +1640,10 @@ const App = {
     // included — returns to that section's menu with the current page highlighted.
     const curKey = onHub ? (App._curHubSection || '') : (App._activeModule || '');
     const stack = [root];
-    let secItem = null;
-    if (curKey) root.groups.forEach(grp => grp.items.forEach(it => { if (it.key === curKey) secItem = it; }));
-    if (!secItem) root.groups.forEach(grp => grp.items.forEach(it => { if (it.contains && it.node) secItem = it; }));
-    if (secItem) {
-      stack.push(secItem.node);
-      secItem.node._homeActive = !secItem.node._contains;   // on the dashboard, not a sub-page
+    if (curKey) {
+      let secItem = null;
+      root.groups.forEach(grp => grp.items.forEach(it => { if (it.key === curKey) secItem = it; }));
+      if (secItem) stack.push(secItem.node);
     }
 
     const mkRow = (label, type, on, icon) => {
@@ -1646,8 +1678,7 @@ const App = {
             bodyEl.appendChild(gl);
           }
           grp.items.forEach(it => {
-            const on = (it.id && it.id === activeId) || it.contains;
-            const row = mkRow(it.label, it.node ? 'drill' : '', on, it.icon);
+            const row = mkRow(it.label, it.node ? 'drill' : '', false, it.icon);
             row.addEventListener('click', () => {
               if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
               else if (it.go) { fire(it.go); }
@@ -1661,26 +1692,26 @@ const App = {
         const accs = [];
         node.items.forEach(it => {
           if (it.pages) {
-            const head = mkRow(it.label, 'acc', false);
+            const head = mkRow(it.label, 'acc', false, it.icon);
             if (it.open) head.classList.add('open');
             const sub = document.createElement('div');
             sub.style.display = it.open ? 'block' : 'none';
             it.pages.forEach(p => {
-              const pr = mkRow(p.label, 'page', !!p.id && p.id === activeId);
+              const pr = mkRow(p.label, 'page', false);
               pr.addEventListener('click', () => fire(p.go));
               sub.appendChild(pr);
             });
             head.addEventListener('click', () => {
               const isOpen = sub.style.display !== 'none';
               accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
-              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
+              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); App._mnavOpenGroups[node._key] = it.groupKey; }
+              else { delete App._mnavOpenGroups[node._key]; }
             });
             accs.push({ head: head, sub: sub });
             bodyEl.appendChild(head);
             bodyEl.appendChild(sub);
           } else {
-            const on = (it.home && node._homeActive) || (!!it.id && it.id === activeId);
-            const row = mkRow(it.label, '', on, it.icon);
+            const row = mkRow(it.label, '', false, it.icon);
             row.addEventListener('click', () => fire(it.go));
             bodyEl.appendChild(row);
           }
