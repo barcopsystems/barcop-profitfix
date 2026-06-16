@@ -674,6 +674,7 @@ const App = {
     document.body.classList.add('chrome-on');     // shared top nav sits above the Hub too
     document.body.classList.add('hub-dashboard'); // dashboard view = no sidebar (full-width)
     this._activeScreenObj = this._hubHelpShim('hub'); // nav "i" → Hub directions
+    this._curHubSection = null;                       // Hub dashboard is not a section
     this._renderProtoTopnav('hub');               // Hub link active, no section active
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
@@ -763,6 +764,7 @@ const App = {
     // dashboard mode (no sidebar); Bar Cop Audit mounts its own context
     // sidebar; everything else falls back to the default Hub sidebar.
     const _sideCtx = this._HUB_SIDEBAR_OF_ACTION[activeAction] || 'grabbag';
+    this._curHubSection = (_sideCtx === 'audit' || _sideCtx === 'books' || _sideCtx === 'settings') ? _sideCtx : null;
     if (_sideCtx === 'none') {
       document.body.classList.add('hub-dashboard');     // full-width, no sidebar
     } else {
@@ -1469,7 +1471,7 @@ const App = {
             const label = (el.querySelector('.nav-label')?.textContent || '').trim();
             if (!label) return;
             if (!cur) { cur = { group: '', pages: [] }; out.push(cur); }
-            cur.pages.push({ label, action, screen: el.dataset.screen || '' });
+            cur.pages.push({ label, action, screen: el.dataset.screen || '', icon: (el.querySelector('.nav-icon') ? el.querySelector('.nav-icon').innerHTML : '') });
           }
         });
       } catch (e) {}
@@ -1515,14 +1517,31 @@ const App = {
     // flat, uniform list shows at a time, so it stays clean however deep the nav
     // goes. The section/sub-group holding the current page are marked so the menu
     // opens drilled-in there with that page highlighted.
-    const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, go: () => routePage(p) });
+    const IC = {
+      hub:'<rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>',
+      blueprint:'<rect x="2" y="3" width="13" height="11" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.5h3M5 9.5h5M11.5 6v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      audit:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      events:'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      books:'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      inventory:'<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
+      labor:'<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      shift:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      profit:'<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      revenue:'<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      traffic:'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      help:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+      bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      dash:'<rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/>'
+    };
+    const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
     // A section node lists its sub-groups as single-open ACCORDIONS (they expand
-    // inline, one at a time) plus any leaf pages. Only the root drills; once
-    // you're inside a section, the sub-group links open below in place.
+    // inline) plus any leaf pages. Leaf pages keep their icons; the accordion
+    // sub-group headers and the links inside them carry no icon.
     const sectionNode = (label, key, homeFn, homeLabel) => {
       const sgs = groupsOf(() => navHtml(key));
       const items = [];
-      if (homeFn) items.push({ label: homeLabel || 'Overview', go: homeFn });
+      if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, go: homeFn });
       sgs.forEach(g => {
         const gActive = !!activeId && g.pages.some(p => (p.screen || p.action) === activeId);
         if (g.pages.length === 1) {
@@ -1535,33 +1554,33 @@ const App = {
       node._contains = !!activeId && sgs.some(g => g.pages.some(p => (p.screen || p.action) === activeId));
       return node;
     };
-    const drill = (label, key, homeFn, homeLabel) => {
+    const drill = (label, key, homeFn, homeLabel, icon) => {
       const node = sectionNode(label, key, homeFn, homeLabel);
-      return { label: label, node: node, contains: node._contains };
+      return { label: label, key: key, icon: icon, node: node, contains: node._contains };
     };
 
     const root = { title: 'Menu', groups: [
       { label: 'Go to', items: [
-        { label: 'Hub', go: () => App.showHub() },
-        { label: 'Blueprint', go: () => S2.FlowMap && S2.FlowMap.open() },
-        drill('Audits', 'audit', null, null),
-        drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard'),
-        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview'),
-        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview')
+        { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
+        { label: 'Blueprint', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
+        drill('Audits', 'audit', null, null, IC.audit),
+        drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', IC.events),
+        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Dashboard', IC.books),
+        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Dashboard', IC.settings)
       ]},
       { label: 'Control', items: [
-        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard'),
-        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard'),
-        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard')
+        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', IC.inventory),
+        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard', IC.labor),
+        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard', IC.shift)
       ]},
       { label: 'Recovery', items: [
-        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard'),
-        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard'),
-        drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard')
+        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard', IC.profit),
+        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard', IC.revenue),
+        drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', IC.traffic)
       ]},
       { label: 'Support', items: [
-        { label: 'Help and FAQ', go: () => S2.HubHelp && S2.HubHelp.open() },
-        { label: 'Report a Bug', go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
+        { label: 'Help and FAQ', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() },
+        { label: 'Report a Bug', icon: IC.bug, go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
       ]}
     ]};
 
@@ -1582,20 +1601,27 @@ const App = {
     panel.appendChild(headEl);
     panel.appendChild(bodyEl);
 
-    // Start drilled into the section holding the current page (its active
-    // sub-group accordion opens automatically inside).
+    // Open drilled into the section you are in (module via _activeModule, hub via
+    // _curHubSection), so reopening the menu on ANY of its pages — the dashboard
+    // included — returns to that section's menu with the current page highlighted.
+    const curKey = onHub ? (App._curHubSection || '') : (App._activeModule || '');
     const stack = [root];
     let secItem = null;
-    root.groups.forEach(grp => grp.items.forEach(it => { if (it.contains && it.node) secItem = it; }));
-    if (secItem) stack.push(secItem.node);
+    if (curKey) root.groups.forEach(grp => grp.items.forEach(it => { if (it.key === curKey) secItem = it; }));
+    if (!secItem) root.groups.forEach(grp => grp.items.forEach(it => { if (it.contains && it.node) secItem = it; }));
+    if (secItem) {
+      stack.push(secItem.node);
+      secItem.node._homeActive = !secItem.node._contains;   // on the dashboard, not a sub-page
+    }
 
-    const mkRow = (label, type, on) => {
+    const mkRow = (label, type, on, icon) => {
       const r = document.createElement('div');
       r.className = 'mnav-row' + (type === 'page' ? ' mnav-page' : '') + (on ? ' on' : '');
+      const ic = '<span class="mnav-ic-slot">' + (icon ? '<svg class="mnav-ic" viewBox="0 0 17 17" fill="none">' + icon + '</svg>' : '') + '</span>';
       let chev = '';
       if (type === 'drill') chev = '<span class="mnav-chev">›</span>';
       else if (type === 'acc') chev = '<span class="mnav-chev mnav-acc-chev">›</span>';
-      r.innerHTML = '<span>' + esc(label) + '</span>' + chev;
+      r.innerHTML = '<span class="mnav-l">' + ic + esc(label) + '</span>' + chev;
       return r;
     };
 
@@ -1611,7 +1637,7 @@ const App = {
 
       bodyEl.innerHTML = '';
       if (node.groups) {
-        // Root: sections drill in; Hub/Blueprint/Support navigate directly.
+        // Root: sections drill in (with icons); Hub/Blueprint/Support navigate.
         node.groups.forEach(grp => {
           if (grp.label) {
             const gl = document.createElement('div');
@@ -1621,7 +1647,7 @@ const App = {
           }
           grp.items.forEach(it => {
             const on = (it.id && it.id === activeId) || it.contains;
-            const row = mkRow(it.label, it.node ? 'drill' : '', on);
+            const row = mkRow(it.label, it.node ? 'drill' : '', on, it.icon);
             row.addEventListener('click', () => {
               if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
               else if (it.go) { fire(it.go); }
@@ -1630,7 +1656,8 @@ const App = {
           });
         });
       } else {
-        // Section: sub-groups are single-open accordions; leaf pages navigate.
+        // Section: leaf pages keep icons; sub-groups are single-open accordions
+        // (no icons on the header or the links inside).
         const accs = [];
         node.items.forEach(it => {
           if (it.pages) {
@@ -1652,8 +1679,8 @@ const App = {
             bodyEl.appendChild(head);
             bodyEl.appendChild(sub);
           } else {
-            const on = !!it.id && it.id === activeId;
-            const row = mkRow(it.label, '', on);
+            const on = (it.home && node._homeActive) || (!!it.id && it.id === activeId);
+            const row = mkRow(it.label, '', on, it.icon);
             row.addEventListener('click', () => fire(it.go));
             bodyEl.appendChild(row);
           }
