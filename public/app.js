@@ -2907,6 +2907,9 @@ const App = {
         traffic_week: 'traffic_weeks', traffic_audit: 'traffic_audits',
         traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
         traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns',
+        // Events section — unified booking record (row-per-record). Replaces the
+        // old revenue_event; rate cards / regulars / calendar stay in the blob.
+        booking: 'bookings',
         // Shared Recovery Scoreboard feed — one module-tagged kind.
         fix_log: 'fix_log',
         // Hub — executive monthly audit history. operating_expenses +
