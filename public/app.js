@@ -1238,7 +1238,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1265,6 +1265,21 @@ const App = {
     'settings-home': { title: 'Settings', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
       { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
+    ] },
+    'audit-help': { title: 'Bar Cop Audit Help', sections: [
+      { p: ['The full Help and FAQ for the Bar Cop Audit: what it measures, the 30-day rhythm, and how it relates to your Profit, Revenue, and Traffic audits.'] },
+      { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
+      { h: 'Directions for a specific page', p: ['Open the page you have a question about and tap this same info i button for its step-by-step. This FAQ covers the why.'] }
+    ] },
+    'books-help': { title: 'Books Help', sections: [
+      { p: ['The full Help and FAQ for Books: the accounting deliverables, how Permits and Operating Expenses work, and where the numbers come from.'] },
+      { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
+      { h: 'Directions for a specific page', p: ['Open the page you have a question about and tap this same info i button for its step-by-step. This FAQ covers the why.'] }
+    ] },
+    'settings-help': { title: 'Settings Help', sections: [
+      { p: ['The full Help and FAQ for Settings: what each settings area does and how your account and team work.'] },
+      { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
+      { h: 'Directions for a specific page', p: ['Open the page you have a question about and tap this same info i button for its step-by-step. This FAQ covers the why.'] }
     ] }
   },
   _hubHelpShim(action) {
