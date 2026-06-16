@@ -735,6 +735,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* Background changes only on MAIN links (drop-down headers + the Dashboard leaf);
    nested links turn their text white on hover with no background change. */
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.nav-leaf:hover{background:var(--c3);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:not(.nav-leaf):hover{background:transparent;}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.active{background:transparent;}
 .nav-mstyle .nav-sec-ic{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:color .12s;}
 .nav-mstyle .nav-sec-ic svg{width:17px;height:17px;}
