@@ -6,6 +6,57 @@ S.Hub = {
   WEEKLY_CUTOFF: 8,
   _sidebarCollapsed: false,
 
+  // ── Bar Cop Audit context sidebar ─────────────────────────────────────────
+  // The Hub shell's sidebar is context-aware. The Bar Cop Audit pages get this
+  // dedicated sidebar instead of the old grab-bag: Overall + quick-links into
+  // each Recovery section's own audit page + History + Support. The three
+  // Recovery-audit rows use data-hub-action "enter", so clicking one hands the
+  // operator off into that section (leaving the Hub shell) and lands on its
+  // existing audit page, unchanged.
+  _auditSidebarHTML() {
+    const ic = {
+      audit:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+      traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      calendar:'<rect x="2" y="3.5" width="13" height="11.5" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 7h13" stroke="currentColor" stroke-width="1.3"/><path d="M5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+      bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+    };
+    const row = (action, name, iconKey, extra) => {
+      const attrs = (extra || []).map(([k, v]) => ' ' + k + '="' + v + '"').join('');
+      return '<div class="nav-item" data-hub-action="' + action + '"' + attrs + '>'
+        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
+        + '<span class="nav-label">' + name + '</span></div>';
+    };
+    return ''
+      + '<div class="nav-section">Audit</div>'
+      + row('bar-cop-audit', 'Overall Audit', 'audit', [])
+      + '<div class="nav-section">By Recovery System</div>'
+      + row('enter', 'Profit Audit',  'profit',  [['data-mod', 'profit'],  ['data-screen', 'audit-tracker']])
+      + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
+      + row('enter', 'Traffic Audit', 'traffic', [['data-mod', 'traffic'], ['data-screen', 't-audit']])
+      + '<div class="nav-section">History</div>'
+      + row('audit-history', 'Audit History', 'calendar', [])
+      + '<div class="nav-section">Support</div>'
+      + row('help',       'Help and FAQ', 'help', [])
+      + row('report-bug', 'Report a Bug', 'bug',  []);
+  },
+
+  // Swap the Hub shell's sidebar for a context. 'audit' mounts the Bar Cop
+  // Audit sidebar; anything else restores the default (grab-bag) nav cached
+  // when the Hub last rendered. The delegated click handler lives on
+  // .sidebar-nav (wired once in render), so swapping innerHTML keeps it live.
+  renderSidebar(context) {
+    const nav = document.querySelector('.hub-app .sidebar-nav');
+    if (!nav) return;
+    if (context === 'audit') {
+      nav.innerHTML = this._auditSidebarHTML();
+    } else if (this._grabBagNavHTML != null) {
+      nav.innerHTML = this._grabBagNavHTML;
+    }
+  },
+
   render(container) {
     this._stage = container;
     // Outer wrapper scrolls when the dashboard content exceeds the viewport
@@ -731,6 +782,10 @@ S.Hub = {
       + navItem('report-bug',       'Report a Bug',    'bug',      [])
       + navItem('contact-support',  'Contact Us',      'mail',     []);
 
+    // Cache the default (grab-bag) sidebar nav so renderSidebar() can restore it
+    // after a context sidebar (e.g. Bar Cop Audit) was swapped in.
+    this._grabBagNavHTML = sidebarNav;
+
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
     // ── Compose ──
@@ -866,6 +921,7 @@ S.Hub = {
       else if (action === 'settings')           S.HubSettings.open();
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
+      else if (action === 'audit-history')      S.HubBarCopAudit?.openHistory?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
