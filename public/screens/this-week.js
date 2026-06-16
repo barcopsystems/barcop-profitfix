@@ -31,11 +31,22 @@ S.ThisWeek = {
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
   // ── Inventory Control COGS feed ───────────────────────────────────────────
-  icCOGS(cats) {
+  icCOGS(cats, periodEnd) {
     const counts = [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
     if (counts.length < 2) return null;
-    const startC = counts[counts.length - 2], endC = counts[counts.length - 1];
+    // Scope to the count pair ending on or before the selected week, so loading a
+    // past week pulls THAT week's usage, not the most recent counts. With no
+    // periodEnd (or no count pair on/before it) fall back to the latest pair.
+    let endIdx = counts.length - 1;
+    if (periodEnd) {
+      const cdate = c => String(c.date || c.created_at || '').slice(0, 10);
+      let idx = -1;
+      for (let i = counts.length - 1; i >= 0; i--) { if (cdate(counts[i]) <= periodEnd) { idx = i; break; } }
+      if (idx < 1) return null;   // no count pair on or before this week → no honest COGS
+      endIdx = idx;
+    }
+    const startC = counts[endIdx - 1], endC = counts[endIdx];
     const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
     const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
     const eMap = {}; (endC.items || []).forEach(it => eMap[it.product_id] = it);
@@ -117,7 +128,7 @@ S.ThisWeek = {
 
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
   freshDraft(periodEnd) {
-    const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
+    const bc = this.icCOGS(this.BAR_CATS, periodEnd), fc = this.icCOGS(this.KITCHEN_CATS, periodEnd);
     const sr = this.shiftRevenue(periodEnd);
     const lc = this.laborCost(periodEnd);
     return {
@@ -429,7 +440,7 @@ S.ThisWeek = {
 
   async pullAll() {
     const pe = this._weekEnd;
-    const bc = this.icCOGS(this.BAR_CATS), fc = this.icCOGS(this.KITCHEN_CATS);
+    const bc = this.icCOGS(this.BAR_CATS, pe), fc = this.icCOGS(this.KITCHEN_CATS, pe);
     const sr = this.shiftRevenue(pe);
     const lc = this.laborCost(pe);
     const incoming = {};
