@@ -1,0 +1,208 @@
+'use strict';
+
+/* ── Events — Regulars ───────────────────────────────────────────────────────
+   The bar's regulars book in digital form: name, contact, birthday, anniversary,
+   drink preferences, last visit. Drives birthday and anniversary outreach (the
+   highest-converting message an independent bar sends) and surfaces regulars who
+   have gone quiet so you can pull them back. Add one at a time or import a list.
+   Persists in event_regulars. */
+
+S.EventsRegulars = {
+  entryMode: 'manual',
+  filter: '',
+  QUIET_DAYS: 60,
+
+  regulars() { if (!Array.isArray(App.data.event_regulars)) App.data.event_regulars = []; return App.data.event_regulars; },
+
+  fmtMD(str)  { if (!str) return ''; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
+  fmtDate(str){ if (!str) return ''; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); },
+  monthOf(str){ if (!str) return -1; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? -1 : d.getMonth(); },
+  daysSince(str){ if (!str) return null; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); if (isNaN(d.getTime())) return null; return Math.round((new Date(App.todayLocal() + 'T00:00:00') - d) / 86400000); },
+  isQuiet(r){ const d = this.daysSince(r.last_visit); return d == null || d >= this.QUIET_DAYS; },
+
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    this.renderList();
+  },
+
+  // Shared field cells; p is the id prefix so the inline add form and the edit
+  // modal never share ids.
+  formCells(r, p) {
+    const v = x => (x != null && x !== '') ? x : '';
+    return '<div class="form-row" style="gap:14px;">'
+      + '<div class="f"><label>Name</label><input type="text" id="' + p + '-name" value="' + esc(r?.name || '') + '" placeholder="Jen Mitchell"/></div>'
+      + '<div class="f"><label>Phone</label><input type="tel" id="' + p + '-phone" value="' + esc(r?.contact_phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f"><label>Email</label><input type="email" id="' + p + '-email" value="' + esc(r?.contact_email || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;">'
+      + '<div class="f"><label>Birthday</label><input type="date" id="' + p + '-bday" value="' + esc(r?.birthday || '') + '"/></div>'
+      + '<div class="f"><label>Anniversary</label><input type="date" id="' + p + '-anniv" value="' + esc(r?.anniversary || '') + '"/></div>'
+      + '<div class="f"><label>Last Visit</label><input type="date" id="' + p + '-visit" value="' + esc(r?.last_visit || '') + '"/></div>'
+      + '<div class="f" style="align-self:flex-end;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);"><input type="checkbox" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + '/> VIP</label></div>'
+      + '</div>'
+      + '<div class="f" style="width:100%;"><label>Drink Preferences</label><input type="text" id="' + p + '-prefs" value="' + esc(r?.drink_prefs || '') + '" placeholder="Negroni, Tito\'s soda, no IPAs"/></div>'
+      + '<div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + '-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
+  },
+
+  collect(p) {
+    const g = x => document.getElementById(p + '-' + x);
+    return {
+      name:          g('name')?.value.trim() || '',
+      contact_phone: g('phone')?.value.trim() || '',
+      contact_email: g('email')?.value.trim() || '',
+      birthday:      g('bday')?.value || '',
+      anniversary:   g('anniv')?.value || '',
+      last_visit:    g('visit')?.value || '',
+      vip:           !!g('vip')?.checked,
+      drink_prefs:   g('prefs')?.value.trim() || '',
+      notes:         g('notes')?.value.trim() || ''
+    };
+  },
+
+  renderList() {
+    const all = this.regulars();
+    const thisMonth = new Date(App.todayLocal() + 'T00:00:00').getMonth();
+    const bdays  = all.filter(r => this.monthOf(r.birthday) === thisMonth);
+    const annivs = all.filter(r => this.monthOf(r.anniversary) === thisMonth);
+    const quiet  = all.filter(r => this.isQuiet(r));
+
+    const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
+      + (this.entryMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    let body;
+    if (this.entryMode === 'import') {
+      body = '<div id="rg-csv"></div><div id="rg-imp-actions" style="margin-top:8px;"></div>';
+    } else {
+      body = this.formCells(null, 'rg')
+        + '<div style="margin-top:4px;display:flex;gap:8px;"><button class="btn btn-primary" id="rg-add">Add Regular</button><button class="btn btn-ghost" id="rg-clear">Start Over</button><span id="rg-err" style="color:var(--red);font-size:12px;align-self:center;display:none;"></span></div>';
+    }
+    const addCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Add a Regular</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + body + '</div>';
+
+    const stat = (l, v, cls) => '<div class="calc-item"><div class="calc-label">' + l + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + v + '</div></div>';
+    const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
+      + stat('Regulars', String(all.length))
+      + stat('Birthdays This Month', String(bdays.length), bdays.length ? 'good' : '')
+      + stat('Anniversaries This Month', String(annivs.length), annivs.length ? 'good' : '')
+      + stat('Gone Quiet (' + this.QUIET_DAYS + '+ Days)', String(quiet.length), quiet.length ? 'warn' : '')
+      + '</div></div>';
+
+    const chips = App.filterChips(this.filter, [
+      { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' }, { v: 'quiet', label: 'Gone Quiet' }, { v: 'vip', label: 'VIP' }
+    ], 'rg-fchip');
+    const headRow = '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 12px;">' + chips + '</div>';
+
+    let list = all.slice();
+    if (this.filter === 'bday') list = bdays;
+    else if (this.filter === 'anniv') list = annivs;
+    else if (this.filter === 'quiet') list = quiet;
+    else if (this.filter === 'vip') list = all.filter(r => r.vip);
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    const rows = list.slice(0, App.LIST_PAGE || 50).map(r => {
+      const q = this.isQuiet(r);
+      return '<tr class="rg-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
+        + '<td><div class="val" style="font-weight:600;">' + esc(r.name || '-') + (r.vip ? ' <span style="color:var(--gold);font-size:10px;font-weight:700;">VIP</span>' : '') + '</div>'
+        +   ((r.contact_phone || r.contact_email) ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.contact_phone || r.contact_email) + '</div>' : '') + '</td>'
+        + '<td>' + (r.birthday ? this.fmtMD(r.birthday) : '-') + '</td>'
+        + '<td>' + (r.anniversary ? this.fmtMD(r.anniversary) : '-') + '</td>'
+        + '<td>' + esc(r.drink_prefs || '-') + '</td>'
+        + '<td style="color:' + (q ? 'var(--amber)' : 'var(--t2)') + ';">' + (r.last_visit ? this.fmtDate(r.last_visit) + (q ? ' (quiet)' : '') : 'never logged') + '</td>'
+        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm rg-edit" data-id="' + esc(r.id) + '">Edit</button><button class="btn btn-danger btn-sm rg-del" data-id="' + esc(r.id) + '">Delete</button></div></td>'
+        + '</tr>';
+    }).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No regulars match.</td></tr>';
+
+    const listCard = all.length === 0
+      ? '<div style="font-size:12px;color:var(--t3);padding:4px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
+      : statStrip + headRow + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>';
+    this.wire();
+    if (this.entryMode === 'import') this.mountImporter();
+  },
+
+  wire() {
+    this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
+    this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
+    document.getElementById('rg-add')?.addEventListener('click', () => this.add());
+    document.getElementById('rg-clear')?.addEventListener('click', () => this.renderList());
+    this.container.querySelectorAll('.rg-row, .rg-edit').forEach(el => el.addEventListener('click', ev => { if (ev.target.closest('.rg-del')) return; this.showEdit(el.dataset.id); }));
+    this.container.querySelectorAll('.rg-del').forEach(b => b.addEventListener('click', async ev => {
+      ev.stopPropagation();
+      const ok = await App.confirmDelete(); if (!ok) return;
+      App.data.event_regulars = this.regulars().filter(x => x.id !== b.dataset.id);
+      await App.saveKey('event_regulars'); this.renderList();
+    }));
+  },
+
+  async add() {
+    const rec = this.collect('rg');
+    if (!rec.name) { const e = document.getElementById('rg-err'); if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
+    rec.id = App.uid(); rec.created_at = new Date().toISOString();
+    this.regulars().push(rec);
+    await App.saveKey('event_regulars');
+    this.renderList();
+  },
+
+  showEdit(id) {
+    const r = this.regulars().find(x => x.id === id); if (!r) return;
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Regular</div>' + this.formCells(r, 'rge')
+      + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button><button class="btn btn-ghost" id="rge-cancel">Cancel</button></div></div>';
+    App.openModal(html, { id: 'rg-edit-modal', maxWidth: 620, noClose: true });
+    document.getElementById('rge-cancel')?.addEventListener('click', () => App.closeModal('rg-edit-modal'));
+    document.getElementById('rge-save')?.addEventListener('click', async () => {
+      const rec = this.collect('rge'); if (!rec.name) return;
+      const list = this.regulars(); const i = list.findIndex(x => x.id === id);
+      if (i > -1) list[i] = Object.assign({}, list[i], rec, { updated_at: new Date().toISOString() });
+      await App.saveKey('event_regulars');
+      App.closeModal('rg-edit-modal'); this.renderList();
+    });
+  },
+
+  mountImporter() {
+    const el = document.getElementById('rg-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your regulars list here',
+      dropSub: 'Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them.',
+      actionsEl: '#rg-imp-actions',
+      fields: [
+        { key: 'name',        label: 'Name',        required: true,  match: ['name', 'guest', 'customer', 'regular', 'full name'] },
+        { key: 'phone',       label: 'Phone',       required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
+        { key: 'email',       label: 'Email',       required: false, match: ['email', 'e-mail', 'email address'] },
+        { key: 'birthday',    label: 'Birthday',    required: false, match: ['birthday', 'birth date', 'dob', 'bday'] },
+        { key: 'anniversary', label: 'Anniversary', required: false, match: ['anniversary'] },
+        { key: 'drink_prefs', label: 'Drink Preferences', required: false, match: ['drink', 'prefs', 'preferences', 'favorite', 'usual'] }
+      ],
+      confirmLabel: 'Import Regulars',
+      onComplete: rows => this.importRows(rows)
+    });
+  },
+
+  async importRows(rows) {
+    const parseDate = s => { if (!s) return ''; const d = new Date(s); return isNaN(d.getTime()) ? '' : App.ymdLocal(d); };
+    (rows || []).forEach(r => {
+      const name = (r.name || '').trim(); if (!name) return;
+      this.regulars().push({
+        id: App.uid(), name,
+        contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
+        birthday: parseDate(r.birthday), anniversary: parseDate(r.anniversary),
+        drink_prefs: (r.drink_prefs || '').trim(), last_visit: '', vip: false, notes: '',
+        created_at: new Date().toISOString()
+      });
+    });
+    await App.saveKey('event_regulars');
+    this.entryMode = 'manual';
+    this.renderList();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How Regulars Works', [
+      { p: ['Your regulars book, the thing a big chain cannot do: know your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The screen surfaces who to reach out to this month and who has gone quiet.'] },
+      { h: 'Outreach', p: ['Birthdays and anniversaries in the current month are counted up top, and the chips filter the list to them. A birthday or anniversary note is the highest-converting message an independent bar sends, so this is your monthly reach-out list.'] },
+      { h: 'Gone Quiet', p: ['A regular with no visit logged in the last ' + this.QUIET_DAYS + ' days reads as quiet. That is your win-back list: a regular who used to come in weekly and has not been seen is worth a text before they are gone for good. Log a last visit when they come in to keep it honest.'] },
+      { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them, and anything missing imports blank to fill later.'] }
+    ]);
+  }
+};
