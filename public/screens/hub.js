@@ -32,7 +32,6 @@ S.Hub = {
     return ''
       + '<div class="nav-section">Audit</div>'
       + row('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
-      + row('audit-history', 'Audit History', 'history', [])
       + '<div class="nav-section">By Recovery System</div>'
       + row('enter', 'Profit Audit',  'profit',  [['data-mod', 'profit'],  ['data-screen', 'audit-tracker']])
       + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
@@ -124,9 +123,9 @@ S.Hub = {
     const MSTYLE = {
       books:    { id: 'nav-books-home',    action: 'books-home' },
       settings: { id: 'nav-settings-home', action: 'settings-home' },
-      // Audits has no Dashboard leaf (the Bar Cop Audit page IS its landing); it
-      // only carries label remaps mirroring the mobile Audits panel.
-      audit:    { remaps: { groups: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' }, items: { 'Bar Cop Audit': 'Run/View Audit' } } }
+      // Audits has no Dashboard leaf (the Bar Cop Audit page IS its landing, now
+      // a flat link); it only renames the recovery-audits group.
+      audit:    { remaps: { groups: { 'By Recovery System': 'Recovery Audits' } } }
     };
     const ms = MSTYLE[context];
     // Mobile-style sidebars keep their DOM across in-section navigation so the
@@ -1011,7 +1010,6 @@ S.Hub = {
       else if (action === 'user-team')          S.HubUserAccounts.open('team');
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
-      else if (action === 'audit-history')      S.HubBarCopAudit?.openHistory?.();
       else if (action === 'books-home')         S.HubBooksHome?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
