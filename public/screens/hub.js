@@ -38,7 +38,7 @@ S.Hub = {
       + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
       + row('enter', 'Traffic Audit', 'traffic', [['data-mod', 'traffic'], ['data-screen', 't-audit']])
       + '<div class="nav-section">Support</div>'
-      + row('help',       'Help and FAQ', 'help', [])
+      + row('audit-help', 'Help and FAQ', 'help', [])
       + row('report-bug', 'Report a Bug', 'bug',  []);
   },
 
@@ -72,7 +72,7 @@ S.Hub = {
       + row('permits', 'Permits and Licenses', 'shield')
       + row('operating-expenses', 'Operating Expenses', 'expense')
       + '<div class="nav-section">Support</div>'
-      + row('help', 'Help and FAQ', 'help')
+      + row('books-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
   },
 
@@ -107,7 +107,7 @@ S.Hub = {
       + row('user-account', 'Your Account', 'user')
       + (isAdmin ? row('user-team', 'Team Members', 'team') : '')
       + '<div class="nav-section">Support</div>'
-      + row('help', 'Help and FAQ', 'help')
+      + row('settings-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
   },
 
@@ -990,6 +990,9 @@ S.Hub = {
       if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
       else if (action === 'hub-home')           App.showHub();
       else if (action === 'getting-started')    S.HubGettingStarted.open();
+      else if (action === 'audit-help')         S.HubAuditHelp?.open?.();
+      else if (action === 'books-help')         S.HubBooksHelp?.open?.();
+      else if (action === 'settings-help')      S.HubSettingsHelp?.open?.();
       else if (action === 'help')               S.HubHelp.open();
       else if (action === 'settings-home')      S.HubSettingsHome?.open?.();
       else if (action === 'settings-profile')   S.HubSettings.open('business-profile');
