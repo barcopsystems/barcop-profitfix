@@ -131,7 +131,7 @@ S.FlowMap = {
     const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;min-width:760px;overflow:visible;">'
       + edgeEls + colTitles + nodeEls + '</svg>';
 
-    this.container.innerHTML = '<div class="screen">'
+    this.container.innerHTML = '<div class="screen" style="max-width:none;">'
       + '<div class="card" style="padding:16px 18px;margin-bottom:14px;overflow-x:auto;">' + svg + '</div>'
       + this.panelHtml(sel)
       + '</div>';
