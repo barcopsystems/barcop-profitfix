@@ -741,10 +741,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.active{background:transparent;}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle:not(.nav-grp-open) .nav-item.nav-leaf.active{background:var(--c3);}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle:not(.nav-grp-open) .nav-item.nav-leaf.active .nav-label{color:var(--w);}
-.app.proto:not(.sidebar-collapsed) .nav-mstyle:not(.nav-grp-open) .nav-item.nav-leaf.active .nav-icon{color:var(--w);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle:not(.nav-grp-open) .nav-item.nav-leaf.active .nav-icon{color:var(--gold);}
 .nav-mstyle .nav-sec-ic{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:color .12s;}
 .nav-mstyle .nav-sec-ic svg{width:17px;height:17px;}
-.nav-mstyle .nav-section:hover .nav-sec-ic,.nav-mstyle .nav-section.nav-sec-open .nav-sec-ic{color:var(--w);}
+.nav-mstyle .nav-section:hover .nav-sec-ic{color:var(--w);}
+.nav-mstyle .nav-section.nav-sec-open .nav-sec-ic{color:var(--gold);}
 .nav-mstyle .nav-section:hover .nav-sec-chev,.nav-mstyle .nav-section.nav-sec-open .nav-sec-chev{color:var(--w);}
 .nav-mstyle .nav-sec-chev{margin-left:auto;font-size:18px;line-height:1;color:var(--t3);}
 .nav-mstyle .nav-sec-chev::before{content:'\203A';}
