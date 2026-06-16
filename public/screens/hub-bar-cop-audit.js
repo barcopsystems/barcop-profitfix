@@ -63,54 +63,6 @@ S.HubBarCopAudit = {
     }, 'bar-cop-audit');
   },
 
-  // History archive — every executive Bar Cop Audit, newest first, View opens
-  // the full detail. Reached from the Bar Cop Audit sidebar's History link.
-  openHistory() {
-    App.openHubFullPage('Audit History', (mount) => {
-      this.container = mount;
-      this._renderHistory();
-    }, 'audit-history');
-  },
-
-  _renderHistory() {
-    const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    let body;
-    if (!audits.length) {
-      body = '<div class="card" style="text-align:center;padding:40px 24px;">'
-        + '<div style="font-size:13px;color:var(--t2);line-height:1.6;max-width:420px;margin:0 auto;">No Bar Cop Audits yet. Run your first one from the Overall Audit page and it shows up here.</div>'
-        + '<button class="btn btn-ghost" id="bcah-go-overall" style="margin-top:18px;">Go to Overall Audit</button></div>';
-    } else {
-      const rows = audits.map((a, i) => {
-        const na  = a.overall_score == null;
-        const col = na ? 'var(--t3)' : App.scoreColor(a.overall_score);
-        const val = na ? 'N/A' : a.overall_score;
-        const lbl = na ? 'Not enough data' : App.scoreLabel(a.overall_score);
-        const bb  = i < audits.length - 1 ? 'border-bottom:1px solid var(--b2);' : '';
-        return '<div class="bcah-row" data-id="' + esc(a.id) + '" style="display:flex;align-items:center;gap:16px;padding:14px 16px;cursor:pointer;' + bb + '">'
-          + '<div style="flex:1;min-width:0;">'
-          +   '<div style="font-size:13px;font-weight:600;color:var(--t1);">' + this._fmtDate(a.date) + '</div>'
-          +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(lbl) + ' &middot; ' + (a.sub_scores_covered || 0) + ' of 6 sub-scores</div>'
-          + '</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:26px;font-weight:700;color:' + col + ';line-height:1;">' + val + '</div>'
-          + '<span class="btn btn-ghost btn-sm">View</span>'
-          + '</div>';
-      }).join('');
-      body = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Past Audits</div>'
-        + '<div class="card" style="padding:0;">' + rows + '</div>';
-    }
-    this.container.innerHTML = '<div style="padding:24px;max-width:780px;margin:0 auto;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--w);letter-spacing:0.3px;margin-bottom:4px;">Audit History</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:20px;">Every Bar Cop Audit you have run, newest first.</div>'
-      + body + '</div>';
-    this.container.querySelectorAll('.bcah-row').forEach(el => {
-      el.addEventListener('click', () => {
-        const a = this.audits().find(x => x.id === el.dataset.id);
-        if (a) { this._viewingId = el.dataset.id; this._renderDetail(a); }
-      });
-    });
-    this.container.querySelector('#bcah-go-overall')?.addEventListener('click', () => this.open());
-  },
-
   // ── Utilities ───────────────────────────────────────────────────────────
   _now() { return new Date(); },
   _daysAgo(n) {
