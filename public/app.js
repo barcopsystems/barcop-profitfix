@@ -999,7 +999,8 @@ const App = {
     // Recovery
     { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
     { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
-    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' }
+    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' },
+    { group:'events',              label:'Events',                   module:'events',    screen:'ev-dashboard',         moduleName:'Events' }
   ],
 
   // Pick the first accessible screen as a non-admin user's landing.
@@ -1113,13 +1114,14 @@ const App = {
     ['profit',    'Profit Recovery'],
     ['revenue',   'Revenue Recovery'],
     ['traffic',   'Traffic Recovery'],
+    ['events',    'Events'],
     ['inventory', 'Inventory Control'],
     ['labor',     'Labor Control'],
     ['shift',     'Shift Control'],
   ],
 
   // The dashboard screen each module lands on when entered.
-  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', traffic: 't-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', traffic: 't-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
 
   // Markup for the section switcher. currentKey defaults to the active module
   // (set before the module nav renders); the Hub sidebar passes 'hub'. Text
@@ -1162,6 +1164,8 @@ const App = {
       nav.innerHTML = Revenue.navHTML();
     } else if (module === 'traffic') {
       nav.innerHTML = Traffic.navHTML();
+    } else if (module === 'events') {
+      nav.innerHTML = Events.navHTML();
     } else if (module === 'inventory') {
       nav.innerHTML = Inventory.navHTML();
     } else if (module === 'shift') {
@@ -1219,20 +1223,21 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','The Hub'],['flowmap','Flow Map'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations']],
+  _PROTO_GLOBAL:   [['hub','The Hub'],['flowmap','Flow Map'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations'],['events','Events']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooks)       ? S.HubBooks.open()       : null;
     if (g === 'ops')   return (window.S && S.HubPermits)     ? S.HubPermits.open()     : null;
+    if (g === 'events') return this.jumpToSection('events');
   },
   _renderProtoTopnav(context) {
     const globalEl = document.getElementById('tn-global');
@@ -1268,6 +1273,7 @@ const App = {
     if (/^ic-/.test(id)) return 'inventory';
     if (/^lc-/.test(id)) return 'labor';
     if (/^sc-/.test(id)) return 'shift';
+    if (/^ev-/.test(id)) return 'events';
     if (/^r-/.test(id))  return 'revenue';
     if (/^t-/.test(id))  return 'traffic';
     return 'profit';
@@ -2900,7 +2906,7 @@ const App = {
         // templates / config); fix_log moves in its own shared pass.
         revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
         revenue_server_check: 'revenue_server_checks', menu_dog_test: 'menu_dog_tests',
-        revenue_price_log: 'revenue_price_log', revenue_event: 'revenue_events',
+        revenue_price_log: 'revenue_price_log',
         // Traffic pass — the 4 Guests & Planning lists (regulars, initiatives,
         // holidays, inquiries) stay in the blob: low-volume CRM/planning the
         // 24-month window would wrongly hide. fix_log moves in its own pass.
@@ -3205,6 +3211,34 @@ const App = {
     if (content) content.scrollTop = 0;
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
 
+    // Events module screens
+    if (this._activeModule === 'events') {
+      const evTitles = {
+        'hub':          ['Recovery Hub', ''],
+        'ev-dashboard': ['Dashboard', 'Events'],
+        'ev-bookings':  ['Bookings', 'Events'],
+        'ev-calendar':  ['Calendar', 'Events'],
+        'ev-regulars':  ['Regulars', 'Events'],
+        'ev-pricing':   ['Pricing', 'Events'],
+        'ev-help':      ['Help and FAQ', 'Events'],
+      };
+      const evScreens = {
+        'ev-dashboard': S.EventsDashboard,
+        'ev-bookings':  S.EventsBookings,
+        'ev-calendar':  S.EventsCalendar,
+        'ev-regulars':  S.EventsRegulars,
+        'ev-pricing':   S.EventsPricing,
+        'ev-help':      S.EventsHelp,
+      };
+      const [title, sub] = evTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = evScreens[id];
+      if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
     // Revenue module screens
     if (this._activeModule === 'revenue') {
       const revTitles = {
@@ -3219,7 +3253,6 @@ const App = {
         'r-menu-engineering':     ['Menu Engineering', ''],
         'r-dog-test':             ['Dog Test Tracker', ''],
         'r-rplh':                 ['RPLH Tracker', ''],
-        'r-events':               ['Events and Catering', ''],
         'r-reports':              ['Reports and History', ''],
         'r-help':                 ['Help and FAQ', ''],
       };
@@ -3234,7 +3267,6 @@ const App = {
         'r-menu-engineering': S.RevenueMenuEngineering,
         'r-dog-test':         S.RevenueDogTest,
         'r-rplh':             S.RevenueRPLH,
-        'r-events':           S.RevenueEvents,
         'r-reports':          S.RevenueReports,
         'r-help':             S.RevenueHelp,
       };
@@ -3262,10 +3294,6 @@ const App = {
         't-social':         ['Social Media', ''],
         't-delivery':       ['Delivery Platforms', ''],
         't-email':          ['Email and Loyalty', ''],
-        't-regulars':       ['VIP Regulars', ''],
-        't-initiatives':    ['Slow-Night Initiatives', ''],
-        't-holidays':       ['Holiday and Events', ''],
-        't-inquiries':      ['Group Inquiries', ''],
         't-reports':        ['Reports and History', ''],
         't-help':           ['Help and FAQ', ''],
       };
@@ -3281,10 +3309,6 @@ const App = {
         't-social':         S.TrafficSocial,
         't-delivery':       S.TrafficDelivery,
         't-email':          S.TrafficEmail,
-        't-regulars':       S.TrafficRegulars,
-        't-initiatives':    S.TrafficInitiatives,
-        't-holidays':       S.TrafficHolidays,
-        't-inquiries':      S.TrafficInquiries,
         't-reports':        S.TrafficReports,
         't-help':           S.TrafficHelp,
       };
