@@ -1360,10 +1360,10 @@ const App = {
     const secEl = document.getElementById('tn-sections');
     if (secEl) {
       const pill = ([k, l]) => '<div class="tn-sec' + (k === context ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
-      secEl.innerHTML = '<span class="tn-grp-label">Recovery:</span>'
-        + this._PROTO_RECOVERY.map(pill).join('')
-        + '<span class="tn-grp-label" style="margin-left:16px;">Control:</span>'
-        + this._PROTO_CONTROL.map(pill).join('');
+      secEl.innerHTML = '<span class="tn-grp-label">Control:</span>'
+        + this._PROTO_CONTROL.map(pill).join('')
+        + '<span class="tn-grp-label" style="margin-left:16px;">Recovery:</span>'
+        + this._PROTO_RECOVERY.map(pill).join('');
       secEl.querySelectorAll('.tn-sec[data-sec]').forEach(el =>
         el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
     }
