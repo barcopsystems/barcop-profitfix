@@ -732,6 +732,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:hover .nav-icon{color:var(--w);}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item .nav-label{font-size:14px;letter-spacing:0;color:var(--t1);}
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:hover .nav-label{color:var(--w);}
+/* Nested drop-down links read like the top-nav links: --t3 at rest, white on
+   hover, white when active on that page (no background, like the top nav). */
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:not(.nav-leaf) .nav-label{color:var(--t3);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:not(.nav-leaf):hover .nav-label{color:var(--w);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:not(.nav-leaf).active .nav-label{color:var(--w);}
 /* Background changes only on MAIN links (drop-down headers + the Dashboard leaf);
    nested links turn their text white on hover with no background change. */
 .app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.nav-leaf:hover{background:var(--c3);}
