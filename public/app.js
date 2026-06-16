@@ -1175,6 +1175,23 @@ const App = {
     } else {
       nav.innerHTML = ProfitNav.html();
     }
+    // Inventory trial: render this sidebar in the mobile drawer's style (group-
+    // icon accordion headers, icon-less nested links, open drop-down lit). A
+    // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
+    // routing to the section dashboard. Scoped via .nav-mstyle so the other
+    // sections keep the standard accordion. (wireNavAccordion adds group icons.)
+    nav.classList.toggle('nav-mstyle', module === 'inventory');
+    if (module === 'inventory') {
+      const firstSec = nav.querySelector('.nav-section');
+      if (firstSec && !nav.querySelector('#nav-ic-dashboard')) {
+        const dleaf = document.createElement('div');
+        dleaf.className = 'nav-item nav-leaf';
+        dleaf.id = 'nav-ic-dashboard';
+        dleaf.dataset.screen = 'ic-dashboard';
+        dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
+        firstSec.parentNode.insertBefore(dleaf, firstSec);
+      }
+    }
     // Rewire nav click handlers, filtering out items the current role can't access
     nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
       if (!App.canAccess(el.dataset.screen)) {
@@ -1250,6 +1267,20 @@ const App = {
           g.sec.appendChild(c);
         }
       });
+      // Mobile-style sidebars (Inventory trial): give each drop-down header its
+      // group icon, from the same map the mobile drawer uses. Idempotent.
+      if (navEl.classList.contains('nav-mstyle')) {
+        const gic = App._NAV_GROUP_IC || {};
+        groups.forEach(g => {
+          if (g.sec.querySelector('.nav-sec-ic')) return;
+          const svg = gic[(g.sec.textContent || '').trim()];
+          if (!svg) return;
+          const span = document.createElement('span');
+          span.className = 'nav-sec-ic';
+          span.innerHTML = '<svg viewBox="0 0 17 17" fill="none">' + svg + '</svg>';
+          g.sec.insertBefore(span, g.sec.firstChild);
+        });
+      }
       if (!navEl._accWired) {
         navEl.addEventListener('click', (ev) => {
           const sec = ev.target.closest('.nav-section');
@@ -1435,6 +1466,39 @@ const App = {
     }
   },
 
+  // Section sub-group (drop-down) icons, keyed by the ORIGINAL sub-group name.
+  // Shared by the mobile drawer (accordion headers) and the desktop mobile-style
+  // sidebar. Only drop-down HEADERS use these; nested links stay icon-less.
+  _NAV_GROUP_IC: {
+    'Analysis':'<circle cx="7" cy="7" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Weekly':'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Leaks':'<path d="M8.5 2.2C8.5 2.2 4 7.4 4 10.4a4.5 4.5 0 0 0 9 0C13 7.4 8.5 2.2 8.5 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+    'Menu and Pricing':'<path d="M7.8 2.2H3.2a1 1 0 0 0-1 1v4.6a1 1 0 0 0 .3.7l6 6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4l-6-6a1 1 0 0 0-.7-.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" fill="currentColor"/>',
+    'Performance':'<path d="M2 12l4-4 3 3 5.5-6M11 5h3.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    'History':'<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
+    'Digital Presence':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+    'Social and Delivery':'<path d="M3 4.2a1.4 1.4 0 0 1 1.4-1.4h8.2A1.4 1.4 0 0 1 14 4.2v5a1.4 1.4 0 0 1-1.4 1.4H7l-3.4 2.8V10.6h-.2A1.4 1.4 0 0 1 3 9.2v-5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+    'Audit':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    'By Recovery System':'<path d="M8.5 2L2 5.3l6.5 3.3L15 5.3 8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2 8.7l6.5 3.3L15 8.7M2 12l6.5 3.3L15 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
+    'Counts':'<rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 7.5h5M6 10.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Ordering':'<path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/>',
+    'Receiving':'<rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/>',
+    'Operations':'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Reports':'<rect x="3" y="2" width="11" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 11V8M8.5 11V6M11 11v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Setup':'<path d="M10.8 2.6a3.4 3.4 0 0 0-4 4.4l-4.3 4.3 2.2 2.2 4.3-4.3a3.4 3.4 0 0 0 4.4-4l-2 2-1.5-.4-.4-1.5 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+    'Scheduling':'<rect x="2" y="3" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6 10h2M9.5 10h1.5M6 12.5h2M9.5 12.5h1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    'Tips':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v7M6.7 6.8h3a1 1 0 0 1 0 2H7.2a1 1 0 0 0 0 2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    'Payroll':'<rect x="2" y="4.5" width="13" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6.5v4M12.5 6.5v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    'Shifts':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Cash':'<rect x="2" y="5" width="13" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M8.5 7.3v2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.2"/>',
+    'Checklists':'<path d="M7 4.5h7.5M7 8.5h7.5M7 12.5h7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 4l1 1 1.6-1.9M2.5 8l1 1 1.6-1.9M2.5 12l1 1 1.6-1.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    'Accounting':'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    'Settings':'<path d="M3 5h5M11.5 5h2.5M3 12h2.5M10 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.5" cy="5" r="1.7" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="12" r="1.7" stroke="currentColor" stroke-width="1.3"/>',
+    'Account':'<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    'Bookings':'<rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 10h6M5.5 12h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    'Support':'<circle cx="8.5" cy="8.5" r="6.3" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 4l2.7 2.7M10.3 10.3L13 13M13 4l-2.7 2.7M6.7 10.3L4 13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+  },
+
   // Unified mobile navigation drawer (App.openMobileNav). On phones the top-nav
   // global links + the Control/Recovery row are hidden, so the burger opens this
   // ACCORDION: tap a section to expand its pages, so the whole menu stays compact
@@ -1539,37 +1603,9 @@ const App = {
       bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       dash:'<rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/>'
     };
-    // Group (drop-down) icons, keyed by the section's ORIGINAL sub-group name.
-    // Only the accordion HEADERS use these; the links nested under them stay
-    // icon-less, and single-page groups render as leaves with their page icon.
-    const GIC = {
-      'Analysis':'<circle cx="7" cy="7" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Weekly':'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Leaks':'<path d="M8.5 2.2C8.5 2.2 4 7.4 4 10.4a4.5 4.5 0 0 0 9 0C13 7.4 8.5 2.2 8.5 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
-      'Menu and Pricing':'<path d="M7.8 2.2H3.2a1 1 0 0 0-1 1v4.6a1 1 0 0 0 .3.7l6 6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4l-6-6a1 1 0 0 0-.7-.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" fill="currentColor"/>',
-      'Performance':'<path d="M2 12l4-4 3 3 5.5-6M11 5h3.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      'History':'<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
-      'Digital Presence':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
-      'Social and Delivery':'<path d="M3 4.2a1.4 1.4 0 0 1 1.4-1.4h8.2A1.4 1.4 0 0 1 14 4.2v5a1.4 1.4 0 0 1-1.4 1.4H7l-3.4 2.8V10.6h-.2A1.4 1.4 0 0 1 3 9.2v-5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
-      'Audit':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      'By Recovery System':'<path d="M8.5 2L2 5.3l6.5 3.3L15 5.3 8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2 8.7l6.5 3.3L15 8.7M2 12l6.5 3.3L15 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
-      'Counts':'<rect x="3.5" y="3" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3V1.7h4V3M6 7.5h5M6 10.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Ordering':'<path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/>',
-      'Receiving':'<rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/>',
-      'Operations':'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Reports':'<rect x="3" y="2" width="11" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 11V8M8.5 11V6M11 11v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Setup':'<path d="M10.8 2.6a3.4 3.4 0 0 0-4 4.4l-4.3 4.3 2.2 2.2 4.3-4.3a3.4 3.4 0 0 0 4.4-4l-2 2-1.5-.4-.4-1.5 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
-      'Scheduling':'<rect x="2" y="3" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6 10h2M9.5 10h1.5M6 12.5h2M9.5 12.5h1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      'Tips':'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v7M6.7 6.8h3a1 1 0 0 1 0 2H7.2a1 1 0 0 0 0 2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      'Payroll':'<rect x="2" y="4.5" width="13" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6.5v4M12.5 6.5v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      'Shifts':'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Cash':'<rect x="2" y="5" width="13" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M8.5 7.3v2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.2"/>',
-      'Checklists':'<path d="M7 4.5h7.5M7 8.5h7.5M7 12.5h7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 4l1 1 1.6-1.9M2.5 8l1 1 1.6-1.9M2.5 12l1 1 1.6-1.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
-      'Accounting':'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      'Settings':'<path d="M3 5h5M11.5 5h2.5M3 12h2.5M10 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.5" cy="5" r="1.7" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="12" r="1.7" stroke="currentColor" stroke-width="1.3"/>',
-      'Account':'<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      'Bookings':'<rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 10h6M5.5 12h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
-    };
+    // Group (drop-down) icons live on App._NAV_GROUP_IC (shared with the desktop
+    // mobile-style sidebar). Only accordion HEADERS use them; nested links don't.
+    const GIC = App._NAV_GROUP_IC;
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
     // Mobile-only label remaps (do NOT touch the desktop sidebars).
     const GROUP_REMAP = { audit: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' }, events: { 'Bookings': 'Scheduling' } };
