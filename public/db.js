@@ -282,7 +282,6 @@ const DB = {
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
     'r-menu-engineering':'revenue-recovery',
     'r-rplh':'revenue-recovery','r-dog-test':'revenue-recovery',
-    'r-events':'revenue-recovery',
     'r-reports':'revenue-recovery','r-help':'_always',
     // Traffic Recovery
     't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
@@ -291,9 +290,10 @@ const DB = {
     't-reviews':'traffic-recovery','t-search':'traffic-recovery',
     't-social':'traffic-recovery','t-delivery':'traffic-recovery',
     't-email':'traffic-recovery',
-    't-regulars':'traffic-recovery','t-initiatives':'traffic-recovery',
-    't-holidays':'traffic-recovery','t-inquiries':'traffic-recovery',
-    't-reports':'traffic-recovery','t-help':'_always'
+    't-reports':'traffic-recovery','t-help':'_always',
+    // Events
+    'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
+    'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'
   },
 
   canAccessLevel(screen) {
@@ -917,8 +917,6 @@ const DB = {
       revenue_server_checks: [],
       menu_dog_tests: [],
       revenue_price_log: [],
-      revenue_events: [],
-      revenue_rate_cards: [],
       getting_started_revenue: {},
       // Traffic Recovery data
       traffic_settings: {
@@ -966,11 +964,6 @@ const DB = {
       traffic_gbp_posts:       [],
       traffic_social_posts:    [],
       traffic_email_campaigns: [],
-      // Guests and Planning section tools.
-      traffic_regulars:    [],
-      traffic_initiatives: [],
-      traffic_holidays:    [],
-      traffic_inquiries:   [],
       getting_started_traffic: {},
       // ── Events section (bookings, guests, planning) ────────────────────────
       // Unified booking record: lead -> quote -> booked -> completed/lost, one
