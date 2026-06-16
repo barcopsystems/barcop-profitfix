@@ -1180,7 +1180,7 @@ const App = {
     // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
-    const MSTYLE_SECTIONS = ['inventory', 'labor'];
+    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift'];
     const mstyle = MSTYLE_SECTIONS.indexOf(module) !== -1;
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
