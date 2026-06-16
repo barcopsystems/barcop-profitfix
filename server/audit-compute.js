@@ -469,7 +469,10 @@ function computeRevenueAudit(appData, controlData, extracted) {
     .slice(-PERIOD_WEEKS);
   const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
   const serverChecks = (appData.revenue_server_checks || appData.revenue_servers || []).filter(c => num(c.check_avg) != null);
-  const events = (appData.revenue_events || []).filter(e => num(e.revenue) != null);
+  // Events now live in the Events section's unified bookings store; a completed
+  // booking is a real event. (The old read filtered revenue_events on e.revenue,
+  // a field that never existed on those records, so S5 silently never scored.)
+  const events = (appData.bookings || []).filter(e => e && e.stage === 'Completed');
 
   const checkTarget = num(rt.check_avg) != null ? rt.check_avg : 35;
   // Labor target now lives in one place: settings.targets.labor_cost_pct (mirrors
@@ -625,7 +628,7 @@ function computeRevenueAudit(appData, controlData, extracted) {
   // ── S5 — Events and Private Dining (scored; no fabricated target dollar) ──
   let s5 = null, eventsPerMonth = null, avgEventRev = null, eventRevPeriod = null;
   if (events.length > 0) {
-    eventRevPeriod = round0(events.reduce((s, e) => s + (e.revenue || 0), 0));
+    eventRevPeriod = round0(events.reduce((s, e) => s + (num(e.actual_revenue) || 0), 0));
     eventsPerMonth = round1(events.length / 3);            // events span ~last 3 months
     avgEventRev = round0(eventRevPeriod / events.length);
     s5 = clampScore(eventsPerMonth >= 4 ? 80 : eventsPerMonth >= 2 ? 60 : eventsPerMonth >= 1 ? 45 : 30);
@@ -1177,7 +1180,7 @@ if (require.main === module) {
   const rev = computeRevenueAudit({
     settings: { bar_name: 'The Anchor Bar & Kitchen' },
     revenue_settings: { targets: { check_avg: 35 } },
-    revenue_weeks: rWeeks, menu_items: rMenu, revenue_server_checks: rServers, revenue_events: []
+    revenue_weeks: rWeeks, menu_items: rMenu, revenue_server_checks: rServers, bookings: []
   }, null, {});
   const rExpCovers = 600 * 4.345;                                  // monthly covers
   const rExpS1Gap = Math.round((35 - 30) * rExpCovers);            // (target-actual) x covers
@@ -1195,7 +1198,7 @@ if (require.main === module) {
     ['Rev OVERALL excludes N/A events', rev.OVERALL_SCORE >= 1 && rev.OVERALL_SCORE <= 100, true]
   ];
   // Events present -> S5 scores.
-  const revEv = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, revenue_events: [{ revenue: 2400 }, { revenue: 3100 }, { revenue: 1800 }] }, null, {});
+  const revEv = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, bookings: [{ stage: 'Completed', actual_revenue: 2400 }, { stage: 'Completed', actual_revenue: 3100 }, { stage: 'Completed', actual_revenue: 1800 }] }, null, {});
   rChecks.push(['Rev S5 scores when events exist', revEv.S5_SCORE > 0, true]);
   // Check-average N/A when no covers anywhere.
   const revNoCovers = computeRevenueAudit({ settings: { annual_bar_revenue: 600000 }, revenue_settings: { targets: {} } }, null, {});
