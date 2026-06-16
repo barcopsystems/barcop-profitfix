@@ -240,12 +240,16 @@ input,select,textarea{color-scheme:dark;}
 .mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}
 .mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;font-size:14px;color:var(--t1);cursor:pointer;background:var(--surface);transition:background .1s;}
 .mnav-row:hover,.mnav-row:active{background:var(--c3);color:var(--w);}
-.mnav-row.open{background:var(--c3);color:var(--w);}
+/* Open drop-down + active main link match the desktop sidebar: #111E26 bg, gold icon. */
+.mnav-row.open,.mnav-row.on{background:var(--c3);color:var(--w);}
 .mnav-l{display:flex;align-items:center;gap:13px;min-width:0;overflow:hidden;}
 .mnav-ic-slot{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--t3);}
 .mnav-ic{width:17px;height:17px;}
-.mnav-row:hover .mnav-ic-slot,.mnav-row.open .mnav-ic-slot{color:var(--w);}
-.mnav-page{padding-left:34px;}
+.mnav-row:hover .mnav-ic-slot{color:var(--w);}
+.mnav-row.open .mnav-ic-slot,.mnav-row.on .mnav-ic-slot{color:var(--gold);}
+/* Nested drop-down links read like the top-nav links: --t3, white on hover/active, no background. */
+.mnav-page{padding-left:34px;color:var(--t3);}
+.mnav-page:hover,.mnav-page.on{background:transparent;color:var(--w);}
 .mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;transition:transform .15s ease;}
 .mnav-row:hover .mnav-chev,.mnav-row.open .mnav-chev{color:var(--w);}
 .mnav-row.open .mnav-acc-chev{transform:rotate(90deg);}
