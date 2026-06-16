@@ -149,6 +149,9 @@ S.Hub = {
         d.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
         firstSec.parentNode.insertBefore(d, firstSec);
       }
+      // Drop Report a Bug, flatten single-link groups (Support → a "Help" leaf),
+      // shorten the Help link — same transform the module sidebars get.
+      App._mstyleSidebar(nav, {});
     }
   },
 
