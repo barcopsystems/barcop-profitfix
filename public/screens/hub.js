@@ -827,7 +827,6 @@ S.Hub = {
       + App.sectionSelectorHTML('hub')
       + '<div class="nav-section">Support</div>'
       + navItem('help',            'Help and FAQ', 'help', [])
-      + navItem('contact-support', 'Contact Us',   'mail', [])
       + navItem('report-bug',      'Report a Bug', 'bug',  []);
 
     // Cache the default (grab-bag) sidebar nav so renderSidebar() can restore it
@@ -984,7 +983,6 @@ S.Hub = {
       else if (action === 'year-end')           S.HubYearEnd.open();
       else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (action === 'permits')            S.HubPermits?.open?.();
-      else if (action === 'contact-support')    S.HubSupport.open();
       else if (action === 'report-bug')         (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
     });
 
