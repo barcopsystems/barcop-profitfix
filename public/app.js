@@ -843,9 +843,11 @@ const App = {
   // paints the gold icon and white label that signals "you are here."
   setActiveHubNav(action) {
     document.querySelectorAll('.hub-app .nav-item').forEach(el => el.classList.remove('active'));
-    if (!action) return;
-    const el = document.querySelector('.hub-app .nav-item[data-hub-action="' + action + '"]');
-    if (el) el.classList.add('active');
+    if (action) {
+      const el = document.querySelector('.hub-app .nav-item[data-hub-action="' + action + '"]');
+      if (el) el.classList.add('active');
+    }
+    this.wireNavAccordion(document.querySelector('.hub-app .sidebar-nav'));
   },
 
   // ── Account switcher (Phase 2 Item 27a) ─────────────────────────────────────
@@ -1175,6 +1177,7 @@ const App = {
     nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
       if (!App.canAccess(el.dataset.screen)) {
         el.style.display = 'none';
+        el.classList.add('role-hidden');
       } else {
         el.addEventListener('click', () => {
           // Close the mobile sidebar after the click so the navigated screen
@@ -1207,6 +1210,68 @@ const App = {
       }
       if (!hasVisible) sec.style.display = 'none';
     });
+    App.wireNavAccordion(nav);
+  },
+
+  // ── Collapsible sub-group sidebar (accordion) ─────────────────────────────
+  // Section sidebars have ~7 sub-groups (COUNTS, ORDERING, …); showing them all
+  // is too long. Each .nav-section header collapses its group: the group holding
+  // the active page is open, the rest closed, single-open on click. Wired
+  // idempotently after each nav render + navigation so it survives rebuilds.
+  _navGroups(navEl) {
+    const groups = [];
+    navEl.querySelectorAll('.nav-section').forEach(sec => {
+      const items = [];
+      let sib = sec.nextElementSibling;
+      while (sib && !sib.classList.contains('nav-section')) {
+        if (sib.classList.contains('nav-item') && !sib.classList.contains('role-hidden')) items.push(sib);
+        sib = sib.nextElementSibling;
+      }
+      if (items.length) groups.push({ sec, items });
+    });
+    return groups;
+  },
+  _setNavGroup(g, open) {
+    g.items.forEach(it => { it.style.display = open ? '' : 'none'; });
+    g.sec.classList.toggle('nav-sec-open', open);
+  },
+  wireNavAccordion(navEl) {
+    if (!navEl) return;
+    try {
+      navEl.classList.add('nav-acc');
+      const groups = this._navGroups(navEl);
+      if (!groups.length) return;
+      groups.forEach(g => {
+        if (!g.sec.querySelector('.nav-sec-chev')) {
+          const c = document.createElement('span');
+          c.className = 'nav-sec-chev';
+          g.sec.appendChild(c);
+        }
+      });
+      if (!navEl._accWired) {
+        navEl.addEventListener('click', (ev) => {
+          const sec = ev.target.closest('.nav-section');
+          if (!sec || !navEl.contains(sec)) return;
+          const gs = App._navGroups(navEl);
+          const wasOpen = sec.classList.contains('nav-sec-open');
+          gs.forEach(g => App._setNavGroup(g, !wasOpen && g.sec === sec));
+        });
+        navEl._accWired = true;
+      }
+      // Open the group with the active item; else keep one open; else the first.
+      const active = navEl.querySelector('.nav-item.active');
+      let openSec = null;
+      if (active) {
+        let p = active.previousElementSibling;
+        while (p && !p.classList.contains('nav-section')) p = p.previousElementSibling;
+        openSec = p;
+      }
+      if (!openSec) {
+        const cur = groups.find(g => g.sec.classList.contains('nav-sec-open'));
+        openSec = cur ? cur.sec : groups[0].sec;
+      }
+      groups.forEach(g => this._setNavGroup(g, g.sec === openSec));
+    } catch (e) {}
   },
 
   // PROTO (design prototype): the new full-width top nav + restyled sidebar,
@@ -1379,22 +1444,36 @@ const App = {
     const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
+    // The live active page — used to auto-expand the section + sub-group you are in.
+    const liveNav = onHub ? document.querySelector('.hub-app .sidebar-nav') : document.getElementById('sidebar-nav');
+    const activeEl = liveNav ? liveNav.querySelector('.nav-item.active') : null;
+    const activeId = activeEl ? (activeEl.dataset.screen || activeEl.dataset.hubAction || '') : '';
 
-    // Parse a section's sidebar HTML into page rows {label, action, screen}.
-    const pagesOf = (htmlFn) => {
+    // Parse a section's sidebar HTML into its sub-groups, each with its pages, so
+    // the mobile menu keeps the COUNTS / ORDERING / … structure and is never one
+    // giant flat list.
+    const groupsOf = (htmlFn) => {
       const out = [];
       try {
         const tmp = document.createElement('div');
         tmp.innerHTML = htmlFn() || '';
-        tmp.querySelectorAll('.nav-item').forEach(el => {
-          if (el.dataset.nav === 'report-bug') return;
-          const action = el.dataset.hubAction || '';
-          if (action === 'report-bug' || action === 'contact-support') return;
-          const label = (el.querySelector('.nav-label')?.textContent || '').trim();
-          if (label) out.push({ label, action, screen: el.dataset.screen || '' });
+        let cur = null;
+        Array.from(tmp.children).forEach(el => {
+          if (el.classList && el.classList.contains('nav-section')) {
+            cur = { group: (el.textContent || '').trim(), pages: [] };
+            out.push(cur);
+          } else if (el.classList && el.classList.contains('nav-item')) {
+            if (el.dataset.nav === 'report-bug') return;
+            const action = el.dataset.hubAction || '';
+            if (action === 'report-bug' || action === 'contact-support') return;
+            const label = (el.querySelector('.nav-label')?.textContent || '').trim();
+            if (!label) return;
+            if (!cur) { cur = { group: '', pages: [] }; out.push(cur); }
+            cur.pages.push({ label, action, screen: el.dataset.screen || '' });
+          }
         });
       } catch (e) {}
-      return out;
+      return out.filter(g => g.pages.length);
     };
     const routePage = (p) => {
       if (p.screen) { App.openScreen(p.screen); return; }   // module pages + recovery-audit jumps
@@ -1431,37 +1510,43 @@ const App = {
       if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
     } catch (e) {} return ''; };
 
-    // An expandable section: an optional home row (Overview/Dashboard) + the
-    // pages parsed from its sidebar. cur = auto-expand when you are in it.
-    const sec = (label, key, homeFn, homeLabel, modKey) => {
-      const pages = [];
-      if (homeFn) pages.push({ label: homeLabel || 'Overview', go: homeFn });
-      pagesOf(() => navHtml(key)).forEach(p => pages.push(p));
-      return { label, pages, cur: !onHub && modKey && modKey === App._activeModule };
+    // An expandable section: an optional home row (Overview/Dashboard) + its
+    // sub-groups. The section and the sub-group holding your current page
+    // auto-expand, so where you are is right there when the menu opens.
+    const sec = (label, key, homeFn, homeLabel) => {
+      const subgroups = groupsOf(() => navHtml(key)).map(sg => ({
+        group: sg.group, pages: sg.pages,
+        cur: !!activeId && sg.pages.some(p => p.screen === activeId || p.action === activeId)
+      }));
+      return {
+        label,
+        home: homeFn ? { label: homeLabel || 'Overview', go: homeFn } : null,
+        subgroups,
+        cur: subgroups.some(sg => sg.cur)
+      };
     };
 
     const GROUPS = [
       { g: 'Go to', items: [
         { label: 'Hub', go: () => App.showHub() },
         { label: 'Blueprint', go: () => S2.FlowMap && S2.FlowMap.open() },
-        sec('Bar Cop Audit', 'audit', null, null, null),
-        sec('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', 'events'),
-        sec('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview', null),
-        sec('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview', null)
+        sec('Audits', 'audit', null, null),
+        sec('Events', 'events', () => App.jumpToSection('events'), 'Dashboard'),
+        sec('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview'),
+        sec('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview')
       ]},
       { g: 'Control', items: [
-        sec('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', 'inventory'),
-        sec('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard', 'labor'),
-        sec('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard', 'shift')
+        sec('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard'),
+        sec('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard'),
+        sec('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard')
       ]},
       { g: 'Recovery', items: [
-        sec('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard', 'profit'),
-        sec('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard', 'revenue'),
-        sec('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', 'traffic')
+        sec('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard'),
+        sec('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard'),
+        sec('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard')
       ]},
       { g: 'Support', items: [
         { label: 'Help and FAQ', go: () => S2.HubHelp && S2.HubHelp.open() },
-        { label: 'Contact Us', go: () => S2.HubSupport && S2.HubSupport.open() },
         { label: 'Report a Bug', go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
       ]}
     ];
@@ -1489,8 +1574,20 @@ const App = {
     bodyEl.style.cssText = 'overflow-y:auto;flex:1;padding-bottom:28px;-webkit-overflow-scrolling:touch;';
     panel.appendChild(bodyEl);
 
-    const ROW = 'display:flex;align-items:center;justify-content:space-between;padding:13px 18px;font-size:14.5px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
-    const PAGE = 'padding:11px 18px 11px 34px;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:1px solid var(--b2);background:var(--bg);';
+    // Strict palette: card surface (sections) -> darkest well (expanded) -> data
+    // row #0D181E (pages). No off-palette tones.
+    const SEC  = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;font-size:14.5px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
+    const CHEV = 'color:var(--t3);font-size:11px;flex-shrink:0;';
+    const WELL = 'background:var(--bg);';
+    const HOME = 'padding:11px 18px 11px 32px;font-size:13px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--row-div);';
+    const SG   = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px 7px 24px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);cursor:pointer;';
+    const PG   = 'padding:11px 18px 11px 38px;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:1px solid var(--row-div);background:#0D181E;';
+    const toggle = (headEl, body) => {
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      const cv = headEl.querySelector('.cv');
+      if (cv) cv.textContent = open ? '▸' : '▾';
+    };
 
     GROUPS.forEach(grp => {
       const gl = document.createElement('div');
@@ -1500,32 +1597,47 @@ const App = {
       grp.items.forEach(it => {
         if (it.go) {
           const row = document.createElement('div');
-          row.style.cssText = ROW;
+          row.style.cssText = SEC;
           row.innerHTML = '<span>' + esc(it.label) + '</span>';
           row.addEventListener('click', () => fire(it.go));
           bodyEl.appendChild(row);
           return;
         }
-        const row = document.createElement('div');
-        row.style.cssText = ROW;
-        row.innerHTML = '<span>' + esc(it.label) + '</span><span class="tn-chev" style="color:var(--t3);font-size:11px;">' + (it.cur ? '▾' : '▸') + '</span>';
-        const sub = document.createElement('div');
-        sub.style.display = it.cur ? 'block' : 'none';
-        it.pages.forEach(p => {
-          const pr = document.createElement('div');
-          pr.style.cssText = PAGE;
-          pr.textContent = p.label;
-          pr.addEventListener('click', () => fire(p.go ? p.go : () => routePage(p)));
-          sub.appendChild(pr);
+        // Section (level 1)
+        const secRow = document.createElement('div');
+        secRow.style.cssText = SEC;
+        secRow.innerHTML = '<span>' + esc(it.label) + '</span><span class="cv" style="' + CHEV + '">' + (it.cur ? '▾' : '▸') + '</span>';
+        const well = document.createElement('div');
+        well.style.cssText = WELL;
+        well.style.display = it.cur ? 'block' : 'none';
+        if (it.home) {
+          const hr = document.createElement('div');
+          hr.style.cssText = HOME;
+          hr.textContent = it.home.label;
+          hr.addEventListener('click', () => fire(it.home.go));
+          well.appendChild(hr);
+        }
+        // Sub-groups (level 2) + pages (level 3)
+        it.subgroups.forEach(sg => {
+          const sgHead = document.createElement('div');
+          sgHead.style.cssText = SG;
+          sgHead.innerHTML = '<span>' + esc(sg.group) + '</span><span class="cv" style="color:var(--t4);font-size:9px;flex-shrink:0;">' + (sg.cur ? '▾' : '▸') + '</span>';
+          const sgBody = document.createElement('div');
+          sgBody.style.display = sg.cur ? 'block' : 'none';
+          sg.pages.forEach(p => {
+            const pr = document.createElement('div');
+            pr.style.cssText = PG;
+            pr.textContent = p.label;
+            pr.addEventListener('click', () => fire(() => routePage(p)));
+            sgBody.appendChild(pr);
+          });
+          sgHead.addEventListener('click', () => toggle(sgHead, sgBody));
+          well.appendChild(sgHead);
+          well.appendChild(sgBody);
         });
-        row.addEventListener('click', () => {
-          const open = sub.style.display !== 'none';
-          sub.style.display = open ? 'none' : 'block';
-          const chev = row.querySelector('.tn-chev');
-          if (chev) chev.textContent = open ? '▸' : '▾';
-        });
-        bodyEl.appendChild(row);
-        bodyEl.appendChild(sub);
+        secRow.addEventListener('click', () => toggle(secRow, well));
+        bodyEl.appendChild(secRow);
+        bodyEl.appendChild(well);
       });
     });
 
@@ -3818,6 +3930,7 @@ const App = {
     document.querySelectorAll('.nav-item, .sidebar-btn').forEach(el => el.classList.remove('active'));
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
+    this.wireNavAccordion(document.getElementById('sidebar-nav'));
   },
 
   updatePeriod() {
