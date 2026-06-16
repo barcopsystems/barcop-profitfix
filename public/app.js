@@ -481,17 +481,7 @@ const App = {
     // Proto top-nav: mobile menu burger opens the off-canvas sidebar; the two
     // utility icon buttons open the Hub Settings / Help views.
     const tnBurger = document.getElementById('tn-mobile-burger');
-    if (tnBurger) tnBurger.onclick = () => {
-      // Open the drawer for whichever shell is visible: the Hub's own sidebar on
-      // the Hub, the module sidebar otherwise (the module shell is hidden on the
-      // Hub, so toggling it there would do nothing).
-      const hubWrap = document.getElementById('hub-wrapper');
-      if (hubWrap && hubWrap.style.display !== 'none') {
-        hubWrap.querySelector('.hub-app')?.classList.toggle('sidebar-open');
-      } else {
-        document.getElementById('app').classList.toggle('sidebar-open');
-      }
-    };
+    if (tnBurger) tnBurger.onclick = () => this.openMobileNav();
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); };
     const tnHelp = document.getElementById('tn-help');
@@ -1376,6 +1366,78 @@ const App = {
         if (node && node.parentElement !== acct) acct.appendChild(node);
       });
     }
+  },
+
+  // Unified mobile navigation drawer. On phones the top-nav global links and the
+  // Control/Recovery row are hidden, so the menu burger opens this single grouped
+  // drawer instead of a per-shell sidebar: every top-level destination, the
+  // current section's own pages (cloned live from its sidebar so all the existing
+  // click wiring is reused), and Support. Desktop is untouched (burger hidden).
+  openMobileNav() {
+    document.getElementById('tn-mnav-ov')?.remove();
+    document.getElementById('tn-mnav')?.remove();
+
+    // Current section's page links, cloned from whichever shell is visible.
+    const hubWrap = document.getElementById('hub-wrapper');
+    const onHub = hubWrap && hubWrap.style.display !== 'none';
+    const navRoot = onHub ? document.querySelector('.hub-app .sidebar-nav') : document.getElementById('sidebar-nav');
+    const SKIP = { 'help': 1, 'audit-help': 1, 'books-help': 1, 'settings-help': 1, 'report-bug': 1, 'contact-support': 1, 'hub-home': 1 };
+    const sectionItems = [];
+    if (navRoot) navRoot.querySelectorAll('.nav-item').forEach(el => {
+      if (el.style.display === 'none') return;
+      if (el.dataset.nav === 'report-bug') return;
+      if (el.dataset.hubAction && SKIP[el.dataset.hubAction]) return;
+      const label = (el.querySelector('.nav-label')?.textContent || '').trim();
+      if (label) sectionItems.push({ el, label });
+    });
+
+    const item = (kind, key, label, cur) =>
+      '<div class="tn-mnav-item' + (cur ? ' cur' : '') + '" data-kind="' + kind + '" data-key="' + esc(String(key)) + '">' + esc(label) + '</div>';
+    const grp = (label, html) => html ? ('<div class="tn-mnav-grp">' + label + '</div>' + html) : '';
+
+    const globalHtml = [['hub', 'Hub'], ['flowmap', 'Blueprint'], ['audit', 'Bar Cop Audit'], ['events', 'Events'], ['books', 'Books'], ['__settings', 'Settings']]
+      .map(g => item('global', g[0], g[1])).join('');
+    const controlHtml  = this._PROTO_CONTROL.map(g => item('section', g[0], g[1], g[0] === this._activeModule)).join('');
+    const recoveryHtml = this._PROTO_RECOVERY.map(g => item('section', g[0], g[1], g[0] === this._activeModule)).join('');
+    const sectionHtml  = sectionItems.map((it, i) => item('page', i, it.label)).join('');
+    const supportHtml  = item('support', 'help', 'Help and FAQ') + item('support', 'contact', 'Contact Us') + item('support', 'report-bug', 'Report a Bug');
+
+    const panel = document.createElement('div');
+    panel.id = 'tn-mnav';
+    panel.innerHTML = '<div class="tn-mnav-head"><span class="tn-mnav-title">Menu</span><button class="btn btn-ghost btn-sm" data-mnav-close>Close</button></div>'
+      + '<div class="tn-mnav-body">'
+      + grp('Go to', globalHtml) + grp('Control', controlHtml) + grp('Recovery', recoveryHtml)
+      + grp('This Section', sectionHtml) + grp('Support', supportHtml)
+      + '</div>';
+    const ov = document.createElement('div');
+    ov.id = 'tn-mnav-ov';
+    ov.className = 'tn-mnav-overlay';
+
+    const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
+    ov.addEventListener('click', close);
+    panel.querySelector('[data-mnav-close]').addEventListener('click', close);
+    panel.querySelector('.tn-mnav-body').addEventListener('click', (ev) => {
+      const el = ev.target.closest('.tn-mnav-item');
+      if (!el) return;
+      const kind = el.dataset.kind, key = el.dataset.key;
+      close();
+      setTimeout(() => {
+        if (kind === 'global') {
+          if (key === '__settings') { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); }
+          else this._protoGlobalClick(key);
+        } else if (kind === 'section') { this.jumpToSection(key); }
+        else if (kind === 'page') { const it = sectionItems[parseInt(key, 10)]; if (it && it.el) it.el.click(); }
+        else if (kind === 'support') {
+          if (key === 'help') { if (window.S && S.HubHelp) S.HubHelp.open(); }
+          else if (key === 'contact') { if (window.S && S.HubSupport) S.HubSupport.open(); }
+          else if (key === 'report-bug') { if (window.S && S.HubReportBug && S.HubReportBug.openModal) S.HubReportBug.openModal(); }
+        }
+      }, 30);
+    });
+
+    document.body.appendChild(ov);
+    document.body.appendChild(panel);
+    requestAnimationFrame(() => { ov.style.opacity = '1'; panel.style.transform = 'translateX(0)'; });
   },
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
