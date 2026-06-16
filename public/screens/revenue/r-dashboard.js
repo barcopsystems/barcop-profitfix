@@ -406,7 +406,7 @@ S.RevenueDashboard = {
       'Weekly check avg gap vs target: $'+Math.abs((parseFloat(aCA)-caT)*parseFloat(aCov)).toFixed(0)+' '+(parseFloat(aCA)<caT?'below target':'above target'),
     ];
     const prompt = 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner. Write 3 short paragraphs, one insight each, based on the revenue and labor data below. Rules: no emdashes, no dashes used as punctuation, no bullet points, no headers, no AI language. Write the way an experienced operator talks to another operator. Plain sentences. Specific numbers. Direct about what needs to change and exactly what to do about it this week.\n\n'+lines.join('\n')+'\n\nLead with check average performance, then labor efficiency, then the single action that will move revenue most this week.';
-    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-5', max_tokens:600, messages:[{role:'user', content:prompt}]})})
+    fetch('/api/claude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:'claude-sonnet-4-6', max_tokens:600, messages:[{role:'user', content:prompt}]})})
     .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(data => {
       if (btn) { btn.disabled=false; btn.textContent='Trend Insights'; }
