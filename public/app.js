@@ -1516,23 +1516,22 @@ const App = {
     // goes. The section/sub-group holding the current page are marked so the menu
     // opens drilled-in there with that page highlighted.
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, go: () => routePage(p) });
+    // A section node lists its sub-groups as single-open ACCORDIONS (they expand
+    // inline, one at a time) plus any leaf pages. Only the root drills; once
+    // you're inside a section, the sub-group links open below in place.
     const sectionNode = (label, key, homeFn, homeLabel) => {
       const sgs = groupsOf(() => navHtml(key));
       const items = [];
-      let activeChild = null;
       if (homeFn) items.push({ label: homeLabel || 'Overview', go: homeFn });
       sgs.forEach(g => {
         const gActive = !!activeId && g.pages.some(p => (p.screen || p.action) === activeId);
         if (g.pages.length === 1) {
           items.push(pageItem(g.pages[0]));
         } else {
-          const child = { title: g.group, groups: [{ items: g.pages.map(pageItem) }] };
-          items.push({ label: g.group, node: child, contains: gActive });
-          if (gActive) activeChild = child;
+          items.push({ label: g.group, pages: g.pages.map(pageItem), open: gActive });
         }
       });
-      const node = { title: label, groups: [{ items: items }] };
-      node._activeChild = activeChild;
+      const node = { title: label, items: items };
       node._contains = !!activeId && sgs.some(g => g.pages.some(p => (p.screen || p.action) === activeId));
       return node;
     };
@@ -1572,7 +1571,7 @@ const App = {
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:312px;max-width:88vw;background:var(--bg);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
+    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:312px;max-width:88vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
     const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
@@ -1583,14 +1582,22 @@ const App = {
     panel.appendChild(headEl);
     panel.appendChild(bodyEl);
 
-    // Start drilled into the section (and sub-group) holding the current page.
+    // Start drilled into the section holding the current page (its active
+    // sub-group accordion opens automatically inside).
     const stack = [root];
     let secItem = null;
     root.groups.forEach(grp => grp.items.forEach(it => { if (it.contains && it.node) secItem = it; }));
-    if (secItem) {
-      stack.push(secItem.node);
-      if (secItem.node._activeChild) stack.push(secItem.node._activeChild);
-    }
+    if (secItem) stack.push(secItem.node);
+
+    const mkRow = (label, type, on) => {
+      const r = document.createElement('div');
+      r.className = 'mnav-row' + (type === 'page' ? ' mnav-page' : '') + (on ? ' on' : '');
+      let chev = '';
+      if (type === 'drill') chev = '<span class="mnav-chev">›</span>';
+      else if (type === 'acc') chev = '<span class="mnav-chev mnav-acc-chev">›</span>';
+      r.innerHTML = '<span>' + esc(label) + '</span>' + chev;
+      return r;
+    };
 
     const render = () => {
       const node = stack[stack.length - 1];
@@ -1603,25 +1610,55 @@ const App = {
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
 
       bodyEl.innerHTML = '';
-      (node.groups || []).forEach(grp => {
-        if (grp.label) {
-          const gl = document.createElement('div');
-          gl.className = 'mnav-glabel';
-          gl.textContent = grp.label;
-          bodyEl.appendChild(gl);
-        }
-        (grp.items || []).forEach(it => {
-          const isOn = (it.id && it.id === activeId) || it.contains;
-          const row = document.createElement('div');
-          row.className = 'mnav-row' + (isOn ? ' on' : '');
-          row.innerHTML = '<span>' + esc(it.label) + '</span>' + (it.node ? '<span class="mnav-chev">›</span>' : '');
-          row.addEventListener('click', () => {
-            if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
-            else if (it.go) { fire(it.go); }
+      if (node.groups) {
+        // Root: sections drill in; Hub/Blueprint/Support navigate directly.
+        node.groups.forEach(grp => {
+          if (grp.label) {
+            const gl = document.createElement('div');
+            gl.className = 'mnav-glabel';
+            gl.textContent = grp.label;
+            bodyEl.appendChild(gl);
+          }
+          grp.items.forEach(it => {
+            const on = (it.id && it.id === activeId) || it.contains;
+            const row = mkRow(it.label, it.node ? 'drill' : '', on);
+            row.addEventListener('click', () => {
+              if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
+              else if (it.go) { fire(it.go); }
+            });
+            bodyEl.appendChild(row);
           });
-          bodyEl.appendChild(row);
         });
-      });
+      } else {
+        // Section: sub-groups are single-open accordions; leaf pages navigate.
+        const accs = [];
+        node.items.forEach(it => {
+          if (it.pages) {
+            const head = mkRow(it.label, 'acc', false);
+            if (it.open) head.classList.add('open');
+            const sub = document.createElement('div');
+            sub.style.display = it.open ? 'block' : 'none';
+            it.pages.forEach(p => {
+              const pr = mkRow(p.label, 'page', !!p.id && p.id === activeId);
+              pr.addEventListener('click', () => fire(p.go));
+              sub.appendChild(pr);
+            });
+            head.addEventListener('click', () => {
+              const isOpen = sub.style.display !== 'none';
+              accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
+              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
+            });
+            accs.push({ head: head, sub: sub });
+            bodyEl.appendChild(head);
+            bodyEl.appendChild(sub);
+          } else {
+            const on = !!it.id && it.id === activeId;
+            const row = mkRow(it.label, '', on);
+            row.addEventListener('click', () => fire(it.go));
+            bodyEl.appendChild(row);
+          }
+        });
+      }
     };
 
     render();
