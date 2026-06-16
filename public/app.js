@@ -1238,6 +1238,10 @@ const App = {
     // .nav-leaf (its icon shows, it sits outside any drop-down). _navGroups
     // excludes .nav-leaf, so it is never folded back into the previous group.
     if (mstyle) {
+      // Desktop group-label remaps (the icon stays keyed to the ORIGINAL name
+      // via data-gkey, so the glyph matches the mobile menu).
+      const DRENAME = { events: { 'Bookings': 'Scheduling' } };
+      const ren = DRENAME[module] || {};
       nav.querySelectorAll('.nav-section').forEach(sec => {
         const items = [];
         let sib = sec.nextElementSibling;
@@ -1245,7 +1249,9 @@ const App = {
           if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) items.push(sib);
           sib = sib.nextElementSibling;
         }
-        if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); }
+        if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); return; }
+        const label = (sec.textContent || '').trim();
+        if (ren[label]) { sec.dataset.gkey = label; sec.textContent = ren[label]; }
       });
     }
     App.wireNavAccordion(nav);
@@ -1292,7 +1298,7 @@ const App = {
         const gic = App._NAV_GROUP_IC || {};
         groups.forEach(g => {
           if (g.sec.querySelector('.nav-sec-ic')) return;
-          const svg = gic[(g.sec.textContent || '').trim()];
+          const svg = gic[g.sec.dataset.gkey || (g.sec.textContent || '').trim()];
           if (!svg) return;
           const span = document.createElement('span');
           span.className = 'nav-sec-ic';
