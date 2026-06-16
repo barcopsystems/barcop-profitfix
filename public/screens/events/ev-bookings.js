@@ -401,7 +401,9 @@ S.EventsBookings = {
     const fields = { stage: to };
     if (to === 'Booked' && !this.bookings().find(x => x.id === id)?.date_received) fields.date_received = App.todayLocal();
     await this.patch(id, fields);
-    // A booked win credits the Recovery Scoreboard — wired in the feeds pass.
+    // No per-booking scoreboard credit by design: a booked/completed event's
+    // revenue flows into This Week (catering, for offsite jobs) and the Revenue
+    // Audit, where the recovery engine measures the real weekly improvement.
   },
 
   // ── Booking form (shared add + edit) ─────────────────────────────────────
