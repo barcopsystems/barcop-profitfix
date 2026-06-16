@@ -481,7 +481,7 @@ const App = {
     // Proto top-nav: mobile menu burger opens the off-canvas sidebar; the two
     // utility icon buttons open the Hub Settings / Help views.
     const tnBurger = document.getElementById('tn-mobile-burger');
-    if (tnBurger) tnBurger.onclick = () => this.openMobileNav();
+    if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); };
     const tnHelp = document.getElementById('tn-help');
@@ -1391,27 +1391,32 @@ const App = {
       if (label) sectionItems.push({ el, label });
     });
 
+    // Inline styles (not just the .tn-mnav CSS classes) so the drawer always
+    // renders, even if a cached stylesheet is being served.
+    const ITEM = 'padding:11px 18px;font-size:14px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
+    const GRP  = 'font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:16px 18px 5px;';
     const item = (kind, key, label, cur) =>
-      '<div class="tn-mnav-item' + (cur ? ' cur' : '') + '" data-kind="' + kind + '" data-key="' + esc(String(key)) + '">' + esc(label) + '</div>';
-    const grp = (label, html) => html ? ('<div class="tn-mnav-grp">' + label + '</div>' + html) : '';
+      '<div class="tn-mnav-item" data-kind="' + kind + '" data-key="' + esc(String(key)) + '" style="' + ITEM + (cur ? 'color:var(--gold);font-weight:600;' : '') + '">' + esc(label) + '</div>';
+    const grp = (label, html) => html ? ('<div style="' + GRP + '">' + label + '</div>' + html) : '';
 
     const globalHtml = [['hub', 'Hub'], ['flowmap', 'Blueprint'], ['audit', 'Bar Cop Audit'], ['events', 'Events'], ['books', 'Books'], ['__settings', 'Settings']]
       .map(g => item('global', g[0], g[1])).join('');
-    const controlHtml  = this._PROTO_CONTROL.map(g => item('section', g[0], g[1], g[0] === this._activeModule)).join('');
-    const recoveryHtml = this._PROTO_RECOVERY.map(g => item('section', g[0], g[1], g[0] === this._activeModule)).join('');
+    const controlHtml  = App._PROTO_CONTROL.map(g => item('section', g[0], g[1], g[0] === App._activeModule)).join('');
+    const recoveryHtml = App._PROTO_RECOVERY.map(g => item('section', g[0], g[1], g[0] === App._activeModule)).join('');
     const sectionHtml  = sectionItems.map((it, i) => item('page', i, it.label)).join('');
     const supportHtml  = item('support', 'help', 'Help and FAQ') + item('support', 'contact', 'Contact Us') + item('support', 'report-bug', 'Report a Bug');
 
+    const ov = document.createElement('div');
+    ov.id = 'tn-mnav-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.innerHTML = '<div class="tn-mnav-head"><span class="tn-mnav-title">Menu</span><button class="btn btn-ghost btn-sm" data-mnav-close>Close</button></div>'
-      + '<div class="tn-mnav-body">'
+    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
+    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Menu</span><button class="btn btn-ghost btn-sm" data-mnav-close>Close</button></div>'
+      + '<div class="tn-mnav-body" style="overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch;">'
       + grp('Go to', globalHtml) + grp('Control', controlHtml) + grp('Recovery', recoveryHtml)
       + grp('This Section', sectionHtml) + grp('Support', supportHtml)
       + '</div>';
-    const ov = document.createElement('div');
-    ov.id = 'tn-mnav-ov';
-    ov.className = 'tn-mnav-overlay';
 
     const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
     ov.addEventListener('click', close);
@@ -1424,8 +1429,8 @@ const App = {
       setTimeout(() => {
         if (kind === 'global') {
           if (key === '__settings') { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); }
-          else this._protoGlobalClick(key);
-        } else if (kind === 'section') { this.jumpToSection(key); }
+          else App._protoGlobalClick(key);
+        } else if (kind === 'section') { App.jumpToSection(key); }
         else if (kind === 'page') { const it = sectionItems[parseInt(key, 10)]; if (it && it.el) it.el.click(); }
         else if (kind === 'support') {
           if (key === 'help') { if (window.S && S.HubHelp) S.HubHelp.open(); }
