@@ -65,7 +65,7 @@ S.ProfitFix = {
     const arr = (this.SIGNALS[signal] || (() => []))();
     let latest = null;
     arr.forEach(r => {
-      const d = r.period_end || r.date || (r.run_at ? String(r.run_at).slice(0, 10) : '') || (r.created_at ? String(r.created_at).slice(0, 10) : '');
+      const d = r.period_end || r.date || (r.run_at ? App.ymdLocal(new Date(r.run_at)) : '') || (r.created_at ? App.ymdLocal(new Date(r.created_at)) : '');
       if (d && (!latest || d > latest)) latest = String(d).slice(0, 10);
     });
     return latest;
@@ -76,7 +76,7 @@ S.ProfitFix = {
     const arr = (this.SIGNALS[signal] || (() => []))();
     let earliest = null;
     arr.forEach(r => {
-      const d = r.period_end || r.date || (r.run_at ? String(r.run_at).slice(0, 10) : '') || (r.created_at ? String(r.created_at).slice(0, 10) : '');
+      const d = r.period_end || r.date || (r.run_at ? App.ymdLocal(new Date(r.run_at)) : '') || (r.created_at ? App.ymdLocal(new Date(r.created_at)) : '');
       if (d) { const ds = String(d).slice(0, 10); if (!earliest || ds < earliest) earliest = ds; }
     });
     return earliest;
