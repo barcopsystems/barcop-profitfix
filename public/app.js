@@ -1368,78 +1368,168 @@ const App = {
     }
   },
 
-  // Unified mobile navigation drawer. On phones the top-nav global links and the
-  // Control/Recovery row are hidden, so the menu burger opens this single grouped
-  // drawer instead of a per-shell sidebar: every top-level destination, the
-  // current section's own pages (cloned live from its sidebar so all the existing
-  // click wiring is reused), and Support. Desktop is untouched (burger hidden).
+  // Unified mobile navigation drawer (App.openMobileNav). On phones the top-nav
+  // global links + the Control/Recovery row are hidden, so the burger opens this
+  // ACCORDION: tap a section to expand its pages, so the whole menu stays compact
+  // and scannable. Each section's pages are parsed live from its own sidebar
+  // source, so the page list and routing are never duplicated here.
   openMobileNav() {
     document.getElementById('tn-mnav-ov')?.remove();
     document.getElementById('tn-mnav')?.remove();
-
-    // Current section's page links, cloned from whichever shell is visible.
+    const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
-    const navRoot = onHub ? document.querySelector('.hub-app .sidebar-nav') : document.getElementById('sidebar-nav');
-    const SKIP = { 'help': 1, 'audit-help': 1, 'books-help': 1, 'settings-help': 1, 'report-bug': 1, 'contact-support': 1, 'hub-home': 1 };
-    const sectionItems = [];
-    if (navRoot) navRoot.querySelectorAll('.nav-item').forEach(el => {
-      if (el.style.display === 'none') return;
-      if (el.dataset.nav === 'report-bug') return;
-      if (el.dataset.hubAction && SKIP[el.dataset.hubAction]) return;
-      const label = (el.querySelector('.nav-label')?.textContent || '').trim();
-      if (label) sectionItems.push({ el, label });
-    });
 
-    // Inline styles (not just the .tn-mnav CSS classes) so the drawer always
-    // renders, even if a cached stylesheet is being served.
-    const ITEM = 'padding:11px 18px;font-size:14px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
-    const GRP  = 'font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:16px 18px 5px;';
-    const item = (kind, key, label, cur) =>
-      '<div class="tn-mnav-item" data-kind="' + kind + '" data-key="' + esc(String(key)) + '" style="' + ITEM + (cur ? 'color:var(--gold);font-weight:600;' : '') + '">' + esc(label) + '</div>';
-    const grp = (label, html) => html ? ('<div style="' + GRP + '">' + label + '</div>' + html) : '';
+    // Parse a section's sidebar HTML into page rows {label, action, screen}.
+    const pagesOf = (htmlFn) => {
+      const out = [];
+      try {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = htmlFn() || '';
+        tmp.querySelectorAll('.nav-item').forEach(el => {
+          if (el.dataset.nav === 'report-bug') return;
+          const action = el.dataset.hubAction || '';
+          if (action === 'report-bug' || action === 'contact-support') return;
+          const label = (el.querySelector('.nav-label')?.textContent || '').trim();
+          if (label) out.push({ label, action, screen: el.dataset.screen || '' });
+        });
+      } catch (e) {}
+      return out;
+    };
+    const routePage = (p) => {
+      if (p.screen) { App.openScreen(p.screen); return; }   // module pages + recovery-audit jumps
+      const r = {
+        'bar-cop-audit':      () => S2.HubBarCopAudit && S2.HubBarCopAudit.open(),
+        'audit-history':      () => S2.HubBarCopAudit && S2.HubBarCopAudit.openHistory(),
+        'audit-help':         () => S2.HubAuditHelp && S2.HubAuditHelp.open(),
+        'weekly-pnl':         () => S2.Reports && S2.Reports._openQboModal(),
+        'books':              () => S2.HubBooks && S2.HubBooks.open(),
+        'year-end':           () => S2.HubYearEnd && S2.HubYearEnd.open(),
+        'permits':            () => S2.HubPermits && S2.HubPermits.open(),
+        'operating-expenses': () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open(),
+        'books-help':         () => S2.HubBooksHelp && S2.HubBooksHelp.open(),
+        'getting-started':    () => S2.HubGettingStarted && S2.HubGettingStarted.open(),
+        'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
+        'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
+        'user-account':       () => S2.HubUserAccounts && S2.HubUserAccounts.open('account'),
+        'user-team':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('team'),
+        'settings-help':      () => S2.HubSettingsHelp && S2.HubSettingsHelp.open(),
+        'help':               () => S2.HubHelp && S2.HubHelp.open()
+      };
+      if (r[p.action]) r[p.action]();
+    };
+    const navHtml = (k) => { try {
+      if (k === 'inventory') return Inventory.navHTML();
+      if (k === 'labor')     return Labor.navHTML();
+      if (k === 'shift')     return Shift.navHTML();
+      if (k === 'events')    return Events.navHTML();
+      if (k === 'profit')    return ProfitNav.html();
+      if (k === 'revenue')   return Revenue.navHTML();
+      if (k === 'traffic')   return Traffic.navHTML();
+      if (k === 'audit')     return S2.Hub._auditSidebarHTML();
+      if (k === 'books')     return S2.Hub._booksSidebarHTML();
+      if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
+    } catch (e) {} return ''; };
 
-    const globalHtml = [['hub', 'Hub'], ['flowmap', 'Blueprint'], ['audit', 'Bar Cop Audit'], ['events', 'Events'], ['books', 'Books'], ['__settings', 'Settings']]
-      .map(g => item('global', g[0], g[1])).join('');
-    const controlHtml  = App._PROTO_CONTROL.map(g => item('section', g[0], g[1], g[0] === App._activeModule)).join('');
-    const recoveryHtml = App._PROTO_RECOVERY.map(g => item('section', g[0], g[1], g[0] === App._activeModule)).join('');
-    const sectionHtml  = sectionItems.map((it, i) => item('page', i, it.label)).join('');
-    const supportHtml  = item('support', 'help', 'Help and FAQ') + item('support', 'contact', 'Contact Us') + item('support', 'report-bug', 'Report a Bug');
+    // An expandable section: an optional home row (Overview/Dashboard) + the
+    // pages parsed from its sidebar. cur = auto-expand when you are in it.
+    const sec = (label, key, homeFn, homeLabel, modKey) => {
+      const pages = [];
+      if (homeFn) pages.push({ label: homeLabel || 'Overview', go: homeFn });
+      pagesOf(() => navHtml(key)).forEach(p => pages.push(p));
+      return { label, pages, cur: !onHub && modKey && modKey === App._activeModule };
+    };
 
+    const GROUPS = [
+      { g: 'Go to', items: [
+        { label: 'Hub', go: () => App.showHub() },
+        { label: 'Blueprint', go: () => S2.FlowMap && S2.FlowMap.open() },
+        sec('Bar Cop Audit', 'audit', null, null, null),
+        sec('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', 'events'),
+        sec('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview', null),
+        sec('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview', null)
+      ]},
+      { g: 'Control', items: [
+        sec('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', 'inventory'),
+        sec('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard', 'labor'),
+        sec('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard', 'shift')
+      ]},
+      { g: 'Recovery', items: [
+        sec('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard', 'profit'),
+        sec('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard', 'revenue'),
+        sec('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', 'traffic')
+      ]},
+      { g: 'Support', items: [
+        { label: 'Help and FAQ', go: () => S2.HubHelp && S2.HubHelp.open() },
+        { label: 'Contact Us', go: () => S2.HubSupport && S2.HubSupport.open() },
+        { label: 'Report a Bug', go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
+      ]}
+    ];
+
+    // ── Build DOM ──
     const ov = document.createElement('div');
     ov.id = 'tn-mnav-ov';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
-    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Menu</span><button class="btn btn-ghost btn-sm" data-mnav-close>Close</button></div>'
-      + '<div class="tn-mnav-body" style="overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch;">'
-      + grp('Go to', globalHtml) + grp('Control', controlHtml) + grp('Recovery', recoveryHtml)
-      + grp('This Section', sectionHtml) + grp('Support', supportHtml)
-      + '</div>';
-
+    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:308px;max-width:88vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
     const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
-    ov.addEventListener('click', close);
-    panel.querySelector('[data-mnav-close]').addEventListener('click', close);
-    panel.querySelector('.tn-mnav-body').addEventListener('click', (ev) => {
-      const el = ev.target.closest('.tn-mnav-item');
-      if (!el) return;
-      const kind = el.dataset.kind, key = el.dataset.key;
-      close();
-      setTimeout(() => {
-        if (kind === 'global') {
-          if (key === '__settings') { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); }
-          else App._protoGlobalClick(key);
-        } else if (kind === 'section') { App.jumpToSection(key); }
-        else if (kind === 'page') { const it = sectionItems[parseInt(key, 10)]; if (it && it.el) it.el.click(); }
-        else if (kind === 'support') {
-          if (key === 'help') { if (window.S && S.HubHelp) S.HubHelp.open(); }
-          else if (key === 'contact') { if (window.S && S.HubSupport) S.HubSupport.open(); }
-          else if (key === 'report-bug') { if (window.S && S.HubReportBug && S.HubReportBug.openModal) S.HubReportBug.openModal(); }
+    const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
+
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;';
+    head.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Menu</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn btn-ghost btn-sm'; closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', close);
+    head.appendChild(closeBtn);
+    panel.appendChild(head);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.style.cssText = 'overflow-y:auto;flex:1;padding-bottom:28px;-webkit-overflow-scrolling:touch;';
+    panel.appendChild(bodyEl);
+
+    const ROW = 'display:flex;align-items:center;justify-content:space-between;padding:13px 18px;font-size:14.5px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
+    const PAGE = 'padding:11px 18px 11px 34px;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:1px solid var(--b2);background:var(--bg);';
+
+    GROUPS.forEach(grp => {
+      const gl = document.createElement('div');
+      gl.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:16px 18px 5px;';
+      gl.textContent = grp.g;
+      bodyEl.appendChild(gl);
+      grp.items.forEach(it => {
+        if (it.go) {
+          const row = document.createElement('div');
+          row.style.cssText = ROW;
+          row.innerHTML = '<span>' + esc(it.label) + '</span>';
+          row.addEventListener('click', () => fire(it.go));
+          bodyEl.appendChild(row);
+          return;
         }
-      }, 30);
+        const row = document.createElement('div');
+        row.style.cssText = ROW;
+        row.innerHTML = '<span>' + esc(it.label) + '</span><span class="tn-chev" style="color:var(--t3);font-size:11px;">' + (it.cur ? '▾' : '▸') + '</span>';
+        const sub = document.createElement('div');
+        sub.style.display = it.cur ? 'block' : 'none';
+        it.pages.forEach(p => {
+          const pr = document.createElement('div');
+          pr.style.cssText = PAGE;
+          pr.textContent = p.label;
+          pr.addEventListener('click', () => fire(p.go ? p.go : () => routePage(p)));
+          sub.appendChild(pr);
+        });
+        row.addEventListener('click', () => {
+          const open = sub.style.display !== 'none';
+          sub.style.display = open ? 'none' : 'block';
+          const chev = row.querySelector('.tn-chev');
+          if (chev) chev.textContent = open ? '▸' : '▾';
+        });
+        bodyEl.appendChild(row);
+        bodyEl.appendChild(sub);
+      });
     });
 
+    ov.addEventListener('click', close);
     document.body.appendChild(ov);
     document.body.appendChild(panel);
     requestAnimationFrame(() => { ov.style.opacity = '1'; panel.style.transform = 'translateX(0)'; });
