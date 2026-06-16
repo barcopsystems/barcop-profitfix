@@ -972,6 +972,16 @@ const DB = {
       traffic_holidays:    [],
       traffic_inquiries:   [],
       getting_started_traffic: {},
+      // ── Events section (bookings, guests, planning) ────────────────────────
+      // Unified booking record: lead -> quote -> booked -> completed/lost, one
+      // per party. Row-per-record via core_events (kind 'booking'); replaces the
+      // old split revenue_events + traffic_inquiries. Rate cards, the guest CRM,
+      // and the planning calendar are blob-persisted.
+      bookings:         [],
+      event_rate_cards: [],
+      event_regulars:   [],
+      event_calendar:   [],
+      getting_started_events: {},
       // Hub — Bar Cop Audit history (executive monthly audits at Hub level)
       bar_cop_audits: [],
       // Hub — Operating Expenses Log (per-entry expense capture, feeds Books)
