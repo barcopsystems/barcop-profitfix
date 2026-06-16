@@ -19,7 +19,7 @@ S.Hub = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
-      calendar:'<rect x="2" y="3.5" width="13" height="11.5" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 7h13" stroke="currentColor" stroke-width="1.3"/><path d="M5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      history: '<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
     };
@@ -31,13 +31,12 @@ S.Hub = {
     };
     return ''
       + '<div class="nav-section">Audit</div>'
-      + row('bar-cop-audit', 'Overall Audit', 'audit', [])
+      + row('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
+      + row('audit-history', 'Audit History', 'history', [])
       + '<div class="nav-section">By Recovery System</div>'
       + row('enter', 'Profit Audit',  'profit',  [['data-mod', 'profit'],  ['data-screen', 'audit-tracker']])
       + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
       + row('enter', 'Traffic Audit', 'traffic', [['data-mod', 'traffic'], ['data-screen', 't-audit']])
-      + '<div class="nav-section">History</div>'
-      + row('audit-history', 'Audit History', 'calendar', [])
       + '<div class="nav-section">Support</div>'
       + row('help',       'Help and FAQ', 'help', [])
       + row('report-bug', 'Report a Bug', 'bug',  []);
