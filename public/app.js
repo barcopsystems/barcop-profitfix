@@ -1237,23 +1237,7 @@ const App = {
     // leaf (matches the mobile menu) — drop the header and make the lone item a
     // .nav-leaf (its icon shows, it sits outside any drop-down). _navGroups
     // excludes .nav-leaf, so it is never folded back into the previous group.
-    if (mstyle) {
-      // Desktop group-label remaps (the icon stays keyed to the ORIGINAL name
-      // via data-gkey, so the glyph matches the mobile menu).
-      const DRENAME = { events: { 'Bookings': 'Scheduling' } };
-      const ren = DRENAME[module] || {};
-      nav.querySelectorAll('.nav-section').forEach(sec => {
-        const items = [];
-        let sib = sec.nextElementSibling;
-        while (sib && !sib.classList.contains('nav-section')) {
-          if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) items.push(sib);
-          sib = sib.nextElementSibling;
-        }
-        if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); return; }
-        const label = (sec.textContent || '').trim();
-        if (ren[label]) { sec.dataset.gkey = label; sec.textContent = ren[label]; }
-      });
-    }
+    if (mstyle) App._mstyleSidebar(nav, ({ events: { 'Bookings': 'Scheduling' } })[module] || {});
     App.wireNavAccordion(nav);
   },
 
@@ -1350,6 +1334,31 @@ const App = {
       }
       groups.forEach(g => this._setNavGroup(g, g.sec === openSec));
     } catch (e) {}
+  },
+
+  // Transform a freshly-rendered mobile-style sidebar (module shell or Hub
+  // shell) before wireNavAccordion runs: (1) drop the Report a Bug link (being
+  // re-homed elsewhere); (2) flatten any group with a single visible link into
+  // a top-level leaf (its icon shows, no drop-down — matches the mobile menu);
+  // (3) apply desktop group-label remaps (the icon stays keyed to the ORIGINAL
+  // name via data-gkey, so the glyph matches mobile); (4) shorten the section
+  // Help link to "Help". Source navHTML + the mobile menu are untouched.
+  _mstyleSidebar(nav, rename) {
+    if (!nav) return;
+    rename = rename || {};
+    nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
+    nav.querySelectorAll('.nav-section').forEach(sec => {
+      const items = [];
+      let sib = sec.nextElementSibling;
+      while (sib && !sib.classList.contains('nav-section')) {
+        if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) items.push(sib);
+        sib = sib.nextElementSibling;
+      }
+      if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); return; }
+      const label = (sec.textContent || '').trim();
+      if (rename[label]) { sec.dataset.gkey = label; sec.textContent = rename[label]; }
+    });
+    nav.querySelectorAll('.nav-item .nav-label').forEach(l => { if ((l.textContent || '').trim() === 'Help and FAQ') l.textContent = 'Help'; });
   },
 
   // PROTO (design prototype): the new full-width top nav + restyled sidebar,
