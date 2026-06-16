@@ -768,7 +768,16 @@ const App = {
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
-    document.body.classList.remove('hub-dashboard'); // a sub-page is open → show the sidebar
+    // Sidebar context: Flow Map (and any 'none' page) keeps the full-width
+    // dashboard mode (no sidebar); Bar Cop Audit mounts its own context
+    // sidebar; everything else falls back to the default Hub sidebar.
+    const _sideCtx = this._HUB_SIDEBAR_OF_ACTION[activeAction] || 'grabbag';
+    if (_sideCtx === 'none') {
+      document.body.classList.add('hub-dashboard');     // full-width, no sidebar
+    } else {
+      document.body.classList.remove('hub-dashboard');  // a sub-page is open → show the sidebar
+      if (window.S && S.Hub && S.Hub.renderSidebar) S.Hub.renderSidebar(_sideCtx);
+    }
     this._renderProtoTopnav(this._GLOBAL_OF_ACTION[activeAction] || '');  // highlight this page's global link
     const content = document.querySelector('.hub-app .content');
     if (!content) {
@@ -1220,7 +1229,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
+  // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
+  // full-width dashboard mode (Flow Map); 'audit' = the Bar Cop Audit sidebar;
+  // missing = the default Hub sidebar. Books/Settings get their own in later
+  // phases of the nav sweep.
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'flowmap': 'none' },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
