@@ -1567,7 +1567,7 @@ const App = {
     };
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
     // Mobile-only label remaps (do NOT touch the desktop sidebars).
-    const GROUP_REMAP = { audit: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' } };
+    const GROUP_REMAP = { audit: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' }, events: { 'Bookings': 'Scheduling' } };
     const PAGE_REMAP  = { audit: { 'Bar Cop Audit': 'Run/View Audit' } };
     // A section node lists its sub-groups as single-open ACCORDIONS (they expand
     // inline) plus any leaf pages. Leaf rows (Dashboard, single-page groups, Help)
@@ -1698,21 +1698,28 @@ const App = {
             sub.style.display = it.open ? 'block' : 'none';
             it.pages.forEach(p => {
               const pr = mkRow(p.label, 'page', false);
-              pr.addEventListener('click', () => fire(p.go));
+              // Navigating to a NESTED link commits its parent drop-down to memory,
+              // so reopening the menu lands back with that drop-down open + lit.
+              pr.addEventListener('click', () => { App._mnavOpenGroups[node._key] = it.groupKey; fire(p.go); });
               sub.appendChild(pr);
             });
+            // Opening/closing a drop-down is in-session only (cosmetic) — it does
+            // NOT persist on its own; only a nested-link click does. An explicit
+            // close clears any remembered drop-down for this section.
             head.addEventListener('click', () => {
               const isOpen = sub.style.display !== 'none';
               accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
-              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); App._mnavOpenGroups[node._key] = it.groupKey; }
+              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
               else { delete App._mnavOpenGroups[node._key]; }
             });
             accs.push({ head: head, sub: sub });
             bodyEl.appendChild(head);
             bodyEl.appendChild(sub);
           } else {
+            // A main (top-level) link click clears the section's remembered
+            // drop-down, so returning to the menu shows it closed/normal.
             const row = mkRow(it.label, '', false, it.icon);
-            row.addEventListener('click', () => fire(it.go));
+            row.addEventListener('click', () => { delete App._mnavOpenGroups[node._key]; fire(it.go); });
             bodyEl.appendChild(row);
           }
         });
