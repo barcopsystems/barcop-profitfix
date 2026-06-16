@@ -42,15 +42,52 @@ S.Hub = {
       + row('report-bug', 'Report a Bug', 'bug',  []);
   },
 
-  // Swap the Hub shell's sidebar for a context. 'audit' mounts the Bar Cop
-  // Audit sidebar; anything else restores the default (grab-bag) nav cached
-  // when the Hub last rendered. The delegated click handler lives on
+  // ── Books context sidebar ─────────────────────────────────────────────────
+  // The Books section's sidebar: Accounting (Overview + the three deliverables)
+  // + Operations (Permits, Operating Expenses, folded in from the retired
+  // top-nav Operations link) + Support. Overview opens the Books landing
+  // (S.HubBooksHome); the rest open their existing screens, all of which now
+  // resolve to this 'books' sidebar context.
+  _booksSidebarHTML() {
+    const ic = {
+      grid:    '<rect x="2" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="2" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="9" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/>',
+      report:  '<rect x="3.5" y="2" width="10" height="13" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 5.5h5M6 8h5M6 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M9 12.5l1.2 1.2 2.2-2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+      books:   '<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      calendar:'<rect x="2" y="3.5" width="13" height="11.5" rx="0.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 7h13" stroke="currentColor" stroke-width="1.3"/><path d="M5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      shield:  '<path d="M8.5 2L3 4v5c0 3 2.5 5 5.5 6 3-1 5.5-3 5.5-6V4l-5.5-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 8.5l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+      expense: '<path d="M3.5 2v13l1.5-1 1.5 1 1.5-1 1.5 1 1.5-1 1.5 1V2H3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 5.5v5M10 6.5H7.5a1 1 0 0 0 0 2H9.5a1 1 0 0 1 0 2H7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
+      help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+      bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+    };
+    const row = (action, name, iconKey) =>
+      '<div class="nav-item" data-hub-action="' + action + '">'
+        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
+        + '<span class="nav-label">' + name + '</span></div>';
+    return ''
+      + '<div class="nav-section">Accounting</div>'
+      + row('books-home', 'Overview', 'grid')
+      + row('weekly-pnl', 'Weekly P&L Brief', 'report')
+      + row('books', 'Month-End Books', 'books')
+      + row('year-end', 'Year-End Review', 'calendar')
+      + '<div class="nav-section">Operations</div>'
+      + row('permits', 'Permits and Licenses', 'shield')
+      + row('operating-expenses', 'Operating Expenses', 'expense')
+      + '<div class="nav-section">Support</div>'
+      + row('help', 'Help and FAQ', 'help')
+      + row('report-bug', 'Report a Bug', 'bug');
+  },
+
+  // Swap the Hub shell's sidebar for a context. 'audit' / 'books' mount their
+  // dedicated sidebars; anything else restores the default (grab-bag) nav
+  // cached when the Hub last rendered. The delegated click handler lives on
   // .sidebar-nav (wired once in render), so swapping innerHTML keeps it live.
   renderSidebar(context) {
     const nav = document.querySelector('.hub-app .sidebar-nav');
     if (!nav) return;
     if (context === 'audit') {
       nav.innerHTML = this._auditSidebarHTML();
+    } else if (context === 'books') {
+      nav.innerHTML = this._booksSidebarHTML();
     } else if (this._grabBagNavHTML != null) {
       nav.innerHTML = this._grabBagNavHTML;
     }
@@ -921,6 +958,7 @@ S.Hub = {
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'audit-history')      S.HubBarCopAudit?.openHistory?.();
+      else if (action === 'books-home')         S.HubBooksHome?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
