@@ -123,7 +123,10 @@ S.Hub = {
     // the module sidebars). Each maps to its section landing's activeAction.
     const MSTYLE = {
       books:    { id: 'nav-books-home',    action: 'books-home' },
-      settings: { id: 'nav-settings-home', action: 'settings-home' }
+      settings: { id: 'nav-settings-home', action: 'settings-home' },
+      // Audits has no Dashboard leaf (the Bar Cop Audit page IS its landing); it
+      // only carries label remaps mirroring the mobile Audits panel.
+      audit:    { remaps: { groups: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' }, items: { 'Bar Cop Audit': 'Run/View Audit' } } }
     };
     const ms = MSTYLE[context];
     // Mobile-style sidebars keep their DOM across in-section navigation so the
@@ -144,18 +147,21 @@ S.Hub = {
     nav.classList.toggle('nav-mstyle', !!ms);
     nav._mstyleClosed = false;
     if (ms) {
-      const firstSec = nav.querySelector('.nav-section');
-      if (firstSec && !nav.querySelector('#' + ms.id)) {
-        const d = document.createElement('div');
-        d.className = 'nav-item nav-leaf';
-        d.id = ms.id;
-        d.setAttribute('data-hub-action', ms.action);
-        d.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
-        firstSec.parentNode.insertBefore(d, firstSec);
+      if (ms.id) {
+        const firstSec = nav.querySelector('.nav-section');
+        if (firstSec && !nav.querySelector('#' + ms.id)) {
+          const d = document.createElement('div');
+          d.className = 'nav-item nav-leaf';
+          d.id = ms.id;
+          d.setAttribute('data-hub-action', ms.action);
+          d.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
+          firstSec.parentNode.insertBefore(d, firstSec);
+        }
       }
       // Drop Report a Bug, flatten single-link groups (Support → a "Help" leaf),
-      // shorten the Help link — same transform the module sidebars get.
-      App._mstyleSidebar(nav, {});
+      // shorten Help, and apply any section label remaps — the same transform
+      // the module sidebars get.
+      App._mstyleSidebar(nav, ms.remaps || {});
     }
   },
 
