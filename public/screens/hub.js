@@ -119,9 +119,16 @@ S.Hub = {
   renderSidebar(context) {
     const nav = document.querySelector('.hub-app .sidebar-nav');
     if (!nav) return;
-    // Books renders mobile-style; keep its DOM across in-section navigation so
-    // the open drop-down persists (the module sidebars never rebuild either).
-    if (context === 'books' && nav._builtCtx === 'books') return;
+    // Mobile-style Hub sections (a Dashboard leaf + group-icon accordions, like
+    // the module sidebars). Each maps to its section landing's activeAction.
+    const MSTYLE = {
+      books:    { id: 'nav-books-home',    action: 'books-home' },
+      settings: { id: 'nav-settings-home', action: 'settings-home' }
+    };
+    const ms = MSTYLE[context];
+    // Mobile-style sidebars keep their DOM across in-section navigation so the
+    // open drop-down persists (the module sidebars never rebuild either).
+    if (ms && nav._builtCtx === context) return;
     nav._builtCtx = context;
     if (context === 'audit') {
       nav.innerHTML = this._auditSidebarHTML();
@@ -132,11 +139,8 @@ S.Hub = {
     } else if (this._grabBagNavHTML != null) {
       nav.innerHTML = this._grabBagNavHTML;
     }
-    // Mobile-style sidebar for Books (matches Inventory/Labor/Shift): a Dashboard
-    // leaf routing to the Books landing + group-icon accordions. wireNavAccordion
-    // (run by setActiveHubNav) adds the group icons and the open/collapse logic.
-    const MSTYLE = { books: { id: 'nav-books-home', action: 'books-home' } };
-    const ms = MSTYLE[context];
+    // A Dashboard leaf routing to the section landing + group-icon accordions;
+    // wireNavAccordion (run by setActiveHubNav) adds the icons + open/collapse.
     nav.classList.toggle('nav-mstyle', !!ms);
     nav._mstyleClosed = false;
     if (ms) {
