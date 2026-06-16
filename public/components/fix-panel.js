@@ -275,7 +275,7 @@ window.FixPanel = {
     if (s.logged === 0) {
       const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
       const audits = (App.data && App.data[auditKey]) || [];
-      const latest = audits[audits.length - 1];
+      const latest = App.latestEvent(audits);   // date-DESC store; never index by position
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual = monthly * 12;
       const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
