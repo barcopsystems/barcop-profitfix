@@ -683,6 +683,7 @@ const App = {
     S.Hub.render(hubWrap);
     document.body.classList.add('chrome-on');     // shared top nav sits above the Hub too
     document.body.classList.add('hub-dashboard'); // dashboard view = no sidebar (full-width)
+    this._activeScreenObj = this._hubHelpShim('hub'); // nav "i" → Hub directions
     this._renderProtoTopnav('hub');               // Hub link active, no section active
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
@@ -830,6 +831,9 @@ const App = {
     // Light up the matching sidebar entry so the operator can see at a
     // glance which Hub section they are in.
     if (activeAction) this.setActiveHubNav(activeAction);
+    // Point the nav "i" page-help at this Hub-shell page's directions (null =
+    // fall back to the full Help and FAQ); clears any stale module screen.
+    this._activeScreenObj = this._hubHelpShim(activeAction);
     // Hand the screen the content element directly so .screen wrapper
     // padding behaves identically to module screens.
     content.innerHTML = '';
@@ -1235,6 +1239,39 @@ const App = {
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
   _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'flowmap': 'none' },
+
+  // Page directions for the nav "i" button on Hub-shell pages. Those pages open
+  // via openHubFullPage (not navigate), so they never register an
+  // _activeScreenObj on their own and the "i" had nothing to show. Keyed by the
+  // page's activeAction; openHubFullPage/showHub install the matching shim.
+  // Pages not listed fall back to the full Help and FAQ. Sections: {h, p:[...]}.
+  _HUB_HELP: {
+    'hub': { title: 'The Hub', sections: [
+      { h: 'What this is', p: ['Your home screen. The Hub pulls the most important numbers from every part of Bar Cop into one view: what you have recovered, your Bar Cop Audit score, and the issues that need attention right now.'] },
+      { h: 'How to use it', p: ['Tap any tile or row to jump to the screen behind it. The weekly readout shows where money is leaking this week, biggest first. The alerts surface anything worth a look across Inventory, Labor, and Shift.'] }
+    ] },
+    'flowmap': { title: 'Blueprint', sections: [
+      { h: 'What this is', p: ['The Blueprint shows how your data moves through Bar Cop, left to right: your Control sections capture it, This Week rolls it into a P&L, Recovery and the Bar Cop Audit diagnose where money is leaking, the Fix Process closes the gaps, and the Hub and Books report it.'] },
+      { h: 'How to use it', p: ['Tap any box to see exactly what feeds it and what it feeds, with a button to open that screen. Use it to trace where a number you logged ends up, or how one part of Bar Cop connects to another.'] }
+    ] },
+    'bar-cop-audit': { title: 'Bar Cop Audit', sections: [
+      { h: 'What this is', p: ['Your monthly read on how well the whole operation is being run. It scores six areas from the data you already log: operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and consistency.'] },
+      { h: 'How to use it', p: ['Run one audit every 30 days. Each sub-score fills in as you log the data behind it, and shows Not Enough Data until then.', 'The sidebar links to your Profit, Revenue, and Traffic audits, which live with their Recovery Fix Systems.'] }
+    ] },
+    'books-home': { title: 'Books', sections: [
+      { h: 'What this is', p: ['Books is your back office. The Accounting pages build the files your accountant needs (Weekly P&L Brief, Month-End Books, Year-End Review), and the Operations pages track permits, licenses, and operating expenses.'] },
+      { h: 'This page', p: ['The overview rolls up your latest month from what you logged, shows what is coming due, and links to every Books page. The numbers are built from your weekly records, so they match the Month-End file.'] }
+    ] },
+    'settings-home': { title: 'Settings', sections: [
+      { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
+      { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
+    ] }
+  },
+  _hubHelpShim(action) {
+    const h = this._HUB_HELP[action];
+    if (!h) return null;
+    return { showHowTo: () => App.showHelpModal(h.title, h.sections) };
+  },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
   _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'r-menu-items', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
