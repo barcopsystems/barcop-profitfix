@@ -19,6 +19,7 @@ S.ProfitForecast = {
   ],
   RUN_WEEKS: 12,   // recent window for the sales + prime-cost run-rate
   MIN_WEEKS: 3,    // honesty gate — need a few weeks for a real run-rate
+  MIN_OPEX_WEEKS: 4,  // need about a month of opex history before projecting lumpy bills
 
   weeks()   { return (App.data.weeks || []).filter(w => w.period_end); },
   opexLog() { return (App.data.operating_expenses || []); },
@@ -48,15 +49,20 @@ S.ProfitForecast = {
     const today   = App.todayLocal();
     const yearAgo = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() - 364); return App.ymdLocal(d); })();
     const ox = this.opexLog().filter(r => r && r.date && r.amount != null && String(r.date).slice(0, 10) >= yearAgo);
-    let avgWeeklyOpex = 0;
-    const opexLogged = ox.length > 0;
-    if (opexLogged) {
+    // Operating costs are lumpy (rent monthly, insurance annual). A run-rate from
+    // only a week or two of history would treat one big bill as if it repeated
+    // every week and blow up the projection, so opex is included only once there
+    // is enough span to average it honestly; below that we project profit BEFORE
+    // operating costs and say so.
+    let avgWeeklyOpex = 0, opexLogged = false, opexShort = false;
+    if (ox.length > 0) {
       const sumOx    = ox.reduce((t, r) => t + (parseFloat(r.amount) || 0), 0);
       const earliest = ox.reduce((m, r) => { const d = String(r.date).slice(0, 10); return d < m ? d : m; }, '9999-12-31');
-      const spanWeeks = Math.max(1, (new Date(today + 'T00:00:00') - new Date(earliest + 'T00:00:00')) / 86400000 / 7);
-      avgWeeklyOpex = sumOx / spanWeeks;
+      const spanWeeks = (new Date(today + 'T00:00:00') - new Date(earliest + 'T00:00:00')) / 86400000 / 7;
+      if (spanWeeks >= this.MIN_OPEX_WEEKS) { avgWeeklyOpex = sumOx / spanWeeks; opexLogged = true; }
+      else opexShort = true;
     }
-    return { nW, avgWeeklyRev, primePctCurrent, avgWeeklyPF, avgWeeklyOpex, opexLogged };
+    return { nW, avgWeeklyRev, primePctCurrent, avgWeeklyPF, avgWeeklyOpex, opexLogged, opexShort };
   },
 
   render(container, actions) {
@@ -128,9 +134,12 @@ S.ProfitForecast = {
       + '</tbody></table></div></div>';
 
     // ── Heads Up: assumptions + disclaimer (standard opaque gold-tint box) ──
+    const opexNote = rr.opexLogged ? ''
+      : rr.opexShort ? ' You have under a month of operating costs logged, not enough history to project them honestly yet, so this shows profit before operating costs. It fills in as more bills land under Accounting, Operating Expenses.'
+      : ' No operating costs are logged yet, so this shows profit before operating costs; add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.';
     const assumeTxt = 'Projected from your last ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ': about ' + money(rr.avgWeeklyRev) + ' a week in sales at a ' + pctTxt(rr.primePctCurrent) + ' prime cost'
       + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex + rr.avgWeeklyPF) + ' a week in operating costs.' : '.')
-      + (rr.opexLogged ? '' : ' No operating costs are logged yet, so this shows profit before operating costs; add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.')
+      + opexNote
       + ' These are projections in whole dollars built from your own averages, an estimate to plan against, not a guarantee or financial advice.';
     const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
