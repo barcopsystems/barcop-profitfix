@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Flow Map — interactive map of how data moves through Bar Cop ──────────────
+/* ── Blueprint — interactive map of how data moves through Bar Cop ──────────────
    A Hub-level full page (top-nav link right of The Hub). Plots the app as a
    left-to-right flow: Control captures, This Week rolls it up, Recovery + the
    Bar Cop Audit diagnose, the Fix Process + Recovery Scoreboard close and
@@ -74,7 +74,7 @@ S.FlowMap = {
   ],
 
   open() {
-    App.openHubFullPage('Flow Map', (mount) => {
+    App.openHubFullPage('Blueprint', (mount) => {
       this.container = mount;
       this._sel = null;
       this.render();
