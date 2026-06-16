@@ -1181,6 +1181,7 @@ const App = {
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
     nav.classList.toggle('nav-mstyle', module === 'inventory');
+    nav._mstyleClosed = false;
     if (module === 'inventory') {
       const firstSec = nav.querySelector('.nav-section');
       if (firstSec && !nav.querySelector('#nav-ic-dashboard')) {
@@ -1290,6 +1291,16 @@ const App = {
           gs.forEach(g => App._setNavGroup(g, !wasOpen && g.sec === sec));
         });
         navEl._accWired = true;
+      }
+      if (navEl.classList.contains('nav-mstyle')) {
+        // Mobile-style: NO auto-open. Collapse every group on a fresh render;
+        // after that the click handler manages single-open and we preserve it
+        // across navigations (no default first/active group opening).
+        if (!navEl._mstyleClosed) {
+          groups.forEach(g => App._setNavGroup(g, false));
+          navEl._mstyleClosed = true;
+        }
+        return;
       }
       // Open the group with the active item; else keep one open; else the first.
       const active = navEl.querySelector('.nav-item.active');
