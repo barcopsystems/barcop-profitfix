@@ -969,23 +969,98 @@ S.HubSettings = {
     });
     App.data.revenue_server_checks = rSC;
 
-    // ── Events and catering pipeline ──
-    App.data.revenue_events = [
-      { id:uid(), event_name:'Reyes Rehearsal Dinner', event_type:'Private Dining', status:'Completed',
-        date:dateStr(38), covers:34, fb_minimum:2200, actual_revenue:2840, estimated_revenue:2500,
-        notes:'', saved_at:daysAgoISO(40) },
-      { id:uid(), event_name:'Downtown Tech Mixer', event_type:'Corporate', status:'Completed',
-        date:dateStr(17), covers:60, fb_minimum:3000, actual_revenue:3620, estimated_revenue:3400,
-        notes:'', saved_at:daysAgoISO(19) },
-      { id:uid(), event_name:'Hargrove 40th Birthday', event_type:'Social', status:'Confirmed',
-        date:dateStr(-9), covers:28, fb_minimum:1800, actual_revenue:0, estimated_revenue:2100,
-        notes:'', saved_at:daysAgoISO(6) },
-      { id:uid(), event_name:'Keller Group Saturday Buyout', event_type:'Buyout', status:'Proposal Sent',
-        date:dateStr(-21), covers:90, fb_minimum:6000, actual_revenue:0, estimated_revenue:6800,
-        notes:'', saved_at:daysAgoISO(3) },
-      { id:uid(), event_name:'Westlake Realty Lunch Catering', event_type:'Catering', status:'Inquiry',
-        date:dateStr(-32), covers:45, fb_minimum:0, actual_revenue:0, estimated_revenue:1500,
-        notes:'', saved_at:daysAgoISO(1) },
+    // ════════════════════════════════════════════════════════════════════
+    //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
+    //  planning calendar. One unified booking record per party (lead -> quote
+    //  -> booked -> completed/lost). "Live Music Friday" links to the tagged
+    //  Friday dinner shift so its Event P&L pulls real revenue + labor.
+    // ════════════════════════════════════════════════════════════════════
+    const monthDay = (day) => { const d = new Date(today); d.setDate(day); return App.ymdLocal(d); };
+    const offMonth = (n, day) => { const d = new Date(today); d.setMonth(d.getMonth() + n, day); return App.ymdLocal(d); };
+
+    App.data.bookings = [
+      { id:uid(), stage:'Completed', event_name:'Reyes Rehearsal Dinner', event_type:'Rehearsal Dinner',
+        contact_name:'Marisol Reyes', contact_phone:'512-555-0148', contact_email:'mreyes@example.com', source:'Referral',
+        date_received:dateStr(72), event_date:dateStr(38), event_time:'6:30 PM', party_size:34, space:'Private Room',
+        fb_minimum:2200, per_head:0, quoted_total:2840, deposit_amount:800, deposit_paid_date:dateStr(60), balance_paid_date:dateStr(37),
+        actual_revenue:2840, event_food_cost:760, event_bar_cost:520, event_other_cost:0,
+        requests:'Family-style, one toast mid-dinner.', created_at:daysAgoISO(72) },
+      { id:uid(), stage:'Completed', event_name:'Live Music Friday', event_type:'Other',
+        contact_name:'', contact_phone:'', contact_email:'', source:'',
+        date_received:dateStr(21), event_date:dateStr(3), event_time:'8:00 PM', party_size:0, space:'Main Floor',
+        fb_minimum:0, per_head:0, quoted_total:0, deposit_amount:0,
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:350,
+        requests:'Trio, 8 to 11. Revenue and labor pull from the tagged Friday dinner shift.', created_at:daysAgoISO(21) },
+      { id:uid(), stage:'Completed', event_name:'Westlake Realty Lunch Catering', event_type:'Catering (Offsite)',
+        contact_name:'Dana Whitfield', contact_phone:'512-555-0173', contact_email:'dana@westlakerealty.example', source:'Email',
+        date_received:dateStr(12), event_date:dateStr(2), event_time:'12:00 PM', party_size:45, space:'Offsite',
+        fb_minimum:0, per_head:35, quoted_total:1575, deposit_amount:400, deposit_paid_date:dateStr(8), balance_paid_date:dateStr(1),
+        actual_revenue:1575, event_food_cost:430, event_bar_cost:0, event_other_cost:180,
+        requests:'Boxed lunches delivered to their office.', created_at:daysAgoISO(12) },
+      { id:uid(), stage:'Booked', event_name:'Hargrove 40th Birthday', event_type:'Birthday',
+        contact_name:'Tom Hargrove', contact_phone:'512-555-0119', contact_email:'thargrove@example.com', source:'Walk-in',
+        date_received:dateStr(15), event_date:dateStr(-9), event_time:'7:00 PM', party_size:28, space:'Private Room',
+        fb_minimum:1800, per_head:0, quoted_total:2100, deposit_amount:500, deposit_paid_date:dateStr(10),
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'Surprise. Cake drop at 8.', created_at:daysAgoISO(15) },
+      { id:uid(), stage:'Booked', event_name:'Keller Saturday Buyout', event_type:'Buyout',
+        contact_name:'Priya Keller', contact_phone:'512-555-0162', contact_email:'pkeller@example.com', source:'OpenTable/Resy',
+        date_received:dateStr(9), event_date:dateStr(-21), event_time:'5:00 PM', party_size:90, space:'Full Buyout',
+        fb_minimum:6000, per_head:0, quoted_total:6800, deposit_amount:1500,
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'Full buyout, passed apps then seated.', created_at:daysAgoISO(9) },
+      { id:uid(), stage:'Quote Sent', event_name:'Downtown Tech Mixer', event_type:'Corporate',
+        contact_name:'Jordan Bell', contact_phone:'512-555-0185', contact_email:'jbell@example.com', source:'Website Form',
+        date_received:dateStr(5), event_date:dateStr(-34), event_time:'6:00 PM', party_size:60, space:'Patio and Bar',
+        fb_minimum:3000, per_head:60, quoted_total:3600, deposit_amount:0,
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'Open bar two hours, passed apps.', created_at:daysAgoISO(5) },
+      { id:uid(), stage:'Lead', event_name:'Nguyen Baby Shower', event_type:'Bridal/Baby Shower',
+        contact_name:'Lan Nguyen', contact_phone:'512-555-0137', contact_email:'lnguyen@example.com', source:'Phone',
+        date_received:dateStr(2), event_date:dateStr(-45), event_time:'2:00 PM', party_size:22, space:'Private Room',
+        fb_minimum:0, per_head:0, quoted_total:0, deposit_amount:0,
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'Daytime, non-alcoholic punch option.', created_at:daysAgoISO(2) },
+      { id:uid(), stage:'Lead', event_name:'Acme Holiday Party', event_type:'Holiday Party',
+        contact_name:'Rob Castellano', contact_phone:'512-555-0151', contact_email:'rob@acme.example', source:'Phone',
+        date_received:dateStr(6), event_date:dateStr(-70), event_time:'7:00 PM', party_size:70, space:'Full Buyout',
+        fb_minimum:0, per_head:0, quoted_total:0, deposit_amount:0,
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'Company party in December, wants a quote.', created_at:daysAgoISO(6) },
+      { id:uid(), stage:'Lost', event_name:'Riverside Wedding Block', event_type:'Rehearsal Dinner',
+        contact_name:'Emily Park', contact_phone:'512-555-0190', contact_email:'epark@example.com', source:'Referral',
+        date_received:dateStr(28), event_date:dateStr(-55), event_time:'6:00 PM', party_size:40, space:'Private Room',
+        fb_minimum:2500, per_head:0, quoted_total:2900, deposit_amount:0, lost_reason:'Booked the steakhouse downtown over room layout.',
+        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:0,
+        requests:'', created_at:daysAgoISO(28) },
+    ];
+
+    App.data.event_rate_cards = [
+      { id:uid(), package_name:'Weeknight Private Room', event_type:'Private Dining', min_covers:15, max_covers:40, fb_minimum:1500, room_fee:0,   per_head:55 },
+      { id:uid(), package_name:'Saturday Full Buyout',   event_type:'Buyout',        min_covers:60, max_covers:110, fb_minimum:6000, room_fee:500, per_head:75 },
+      { id:uid(), package_name:'Offsite Catering',       event_type:'Catering (Offsite)', min_covers:20, max_covers:200, fb_minimum:0, room_fee:0, per_head:32 },
+    ];
+
+    App.data.event_regulars = [
+      { id:uid(), name:'Carla Mendez',   contact_phone:'512-555-0211', contact_email:'carla.m@example.com', birthday:monthDay(8),  anniversary:offMonth(4,12), drink_prefs:'Negroni, then a mezcal old fashioned', last_visit:dateStr(4),  vip:true,  notes:'Sits at the corner of the bar.' , created_at:daysAgoISO(120) },
+      { id:uid(), name:'Derek Hollis',   contact_phone:'512-555-0224', contact_email:'dhollis@example.com',  birthday:monthDay(19), anniversary:offMonth(7,3),  drink_prefs:'Tito\'s soda, lime. No IPAs.',         last_visit:dateStr(9),  vip:false, notes:'' , created_at:daysAgoISO(110) },
+      { id:uid(), name:'Sofia Reyes',    contact_phone:'512-555-0238', contact_email:'sofia.r@example.com',  birthday:monthDay(27), anniversary:offMonth(2,18), drink_prefs:'Natural wine, skin contact',           last_visit:dateStr(2),  vip:true,  notes:'Industry. Comes in late.' , created_at:daysAgoISO(95) },
+      { id:uid(), name:'Marcus Webb',    contact_phone:'512-555-0245', contact_email:'mwebb@example.com',    birthday:offMonth(3,14), anniversary:monthDay(12), drink_prefs:'Bourbon neat, Buffalo Trace or better', last_visit:dateStr(18), vip:false, notes:'' , created_at:daysAgoISO(140) },
+      { id:uid(), name:'Priya Anand',    contact_phone:'512-555-0259', contact_email:'panand@example.com',   birthday:offMonth(5,9),  anniversary:monthDay(22), drink_prefs:'Gin martini, extra olives',            last_visit:dateStr(75), vip:false, notes:'Used to come weekly, slowed down.' , created_at:daysAgoISO(160) },
+      { id:uid(), name:'Tom & Ana Briggs',contact_phone:'512-555-0263',contact_email:'briggs@example.com',  birthday:'', anniversary:monthDay(5), drink_prefs:'A bottle of Sancerre',                          last_visit:dateStr(11), vip:true,  notes:'Date-night regulars on Thursdays.' , created_at:daysAgoISO(200) },
+      { id:uid(), name:'Jamal Carter',   contact_phone:'512-555-0271', contact_email:'jcarter@example.com',  birthday:offMonth(8,21), anniversary:'', drink_prefs:'Hazy IPA, whatever is freshest',                last_visit:dateStr(6),  vip:false, notes:'' , created_at:daysAgoISO(80) },
+      { id:uid(), name:'Helen Vance',    contact_phone:'512-555-0288', contact_email:'hvance@example.com',   birthday:offMonth(1,3),  anniversary:offMonth(9,16), drink_prefs:'Espresso martini',                   last_visit:dateStr(92), vip:false, notes:'Gone quiet, was a Friday regular.' , created_at:daysAgoISO(175) },
+      { id:uid(), name:'Owen Fitzgerald',contact_phone:'512-555-0294', contact_email:'owenf@example.com',    birthday:monthDay(14), anniversary:'', drink_prefs:'Guinness, then a Jameson',                       last_visit:dateStr(3),  vip:false, notes:'' , created_at:daysAgoISO(60) },
+      { id:uid(), name:'Renee Cho',      contact_phone:'512-555-0303', contact_email:'rcho@example.com',     birthday:offMonth(6,28), anniversary:offMonth(3,2), drink_prefs:'Low-ABV spritz, Aperol',              last_visit:dateStr(14), vip:false, notes:'' , created_at:daysAgoISO(70) },
+      { id:uid(), name:'Greg Pulaski',   contact_phone:'512-555-0317', contact_email:'gpulaski@example.com', birthday:offMonth(10,11), anniversary:'', drink_prefs:'Manhattan, rye, up',                          last_visit:dateStr(120),vip:false, notes:'Win-back: has not been in months.' , created_at:daysAgoISO(190) },
+      { id:uid(), name:'Bianca Russo',   contact_phone:'512-555-0322', contact_email:'brusso@example.com',   birthday:offMonth(2,7),  anniversary:offMonth(11,19), drink_prefs:'Margarita, Espolon, Tajin rim',     last_visit:dateStr(7),  vip:true,  notes:'Brings big groups on weekends.' , created_at:daysAgoISO(130) },
+    ];
+
+    App.data.event_calendar = [
+      { id:uid(), date:dateStr(-5),  name:'Industry Night Launch', type:'Promotion',   checklist:{ menu:true,  promo:false, staffing:true,  reservations:false }, notes:'Mondays. Comp the first round for service industry.' },
+      { id:uid(), date:dateStr(-12), name:'Local Music Festival',  type:'Local Event', checklist:{ menu:true,  promo:true,  staffing:false, reservations:false }, notes:'Festival crowd spills over. Staff up the patio.' },
+      { id:uid(), date:dateStr(-18), name:'Big Game Sunday',       type:'Big Game',    checklist:{ menu:true,  promo:true,  staffing:true,  reservations:true  }, notes:'Wing and bucket specials. All hands.' },
+      { id:uid(), date:dateStr(-40), name:'Patio Season Kickoff',  type:'Promotion',   checklist:{ menu:false, promo:false, staffing:false, reservations:false }, notes:'' },
     ];
 
     // ════════════════════════════════════════════════════════════════════
@@ -2137,7 +2212,7 @@ S.HubSettings = {
           // Phase 0: event_tag + weather_tag give the audits real context so a
           // low-revenue Friday during a thunderstorm reads as bad luck, not bad
           // ops. Salted onto the Dinner service of a couple of days.
-          const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'live music' : '';
+          const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'Live Music Friday' : '';
           const weatherTag = (a.wk === ANCHS.weeks.length - 3 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
           const sIdx = scShifts.length;
           const cashRecon = seedCashRecon(p[0], bar + floor, sIdx);
