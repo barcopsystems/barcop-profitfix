@@ -217,6 +217,16 @@ input,select,textarea{color-scheme:dark;}
 .nav-item.active .nav-label{color:var(--w);}
 .app.sidebar-collapsed .nav-label{width:0;opacity:0;overflow:hidden;}
 
+/* Collapsible sub-group sidebar (App.wireNavAccordion). Each .nav-section is a
+   header that opens/closes its group; one open at a time. Colors stay in the
+   sidebar's own palette (card surface + the existing nav hover/active navies). */
+.nav-acc .nav-section{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none;}
+.nav-acc .nav-section:hover{color:var(--t2);}
+.nav-sec-chev{display:inline-block;font-size:8px;line-height:1;color:var(--t4);transition:transform .15s ease;flex-shrink:0;}
+.nav-sec-chev::before{content:'\25B8';}
+.nav-section.nav-sec-open .nav-sec-chev{transform:rotate(90deg);}
+.app.sidebar-collapsed .nav-sec-chev{display:none;}
+
 /* Footer */
 .sidebar-footer{
   padding:10px 12px 12px;
