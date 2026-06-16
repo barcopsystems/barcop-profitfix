@@ -1266,6 +1266,58 @@ const App = {
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
       { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
     ] },
+    'audit-history': { title: 'Audit History', sections: [
+      { h: 'What this page is', p: ['Every Bar Cop Audit you have run, newest first. Each row shows the date, the overall score, and how many of the six sub-scores had enough data to count.'] },
+      { h: 'How to use it', p: ['Tap View on any audit to open its full detail exactly as it scored that day. Use it to see how a score moved over time and what was flagged when, so you can tell whether a change you made actually stuck.'] }
+    ] },
+    'weekly-pnl': { title: 'Weekly P&L Brief', sections: [
+      { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books package.'] },
+      { h: 'How to use it', p: ['Pick a range: the last completed week, the last four, the last thirteen for a quarter, year to date, all saved weeks, or a custom range. The preview tells you how many weeks will export. Click Download File to save it.'] },
+      { h: 'Before you file', p: ['These numbers come from what you have logged. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.'] }
+    ] },
+    'books': { title: 'Month-End Books', sections: [
+      { h: 'What this page is', p: ['Builds the monthly close package: one Excel workbook plus a one-page owner summary PDF. It pulls every number together from what you already log, the accountant-grade deliverable behind the Books section.'] },
+      { h: 'How to use it', p: ['Pick the month to close and click Generate File. The workbook holds an income statement (month and year to date), inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, and labor cost. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
+      { h: 'Before you file', p: ['Bar Cop pulls these from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before you file anything or close the books.'] }
+    ] },
+    'year-end': { title: 'Year-End Review', sections: [
+      { h: 'What this page is', p: ['The annual roll-up: your full year in one place for tax season and for your own read on how the year went.'] },
+      { h: 'How to use it', p: ['Generate the review for the year you want. It is built from the same logged data as your weekly and monthly numbers, so it ties out, and like everything in Books it is meant to hand to your accountant to verify before filing.'] }
+    ] },
+    'permits': { title: 'Permits and Licenses', sections: [
+      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its next renewal date and Bar Cop watches the calendar for you.'] },
+      { h: 'How the statuses work', p: ['A renewal more than 30 days out is Active. Within 30 days is Due Soon, within 14 is Critical, and once the date passes it is Overdue. Anything within 30 days or overdue also shows under Coming Due on the Books overview.'] },
+      { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
+    ] },
+    'operating-expenses': { title: 'Operating Expenses', sections: [
+      { h: 'What this page is', p: ['Where you log the bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest, by category and month.'] },
+      { h: 'How to use it', p: ['Add each expense with its category, amount, and date, and log recurring bills each month. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] }
+    ] },
+    'settings-profile': { title: 'Business Profile', sections: [
+      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
+      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, from Open the Floor to the schedule to the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] },
+      { h: 'Operation links', p: ['Paste the public URL for each platform: your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data into the Traffic Audit.'] }
+    ] },
+    'settings-targets': { title: 'Recovery Targets', sections: [
+      { h: 'What this page is', p: ['The benchmarks Bar Cop grades you against across Profit, Revenue, and Traffic, plus the conversion rates behind the Traffic scoreboard. Industry defaults are pre-filled so you can start day one. Each section saves with its own Save button.'] },
+      { h: 'How to use it', p: ['Adjust each target to your own operation: pour, food, labor, and prime cost percentages for Profit; check average and revenue per labor hour for Revenue; rating, reviews, and response rate for Traffic.'] },
+      { h: 'Conversion rates', p: ['These turn a digital improvement into a dollar figure on the Recovery Scoreboard for Traffic fixes. The defaults are industry benchmarks; override them once your own data shows a different conversion.'] }
+    ] },
+    'getting-started': { title: 'Getting Started', sections: [
+      { h: 'What this page is', p: ['The setup checklist that turns a blank account into a working one, grouped into four phases: Foundation, Baseline Diagnosis, Capture System, and Weekly Work.'] },
+      { h: 'How to use it', p: ['Work the steps top to bottom. Each one has a Go button that drops you on the exact screen to do it, and you check it off when done. The phases build on each other: Foundation sets your profile and targets, Baseline runs your first audits, Capture builds the operational engine, and Weekly Work is the ongoing rhythm.'] },
+      { h: 'When it is done', p: ['Once every step is checked, Getting Started drops off the Settings sidebar on its own so it is not in your way. Your setup status always lives on the Settings overview.'] }
+    ] },
+    'user-account': { title: 'Your Account', sections: [
+      { h: 'What this page is', p: ['Your personal account controls: your password, your subscription, a full data backup, and, outside the demo, the testing tools.'] },
+      { h: 'Password and backup', p: ['Set a new password any time. Export Backup saves everything in your account (settings, weekly numbers, audits, and all your Inventory, Labor, and Shift records) to one file you keep offsite. Restore from a backup to recover your data or move it.'] },
+      { h: 'Testing tools', p: ['Load Sample Data fills every system with realistic records so you can see how the calculations and layouts behave. Clear All Data wipes every record and starts fresh. These are for setting up and testing, not daily use.'] }
+    ] },
+    'user-team': { title: 'Team Members', sections: [
+      { h: 'What this page is', p: ['Where you invite the rest of your team and decide what each person can see. Admins only.'] },
+      { h: 'Roles', p: ['Admin sees everything. Viewer is read-only on all data, useful for a bookkeeper. Staff gets only the sections you check, with optional edit and delete on each, so a bartender sees what they need and nothing more.'] },
+      { h: 'Inviting and permissions', p: ['Enter an email, pick a role, and for Staff check the sections to grant. Check Access to give a section, and Allow Edit or Delete to let them change existing entries; left unchecked, Staff can add new entries but not alter past ones. Send the invite and they get an email to join. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.'] }
+    ] },
     'audit-help': { title: 'Bar Cop Audit Help', sections: [
       { p: ['The full Help and FAQ for the Bar Cop Audit: what it measures, the 30-day rhythm, and how it relates to your Profit, Revenue, and Traffic audits.'] },
       { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
