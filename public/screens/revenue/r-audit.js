@@ -345,7 +345,7 @@ S.RevenueAudit = {
       { label: 'Labor and RPLH', ok: cd && (cd.labor_pct_blended != null || cd.rplh_blended != null) },
       { label: 'Menu Mix',       ok: costedMenu.length >= 4 },
       { label: 'Server Spread',  ok: (App.data.revenue_server_checks || []).length >= 3 },
-      { label: 'Events',         ok: (App.data.revenue_events || []).length > 0 }
+      { label: 'Events',         ok: (App.data.bookings || []).length > 0 }
     ];
 
     const salesCard = AuditUI.formCard('Annual Sales',
