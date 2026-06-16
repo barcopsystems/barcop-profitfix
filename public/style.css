@@ -712,6 +712,32 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .app.proto.sidebar-collapsed .nav-item{padding:8px 0;justify-content:center;}
 .app.proto.sidebar-collapsed .nav-section{opacity:0;height:0;padding:0;margin:0;}
 
+/* Mobile-style section sidebar — trial on Inventory (#sidebar-nav.nav-mstyle).
+   Mirrors the mobile drawer's section panel: a Dashboard leaf + group-icon
+   accordion headers (normal-case 14px), icon-less indented nested links, the
+   open drop-down lit #111E26 (--c3), and no per-page row highlight. Scoped so
+   other sections keep the standard accordion; skipped when the sidebar is
+   collapsed (icons-only mode takes over). */
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-section{
+  display:flex;align-items:center;justify-content:flex-start;gap:13px;
+  padding:13px 18px;font-size:14px;font-weight:600;letter-spacing:0;
+  text-transform:none;color:var(--t1);transition:background .12s,color .12s;
+}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-section:hover,
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-section.nav-sec-open{background:var(--c3);color:var(--w);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item{padding:11px 18px 11px 48px;}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.nav-leaf{padding:13px 18px;}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:not(.nav-leaf) .nav-icon{display:none;}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item .nav-label{font-size:14px;letter-spacing:0;color:var(--t1);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:hover .nav-label{color:var(--w);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item:hover{background:var(--c3);}
+.app.proto:not(.sidebar-collapsed) .nav-mstyle .nav-item.active{background:transparent;}
+.nav-mstyle .nav-sec-ic{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:color .12s;}
+.nav-mstyle .nav-sec-ic svg{width:17px;height:17px;}
+.nav-mstyle .nav-section:hover .nav-sec-ic,.nav-mstyle .nav-section.nav-sec-open .nav-sec-ic{color:var(--w);}
+.nav-mstyle .nav-section:hover .nav-sec-chev,.nav-mstyle .nav-section.nav-sec-open .nav-sec-chev{color:var(--w);}
+.nav-mstyle .nav-sec-chev{margin-left:auto;}
+
 @media (max-width:768px){
   :root{--navh:52px;}                 /* one row (row 2 hidden) on mobile */
   .app.proto{display:flex;}
