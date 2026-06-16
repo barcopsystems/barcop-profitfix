@@ -96,9 +96,9 @@ S.HubHelp = {
         { q: 'I logged data and the dashboard did not update.',
           a: 'Two things to check. First, did the save complete? Most screens show a brief Saved confirmation in gold after a successful write. If you closed the screen before that appeared, the change may not have committed. Reopen the screen and verify the data is there. Second, are you looking at the right week? Most dashboard figures roll up to the current period. A shift logged for last week shows up in last week, not this week. Cross-system rollups also need the week to be closed and saved on the relevant system before they reflect.' },
         { q: 'Something is broken.',
-          a: 'Use Report a Bug in the Support section of the Hub sidebar. Tell us what you were doing when it broke and what you expected to see instead. A screenshot of the screen helps. Reports come straight to support and we triage every one. If the bug is blocking you from running your shift, say so in the description and we move it to the top of the queue.' },
+          a: 'Use Report a Bug in the Support section of the sidebar. Tell us what you were doing when it broke and what you expected to see instead. A screenshot of the screen helps. Reports come straight to support and we triage every one. If the bug is blocking you from running your shift, say so in the description and we move it to the top of the queue.' },
         { q: 'I want a feature that does not exist yet.',
-          a: 'Use Contact Us in the Support section of the Hub sidebar. Tell us what you are trying to do, what would help, and how often you would use it. Feature requests get read by the team that builds Bar Cop. Operator suggestions drive most of what gets built next. Specific requests with a real use case land louder than abstract wishlists.' }
+          a: 'Use Report a Bug in the Support section and describe the feature instead of a problem. Tell us what you are trying to do, what would help, and how often you would use it. Every note gets read by the team that builds Bar Cop, and operator suggestions drive most of what gets built next. Specific requests with a real use case land louder than abstract wishlists.' }
       ]}
     ];
 
