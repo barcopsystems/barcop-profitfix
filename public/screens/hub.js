@@ -817,43 +817,18 @@ S.Hub = {
         + '<span class="nav-label">' + name + '</span></div>';
     };
 
+    // The Hub-shell DEFAULT sidebar. Its old navigation pile (Analysis, Recovery,
+    // Control, Accounting, Operations, Setup) now lives in the top nav + the
+    // per-section context sidebars, so the default is trimmed to Support, the
+    // only thing not homed elsewhere. All mobile navigation goes through the
+    // unified drawer (App.openMobileNav); this default shows on the desktop
+    // Help / Contact pages.
     const sidebarNav = ''
-      // Overview section -- The Hub link is the operator's way back to the
-      // Hub Dashboard from any other Hub-level screen. Multi-location operators
-      // get the Group Dashboard as a topbar button (next to the location
-      // switcher) instead of a sidebar entry, so it stays accessible from
-      // module screens too.
       + App.sectionSelectorHTML('hub')
-      + '<div class="nav-section">Analysis</div>'
-      + navItem('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
-      + '<div class="nav-section">Recovery</div>'
-      + navItem('enter', 'Profit Recovery',  'profit',  [['data-mod','profit'],   ['data-screen','dashboard']])
-      + navItem('enter', 'Revenue Recovery', 'revenue', [['data-mod','revenue'],  ['data-screen','r-dashboard']])
-      + navItem('enter', 'Traffic Recovery', 'traffic', [['data-mod','traffic'],  ['data-screen','t-dashboard']])
-      + '<div class="nav-section">Control</div>'
-      + navItem('enter', 'Inventory Control','inv',     [['data-mod','inventory'],['data-screen','ic-dashboard']])
-      + navItem('enter', 'Labor Control',    'labor',   [['data-mod','labor'],    ['data-screen','lc-dashboard']])
-      + navItem('enter', 'Shift Control',    'shift',   [['data-mod','shift'],    ['data-screen','sc-dashboard']])
-      + '<div class="nav-section">Accounting</div>'
-      + navItem('weekly-pnl',         'Weekly P&L Brief',    'report',   [])
-      + navItem('books',              'Month-End Books',     'books',    [])
-      + navItem('year-end',           'Year-End Review',     'calendar', [])
-      + '<div class="nav-section">Operations</div>'
-      + navItem('permits',            'Permits and Licenses','shield',   [])
-      + navItem('operating-expenses', 'Operating Expenses',  'expense',  [])
-      + '<div class="nav-section">Setup</div>'
-      // Getting Started hides once every setup step is checked off so the
-      // sidebar does not carry permanent clutter for operators past setup.
-      // Auto-resurfaces if a new step ever gets added to the list.
-      + ((App.isSetupComplete && App.isSetupComplete())
-          ? ''
-          : navItem('getting-started',  'Getting Started', 'getStart', []))
-      + navItem('user-accounts',    'User Accounts',   'user',     [])
-      + navItem('settings',         'App Settings',    'settings', [])
       + '<div class="nav-section">Support</div>'
-      + navItem('help',             'Help and FAQ',    'help',     [])
-      + navItem('report-bug',       'Report a Bug',    'bug',      [])
-      + navItem('contact-support',  'Contact Us',      'mail',     []);
+      + navItem('help',            'Help and FAQ', 'help', [])
+      + navItem('contact-support', 'Contact Us',   'mail', [])
+      + navItem('report-bug',      'Report a Bug', 'bug',  []);
 
     // Cache the default (grab-bag) sidebar nav so renderSidebar() can restore it
     // after a context sidebar (e.g. Bar Cop Audit) was swapped in.
@@ -1010,7 +985,7 @@ S.Hub = {
       else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (action === 'permits')            S.HubPermits?.open?.();
       else if (action === 'contact-support')    S.HubSupport.open();
-      else if (action === 'report-bug')         S.HubReportBug.open();
+      else if (action === 'report-bug')         (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
     });
 
     // Trend chart data point hover — populate and position the shared
