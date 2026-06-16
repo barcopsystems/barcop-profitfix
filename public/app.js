@@ -1377,12 +1377,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1409,10 +1409,6 @@ const App = {
     'settings-home': { title: 'Settings', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
       { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
-    ] },
-    'audit-history': { title: 'Audit History', sections: [
-      { h: 'What this page is', p: ['Every Bar Cop Audit you have run, newest first. Each row shows the date, the overall score, and how many of the six sub-scores had enough data to count.'] },
-      { h: 'How to use it', p: ['Tap View on any audit to open its full detail exactly as it scored that day. Use it to see how a score moved over time and what was flagged when, so you can tell whether a change you made actually stuck.'] }
     ] },
     'weekly-pnl': { title: 'Weekly P&L Brief', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books package.'] },
@@ -1606,7 +1602,6 @@ const App = {
       if (p.screen) { App.openScreen(p.screen); return; }   // module pages + recovery-audit jumps
       const r = {
         'bar-cop-audit':      () => S2.HubBarCopAudit && S2.HubBarCopAudit.open(),
-        'audit-history':      () => S2.HubBarCopAudit && S2.HubBarCopAudit.openHistory(),
         'audit-help':         () => S2.HubAuditHelp && S2.HubAuditHelp.open(),
         'weekly-pnl':         () => S2.Reports && S2.Reports._openQboModal(),
         'books':              () => S2.HubBooks && S2.HubBooks.open(),
@@ -1664,8 +1659,8 @@ const App = {
     const GIC = App._NAV_GROUP_IC;
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
     // Mobile-only label remaps (do NOT touch the desktop sidebars).
-    const GROUP_REMAP = { audit: { 'Audit': 'Bar Cop Audit', 'By Recovery System': 'Recovery Audits' }, events: { 'Bookings': 'Scheduling' } };
-    const PAGE_REMAP  = { audit: { 'Bar Cop Audit': 'Run/View Audit' } };
+    const GROUP_REMAP = { audit: { 'By Recovery System': 'Recovery Audits' }, events: { 'Bookings': 'Scheduling' } };
+    const PAGE_REMAP  = {};
     // A section node lists its sub-groups as single-open ACCORDIONS (they expand
     // inline) plus any leaf pages. Leaf rows (Dashboard, single-page groups, Help)
     // keep their icons; the accordion sub-group HEADERS now carry a group icon
