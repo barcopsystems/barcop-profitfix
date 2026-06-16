@@ -940,15 +940,8 @@ const App = {
   canSeeModule(module) {
     // A module is visible if the user has access to at least one screen in it.
     if (!window.DB || !DB.SCREEN_GROUPS) return true;
-    for (const [screen, group] of Object.entries(DB.SCREEN_GROUPS)) {
-      const prefix = screen.split('-')[0];
-      const moduleOfScreen = (prefix === 'ic') ? 'inventory'
-        : (prefix === 'lc') ? 'labor'
-        : (prefix === 'sc') ? 'shift'
-        : (prefix === 'r') ? 'revenue'
-        : (prefix === 't') ? 'traffic'
-        : 'profit';
-      if (moduleOfScreen === module && DB.screenAllowed(screen)) return true;
+    for (const screen of Object.keys(DB.SCREEN_GROUPS)) {
+      if (this._moduleOf(screen) === module && DB.screenAllowed(screen)) return true;
     }
     return false;
   },
