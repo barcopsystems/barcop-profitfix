@@ -1284,11 +1284,20 @@ const App = {
       }
       if (!navEl._accWired) {
         navEl.addEventListener('click', (ev) => {
+          // Mobile-style: clicking a MAIN leaf (e.g. Dashboard) closes every
+          // open drop-down so the leaf becomes the lone highlighted item.
+          const leaf = ev.target.closest('.nav-item.nav-leaf');
+          if (leaf && navEl.contains(leaf)) {
+            App._navGroups(navEl).forEach(g => App._setNavGroup(g, false));
+            navEl.classList.remove('nav-grp-open');
+            return;
+          }
           const sec = ev.target.closest('.nav-section');
           if (!sec || !navEl.contains(sec)) return;
           const gs = App._navGroups(navEl);
           const wasOpen = sec.classList.contains('nav-sec-open');
           gs.forEach(g => App._setNavGroup(g, !wasOpen && g.sec === sec));
+          navEl.classList.toggle('nav-grp-open', !wasOpen);
         });
         navEl._accWired = true;
       }
@@ -1298,6 +1307,7 @@ const App = {
         // across navigations (no default first/active group opening).
         if (!navEl._mstyleClosed) {
           groups.forEach(g => App._setNavGroup(g, false));
+          navEl.classList.remove('nav-grp-open');
           navEl._mstyleClosed = true;
         }
         return;
