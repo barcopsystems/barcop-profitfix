@@ -195,16 +195,14 @@ S.Dashboard = {
 
   showInsights() {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
-    const ID = 'db-insights';
+    const btn = document.getElementById('db-insights-btn');
     const weeks = (App.data.weeks || []).slice(-8);
-    const wrap = inner => '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">Bar Cop Insights</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.85;">' + inner + '</div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" onclick="App.closeModal(\'' + ID + '\')">Close</button></div></div>';
-    const open = inner => App.openModal(wrap(inner), { id: ID, maxWidth: 600, noClose: true });
+    if (weeks.length < 2) { this._insightsModal('Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
-    if (weeks.length < 2) { open('Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
-    open('Reading your last ' + weeks.length + ' weeks&hellip;');
+    // Session cache keyed on the data signature, so a re-click opens instantly
+    // but a newly confirmed week regenerates. Mirrors Bar Cop Outlook.
+    const sig = weeks.length + ':' + (weeks[weeks.length - 1].period_end || '');
+    if (this._insightsCache && this._insightsCache.sig === sig) { this._insightsModal(this._insightsCache.html); return; }
 
     const t = App.data.settings.targets || {};
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
@@ -253,17 +251,45 @@ S.Dashboard = {
       + 'FACTS:\n' + facts.join('\n')
       + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
 
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
+
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
-        if (data.error) { open('Could not read the trend right now: ' + esc(data.error.message || 'try again.')); return; }
+        if (data.error) { this._insightsModal('Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
         const text = data.content?.[0]?.text;
-        if (!text) { open('No response came back. Try again.'); return; }
+        if (!text) { this._insightsModal('No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        open('<p style="margin:0;">' + safe + '</p>');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        this._insightsCache = { sig, html };
+        this._insightsModal(html);
+        restore();
       })
-      .catch(err => open('Connection error: ' + esc(err.message) + '. Check your connection and try again.'));
+      .catch(err => { this._insightsModal('Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+  },
+
+  // Popup styled like Bar Cop Outlook: title left, Close top-right, overlay and
+  // Esc to close. Opens only when the text is ready (the button shows
+  // "Analyzing..." until then).
+  _insightsModal(bodyHtml) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Insights</div>'
+      + '<button class="btn btn-ghost btn-sm db-ins-close">Close</button></div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    box.querySelector('.db-ins-close')?.addEventListener('click', close);
+    const onKey = e => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
+    document.addEventListener('keydown', onKey);
   }
 };
