@@ -98,11 +98,6 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">RPLH Tracker</span>
       </div>
-      <div class="nav-section">Events</div>
-      <div class="nav-item" data-screen="r-events" id="nav-r-events">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 10h6M5.5 12.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Events and Catering</span>
-      </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="r-reports" id="nav-r-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -170,23 +165,6 @@ const Traffic = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 6.5l7 4.5 7-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Email and Loyalty</span>
       </div>
-      <div class="nav-section">Guests and Planning</div>
-      <div class="nav-item" data-screen="t-regulars" id="nav-t-regulars">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 5.5l1 1.2L15.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">VIP Regulars</span>
-      </div>
-      <div class="nav-item" data-screen="t-initiatives" id="nav-t-initiatives">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 13l3-4 3 2 5-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Slow-Night Initiatives</span>
-      </div>
-      <div class="nav-item" data-screen="t-holidays" id="nav-t-holidays">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="6" cy="11" r="0.7" fill="currentColor"/><circle cx="8.5" cy="11" r="0.7" fill="currentColor"/><circle cx="11" cy="11" r="0.7" fill="currentColor"/></svg>
-        <span class="nav-label">Holiday and Events</span>
-      </div>
-      <div class="nav-item" data-screen="t-inquiries" id="nav-t-inquiries">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 4h11v8H6l-3 3V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 7h5M6 9.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Group Inquiries</span>
-      </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="t-reports" id="nav-t-reports">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -198,6 +176,43 @@ const Traffic = {
         <span class="nav-label">Help and FAQ</span>
       </div>
       <div class="nav-item" data-nav="report-bug" id="nav-t-report-bug">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Report a Bug</span>
+      </div>
+    `;
+  }
+};
+
+/* ── Events Nav ── */
+const Events = {
+  navHTML() {
+    return `
+      ${App.sectionSelectorHTML()}
+      <div class="nav-section">Bookings</div>
+      <div class="nav-item" data-screen="ev-bookings" id="nav-ev-bookings">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 10h6M5.5 12.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Bookings</span>
+      </div>
+      <div class="nav-item" data-screen="ev-calendar" id="nav-ev-calendar">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="6" cy="11" r="0.7" fill="currentColor"/><circle cx="8.5" cy="11" r="0.7" fill="currentColor"/><circle cx="11" cy="11" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Calendar</span>
+      </div>
+      <div class="nav-section">Guests</div>
+      <div class="nav-item" data-screen="ev-regulars" id="nav-ev-regulars">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 5.5l1 1.2L15.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Regulars</span>
+      </div>
+      <div class="nav-section">Setup</div>
+      <div class="nav-item" data-screen="ev-pricing" id="nav-ev-pricing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5.5v6M6.5 7.5h3.5a1 1 0 0 1 0 2H7a1 1 0 0 0 0 2h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Pricing</span>
+      </div>
+      <div class="nav-section">Support</div>
+      <div class="nav-item" data-screen="ev-help" id="nav-ev-help">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
+        <span class="nav-label">Help and FAQ</span>
+      </div>
+      <div class="nav-item" data-nav="report-bug" id="nav-ev-report-bug">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span class="nav-label">Report a Bug</span>
       </div>
