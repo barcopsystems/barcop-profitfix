@@ -126,6 +126,28 @@ S.ThisWeek = {
   // shared App.dateRangeLabel so the format matches every other week selector.
   weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },
 
+  // Catering revenue from the Events section for this week — but ONLY standalone /
+  // offsite completed bookings. An in-house event tagged to a shift already lands
+  // in bar/food revenue above, so counting it here too would double-count; those
+  // are skipped (they have linked shifts). Revenue + food/bar cost prefill; labor
+  // stays for the operator to add (offsite labor is not auto-tracked).
+  cateringFromBookings(periodEnd) {
+    const blank = { revenue: '', cogs: '', labor: '' };
+    const EB = S.EventsBookings;
+    if (!EB || !periodEnd) return blank;
+    const start = App.weekStartFor(periodEnd);
+    let rev = 0, cogs = 0;
+    (App.data.bookings || []).forEach(b => {
+      if (b.stage !== 'Completed' || !b.event_date) return;
+      const ed = String(b.event_date).slice(0, 10);
+      if (ed < start || ed > periodEnd) return;
+      if (EB.linkedShifts(b).length) return;   // already in bar/food via the tagged shift
+      rev  += parseFloat(b.actual_revenue) || 0;
+      cogs += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0);
+    });
+    return rev > 0 ? { revenue: rev.toFixed(2), cogs: cogs.toFixed(2), labor: '' } : blank;
+  },
+
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
   freshDraft(periodEnd) {
     const bc = this.icCOGS(this.BAR_CATS, periodEnd), fc = this.icCOGS(this.KITCHEN_CATS, periodEnd);
@@ -135,7 +157,7 @@ S.ThisWeek = {
       period_end: periodEnd,
       bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
       food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
-      catering: { revenue: '', cogs: '', labor: '' },
+      catering: this.cateringFromBookings(periodEnd),
       platform_fees: '',
       notes: ''
     };
