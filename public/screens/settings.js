@@ -451,7 +451,9 @@ S.HubSettings = {
         if (d.S3_MONTHLY_GAP    > 0) items.push({ action:'Reduce food cost. $'+Math.round(d.S3_MONTHLY_GAP)+'/month gap vs target.', monthly_impact:d.S3_MONTHLY_GAP, gap_id:'food-cost' });
         if (d.S2_MONTHLY_GAP    > 0) items.push({ action:'Address void and comp rate. $'+Math.round(d.S2_MONTHLY_GAP)+'/month in excess.', monthly_impact:d.S2_MONTHLY_GAP, gap_id:'theft-loss' });
         if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action:'Improve vendor verification. $'+Math.round(d.S4_EXPOSURE_MONTHLY)+'/month exposure.', monthly_impact:d.S4_EXPOSURE_MONTHLY, gap_id:'vendor-control' });
-        if (d.S5_COMBINED_COGS_GAP > 0) items.push({ action:'Close prime cost gap. $'+Math.round(d.S5_COMBINED_COGS_GAP)+'/month combined COGS overage.', monthly_impact:d.S5_COMBINED_COGS_GAP, gap_id:'prime-cost' });
+        // Prime cost (S5_COMBINED_COGS_GAP) already equals S1 + S3, so it is context
+        // only, never a recoverable item, or Total Recoverable double-counts pour +
+        // food. Mirrors audit-tracker.js extractActionItems. Do not re-add a $ here.
       } else {
         if (d.S1_SCORE != null) sections['Check Average and Revenue'] = d.S1_SCORE;
         if (d.S2_SCORE != null) sections['Labor Efficiency']          = d.S2_SCORE;
