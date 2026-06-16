@@ -768,7 +768,7 @@ const App = {
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
-    // Sidebar context: Flow Map (and any 'none' page) keeps the full-width
+    // Sidebar context: Blueprint (and any 'none' page) keeps the full-width
     // dashboard mode (no sidebar); Bar Cop Audit mounts its own context
     // sidebar; everything else falls back to the default Hub sidebar.
     const _sideCtx = this._HUB_SIDEBAR_OF_ACTION[activeAction] || 'grabbag';
@@ -1225,13 +1225,13 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','The Hub'],['flowmap','Flow Map'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations'],['events','Events']],
+  _PROTO_GLOBAL:   [['hub','The Hub'],['flowmap','Blueprint'],['audit','Bar Cop Audit'],['books','Books'],['ops','Operations'],['events','Events']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'books': 'books', 'year-end': 'books', 'operating-expenses': 'ops', 'permits': 'ops', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
-  // full-width dashboard mode (Flow Map); 'audit' = the Bar Cop Audit sidebar;
+  // full-width dashboard mode (Blueprint); 'audit' = the Bar Cop Audit sidebar;
   // missing = the default Hub sidebar. Books/Settings get their own in later
   // phases of the nav sweep.
   _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'audit-history': 'audit', 'flowmap': 'none' },
