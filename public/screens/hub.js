@@ -119,6 +119,10 @@ S.Hub = {
   renderSidebar(context) {
     const nav = document.querySelector('.hub-app .sidebar-nav');
     if (!nav) return;
+    // Books renders mobile-style; keep its DOM across in-section navigation so
+    // the open drop-down persists (the module sidebars never rebuild either).
+    if (context === 'books' && nav._builtCtx === 'books') return;
+    nav._builtCtx = context;
     if (context === 'audit') {
       nav.innerHTML = this._auditSidebarHTML();
     } else if (context === 'books') {
@@ -127,6 +131,24 @@ S.Hub = {
       nav.innerHTML = this._settingsSidebarHTML();
     } else if (this._grabBagNavHTML != null) {
       nav.innerHTML = this._grabBagNavHTML;
+    }
+    // Mobile-style sidebar for Books (matches Inventory/Labor/Shift): a Dashboard
+    // leaf routing to the Books landing + group-icon accordions. wireNavAccordion
+    // (run by setActiveHubNav) adds the group icons and the open/collapse logic.
+    const MSTYLE = { books: { id: 'nav-books-home', action: 'books-home' } };
+    const ms = MSTYLE[context];
+    nav.classList.toggle('nav-mstyle', !!ms);
+    nav._mstyleClosed = false;
+    if (ms) {
+      const firstSec = nav.querySelector('.nav-section');
+      if (firstSec && !nav.querySelector('#' + ms.id)) {
+        const d = document.createElement('div');
+        d.className = 'nav-item nav-leaf';
+        d.id = ms.id;
+        d.setAttribute('data-hub-action', ms.action);
+        d.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
+        firstSec.parentNode.insertBefore(d, firstSec);
+      }
     }
   },
 
