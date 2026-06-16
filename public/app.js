@@ -1180,7 +1180,7 @@ const App = {
     // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
-    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift'];
+    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift', 'events'];
     const mstyle = MSTYLE_SECTIONS.indexOf(module) !== -1;
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
@@ -1233,6 +1233,21 @@ const App = {
       }
       if (!hasVisible) sec.style.display = 'none';
     });
+    // Mobile-style: a group with a single visible link flattens to a top-level
+    // leaf (matches the mobile menu) — drop the header and make the lone item a
+    // .nav-leaf (its icon shows, it sits outside any drop-down). _navGroups
+    // excludes .nav-leaf, so it is never folded back into the previous group.
+    if (mstyle) {
+      nav.querySelectorAll('.nav-section').forEach(sec => {
+        const items = [];
+        let sib = sec.nextElementSibling;
+        while (sib && !sib.classList.contains('nav-section')) {
+          if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) items.push(sib);
+          sib = sib.nextElementSibling;
+        }
+        if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); }
+      });
+    }
     App.wireNavAccordion(nav);
   },
 
@@ -1247,7 +1262,7 @@ const App = {
       const items = [];
       let sib = sec.nextElementSibling;
       while (sib && !sib.classList.contains('nav-section')) {
-        if (sib.classList.contains('nav-item') && !sib.classList.contains('role-hidden')) items.push(sib);
+        if (sib.classList.contains('nav-item') && !sib.classList.contains('role-hidden') && !sib.classList.contains('nav-leaf')) items.push(sib);
         sib = sib.nextElementSibling;
       }
       if (items.length) groups.push({ sec, items });
