@@ -1510,137 +1510,121 @@ const App = {
       if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
     } catch (e) {} return ''; };
 
-    // An expandable section: an optional home row (Overview/Dashboard) + its
-    // sub-groups. The section and the sub-group holding your current page
-    // auto-expand, so where you are is right there when the menu opens.
-    const sec = (label, key, homeFn, homeLabel) => {
-      const subgroups = groupsOf(() => navHtml(key)).map(sg => ({
-        group: sg.group, pages: sg.pages,
-        cur: !!activeId && sg.pages.some(p => p.screen === activeId || p.action === activeId)
-      }));
-      return {
-        label,
-        home: homeFn ? { label: homeLabel || 'Overview', go: homeFn } : null,
-        subgroups,
-        cur: subgroups.some(sg => sg.cur)
-      };
+    // Build the nav tree as nodes for a drill-in (push) menu. A node has groups
+    // of rows; a leaf row navigates, a parent row pushes its child node. Only one
+    // flat, uniform list shows at a time, so it stays clean however deep the nav
+    // goes. The section/sub-group holding the current page are marked so the menu
+    // opens drilled-in there with that page highlighted.
+    const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, go: () => routePage(p) });
+    const sectionNode = (label, key, homeFn, homeLabel) => {
+      const sgs = groupsOf(() => navHtml(key));
+      const items = [];
+      let activeChild = null;
+      if (homeFn) items.push({ label: homeLabel || 'Overview', go: homeFn });
+      sgs.forEach(g => {
+        const gActive = !!activeId && g.pages.some(p => (p.screen || p.action) === activeId);
+        if (g.pages.length === 1) {
+          items.push(pageItem(g.pages[0]));
+        } else {
+          const child = { title: g.group, groups: [{ items: g.pages.map(pageItem) }] };
+          items.push({ label: g.group, node: child, contains: gActive });
+          if (gActive) activeChild = child;
+        }
+      });
+      const node = { title: label, groups: [{ items: items }] };
+      node._activeChild = activeChild;
+      node._contains = !!activeId && sgs.some(g => g.pages.some(p => (p.screen || p.action) === activeId));
+      return node;
+    };
+    const drill = (label, key, homeFn, homeLabel) => {
+      const node = sectionNode(label, key, homeFn, homeLabel);
+      return { label: label, node: node, contains: node._contains };
     };
 
-    const GROUPS = [
-      { g: 'Go to', items: [
+    const root = { title: 'Menu', groups: [
+      { label: 'Go to', items: [
         { label: 'Hub', go: () => App.showHub() },
         { label: 'Blueprint', go: () => S2.FlowMap && S2.FlowMap.open() },
-        sec('Audits', 'audit', null, null),
-        sec('Events', 'events', () => App.jumpToSection('events'), 'Dashboard'),
-        sec('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview'),
-        sec('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview')
+        drill('Audits', 'audit', null, null),
+        drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard'),
+        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Overview'),
+        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Overview')
       ]},
-      { g: 'Control', items: [
-        sec('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard'),
-        sec('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard'),
-        sec('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard')
+      { label: 'Control', items: [
+        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard'),
+        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard'),
+        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard')
       ]},
-      { g: 'Recovery', items: [
-        sec('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard'),
-        sec('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard'),
-        sec('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard')
+      { label: 'Recovery', items: [
+        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard'),
+        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard'),
+        drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard')
       ]},
-      { g: 'Support', items: [
+      { label: 'Support', items: [
         { label: 'Help and FAQ', go: () => S2.HubHelp && S2.HubHelp.open() },
         { label: 'Report a Bug', go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
       ]}
-    ];
+    ]};
 
-    // ── Build DOM ──
+    // ── DOM shell (inline-positioned so it shows even against a cached CSS) ──
     const ov = document.createElement('div');
     ov.id = 'tn-mnav-ov';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:308px;max-width:88vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
+    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:312px;max-width:88vw;background:var(--bg);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
     const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
-    const head = document.createElement('div');
-    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;';
-    head.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Menu</span>';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'btn btn-ghost btn-sm'; closeBtn.textContent = 'Close';
-    closeBtn.addEventListener('click', close);
-    head.appendChild(closeBtn);
-    panel.appendChild(head);
-
+    const headEl = document.createElement('div');
+    headEl.className = 'mnav-head';
     const bodyEl = document.createElement('div');
-    bodyEl.style.cssText = 'overflow-y:auto;flex:1;padding-bottom:28px;-webkit-overflow-scrolling:touch;';
+    bodyEl.className = 'mnav-body';
+    panel.appendChild(headEl);
     panel.appendChild(bodyEl);
 
-    // Strict palette: card surface (sections) -> darkest well (expanded) -> data
-    // row #0D181E (pages). No off-palette tones.
-    const SEC  = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;font-size:14.5px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--b2);';
-    const CHEV = 'color:var(--t3);font-size:11px;flex-shrink:0;';
-    const WELL = 'background:var(--bg);';
-    const HOME = 'padding:11px 18px 11px 32px;font-size:13px;color:var(--t1);cursor:pointer;border-bottom:1px solid var(--row-div);';
-    const SG   = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px 7px 24px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);cursor:pointer;';
-    const PG   = 'padding:11px 18px 11px 38px;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:1px solid var(--row-div);background:#0D181E;';
-    const toggle = (headEl, body) => {
-      const open = body.style.display !== 'none';
-      body.style.display = open ? 'none' : 'block';
-      const cv = headEl.querySelector('.cv');
-      if (cv) cv.textContent = open ? '▸' : '▾';
+    // Start drilled into the section (and sub-group) holding the current page.
+    const stack = [root];
+    let secItem = null;
+    root.groups.forEach(grp => grp.items.forEach(it => { if (it.contains && it.node) secItem = it; }));
+    if (secItem) {
+      stack.push(secItem.node);
+      if (secItem.node._activeChild) stack.push(secItem.node._activeChild);
+    }
+
+    const render = () => {
+      const node = stack[stack.length - 1];
+      const canBack = stack.length > 1;
+      headEl.innerHTML = (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '<span class="mnav-back-sp"></span>')
+        + '<span class="mnav-title">' + esc(node.title) + '</span>'
+        + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
+      headEl.querySelector('.mnav-x').addEventListener('click', close);
+      const backBtn = headEl.querySelector('.mnav-back');
+      if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
+
+      bodyEl.innerHTML = '';
+      (node.groups || []).forEach(grp => {
+        if (grp.label) {
+          const gl = document.createElement('div');
+          gl.className = 'mnav-glabel';
+          gl.textContent = grp.label;
+          bodyEl.appendChild(gl);
+        }
+        (grp.items || []).forEach(it => {
+          const isOn = (it.id && it.id === activeId) || it.contains;
+          const row = document.createElement('div');
+          row.className = 'mnav-row' + (isOn ? ' on' : '');
+          row.innerHTML = '<span>' + esc(it.label) + '</span>' + (it.node ? '<span class="mnav-chev">›</span>' : '');
+          row.addEventListener('click', () => {
+            if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
+            else if (it.go) { fire(it.go); }
+          });
+          bodyEl.appendChild(row);
+        });
+      });
     };
 
-    GROUPS.forEach(grp => {
-      const gl = document.createElement('div');
-      gl.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:16px 18px 5px;';
-      gl.textContent = grp.g;
-      bodyEl.appendChild(gl);
-      grp.items.forEach(it => {
-        if (it.go) {
-          const row = document.createElement('div');
-          row.style.cssText = SEC;
-          row.innerHTML = '<span>' + esc(it.label) + '</span>';
-          row.addEventListener('click', () => fire(it.go));
-          bodyEl.appendChild(row);
-          return;
-        }
-        // Section (level 1)
-        const secRow = document.createElement('div');
-        secRow.style.cssText = SEC;
-        secRow.innerHTML = '<span>' + esc(it.label) + '</span><span class="cv" style="' + CHEV + '">' + (it.cur ? '▾' : '▸') + '</span>';
-        const well = document.createElement('div');
-        well.style.cssText = WELL;
-        well.style.display = it.cur ? 'block' : 'none';
-        if (it.home) {
-          const hr = document.createElement('div');
-          hr.style.cssText = HOME;
-          hr.textContent = it.home.label;
-          hr.addEventListener('click', () => fire(it.home.go));
-          well.appendChild(hr);
-        }
-        // Sub-groups (level 2) + pages (level 3)
-        it.subgroups.forEach(sg => {
-          const sgHead = document.createElement('div');
-          sgHead.style.cssText = SG;
-          sgHead.innerHTML = '<span>' + esc(sg.group) + '</span><span class="cv" style="color:var(--t4);font-size:9px;flex-shrink:0;">' + (sg.cur ? '▾' : '▸') + '</span>';
-          const sgBody = document.createElement('div');
-          sgBody.style.display = sg.cur ? 'block' : 'none';
-          sg.pages.forEach(p => {
-            const pr = document.createElement('div');
-            pr.style.cssText = PG;
-            pr.textContent = p.label;
-            pr.addEventListener('click', () => fire(() => routePage(p)));
-            sgBody.appendChild(pr);
-          });
-          sgHead.addEventListener('click', () => toggle(sgHead, sgBody));
-          well.appendChild(sgHead);
-          well.appendChild(sgBody);
-        });
-        secRow.addEventListener('click', () => toggle(secRow, well));
-        bodyEl.appendChild(secRow);
-        bodyEl.appendChild(well);
-      });
-    });
-
+    render();
     ov.addEventListener('click', close);
     document.body.appendChild(ov);
     document.body.appendChild(panel);
