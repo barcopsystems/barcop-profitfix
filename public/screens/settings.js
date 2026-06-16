@@ -6,14 +6,25 @@
    own. Reads and writes the existing settings keys; purely a UI consolidation. */
 S.HubSettings = {
 
-  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "APP SETTINGS | Back to Dashboard".
-  open() {
-    App.openHubFullPage('App Settings', (mount) => this.render(mount), 'settings');
+  // The seven settings sections split across two Settings-sidebar pages so
+  // neither is overloaded. open(group) lands on one; the gear and the legacy
+  // openScreen('settings') default to Business Profile. wire() only mounts
+  // ServicePeriods and saves the sections actually present, so a subset renders
+  // safely.
+  _GROUPS: {
+    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'service', 'links'] },
+    'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue', 'traffic', 'tconv'] }
   },
 
-  render(container) {
-    const secs = [
+  // Full-page Hub screen. Sidebar stays mounted, content area swaps.
+  open(group) {
+    const g = this._GROUPS[group] ? group : 'business-profile';
+    const meta = this._GROUPS[g];
+    App.openHubFullPage(meta.title, (mount) => this.render(mount, g), meta.action);
+  },
+
+  render(container, group) {
+    const allSecs = [
       { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
       { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
@@ -22,6 +33,8 @@ S.HubSettings = {
       { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
       { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true }
     ];
+    const grp = this._GROUPS[group];
+    const secs = grp ? allSecs.filter(s => grp.ids.indexOf(s.id) !== -1) : allSecs;
     container.scrollTop = 0;
 
     const cards = secs.map(s =>
