@@ -40,19 +40,18 @@ S.HubSettingsHome = {
         + '<div style="width:44px;text-align:right;font-size:11px;color:var(--t3);">' + gd + '/' + gt.length + '</div></div>';
     }).join('');
 
-    const setupCard = '<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:' + (complete ? '0' : '16px') + ';">'
+    // The setup card exists only while there is setup left to do. Once every
+    // step is done, Getting Started disappears (from the sidebar too), so the
+    // card has nothing to be about and is dropped entirely.
+    const setupCard = complete ? '' : ('<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">'
       +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-      +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">' + (complete
-              ? 'Your setup is complete. Everything Bar Cop needs is in place.'
-              : done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.') + '</div></div>'
-      +   (complete ? '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--green);">Complete</div>'
-                    : '<button class="btn btn-primary" data-act="getting-started">Continue Setup</button>')
+      +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">' + done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.</div></div>'
+      +   '<button class="btn btn-primary" data-act="getting-started">Continue Setup</button>'
       + '</div>'
-      + (complete ? '' :
-          '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="width:' + pct + '%;height:100%;background:var(--gold);"></div></div>'
-          + '<div style="border:1px solid var(--b2);border-radius:6px;padding:4px 16px;">' + groupRows + '</div>')
-      + '</div>';
+      + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="width:' + pct + '%;height:100%;background:var(--gold);"></div></div>'
+      + '<div style="border:1px solid var(--b2);border-radius:6px;padding:4px 16px;">' + groupRows + '</div>'
+      + '</div>');
 
     // ── Account ──
     const s       = (App.data && App.data.settings) || {};
@@ -65,7 +64,7 @@ S.HubSettingsHome = {
     const acctCard = '<div class="card" style="margin-bottom:18px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Account</div>'
-      +   '<button class="btn btn-ghost btn-sm" data-act="user-accounts">Manage</button>'
+      +   '<button class="btn btn-ghost btn-sm" data-act="user-account">Manage</button>'
       + '</div>'
       + acctRow('Operation', esc(barName))
       + (email ? acctRow('Signed in', esc(email)) : '')
@@ -80,8 +79,8 @@ S.HubSettingsHome = {
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">'
       +   link('settings-profile', 'Business Profile', 'Name, sales, service periods, and your public links.')
       +   link('settings-targets', 'Recovery Targets', 'Profit, revenue, and traffic benchmarks Bar Cop measures against.')
-      +   link('getting-started', 'Getting Started', 'The full setup checklist, step by step.')
-      +   link('user-accounts', 'User Accounts', 'Password, team members, roles, and backups.')
+      +   (complete ? '' : link('getting-started', 'Getting Started', 'The full setup checklist, step by step.'))
+      +   link('user-account', 'Your Account', 'Password, subscription, and backups.')
       + '</div>';
 
     mount.innerHTML = '<div class="screen">' + head + setupCard + acctCard + links + '</div>';
@@ -91,7 +90,8 @@ S.HubSettingsHome = {
   _wire() {
     const go = (act) => {
       if (act === 'getting-started')       S.HubGettingStarted?.open?.();
-      else if (act === 'user-accounts')    S.HubUserAccounts?.open?.();
+      else if (act === 'user-account')     S.HubUserAccounts?.open?.('account');
+      else if (act === 'user-team')        S.HubUserAccounts?.open?.('team');
       else if (act === 'settings-profile') S.HubSettings?.open?.('business-profile');
       else if (act === 'settings-targets') S.HubSettings?.open?.('recovery-targets');
     };
