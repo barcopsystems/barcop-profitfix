@@ -719,6 +719,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    top-nav-style nested links, the open drop-down lit #111E26 (--c3), gold icon
    on the active main link. Sections without the class keep the standard
    accordion; skipped when the sidebar is collapsed (icons-only mode). */
+:is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-mstyle{padding-top:26px;}
 :is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-mstyle .nav-section{
   display:flex;align-items:center;justify-content:flex-start;gap:13px;
   padding:13px 18px;font-size:14px;font-weight:600;letter-spacing:0;
