@@ -1237,7 +1237,7 @@ const App = {
     // leaf (matches the mobile menu) — drop the header and make the lone item a
     // .nav-leaf (its icon shows, it sits outside any drop-down). _navGroups
     // excludes .nav-leaf, so it is never folded back into the previous group.
-    if (mstyle) App._mstyleSidebar(nav, ({ events: { 'Bookings': 'Scheduling' } })[module] || {});
+    if (mstyle) App._mstyleSidebar(nav, ({ events: { groups: { 'Bookings': 'Scheduling' } }, shift: { items: { 'Shift Reports': 'Reports' } } })[module] || {});
     App.wireNavAccordion(nav);
   },
 
@@ -1343,9 +1343,11 @@ const App = {
   // (3) apply desktop group-label remaps (the icon stays keyed to the ORIGINAL
   // name via data-gkey, so the glyph matches mobile); (4) shorten the section
   // Help link to "Help". Source navHTML + the mobile menu are untouched.
-  _mstyleSidebar(nav, rename) {
+  _mstyleSidebar(nav, opts) {
     if (!nav) return;
-    rename = rename || {};
+    opts = opts || {};
+    const gren = opts.groups || {};                                  // group-header (drop-down) label remaps
+    const iren = Object.assign({ 'Help and FAQ': 'Help' }, opts.items || {});  // link-label remaps (Help shortened everywhere)
     nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
     nav.querySelectorAll('.nav-section').forEach(sec => {
       const items = [];
@@ -1356,9 +1358,9 @@ const App = {
       }
       if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); return; }
       const label = (sec.textContent || '').trim();
-      if (rename[label]) { sec.dataset.gkey = label; sec.textContent = rename[label]; }
+      if (gren[label]) { sec.dataset.gkey = label; sec.textContent = gren[label]; }
     });
-    nav.querySelectorAll('.nav-item .nav-label').forEach(l => { if ((l.textContent || '').trim() === 'Help and FAQ') l.textContent = 'Help'; });
+    nav.querySelectorAll('.nav-item .nav-label').forEach(l => { const t = (l.textContent || '').trim(); if (iren[t]) l.textContent = iren[t]; });
   },
 
   // PROTO (design prototype): the new full-width top nav + restyled sidebar,
