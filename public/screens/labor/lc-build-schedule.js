@@ -173,6 +173,13 @@ S.LaborBuildSchedule = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
+    // Events "Schedule Staff for this Event" jump: land on the event's week and
+    // show a context banner. Reuses the one-shot _gotoWeek handoff below.
+    if (App._eventStaffDate) {
+      this._gotoWeek = this.mondayOf(App._eventStaffDate);
+      this._eventContext = { name: App._eventStaffTag || '', date: App._eventStaffDate };
+      App._eventStaffDate = null; App._eventStaffTag = null;
+    }
     // Landing behavior. Every week change re-resolves editId to that week's
     // posted schedule (or null), so editId always matches the displayed week and
     // a save can never overwrite the wrong week.
@@ -395,12 +402,25 @@ S.LaborBuildSchedule = {
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
+      + this._eventBanner()
       + budgetCard
       + gridCard + totalsCard + actionsCard
       + this.templatesSection()
       + '</div>';
 
     this._wire();
+    document.getElementById('bs-ev-dismiss')?.addEventListener('click', () => { this._eventContext = null; this.draw(); });
+  },
+
+  // Context banner shown when arriving from an Events "Schedule Staff" jump.
+  _eventBanner() {
+    const c = this._eventContext;
+    if (!c) return '';
+    const dt = new Date((c.date || '') + 'T00:00:00');
+    const dStr = isNaN(dt.getTime()) ? esc(c.date || '') : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div style="font-size:12px;color:var(--t1);line-height:1.5;">Scheduling for <span style="font-weight:700;">' + esc(c.name || 'an event') + '</span>' + (c.date ? ' on ' + dStr : '') + '. Add the staff working it that day. When you log the shift, tag it to this event so its hours land on the Event P&amp;L.</div>'
+      + '<button class="btn btn-ghost btn-sm" id="bs-ev-dismiss">Dismiss</button></div>';
   },
 
   _fmtTime(t) {
