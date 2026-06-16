@@ -1446,12 +1446,15 @@ const App = {
     const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
-    // Drop-down memory: a SINGLE remembered-open drop-down ({key, group}),
-    // committed ONLY by navigating to one of its nested links. ANY other
-    // navigation (a main link, a root link, a different section) clears it, so
-    // the menu never persists an open drop-down past a click-away. The last
-    // visited PAGE is never tracked or highlighted.
-    if (App._mnavOpen === undefined) App._mnavOpen = null;
+    // Which drop-down opens on reopen is driven by the LIVE current page (read
+    // off the active sidebar item), NOT by tracking menu clicks. A multi-page
+    // group auto-opens only when the page you are actually on lives under it, so
+    // a nested-link nav keeps that drop-down open while ANY other navigation (a
+    // main link, or a page in another section, by whatever route) leaves every
+    // drop-down closed. The page row itself is never highlighted.
+    const liveNav = onHub ? document.querySelector('.hub-app .sidebar-nav') : document.getElementById('sidebar-nav');
+    const activeEl = liveNav ? liveNav.querySelector('.nav-item.active') : null;
+    const activeId = activeEl ? (activeEl.dataset.screen || activeEl.dataset.hubAction || '') : '';
 
     // Parse a section's sidebar HTML into its sub-groups, each with its pages, so
     // the mobile menu keeps the COUNTS / ORDERING / … structure and is never one
@@ -1586,7 +1589,7 @@ const App = {
         if (g.pages.length === 1) {
           items.push(mkPage(g.pages[0]));
         } else {
-          items.push({ label: gr[g.group] || g.group, groupKey: g.group, icon: GIC[g.group] || '', pages: g.pages.map(mkPage), open: !!(App._mnavOpen && App._mnavOpen.key === key && App._mnavOpen.group === g.group) });
+          items.push({ label: gr[g.group] || g.group, groupKey: g.group, icon: GIC[g.group] || '', pages: g.pages.map(mkPage), open: !!activeId && g.pages.some(p => (p.screen || p.action) === activeId) });
         }
       });
       return { title: panelTitle || label, items: items, _key: key };
@@ -1683,7 +1686,7 @@ const App = {
             const row = mkRow(it.label, it.node ? 'drill' : '', false, it.icon);
             row.addEventListener('click', () => {
               if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
-              else if (it.go) { App._mnavOpen = null; fire(it.go); }
+              else if (it.go) { fire(it.go); }
             });
             bodyEl.appendChild(row);
           });
@@ -1700,28 +1703,22 @@ const App = {
             sub.style.display = it.open ? 'block' : 'none';
             it.pages.forEach(p => {
               const pr = mkRow(p.label, 'page', false);
-              // Navigating to a NESTED link commits its parent drop-down to memory,
-              // so reopening the menu lands back with that drop-down open + lit.
-              pr.addEventListener('click', () => { App._mnavOpen = { key: node._key, group: it.groupKey }; fire(p.go); });
+              pr.addEventListener('click', () => fire(p.go));
               sub.appendChild(pr);
             });
-            // Opening/closing a drop-down is in-session only (cosmetic) — it does
-            // NOT persist on its own; only a nested-link click does. An explicit
-            // close clears any remembered drop-down for this section.
+            // Opening/closing a drop-down is in-session only (cosmetic). What
+            // shows on the next open is decided by the live current page above.
             head.addEventListener('click', () => {
               const isOpen = sub.style.display !== 'none';
               accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
               if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
-              else if (App._mnavOpen && App._mnavOpen.key === node._key) { App._mnavOpen = null; }
             });
             accs.push({ head: head, sub: sub });
             bodyEl.appendChild(head);
             bodyEl.appendChild(sub);
           } else {
-            // A main (top-level) link click clears the section's remembered
-            // drop-down, so returning to the menu shows it closed/normal.
             const row = mkRow(it.label, '', false, it.icon);
-            row.addEventListener('click', () => { App._mnavOpen = null; fire(it.go); });
+            row.addEventListener('click', () => fire(it.go));
             bodyEl.appendChild(row);
           }
         });
