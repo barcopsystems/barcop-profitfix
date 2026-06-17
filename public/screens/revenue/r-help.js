@@ -35,7 +35,7 @@ S.RevenueHelp = {
       { q: 'What flows from Inventory Control into Revenue Recovery?',
         a: 'Product prices flow into Menu Items: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
       { q: 'How does the Recovery Scoreboard pick up a price change?',
-        a: 'Logging a price change in Menu Engineering\'s Price Sensitivity, or editing a price directly on a Menu Item, auto-writes a fix entry tied to the Pricing area. The Scoreboard then watches check average and revenue for the weeks after the change and surfaces the recovered dollars. There is no separate "mark implemented" step for a change you already logged.' },
+        a: 'Logging a price change in the Price Calculator, or editing a price directly on a Menu Item, auto-writes a fix entry tied to the Pricing area. The Scoreboard then watches check average and revenue for the weeks after the change and surfaces the recovered dollars. There is no separate "mark implemented" step for a change you already logged.' },
       { q: 'Why do my Revenue numbers not match my POS exactly?',
         a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let This Week sum from there.' }
     ]},
