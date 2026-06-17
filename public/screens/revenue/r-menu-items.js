@@ -296,10 +296,13 @@ S.RevenueMenuItems = {
             + '<button class="btn btn-danger btn-sm mi-del" data-id="' + esc(item.id) + '">Delete</button>'
             + '</div></td></tr>';
         }).join('');
+        // No outside titles above the cards — the category lives in the first
+        // column header. The Export PDF button rides a title-less row above the
+        // first card.
         return (ci === 0
-            ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;"><div class="sh" style="margin:0;">' + esc(cat) + '</div><button class="btn btn-ghost btn-sm no-print" id="mi-export">Export PDF</button></div>'
-            : '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + '</div>')
-          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:780px;">'
+            ? '<div class="no-print" style="display:flex;justify-content:flex-end;margin:0 0 10px;"><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
+            : '')
+          + '<div class="card card-bleed data-card" style="margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:780px;">'
           + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
           + '<thead><tr>'
           + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
