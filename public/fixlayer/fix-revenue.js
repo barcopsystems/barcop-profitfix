@@ -64,10 +64,10 @@ FIX.revenue = [
           detail: 'Menu Items shows each item\'s cost percent and contribution margin against your category target. An item running well over its target cost percent is priced below its floor. The worst offenders are the biggest annual margin leaks, so start there.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Weigh the margin dollars before you reprice',
-          detail: 'Open Menu Engineering and read the contribution margin in dollars on the items you flagged. The percentage tells you the item is underpriced. The dollar margin and the volume tell you how much a correction is actually worth. The vs Last Update column also tells you how covers have moved on that item since you last touched it.' },
-        { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Price Sensitivity',
-          title: 'Model the change on Price Sensitivity',
-          detail: 'On Menu Engineering, click the Price Sensitivity tab. Pick the flagged item, type the price you are considering and a volume change estimate. Bar Cop shows the cost floor, new margin, weekly and annual impact, and the break-even volume drop you can absorb before total margin slips. Knowing that number before you move a price is what makes the call confident. The Log This Price Change button persists the entry for verification three weeks later.' },
+          detail: 'Open Menu Engineering and read the contribution margin in dollars on the items you flagged. The percentage tells you the item is underpriced. The dollar margin and the volume tell you how much a correction is actually worth, so weigh the biggest-dollar items first.' },
+        { kind: 'action', target: 'r-price-calc', targetLabel: 'Price Calculator',
+          title: 'Model the change on the Price Calculator',
+          detail: 'Open the Price Calculator, or click Reprice on the item in Menu Engineering to land there with it preselected. Type the price you are considering and a volume change estimate. Bar Cop shows the cost floor, new margin, weekly and annual impact, and the break-even volume drop you can absorb before total margin slips. Knowing that number before you move a price is what makes the call confident. The Log Price Change button persists the entry for verification three weeks later.' },
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Apply the change directly on Menu Items',
           detail: 'Once you have the number, open the item on Menu Items and update the price field. Bar Cop auto-writes a revenue_price_log entry AND a Recovery Scoreboard fix_log entry tied to the Pricing gap area. The Scoreboard then watches check average and revenue for the 8 weeks after, and surfaces the recovered dollars without you marking anything implemented manually. Surgical, item-by-item changes rarely draw guest feedback; a blanket increase reads as a price event.' },
@@ -83,7 +83,7 @@ FIX.revenue = [
       'Raising all prices at once in a visible refresh. A blanket increase reads as a price event. Surgical item-by-item increases rarely draw feedback.',
       'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is 38% once trim loss is in it.',
       'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
-      'Skipping the price sensitivity check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
+      'Skipping the Price Calculator check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
     ]
   },
 
