@@ -343,11 +343,12 @@ S.InventoryLocations = {
       + '<td>' + esc(this.sizeLabel(p)) + '</td>'
       + '<td>' + esc(p.vendor || '-') + '</td>'
       + '</tr>';
+    const colgroup = '<colgroup><col style="width:40px;"/><col style="width:220px;"/><col/><col/><col/></colgroup>';
     return App.subcatGroups(prods, cat).map((g, gi) => {
       const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
       return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
-        + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th style="width:40px;"></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
+        + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:640px;">' + colgroup + '<thead><tr>'
+        + '<th></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
         + '</tr></thead><tbody>' + g.items.map(rowHtml).join('') + '</tbody></table></div></div>';
     }).join('');
   },
