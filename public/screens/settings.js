@@ -1427,7 +1427,7 @@ S.HubSettings = {
       // Wine
       'House Cabernet':'Red', 'Pinot Noir':'Red', 'Malbec':'Red', 'Red Blend':'Red', 'Cabernet Reserve':'Red',
       'House Chardonnay':'White', 'Sauvignon Blanc':'White', 'Pinot Grigio':'White', 'Chardonnay Reserve':'White',
-      'Rosé':'Rosé', 'Prosecco':'Sparkling', 'Champagne':'Sparkling', 'Sweet Vermouth':'Vermouth', 'Dry Vermouth':'Vermouth',
+      'Rosé':'Rosé', 'Prosecco':'Sparkling', 'Champagne':'Champagne', 'Sweet Vermouth':'Vermouth', 'Dry Vermouth':'Vermouth',
       // Bottle Beer
       'Bud Light':'Domestic', 'Lone Star':'Domestic', 'Modelo Especial':'Import', 'Corona':'Import', 'Stella Artois':'Import',
       'White Claw':'Seltzer', 'Austin Eastciders':'Cider', 'Athletic NA':'Non-Alcoholic',
