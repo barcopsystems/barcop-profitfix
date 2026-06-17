@@ -2699,7 +2699,7 @@ const App = {
   // NA Beverage shows in the Menu Items NA picker (and stays available as a
   // mixer); Drink Mixer / Food Ingredient are recipe ingredients only; the two
   // supply types stay out of every menu/recipe picker.
-  MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Food Ingredient', 'Paper & To-Go', 'Cleaning & Supplies'],
+  MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Food Ingredient', 'Paper & To-Go', 'Cleaning & Supplies', 'Other'],
   MISC_SUPPLY_TYPES: ['Paper & To-Go', 'Cleaning & Supplies'],
   // Tagged as an NA beverage in Inventory (vs a mixer or a supply).
   miscSellable(p) { return !!p && p.category === 'Misc' && p.misc_type === 'NA Beverage'; },
@@ -2737,7 +2737,7 @@ const App = {
     'Wine':        ['Red', 'White', 'Rosé', 'Sparkling', 'Vermouth', 'Fortified', 'Dessert'],
     'Bottle Beer': ['Domestic', 'Import', 'Craft', 'Cider', 'Seltzer', 'Non-Alcoholic'],
     'Draft Beer':  ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Wheat', 'Ale', 'Sour', 'Cider'],
-    'Food':        ['Protein', 'Seafood', 'Produce', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Sauces & Condiments', 'Spices', 'Beverage']
+    'Food':        ['Protein', 'Seafood', 'Produce', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Sauces & Condiments', 'Spices']
   },
   // Datalist values = the starter set + any sub-categories the operator has
   // already used for this category (so typos do not splinter a group).
