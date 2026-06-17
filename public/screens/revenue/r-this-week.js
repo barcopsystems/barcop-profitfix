@@ -1,17 +1,33 @@
 'use strict';
 
-/* ── Revenue Recovery — This Week (thin weekly confirm screen) ────────────────
-   Restructured per the platform map: a thin confirm screen, not a 6-step
-   wizard. Revenue and covers auto-fill from Shift Control (sc_shifts); labor
-   auto-fills from Labor Control (lc_actuals). Every field is editable as an
-   override only. RPLH-by-daypart and server entry moved to their own screens. */
+/* ── Revenue Recovery — This Week (weekly confirm + history) ──────────────────
+   Brought to the Control entry-page standard (Build Schedule / Log Hours /
+   Profit This Week): a stat strip up top, a week-chip selector row (chips left,
+   page actions right), the confirm form, Save + Start Over below the card, then
+   a filter-chip row and a view/edit history table. Revenue and covers pull from
+   Shift Control (sc_shifts); labor pulls from Labor Control (lc_actuals). The
+   operator confirms. Stepping the selector to a saved week loads it for edit;
+   Save updates that record. Saves to App.data.revenue_weeks. */
 
 S.RevenueThisWeek = {
   draft: null,
+  _weekEnd: null,
+  _editId: null,
   _msg: '',
   DRAFT_KEY: 'rf_draft',
+  filterPreset: 'last-12',
+  _prevPreset: 'last-12',
+  filterFrom: '',
+  filterTo: '',
+  RANGE_CHIPS: [
+    { v: 'this-month', label: 'This Month' },
+    { v: 'last-4', label: 'Last 4 Weeks' },
+    { v: 'last-12', label: 'Last 12 Weeks' },
+    { v: 'all', label: 'All' },
+    { v: 'custom', label: 'Custom' }
+  ],
 
-  // ── Shift Control revenue/covers feed ─────────────────────────────────────
+  // ── Shift Control revenue/covers feed (7-day week ending periodEnd) ─────────
   hasShifts() {
     return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
   },
@@ -33,7 +49,7 @@ S.RevenueThisWeek = {
     return any ? { bar, floor, covers } : { bar: 0, floor: 0, covers: 0 };
   },
 
-  // ── Labor Control labor feed ──────────────────────────────────────────────
+  // ── Labor Control labor feed (7-day week ending periodEnd) ─────────────────
   hasLabor() {
     return (((App.laborData && App.laborData.lc_actuals) || []).length) > 0;
   },
@@ -62,203 +78,259 @@ S.RevenueThisWeek = {
   targets() { return (App.data.revenue_settings && App.data.revenue_settings.targets) || {}; },
   laborTarget() { return App.laborTargetPct(); },
 
-  // ── Draft ─────────────────────────────────────────────────────────────────
-  loadDraft() {
-    let saved = null;
-    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) saved = JSON.parse(r); } catch (e) {}
+  // ── Dates ──────────────────────────────────────────────────────────────────
+  currentWeekEnd() { return App.nextSunday ? App.nextSunday() : App.todayLocal(); },
+  addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  fmtDate(ymd) { if (!ymd) return '-'; const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? esc(ymd) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); },
+  savedWeek(periodEnd) { return (App.data.revenue_weeks || []).find(w => (w.period_end || '').slice(0, 10) === periodEnd) || null; },
+  // "Jun 15 - Jun 21" for the 7-day week ending on `end` (Sunday). Uses the
+  // shared App.dateRangeLabel so the format matches every other week selector.
+  weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },
+  nextWeekNum() {
     const weeks = App.data.revenue_weeks || [];
-    // revenue_weeks load date-DESC, so the last array element is the OLDEST week.
-    // Pick the newest by date for the draft's default week number / period end.
-    const lastWeek = App.latestEvent ? App.latestEvent(weeks) : (weeks.length ? weeks[weeks.length - 1] : null);
-    const periodEnd = (saved && saved.period_end) || (App.nextSunday ? App.nextSunday() : App.todayLocal());
-    if (saved) {
-      return {
-        week_num: saved.week_num || ((lastWeek && lastWeek.week_num || 0) + 1),
-        period_end: periodEnd,
-        bar_revenue: saved.bar_revenue || '',
-        floor_revenue: saved.floor_revenue || '',
-        covers: saved.covers || '',
-        labor_hours: saved.labor_hours || '',
-        labor_cost: saved.labor_cost || '',
-        notes: saved.notes || '',
-        _edit_id: saved._edit_id || null
-      };
-    }
+    return weeks.reduce((m, w) => Math.max(m, w.week_num || 0), 0) + 1;
+  },
+
+  // ── Draft (localStorage; only the unsaved current-week confirm persists) ────
+  freshDraft(periodEnd) {
     const sf = this.shiftFeed(periodEnd);
     const lf = this.laborFeed(periodEnd);
     return {
-      week_num: (lastWeek && lastWeek.week_num || 0) + 1,
-      period_end: periodEnd,
       bar_revenue: sf && sf.bar ? sf.bar.toFixed(2) : '',
       floor_revenue: sf && sf.floor ? sf.floor.toFixed(2) : '',
       covers: sf && sf.covers ? String(sf.covers) : '',
       labor_hours: lf && lf.hours ? lf.hours.toFixed(2) : '',
       labor_cost: lf && lf.cost ? lf.cost.toFixed(2) : '',
-      notes: '',
-      _edit_id: null
+      notes: ''
     };
   },
-  saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
-  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} this.draft = null; },
-
-  render(container, actions) {
-    this.container = container;
-    if (actions) actions.innerHTML = '';
-    if (!this.draft) this.draft = this.loadDraft();
-    this.draw();
-  },
-
-  feedNote(kind) {
-    if (kind === 'revenue') {
-      return this.hasShifts()
-        ? 'Auto-filled from Shift Control: the weekly sum of shift revenue and covers. <a href="#" onclick="S.RevenueThisWeek.pullRevenue();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No shifts logged in Shift Control yet. Log shifts there, or enter manually.';
-    }
-    if (kind === 'labor') {
-      return this.hasLabor()
-        ? 'Auto-filled from Labor Control: logged hours and cost for the week. <a href="#" onclick="S.RevenueThisWeek.pullLabor();return false;" style="color:var(--gold);font-weight:700;">Pull latest</a>'
-        : 'No hours logged in Labor Control yet. Log hours there, or enter manually.';
-    }
-    return '';
-  },
-
-  moneyField(id, label, value, kind, prefix) {
-    const input = prefix === '$'
-      ? '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.RevenueThisWeek.onInput()"/></div>'
-      : '<input type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" oninput="S.RevenueThisWeek.onInput()"/>';
-    return '<div class="f w-md"><label>' + label + '</label>' + input
-      + (kind ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.4;">' + this.feedNote(kind) + '</div>' : '')
-      + '</div>';
-  },
-
-  draw() {
-    const d = this.draft;
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div class="card-title">Period</div>'
-      + '<div class="form-row">'
-      + '<div class="f" style="width:100px;"><label>Week #</label><input type="number" id="rw-wk" value="' + esc(String(d.week_num)) + '" min="1" oninput="S.RevenueThisWeek.onInput()"/></div>'
-      + '<div class="f" style="width:160px;"><label>Period End Date</label><input type="date" id="rw-end" value="' + esc(d.period_end) + '" oninput="S.RevenueThisWeek.onInput()"/></div>'
-      + '</div></div>'
-
-      + '<div class="card"><div class="card-title">Revenue and Covers</div>'
-      + '<div class="form-row">'
-      + this.moneyField('rw-brev', 'Bar Revenue', d.bar_revenue, 'revenue', '$')
-      + this.moneyField('rw-frev', 'Floor Revenue', d.floor_revenue, 'revenue', '$')
-      + this.moneyField('rw-cov', 'Total Covers', d.covers, 'revenue', '')
-      + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val" id="rw-c-rev">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Forecast</div><div class="calc-val" id="rw-c-fc">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val" id="rw-c-fcgap">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val" id="rw-c-ca">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">$' + (this.targets().check_avg || 35) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val" id="rw-c-cagap">-</div></div>'
-      + '</div></div>'
-
-      + '<div class="card"><div class="card-title">Labor</div>'
-      + '<div class="form-row">'
-      + this.moneyField('rw-lhrs', 'Labor Hours', d.labor_hours, 'labor', '')
-      + this.moneyField('rw-lcost', 'Labor Cost', d.labor_cost, 'labor', '$')
-      + '</div>'
-      + '<div class="calc">'
-      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val" id="rw-c-lpct">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val dim">' + App.fmtPct(this.laborTarget()) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val" id="rw-c-rplh">-</div></div>'
-      + '</div></div>'
-
-      + '<div class="card"><div class="card-title">Review</div>'
-      + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label>'
-      + '<textarea id="rw-notes" rows="2" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary btn-lg" id="rw-save">' + (d._edit_id ? 'Update Week' : 'Save Week') + '</button>'
-      + (d._edit_id ? '<button class="btn btn-ghost" id="rw-cancel">Cancel</button>' : '')
-      + '<span id="rw-msg" style="color:var(--gold);font-size:12px;font-weight:700;margin-left:8px;display:' + (this._msg ? 'inline' : 'none') + ';">' + esc(this._msg || '') + '</span>'
-      + '<span id="rw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>'
-      + this.renderHistory()
-      + '</div>';
-    this._msg = '';
-
-    document.getElementById('rw-save')?.addEventListener('click', () => this.saveWeek());
-    document.getElementById('rw-cancel')?.addEventListener('click', () => this.cancelEdit());
-    document.getElementById('rw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
-    this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
-    this.container.querySelectorAll('.rw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
-    this.calc();
-  },
-
-  // ── Weekly history (data-card table + in-app PDF export) ────────────────────
-  // Folded in from the retired Reports and History screen. The old screen also
-  // carried an "Annual Revenue Projection" card; that was an invented annual
-  // run-rate and was dropped — the real forward number lives in Revenue Forecast.
-  renderHistory() {
-    const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end);
-    if (!weeks.length) return '';
-    const targetCA = this.targets().check_avg || 35;
-    const tgtLP = this.laborTarget();
-    const sorted = weeks.slice().sort((a, b) => (b.period_end || '').localeCompare(a.period_end || ''));
-    const rows = sorted.map(w => {
-      const total = (w.bar_revenue || 0) + (w.floor_revenue || 0);
-      const caCls = w.check_avg ? (w.check_avg >= targetCA ? 'pos' : 'neg') : '';
-      const lpCls = w.labor_pct_blended ? (w.labor_pct_blended <= tgtLP ? 'pos' : 'neg') : '';
-      return '<tr>'
-        + '<td>' + (w.period_end || '').slice(0, 10) + '</td>'
-        + '<td>Wk ' + (w.week_num != null ? w.week_num : '-') + '</td>'
-        + '<td>' + App.fmtCurrency(w.bar_revenue || 0) + '</td>'
-        + '<td>' + App.fmtCurrency(w.floor_revenue || 0) + '</td>'
-        + '<td class="val">' + App.fmtCurrency(total) + '</td>'
-        + '<td>' + (w.covers || '-') + '</td>'
-        + '<td class="' + caCls + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
-        + '<td class="' + lpCls + '">' + (w.labor_pct_blended ? App.fmtPct(w.labor_pct_blended) : '-') + '</td>'
-        + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '-') + '</td>'
-        + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm rw-edit" data-id="' + esc(w.id) + '">Edit</button>'
-        + '<button class="btn btn-danger btn-sm rw-del" data-id="' + esc(w.id) + '">Delete</button>'
-        + '</div></td>'
-        + '</tr>';
-    }).join('');
-    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
-      + '<div class="sh" style="margin:0;">Weekly History</div>'
-      + '<button class="btn btn-ghost btn-sm" id="rw-export">Export PDF</button>'
-      + '</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-  },
-
-  editWeek(id) {
-    const w = (App.data.revenue_weeks || []).find(x => x.id === id);
-    if (!w) return;
-    this.draft = {
-      week_num: w.week_num != null ? String(w.week_num) : '',
-      period_end: (w.period_end || '').slice(0, 10),
+  draftFromWeek(w) {
+    return {
       bar_revenue: w.bar_revenue ? String(w.bar_revenue) : '',
       floor_revenue: w.floor_revenue ? String(w.floor_revenue) : '',
       covers: w.covers ? String(w.covers) : '',
       labor_hours: w.total_hours ? String(w.total_hours) : '',
       labor_cost: w.total_labor_cost ? String(w.total_labor_cost) : '',
-      notes: w.notes || '',
-      _edit_id: id
+      notes: w.notes || ''
     };
-    this.saveDraft();
+  },
+  saveDraft() { if (this._editId) return; try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify({ weekEnd: this._weekEnd, draft: this.draft })); } catch (e) {} },
+  clearDraft() { try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {} },
+  readDraft(weekEnd) {
+    try { const r = localStorage.getItem(this.DRAFT_KEY); if (r) { const o = JSON.parse(r); if (o && o.weekEnd === weekEnd && o.draft) return o.draft; } } catch (e) {}
+    return null;
+  },
+
+  // Load a week into the form: saved → editable (carry its id), else a fresh
+  // Control pull (with the current-week localStorage draft restored if present).
+  loadWeek(weekEnd) {
+    this._weekEnd = weekEnd;
+    const saved = this.savedWeek(weekEnd);
+    if (saved) {
+      this.draft = this.draftFromWeek(saved);
+      this._editId = saved.id;
+    } else {
+      this._editId = null;
+      const dr = (weekEnd === this.currentWeekEnd()) ? this.readDraft(weekEnd) : null;
+      this.draft = dr || this.freshDraft(weekEnd);
+    }
+  },
+
+  // ── History filter range ────────────────────────────────────────────────────
+  effectiveRange() {
+    if (this.filterPreset === 'custom') return { from: this.filterFrom || '', to: this.filterTo || '' };
+    return App.datePresetRange(this.filterPreset);
+  },
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    if (!this._weekEnd) this.loadWeek(this.currentWeekEnd());
     this.draw();
+  },
+
+  showHowTo() {
+    App.showHelpModal('How This Week Works', [
+      { p: ['This is the weekly revenue confirm. Bar Cop pulls the week in from your Control systems: revenue and covers from Shift Control, hours and cost from Labor Control. You read the money picture up top, confirm the numbers, and save. You almost never type a raw number, you confirm one.'] },
+      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one.'] },
+      { h: 'The Money Picture', p: ['Total revenue, how the week tracked versus your forecast, check average against target, labor percent against target, and revenue per labor hour, all live as you confirm the numbers.'] },
+      { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Every cell is pre-filled from Control and editable. Load from Control re-runs the pull and refills the cells; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first, with check average and labor percent colored against your targets. Edit loads a week back into the form; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
+    ]);
+  },
+
+  // ── Stat strip (the selected week's money picture) ──────────────────────────
+  heroStrip() {
+    return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
+      + '<div class="calc-item"><div class="calc-label">Total Revenue</div><div class="calc-val lg" id="rw-h-rev">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Forecast</div><div class="calc-val lg" id="rw-h-fcgap">-</div><div style="font-size:11px;color:var(--t3);margin-top:3px;" id="rw-h-fcsub">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="rw-h-ca">-</div><div style="font-size:11px;color:var(--t3);margin-top:3px;" id="rw-h-casub">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val lg" id="rw-h-lpct">-</div><div style="font-size:11px;color:var(--t3);margin-top:3px;" id="rw-h-lpctsub">-</div></div>'
+      + '<div class="calc-item"><div class="calc-label">RPLH</div><div class="calc-val lg" id="rw-h-rplh">-</div></div>'
+      + '</div></div>';
+  },
+
+  // ── Week-chip selector row (chips left, page actions right) ──────────────────
+  selectorRow() {
+    const now = this.currentWeekEnd();
+    const sel = this._weekEnd;
+    const older = this.addDays(sel, -7);
+    const fwdDisabled = sel >= now;   // never step past the in-progress current week
+    const chip = (end, active) =>
+      '<button class="rw-wk-chip btn btn-sm" data-end="' + end + '" style="'
+        + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + this.weekRangeLabel(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm rw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
+      + chip(older, false) + chip(sel, true)
+      + '<button class="btn btn-ghost btn-sm rw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
+      + (sel !== now ? '<button class="btn btn-ghost btn-sm rw-wk-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button class="btn btn-ghost btn-sm" id="rw-pull">Load from Control</button>'
+      + '</div></div>';
+  },
+
+  // ── Confirm form (form-card) ────────────────────────────────────────────────
+  moneyField(id, label, value, width) {
+    return '<div class="f" style="width:' + (width || 160) + 'px;flex-shrink:0;"><label>' + label + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" oninput="S.RevenueThisWeek.onInput()"/></div></div>';
+  },
+  numField(id, label, value, width) {
+    return '<div class="f" style="width:' + (width || 140) + 'px;flex-shrink:0;"><label>' + label + '</label>'
+      + '<input class="form-input" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" oninput="S.RevenueThisWeek.onInput()"/></div>';
+  },
+  entryCard(d) {
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Confirm the Week</div>'
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;flex-wrap:wrap;">'
+      + this.moneyField('rw-brev', 'Bar Revenue', d.bar_revenue, 160)
+      + this.moneyField('rw-frev', 'Floor Revenue', d.floor_revenue, 160)
+      + this.numField('rw-cov', 'Total Covers', d.covers, 140)
+      + '</div>'
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;flex-wrap:wrap;margin-top:6px;">'
+      + this.numField('rw-lhrs', 'Labor Hours', d.labor_hours, 140)
+      + this.moneyField('rw-lcost', 'Labor Cost', d.labor_cost, 160)
+      + '</div>'
+      + '<div class="f" style="margin:14px 0 0;"><label>Notes (optional)</label>'
+      + '<textarea id="rw-notes" class="notes-ta" rows="2" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + '</div>';
+  },
+
+  // ── Weekly history (filter chips + data-card table + in-app PDF export) ──────
+  historyBlock() {
+    const r = this.effectiveRange();
+    const targetCA = this.targets().check_avg || 35;
+    const tgtLP = this.laborTarget();
+    const all = (App.data.revenue_weeks || []).slice()
+      .filter(w => w.period_end)
+      .filter(w => { const pe = (w.period_end || '').slice(0, 10); return (!r.from || pe >= r.from) && (!r.to || pe <= r.to); })
+      .sort((a, b) => (b.period_end || '').localeCompare(a.period_end || ''));
+
+    const customRow = this.filterPreset === 'custom'
+      ? '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">'
+        + '<div class="f" style="width:180px;"><label>From</label><input type="date" id="rw-from" value="' + esc(this.filterFrom) + '"/></div>'
+        + '<div class="f" style="width:180px;"><label>To</label><input type="date" id="rw-to" value="' + esc(this.filterTo) + '"/></div></div>'
+      : '';
+
+    const rows = all.length
+      ? all.map(w => {
+          const total = (w.bar_revenue || 0) + (w.floor_revenue || 0);
+          const caCls = w.check_avg ? (w.check_avg >= targetCA ? 'pos' : 'neg') : '';
+          const lpCls = w.labor_pct_blended ? (w.labor_pct_blended <= tgtLP ? 'pos' : 'neg') : '';
+          return '<tr>'
+            + '<td><div class="val">' + this.fmtDate((w.period_end || '').slice(0, 10)) + '</div></td>'
+            + '<td>Wk ' + (w.week_num != null ? w.week_num : '-') + '</td>'
+            + '<td>' + App.fmtCurrency(w.bar_revenue || 0) + '</td>'
+            + '<td>' + App.fmtCurrency(w.floor_revenue || 0) + '</td>'
+            + '<td class="val">' + App.fmtCurrency(total) + '</td>'
+            + '<td>' + (w.covers || '-') + '</td>'
+            + '<td class="' + caCls + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
+            + '<td class="' + lpCls + '">' + (w.labor_pct_blended ? App.fmtPct(w.labor_pct_blended) : '-') + '</td>'
+            + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '-') + '</td>'
+            + '<td><div class="row-actions">'
+            + '<button class="btn btn-ghost btn-sm rw-edit" data-id="' + esc(w.id) + '">Edit</button>'
+            + '<button class="btn btn-danger btn-sm rw-del" data-id="' + esc(w.id) + '">Delete</button>'
+            + '</div></td></tr>';
+        }).join('')
+      : '<tr><td colspan="10" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Save a week above, or widen the range.</td></tr>';
+
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'rw-range-chip') + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rw-export">Export PDF</button>'
+      + '</div>'
+      + customRow
+      + '<div id="rw-hist-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+  },
+
+  draw() {
+    const d = this.draft;
+    const editing = !!this._editId;
+    this.container.innerHTML = '<div class="screen">'
+      + this.heroStrip()
+      + this.selectorRow()
+      + this.entryCard(d)
+      + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="rw-save">' + (editing ? 'Update Week' : 'Save Week') + '</button>'
+      + '<button class="btn btn-ghost" id="rw-start-over">Start Over</button>'
+      + '<span id="rw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '<span id="rw-msg" style="color:var(--gold);font-size:12px;font-weight:700;margin-left:8px;display:' + (this._msg ? 'inline' : 'none') + ';">' + esc(this._msg) + '</span>'
+      + '</div>'
+      + this.historyBlock()
+      + '</div>';
+    this._msg = '';
+    this.wire();
+    this.calc();
+  },
+
+  wire() {
+    document.getElementById('rw-save')?.addEventListener('click', () => this.saveWeek());
+    document.getElementById('rw-start-over')?.addEventListener('click', () => this.startOver());
+    document.getElementById('rw-pull')?.addEventListener('click', () => this.pullAll());
+    this.container.querySelectorAll('.rw-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeek(b.dataset.end)));
+    this.container.querySelector('.rw-wk-prev')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, -7)));
+    this.container.querySelector('.rw-wk-next')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, 7)));
+    this.container.querySelector('.rw-wk-now')?.addEventListener('click', () => this.gotoWeek(this.currentWeekEnd()));
+    this.container.querySelectorAll('.rw-range-chip').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.v;
+      if (v === 'custom') { this.filterPreset = (this.filterPreset === 'custom') ? this._prevPreset : 'custom'; }
+      else { this._prevPreset = v; this.filterPreset = v; }
+      this.draw();
+    }));
+    document.getElementById('rw-from')?.addEventListener('change', e => { this.filterFrom = e.target.value; this.draw(); });
+    document.getElementById('rw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
+    document.getElementById('rw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: document.getElementById('rw-hist-export') || this.container }));
+    this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
+    this.container.querySelectorAll('.rw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
+  },
+
+  gotoWeek(weekEnd) {
+    if (!weekEnd) return;
+    if (!this._editId) { this.collect(); this.saveDraft(); }
+    this.loadWeek(weekEnd);
+    this.draw();
+  },
+
+  editWeek(id) {
+    const w = (App.data.revenue_weeks || []).find(x => x.id === id);
+    if (!w) return;
+    this.gotoWeek((w.period_end || '').slice(0, 10));
     const el = App._activeContentEl ? App._activeContentEl() : null;
     if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
     else if (el) el.scrollTop = 0;
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
-  cancelEdit() {
-    this.clearDraft();
-    this.draft = this.loadDraft();
-    this.draw();
-  },
-
   deleteWeek(id) {
     App.confirmDelete().then(ok => {
       if (!ok) return;
       App.removeRecord('core', 'revenue_week', id).then(() => {
-        if (this.draft && this.draft._edit_id === id) { this.clearDraft(); this.draft = this.loadDraft(); }
+        if (this._editId === id) this.loadWeek(this._weekEnd);
         this.draw();
       });
     });
@@ -269,87 +341,84 @@ S.RevenueThisWeek = {
   collect() {
     const v = id => document.getElementById(id)?.value ?? '';
     const d = this.draft;
-    d.week_num = v('rw-wk'); d.period_end = v('rw-end');
     d.bar_revenue = v('rw-brev'); d.floor_revenue = v('rw-frev'); d.covers = v('rw-cov');
     d.labor_hours = v('rw-lhrs'); d.labor_cost = v('rw-lcost');
     d.notes = v('rw-notes');
   },
 
-  // True when the current input differs from the incoming value by enough
-  // to call it a real override (covers integer compare; dollars by 50 cents).
+  // True when the current input differs from the incoming value enough to call
+  // it a real override (covers integer compare; dollars by 50 cents).
   _isOverride(id, incoming) {
     const cur = parseFloat(document.getElementById(id)?.value);
     if (isNaN(cur) || cur === 0) return false;
     const inc = parseFloat(incoming);
     if (isNaN(inc)) return false;
-    const tol = id === 'rw-cov' ? 0.5 : 0.5;
-    return Math.abs(cur - inc) > tol;
+    return Math.abs(cur - inc) > 0.5;
   },
 
-  async pullRevenue() {
-    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
+  // One "Load from Control" pulls revenue + covers from Shift Control and hours
+  // + cost from Labor Control, with a single overwrite confirm if any typed cell
+  // would change.
+  async pullAll() {
+    const pe = this._weekEnd;
     const sf = this.shiftFeed(pe);
-    if (!sf) return;
-    const incoming = { 'rw-brev': sf.bar, 'rw-frev': sf.floor, 'rw-cov': sf.covers || 0 };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
-    if (conflicted) {
-      const ok = await App.confirm({
-        title: 'Overwrite your numbers?',
-        message: 'You\'ve already typed values into Bar Revenue, Floor Revenue, or Covers that don\'t match Shift Control. Pulling latest will replace them.',
-        confirmText: 'Overwrite', cancelText: 'Keep Mine'
-      });
-      if (!ok) return;
-    }
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    set('rw-brev', sf.bar.toFixed(2));
-    set('rw-frev', sf.floor.toFixed(2));
-    set('rw-cov', sf.covers ? String(sf.covers) : '');
-    this.onInput();
-  },
-  async pullLabor() {
-    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
     const lf = this.laborFeed(pe);
-    if (!lf) return;
-    const incoming = { 'rw-lhrs': lf.hours, 'rw-lcost': lf.cost };
-    const conflicted = Object.entries(incoming).some(([id, v]) => this._isOverride(id, v));
+    const incoming = {};
+    if (sf && (sf.bar || sf.floor || sf.covers)) {
+      incoming['rw-brev'] = sf.bar; incoming['rw-frev'] = sf.floor;
+      if (sf.covers) incoming['rw-cov'] = sf.covers;
+    }
+    if (lf && (lf.cost || lf.hours)) { incoming['rw-lhrs'] = lf.hours; incoming['rw-lcost'] = lf.cost; }
+    if (!Object.keys(incoming).length) {
+      await App.confirm({ title: 'Nothing to pull yet', message: 'No shifts or hours are logged in Control for this week yet. Log them in Shift and Labor Control, or enter the numbers here by hand.', confirmText: 'OK', cancelText: '' });
+      return;
+    }
+    const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
     if (conflicted) {
-      const ok = await App.confirm({
-        title: 'Overwrite your labor numbers?',
-        message: 'Your typed Labor Hours or Labor Cost don\'t match what\'s logged in Labor Control. Pulling latest will replace them.',
-        confirmText: 'Overwrite', cancelText: 'Keep Mine'
-      });
+      const ok = await App.confirm({ title: 'Overwrite your numbers?', message: 'Some cells you edited do not match what Control just computed. Loading will replace them with the logged figures.', confirmText: 'Overwrite', cancelText: 'Keep Mine' });
       if (!ok) return;
     }
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    set('rw-lhrs', lf.hours.toFixed(2));
-    set('rw-lcost', lf.cost.toFixed(2));
+    Object.entries(incoming).forEach(([id, val]) => {
+      const el = document.getElementById(id); if (!el) return;
+      el.value = id === 'rw-cov' ? String(Math.round(Number(val) || 0)) : (Number(val) || 0).toFixed(2);
+    });
     this.onInput();
   },
 
   calc() {
     const num = id => parseFloat(document.getElementById(id)?.value) || 0;
-    const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    const set = (id, val, color) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; if (color !== undefined) el.style.color = color; };
+    const targetCA = this.targets().check_avg || 35;
+    const tgtLP = this.laborTarget();
+
     const totalRev = num('rw-brev') + num('rw-frev');
     const covers = num('rw-cov');
     const checkAvg = covers > 0 ? totalRev / covers : null;
-    const targetCA = this.targets().check_avg || 35;
-    set('rw-c-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '-');
-    // Forecast comparison: read this week's forecast (keyed by Monday week_start)
-    const pe = document.getElementById('rw-end')?.value || this.draft.period_end;
-    const fc = (pe && App.forecastForWeek) ? App.forecastForWeek(pe) : null;
-    const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
-    set('rw-c-fc', fcTotal > 0 ? App.fmtCurrency(fcTotal) : '-', fcTotal > 0 ? 'dim' : '');
-    const fcGap = fcTotal > 0 && totalRev > 0 ? totalRev - fcTotal : null;
-    set('rw-c-fcgap', fcGap != null ? (fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap) : '-', fcGap != null ? (fcGap >= 0 ? 'good' : 'warn') : '');
-    set('rw-c-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= targetCA ? 'good' : 'warn') : '');
-    const caGap = checkAvg != null ? checkAvg - targetCA : null;
-    set('rw-c-cagap', caGap != null ? (caGap >= 0 ? '+' : '') + App.fmtCurrency(caGap) : '-', caGap != null ? (caGap >= 0 ? 'good' : 'warn') : '');
-
     const laborCost = num('rw-lcost'), laborHrs = num('rw-lhrs');
     const laborPct = totalRev > 0 && laborCost > 0 ? laborCost / totalRev * 100 : null;
     const rplh = laborHrs > 0 && totalRev > 0 ? totalRev / laborHrs : null;
-    set('rw-c-lpct', laborPct != null ? App.fmtPct(laborPct) : '-', laborPct != null ? (laborPct > this.laborTarget() ? 'warn' : 'good') : '');
-    set('rw-c-rplh', rplh != null ? App.fmtCurrency(rplh) : '-');
+
+    const fc = (this._weekEnd && App.forecastForWeek) ? App.forecastForWeek(this._weekEnd) : null;
+    const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
+    const fcGap = fcTotal > 0 && totalRev > 0 ? totalRev - fcTotal : null;
+
+    set('rw-h-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '-', 'var(--t1)');
+    set('rw-h-fcgap', fcGap != null ? ((fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcGap >= 0 ? 'var(--green)' : 'var(--red)'));
+    set('rw-h-fcsub', fcTotal > 0 ? 'forecast ' + App.fmtCurrency(fcTotal) : 'no forecast set');
+    set('rw-h-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg == null ? 'var(--t3)' : (checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)'));
+    set('rw-h-casub', 'target ' + App.fmtCurrency(targetCA));
+    set('rw-h-lpct', laborPct != null ? App.fmtPct(laborPct) : '-', laborPct == null ? 'var(--t3)' : (laborPct > tgtLP ? 'var(--red)' : 'var(--gold)'));
+    set('rw-h-lpctsub', 'target ' + App.fmtPct(tgtLP));
+    set('rw-h-rplh', rplh != null ? App.fmtCurrency(rplh) : '-', 'var(--t1)');
+  },
+
+  startOver() {
+    App.confirm({ title: 'Start over?', message: this._editId ? 'This drops your unsaved changes to this week and reloads what is saved.' : 'This clears the numbers entered for this week and re-pulls a fresh copy from Control.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
+      if (!ok) return;
+      if (!this._editId) this.clearDraft();
+      this.loadWeek(this._weekEnd);
+      this.draw();
+    });
   },
 
   async saveWeek() {
@@ -357,6 +426,8 @@ S.RevenueThisWeek = {
     const d = this.draft;
     const err = document.getElementById('rw-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (err) err.style.display = 'none';
+
     const barRev = parseFloat(d.bar_revenue) || 0;
     const floorRev = parseFloat(d.floor_revenue) || 0;
     const totalRev = barRev + floorRev;
@@ -369,10 +440,11 @@ S.RevenueThisWeek = {
     const laborPct = totalRev > 0 ? laborCost / totalRev * 100 : 0;
     const rplh = laborHrs > 0 ? totalRev / laborHrs : 0;
 
+    const existing = this._editId ? (App.data.revenue_weeks || []).find(w => w.id === this._editId) : null;
     const week = {
-      id:                d._edit_id || App.uid(),
-      week_num:          parseInt(d.week_num) || 1,
-      period_end:        d.period_end,
+      id:                this._editId || App.uid(),
+      week_num:          existing ? existing.week_num : this.nextWeekNum(),
+      period_end:        this._weekEnd,
       bar_revenue:       barRev,
       floor_revenue:     floorRev,
       covers:            covers,
@@ -386,16 +458,17 @@ S.RevenueThisWeek = {
     };
 
     const btn = document.getElementById('rw-save');
+    const wasEditing = !!this._editId;
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('core', 'revenue_week', week);
     if (ok) {
-      this.clearDraft();
+      if (!wasEditing) this.clearDraft();
       App.markSetupDone('gs_r_week');
-      this._msg = 'Saved.';
-      this.draft = this.loadDraft();
+      this._msg = wasEditing ? 'Week updated.' : 'Week saved.';
+      this.loadWeek(this._weekEnd);   // reload the now-saved week (becomes editable)
       this.draw();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = d._edit_id ? 'Update Week' : 'Save Week'; }
+      if (btn) { btn.disabled = false; btn.textContent = wasEditing ? 'Update Week' : 'Save Week'; }
       fail('Save failed. Try again.');
     }
   }
