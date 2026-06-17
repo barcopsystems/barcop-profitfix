@@ -202,11 +202,11 @@ S.RevenueForecast = {
         + '<td><div class="val">' + esc(this.dayLabel(i)) + '</div></td>'
         + '<td><div style="display:flex;align-items:center;gap:10px;">'
         +   '<div class="fw" style="flex:1;max-width:200px;"><span class="pre">$</span><input class="form-input pre rf-val" type="number" min="0" step="0.01" inputmode="decimal" value="' + v + '" style="width:100%;"/></div>'
-        +   useBtn('rf-apply', d, sug, 'Use ' + this.fmt(sug))
+        +   useBtn('rf-apply', d, sug, '+ Use ' + this.fmt(sug))
         + '</div></td>'
         + '<td><div style="display:flex;align-items:center;gap:10px;">'
         +   '<input class="form-input rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '" style="flex:1;max-width:120px;"/>'
-        +   useBtn('rf-capply', d, csug, 'Use ' + csug)
+        +   useBtn('rf-capply', d, csug, '+ Use ' + csug)
         + '</div></td>'
         + '</tr>';
     }).join('');
