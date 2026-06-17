@@ -21,8 +21,8 @@ S.Dashboard = {
   },
 
   // Populated dashboard: Recovery Scoreboard hero, a diagnosis row (Where You're
-  // Leaking Now as text + the 8-week trend), a standard row (This Week + Profit
-  // Audit), then Quick Actions. Same skeleton clones to Revenue and Traffic.
+  // Leaking Now as text + Cost vs Target), a standard row (Profit Forecast +
+  // Profit Audit), then Quick Actions. Layout via the shared DashUI.
   renderFull(container) {
     const weeks   = (App.data && App.data.weeks) || [];
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
@@ -31,30 +31,27 @@ S.Dashboard = {
     const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>';
     container.innerHTML = '<div class="screen">'
       + FixPanel._scoreboardCard('profit')
-      + this.row(this.shPanel('Where You\'re Leaking Now', leakBody), this.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets), insightsBtn))
-      + this.row(this.shPanel('Profit Forecast', this.forecastPanel()), this.shPanel('Profit Audit', this.auditPanel()))
-      + this.quickActions()
+      + DashUI.row(
+          DashUI.shPanel('Where You\'re Leaking Now', leakBody),
+          DashUI.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets), insightsBtn))
+      + DashUI.row(
+          DashUI.shPanel('Profit Forecast', this.forecastPanel()),
+          DashUI.shPanel('Profit Audit', DashUI.auditPanel({
+            audits: App.data.audits,
+            screen: 'audit-tracker',
+            runText: 'Run Profit Audit',
+            emptyText: 'Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.'
+          })))
+      + DashUI.quickActions([
+          { go: 'this-week', label: 'Enter This Week' },
+          { go: 'audit-tracker', label: 'Run Profit Audit' },
+          { go: 'profit-forecast', label: 'Profit Forecast' },
+          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
+        ])
       + '</div>';
     FixPanel.wireFixAreas(container);
     document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
-    this.wireQuick(container);
-  },
-
-  // Equal-height two-column row (the Control-dashboard pattern).
-  row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
-      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
-      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
-  },
-
-  // Heading-outside panel (Control-dashboard style): .sh title above a flex card.
-  // The heading is a fixed-height single-line row so titles line up across the
-  // row and the cards below start at the same Y; flex:1 + the row's align-items
-  // stretch then make both cards equal height.
-  shPanel(title, bodyHtml, titleRight) {
-    const sh = '<div class="sh" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:22px;margin:0 0 10px;">' + sh + (titleRight || '') + '</div>';
-    return head + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
+    DashUI.wireQuick(container);
   },
 
   // Profit Forecast panel — profit projected forward twelve months, plus what
@@ -85,91 +82,45 @@ S.Dashboard = {
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button></div>';
   },
 
-  // Profit Audit panel — latest score + next-audit timing + a way in.
-  auditPanel() {
-    const audits = ((App.data && App.data.audits) || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    const latest = audits[0];
-    if (!latest) return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">Run Profit Audit</button>';
-    const score = latest.overall_score || 0;
-    const col = App.scoreColor(score);
-    const daysSince = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const daysLeft = Math.max(0, 30 - daysSince);
-    const timing = daysLeft > 0 ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') : 'Ready to run a new audit';
-    return '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'
-      + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(App.scoreLabel(score)) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + timing + '</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="audit-tracker">View Audit</button>';
-  },
-
-  // Day one (no weeks, no audits): guided steps + placeholders, like Control. The
-  // Recovery day-one points at the first audit and the Control feeds, not a prereq
-  // checklist; the wow visuals switch on only once data backs them.
+  // Day one (no weeks, no audits): guided steps + placeholders, like Control.
   renderDayOne(container) {
     const hasAudit = ((App.data && App.data.audits) || []).length > 0;
     const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
-
-    const step = (done, num, label, go, cross) =>
-      '<div class="db-go" data-go="' + go + '"' + (cross ? ' data-cross="1"' : '') + ' style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
-      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
-
-    const strip = '<div class="card form-card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Run your first Profit Audit for a baseline, and set up the Control sections that feed Recovery. As that data lands, this dashboard fills in with your recovered dollars and where the operation is leaking.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasAudit, 1, 'Run your first Profit Audit', 'audit-tracker', false)
-      + step(hasInv,   2, 'Set up Inventory Control', 'ic-dashboard', true)
-      + step(hasShift, 3, 'Set up Shift Control', 'sc-dashboard', true)
-      + step(hasLabor, 4, 'Set up Labor Control', 'lc-dashboard', true)
-      + '</div></div>';
-
-    const ph = (msg) => '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
+    const ph = DashUI.ph;
 
     container.innerHTML = '<div class="screen">'
-      + strip
+      + DashUI.dayOneStrip(
+          'Run your first Profit Audit for a baseline, and set up the Control sections that feed Recovery. As that data lands, this dashboard fills in with your recovered dollars and where the operation is leaking.',
+          [
+            { done: hasAudit, num: 1, label: 'Run your first Profit Audit', go: 'audit-tracker' },
+            { done: hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
+            { done: hasShift, num: 3, label: 'Set up Shift Control', go: 'sc-dashboard', cross: true },
+            { done: hasLabor, num: 4, label: 'Set up Labor Control', go: 'lc-dashboard', cross: true }
+          ])
       + '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Recovery Scoreboard</div>'
         + ph('Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
-      + this.row(
-          this.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
-          this.shPanel('Cost vs Target', ph('Your bar pour, food, and prime cost against target show here once you confirm a week.')))
-      + this.row(
-          this.shPanel('Profit Forecast', ph('Your profit projected forward shows here once you have a few weeks confirmed in This Week.')),
-          this.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
-      + this.quickActions()
+      + DashUI.row(
+          DashUI.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
+          DashUI.shPanel('Cost vs Target', ph('Your bar pour, food, and prime cost against target show here once you confirm a week.')))
+      + DashUI.row(
+          DashUI.shPanel('Profit Forecast', ph('Your profit projected forward shows here once you have a few weeks confirmed in This Week.')),
+          DashUI.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
+      + DashUI.quickActions([
+          { go: 'this-week', label: 'Enter This Week' },
+          { go: 'audit-tracker', label: 'Run Profit Audit' },
+          { go: 'profit-forecast', label: 'Profit Forecast' },
+          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
+        ])
       + '</div>';
-    this.wireQuick(container);
-  },
-
-  quickActions() {
-    const btn = (go, label) => '<button class="btn btn-primary db-qa" data-go="' + go + '" style="flex:1;min-width:150px;">' + label + '</button>';
-    return '<div style="margin-top:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
-      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
-      + btn('this-week', 'Enter This Week')
-      + btn('audit-tracker', 'Run Profit Audit')
-      + btn('profit-forecast', 'Profit Forecast')
-      + btn('recipe-cost-analysis', 'Recipe Summary')
-      + '</div></div>';
-  },
-
-  wireQuick(container) {
-    container.querySelectorAll('.db-qa').forEach(b =>
-      b.addEventListener('click', () => App.navigate(b.dataset.go)));
-    container.querySelectorAll('.db-go').forEach(b =>
-      b.addEventListener('click', () => {
-        if (b.dataset.cross) App.openScreen(b.dataset.go); else App.navigate(b.dataset.go);
-      }));
+    DashUI.wireQuick(container);
   },
 
   // Cost vs Target — your latest confirmed week's bar pour cost, food cost, and
   // prime cost, each as a plain percentage colored by over/under its own target
   // (red over, green at or under). No chart; the written read lives behind the
-  // Insights button. Returns inner HTML (shPanel wraps the card).
+  // Insights button. Returns the metricsPanel card body (shPanel wraps it).
   costPanel(weeks, targets) {
     const metrics = [
       { label: 'Bar Pour Cost', vals: weeks.map(w => (w && w.bar)  ? (w.bar.cost_pct  != null ? w.bar.cost_pct  : null) : null), tgt: targets.bar_pour_cost_pct || 22 },
@@ -177,32 +128,27 @@ S.Dashboard = {
       { label: 'Prime Cost',    vals: weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null),                   tgt: targets.prime_cost_pct || 60 }
     ];
     if (!metrics.some(m => m.vals.some(v => v != null))) {
-      return '<div style="text-align:center;padding:28px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Confirm a week to see your costs</div>';
+      return DashUI.metricsPanel([], 'Confirm a week to see your costs');
     }
-
-    return metrics.map((m, i) => {
+    const rows = metrics.map(m => {
       let li = m.vals.length - 1; while (li >= 0 && m.vals[li] == null) li--;
       const lastV = li >= 0 ? m.vals[li] : null;
       const col = (lastV != null && lastV > m.tgt) ? 'var(--red)' : (lastV != null ? 'var(--green)' : 'var(--t3)');
-      const last = i === metrics.length - 1;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;' + (last ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
-        + '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--t1);">' + m.label + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);">target ' + m.tgt + '%</div></div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + col + ';">' + (lastV != null ? lastV.toFixed(1) + '%' : 'n/a') + '</div>'
-        + '</div>';
-    }).join('');
+      return { label: m.label, sub: 'target ' + m.tgt + '%', value: lastV != null ? lastV.toFixed(1) + '%' : 'n/a', color: col };
+    });
+    return DashUI.metricsPanel(rows, 'Confirm a week to see your costs');
   },
 
   showInsights() {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
     const btn = document.getElementById('db-insights-btn');
     const weeks = (App.data.weeks || []).slice(-8);
-    if (weeks.length < 2) { this._insightsModal('Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
+    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
     // Session cache keyed on the data signature, so a re-click opens instantly
     // but a newly confirmed week regenerates. Mirrors Bar Cop Outlook.
     const sig = weeks.length + ':' + (weeks[weeks.length - 1].period_end || '');
-    if (this._insightsCache && this._insightsCache.sig === sig) { this._insightsModal(this._insightsCache.html); return; }
+    if (this._insightsCache && this._insightsCache.sig === sig) { DashUI.insightsModal('Bar Cop Insights', this._insightsCache.html); return; }
 
     const t = App.data.settings.targets || {};
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
@@ -212,9 +158,6 @@ S.Dashboard = {
       const d = v[v.length - 1] - v[0];
       return d > 0.5 ? 'rising, getting worse' : d < -0.5 ? 'falling, improving' : 'holding steady';
     };
-    // One fact line per metric, all computed here so the written read cannot
-    // drift off the numbers the operator sees on screen. "Current week" is the
-    // same latest value shown on the Cost vs Target card.
     const metricFact = (name, raw, tgt) => {
       const v = raw.filter(x => x != null);
       if (!v.length) return name + ': no weeks logged yet.';
@@ -258,38 +201,17 @@ S.Dashboard = {
     fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
-        if (data.error) { this._insightsModal('Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        if (data.error) { DashUI.insightsModal('Bar Cop Insights', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
         const text = data.content?.[0]?.text;
-        if (!text) { this._insightsModal('No response came back. Try again.'); restore('Try Again'); return; }
+        if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
         const html = '<p style="margin:0;">' + safe + '</p>';
         this._insightsCache = { sig, html };
-        this._insightsModal(html);
+        DashUI.insightsModal('Bar Cop Insights', html);
         restore();
       })
-      .catch(err => { this._insightsModal('Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
-  },
-
-  // Popup styled like Bar Cop Outlook: title left, Close top-right, overlay and
-  // Esc to close. Opens only when the text is ready (the button shows
-  // "Analyzing..." until then).
-  _insightsModal(bodyHtml) {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
-    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Insights</div>'
-      + '<button class="btn btn-ghost btn-sm db-ins-close">Close</button></div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.db-ins-close')?.addEventListener('click', close);
-    const onKey = e => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
+      .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
   }
 };
