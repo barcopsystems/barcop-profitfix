@@ -410,9 +410,9 @@ S.RevenueMenuItems = {
     const catOpts = '<option value="">Select category...</option>'
       + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     return '<div class="form-row">'
-      + '<div class="f" style="width:300px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
-      + '<div class="f" id="mi-linked-slot" style="width:300px;flex-shrink:0;display:none;"></div>'
+      + '<div class="f" style="width:210px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '<div class="f" id="mi-linked-slot" style="width:210px;flex-shrink:0;display:none;"></div>'
       + '</div>'
       + '<div id="mi-adaptive"></div>';
   },
@@ -482,7 +482,7 @@ S.RevenueMenuItems = {
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
       + '</div>'
       + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
-      + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
+      + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
   },
 
   // The inventory-product picker — rendered into the top-row slot (right of
@@ -502,17 +502,17 @@ S.RevenueMenuItems = {
     // items (NA beverages, Snacks) are sold whole, so the field is dropped.
     const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
     const showPour = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
-    const pourRow = showPour
-      ? '<div class="form-row"><div class="f" style="width:170px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div></div>'
+    const pourField = showPour
+      ? '<div class="f" style="width:130px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div>'
       : '';
     return '<div class="form-row">'
-      + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:170px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
+      + '<div class="f" style="width:120px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:160px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
+      + pourField
       + '</div>'
-      + pourRow
-      + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
+      + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
   },
 
   wireInventoryFields() {
