@@ -48,32 +48,36 @@ S.RevenueForecast = {
   // "Jun 8 - Jun 14" for the Mon-Sun week starting `ws`.
   weekRangeLabel(ws) { return App.dateRangeLabel(ws, App.periodEndFor(ws)); },
 
-  // Same-weekday cover defaults pulled from sc_shifts last 8 weeks. Parallel to
-  // App.forecastDefaultsFor (revenue), but for covers.
+  // Same-weekday cover defaults from sc_shifts: SUM covers per date first (a day
+  // can run several services), then average the last 8 same-weekday dates —
+  // mirrors App.forecastDefaultsFor for revenue, so the suggestion is a per-day
+  // total, not a per-shift average.
   _coverDefaults() {
     const shifts = (App.shiftData?.sc_shifts || []).filter(s => s && s.date && s.covers != null);
-    const buckets = {};
-    this.DAYS.forEach(d => { buckets[d] = []; });
-    const wsDate = new Date(this.weekStart + 'T00:00:00');
-    shifts.forEach(s => {
-      const d = new Date(String(s.date).length <= 10 ? s.date + 'T00:00:00' : s.date);
-      if (isNaN(d.getTime()) || d >= wsDate) return;
-      const daysBack = Math.round((wsDate.getTime() - d.getTime()) / 86400000);
-      if (daysBack > 56) return;  // 8 weeks
-      const idx = (d.getDay() + 6) % 7;
-      const key = this.DAYS[idx];
-      if (key && buckets[key]) buckets[key].push(parseFloat(s.covers) || 0);
-    });
+    const covByDate = {};
+    shifts.forEach(s => { covByDate[s.date] = (covByDate[s.date] || 0) + (parseFloat(s.covers) || 0); });
+    const start = new Date(this.weekStart + 'T00:00:00');
     const per_day = {};
     let total = 0;
-    this.DAYS.forEach(d => {
-      const arr = buckets[d];
-      if (!arr.length) { per_day[d] = 0; return; }
-      // Weighted average — newer entries get higher weight (linear).
-      let weightedSum = 0, weightTotal = 0;
-      arr.forEach((v, i) => { const w = i + 1; weightedSum += v * w; weightTotal += w; });
-      per_day[d] = Math.round(weightedSum / weightTotal);
-      total += per_day[d];
+    this.DAYS.forEach((day, idx) => {
+      const target = new Date(start.getTime());
+      target.setDate(target.getDate() + idx);
+      const samples = [];
+      for (let back = 1; back <= 8; back++) {
+        const probe = new Date(target.getTime());
+        probe.setDate(probe.getDate() - back * 7);
+        const key = App.ymdLocal(probe);
+        if (covByDate[key] != null) samples.push(covByDate[key]);
+      }
+      let avg = 0;
+      if (samples.length) {
+        // Newest sample first; weight newer higher (linear), like the revenue defaults.
+        let wsum = 0, vsum = 0;
+        samples.forEach((v, i) => { const w = samples.length - i; vsum += v * w; wsum += w; });
+        avg = wsum > 0 ? Math.round(vsum / wsum) : 0;
+      }
+      per_day[day] = avg;
+      total += avg;
     });
     return { per_day, total };
   },
@@ -184,21 +188,26 @@ S.RevenueForecast = {
 
   // ── Daily forecast grid (form-card + framed ing-tbl) ────────────────────────
   rowsHtml() {
+    // Single-line rows: a sized input with its "Use" suggestion beside it (not
+    // stacked below), so the grid stays compact.
+    const useBtn = (cls, day, val, label) => val > 0
+      ? '<button class="' + cls + '" data-day="' + day + '" data-val="' + val + '" style="background:none;border:none;color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:0;white-space:nowrap;flex-shrink:0;">' + label + '</button>'
+      : '<span style="font-size:10px;color:var(--t4);white-space:nowrap;flex-shrink:0;">No history</span>';
     return this.DAYS.map((d, i) => {
       const v = this.per_day[d] || 0;
       const cv = this.covers_per_day[d] || 0;
       const sug = this.defaults.per_day[d] || 0;
       const csug = this.cover_defaults.per_day[d] || 0;
-      const sugBtn = sug > 0
-        ? '<button class="rf-apply" data-day="' + d + '" data-val="' + sug + '" style="background:none;border:none;color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:5px 0 0;">Use ' + this.fmt(sug) + '</button>'
-        : '<div style="font-size:10px;color:var(--t4);padding-top:5px;">No history</div>';
-      const csugBtn = csug > 0
-        ? '<button class="rf-capply" data-day="' + d + '" data-val="' + csug + '" style="background:none;border:none;color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:5px 0 0;">Use ' + csug + '</button>'
-        : '<div style="font-size:10px;color:var(--t4);padding-top:5px;">No history</div>';
       return '<tr class="rf-row" data-day="' + d + '">'
         + '<td><div class="val">' + esc(this.dayLabel(i)) + '</div></td>'
-        + '<td><div class="fw"><span class="pre">$</span><input class="form-input pre rf-val" type="number" min="0" step="0.01" inputmode="decimal" value="' + v + '" style="width:100%;"/></div>' + sugBtn + '</td>'
-        + '<td><input class="form-input rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '" style="width:100%;"/>' + csugBtn + '</td>'
+        + '<td><div style="display:flex;align-items:center;gap:10px;">'
+        +   '<div class="fw" style="flex:1;max-width:200px;"><span class="pre">$</span><input class="form-input pre rf-val" type="number" min="0" step="0.01" inputmode="decimal" value="' + v + '" style="width:100%;"/></div>'
+        +   useBtn('rf-apply', d, sug, 'Use ' + this.fmt(sug))
+        + '</div></td>'
+        + '<td><div style="display:flex;align-items:center;gap:10px;">'
+        +   '<input class="form-input rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '" style="flex:1;max-width:120px;"/>'
+        +   useBtn('rf-capply', d, csug, 'Use ' + csug)
+        + '</div></td>'
         + '</tr>';
     }).join('');
   },
@@ -209,8 +218,8 @@ S.RevenueForecast = {
       + '<table class="ing-tbl" style="table-layout:fixed;"><colgroup><col style="width:160px;"/><col/><col/></colgroup>'
       + '<thead><tr><th>Day</th><th>Forecast Revenue</th><th>Cover Goal</th></tr></thead>'
       + '<tbody id="rf-rows">' + this.rowsHtml() + '</tbody></table></div>'
-      + '<div class="f" style="margin:0;"><label>Notes (optional)</label>'
-      + '<textarea id="rf-notes" class="notes-ta" rows="2" placeholder="Event on Saturday, slow Tuesday, weather looking soft Friday...">' + esc(this.notes) + '</textarea></div>'
+      + '<div class="f" style="margin:0;"><label>Notes</label>'
+      + '<textarea id="rf-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(this.notes) + '</textarea></div>'
       + '</div>';
   },
 
@@ -224,7 +233,6 @@ S.RevenueForecast = {
       + '<button class="btn btn-ghost" id="rf-start-over">Start Over</button>'
       + '<span id="rf-status" style="font-size:12px;color:var(--gold);font-weight:700;margin-left:8px;display:none;">Saved.</span>'
       + '<span id="rf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + (this.savedId ? '<button class="btn btn-danger btn-sm" id="rf-delete" style="margin-left:auto;">Delete Forecast</button>' : '')
       + '</div>'
       + this.accuracyBlock()
       + '</div>';
@@ -312,7 +320,6 @@ S.RevenueForecast = {
     });
     document.getElementById('rf-save')?.addEventListener('click', () => this.save());
     document.getElementById('rf-start-over')?.addEventListener('click', () => this.startOver());
-    document.getElementById('rf-delete')?.addEventListener('click', () => this.confirmDelete());
     document.getElementById('rf-export-acc')?.addEventListener('click', () => App.exportPDF({ title: 'Forecast Accuracy', root: document.getElementById('rf-acc-export') || this.container }));
   },
 
@@ -396,7 +403,7 @@ S.RevenueForecast = {
       const wasNew = !this.savedId;
       this.savedId = rec.id;
       App.markSetupDone && App.markSetupDone('gs_r_forecast');
-      // Re-render so the accuracy history + the Delete button reflect the save.
+      // Re-render so the accuracy history reflects the save.
       this.draw();
       const st = document.getElementById('rf-status');
       if (st) { st.textContent = wasNew ? 'Forecast saved.' : 'Forecast updated.'; st.style.display = 'inline'; setTimeout(() => { if (st) st.style.display = 'none'; }, 2500); }
@@ -404,27 +411,6 @@ S.RevenueForecast = {
       App.data.revenue_forecasts = snapshot;
       if (btn) btn.textContent = this.savedId ? 'Update Forecast' : 'Save Forecast';
       fail('Save failed. Try again.');
-    }
-  },
-
-  confirmDelete() {
-    if (!this.savedId) return;
-    App.confirmDelete().then(ok => { if (ok) this.doDelete(); });
-  },
-
-  async doDelete() {
-    const list = App.data.revenue_forecasts || [];
-    const snapshot = list.slice();
-    App.data.revenue_forecasts = list.filter(x => x.id !== this.savedId);
-    const ok = await App.saveKey('revenue_forecasts');
-    if (ok) {
-      this.savedId = null;
-      this.per_day = Object.assign({}, this.defaults.per_day);
-      this.covers_per_day = Object.assign({}, this.cover_defaults.per_day);
-      this.notes = '';
-      this.draw();
-    } else {
-      App.data.revenue_forecasts = snapshot;
     }
   }
 };
