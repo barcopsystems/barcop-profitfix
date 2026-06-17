@@ -231,8 +231,8 @@ input,select,textarea{color-scheme:dark;}
    uniform list per screen; a parent row (›) pushes its child list, the back
    arrow pops, the current location is highlighted. Strict palette: darkest
    panel, card-surface rows, the sidebar's navy for hover + selected. */
-.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px 11px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
-.mnav-title{flex:1;text-align:left;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
+.mnav-title{flex:1;text-align:center;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;color:var(--t2);font-size:20px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
 .mnav-back:hover,.mnav-x:hover{background:var(--c4);color:var(--w);}
 .mnav-back-sp{width:34px;flex-shrink:0;}
