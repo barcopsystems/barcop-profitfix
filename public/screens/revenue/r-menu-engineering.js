@@ -1,24 +1,30 @@
 'use strict';
 
 /* ── Revenue Recovery — Menu Engineering ──────────────────────────────────────
-   Two tabs (in-page .ch-tabs): a margin x popularity classification Matrix
-   (Stars / Plowhorses / Puzzles / Dogs) and a Price Sensitivity calculator with
-   a verifiable Pricing Review Log. Reads priced, costed menu_items; the four
-   quadrant colors encode the classification (the chart's meaning). */
+   One page, no tabs: a margin x popularity classification (Stars / Plowhorses /
+   Puzzles / Dogs) that NAMES THE MOVE for each group, then a Price Calculator
+   with a verifiable Pricing Review Log. Reads priced, costed menu_items; the
+   four quadrant colors encode the classification meaning. (The old SVG scatter
+   matrix + the "vs Last Update" mix-delta column were removed — the scatter told
+   the operator nothing actionable, and the delta was anchored to arbitrary
+   manual-edit timing.) */
 
 S.RevenueMenuEngineering = {
-  activeTab: 'matrix',
-
-  // Quadrant colors = the classification meaning (on-palette: gold win / amber
-  // watch / steel act / red cut). Used by the matrix dots, legend, and the
-  // section dots below.
+  // Quadrant colors = the classification meaning (gold win / steel act / amber
+  // watch / red cut), plus the one-line move for each.
   QUAD_COLOR: { STAR: 'var(--gold)', PLOWHORSE: 'var(--focus)', PUZZLE: 'var(--amber)', DOG: 'var(--red)' },
+  QUAD: [
+    { key: 'STAR',      label: 'Stars',      move: 'Feature & push' },
+    { key: 'PLOWHORSE', label: 'Plowhorses', move: 'Raise the price' },
+    { key: 'PUZZLE',    label: 'Puzzles',    move: 'Promote' },
+    { key: 'DOG',       label: 'Dogs',       move: 'Rework or cut' }
+  ],
 
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
-      { p: ['Menu Engineering sorts every priced item that has a cost and weekly covers into four quadrants by margin and popularity, so you know exactly what to push, reprice, promote, or cut. It needs at least four complete items; finish any Incomplete ones in Menu Items.'] },
-      { h: 'The Four Quadrants', p: ['Stars are high margin and high volume, your winners, so feature them and brief servers to push them. Plowhorses sell well but earn little, so raise the price. Puzzles earn well but sell slowly, so promote them and give them server attention. Dogs are low on both, candidates to rework or cut.'] },
-      { h: 'Price Sensitivity', p: ['Pick an item, type a proposed price and an estimated volume change, and see the new margin, the weekly and annual dollar impact, and how many covers you could lose before the change stops paying. Log the change and Bar Cop tracks the real result against your prediction once three weeks of covers come in.'] },
+      { p: ['Menu Engineering sorts every priced item that has a cost and weekly covers into four groups by margin and popularity, so you know exactly what to push, reprice, promote, or cut. It needs at least four complete items; finish any Incomplete ones in Menu Items.'] },
+      { h: 'The Four Groups', p: ['Stars are high margin and high volume, your winners, so feature them and brief servers to push them. Plowhorses sell well but earn little, so raise the price. Puzzles earn well but sell slowly, so promote them and give them server attention. Dogs are low on both, candidates to rework or cut.'] },
+      { h: 'The Price Calculator', p: ['Pick an item, type a proposed price and an estimated volume change, and see the new margin, the weekly and annual dollar impact, and how many covers you could lose before the change stops paying. Log the change and Bar Cop tracks the real result against your prediction once three weeks of covers come in.'] },
       { h: 'The Pricing Review Log', p: ['Every logged price change lands here with a live verification: once three weeks pass it shows the real weekly dollar swing against what you predicted, so your pricing instincts sharpen over time. Logged changes also feed the Recovery Scoreboard.'] }
     ]);
   },
@@ -30,20 +36,15 @@ S.RevenueMenuEngineering = {
   },
 
   draw() {
-    const tabBar = '<div class="ch-tabs no-print">'
-      + [['matrix', 'Matrix'], ['price-sensitivity', 'Price Sensitivity']].map(([id, label]) =>
-          '<button class="ch-tab' + (id === this.activeTab ? ' on' : '') + '" data-tab="' + id + '">' + label + '</button>').join('')
+    this.container.innerHTML = '<div class="screen">'
+      + this.classificationHtml()
+      + this.priceCalcHtml()
       + '</div>';
-    const body = this.activeTab === 'matrix' ? this.matrixHtml() : this.priceSensHtml();
-    this.container.innerHTML = '<div class="screen">' + tabBar + body + '</div>';
-    this.container.querySelectorAll('.ch-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this.draw(); }));
-    if (this.activeTab === 'matrix') this.wireMatrix();
-    else this.wirePriceSens();
+    this.wirePriceCalc();
   },
 
-  // ── Matrix tab ──────────────────────────────────────────────────────────────
-  matrixHtml() {
+  // ── Classification (Stars / Plowhorses / Puzzles / Dogs) ─────────────────────
+  classificationHtml() {
     // Inject the effective cost (auto-computed from recipe when attached, else
     // the manually-entered cost) so the math always sees a current number.
     const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers);
@@ -53,7 +54,7 @@ S.RevenueMenuEngineering = {
     if (items.length < 4) {
       return '<div class="card"><div class="empty">'
         + '<div class="empty-title">Not Enough Data</div>'
-        + '<div class="empty-sub">Add at least 4 menu items with price, cost, and weekly covers to run Menu Engineering.</div>'
+        + '<div class="empty-sub">Add at least 4 menu items with price, cost, and weekly covers to sort your menu into Stars, Plowhorses, Puzzles, and Dogs.</div>'
         + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'r-menu-items\')">Go to Menu Items</button></div>'
         + '</div></div>';
     }
@@ -71,69 +72,29 @@ S.RevenueMenuEngineering = {
     const color = this.QUAD_COLOR;
     const classified = items.map(item => ({ ...item, quad: classify(item), cm: item.price - item.cost, pct: (item.cost / item.price * 100).toFixed(1) }));
 
-    // SVG matrix
-    const W = 500, H = 320, PAD = 40;
-    const maxCM  = Math.max(...classified.map(i => i.cm)) * 1.1;
-    const maxCov = Math.max(...classified.map(i => i.weekly_covers)) * 1.1;
-    const xp = cm  => PAD + (cm / maxCM) * (W - PAD * 2);
-    const yp = cov => (H - PAD) - (cov / maxCov) * (H - PAD * 2);
-    const midX = xp(avgCM), midY = yp(avgCovers);
-    const dots = classified.map(i =>
-      '<circle cx="' + xp(i.cm).toFixed(1) + '" cy="' + yp(i.weekly_covers).toFixed(1) + '" r="6" fill="' + color[i.quad] + '" opacity="0.85">'
-      + '<title>' + esc(i.name) + ' (' + i.quad + ')</title></circle>').join('');
-
-    const svgMatrix = '<div class="card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Menu Engineering Matrix</div>'
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:500px;height:auto;display:block;margin:0 auto;">'
-      + '<rect x="' + PAD + '" y="' + PAD + '" width="' + (W - PAD * 2) + '" height="' + (H - PAD * 2) + '" fill="var(--input)" stroke="var(--b1)"/>'
-      + '<line x1="' + midX.toFixed(1) + '" y1="' + PAD + '" x2="' + midX.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="var(--b2)" stroke-dasharray="4,4"/>'
-      + '<line x1="' + PAD + '" y1="' + midY.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + midY.toFixed(1) + '" stroke="var(--b2)" stroke-dasharray="4,4"/>'
-      + '<text x="' + (PAD + 8) + '" y="' + (PAD + 16) + '" fill="' + color.PUZZLE + '" font-size="9" font-weight="700">PUZZLES</text>'
-      + '<text x="' + (midX + 8) + '" y="' + (PAD + 16) + '" fill="' + color.STAR + '" font-size="9" font-weight="700">STARS</text>'
-      + '<text x="' + (PAD + 8) + '" y="' + (H - PAD - 8) + '" fill="' + color.DOG + '" font-size="9" font-weight="700">DOGS</text>'
-      + '<text x="' + (midX + 8) + '" y="' + (H - PAD - 8) + '" fill="' + color.PLOWHORSE + '" font-size="9" font-weight="700">PLOWHORSES</text>'
-      + dots
-      + '<text x="' + (W / 2) + '" y="' + (H - 4) + '" text-anchor="middle" fill="var(--t4)" font-size="8">Contribution Margin</text>'
-      + '</svg>'
-      + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;">'
-      + ['STAR', 'PLOWHORSE', 'PUZZLE', 'DOG'].map(q => '<div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:' + color[q] + ';"></div><span style="font-size:11px;color:var(--t3);">' + q + '</span></div>').join('')
-      + '</div></div>';
-
-    const quadSections = ['STAR', 'PLOWHORSE', 'PUZZLE', 'DOG'].map(q => {
-      const qItems = classified.filter(i => i.quad === q);
+    // One card per group: a heading that names the group + count + the move, then
+    // the item detail. No scatter, no box-in-box. Shared fixed colgroup so the
+    // four group tables line their columns up down the page.
+    return this.QUAD.map(q => {
+      const qItems = classified.filter(i => i.quad === q.key).sort((a, b) => b.weekly_covers - a.weekly_covers);
       if (!qItems.length) return '';
-      const rows = qItems.map(i => {
-        // Menu Mix Delta: current weekly_covers vs prev_weekly_covers (stamped on
-        // r-menu-items save when the value changes). Empty until a prior anchor
-        // exists.
-        let deltaCell = '<span style="color:var(--t4);">-</span>';
-        if (i.prev_weekly_covers != null && i.weekly_covers != null) {
-          const delta = i.weekly_covers - i.prev_weekly_covers;
-          const pct = i.prev_weekly_covers > 0 ? (delta / i.prev_weekly_covers * 100) : null;
-          const col = delta > 0 ? 'var(--gold)' : delta < 0 ? 'var(--red)' : 'var(--t3)';
-          deltaCell = '<span style="color:' + col + ';font-weight:600;">'
-            + (delta >= 0 ? '+' : '') + delta
-            + (pct != null ? ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)' : '') + '</span>';
-        }
-        return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
-          + '<td>' + esc(i.category || '') + '</td>'
-          + '<td>' + App.fmtCurrency(i.price) + '</td>'
-          + '<td>' + i.pct + '%</td>'
-          + '<td>' + App.fmtCurrency(i.cm) + '</td>'
-          + '<td>' + i.weekly_covers + '</td>'
-          + '<td>' + deltaCell + '</td></tr>';
-      }).join('');
+      const rows = qItems.map(i =>
+        '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
+        + '<td>' + esc(i.category || '') + '</td>'
+        + '<td>' + App.fmtCurrency(i.price) + '</td>'
+        + '<td>' + i.pct + '%</td>'
+        + '<td>' + App.fmtCurrency(i.cm) + '</td>'
+        + '<td>' + i.weekly_covers + '</td></tr>').join('');
       return '<div class="sh" style="margin:22px 0 10px;display:flex;align-items:center;gap:8px;">'
-        + '<span style="width:9px;height:9px;border-radius:50%;background:' + color[q] + ';display:inline-block;"></span>' + q + 'S</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Item</th><th>Category</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th>vs Last Update</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '<span style="width:9px;height:9px;border-radius:50%;background:' + color[q.key] + ';display:inline-block;"></span>'
+        + esc(q.label) + ' (' + qItems.length + ')'
+        + '<span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">&nbsp;&mdash; ' + esc(q.move) + '</span></div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:640px;">'
+        + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/></colgroup>'
+        + '<thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div></div>';
     }).join('');
-
-    return svgMatrix + quadSections;
   },
-
-  wireMatrix() { /* matrix is read-only; the empty-state button uses inline onclick */ },
 
   /* Price-Change Verification — measure a logged price change against the
      prediction made when it was logged, once three weeks of covers data exist.
@@ -185,16 +146,16 @@ S.RevenueMenuEngineering = {
       + '<td style="font-size:11px;color:var(--t2);">' + esc(entry.reason || '') + '</td></tr>';
   },
 
-  // ── Price Sensitivity tab ─────────────────────────────────────────────────────
-  priceSensHtml() {
+  // ── Price Calculator ─────────────────────────────────────────────────────────
+  priceCalcHtml() {
     const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost);
     const log   = (App.data.revenue_price_log || []).slice().reverse();
     const itemOpts = items.map((i, idx) => '<option value="' + idx + '">' + esc(i.name) + '   $' + i.price + '</option>').join('');
     const logRows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
       || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet.</td></tr>';
 
-    return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Price Sensitivity Calculator</div>'
+    return '<div class="card form-card" style="margin:24px 0 16px;">'
+      + '<div class="card-title">Price Calculator</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f w-lg"><label>Menu Item</label><select class="form-input" id="rps-item"><option value="">Select item...</option>' + itemOpts + '</select></div>'
       + '<div class="f w-md"><label>Proposed New Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rps-newprice" step="0.25" placeholder="0.00"/></div></div>'
@@ -218,7 +179,7 @@ S.RevenueMenuEngineering = {
       + App.showOlderBar('core', 'revenue_price_log', log, false) + '</div>';
   },
 
-  wirePriceSens() {
+  wirePriceCalc() {
     const container = this.container;
     const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost);
 
