@@ -256,11 +256,8 @@ input,select,textarea{color-scheme:dark;}
 /* Location switcher (multi-unit only): a chip showing the current unit; tap to
    reveal the others as chips. No drop-down arrow. Sits above the Hub link. */
 .mnav-loc{padding:14px 18px 2px;}
-.mnav-loc-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:6px;font-size:13px;font-weight:600;line-height:1;cursor:pointer;background:transparent;border:1px solid var(--b1);color:var(--t2);text-align:left;}
-.mnav-loc-chip svg{width:15px;height:15px;flex-shrink:0;}
-.mnav-loc-cur{background:var(--gold-tint);border-color:var(--gold-tint-bord);color:var(--t1);}
-.mnav-loc-cur svg{color:var(--gold);}
-.mnav-loc-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.mnav-loc-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;}
+.mnav-loc-sel{width:100%;font-size:13px;}
 
 /* Footer */
 .sidebar-footer{
