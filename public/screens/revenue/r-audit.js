@@ -136,7 +136,14 @@ S.RevenueAudit = {
 
     AuditUI.attachOutlook('ra', audit, 'revenue');
     this.container.querySelectorAll('.ra-fix-btn').forEach(btn => {
-      btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('r-fix'); });
+      btn.addEventListener('click', () => {
+        const gap = btn.dataset.gap;
+        // Events is its own section now (dropped from the Revenue Fix rail), so
+        // the Events and Private Dining action jumps to the Events booking
+        // pipeline instead of falling back to the first Fix system.
+        if (gap === 'events-catering') { App.openScreen('ev-bookings'); return; }
+        App._fixFocus = gap; App.navigate('r-fix');
+      });
     });
   },
 
@@ -357,8 +364,7 @@ S.RevenueAudit = {
       + AuditUI.intakeHasBlock('What Bar Cop Already Has', 'Highlighted areas pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.', checks));
 
     const uploadCard = AuditUI.formCard('Your Reports',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional. Drop in a report to score a section Bar Cop cannot see yet. One drop zone takes them all.</div>'
-      + FileDrop.render('ra-drop', { items: [
+      FileDrop.render('ra-drop', { items: [
           { t: 'POS Sales Summary',          s: 'Scores Check Average (revenue, covers, blended check average).' },
           { t: 'Server Sales Report',        s: 'Scores Server Performance (check average by server, spread, top and bottom).', hi: true },
           { t: 'Menu Sales Mix and Pricing', s: 'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing).' },
@@ -368,8 +374,7 @@ S.RevenueAudit = {
 
     const pr = d.practices || {};
     const questionsCard = AuditUI.formCard('A Few Quick Questions',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your scores and are not in your reports. Answer what applies; the rest carry over to next time.</div>'
-      + AuditUI.intakeQRow('ra', 'Pre-shift briefing held?', 'pre_shift', [['never','Never'],['sometimes','Sometimes'],['every','Every shift']], pr.pre_shift)
+      AuditUI.intakeQRow('ra', 'Pre-shift briefing held?', 'pre_shift', [['never','Never'],['sometimes','Sometimes'],['every','Every shift']], pr.pre_shift)
       + AuditUI.intakeQRow('ra', 'Server upsell standard taught and tracked?', 'upsell_standard', [['false','No'],['true','Yes']], pr.upsell_standard)
       + AuditUI.intakeQRow('ra', 'Private dining package with a spend minimum?', 'private_dining_min', [['false','No'],['true','Yes']], pr.private_dining_min)
       + AuditUI.intakeQRow('ra', 'Menu repriced or engineered in last 6 months?', 'menu_engineered', [['false','No'],['true','Yes']], pr.menu_engineered)
