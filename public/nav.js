@@ -85,6 +85,10 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Menu Engineering</span>
       </div>
+      <div class="nav-item" data-screen="r-price-calc" id="nav-r-price-calc">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="2" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.3"/><rect x="5" y="4" width="7" height="2.5" rx="0.5" stroke="currentColor" stroke-width="1.1"/><path d="M5.5 9h.01M8.5 9h.01M11 9h.01M5.5 11.5h.01M8.5 11.5h.01M11 11.5h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span class="nav-label">Price Calculator</span>
+      </div>
       <div class="nav-item" data-screen="r-dog-test" id="nav-r-dog-test">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Dog Test Tracker</span>
