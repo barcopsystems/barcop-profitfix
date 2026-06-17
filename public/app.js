@@ -1237,8 +1237,44 @@ const App = {
     // leaf (matches the mobile menu) — drop the header and make the lone item a
     // .nav-leaf (its icon shows, it sits outside any drop-down). _navGroups
     // excludes .nav-leaf, so it is never folded back into the previous group.
-    if (mstyle) App._mstyleSidebar(nav, ({ events: { groups: { 'Bookings': 'Scheduling' } }, shift: { items: { 'Shift Reports': 'Reports' } } })[module] || {});
-    App.wireNavAccordion(nav);
+    // Inventory DESKTOP trial: a flat icon list with a divider between groups
+    // (no drop-down headers). Scoped to inventory; the mobile drawer + the other
+    // sections (mstyle accordion) are untouched. Reversible — drop 'inventory'
+    // from FLAT_SECTIONS to restore the accordion.
+    const FLAT_SECTIONS = ['inventory'];
+    const flat = FLAT_SECTIONS.indexOf(module) !== -1;
+    if (flat) {
+      nav.classList.remove('nav-mstyle');
+      nav.classList.add('nav-flat');
+      App._flatSidebar(nav);
+    } else if (mstyle) {
+      App._mstyleSidebar(nav, ({ events: { groups: { 'Bookings': 'Scheduling' } }, shift: { items: { 'Shift Reports': 'Reports' } } })[module] || {});
+    }
+    if (!flat) App.wireNavAccordion(nav);
+  },
+
+  // Inventory desktop trial: turn a freshly-rendered sidebar into a flat icon
+  // list — drop the group headers, leave a divider line between groups, keep
+  // every link's icon. Mirrors the mstyle cleanups (no Report a Bug, Help and FAQ
+  // → Help). The mobile drawer is built separately and is unaffected.
+  _flatSidebar(nav) {
+    if (!nav) return;
+    nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
+    nav.querySelectorAll('.nav-item .nav-label').forEach(l => { if ((l.textContent || '').trim() === 'Help and FAQ') l.textContent = 'Help'; });
+    nav.querySelectorAll('.nav-section').forEach(sec => {
+      // Drop a header whose whole group is empty or role-hidden so no stray
+      // divider is left behind.
+      let hasItem = false;
+      let sib = sec.nextElementSibling;
+      while (sib && !sib.classList.contains('nav-section')) {
+        if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) { hasItem = true; break; }
+        sib = sib.nextElementSibling;
+      }
+      if (!hasItem) { sec.remove(); return; }
+      const div = document.createElement('div');
+      div.className = 'nav-divider';
+      sec.parentNode.replaceChild(div, sec);
+    });
   },
 
   // ── Collapsible sub-group sidebar (accordion) ─────────────────────────────
