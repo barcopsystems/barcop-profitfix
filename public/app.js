@@ -2680,7 +2680,10 @@ const App = {
   MENU_INVENTORY_GROUPS: [
     { menuCat: 'Beer',         icCats: ['Bottle Beer', 'Draft Beer'] },
     { menuCat: 'Wine',         icCats: ['Wine'] },
-    { menuCat: 'NA Beverages', icCats: ['Misc'] }
+    { menuCat: 'NA Beverages', icCats: ['Misc'] },
+    // Packaged items bought and sold whole (bagged snacks, bottled NA, etc.).
+    // Any Food or Misc product marked "Sold on the menu" lands here.
+    { menuCat: 'Snacks',       icCats: ['Food', 'Misc'] }
   ],
   // Reverse map: IC product category → menu category (auto-derived on save).
   MENU_IC_TO_CAT: {
@@ -2698,10 +2701,44 @@ const App = {
   // supply types stay out of every menu/recipe picker.
   MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Food Ingredient', 'Paper & To-Go', 'Cleaning & Supplies'],
   MISC_SUPPLY_TYPES: ['Paper & To-Go', 'Cleaning & Supplies'],
-  // Sellable as an NA beverage on the menu (shows in the NA product picker).
+  // Tagged as an NA beverage in Inventory (vs a mixer or a supply).
   miscSellable(p) { return !!p && p.category === 'Misc' && p.misc_type === 'NA Beverage'; },
   // Pure operating supply — not a recipe ingredient, not a menu item.
   miscIsSupply(p) { return !!p && p.category === 'Misc' && this.MISC_SUPPLY_TYPES.includes(p.misc_type); },
+
+  // ── Resale items (bought and sold whole) ──────────────────────────────
+  // A Food or Misc product the operator marked "Sold on the menu." Its cost
+  // flows to the menu item per SERVING, not per purchased unit (a case of 30
+  // bags costs cost/30 a bag), the same case→unit step Bottle Beer already
+  // does. Beer/Wine/Draft are never resale here — they keep their own cost path.
+  isResale(p) { return !!p && (p.category === 'Food' || p.category === 'Misc') && p.sold_on_menu === true; },
+  resaleCostPerServing(p) {
+    if (!p) return 0;
+    const c = parseFloat(p.unit_cost); if (isNaN(c)) return 0;
+    const n = parseFloat(p.servings_per_unit);
+    return (n && n > 0) ? c / n : c;
+  },
+  // The per-sale cost of an inventory product when it is linked to a menu item:
+  // resale items use cost per serving, bottle beer divides the case, everything
+  // else is the straight per-container cost. One source for menuItemCost and the
+  // Menu Items linked-product forms so they never disagree.
+  menuLinkCost(p) {
+    if (!p) return 0;
+    if (this.isResale(p)) return this.resaleCostPerServing(p);
+    const bc = this.bottleCost(p);
+    return bc != null ? bc : (parseFloat(p.unit_cost) || 0);
+  },
+  // The menu category an inventory product belongs to when linked to a menu
+  // item. Drives the Menu Items category picker + the auto-derived category on
+  // save. Returns '' when the product is not sellable on the menu.
+  menuCatForProduct(p) {
+    if (!p) return '';
+    if (p.category === 'Bottle Beer' || p.category === 'Draft Beer') return 'Beer';
+    if (p.category === 'Wine') return 'Wine';
+    if (this.miscSellable(p) && p.sold_on_menu) return 'NA Beverages';
+    if ((p.category === 'Food' || p.category === 'Misc') && p.sold_on_menu) return 'Snacks';
+    return '';
+  },
 
   // Target cost % defaults per menu category. Plate dishes target 32%,
   // single-drink cocktails target 22%, catering targets 28%. Operators
@@ -3432,11 +3469,7 @@ const App = {
     if (item.linked_product_id) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const p = prods.find(x => x.id === item.linked_product_id);
-      if (p) {
-        const bc = this.bottleCost ? this.bottleCost(p) : null;
-        if (bc != null) return bc;
-        return p.unit_cost || 0;
-      }
+      if (p) return this.menuLinkCost(p);
     }
 
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
