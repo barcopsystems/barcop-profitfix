@@ -478,7 +478,7 @@ S.RevenueMenuItems = {
   recipeFields(item) {
     return '<div class="form-row">'
       + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:150px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
       + '</div>'
       + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
@@ -760,7 +760,7 @@ S.RevenueMenuItems = {
       name,
       category,
       price,
-      cost:               computedCost,
+      cost:               +(computedCost || 0).toFixed(2),
       weekly_covers:      covers,
       prev_weekly_covers: prevCovers,
       weekly_covers_updated_at: coversUpdatedAt,
@@ -859,7 +859,7 @@ S.RevenueMenuItems = {
         name,
         category:           (r.category || '').trim(),
         price:              num(r.price),
-        cost:               num(r.cost),
+        cost:               +(num(r.cost)).toFixed(2),
         weekly_covers:      num(r.covers),
         prev_weekly_covers: null,
         weekly_covers_updated_at: null,
