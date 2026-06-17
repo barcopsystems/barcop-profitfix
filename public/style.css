@@ -674,7 +674,7 @@ body.chrome-on .hub-app .nav-item:hover{background:var(--c3);}
 body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* Row 1 — brand + global destinations + utility. */
-.tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);}
+.tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);position:relative;}
 .tn-logo{height:22px;width:auto;display:block;flex-shrink:0;}
 .tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
 .tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
@@ -786,6 +786,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-global{display:none;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
+  /* Burger far-left, logo centered (on its own), info far-right. */
+  .tn-logo{position:absolute;left:50%;transform:translateX(-50%);}
   .app.proto .sec-switch{display:block;}
   #tn-acct #topbar-group-dashboard{display:none !important;}
   /* The shared nav replaces the old header on mobile and the burger opens the
