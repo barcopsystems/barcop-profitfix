@@ -1601,17 +1601,8 @@ const App = {
   // and scannable. Each section's pages are parsed live from its own sidebar
   // source, so the page list and routing are never duplicated here.
   openMobileNav() {
-    // The hamburger is a standard open/close toggle: if the drawer is already
-    // open, tapping it (or anywhere outside) closes it.
-    const _exPanel = document.getElementById('tn-mnav');
-    if (_exPanel) {
-      const _exOv = document.getElementById('tn-mnav-ov');
-      _exPanel.style.transform = 'translateX(-100%)';
-      if (_exOv) _exOv.style.opacity = '0';
-      setTimeout(() => { if (_exOv) _exOv.remove(); _exPanel.remove(); }, 230);
-      return;
-    }
     document.getElementById('tn-mnav-ov')?.remove();
+    document.getElementById('tn-mnav')?.remove();
     const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
@@ -1805,8 +1796,10 @@ const App = {
     const render = () => {
       const node = stack[stack.length - 1];
       const canBack = stack.length > 1;
-      headEl.innerHTML = '<span class="mnav-title">' + esc(node.title) + '</span>'
-        + (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '');
+      headEl.innerHTML = '<button class="mnav-x" type="button" aria-label="Close">×</button>'
+        + (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '')
+        + '<span class="mnav-title">' + esc(node.title) + '</span>';
+      headEl.querySelector('.mnav-x').addEventListener('click', close);
       const backBtn = headEl.querySelector('.mnav-back');
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
 
