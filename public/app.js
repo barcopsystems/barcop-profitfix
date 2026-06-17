@@ -1669,7 +1669,7 @@ const App = {
       const sgs = groupsOf(() => navHtml(key));
       const gr = GROUP_REMAP[key] || {};
       const pr = PAGE_REMAP[key] || {};
-      const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; return it; };
+      const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
       const items = [];
       const homeId = App._SECTION_DASH[key] || ({ books: 'books-home', settings: 'settings-home' })[key] || '';
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
@@ -1706,7 +1706,7 @@ const App = {
         drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', IC.traffic)
       ]},
       { label: 'Support', items: [
-        { label: 'Help and FAQ', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() },
+        { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() },
         { label: 'Report a Bug', icon: IC.bug, go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
       ]}
     ]};
@@ -1761,6 +1761,7 @@ const App = {
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
 
       bodyEl.innerHTML = '';
+      bodyEl.classList.remove('mnav-grp-open');
       if (node.groups) {
         // Root: sections drill in (with icons); Hub/Blueprint/Support navigate.
         node.groups.forEach(grp => {
@@ -1800,6 +1801,7 @@ const App = {
               const isOpen = sub.style.display !== 'none';
               accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
               if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
+              bodyEl.classList.toggle('mnav-grp-open', !isOpen);
             });
             accs.push({ head: head, sub: sub });
             bodyEl.appendChild(head);
@@ -1810,6 +1812,7 @@ const App = {
             bodyEl.appendChild(row);
           }
         });
+        bodyEl.classList.toggle('mnav-grp-open', accs.some(a => a.head.classList.contains('open')));
       }
     };
 
