@@ -367,7 +367,7 @@ S.InventoryProducts = {
       const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
         + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
       const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
-        const hdr = (g.key ? esc(g.key) + ' Products' : 'Uncategorized') + ' (' + g.items.length + ')';
+        const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
         return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
           + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -551,10 +551,20 @@ S.InventoryProducts = {
         + '<select id="ip-misctype"><option value="">Select type...</option>'
         + App.MISC_TYPES.map(t => '<option' + (p?.misc_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
         + '</select></div>'
-      : '<div class="f"><label>Sub-Category</label>'
-        + '<input type="text" id="ip-subcat" list="ip-subcat-list" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/>'
-        + '<datalist id="ip-subcat-list">' + App.subcatSuggestions(cat).map(s => '<option value="' + esc(s) + '"></option>').join('') + '</datalist>'
-        + '</div>';
+      : (() => {
+          const cur = (p?.sub_category || '');
+          const opts = App.subcatSuggestions(cat);
+          const known = opts.some(o => o.toLowerCase() === cur.toLowerCase());
+          const isCustom = !!cur && !known;
+          return '<div class="f"><label>Sub-Category</label>'
+            + '<select id="ip-subcat-sel">'
+              + '<option value="">Select...</option>'
+              + opts.map(o => '<option' + (o.toLowerCase() === cur.toLowerCase() ? ' selected' : '') + '>' + esc(o) + '</option>').join('')
+              + '<option value="__custom__"' + (isCustom ? ' selected' : '') + '>Other (type your own)</option>'
+            + '</select></div>'
+            + '<div class="f" id="ip-subcat-cw" style="' + (isCustom ? '' : 'display:none;') + '"><label>Custom Sub-Category</label>'
+            + '<input type="text" id="ip-subcat-custom" value="' + (isCustom ? esc(cur) : '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>';
+        })();
 
     const row1 = '<div class="form-grid" style="align-items:start;">'
       + '<div class="f"><label>Product Name</label>'
@@ -765,6 +775,12 @@ S.InventoryProducts = {
       const uw = document.getElementById('ip-uw');
       if (uw) uw.style.display = document.getElementById('ip-unit').value === 'custom' ? '' : 'none';
     });
+    document.getElementById('ip-subcat-sel')?.addEventListener('change', () => {
+      const cw = document.getElementById('ip-subcat-cw');
+      if (cw) cw.style.display = document.getElementById('ip-subcat-sel').value === '__custom__' ? '' : 'none';
+      const ci = document.getElementById('ip-subcat-custom');
+      if (ci && document.getElementById('ip-subcat-sel').value === '__custom__') ci.focus();
+    });
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
@@ -836,6 +852,14 @@ S.InventoryProducts = {
     if (!u) return null;
     if (u === 'custom') return (document.getElementById('ip-unit-custom')?.value.trim() || null);
     return u;
+  },
+
+  // Sub-Category value: the picked option, or the custom text when "Other".
+  getSubcat() {
+    const sel = document.getElementById('ip-subcat-sel');
+    if (!sel) return document.getElementById('ip-subcat')?.value.trim() || '';
+    if (sel.value === '__custom__') return (document.getElementById('ip-subcat-custom')?.value.trim() || '');
+    return sel.value;
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -1015,7 +1039,7 @@ S.InventoryProducts = {
       name,
       brand:               document.getElementById('ip-brand')?.value.trim() || '',
       category:            cat,
-      sub_category:        document.getElementById('ip-subcat')?.value.trim() || '',
+      sub_category:        this.getSubcat(),
       misc_type:           cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '',
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
       container_size_oz:   oz,
