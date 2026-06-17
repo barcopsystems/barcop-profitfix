@@ -236,9 +236,66 @@ S.RevenueForecast = {
       + (this.savedId ? '<button class="btn btn-ghost" id="rf-delete">Delete</button>' : '')
       + '<span id="rf-status" style="font-size:11px;color:var(--gold);margin-left:8px;display:none;">Saved.</span>'
       + '<span id="rf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div></div>'
+
+      + this.accuracyBlock()
+      + '</div>';
 
     this.wire();
+  },
+
+  // ── Forecast accuracy (folded in from the retired Reports and History) ──────
+  // Forecasted vs actual per week: pair each saved forecast (keyed by Monday
+  // week_start) to the revenue_weeks actual (Sunday period_end). Last 12 matched
+  // weeks. On-page data-card + in-app PDF export.
+  accuracyPairs() {
+    const forecasts = (App.data.revenue_forecasts || []).slice();
+    const weeks = (App.data.revenue_weeks || []).slice();
+    const pairs = [];
+    forecasts.forEach(f => {
+      if (!f.week_start || !f.total) return;
+      const d = new Date(f.week_start + 'T00:00:00');
+      d.setDate(d.getDate() + 6);
+      const periodEnd = App.ymdLocal(d);
+      const actual = weeks.find(w => w.period_end && w.period_end.slice(0, 10) === periodEnd);
+      if (!actual) return;
+      const actualTotal = (parseFloat(actual.bar_revenue) || 0) + (parseFloat(actual.floor_revenue) || 0);
+      const gap = actualTotal - f.total;
+      const gapPct = f.total > 0 ? (gap / f.total) * 100 : null;
+      pairs.push({ week_start: f.week_start, period_end: periodEnd, forecast: f.total, actual: actualTotal, gap, gapPct });
+    });
+    pairs.sort((a, b) => b.period_end.localeCompare(a.period_end));
+    return pairs.slice(0, 12);
+  },
+
+  accuracyBlock() {
+    const recent = this.accuracyPairs();
+    if (!recent.length) return '';
+    const sumAbs = recent.reduce((s, p) => s + (p.gapPct != null ? Math.abs(p.gapPct) : 0), 0);
+    const avgErr = sumAbs / recent.length;
+    const rows = recent.map(p => {
+      const cls = p.gap >= 0 ? 'pos' : 'neg';
+      return '<tr>'
+        + '<td>' + p.period_end + '</td>'
+        + '<td>' + this.fmt(p.forecast) + '</td>'
+        + '<td class="val">' + this.fmt(p.actual) + '</td>'
+        + '<td class="' + cls + '">' + (p.gap >= 0 ? '+' : '') + this.fmt(p.gap) + '</td>'
+        + '<td class="' + cls + '">' + (p.gapPct != null ? (p.gapPct >= 0 ? '+' : '') + p.gapPct.toFixed(1) + '%' : '-') + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<div class="sh" style="margin:0;">Forecast Accuracy</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rf-export-acc">Export PDF</button>'
+      + '</div>'
+      + '<div id="rf-acc-export">'
+      + '<div class="card" style="margin-top:8px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Average Error</div><div class="calc-val lg">' + avgErr.toFixed(1) + '%</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Matched Weeks</div><div class="calc-val lg">' + recent.length + '</div></div>'
+      + '</div></div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Week Ending</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</div>';
   },
 
   wire() {
@@ -277,6 +334,7 @@ S.RevenueForecast = {
     document.getElementById('rf-next')?.addEventListener('click', () => this.shiftWeek(7));
     document.getElementById('rf-save')?.addEventListener('click', () => this.save());
     document.getElementById('rf-delete')?.addEventListener('click', () => this.confirmDelete());
+    document.getElementById('rf-export-acc')?.addEventListener('click', () => App.exportPDF({ title: 'Forecast Accuracy', root: document.getElementById('rf-acc-export') || this.container }));
   },
 
   shiftWeek(days) {
