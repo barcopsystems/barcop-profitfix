@@ -1106,6 +1106,8 @@ S.InventoryProducts = {
     if (spec.showCaseSize)  defs.push({ key: 'case', label: 'Case Size', type: 'int', suffix: 'btl' });
     if (spec.showUnitType)  defs.push({ key: 'unit', label: 'Unit Type', type: 'unit' });
     if (spec.showMenuPrice) defs.push({ key: 'price', label: 'Menu Price', type: 'money' });
+    if (cat === 'Misc') defs.push({ key: 'misctype', label: 'Misc Type', type: 'misctype' });
+    else                defs.push({ key: 'subcat',   label: 'Sub-Category', type: 'subcat' });
     defs.push({ key: 'vendor',  label: 'Primary Vendor',   type: 'vendor' });
     defs.push({ key: 'loc',     label: 'Primary Location', type: 'location' });
     defs.push({ key: 'par',     label: 'Par' + (spec.parUnit ? ' (' + spec.parUnit + ')' : ''),     type: 'int' });
@@ -1113,8 +1115,19 @@ S.InventoryProducts = {
     return defs;
   },
 
-  bulkInputHTML(def, spec) {
+  bulkInputHTML(def, spec, cat) {
     const k = def.key;
+    if (def.type === 'subcat') {
+      const opts = (App.subcatSuggestions(cat) || []).filter(o => o.toLowerCase() !== 'other');
+      return '<select id="be-subcat" class="be-input" data-key="subcat"><option value="">Select...</option>'
+        + opts.map(o => '<option>' + esc(o) + '</option>').join('')
+        + '<option>Other</option></select>';
+    }
+    if (def.type === 'misctype') {
+      return '<select id="be-misctype" class="be-input" data-key="misctype"><option value="">Select...</option>'
+        + (App.MISC_TYPES || []).map(t => '<option>' + esc(t) + '</option>').join('')
+        + '</select>';
+    }
     if (def.type === 'size') {
       return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup) + '</select>'
         + '<div id="be-cw" style="display:none;margin-top:6px;"><div class="fw"><input class="suf be-input" type="number" id="be-coz" step="0.1" data-key="size"/><span class="suf">oz</span></div></div>';
@@ -1150,7 +1163,7 @@ S.InventoryProducts = {
         + '<input type="checkbox" class="be-apply" data-key="' + def.key + '" style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/>'
         + '<span>' + esc(def.label) + '</span>'
       + '</label>'
-      + this.bulkInputHTML(def, spec)
+      + this.bulkInputHTML(def, spec, cat)
       + '</div>').join('');
     const body = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Bulk Edit ' + n + ' ' + esc(cat) + ' Product' + (n === 1 ? '' : 's') + '</div>'
@@ -1211,6 +1224,8 @@ S.InventoryProducts = {
       if (applied.case)    p.case_size = intVal('be-case');
       if (applied.unit)    p.unit_type = getUnit();
       if (applied.price)   p.menu_price = num('be-price');
+      if (applied.subcat)   p.sub_category = (document.getElementById('be-subcat')?.value || '');
+      if (applied.misctype) p.misc_type = (document.getElementById('be-misctype')?.value || '');
       if (applied.vendor)  p.vendor = (document.getElementById('be-vendor')?.value || '').trim();
       if (applied.loc) {
         const locVal = (document.getElementById('be-loc')?.value || '').trim();
