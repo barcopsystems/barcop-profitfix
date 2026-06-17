@@ -8,6 +8,7 @@
 
 S.RevenueThisWeek = {
   draft: null,
+  _msg: '',
   DRAFT_KEY: 'rf_draft',
 
   // ── Shift Control revenue/covers feed ─────────────────────────────────────
@@ -79,7 +80,8 @@ S.RevenueThisWeek = {
         covers: saved.covers || '',
         labor_hours: saved.labor_hours || '',
         labor_cost: saved.labor_cost || '',
-        notes: saved.notes || ''
+        notes: saved.notes || '',
+        _edit_id: saved._edit_id || null
       };
     }
     const sf = this.shiftFeed(periodEnd);
@@ -92,7 +94,8 @@ S.RevenueThisWeek = {
       covers: sf && sf.covers ? String(sf.covers) : '',
       labor_hours: lf && lf.hours ? lf.hours.toFixed(2) : '',
       labor_cost: lf && lf.cost ? lf.cost.toFixed(2) : '',
-      notes: ''
+      notes: '',
+      _edit_id: null
     };
   },
   saveDraft() { try { localStorage.setItem(this.DRAFT_KEY, JSON.stringify(this.draft)); } catch (e) {} },
@@ -167,12 +170,98 @@ S.RevenueThisWeek = {
       + '<div class="f" style="margin-bottom:14px;"><label>Notes (optional)</label>'
       + '<textarea id="rw-notes" rows="2" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary btn-lg" id="rw-save">Save Week</button>'
+      + '<button class="btn btn-primary btn-lg" id="rw-save">' + (d._edit_id ? 'Update Week' : 'Save Week') + '</button>'
+      + (d._edit_id ? '<button class="btn btn-ghost" id="rw-cancel">Cancel</button>' : '')
+      + '<span id="rw-msg" style="color:var(--gold);font-size:12px;font-weight:700;margin-left:8px;display:' + (this._msg ? 'inline' : 'none') + ';">' + esc(this._msg || '') + '</span>'
       + '<span id="rw-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div></div>';
+      + '</div></div>'
+      + this.renderHistory()
+      + '</div>';
+    this._msg = '';
 
     document.getElementById('rw-save')?.addEventListener('click', () => this.saveWeek());
+    document.getElementById('rw-cancel')?.addEventListener('click', () => this.cancelEdit());
+    document.getElementById('rw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
+    this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
+    this.container.querySelectorAll('.rw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
     this.calc();
+  },
+
+  // ── Weekly history (data-card table + in-app PDF export) ────────────────────
+  // Folded in from the retired Reports and History screen. The old screen also
+  // carried an "Annual Revenue Projection" card; that was an invented annual
+  // run-rate and was dropped — the real forward number lives in Revenue Forecast.
+  renderHistory() {
+    const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end);
+    if (!weeks.length) return '';
+    const targetCA = this.targets().check_avg || 35;
+    const tgtLP = this.laborTarget();
+    const sorted = weeks.slice().sort((a, b) => (b.period_end || '').localeCompare(a.period_end || ''));
+    const rows = sorted.map(w => {
+      const total = (w.bar_revenue || 0) + (w.floor_revenue || 0);
+      const caCls = w.check_avg ? (w.check_avg >= targetCA ? 'pos' : 'neg') : '';
+      const lpCls = w.labor_pct_blended ? (w.labor_pct_blended <= tgtLP ? 'pos' : 'neg') : '';
+      return '<tr>'
+        + '<td>' + (w.period_end || '').slice(0, 10) + '</td>'
+        + '<td>Wk ' + (w.week_num != null ? w.week_num : '-') + '</td>'
+        + '<td>' + App.fmtCurrency(w.bar_revenue || 0) + '</td>'
+        + '<td>' + App.fmtCurrency(w.floor_revenue || 0) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(total) + '</td>'
+        + '<td>' + (w.covers || '-') + '</td>'
+        + '<td class="' + caCls + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
+        + '<td class="' + lpCls + '">' + (w.labor_pct_blended ? App.fmtPct(w.labor_pct_blended) : '-') + '</td>'
+        + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '-') + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm rw-edit" data-id="' + esc(w.id) + '">Edit</button>'
+        + '<button class="btn btn-danger btn-sm rw-del" data-id="' + esc(w.id) + '">Delete</button>'
+        + '</div></td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<div class="sh" style="margin:0;">Weekly History</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rw-export">Export PDF</button>'
+      + '</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Period End</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  },
+
+  editWeek(id) {
+    const w = (App.data.revenue_weeks || []).find(x => x.id === id);
+    if (!w) return;
+    this.draft = {
+      week_num: w.week_num != null ? String(w.week_num) : '',
+      period_end: (w.period_end || '').slice(0, 10),
+      bar_revenue: w.bar_revenue ? String(w.bar_revenue) : '',
+      floor_revenue: w.floor_revenue ? String(w.floor_revenue) : '',
+      covers: w.covers ? String(w.covers) : '',
+      labor_hours: w.total_hours ? String(w.total_hours) : '',
+      labor_cost: w.total_labor_cost ? String(w.total_labor_cost) : '',
+      notes: w.notes || '',
+      _edit_id: id
+    };
+    this.saveDraft();
+    this.draw();
+    const el = App._activeContentEl ? App._activeContentEl() : null;
+    if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
+    else if (el) el.scrollTop = 0;
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+
+  cancelEdit() {
+    this.clearDraft();
+    this.draft = this.loadDraft();
+    this.draw();
+  },
+
+  deleteWeek(id) {
+    App.confirmDelete().then(ok => {
+      if (!ok) return;
+      App.removeRecord('core', 'revenue_week', id).then(() => {
+        if (this.draft && this.draft._edit_id === id) { this.clearDraft(); this.draft = this.loadDraft(); }
+        this.draw();
+      });
+    });
   },
 
   onInput() { this.collect(); this.saveDraft(); this.calc(); },
@@ -281,7 +370,7 @@ S.RevenueThisWeek = {
     const rplh = laborHrs > 0 ? totalRev / laborHrs : 0;
 
     const week = {
-      id:                App.uid(),
+      id:                d._edit_id || App.uid(),
       week_num:          parseInt(d.week_num) || 1,
       period_end:        d.period_end,
       bar_revenue:       barRev,
@@ -302,9 +391,11 @@ S.RevenueThisWeek = {
     if (ok) {
       this.clearDraft();
       App.markSetupDone('gs_r_week');
-      App.navigate('r-dashboard');
+      this._msg = 'Saved.';
+      this.draft = this.loadDraft();
+      this.draw();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Week'; }
+      if (btn) { btn.disabled = false; btn.textContent = d._edit_id ? 'Update Week' : 'Save Week'; }
       fail('Save failed. Try again.');
     }
   }
