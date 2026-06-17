@@ -344,7 +344,7 @@ S.InventoryLocations = {
       + '<td>' + esc(p.vendor || '-') + '</td>'
       + '</tr>';
     return App.subcatGroups(prods, cat).map((g, gi) => {
-      const hdr = (g.key ? esc(g.key) + ' Products' : 'Uncategorized') + ' (' + g.items.length + ')';
+      const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
       return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
         + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th style="width:40px;"></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
