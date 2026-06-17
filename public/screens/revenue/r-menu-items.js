@@ -1,21 +1,16 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Items (THE single edit surface) ──────────────────
-   Landing screen mirrors IC Add Products: three cards on top (one per menu
-   item type) + three tabs to filter the unified list below.
-
-     Card 1 / Tab 1 — Plate Items     (food: Appetizers/Entrees/Desserts/Specials)
-     Card 2 / Tab 2 — Cocktail Items  (Cocktails — single drink recipes)
-     Card 3 / Tab 3 — Inventory Items (direct-pour: Beer/Wine/NA — picks from
-                                       ic_products, cost auto-fills)
-
-   Each card opens a form tailored to that type. No cross-type confusion —
-   the Plate form never offers a single drink recipe, the Cocktail form's
-   category is fixed, the Inventory form has no recipe builder. */
+/* ── Revenue Recovery — Menu Items (THE single menu edit surface) ─────────────
+   An always-on inline Add form (Enter Manually / Import File) sits on top; the
+   menu below is grouped into category data-cards. The category you pick drives
+   the form: Cocktails and food (Appetizers/Entrees/Desserts/Specials) get the
+   recipe builder (cost auto-computes from ingredients, or type a flat cost);
+   Beer/Wine/NA link an inventory product and the cost auto-fills. Editing opens
+   one modal with the same shared form body, so add and edit never drift. This is
+   the single edit door — also opened in place from Recipe Cost Analysis. */
 
 S.RevenueMenuItems = {
   // ── State ─────────────────────────────────────────────────────────────
-  activeTab:        'plate',     // 'plate' | 'cocktail' | 'inventory'
   editIdx:          null,
   formType:         null,        // 'plate' | 'cocktail' | 'inventory'
   rows:             [],          // recipe ingredient rows
@@ -26,8 +21,8 @@ S.RevenueMenuItems = {
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
-  // the screens that consume them (r-menu-items, r-menu-engineering, r-pricing,
-  // r-dog-test, recipe-cost-analysis). Read App.MENU_* directly.
+  // the screens that consume them (r-menu-items, r-menu-engineering, r-dog-test,
+  // recipe-cost-analysis). Read App.MENU_* directly.
   get PLATE_CATEGORIES()   { return App.MENU_PLATE_CATEGORIES; },
   get COCKTAIL_ING_CATS()  { return App.MENU_COCKTAIL_ING_CATS; },
   get PLATE_ING_CATS()     { return App.MENU_PLATE_ING_CATS; },
@@ -178,6 +173,15 @@ S.RevenueMenuItems = {
     });
   },
 
+  showHowTo() {
+    App.showHelpModal('How Menu Items Works', [
+      { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly covers, lives here, and Menu Engineering, Dog Test, and Recipe Cost all read from it.'] },
+      { h: 'Adding an Item', p: ['Pick a category and the form fills in. Cocktails and food (Appetizers, Entrees, Desserts, Specials) get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. Beer, Wine and NA link straight to an Inventory Control product and the cost auto-fills. Enter covers so Menu Engineering can weight the item by how often it sells.'] },
+      { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
+      { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review and the Recovery Scoreboard pick it up.'] }
+    ]);
+  },
+
   // ── Entry point ───────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
@@ -248,7 +252,7 @@ S.RevenueMenuItems = {
 
     let body;
     if (!all.length) {
-      body = '<div style="color:var(--t3);font-size:13px;margin-top:4px;">No menu items yet. Use the form above to add your first one.</div>';
+      body = '<div style="color:var(--t3);font-size:13px;margin-top:8px;">No menu items yet. Add your first one with the form above, or switch to Import File to bring your whole menu in at once.</div>';
     } else {
       const cats = [...new Set(all.map(i => i.category || 'Uncategorized'))]
         .sort((a, b) => {
