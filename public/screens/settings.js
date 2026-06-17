@@ -878,7 +878,7 @@ S.HubSettings = {
       });
       // Current week feeds Active Shift's Cover Goal; the coming week feeds the
       // schedule builder.
-      App.data.revenue_forecasts.push(mk(monAt(0), 'Current week.'));
+      App.data.revenue_forecasts.push(mk(monAt(0), ''));
       App.data.revenue_forecasts.push(mk(monAt(1), 'Coming week. Adjust per event or weather.'));
     })();
 
