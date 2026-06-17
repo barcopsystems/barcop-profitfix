@@ -1772,10 +1772,10 @@ const App = {
     // stay visible and the burger toggles it open/closed.
     const ov = document.createElement('div');
     ov.id = 'tn-mnav-ov';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);width:100%;background:var(--surface);border-top:1px solid var(--b1);border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,0.45);z-index:9001;transform:translateY(100%);transition:transform .24s ease;display:flex;flex-direction:column;overflow:hidden;';
+    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);width:100%;background:var(--surface);border-top:1px solid var(--b1);box-shadow:0 -8px 30px rgba(0,0,0,0.45);z-index:9001;transform:translateY(100%);transition:transform .24s ease;display:flex;flex-direction:column;overflow:hidden;';
     const close = () => { panel.style.transform = 'translateY(100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 240); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
