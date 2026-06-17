@@ -469,7 +469,7 @@ S.InventoryProducts = {
       } else {
         const zone = this.container.querySelector('.ip-drop');
         const input = document.getElementById('ip-imp-input');
-        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'transparent'; };
+        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'var(--input)'; };
         zone?.addEventListener('click', () => input && input.click());
         ['dragenter', 'dragover'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
         ['dragleave', 'dragend'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
@@ -553,17 +553,13 @@ S.InventoryProducts = {
         + '</select></div>'
       : (() => {
           const cur = (p?.sub_category || '');
-          const opts = App.subcatSuggestions(cat);
-          const known = opts.some(o => o.toLowerCase() === cur.toLowerCase());
-          const isCustom = !!cur && !known;
+          const opts = App.subcatSuggestions(cat).filter(o => o.toLowerCase() !== 'other');
           return '<div class="f"><label>Sub-Category</label>'
             + '<select id="ip-subcat-sel">'
               + '<option value="">Select...</option>'
               + opts.map(o => '<option' + (o.toLowerCase() === cur.toLowerCase() ? ' selected' : '') + '>' + esc(o) + '</option>').join('')
-              + '<option value="__custom__"' + (isCustom ? ' selected' : '') + '>Other (type your own)</option>'
-            + '</select></div>'
-            + '<div class="f" id="ip-subcat-cw" style="' + (isCustom ? '' : 'display:none;') + '"><label>Custom Sub-Category</label>'
-            + '<input type="text" id="ip-subcat-custom" value="' + (isCustom ? esc(cur) : '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>';
+              + '<option' + (cur.toLowerCase() === 'other' ? ' selected' : '') + '>Other</option>'
+            + '</select></div>';
         })();
 
     const row1 = '<div class="form-grid" style="align-items:start;">'
@@ -775,12 +771,6 @@ S.InventoryProducts = {
       const uw = document.getElementById('ip-uw');
       if (uw) uw.style.display = document.getElementById('ip-unit').value === 'custom' ? '' : 'none';
     });
-    document.getElementById('ip-subcat-sel')?.addEventListener('change', () => {
-      const cw = document.getElementById('ip-subcat-cw');
-      if (cw) cw.style.display = document.getElementById('ip-subcat-sel').value === '__custom__' ? '' : 'none';
-      const ci = document.getElementById('ip-subcat-custom');
-      if (ci && document.getElementById('ip-subcat-sel').value === '__custom__') ci.focus();
-    });
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
@@ -854,12 +844,10 @@ S.InventoryProducts = {
     return u;
   },
 
-  // Sub-Category value: the picked option, or the custom text when "Other".
+  // Sub-Category value: the picked option (including the "Other" catch-all).
   getSubcat() {
     const sel = document.getElementById('ip-subcat-sel');
-    if (!sel) return document.getElementById('ip-subcat')?.value.trim() || '';
-    if (sel.value === '__custom__') return (document.getElementById('ip-subcat-custom')?.value.trim() || '');
-    return sel.value;
+    return sel ? sel.value : (document.getElementById('ip-subcat')?.value.trim() || '');
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -1415,7 +1403,7 @@ S.InventoryProducts = {
         + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
     }
     return '<div class="card">' + header
-      + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;">'
+      + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;background:var(--input);">'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your ' + esc(cat) + ' product file here</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;">Needs a product name column; cost, size, price and par are optional.</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
