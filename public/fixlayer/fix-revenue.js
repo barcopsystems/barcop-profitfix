@@ -198,48 +198,6 @@ FIX.revenue = [
   },
 
   {
-    id: 'events-catering',
-    name: 'Events and Catering',
-    module: 'revenue',
-    summary: 'Private dining and catering is revenue most independents leave on the table.',
-
-    process: {
-      steps: [
-        { kind: 'action', target: 'ev-pricing', targetLabel: 'Pricing',
-          title: 'Build the rate card before any inquiry',
-          detail: 'On the Events Pricing screen, set up your rate cards: published packages, per-head pricing, and F&B minimums by room. Pricing decided once, in advance, is faster, produces better margins, and looks more professional than bespoke pricing worked out per inquiry.' },
-        { kind: 'reference', target: 'Private_Dining_Events_Package.docx', targetLabel: 'Private Dining and Events Package',
-          title: 'Respond to every inquiry within two hours',
-          detail: 'Download the Private Dining and Events Package, fill in your venue details, and send it as the complete answer to every inquiry. Send the package first and ask clarifying questions after. Booking probability drops sharply after two hours and below 20% after 24.' },
-        { kind: 'action', target: 'ev-bookings', targetLabel: 'Bookings',
-          title: 'Track every inquiry in the pipeline',
-          detail: 'Log every inquiry in Bookings and move it through Lead, Quote Sent, and Booked. Any lead without a next action in 7 days gets one. Anything stuck 14 days in one stage gets a close-or-reactivate decision. A 15-minute Monday pipeline review keeps every open lead moving.' },
-        { kind: 'result', target: 'ev-bookings', targetLabel: 'Bookings',
-          title: 'Run the Event P&L before you confirm',
-          detail: 'Bookings works out the P&L for each event from its revenue, COGS, labor, and ancillary costs. Event margin varies widely, so read the P&L before you confirm, not after. And take a deposit to hold the date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.' },
-        { kind: 'reference', target: 'Private_Dining_Site_Inspection.pdf', targetLabel: 'Private Dining Site Inspection',
-          title: 'Walk the space before you confirm',
-          detail: 'For any private dining booking, run the Private Dining Site Inspection checklist with the client. Walking the room together sets expectations on capacity, layout, and service before anything is signed.' },
-        { kind: 'reference', target: 'Event_Day_Operations.pdf', targetLabel: 'Event Day Operations',
-          title: 'Execute the event off the checklist',
-          detail: 'Run the event off the Event Day Operations checklist with manager sign-off. A checklist is what makes a good event repeatable instead of dependent on whoever happens to be working.' },
-        { kind: 'reference', target: 'Catering_Delivery_Setup.pdf', targetLabel: 'Catering Delivery Setup',
-          title: 'Run catering deliveries off the setup checklist',
-          detail: 'For off-site catering, run the Catering Delivery Setup checklist. Transport, timing, equipment, and on-site setup all have to be confirmed before the truck leaves, because there is no kitchen to fall back on once it arrives.' }
-      ]
-    },
-
-    commonMistakes: [
-      'Having no named owner for events. Everyone responsible means nobody responsible.',
-      'Pricing events per inquiry rather than from a rate card. Bespoke pricing is slower, produces worse margins, and signals to the client you do not have your operation buttoned up.',
-      'Waiting more than two hours to respond. Booking probability drops sharply after two hours and below 20% after 24.',
-      'Sending a website link instead of a complete package. A client who has to hunt for pricing calls the next venue.',
-      'Not requiring a deposit to hold a date. A hold without a deposit cancels, and a canceled hold that was not replaced costs the whole date.',
-      'Not running an Event P&L on every booking. Event margin varies widely, so calculate it before the event, not after.'
-    ]
-  },
-
-  {
     id: 'server-performance',
     name: 'Server Performance',
     module: 'revenue',
