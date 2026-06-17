@@ -231,10 +231,10 @@ input,select,textarea{color-scheme:dark;}
    uniform list per screen; a parent row (›) pushes its child list, the back
    arrow pops, the current location is highlighted. Strict palette: darkest
    panel, card-surface rows, the sidebar's navy for hover + selected. */
-.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
-.mnav-title{flex:1;text-align:center;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--t2);font-size:22px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
-.mnav-back:hover,.mnav-x:hover{background:var(--c3);color:var(--w);}
+.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px 11px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
+.mnav-title{flex:1;text-align:left;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;color:var(--t2);font-size:20px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
+.mnav-back:hover,.mnav-x:hover{background:var(--c4);color:var(--w);}
 .mnav-back-sp{width:34px;flex-shrink:0;}
 .mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:28px;background:var(--surface);}
 /* Flat mobile drawer (matches the desktop flat sidebar): a flat icon list with a
@@ -242,8 +242,8 @@ input,select,textarea{color-scheme:dark;}
    = white text + gold icon, no row background. Two-level drill stays (root rows
    with a ‹drill› chevron push a section panel). */
 .mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}   /* unused in the flat menu; kept for revert */
-.mnav-divider{height:0;border-top:1px solid var(--b2);margin:9px 18px;}
-.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;font-size:14px;color:var(--t3);cursor:pointer;background:transparent;transition:color .12s;}
+.mnav-divider{height:0;border-top:1px solid var(--b2);margin:11px 18px;}
+.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;font-size:14px;color:var(--t3);cursor:pointer;background:transparent;transition:color .12s;}
 .mnav-row:hover,.mnav-row:active{background:transparent;color:var(--w);}
 .mnav-row.on{background:transparent;color:var(--w);}
 .mnav-l{display:flex;align-items:center;gap:13px;min-width:0;overflow:hidden;}
