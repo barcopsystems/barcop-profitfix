@@ -633,11 +633,35 @@ S.InventoryProducts = {
 
     const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
 
+    // ── Resale block (Food + Misc) ────────────────────────────────────────
+    // For packaged items the bar buys and sells whole (bagged chips, bottled
+    // NA), an optional "Sold on the menu" reveal carries a menu price + how many
+    // servings one purchased unit yields, so cost flows to the menu per serving.
+    let resaleBlock = '';
+    if (spec.showUnitType) {
+      const sold = !!p?.sold_on_menu;
+      const initCps = sold ? this._resaleCps(p?.unit_cost, p?.servings_per_unit) : 0;
+      resaleBlock = '<div class="form-row" style="margin-top:16px;">'
+        + '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t1);cursor:pointer;">'
+          + '<input type="checkbox" id="ip-sold"' + (sold ? ' checked' : '') + ' style="width:auto;margin:0;"/> Sold on the menu as-is (resale item)</label>'
+      + '</div>'
+      + '<div id="ip-resale" style="' + (sold ? '' : 'display:none;') + 'margin-top:10px;">'
+        + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+          + '<div class="f" style="width:130px;flex-shrink:0;"><label>Menu Price</label>'
+            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
+          + '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings per Unit</label>'
+            + '<input type="number" id="ip-servings" value="' + v(p?.servings_per_unit) + '" step="1" min="1" placeholder="1"/></div>'
+          + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cost / Serving</label>'
+            + '<div class="calc-val" id="ip-cps" style="padding-top:7px;">' + (initCps > 0 ? App.fmtCurrency(initCps) : '-') + '</div></div>'
+        + '</div></div>';
+    }
+
     const formCard = '<div class="card form-card">'
       + header
       + row1
       + row2
       + calcStrip
+      + resaleBlock
       + servingBlock
       + notes
       + '<div class="card-actions">'
@@ -727,6 +751,14 @@ S.InventoryProducts = {
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
+    // Resale block (Food / Misc): toggle the menu-price fields + live cost/serving.
+    document.getElementById('ip-sold')?.addEventListener('change', e => {
+      const box = document.getElementById('ip-resale');
+      if (box) box.style.display = e.target.checked ? '' : 'none';
+      this._calcResale();
+    });
+    ['ip-cost','ip-price','ip-servings'].forEach(fid =>
+      document.getElementById(fid)?.addEventListener('input', () => this._calcResale()));
     // Field-missing refresh on the other required inputs
     ['ip-name', 'ip-vendor', 'ip-loc1'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this._refreshMissing())
@@ -787,6 +819,19 @@ S.InventoryProducts = {
     if (!u) return null;
     if (u === 'custom') return (document.getElementById('ip-unit-custom')?.value.trim() || null);
     return u;
+  },
+
+  // Cost per menu serving for a resale item = purchase cost / servings per unit.
+  _resaleCps(cost, servings) {
+    const c = parseFloat(cost) || 0;
+    const n = parseFloat(servings);
+    return (n && n > 0) ? c / n : c;
+  },
+  _calcResale() {
+    const el = document.getElementById('ip-cps');
+    if (!el) return;
+    const cps = this._resaleCps(document.getElementById('ip-cost')?.value, document.getElementById('ip-servings')?.value);
+    el.textContent = cps > 0 ? App.fmtCurrency(cps) : '-';
   },
 
   // Per-bottle cost from the form. For Bottle Beer with case_size > 0, the
@@ -908,7 +953,12 @@ S.InventoryProducts = {
     const oz    = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
     const pour  = spec.showPour ? num('ip-pour') : null;
     const cost  = num('ip-cost');
-    const price = spec.showMenuPrice ? num('ip-price') : null;
+    // Resale items (Food / Misc) carry a menu price too — read it from the same
+    // ip-price field, gated on the Sold-on-menu checkbox.
+    const soldOnMenu = spec.showUnitType ? !!document.getElementById('ip-sold')?.checked : false;
+    const servingsPerUnit = soldOnMenu ? (parseInt(document.getElementById('ip-servings')?.value) || 1) : null;
+    const price = (spec.showMenuPrice || soldOnMenu) ? num('ip-price') : null;
+    const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
     const pours = oz && pour ? oz / pour : null;
     const effCost = this.effectiveBottleCost();
     const cpp   = pours && effCost != null && effCost > 0 ? effCost / pours : null;
@@ -957,6 +1007,9 @@ S.InventoryProducts = {
       unit_type:           unitType,
       unit_cost:           cost,
       menu_price:          price,
+      sold_on_menu:        soldOnMenu,
+      servings_per_unit:   servingsPerUnit,
+      cost_per_serving:    costPerServing,
       par_level:           num('ip-par'),
       reorder_point:       num('ip-reorder'),
       locations:           locsArr,
@@ -1277,9 +1330,11 @@ S.InventoryProducts = {
       ]);
     }
     const tail = [
-      {key:'unit_type',     label:'Unit Type (lb / case / each / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
-      {key:'par_level',     label:'Par Level',     required:false, aliases:['par','par level','target stock']},
-      {key:'reorder_point', label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum']},
+      {key:'unit_type',         label:'Unit Type (lb / case / each / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
+      {key:'menu_price',        label:'Menu Price ($, if sold as-is)', required:false, aliases:['price','menu price','sell price','retail','selling price']},
+      {key:'servings_per_unit', label:'Servings per Unit (if sold as-is)', required:false, aliases:['servings','servings per unit','units per','per unit','yield','pack','pack size']},
+      {key:'par_level',         label:'Par Level',     required:false, aliases:['par','par level','target stock']},
+      {key:'reorder_point',     label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum']},
     ];
     if (cat === 'Misc') {
       // Misc swaps free-text Sub-Category for the structured Misc Type tag.
@@ -1385,7 +1440,11 @@ S.InventoryProducts = {
       const oz   = numOf(cell(row, getCol('container_size_oz')));
       const pour = spec.showPour ? numOf(cell(row, getCol('pour_size_oz'))) : null;
       const cost = numOf(cell(row, getCol('unit_cost')));
-      const price = spec.showMenuPrice ? numOf(cell(row, getCol('menu_price'))) : null;
+      // Menu price + servings come in for resale Food/Misc as well as pourables.
+      const price = (spec.showMenuPrice || spec.showUnitType) ? numOf(cell(row, getCol('menu_price'))) : null;
+      const soldOnMenu = spec.showUnitType && price != null && price > 0;
+      const servingsPerUnit = soldOnMenu ? (parseInt(cell(row, getCol('servings_per_unit'))) || 1) : null;
+      const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
       const caseSize = spec.showCaseSize ? (parseInt(cell(row, getCol('case_size'))) || null) : null;
       const unitType = spec.showUnitType ? (cell(row, getCol('unit_type')).toLowerCase() || spec.defaultUnitType) : null;
       const pours = oz && pour ? oz / pour : null;
@@ -1409,6 +1468,9 @@ S.InventoryProducts = {
         unit_type:           unitType,
         unit_cost:           cost,
         menu_price:          price,
+        sold_on_menu:        soldOnMenu,
+        servings_per_unit:   servingsPerUnit,
+        cost_per_serving:    costPerServing,
         par_level:           numOf(cell(row, getCol('par_level'))),
         reorder_point:       numOf(cell(row, getCol('reorder_point'))),
         primary_location:    '',
