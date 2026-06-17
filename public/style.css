@@ -247,8 +247,13 @@ input,select,textarea{color-scheme:dark;}
 .mnav-ic{width:17px;height:17px;}
 .mnav-row:hover .mnav-ic-slot{color:var(--w);}
 .mnav-row.open .mnav-ic-slot,.mnav-row.on .mnav-ic-slot{color:var(--gold);}
-/* Nested drop-down links read like the top-nav links: --t3, white on hover/active, no background. */
-.mnav-page{padding-left:34px;color:var(--t3);}
+/* When a drop-down is open, the active main link (e.g. Dashboard) is NOT also lit
+   — the open drop-down is the lone gold/highlighted row (matches the desktop). */
+.mnav-grp-open .mnav-row.on:not(.mnav-page){background:transparent;color:var(--t1);}
+.mnav-grp-open .mnav-row.on:not(.mnav-page) .mnav-ic-slot{color:var(--t3);}
+/* Nested drop-down links read like the top-nav links: --t3, white on hover/active,
+   no background, and left-aligned with the main link labels (no extra indent). */
+.mnav-page{color:var(--t3);}
 .mnav-page:hover,.mnav-page.on{background:transparent;color:var(--w);}
 .mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;transition:transform .15s ease;}
 .mnav-row:hover .mnav-chev,.mnav-row.open .mnav-chev{color:var(--w);}
