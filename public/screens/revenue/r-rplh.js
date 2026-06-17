@@ -1,10 +1,10 @@
 'use strict';
 
 /* ── Revenue Recovery — RPLH Tracker ──────────────────────────────────────────
-   Revenue-per-labor-hour analysis. Restructured per the platform map: labor
-   hours come from Labor Control (lc_actuals, carried on each revenue_weeks
-   record as total_hours). The daypart breakdown is retired with the This Week
-   wizard — RPLH is now tracked blended, week over week. */
+   Revenue-per-labor-hour analysis. Labor hours come from Labor Control
+   (lc_actuals, carried on each revenue_weeks record as total_hours). RPLH is
+   tracked blended, week over week. Brought to the standard: stat strip → trend
+   chart → Optimal Staffing Calculator (form-card) → RPLH History (data-card). */
 
 S.RevenueRPLH = {
   rplhTarget() {
@@ -18,7 +18,16 @@ S.RevenueRPLH = {
     return w.total_hours > 0 ? rev / w.total_hours : null;
   },
 
+  showHowTo() {
+    App.showHelpModal('How the RPLH Tracker Works', [
+      { p: ['Revenue per labor hour is the cleanest read on how hard your labor dollars work: weekly revenue divided by labor hours, blended across the week. Revenue and hours both come from your saved weeks in This Week, where the hours flow in from Labor Control.'] },
+      { h: 'The Numbers', p: ['Blended RPLH is the latest saved week against your target. The 4-Week Average smooths out a single big or slow week. The 8-week trend shows the direction, with your target as the dashed line.'] },
+      { h: 'Optimal Staffing Calculator', p: ['Enter a revenue forecast and your RPLH target to see the labor hours that revenue can support, plus your labor budget cap at your cost-percent target. Use it when you build next week\'s schedule.'] }
+    ]);
+  },
+
   render(container, actions) {
+    this.container = container;
     if (actions) actions.innerHTML = '';
     const weeks = (App.data.revenue_weeks || []).filter(w => this.weekRevenue(w) > 0);
     const last = weeks.length ? weeks[weeks.length - 1] : null;
@@ -30,30 +39,21 @@ S.RevenueRPLH = {
     const avg = avg4(w => this.weekRPLH(w));
     const gap = cur != null ? cur - target : null;
 
-    const metricCard = (label, valHtml, sub, impact, impactCls) =>
-      '<div class="metric-card"><div class="metric-label">' + label + '</div>' + valHtml
-      + '<div class="metric-target">' + sub + '</div>'
-      + '<div class="metric-impact ' + (impactCls || '') + '">' + (impact || ' ') + '</div>'
-      + '<div class="metric-trend"> </div></div>';
-    const mv = (txt, cls) => '<div class="metric-val ' + (cls || '') + '">' + txt + '</div>';
+    // ── Stat strip ────────────────────────────────────────────────────────────
+    const item = (label, val, sub, color) =>
+      '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div>'
+      + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
+    const strip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
+      + item('Blended RPLH', cur != null ? App.fmtCurrency(cur) : '-',
+          'target ' + App.fmtCurrency(target) + (gap != null ? ' &middot; ' + (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + ' vs target' : ''),
+          cur == null ? null : (cur >= target ? 'var(--gold)' : 'var(--red)'))
+      + item('4-Week Average', avg != null ? App.fmtCurrency(avg) : '-', 'prior 4 weeks', null)
+      + item('Revenue This Week', last ? App.fmtCurrency(this.weekRevenue(last)) : '-', last ? 'Week ' + last.week_num : 'no weeks saved', null)
+      + item('Labor Hours', last && last.total_hours ? last.total_hours.toFixed(1) : '-', 'from Labor Control', null)
+      + '</div></div>';
 
-    const cards =
-        metricCard('Blended RPLH',
-          mv(cur != null ? App.fmtCurrency(cur) : ' ', cur == null ? '' : cur >= target ? 'on-target' : 'over-target'),
-          'Target: ' + App.fmtCurrency(target),
-          gap != null ? (gap >= 0 ? '+' : '') + App.fmtCurrency(gap) + ' vs target' : '',
-          gap == null ? '' : gap >= 0 ? 'pos' : 'neg')
-      + metricCard('4-Week Average',
-          mv(avg != null ? App.fmtCurrency(avg) : ' '),
-          'Prior 4 weeks', '', '')
-      + metricCard('Revenue This Week',
-          mv(last ? App.fmtCurrency(this.weekRevenue(last)) : ' '),
-          last ? 'Week ' + last.week_num : 'No weeks saved', '', '')
-      + metricCard('Labor Hours',
-          mv(last && last.total_hours ? last.total_hours.toFixed(1) : ' '),
-          'From Labor Control', '', '');
-
-    // 8-week blended RPLH trend
+    // ── 8-week blended RPLH trend ───────────────────────────────────────────────
     const chartWeeks = weeks.slice(-8);
     let chartHtml = '';
     if (chartWeeks.length >= 2) {
@@ -79,46 +79,49 @@ S.RevenueRPLH = {
         }
         const range = maxY - minY, tickStep = range <= 20 ? 4 : range <= 40 ? 8 : 12;
         const ticks = []; for (let v = Math.ceil(minY / tickStep) * tickStep; v <= maxY; v += tickStep) ticks.push(v);
-        const yTicks = ticks.map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.04)"/><text x="' + (PAD.l - 6) + '" y="' + (ys(v) + 4).toFixed(1) + '" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">$' + v + '</text>').join('');
-        const xLabels = chartWeeks.map((w, i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (w.period_end ? w.period_end.slice(5).replace('-', '/') : 'Wk' + w.week_num) + '</text>').join('');
-        const tgtLine = '<line x1="' + PAD.l + '" y1="' + ys(target).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(target).toFixed(1) + '" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
-        const dots = valid.map(p => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="#070E15" stroke="#DBAB46" stroke-width="1.5"/>').join('');
-        chartHtml = '<div class="chart-card" style="padding:20px 24px 16px;margin-top:16px;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;">8-Week Blended RPLH Trend</div>'
+        const yTicks = ticks.map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="var(--b1)"/><text x="' + (PAD.l - 6) + '" y="' + (ys(v) + 4).toFixed(1) + '" text-anchor="end" fill="var(--t4)" font-family="Barlow,sans-serif" font-size="9">$' + v + '</text>').join('');
+        const xLabels = chartWeeks.map((w, i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--t3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (w.period_end ? w.period_end.slice(5).replace('-', '/') : 'Wk' + w.week_num) + '</text>').join('');
+        const tgtLine = '<line x1="' + PAD.l + '" y1="' + ys(target).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(target).toFixed(1) + '" stroke="var(--gold)" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/>';
+        const dots = valid.map(p => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="var(--bg)" stroke="var(--gold)" stroke-width="1.5"/>').join('');
+        chartHtml = '<div class="card" style="margin-bottom:16px;">'
+          + '<div class="card-title">8-Week Blended RPLH Trend</div>'
           + '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;" preserveAspectRatio="none">'
           + yTicks + tgtLine
-          + (line ? '<path d="' + line + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '')
+          + (line ? '<path d="' + line + '" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '')
           + dots + xLabels
           + '</svg></div>';
       }
     }
 
-    // Optimal staffing calculator
-    const t = (App.data.revenue_settings && App.data.revenue_settings.targets) || {};
-    const calcHtml = '<div class="card" style="margin-top:16px;">'
-      + '<div class="sh">Optimal Staffing Calculator</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:16px;">'
-      + '<div class="f w-md"><label>Revenue Forecast</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-rev" placeholder=""/></div></div>'
-      + '<div class="f w-md"><label>RPLH Target</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rplh-tgt" value="' + Math.round(target) + '"/></div></div>'
-      + '<div class="f w-md"><label>Labor Cost Target %</label><div class="fw"><input class="suf" type="number" id="rplh-pct" value="' + App.laborTargetPct() + '" step="0.5"/><span class="suf">%</span></div></div>'
+    // ── Optimal staffing calculator (form-card) ─────────────────────────────────
+    const calcHtml = '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Optimal Staffing Calculator</div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      + '<div class="f w-md"><label>Revenue Forecast</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rplh-rev" placeholder=""/></div></div>'
+      + '<div class="f w-md"><label>RPLH Target</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rplh-tgt" value="' + Math.round(target) + '"/></div></div>'
+      + '<div class="f w-md"><label>Labor Cost Target %</label><div class="fw"><input class="form-input suf" type="number" id="rplh-pct" value="' + App.laborTargetPct() + '" step="0.5"/><span class="suf">%</span></div></div>'
       + '</div><div id="rplh-result"></div></div>';
 
+    // ── RPLH history (data-card + in-app PDF export) ────────────────────────────
     const histRows = weeks.slice().reverse().slice(0, 12).map(w => {
       const rplh = this.weekRPLH(w);
       return '<tr><td>Wk ' + w.week_num + '</td>'
         + '<td>' + App.fmtCurrency(this.weekRevenue(w)) + '</td>'
-        + '<td>' + (w.total_hours ? w.total_hours.toFixed(1) : ' ') + '</td>'
-        + '<td class="val">' + (rplh != null ? App.fmtCurrency(rplh) : ' ') + '</td></tr>';
-    }).join('') || '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No weeks saved yet.</td></tr>';
+        + '<td>' + (w.total_hours ? w.total_hours.toFixed(1) : '-') + '</td>'
+        + '<td class="val">' + (rplh != null ? App.fmtCurrency(rplh) : '-') + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" style="color:var(--t4);text-align:center;padding:22px;">No weeks saved yet. Save a week in This Week to start tracking RPLH.</td></tr>';
 
     container.innerHTML = '<div class="screen">'
-      + '<div class="metric-grid">' + cards + '</div>'
+      + strip
       + chartHtml
       + calcHtml
-      + '<div class="sh" style="margin-top:16px;">RPLH History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Week</th><th>Revenue</th><th>Labor Hours</th><th>Blended RPLH</th></tr></thead><tbody>' + histRows + '</tbody></table></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
-      + 'Labor hours are sourced from Labor Control. RPLH is weekly revenue divided by labor hours.</div>'
+      + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">RPLH History</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rplh-export">Export PDF</button>'
+      + '</div>'
+      + '<div id="rplh-hist-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Week</th><th>Revenue</th><th>Labor Hours</th><th>Blended RPLH</th>'
+      + '</tr></thead><tbody>' + histRows + '</tbody></table></div></div></div>'
       + '</div>';
 
     const calcResult = () => {
@@ -130,10 +133,11 @@ S.RevenueRPLH = {
       const optHrs = rev / tgt;
       const maxLabor = rev * (pct / 100);
       el.innerHTML = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">'
-        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Optimal Hours</div><div style="font-size:20px;font-weight:800;color:var(--gold);">' + optHrs.toFixed(1) + ' hrs</div></div>'
-        + '<div style="background:var(--input);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Max Labor Budget</div><div style="font-size:20px;font-weight:800;color:var(--t1);">' + App.fmtCurrency(maxLabor) + '</div></div>'
+        + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Optimal Hours</div><div style="font-size:20px;font-weight:800;color:var(--gold);">' + optHrs.toFixed(1) + ' hrs</div></div>'
+        + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:10px 14px;"><div style="font-size:10px;color:var(--t3);">Max Labor Budget</div><div style="font-size:20px;font-weight:800;color:var(--t1);">' + App.fmtCurrency(maxLabor) + '</div></div>'
         + '</div>';
     };
     ['rplh-rev', 'rplh-tgt', 'rplh-pct'].forEach(id => document.getElementById(id)?.addEventListener('input', calcResult));
+    document.getElementById('rplh-export')?.addEventListener('click', () => App.exportPDF({ title: 'RPLH History', root: document.getElementById('rplh-hist-export') || this.container }));
   }
 };
