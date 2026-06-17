@@ -141,9 +141,10 @@ S.Hub = {
     } else if (this._grabBagNavHTML != null) {
       nav.innerHTML = this._grabBagNavHTML;
     }
-    // A Dashboard leaf routing to the section landing + group-icon accordions;
-    // wireNavAccordion (run by setActiveHubNav) adds the icons + open/collapse.
-    nav.classList.toggle('nav-mstyle', !!ms);
+    // A Dashboard leaf routing to the section landing, then a flat icon list with
+    // a divider between groups (the desktop sidebar standard, app-wide). The
+    // mobile drawer is built separately and is unaffected.
+    nav.classList.toggle('nav-flat', !!ms);
     nav._mstyleClosed = false;
     if (ms) {
       if (ms.id) {
@@ -157,10 +158,10 @@ S.Hub = {
           firstSec.parentNode.insertBefore(d, firstSec);
         }
       }
-      // Drop Report a Bug, flatten single-link groups (Support → a "Help" leaf),
-      // shorten Help, and apply any section label remaps — the same transform
-      // the module sidebars get.
-      App._mstyleSidebar(nav, ms.remaps || {});
+      // Drop Report a Bug, headers become dividers, shorten Help, apply any item
+      // label remaps — the same flat transform the module sidebars get. (Group
+      // label remaps are moot here since the flat list has no headers.)
+      App._flatSidebar(nav, ms.remaps || {});
     }
   },
 
