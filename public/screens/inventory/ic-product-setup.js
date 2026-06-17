@@ -366,12 +366,15 @@ S.InventoryProducts = {
       // "Uncategorized" card at the bottom.
       const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
         + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
+      // Shared fixed colgroup so every group card lines its columns up in straight
+      // lines down the page (and the mobile full-width stack hook kicks in).
+      const colgroup = '<colgroup><col style="width:40px;"/><col style="width:190px;"/><col/><col/><col/><col/><col/><col/><col style="width:150px;"/></colgroup>';
       const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
         const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
         return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
-          + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th style="width:40px;"></th><th>' + hdr + '</th>' + headerCols
+          + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:900px;">' + colgroup + '<thead><tr>'
+          + '<th></th><th>' + hdr + '</th>' + headerCols
           + '</tr></thead><tbody>' + groupRows + '</tbody></table></div></div>';
       }).join('');
 
