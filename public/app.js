@@ -1310,14 +1310,20 @@ const App = {
         navEl._accWired = true;
       }
       if (navEl.classList.contains('nav-mstyle')) {
-        // Mobile-style: NO auto-open. Collapse every group on a fresh render;
-        // after that the click handler manages single-open and we preserve it
-        // across navigations (no default first/active group opening).
-        if (!navEl._mstyleClosed) {
-          groups.forEach(g => App._setNavGroup(g, false));
-          navEl.classList.remove('nav-grp-open');
-          navEl._mstyleClosed = true;
+        // Page-derived open: the drop-down holding the ACTIVE page is opened (so a
+        // deep-link — e.g. a cross-section Fix step — landing on a nested page
+        // opens its group). A leaf or no active page opens nothing (never a
+        // default/first group). Clicking a header re-opens single-open until the
+        // next navigation. The lone open drop-down is the gold/lit row.
+        const active = navEl.querySelector('.nav-item.active');
+        let openSec = null;
+        if (active && !active.classList.contains('nav-leaf')) {
+          let p = active.previousElementSibling;
+          while (p && !p.classList.contains('nav-section')) p = p.previousElementSibling;
+          openSec = p;
         }
+        groups.forEach(g => App._setNavGroup(g, g.sec === openSec));
+        navEl.classList.toggle('nav-grp-open', !!openSec);
         return;
       }
       // Open the group with the active item; else keep one open; else the first.
