@@ -669,7 +669,7 @@ S.InventoryProducts = {
       const initCps = sold ? this._resaleCps(p?.unit_cost, p?.servings_per_unit) : 0;
       resaleBlock = '<div class="form-row" style="margin-top:16px;">'
         + '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t1);cursor:pointer;">'
-          + '<input type="checkbox" id="ip-sold"' + (sold ? ' checked' : '') + ' style="width:auto;margin:0;"/> Sold on the menu as-is (resale item)</label>'
+          + '<input type="checkbox" id="ip-sold"' + (sold ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> Sold on the menu as-is (resale item)</label>'
       + '</div>'
       + '<div id="ip-resale" style="' + (sold ? '' : 'display:none;') + 'margin-top:10px;">'
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
