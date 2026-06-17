@@ -282,7 +282,7 @@ const DB = {
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
     'r-menu-engineering':'revenue-recovery',
     'r-rplh':'revenue-recovery','r-dog-test':'revenue-recovery',
-    'r-reports':'revenue-recovery','r-help':'_always',
+    'r-help':'_always',
     // Traffic Recovery
     't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
     't-audit':'traffic-recovery','t-fix':'traffic-recovery',
