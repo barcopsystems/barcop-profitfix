@@ -101,20 +101,19 @@ S.RevenuePriceCalc = {
     const logRows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
       || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet.</td></tr>';
 
-    return '<div class="card form-card" style="margin-bottom:16px;">'
+    return '<div class="card form-card" style="margin-bottom:0;">'
       + '<div class="card-title">Price Calculator</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f w-lg"><label>Menu Item</label><select class="form-input" id="rps-item"><option value="">Select item...</option>' + itemOpts + '</select></div>'
       + '<div class="f w-md"><label>Proposed New Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rps-newprice" step="0.25" placeholder="0.00"/></div></div>'
       + '<div class="f w-md"><label>Est. Volume Change</label><div class="fw"><input class="form-input suf" type="number" id="rps-vol" step="1" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
-      + '<div id="rps-result" style="margin-bottom:18px;"></div>'
-      + '<div id="rps-log-wrap" style="display:none;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Log This Price Change</div>'
-      + '<div class="form-row" style="gap:16px;align-items:flex-end;">'
-      + '<div class="f w-lg"><label>Reason</label><input class="form-input" type="text" id="rps-reason" placeholder="Cost increase, repositioning..."/></div>'
-      + '<button class="btn btn-ghost" id="rps-log-btn">Log Price Change</button>'
-      + '</div></div>'
+      + '<div id="rps-result" style="margin-top:16px;"></div>'
+      + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Reason</label><input class="form-input" type="text" id="rps-reason" placeholder="Cost increase, repositioning..."/></div>'
+      + '</div>'
+      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="rps-log-btn">Log Price Change</button>'
+      + '<button class="btn btn-ghost" id="rps-start-over">Start Over</button>'
       + '</div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Pricing Review Log</div>'
@@ -135,37 +134,47 @@ S.RevenuePriceCalc = {
     document.getElementById('rps-export')?.addEventListener('click', () =>
       App.exportPDF({ title: 'Pricing Review Log', root: document.getElementById('rps-log-export') || container }));
 
+    const box = (label, val, color) =>
+      '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">' + label + '</div>'
+      + '<div style="font-size:16px;font-weight:700;color:' + (color || 'var(--t1)') + ';">' + val + '</div></div>';
+    // The six boxes ALWAYS show so a first-time user sees what the tool computes;
+    // they read "-" until an item and a new price are entered.
     const calc = () => {
       const idx      = parseInt(document.getElementById('rps-item')?.value);
       const newPrice = parseFloat(document.getElementById('rps-newprice')?.value) || 0;
       const volChg   = parseFloat(document.getElementById('rps-vol')?.value) || 0;
       const el       = document.getElementById('rps-result');
-      const lw       = document.getElementById('rps-log-wrap');
-      if (isNaN(idx) || !items[idx] || !newPrice) { if (el) el.innerHTML = ''; if (lw) lw.style.display = 'none'; return; }
-      const item     = items[idx];
-      const oldCM    = item.price - item.cost;
-      const newCM    = newPrice - item.cost;
-      const newPct   = (item.cost / newPrice * 100).toFixed(1);
-      const oldPct   = (item.cost / item.price * 100).toFixed(1);
-      const covers   = item.weekly_covers || 0;
-      const adjCov   = covers * (1 + volChg / 100);
-      const wkImpact = (newCM * adjCov) - (oldCM * covers);
-      const annImpact = wkImpact * 52;
-      const breakeven = oldCM > 0 ? covers * (1 - newCM / oldCM) : 0;
-      const box = (label, val, color) =>
-        '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:10px 12px;"><div style="font-size:10px;color:var(--t3);">' + label + '</div>'
-        + '<div style="font-size:16px;font-weight:700;color:' + (color || 'var(--t1)') + ';">' + val + '</div></div>';
-      if (el) el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:4px;">'
-        + box('Old Cost %', oldPct + '%')
-        + box('New Cost %', newPct + '%')
-        + box('New Margin', App.fmtCurrency(newCM), newCM > oldCM ? 'var(--gold)' : 'var(--red)')
-        + box('Weekly Impact', (wkImpact > 0 ? '+' : '') + App.fmtCurrency(wkImpact), wkImpact > 0 ? 'var(--gold)' : 'var(--red)')
-        + box('Annual Impact', (annImpact > 0 ? '+' : '') + App.fmtCurrency(annImpact), annImpact > 0 ? 'var(--gold)' : 'var(--red)')
-        + (covers > 0 ? box('Breakeven Volume Drop', Math.round(breakeven) + ' covers', 'var(--t2)') : '')
+      if (!el) return;
+      const item = (!isNaN(idx) && items[idx]) ? items[idx] : null;
+      const D = '-';
+      let oldPct = D, newPct = D, newMargin = D, newMarginC, wk = D, wkC, ann = D, annC, be = D;
+      if (item && newPrice) {
+        const oldCM = item.price - item.cost, newCM = newPrice - item.cost;
+        const covers = item.weekly_covers || 0, adjCov = covers * (1 + volChg / 100);
+        const wkImpact = (newCM * adjCov) - (oldCM * covers), annImpact = wkImpact * 52;
+        oldPct = (item.cost / item.price * 100).toFixed(1) + '%';
+        newPct = (item.cost / newPrice * 100).toFixed(1) + '%';
+        newMargin = App.fmtCurrency(newCM); newMarginC = newCM > oldCM ? 'var(--gold)' : 'var(--red)';
+        wk  = (wkImpact > 0 ? '+' : '') + App.fmtCurrency(wkImpact);  wkC  = wkImpact > 0 ? 'var(--gold)' : 'var(--red)';
+        ann = (annImpact > 0 ? '+' : '') + App.fmtCurrency(annImpact); annC = annImpact > 0 ? 'var(--gold)' : 'var(--red)';
+        be  = (oldCM > 0 && covers > 0) ? Math.round(covers * (1 - newCM / oldCM)) + ' covers' : D;
+      }
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
+        + box('Old Cost %', oldPct)
+        + box('New Cost %', newPct)
+        + box('New Margin', newMargin, newMarginC)
+        + box('Weekly Impact', wk, wkC)
+        + box('Annual Impact', ann, annC)
+        + box('Breakeven Volume Drop', be)
         + '</div>';
-      if (lw) lw.style.display = '';
     };
     ['rps-item', 'rps-newprice', 'rps-vol'].forEach(id => document.getElementById(id)?.addEventListener('input', calc));
+    calc();   // render the boxes immediately (dashes until input)
+
+    document.getElementById('rps-start-over')?.addEventListener('click', () => {
+      ['rps-item', 'rps-newprice', 'rps-vol', 'rps-reason'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+      calc();
+    });
 
     document.getElementById('rps-log-btn')?.addEventListener('click', async () => {
       const idx      = parseInt(document.getElementById('rps-item')?.value);
