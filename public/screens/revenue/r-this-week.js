@@ -194,29 +194,28 @@ S.RevenueThisWeek = {
       + '</div></div>';
   },
 
-  // ── Confirm form (form-card) ────────────────────────────────────────────────
-  moneyField(id, label, value, width) {
-    return '<div class="f" style="width:' + (width || 160) + 'px;flex-shrink:0;"><label>' + label + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" oninput="S.RevenueThisWeek.onInput()"/></div></div>';
+  // ── Confirm form (framed grid + notes, like Profit This Week) ────────────────
+  moneyCell(id, value) {
+    return '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" style="width:100%;" oninput="S.RevenueThisWeek.onInput()"/></div>';
   },
-  numField(id, label, value, width) {
-    return '<div class="f" style="width:' + (width || 140) + 'px;flex-shrink:0;"><label>' + label + '</label>'
-      + '<input class="form-input" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" oninput="S.RevenueThisWeek.onInput()"/></div>';
+  numCell(id, value) {
+    return '<input class="form-input" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" style="width:100%;" oninput="S.RevenueThisWeek.onInput()"/>';
   },
   entryCard(d) {
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Confirm the Week</div>'
-      + '<div class="form-row" style="align-items:flex-end;gap:18px;flex-wrap:wrap;">'
-      + this.moneyField('rw-brev', 'Bar Revenue', d.bar_revenue, 160)
-      + this.moneyField('rw-frev', 'Floor Revenue', d.floor_revenue, 160)
-      + this.numField('rw-cov', 'Total Covers', d.covers, 140)
-      + '</div>'
-      + '<div class="form-row" style="align-items:flex-end;gap:18px;flex-wrap:wrap;margin-top:6px;">'
-      + this.numField('rw-lhrs', 'Labor Hours', d.labor_hours, 140)
-      + this.moneyField('rw-lcost', 'Labor Cost', d.labor_cost, 160)
-      + '</div>'
-      + '<div class="f" style="margin:14px 0 0;"><label>Notes (optional)</label>'
-      + '<textarea id="rw-notes" class="notes-ta" rows="2" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
+      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<th>Bar Revenue</th><th>Floor Revenue</th><th>Total Covers</th><th>Labor Hours</th><th>Labor Cost</th>'
+      + '</tr></thead><tbody><tr class="rw-line">'
+      + '<td>' + this.moneyCell('rw-brev', d.bar_revenue) + '</td>'
+      + '<td>' + this.moneyCell('rw-frev', d.floor_revenue) + '</td>'
+      + '<td>' + this.numCell('rw-cov', d.covers) + '</td>'
+      + '<td>' + this.numCell('rw-lhrs', d.labor_hours) + '</td>'
+      + '<td>' + this.moneyCell('rw-lcost', d.labor_cost) + '</td>'
+      + '</tr></tbody></table></div>'
+      + '<div class="f" style="margin:0;"><label>Notes</label>'
+      + '<textarea id="rw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
   },
 
