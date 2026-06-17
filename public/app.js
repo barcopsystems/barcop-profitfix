@@ -178,7 +178,7 @@ const TT = {
     'ic-pours-container':{t:'Pours Per Container',b:'Container Size divided by Pour Size. How many standard pours one full container yields. Calculated automatically.',e:'A 750ml bottle of 25.4 oz at a 1.5 oz pour = 16.9 pours'},
     'ic-product-name':  {t:'Product Name',b:'How this product shows up everywhere in Bar Cop: Take Inventory, Order Sheet, Receive Delivery, Profit Recovery reports. Use the name your bar staff would say at a glance, not the distributor SKU.',e:'Use "Tito\'s Handmade Vodka 750ml" rather than "TITOS-VOD-750-USA"'},
     'ic-brand':         {t:'Brand',b:'The producer or label, kept separate from product name so reports can group by brand. Optional, leave blank if it does not apply.',e:'Tito\'s · Republic National · Austin Beerworks'},
-    'ic-subcategory':   {t:'Sub-Category',b:'How you organize products within a category. Lets you slice reports by style without polluting the main category list. Free text, pick what makes sense for your bar.',e:'Liquor: Vodka, Bourbon, Tequila · Wine: Red, White, Sparkling · Bottle Beer: Domestic, Import, Craft'},
+    'ic-subcategory':   {t:'Sub-Category',b:'Groups your product list by style so you can scan what you carry at a glance. Pick a suggestion or type your own; products with the same sub-category group together on the Products list and Set Locations.',e:'Liquor: Vodka, Bourbon, Tequila · Wine: Red, White, Sparkling · Bottle Beer: Domestic, Import, Craft'},
     'ic-primary-vendor':{t:'Primary Vendor',b:'The vendor you order this product from. Set up vendors on the Vendors screen first. The Order Sheet groups reorder suggestions by vendor, and Email to Vendor pulls the right contact info from this field.',e:'Republic National for spirits, Glazer\'s for beer, Sysco for food'},
     'ic-primary-location':{t:'Primary Location',b:'The physical spot in your bar or kitchen where this product lives. Set up locations on the Locations screen. Take Inventory walks you through one location at a time so counting matches the way you move through the room.',e:'Front Bar · Back Bar · Walk-In Cooler · Dry Storage'},
     'ic-bottle-size':   {t:'Bottle Size',b:'The size of one bottle in ounces. For spirits and wine this drives how many pours you get per bottle and the cost per pour. Pick from the list, Bar Cop converts ml to oz automatically.',e:'750ml = 25.4 oz · 1L = 33.8 oz · 1.75L = 59.2 oz'},
@@ -2728,6 +2728,55 @@ const App = {
     const bc = this.bottleCost(p);
     return bc != null ? bc : (parseFloat(p.unit_cost) || 0);
   },
+  // ── Sub-category (product style) ──────────────────────────────────────
+  // Starter suggestions per category for the Sub-Category datalist. The
+  // operator picks one or types their own; matching values group the product
+  // list (and Set Locations) by style so they can scan what they carry.
+  SUBCAT_SUGGESTIONS: {
+    'Liquor':      ['Vodka', 'Gin', 'Rum', 'Tequila', 'Mezcal', 'Bourbon', 'Rye', 'Whiskey', 'Scotch', 'Irish Whiskey', 'Brandy', 'Cognac', 'Liqueur', 'Amaro', 'Aperitif', 'Bitters'],
+    'Wine':        ['Red', 'White', 'Rosé', 'Sparkling', 'Vermouth', 'Fortified', 'Dessert'],
+    'Bottle Beer': ['Domestic', 'Import', 'Craft', 'Cider', 'Seltzer', 'Non-Alcoholic'],
+    'Draft Beer':  ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Wheat', 'Ale', 'Sour', 'Cider'],
+    'Food':        ['Protein', 'Seafood', 'Produce', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Sauces & Condiments', 'Spices', 'Beverage']
+  },
+  // Datalist values = the starter set + any sub-categories the operator has
+  // already used for this category (so typos do not splinter a group).
+  subcatSuggestions(category) {
+    const starter = (this.SUBCAT_SUGGESTIONS && this.SUBCAT_SUGGESTIONS[category]) || [];
+    const used = [];
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    prods.forEach(p => {
+      if ((p.category || '') !== category) return;
+      const s = (p.sub_category || '').trim();
+      if (s && !starter.some(x => x.toLowerCase() === s.toLowerCase()) && !used.some(x => x.toLowerCase() === s.toLowerCase())) used.push(s);
+    });
+    return starter.concat(used.sort((a, b) => a.localeCompare(b)));
+  },
+  // Group products for the grouped product lists: by Misc Type for Misc, by
+  // category for an 'All' view, else by Sub-Category. Returns ordered groups
+  // [{key, items}] — starter order first, custom values alpha, blank ('') last.
+  subcatGroups(prods, category) {
+    const byCat  = !category || category === 'All';
+    const isMisc = category === 'Misc';
+    const keyOf  = p => byCat ? (p.category || '') : (isMisc ? (p.misc_type || '') : (p.sub_category || ''));
+    let starter;
+    if (byCat)       starter = this.IC_CATEGORIES || [];
+    else if (isMisc) starter = this.MISC_TYPES || [];
+    else             starter = (this.SUBCAT_SUGGESTIONS && this.SUBCAT_SUGGESTIONS[category]) || [];
+    const order = {}; starter.forEach((s, i) => { order[String(s).toLowerCase()] = i; });
+    const groups = {};
+    prods.forEach(p => { const k = keyOf(p); (groups[k] = groups[k] || []).push(p); });
+    const keys = Object.keys(groups).sort((a, b) => {
+      if (a === '') return 1; if (b === '') return -1;
+      const ia = order[a.toLowerCase()], ib = order[b.toLowerCase()];
+      if (ia != null && ib != null) return ia - ib;
+      if (ia != null) return -1;
+      if (ib != null) return 1;
+      return a.localeCompare(b);
+    });
+    return keys.map(k => ({ key: k, items: groups[k].slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')) }));
+  },
+
   // The menu category an inventory product belongs to when linked to a menu
   // item. Drives the Menu Items category picker + the auto-derived category on
   // save. Returns '' when the product is not sellable on the menu.
