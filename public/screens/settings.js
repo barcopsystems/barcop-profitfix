@@ -1410,6 +1410,41 @@ S.HubSettings = {
     ].map(([n, type]) => ({ id:uid(), name:n, type, archived:false, service_bar: SERVICE_BARS.has(n) }));
 
     // Categories must match Profit's BAR_CATS / KITCHEN_CATS for the COGS feed.
+    // Sub-category (style) per product, so the grouped Products + Set Locations
+    // lists land populated in the demo. Keyed by the CLEANED name (unit suffix
+    // stripped). Misc uses misc_type instead, so it is not listed here.
+    const SUBCAT_SEED = {
+      // Liquor
+      "Tito's Handmade Vodka":'Vodka', 'Ketel One':'Vodka', 'Grey Goose':'Vodka',
+      'Hendrick\'s Gin':'Gin', 'Tanqueray':'Gin', 'Roku Gin':'Gin',
+      'Espolòn Tequila Blanco':'Tequila', 'Don Julio Blanco':'Tequila', 'Casamigos Reposado':'Tequila',
+      'Mezcal':'Mezcal', 'White Rum':'Rum', 'Mount Gay Eclipse':'Rum', 'Sailor Jerry Spiced':'Rum',
+      'Bulleit Bourbon':'Bourbon', "Maker's Mark":'Bourbon', 'Woodford Reserve':'Bourbon', 'Buffalo Trace':'Bourbon',
+      'Rittenhouse Rye':'Rye', 'Jameson':'Irish Whiskey', 'Macallan 12':'Scotch', "Dewar's":'Scotch',
+      'Hennessy VS':'Cognac', 'Campari':'Amaro', 'Aperol':'Aperitif',
+      'Triple Sec':'Liqueur', 'Coffee Liqueur':'Liqueur', 'Maraschino Liqueur':'Liqueur',
+      'St-Germain':'Liqueur', 'Cointreau':'Liqueur', 'Disaronno Amaretto':'Liqueur', 'Green Chartreuse':'Liqueur',
+      // Wine
+      'House Cabernet':'Red', 'Pinot Noir':'Red', 'Malbec':'Red', 'Red Blend':'Red', 'Cabernet Reserve':'Red',
+      'House Chardonnay':'White', 'Sauvignon Blanc':'White', 'Pinot Grigio':'White', 'Chardonnay Reserve':'White',
+      'Rosé':'Rosé', 'Prosecco':'Sparkling', 'Champagne':'Sparkling', 'Sweet Vermouth':'Vermouth', 'Dry Vermouth':'Vermouth',
+      // Bottle Beer
+      'Bud Light':'Domestic', 'Lone Star':'Domestic', 'Modelo Especial':'Import', 'Corona':'Import', 'Stella Artois':'Import',
+      'White Claw':'Seltzer', 'Austin Eastciders':'Cider', 'Athletic NA':'Non-Alcoholic',
+      // Draft Beer
+      'ABW Pearl Snap (1/2 bbl)':'Pilsner', 'Live Oak Hefeweizen':'Wheat', "Real Ale Fireman's 4":'Ale',
+      'ABW Fire Eagle IPA':'IPA', 'Independence Stout':'Stout', 'Seasonal Rotating Tap':'Ale',
+      // Food
+      'Ground Beef 80/20':'Protein', 'Chicken Thigh':'Protein', 'Applewood Bacon':'Protein', 'Pork Chop':'Protein',
+      'Beef Brisket':'Protein', 'Chicken Wings':'Protein', 'Beef Short Rib':'Protein', 'Charcuterie Selection':'Protein',
+      'Atlantic Cod':'Seafood', 'Salmon Fillet':'Seafood', 'Gulf Shrimp':'Seafood', 'Calamari':'Seafood', 'Ahi Tuna':'Seafood',
+      'Romaine':'Produce', 'Beefsteak Tomato':'Produce', 'Mixed Greens':'Produce', 'Russet Potato':'Produce',
+      'Hass Avocado':'Produce', 'Brussels Sprouts':'Produce', 'Sweet Corn':'Produce',
+      'Cheddar Cheese':'Dairy', 'Large Eggs':'Dairy', 'Parmesan':'Dairy', 'Heavy Cream':'Dairy',
+      'Flour Tortilla':'Bakery', 'Brioche Bun':'Bakery', 'Flatbread':'Bakery', 'Sourdough Loaf':'Bakery',
+      'Arborio Rice':'Dry Goods', 'Tortilla Chips':'Dry Goods', 'Chickpeas':'Dry Goods', 'Elbow Pasta':'Dry Goods',
+      'Quinoa':'Dry Goods', 'Waffle Mix':'Dry Goods', 'Dark Chocolate':'Dry Goods', 'Kettle Chips':'Dry Goods'
+    };
     const icProducts = [
       { name:"Tito's Handmade Vodka",    category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.40, menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Liquor Room' },
       { name:'Espolòn Tequila Blanco',   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.50, menu_price:10, par_level:20,  reorder_point:9,   primary_location:'Liquor Room' },
@@ -1540,7 +1575,8 @@ S.HubSettings = {
         // Phase 0: cost_history captures every auto-update from Receive Delivery
         // price changes. Empty on fresh data; populated as deliveries log price moves.
         cost_history:[],
-        ...p, name: cleanName, unit_type: unitType };
+        ...p, name: cleanName, unit_type: unitType,
+        sub_category: p.sub_category || SUBCAT_SEED[cleanName] || '' };
     });
     // Multi-location stocking: bar products live in storage AND at the service
     // bars, the way a real bar runs. locations[0] is the primary (ordering home).
