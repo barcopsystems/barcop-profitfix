@@ -3814,7 +3814,6 @@ const App = {
         'r-menu-engineering':     ['Menu Engineering', ''],
         'r-dog-test':             ['Dog Test Tracker', ''],
         'r-rplh':                 ['RPLH Tracker', ''],
-        'r-reports':              ['Reports and History', ''],
         'r-help':                 ['Help and FAQ', ''],
       };
       const revScreens = {
@@ -3828,7 +3827,6 @@ const App = {
         'r-menu-engineering': S.RevenueMenuEngineering,
         'r-dog-test':         S.RevenueDogTest,
         'r-rplh':             S.RevenueRPLH,
-        'r-reports':          S.RevenueReports,
         'r-help':             S.RevenueHelp,
       };
       const [title, sub] = revTitles[id] || [id, ''];
@@ -4093,7 +4091,7 @@ const App = {
     // here (no duplicate topbar button): the four Inventory reports, plus the
     // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
     // lc-callout-log needs no export).
-    'r-reports': 1, 't-reports': 1
+    't-reports': 1
   },
   _exportBtn(id, actions) {
     if (!this._REPORT_SCREENS[id] || !actions) return;
