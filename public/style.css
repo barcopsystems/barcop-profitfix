@@ -237,27 +237,22 @@ input,select,textarea{color-scheme:dark;}
 .mnav-back:hover,.mnav-x:hover{background:var(--c3);color:var(--w);}
 .mnav-back-sp{width:34px;flex-shrink:0;}
 .mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:28px;background:var(--surface);}
-.mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}
-.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;font-size:14px;color:var(--t1);cursor:pointer;background:var(--surface);transition:background .1s;}
-.mnav-row:hover,.mnav-row:active{background:var(--c3);color:var(--w);}
-/* Open drop-down + active main link match the desktop sidebar: #111E26 bg, gold icon. */
-.mnav-row.open,.mnav-row.on{background:var(--c3);color:var(--w);}
+/* Flat mobile drawer (matches the desktop flat sidebar): a flat icon list with a
+   divider between groups, no accordions. Default muted, white on tap, active page
+   = white text + gold icon, no row background. Two-level drill stays (root rows
+   with a ‹drill› chevron push a section panel). */
+.mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}   /* unused in the flat menu; kept for revert */
+.mnav-divider{height:0;border-top:1px solid var(--b2);margin:9px 18px;}
+.mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;font-size:14px;color:var(--t3);cursor:pointer;background:transparent;transition:color .12s;}
+.mnav-row:hover,.mnav-row:active{background:transparent;color:var(--w);}
+.mnav-row.on{background:transparent;color:var(--w);}
 .mnav-l{display:flex;align-items:center;gap:13px;min-width:0;overflow:hidden;}
 .mnav-ic-slot{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--t3);}
 .mnav-ic{width:17px;height:17px;}
-.mnav-row:hover .mnav-ic-slot{color:var(--w);}
-.mnav-row.open .mnav-ic-slot,.mnav-row.on .mnav-ic-slot{color:var(--gold);}
-/* When a drop-down is open, the active main link (e.g. Dashboard) is NOT also lit
-   — the open drop-down is the lone gold/highlighted row (matches the desktop). */
-.mnav-grp-open .mnav-row.on:not(.mnav-page){background:transparent;color:var(--t1);}
-.mnav-grp-open .mnav-row.on:not(.mnav-page) .mnav-ic-slot{color:var(--t3);}
-/* Nested drop-down links read like the top-nav links: --t3, white on hover/active,
-   no background, and left-aligned with the main link labels (no extra indent). */
-.mnav-page{color:var(--t3);}
-.mnav-page:hover,.mnav-page.on{background:transparent;color:var(--w);}
-.mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;transition:transform .15s ease;}
-.mnav-row:hover .mnav-chev,.mnav-row.open .mnav-chev{color:var(--w);}
-.mnav-row.open .mnav-acc-chev{transform:rotate(90deg);}
+.mnav-row:hover .mnav-ic-slot,.mnav-row:active .mnav-ic-slot{color:var(--w);}
+.mnav-row.on .mnav-ic-slot{color:var(--gold);}
+.mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;}
+.mnav-row:hover .mnav-chev,.mnav-row:active .mnav-chev{color:var(--w);}
 
 /* Footer */
 .sidebar-footer{
