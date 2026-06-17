@@ -116,18 +116,23 @@ S.InventoryLocations = {
   },
   // A flat checklist on the form canvas (no nested card). Name + brand + size so a
   // row is identifiable, with the category right-aligned.
-  checklistPanelHTML(prods, checkedSet, cbClass, emptyMsg) {
+  checklistPanelHTML(prods, checkedSet, cbClass, emptyMsg, cat) {
     if (!prods.length) {
       return '<div style="font-size:12px;color:var(--t4);padding:8px 0;">' + emptyMsg + '</div>';
     }
-    return '<div style="max-height:280px;overflow:auto;border-top:1px solid var(--b1);">'
-      + prods.map(p => '<label style="display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
-          + '<input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
-          + '<span style="flex:1;min-width:0;">' + esc(p.name)
-            + (p.brand ? ' <span style="color:var(--t3);">' + esc(p.brand) + '</span>' : '') + '</span>'
-          + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(this.sizeLabel(p)) + '</span>'
-          + '<span style="font-size:10px;color:var(--t3);min-width:78px;text-align:right;">' + esc(p.category || '') + '</span></label>').join('')
-      + '</div>';
+    const rowHtml = p => '<label style="display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
+      + '<input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
+      + '<span style="flex:1;min-width:0;">' + esc(p.name)
+        + (p.brand ? ' <span style="color:var(--t3);">' + esc(p.brand) + '</span>' : '') + '</span>'
+      + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(this.sizeLabel(p)) + '</span>'
+      + '<span style="font-size:10px;color:var(--t3);min-width:78px;text-align:right;">' + esc(p.category || '') + '</span></label>';
+    // Sub-category sub-headers (sticky) so a long triage list scans by style.
+    const inner = App.subcatGroups(prods, cat).map(g => {
+      const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
+      return '<div style="position:sticky;top:0;background:var(--surface);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding:9px 2px 5px;border-bottom:1px solid var(--b1);">' + hdr + '</div>'
+        + g.items.map(rowHtml).join('');
+    }).join('');
+    return '<div style="max-height:280px;overflow:auto;border-top:1px solid var(--b1);">' + inner + '</div>';
   },
 
   // Human size for a product, matching the Products list: container-size label for
@@ -318,28 +323,33 @@ S.InventoryLocations = {
     const prods = this.catProducts(this.newCat);
     return this.catTabsHTML(this.newCat, c => this.catProducts(c).length)
       + this.bulkControlsHTML('new')
-      + this.productSelectTable(prods, this.newChecked);
+      + this.productSelectTable(prods, this.newChecked, 'il-cb', 'il-prow', this.newCat);
   },
 
-  // The product selection list as a standard data-row table (checkbox + product
-  // info). Standalone section, so a full .data-card is fine here.
-  productSelectTable(prods, checkedSet, cbClass, rowClass) {
+  // The product selection list as standard data-row tables, grouped by
+  // Sub-Category (Misc Type for Misc, Category for the 'All' tab) into a card
+  // per group — "Vodka Products (5)" — so a bar or cooler is easy to build by
+  // style. Matches the grouped Products list on the Add Products screen.
+  productSelectTable(prods, checkedSet, cbClass, rowClass, cat) {
     cbClass = cbClass || 'il-cb';
     rowClass = rowClass || 'il-prow';
     if (!prods.length) {
       return '<div style="font-size:12px;color:var(--t4);padding:10px 2px;">No matching products yet. Add products on the Products screen first, then assign them here.</div>';
     }
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th style="width:40px;"></th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
-      + '</tr></thead><tbody>'
-      + prods.map(p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
-          + '<td><input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
-          + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
-          + '<td>' + esc(p.category || '-') + '</td>'
-          + '<td>' + esc(this.sizeLabel(p)) + '</td>'
-          + '<td>' + esc(p.vendor || '-') + '</td>'
-          + '</tr>').join('')
-      + '</tbody></table></div></div>';
+    const rowHtml = p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
+      + '<td><input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
+      + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
+      + '<td>' + esc(p.category || '-') + '</td>'
+      + '<td>' + esc(this.sizeLabel(p)) + '</td>'
+      + '<td>' + esc(p.vendor || '-') + '</td>'
+      + '</tr>';
+    return App.subcatGroups(prods, cat).map((g, gi) => {
+      const hdr = (g.key ? esc(g.key) + ' Products' : 'Uncategorized') + ' (' + g.items.length + ')';
+      return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
+        + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th style="width:40px;"></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
+        + '</tr></thead><tbody>' + g.items.map(rowHtml).join('') + '</tbody></table></div></div>';
+    }).join('');
   },
 
   _toggleNew(id, on) {
@@ -538,7 +548,7 @@ S.InventoryLocations = {
     const prods = this.catProducts(this.editCat);
     return this.catTabsHTML(this.editCat, c => this.catProducts(c).length)
       + this.bulkControlsHTML('edit')
-      + this.productSelectTable(prods, this.editChecked, 'il-edit-cb', 'il-eprow');
+      + this.productSelectTable(prods, this.editChecked, 'il-edit-cb', 'il-eprow', this.editCat);
   },
 
   updateEditCount() {
@@ -714,7 +724,7 @@ S.InventoryLocations = {
     const inCat = this.triageCat === 'All' ? unplaced : unplaced.filter(p => p.category === this.triageCat);
     return this.catTabsHTML(this.triageCat, c => c === 'All' ? unplaced.length : unplaced.filter(p => p.category === c).length, cats)
       + this.bulkControlsHTML('triage')
-      + this.checklistPanelHTML(inCat, this.triageChecked, 'il-tri-cb', 'No products need a location.');
+      + this.checklistPanelHTML(inCat, this.triageChecked, 'il-tri-cb', 'No products need a location.', this.triageCat);
   },
 
   updateTriageCount() {
