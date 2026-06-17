@@ -253,6 +253,14 @@ input,select,textarea{color-scheme:dark;}
 .mnav-row.on .mnav-ic-slot{color:var(--gold);}
 .mnav-chev{color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;}
 .mnav-row:hover .mnav-chev,.mnav-row:active .mnav-chev{color:var(--w);}
+/* Location switcher (multi-unit only): a chip showing the current unit; tap to
+   reveal the others as chips. No drop-down arrow. Sits above the Hub link. */
+.mnav-loc{padding:14px 18px 2px;}
+.mnav-loc-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:6px;font-size:13px;font-weight:600;line-height:1;cursor:pointer;background:transparent;border:1px solid var(--b1);color:var(--t2);text-align:left;}
+.mnav-loc-chip svg{width:15px;height:15px;flex-shrink:0;}
+.mnav-loc-cur{background:var(--gold-tint);border-color:var(--gold-tint-bord);color:var(--t1);}
+.mnav-loc-cur svg{color:var(--gold);}
+.mnav-loc-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
 
 /* Footer */
 .sidebar-footer{
@@ -676,7 +684,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* Row 1 — brand + global destinations + utility. */
 .tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);position:relative;}
 .tn-logo{height:22px;width:auto;display:block;flex-shrink:0;}
-.tn-divider{display:none;width:1px;height:22px;background:var(--b-edge);flex-shrink:0;}   /* mobile only: separates the logo from the burger */
 .tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
 .tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
 .tn-glink:hover,.tn-glink.active{color:var(--w);}
@@ -787,8 +794,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-global{display:none;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
-  /* Logo left, a vertical divider, then the burger; info far-right. */
-  .tn-divider{display:block;}
   .app.proto .sec-switch{display:block;}
   #tn-acct #topbar-group-dashboard{display:none !important;}
   /* The shared nav replaces the old header on mobile and the burger opens the
