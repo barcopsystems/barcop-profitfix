@@ -8,9 +8,8 @@
    r-price-calc; the old SVG scatter matrix + "vs Last Update" column are gone.) */
 
 S.RevenueMenuEngineering = {
-  // Quadrant colors = the classification meaning (gold win / steel act / amber
-  // watch / red cut), plus the one-line move for each.
-  QUAD_COLOR: { STAR: 'var(--gold)', PLOWHORSE: 'var(--focus)', PUZZLE: 'var(--amber)', DOG: 'var(--red)' },
+  // The four groups + the one-line move for each. The diagnosis is text now
+  // (no color cue — the move spells out what to do).
   QUAD: [
     { key: 'STAR',      label: 'Stars',      move: 'Feature & push' },
     { key: 'PLOWHORSE', label: 'Plowhorses', move: 'Raise the price' },
@@ -64,7 +63,6 @@ S.RevenueMenuEngineering = {
       if (hiM && !hiV) return 'PUZZLE';
       return 'DOG';
     };
-    const color = this.QUAD_COLOR;
     const classified = items.map(item => ({ ...item, quad: classify(item), cm: item.price - item.cost, pct: (item.cost / item.price * 100).toFixed(1) }));
 
     // ── Stat box — menu-level rollups + the reprice-candidate count ────────────
@@ -92,8 +90,7 @@ S.RevenueMenuEngineering = {
         + '<td>' + App.fmtCurrency(i.cm) + '</td>'
         + '<td>' + i.weekly_covers + '</td>'
         + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div></td></tr>').join('');
-      return '<div class="sh" style="margin:22px 0 10px;display:flex;align-items:center;gap:8px;">'
-        + '<span style="width:9px;height:9px;border-radius:50%;background:' + color[q.key] + ';display:inline-block;"></span>'
+      return '<div class="sh" style="margin:22px 0 10px;">'
         + esc(q.label) + ' (' + qItems.length + ')'
         + '<span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">&nbsp;&mdash; ' + esc(q.move) + '</span></div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:680px;">'
