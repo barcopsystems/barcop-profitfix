@@ -1750,8 +1750,7 @@ const App = {
         drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', IC.traffic)
       ]},
       { label: 'Support', items: [
-        { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() },
-        { label: 'Report a Bug', icon: IC.bug, go: () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug) }
+        { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() }
       ]}
     ]};
 
@@ -1797,8 +1796,8 @@ const App = {
     const render = () => {
       const node = stack[stack.length - 1];
       const canBack = stack.length > 1;
-      headEl.innerHTML = (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '<span class="mnav-back-sp"></span>')
-        + '<span class="mnav-title">' + esc(node.title) + '</span>'
+      headEl.innerHTML = '<span class="mnav-title">' + esc(node.title) + '</span>'
+        + (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '')
         + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
       headEl.querySelector('.mnav-x').addEventListener('click', close);
       const backBtn = headEl.querySelector('.mnav-back');
