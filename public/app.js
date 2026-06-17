@@ -2733,11 +2733,11 @@ const App = {
   // operator picks one or types their own; matching values group the product
   // list (and Set Locations) by style so they can scan what they carry.
   SUBCAT_SUGGESTIONS: {
-    'Liquor':      ['Vodka', 'Gin', 'Rum', 'Tequila', 'Mezcal', 'Bourbon', 'Rye', 'Whiskey', 'Scotch', 'Irish Whiskey', 'Brandy', 'Cognac', 'Liqueur', 'Amaro', 'Aperitif', 'Bitters'],
-    'Wine':        ['Red', 'White', 'Rosé', 'Sparkling', 'Vermouth', 'Fortified', 'Dessert'],
-    'Bottle Beer': ['Domestic', 'Import', 'Craft', 'Cider', 'Seltzer', 'Non-Alcoholic'],
-    'Draft Beer':  ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Wheat', 'Ale', 'Sour', 'Cider'],
-    'Food':        ['Protein', 'Seafood', 'Produce', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Sauces & Condiments', 'Spices']
+    'Liquor':      ['Vodka', 'Gin', 'Rum', 'Tequila', 'Mezcal', 'Bourbon', 'Rye', 'Whiskey', 'Scotch', 'Irish Whiskey', 'Brandy', 'Cognac', 'Liqueur', 'Amaro', 'Aperitif', 'Bitters', 'Other'],
+    'Wine':        ['Red', 'White', 'Rosé', 'Sparkling', 'Champagne', 'Vermouth', 'Fortified', 'Dessert', 'Other'],
+    'Bottle Beer': ['Domestic', 'Import', 'Craft', 'Cider', 'Seltzer', 'Non-Alcoholic', 'Other'],
+    'Draft Beer':  ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Wheat', 'Ale', 'Sour', 'Cider', 'Other'],
+    'Food':        ['Protein', 'Seafood', 'Produce', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Sauces', 'Condiments', 'Spices', 'Other']
   },
   // Datalist values = the starter set + any sub-categories the operator has
   // already used for this category (so typos do not splinter a group).
