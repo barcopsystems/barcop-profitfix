@@ -100,27 +100,27 @@ S.RevenueMenuItems = {
   },
 
   // ── Inventory product picker (Card 3 / Inventory form) ───────────────
-  inventoryProductOptions(selectedId) {
+  inventoryProductOptions(selectedId, menuCat) {
     const prods = this.products().filter(p => p.active !== false);
     let h = '<option value="">Select inventory product...</option>';
+    // Scope to the menu category the operator picked, so Beer shows only beers,
+    // Wine only wines, NA only NA beverages, Snacks only packaged resale items.
+    // With no category yet, every sellable group shows. menuCatForProduct is the
+    // single classifier — each product lands in exactly one group.
+    const groups = menuCat ? this.INVENTORY_GROUPS.filter(g => g.menuCat === menuCat) : this.INVENTORY_GROUPS;
     let totalShown = 0;
-    this.INVENTORY_GROUPS.forEach(grp => {
-      grp.icCats.forEach(icCat => {
-        // Misc is a catch-all (mixers, supplies, NA beverages). Only the
-        // products tagged "NA Beverage" are sellable, so the NA group lists
-        // those alone instead of dumping fryer oil and to-go boxes here.
-        const inCat = prods.filter(p => (p.category || '') === icCat && (icCat !== 'Misc' || App.miscSellable(p)))
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        if (!inCat.length) return;
-        totalShown += inCat.length;
-        h += '<optgroup label="' + esc(icCat) + ' (' + esc(grp.menuCat) + ')">';
-        inCat.forEach(p => {
-          h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
-        });
-        h += '</optgroup>';
+    groups.forEach(grp => {
+      const inGrp = prods.filter(p => App.menuCatForProduct(p) === grp.menuCat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!inGrp.length) return;
+      totalShown += inGrp.length;
+      h += '<optgroup label="' + esc(grp.menuCat) + '">';
+      inGrp.forEach(p => {
+        h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
       });
+      h += '</optgroup>';
     });
-    if (!totalShown) h += '<option value="" disabled>No Beer / Wine / NA products in Inventory Control yet</option>';
+    if (!totalShown) h += '<option value="" disabled>No ' + esc(menuCat || 'sellable') + ' products in Inventory Control yet</option>';
     return h;
   },
 
@@ -182,7 +182,7 @@ S.RevenueMenuItems = {
   showHowTo() {
     App.showHelpModal('How Menu Items Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly covers, lives here, and Menu Engineering, Dog Test, and Recipe Cost all read from it.'] },
-      { h: 'Adding an Item', p: ['Pick a category and the form fills in. Cocktails and food (Appetizers, Entrees, Desserts, Specials) get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. Beer, Wine and NA link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). The NA list shows only products tagged as NA beverages in Inventory, so mixers and supplies stay out of it. Enter covers so Menu Engineering can weight the item by how often it sells.'] },
+      { h: 'Adding an Item', p: ['Pick a category and the form fills in. Cocktails and food (Appetizers, Entrees, Desserts, Specials) get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. Beer, Wine, NA, and Snacks link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). The product list shows only the products that fit the category you picked, so there is nothing to scroll past. Snacks are packaged items you buy and sell whole (bagged chips, bottled NA), marked Sold on the menu in Inventory; their cost comes in per serving. Enter covers so Menu Engineering can weight the item by how often it sells.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review and the Recovery Scoreboard pick it up.'] }
     ]);
@@ -204,7 +204,7 @@ S.RevenueMenuItems = {
   },
 
   // ── Landing: three cards + tabs + filtered table ─────────────────────
-  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages'],
+  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
   renderLanding() {
     const all = this.items();
@@ -436,7 +436,10 @@ S.RevenueMenuItems = {
 
   onCategoryChange(cat) {
     this.formType = this.typeForCategory(cat);
-    if (this.formType === 'inventory') { this.mode = null; this.rows = []; }
+    // Switching to (or between) an inventory category resets the linked product
+    // so the scoped picker starts blank instead of holding a stale pick from the
+    // previous category.
+    if (this.formType === 'inventory') { this.mode = null; this.rows = []; this.linkedProductId = ''; }
     else if (this.formType) {
       this.mode = this.formType === 'cocktail' ? 'single' : 'food';
       if (!this.rows.length) this.rows = [{ source: 'product', id: '', quantity: '' }];
@@ -483,21 +486,29 @@ S.RevenueMenuItems = {
   // Category), at normal width.
   linkedFieldHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
+    const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
     return '<label>Inventory Product</label>'
-      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select>';
+      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId, menuCat) + '</select>';
   },
   // Everything below the top row for an inventory item: price, cost, covers, pour, notes.
   inventoryRestHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
     const linkedProd = linkedId ? this.prodById(linkedId) : null;
-    const autoCost = linkedProd ? (App.bottleCost ? (App.bottleCost(linkedProd) || linkedProd.unit_cost || 0) : (linkedProd.unit_cost || 0)) : 0;
+    const autoCost = linkedProd ? (App.menuLinkCost(linkedProd) || 0) : 0;
+    // Pour Size only matters for poured drinks (Beer/Wine). Packaged resale
+    // items (NA beverages, Snacks) are sold whole, so the field is dropped.
+    const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
+    const showPour = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
+    const pourRow = showPour
+      ? '<div class="form-row"><div class="f" style="width:170px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div></div>'
+      : '';
     return '<div class="form-row">'
       + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:170px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
       + '</div>'
-      + '<div class="form-row"><div class="f" style="width:170px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-      + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div></div>'
+      + pourRow
       + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
   },
 
@@ -507,7 +518,7 @@ S.RevenueMenuItems = {
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
       const costInp = document.getElementById('ri-cost');
       if (costInp) {
-        const bc = p ? (App.bottleCost ? (App.bottleCost(p) || p.unit_cost || 0) : (p.unit_cost || 0)) : 0;
+        const bc = p ? (App.menuLinkCost(p) || 0) : 0;
         costInp.value = bc > 0 ? bc.toFixed(2) : '';
       }
       // Auto-fill the menu price from the linked product's saved menu price,
@@ -717,7 +728,7 @@ S.RevenueMenuItems = {
       if (!linkedProductId) { fail('Pick an inventory product.'); return; }
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
-      category = this.IC_TO_MENU_CAT[p.category] || 'Other';
+      category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
       const tmp = { linked_product_id: linkedProductId };
       computedCost = App.menuItemCost(tmp) || 0;
     }
