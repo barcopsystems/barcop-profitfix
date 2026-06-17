@@ -232,10 +232,10 @@ S.RevenueMenuItems = {
       modeBody  = '<div id="mi-csv"></div><div id="mi-imp-result"></div>';
       // Empty until a file is dropped; CSVMapper renders its Import / Cancel row
       // here (below the card) so there is no gap beforehand.
-      actionRow = '<div id="mi-imp-actions" class="no-print" style="margin:16px 0 24px;"></div>';
+      actionRow = '<div id="mi-imp-actions" class="no-print" data-collapse-group="mi-add" style="margin:16px 0 24px;"></div>';
     } else {
       modeBody  = this.formBodyHtml(null);
-      actionRow = '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      actionRow = '<div class="no-print" data-collapse-group="mi-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
         + '<button class="btn btn-ghost" id="ri-start-over">Start Over</button>'
         + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -243,9 +243,11 @@ S.RevenueMenuItems = {
     }
     const addWrap = '<div id="mi-add-wrap">'
       + '<div class="card form-card" style="margin-bottom:0;">'
-        + '<div class="card-title">Add Menu Item</div>'
-        + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
-        + modeBody
+        + App.collapsibleCardTitle('mi-add', 'Add Menu Item')
+        + '<div class="collapse-body">'
+          + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+          + modeBody
+        + '</div>'
       + '</div>'
       + actionRow
     + '</div>';
@@ -263,7 +265,7 @@ S.RevenueMenuItems = {
         ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:16px;font-size:12px;color:var(--t1);">'
           + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
         : '';
-      const sections = cats.map(cat => {
+      const sections = cats.map((cat, ci) => {
         const items = all.filter(i => (i.category || 'Uncategorized') === cat)
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const rows = items.map(item => {
@@ -288,14 +290,16 @@ S.RevenueMenuItems = {
             + '<button class="btn btn-danger btn-sm mi-del" data-id="' + esc(item.id) + '">Delete</button>'
             + '</div></td></tr>';
         }).join('');
-        return '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + '</div>'
+        return (ci === 0
+            ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;"><div class="sh" style="margin:0;">' + esc(cat) + '</div><button class="btn btn-ghost btn-sm no-print" id="mi-export">Export PDF</button></div>'
+            : '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + '</div>')
           + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:780px;">'
           + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
           + '<thead><tr>'
           + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
       }).join('');
-      body = warn + sections;
+      body = '<div id="mi-list-export">' + warn + sections + '</div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + addWrap + body + '</div>';
@@ -326,6 +330,12 @@ S.RevenueMenuItems = {
         await App.saveKey('menu_items');
         this.renderLanding();
       }));
+
+    // Collapsible Add card (chevron) + the menu PDF export on the first category row.
+    const collapseHead = this.container.querySelector('.card-collapse-head');
+    if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
+    document.getElementById('mi-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Items', root: document.getElementById('mi-list-export') }));
+    App.applyCollapsed(this.container);
   },
 
   // ── Editor (ONE modal, adapts to the chosen category) ────────────────────
@@ -393,6 +403,7 @@ S.RevenueMenuItems = {
     return '<div class="form-row">'
       + '<div class="f" style="width:300px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '<div class="f" id="mi-linked-slot" style="width:300px;flex-shrink:0;display:none;"></div>'
       + '</div>'
       + '<div id="mi-adaptive"></div>';
   },
@@ -430,13 +441,18 @@ S.RevenueMenuItems = {
 
   renderAdaptive(item) {
     const host = document.getElementById('mi-adaptive');
+    const slot = document.getElementById('mi-linked-slot');
+    if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }   // the inventory-product field rides the top row; reset it
     if (!host) return;
     if (!this.formType) {
       host.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
       return;
     }
     if (this.formType === 'inventory') {
-      host.innerHTML = this.inventoryFields(item);
+      // Inventory Product loads to the RIGHT of Category in the top row; price/
+      // cost/covers/pour/notes go in the adaptive section below.
+      if (slot) { slot.innerHTML = this.linkedFieldHtml(item); slot.style.display = ''; }
+      host.innerHTML = this.inventoryRestHtml(item);
       this.wireInventoryFields();
       return;
     }
@@ -457,13 +473,19 @@ S.RevenueMenuItems = {
       + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Notes (optional)</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '"/></div>';
   },
 
-  inventoryFields(item) {
+  // The inventory-product picker — rendered into the top-row slot (right of
+  // Category), at normal width.
+  linkedFieldHtml(item) {
+    const linkedId = this.linkedProductId || item?.linked_product_id || '';
+    return '<label>Inventory Product</label>'
+      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select>';
+  },
+  // Everything below the top row for an inventory item: price, cost, covers, pour, notes.
+  inventoryRestHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
     const linkedProd = linkedId ? this.prodById(linkedId) : null;
     const autoCost = linkedProd ? (App.bottleCost ? (App.bottleCost(linkedProd) || linkedProd.unit_cost || 0) : (linkedProd.unit_cost || 0)) : 0;
-    return '<div class="form-row"><div class="f" style="flex:1;min-width:240px;"><label>Inventory Product</label>'
-      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select></div></div>'
-      + '<div class="form-row">'
+    return '<div class="form-row">'
       + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:170px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
