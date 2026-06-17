@@ -1823,7 +1823,10 @@ S.HubSettings = {
       78:[0.5,1.4], 79:[0.4,1], 80:[0.3,0.8], 81:[2.5,6.7], 82:[2.2,5.8], 83:[2.9,7.7],
       84:[2.7,7.2], 85:[2.3,6.2], 86:[1.8,4.8], 87:[0.9,2.4], 88:[0.4,1], 89:[0.7,1.9],
       90:[0.7,1.9], 91:[34,91], 92:[27,72], 93:[14,38], 94:[7,19], 95:[22,58],
-      96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8]
+      96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8],
+      // Resale items appended to icProducts (Topo Chico, House Lemonade, Kettle
+      // Chips) — every product index needs an entry here or mkCount throws.
+      102:[18,48], 103:[2,6], 104:[22,60]
     };
     // Bottle beer is counted, ordered and valued by the CASE (the one canonical
     // unit). icTotals above were authored in bottles, so convert every beer index
