@@ -1604,8 +1604,17 @@ const App = {
   // and scannable. Each section's pages are parsed live from its own sidebar
   // source, so the page list and routing are never duplicated here.
   openMobileNav() {
+    // Burger is a toggle: it stays visible above the sheet, so tapping it while
+    // open slides the menu back down.
+    const _ex = document.getElementById('tn-mnav');
+    if (_ex) {
+      const _exov = document.getElementById('tn-mnav-ov');
+      _ex.style.transform = 'translateY(100%)';
+      if (_exov) _exov.style.opacity = '0';
+      setTimeout(() => { if (_exov) _exov.remove(); _ex.remove(); }, 240);
+      return;
+    }
     document.getElementById('tn-mnav-ov')?.remove();
-    document.getElementById('tn-mnav')?.remove();
     const S2 = window.S || {};
     const hubWrap = document.getElementById('hub-wrapper');
     const onHub = hubWrap && hubWrap.style.display !== 'none';
@@ -1758,13 +1767,16 @@ const App = {
     ]};
 
     // ── DOM shell (inline-positioned so it shows even against a cached CSS) ──
+    // Full-width sheet that slides UP from the bottom (the burger lives top-right;
+    // a side-drawer would fight it). Sits below the top nav so the logo + burger
+    // stay visible and the burger toggles it open/closed.
     const ov = document.createElement('div');
     ov.id = 'tn-mnav-ov';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
+    ov.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;top:0;left:0;height:100%;width:var(--sidebar-w);max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;';
-    const close = () => { panel.style.transform = 'translateX(-100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 230); };
+    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);width:100%;background:var(--surface);border-top:1px solid var(--b1);border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,0.45);z-index:9001;transform:translateY(100%);transition:transform .24s ease;display:flex;flex-direction:column;overflow:hidden;';
+    const close = () => { panel.style.transform = 'translateY(100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 240); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
     const headEl = document.createElement('div');
@@ -1870,7 +1882,7 @@ const App = {
     ov.addEventListener('click', close);
     document.body.appendChild(ov);
     document.body.appendChild(panel);
-    requestAnimationFrame(() => { ov.style.opacity = '1'; panel.style.transform = 'translateX(0)'; });
+    requestAnimationFrame(() => { ov.style.opacity = '1'; panel.style.transform = 'translateY(0)'; });
   },
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
