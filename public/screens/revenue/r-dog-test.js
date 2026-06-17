@@ -21,6 +21,15 @@ S.RevenueDogTest = {
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   },
 
+  showHowTo() {
+    App.showHelpModal('How the Dog Test Tracker Works', [
+      { p: ['A Dog (low margin and low volume on the Menu Engineering matrix) is not always a bad dish. Some are good items buried in a bad menu slot with a weak description. Before you pull one, give it a fair 90-day test in a better position with a rewritten description and watch whether volume moves.'] },
+      { h: 'Starting a Test', p: ['Pick the menu item and Bar Cop auto-fills the baseline from its current weekly covers on Menu Items. Note what you changed (new position, new description) and start. The test runs 90 days.'] },
+      { h: 'Tracking It', p: ['Current weekly volume reads live from that item\'s weekly covers on the Menu Items screen, so keep that number current as service data comes in. The card shows the lift against baseline and counts down the 90 days.'] },
+      { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Remove It if it did not. The decision snapshots the final volume and lands in Test History.'] }
+    ]);
+  },
+
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
@@ -45,20 +54,19 @@ S.RevenueDogTest = {
       }).join('');
     const today = App.todayLocal();
 
-    const form = '<div class="card"><div class="card-title">Start a 90-Day Dog Test</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">'
-      + 'Picking an item auto-fills the baseline from its current weekly_covers on the Menu Items screen. As you update weekly_covers there during the test, current volume here updates automatically.'
+    const form = '<div class="card form-card"><div class="card-title">Start a 90-Day Dog Test</div>'
+      + '<div class="form-row" style="flex-wrap:wrap;">'
+      + '<div class="f" style="width:280px;"><label>Menu Item</label><select class="form-input" id="dt-item">' + opts + '</select></div>'
+      + '<div class="f" style="width:150px;"><label>Start Date</label><input class="form-input" type="date" id="dt-date" value="' + today + '"/></div>'
+      + '<div class="f" style="width:170px;"><label>Baseline Weekly Units</label><input class="form-input" type="number" id="dt-base" step="1" placeholder="Auto-fills from item"/></div>'
       + '</div>'
       + '<div class="form-row">'
-      + '<div class="f" style="width:280px;"><label>Menu Item</label><select id="dt-item">' + opts + '</select></div>'
-      + '<div class="f" style="width:150px;"><label>Start Date</label><input type="date" id="dt-date" value="' + today + '"/></div>'
-      + '<div class="f" style="width:160px;"><label>Baseline Weekly Units</label><input type="number" id="dt-base" step="1" placeholder="Auto-fills from item"/></div>'
+      + '<div class="f" style="flex:1;min-width:260px;"><label>What You Changed</label><input class="form-input" type="text" id="dt-notes" placeholder="New menu position, rewritten description"/></div>'
       + '</div>'
-      + '<div class="form-row">'
-      + '<div class="f" style="flex:1;min-width:260px;"><label>What You Changed</label><input type="text" id="dt-notes" placeholder="New menu position, rewritten description"/></div>'
       + '</div>'
-      + '<div id="dt-err" style="color:var(--red);font-size:12px;margin-bottom:10px;display:none;"></div>'
+      + '<div class="no-print" style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="dt-start">Start Test</button>'
+      + '<span id="dt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
     // Look up linked menu items so current_volume always reflects the latest
@@ -72,7 +80,7 @@ S.RevenueDogTest = {
 
     let active = '';
     if (testing.length) {
-      active = '<div class="sh">Active Tests</div>' + testing.map(t => {
+      active = '<div class="sh" style="margin:22px 0 10px;">Active Tests</div>' + testing.map(t => {
         const elapsed = Math.max(0, this._daysSince(t.start_date) || 0);
         const pct = Math.min(100, Math.round(elapsed / this.WINDOW * 100));
         const remaining = Math.max(0, this.WINDOW - elapsed);
@@ -100,7 +108,6 @@ S.RevenueDogTest = {
           +   '<div class="f" style="width:170px;"><label>Current Weekly</label><div style="font-size:13px;color:var(--t1);padding:8px 0;">' + (cur != null ? cur.toFixed(0) + ' units' : '<span style="color:var(--t4);">not set on item</span>') + '</div></div>'
           +   (liftLine ? '<div class="f" style="flex:1;min-width:140px;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t2);padding:8px 0;">' + liftLine + '</div></div>' : '')
           + '</div>'
-          + '<div style="font-size:10px;color:var(--t3);margin-bottom:10px;">Current weekly reads from this menu item\'s weekly_covers on the Menu Items screen. Update there as service data comes in.</div>'
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
           +   '<button class="btn btn-primary btn-sm dt-keep" data-id="' + esc(t.id) + '">Keep It</button>'
           +   '<button class="btn btn-danger btn-sm dt-remove" data-id="' + esc(t.id) + '">Remove It</button>'
@@ -113,9 +120,9 @@ S.RevenueDogTest = {
     let history = '';
     if (decided.length) {
       const rows = decided.slice(0, App.listLimit('core', 'menu_dog_test')).map(t => {
-        const badge = t.status === 'Kept'
-          ? '<span class="badge badge-ok">Kept</span>'
-          : '<span class="badge badge-warn">Removed</span>';
+        const decision = t.status === 'Kept'
+          ? '<span style="color:var(--green);font-weight:600;">Kept</span>'
+          : '<span style="color:var(--t3);font-weight:600;">Removed</span>';
         // For decided tests, fall back to the volume snapshot saved at decision time.
         const liveCur = currentFor(t);
         const finalCur = (t.current_volume != null) ? t.current_volume : liveCur;
@@ -126,13 +133,13 @@ S.RevenueDogTest = {
           + '<td>' + (t.baseline_volume != null ? t.baseline_volume : '-') + '</td>'
           + '<td>' + (finalCur != null ? finalCur.toFixed(0) : '-') + '</td>'
           + '<td class="' + (lift == null ? '' : lift >= 0 ? 'pos' : 'neg') + '">' + (lift == null ? '-' : (lift >= 0 ? '+' : '') + lift.toFixed(0)) + '</td>'
-          + '<td>' + badge + '</td>'
+          + '<td>' + decision + '</td>'
           + '<td><button class="btn btn-ghost btn-sm dt-del" data-id="' + esc(t.id) + '">Remove</button></td></tr>';
       }).join('');
-      history = '<div class="sh">Test History</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+      history = '<div class="sh" style="margin:22px 0 10px;">Test History</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Item</th><th>Started</th><th>Baseline</th><th>Final Weekly</th><th>Change</th><th>Decision</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         + App.showOlderBar('core', 'menu_dog_test', decided, false);
     }
 
