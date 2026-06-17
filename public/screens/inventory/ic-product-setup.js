@@ -340,38 +340,6 @@ S.InventoryProducts = {
     } else {
       const spec = this.FORM_SPEC[this.activeCat];
       const pourable = this.isPourable(this.activeCat);
-      const rows = prods.map(p => {
-        const complete = this.isComplete(p);
-        const sz  = this.SIZES.find(s => s.oz === p.container_size_oz);
-        const szL = p.category === 'Food' || p.category === 'Misc'
-          ? esc(p.unit_type || '-')
-          : (sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-'));
-        const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
-        const dim = p.active === false ? 'opacity:0.5;' : '';
-        const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
-        const costDisplay = p.unit_cost != null
-          ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
-          : '<span style="color:var(--t4);">-</span>';
-        const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
-        return '<tr style="' + dim + '">'
-          + '<td style="width:40px;text-align:center;"><input type="checkbox" class="ip-sel" data-id="' + p.id + '"' + checked + ' style="appearance:auto;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;vertical-align:middle;"/></td>'
-          + '<td><div class="val">' + esc(p.name)
-          + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
-          + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
-          + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
-          + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
-          + '<td>' + esc(p.vendor || '-') + '</td>'
-          + '<td>' + esc(szL) + '</td>'
-          + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td>' + costDisplay + '</td>'
-          + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
-          + '<td><div class="row-actions">'
-          + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
-          + '<button class="btn btn-danger btn-sm ip-del" data-id="' + p.id + '">Delete</button>'
-          + '</div></td></tr>';
-      }).join('');
-
       const dismissed = this._dismissedAlerts && this._dismissedAlerts.has(this.activeCat);
       const alertBar = (incompleteHere.length > 0 && !dismissed)
         ? '<div class="alert-bar" style="margin-bottom:14px;"><div class="alert-text">'
@@ -391,11 +359,23 @@ S.InventoryProducts = {
       const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
       const costCol = 'Cost Per';
 
-      body = alertBar + toolbar
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th style="width:40px;"></th><th>Product</th><th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
-        + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      // Group the list by Sub-Category (Misc Type for Misc) into its own card so a
+      // manager can scan each style — "Vodka Products (18)" — and spot what is
+      // missing. The sub-category lands in the first column header, like the
+      // category-grouped usage reports. Products with no sub-category fall into an
+      // "Uncategorized" card at the bottom.
+      const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
+        + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
+      const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
+        const hdr = (g.key ? esc(g.key) + ' Products' : 'Uncategorized') + ' (' + g.items.length + ')';
+        const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
+        return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
+          + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th style="width:40px;"></th><th>' + hdr + '</th>' + headerCols
+          + '</tr></thead><tbody>' + groupRows + '</tbody></table></div></div>';
+      }).join('');
+
+      body = alertBar + toolbar + tables;
     }
 
     // When an upload is active, the lower area becomes the in-place import
@@ -405,6 +385,39 @@ S.InventoryProducts = {
     const lower = this._import ? this.importPanelHTML() : (tabs + body);
     this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>';
     this.wireLanding();
+  },
+
+  // One product row for the grouped Products list.
+  _productRowHtml(p, pourable, target) {
+    const complete = this.isComplete(p);
+    const sz  = this.SIZES.find(s => s.oz === p.container_size_oz);
+    const szL = p.category === 'Food' || p.category === 'Misc'
+      ? esc(p.unit_type || '-')
+      : (sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-'));
+    const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
+    const dim = p.active === false ? 'opacity:0.5;' : '';
+    const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
+    const costDisplay = p.unit_cost != null
+      ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
+      : '<span style="color:var(--t4);">-</span>';
+    const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
+    return '<tr style="' + dim + '">'
+      + '<td style="width:40px;text-align:center;"><input type="checkbox" class="ip-sel" data-id="' + p.id + '"' + checked + ' style="appearance:auto;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;vertical-align:middle;"/></td>'
+      + '<td><div class="val">' + esc(p.name)
+      + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
+      + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
+      + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
+      + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
+      + '<td>' + esc(p.vendor || '-') + '</td>'
+      + '<td>' + esc(szL) + '</td>'
+      + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td>' + costDisplay + '</td>'
+      + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
+      + '<button class="btn btn-danger btn-sm ip-del" data-id="' + p.id + '">Delete</button>'
+      + '</div></td></tr>';
   },
 
   // Category filter tabs, styled to match the report tab bar (.rpt-tabs).
@@ -530,14 +543,18 @@ S.InventoryProducts = {
     // product (NA Beverage / Drink Mixer / Food Ingredient / supplies). That tag
     // drives the Menu Items NA picker and the recipe ingredient picker, so it
     // replaces the unreliable free-text Sub-Category here. Every other category
-    // keeps its free-text Sub-Category.
+    // keeps a Sub-Category, but as a datalist (suggestions + values already used)
+    // so matching styles group cleanly on the Products list instead of splintering
+    // on typos.
     const subOrType = cat === 'Misc'
       ? '<div class="f"><label>Misc Type</label>'
         + '<select id="ip-misctype"><option value="">Select type...</option>'
         + App.MISC_TYPES.map(t => '<option' + (p?.misc_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
         + '</select></div>'
       : '<div class="f"><label>Sub-Category</label>'
-        + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>';
+        + '<input type="text" id="ip-subcat" list="ip-subcat-list" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/>'
+        + '<datalist id="ip-subcat-list">' + App.subcatSuggestions(cat).map(s => '<option value="' + esc(s) + '"></option>').join('') + '</datalist>'
+        + '</div>';
 
     const row1 = '<div class="form-grid" style="align-items:start;">'
       + '<div class="f"><label>Product Name</label>'
