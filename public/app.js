@@ -862,6 +862,9 @@ const App = {
     const accounts = await DB.listMyAccounts();
     const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
     const isMulti  = !!(accounts && accounts.length > 1);
+    // Cache for the mobile drawer's location chip (built synchronously).
+    this._acctList = accounts || [];
+    this._acctActiveId = activeId;
     // Both topbars (module + hub) have their own switcher slot -- populate both
     ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
       const slot = document.getElementById(slotId);
@@ -1809,6 +1812,35 @@ const App = {
       let started = false;
       const divider = () => { if (started) { const d = document.createElement('div'); d.className = 'mnav-divider'; bodyEl.appendChild(d); } started = true; };
       if (node.groups) {
+        // Multi-unit only: a location chip above the Hub link. Shows the current
+        // unit; tap to reveal the others as chips (no drop-down arrow). Switching
+        // a unit reloads into that account.
+        const accts = App._acctList || [];
+        if (accts.length > 1) {
+          const active = accts.find(a => a.id === App._acctActiveId) || accts[0];
+          const loc = document.createElement('div');
+          loc.className = 'mnav-loc';
+          const cur = document.createElement('button');
+          cur.type = 'button';
+          cur.className = 'mnav-loc-chip mnav-loc-cur';
+          cur.innerHTML = '<svg viewBox="0 0 17 17" fill="none"><path d="M8.5 1.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.4 4.7 8.6 4.7 8.6s4.7-5.2 4.7-8.6c0-2.6-2.1-4.7-4.7-4.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="6.3" r="1.7" stroke="currentColor" stroke-width="1.3"/></svg><span>' + esc(active.name) + '</span>';
+          const list = document.createElement('div');
+          list.className = 'mnav-loc-list';
+          list.style.display = 'none';
+          accts.filter(a => a.id !== active.id).forEach(a => {
+            const opt = document.createElement('button');
+            opt.type = 'button';
+            opt.className = 'mnav-loc-chip';
+            opt.textContent = a.name;
+            opt.addEventListener('click', () => fire(() => { if (window.DB && DB.setActiveAccount) DB.setActiveAccount(a.id); }));
+            list.appendChild(opt);
+          });
+          cur.addEventListener('click', () => { list.style.display = list.style.display === 'none' ? 'flex' : 'none'; });
+          loc.appendChild(cur);
+          loc.appendChild(list);
+          bodyEl.appendChild(loc);
+          started = true;
+        }
         // Level 1 (root): each category is a divider-separated block. Section rows
         // drill in (with a chevron); Hub/Blueprint/Support navigate.
         node.groups.forEach(grp => {
