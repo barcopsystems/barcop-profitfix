@@ -50,14 +50,14 @@ S.RevenueDashboard = {
             runText: 'Run Revenue Audit',
             emptyText: 'Run your first Revenue Audit for a baseline across check average, menu mix, server performance, and labor efficiency.'
           })))
+      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
+      + this.buildInitiativesCard()
       + DashUI.quickActions([
           { go: 'r-this-week', label: 'Enter This Week' },
           { go: 'r-audit', label: 'Run Revenue Audit' },
           { go: 'r-forecast', label: 'Revenue Forecast' },
           { go: 'r-menu-engineering', label: 'Menu Engineering' }
         ])
-      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
-      + this.buildInitiativesCard()
       + '</div>';
 
     FixPanel.wireFixAreas(container);
@@ -243,7 +243,7 @@ S.RevenueDashboard = {
 
     return '<div class="card" style="padding:0;overflow:hidden;">'
       + '<div style="padding:14px 20px;display:flex;align-items:center;justify-content:flex-end;">'
-      + '<button class="btn btn-primary btn-sm" id="init-add">+ Start Initiative</button>'
+      + '<button class="btn btn-ghost btn-sm" id="init-add">+ Start Initiative</button>'
       + '</div>'
       + activeRows + closedRows + '</div>';
   },
