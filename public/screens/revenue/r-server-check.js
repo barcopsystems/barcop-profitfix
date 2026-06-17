@@ -254,8 +254,11 @@ S.RevenueServerCheck = {
         + '</tr>';
     }).join('');
 
-    return '<div class="card">'
-      + '<div class="card-title">Server Scorecard &middot; Last 30 Days</div>'
+    return '<div class="card" id="rsc-sc-export">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<span>Server Scorecard &middot; Last 30 Days</span>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="rsc-export">Export PDF</button>'
+      + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.55;">Per-server performance. Comps come from Shift Control&apos;s Void and Comp log. Tips come from the Tip Pool split when saved, otherwise the Tip Log. Trend arrow compares last 7 days vs the prior 7 (10% threshold). Click + Coaching Note on any row to log a coaching moment for that server in Labor Control.</div>'
       + tiles
       + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
@@ -352,6 +355,7 @@ S.RevenueServerCheck = {
 
   // ── Wiring ────────────────────────────────────────────────────────────
   wireForm(container, actions) {
+    document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Server Performance', root: document.getElementById('rsc-sc-export') || container }));
     document.getElementById('rsc-cov')?.addEventListener('input', () => this.calc());
     document.getElementById('rsc-sales')?.addEventListener('input', () => this.calc());
     document.getElementById('rsc-submit')?.addEventListener('click', () => {
