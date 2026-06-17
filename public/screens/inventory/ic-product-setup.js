@@ -526,13 +526,25 @@ S.InventoryProducts = {
     // ── Row 1: identity fields (Name, Brand, Sub-Cat, Vendor, Location) ────
     // Auto-fit grid: fits all five on one row on wide screens and wraps/stacks
     // cleanly on narrow screens instead of overflowing the form container.
+    // Misc is a grab-bag, so it gets a structured Misc Type select that tags the
+    // product (NA Beverage / Drink Mixer / Food Ingredient / supplies). That tag
+    // drives the Menu Items NA picker and the recipe ingredient picker, so it
+    // replaces the unreliable free-text Sub-Category here. Every other category
+    // keeps its free-text Sub-Category.
+    const subOrType = cat === 'Misc'
+      ? '<div class="f"><label>Misc Type</label>'
+        + '<select id="ip-misctype"><option value="">Select type...</option>'
+        + App.MISC_TYPES.map(t => '<option' + (p?.misc_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
+        + '</select></div>'
+      : '<div class="f"><label>Sub-Category</label>'
+        + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>';
+
     const row1 = '<div class="form-grid" style="align-items:start;">'
       + '<div class="f"><label>Product Name</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Brand</label>'
       + '<input type="text" id="ip-brand" value="' + esc(p?.brand || '') + '" placeholder="' + esc(this._brandPlaceholder(cat)) + '"/></div>'
-      + '<div class="f"><label>Sub-Category</label>'
-      + '<input type="text" id="ip-subcat" value="' + esc(p?.sub_category || '') + '" placeholder="' + esc(this._subcatPlaceholder(cat)) + '"/></div>'
+      + subOrType
       + '<div class="f"><label>Primary Vendor</label>'
       + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
       + '<div class="f"><label>Primary Location</label>'
@@ -937,6 +949,7 @@ S.InventoryProducts = {
       brand:               document.getElementById('ip-brand')?.value.trim() || '',
       category:            cat,
       sub_category:        document.getElementById('ip-subcat')?.value.trim() || '',
+      misc_type:           cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '',
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
       container_size_oz:   oz,
       case_size:           caseSize,
@@ -1263,12 +1276,19 @@ S.InventoryProducts = {
         {key:'reorder_point',    label:'Reorder Point (kegs)', required:false, aliases:['reorder','reorder point','min','minimum']},
       ]);
     }
-    // Food / Misc
-    return COMMON.concat([
+    const tail = [
       {key:'unit_type',     label:'Unit Type (lb / case / each / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
       {key:'par_level',     label:'Par Level',     required:false, aliases:['par','par level','target stock']},
       {key:'reorder_point', label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum']},
-    ]);
+    ];
+    if (cat === 'Misc') {
+      // Misc swaps free-text Sub-Category for the structured Misc Type tag.
+      return COMMON.filter(f => f.key !== 'sub_category').concat([
+        {key:'misc_type', label:'Misc Type (NA Beverage / Drink Mixer / Food Ingredient / supply)', required:false, aliases:['misc type','type','group','category','sub-category','subcategory','sub category']},
+      ], tail);
+    }
+    // Food
+    return COMMON.concat(tail);
   },
 
   autoMap(headers, fields) {
@@ -1354,6 +1374,9 @@ S.InventoryProducts = {
     }
     const cell = (row, col) => { const i = headers.indexOf(col); return i >= 0 ? String(row[i] || '').trim() : ''; };
     const numOf = str => { if (!str) return null; const n = parseFloat(String(str).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
+    // Snap an imported Misc Type to a known tag (case-insensitive); an unknown
+    // value is kept as typed and simply behaves as a recipe ingredient.
+    const normMiscType = v => { const s = (v || '').trim().toLowerCase(); return (App.MISC_TYPES || []).find(t => t.toLowerCase() === s) || (v || '').trim(); };
 
     const imported = [];
     rows.forEach(row => {
@@ -1377,7 +1400,8 @@ S.InventoryProducts = {
         name,
         brand:               cell(row, getCol('brand')),
         category:            cat,
-        sub_category:        cell(row, getCol('sub_category')),
+        sub_category:        cat === 'Misc' ? '' : cell(row, getCol('sub_category')),
+        misc_type:           cat === 'Misc' ? normMiscType(cell(row, getCol('misc_type'))) : '',
         vendor:              cell(row, getCol('vendor')),
         container_size_oz:   oz,
         case_size:           caseSize,
