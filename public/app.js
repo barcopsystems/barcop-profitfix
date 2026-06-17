@@ -1796,9 +1796,9 @@ const App = {
     const render = () => {
       const node = stack[stack.length - 1];
       const canBack = stack.length > 1;
-      headEl.innerHTML = '<button class="mnav-x" type="button" aria-label="Close">×</button>'
+      headEl.innerHTML = '<span class="mnav-title">' + esc(node.title) + '</span>'
         + (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '')
-        + '<span class="mnav-title">' + esc(node.title) + '</span>';
+        + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
       headEl.querySelector('.mnav-x').addEventListener('click', close);
       const backBtn = headEl.querySelector('.mnav-back');
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
