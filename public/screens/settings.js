@@ -1517,6 +1517,10 @@ S.HubSettings = {
       { name:'ABW Fire Eagle IPA',       category:'Draft Beer', vendor:'Austin Beerworks',    container_size_oz:1984, pour_size_oz:16, unit_cost:190.00, menu_price:7, par_level:3, reorder_point:1, primary_location:'Walk-in Cooler' },
       { name:'Independence Stout',       category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:175.00, menu_price:6, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
       { name:'Seasonal Rotating Tap',    category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:185.00, menu_price:7, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
+      // ── Resale items (bought + sold whole, marked Sold on the menu) ─────────
+      { name:'Topo Chico (each)',        category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.95, menu_price:4,    servings_per_unit:1,  cost_per_serving:0.95, par_level:48, reorder_point:24, primary_location:'Walk-in Cooler' },
+      { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gal', vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
+      { name:'Kettle Chips (bag)',       category:'Food', sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.85, menu_price:3.5, servings_per_unit:1, cost_per_serving:0.85, par_level:60, reorder_point:24, primary_location:'Dry Storage' },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       // Bottle Beer unit_cost is per CASE; convert to per-bottle before costing
@@ -1600,6 +1604,22 @@ S.HubSettings = {
       ['Sauvignon Blanc', 11, 85], ['Pinot Grigio', 10, 75], ['Rosé', 11, 60], ['Champagne', 14, 30],
       ['Cabernet Reserve', 16, 24], ['Chardonnay Reserve', 15, 22]
     ].forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(invMenuItem(p, row[1], row[2])); });
+
+    // ── Resale items (NA beverages + snacks) as linked Menu Items ───────────
+    // Packaged items sold whole, linked to their Inventory product. Cost flows
+    // per serving via App.menuLinkCost (cost / servings per unit), so the menu
+    // shows an honest per-serving cost, not the per-case purchase cost.
+    const resaleMenuItem = (p, covers) => ({
+      id:uid(), name:p.name,
+      category:(App.menuCatForProduct ? (App.menuCatForProduct(p) || 'Snacks') : 'Snacks'),
+      price:p.menu_price || 0,
+      cost:+((App.menuLinkCost ? App.menuLinkCost(p) : (p.unit_cost || 0))).toFixed(2),
+      weekly_covers:covers, prev_weekly_covers:null, weekly_covers_updated_at:null, notes:'',
+      recipe:null, linked_product_id:p.id, pour_size_oz:null, target_cost_pct:null,
+      created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+    });
+    [ ['Topo Chico', 90], ['House Lemonade', 70], ['Kettle Chips', 110] ]
+      .forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(resaleMenuItem(p, row[1])); });
 
     // ── Recipes attached to menu items + standalone batches ─────────────────
     // Recipes now live EMBEDDED in App.data.menu_items as the optional
