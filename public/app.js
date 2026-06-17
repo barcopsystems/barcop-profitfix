@@ -1805,17 +1805,18 @@ const App = {
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
 
       bodyEl.innerHTML = '';
-      bodyEl.classList.remove('mnav-grp-open');
+      // Flat list with a divider between groups (matches the desktop sidebar).
+      // No accordions on either level; the two-level drill stays.
+      let started = false;
+      const divider = () => { if (started) { const d = document.createElement('div'); d.className = 'mnav-divider'; bodyEl.appendChild(d); } started = true; };
       if (node.groups) {
-        // Root: sections drill in (with icons); Hub/Blueprint/Support navigate.
+        // Level 1 (root): each category is a divider-separated block. Section rows
+        // drill in (with a chevron); Hub/Blueprint/Support navigate.
         node.groups.forEach(grp => {
-          if (grp.label) {
-            const gl = document.createElement('div');
-            gl.className = 'mnav-glabel';
-            gl.textContent = grp.label;
-            bodyEl.appendChild(gl);
-          }
-          grp.items.forEach(it => {
+          const items = grp.items || [];
+          if (!items.length) return;
+          divider();
+          items.forEach(it => {
             const row = mkRow(it.label, it.node ? 'drill' : '', false, it.icon);
             row.addEventListener('click', () => {
               if (it.node) { stack.push(it.node); render(); bodyEl.scrollTop = 0; }
@@ -1825,38 +1826,22 @@ const App = {
           });
         });
       } else {
-        // Section: leaf pages keep icons; sub-groups are single-open accordions
-        // (no icons on the header or the links inside).
-        const accs = [];
+        // Level 2 (section): the Dashboard leaf, then every page as a flat row
+        // (with its icon), a divider between the source sub-groups. No accordions.
         node.items.forEach(it => {
+          divider();
           if (it.pages) {
-            const head = mkRow(it.label, 'acc', false, it.icon);
-            if (it.open) head.classList.add('open');
-            const sub = document.createElement('div');
-            sub.style.display = it.open ? 'block' : 'none';
             it.pages.forEach(p => {
-              const pr = mkRow(p.label, 'page', !!p.id && p.id === activeId);
+              const pr = mkRow(p.label, '', !!p.id && p.id === activeId, p.icon);
               pr.addEventListener('click', () => fire(p.go));
-              sub.appendChild(pr);
+              bodyEl.appendChild(pr);
             });
-            // Opening/closing a drop-down is in-session only (cosmetic). What
-            // shows on the next open is decided by the live current page above.
-            head.addEventListener('click', () => {
-              const isOpen = sub.style.display !== 'none';
-              accs.forEach(a => { a.sub.style.display = 'none'; a.head.classList.remove('open'); });
-              if (!isOpen) { sub.style.display = 'block'; head.classList.add('open'); }
-              bodyEl.classList.toggle('mnav-grp-open', !isOpen);
-            });
-            accs.push({ head: head, sub: sub });
-            bodyEl.appendChild(head);
-            bodyEl.appendChild(sub);
           } else {
             const row = mkRow(it.label, '', !!it.id && it.id === activeId, it.icon);
             row.addEventListener('click', () => fire(it.go));
             bodyEl.appendChild(row);
           }
         });
-        bodyEl.classList.toggle('mnav-grp-open', accs.some(a => a.head.classList.contains('open')));
       }
     };
 
