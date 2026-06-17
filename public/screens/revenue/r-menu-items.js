@@ -391,8 +391,8 @@ S.RevenueMenuItems = {
     const catOpts = '<option value="">Select category...</option>'
       + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     return '<div class="form-row">'
-      + '<div class="f" style="flex:2;min-width:220px;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '<div class="f" style="width:300px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
       + '</div>'
       + '<div id="mi-adaptive"></div>';
   },
