@@ -289,7 +289,9 @@ S.RevenueMenuItems = {
             + '</div></td></tr>';
         }).join('');
         return '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + '</div>'
-          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:780px;">'
+          + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
+          + '<thead><tr>'
           + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
       }).join('');
