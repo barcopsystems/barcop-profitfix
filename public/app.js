@@ -2690,6 +2690,19 @@ const App = {
     'Misc':        'NA Beverages'
   },
 
+  // 2nd-level tag on the catch-all Misc category. Misc lumps three different
+  // kinds of thing (things you sell, things you cook/mix with, and pure
+  // operating supplies), so this tag keeps each out of the wrong list:
+  // NA Beverage shows in the Menu Items NA picker (and stays available as a
+  // mixer); Drink Mixer / Food Ingredient are recipe ingredients only; the two
+  // supply types stay out of every menu/recipe picker.
+  MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Food Ingredient', 'Paper & To-Go', 'Cleaning & Supplies'],
+  MISC_SUPPLY_TYPES: ['Paper & To-Go', 'Cleaning & Supplies'],
+  // Sellable as an NA beverage on the menu (shows in the NA product picker).
+  miscSellable(p) { return !!p && p.category === 'Misc' && p.misc_type === 'NA Beverage'; },
+  // Pure operating supply — not a recipe ingredient, not a menu item.
+  miscIsSupply(p) { return !!p && p.category === 'Misc' && this.MISC_SUPPLY_TYPES.includes(p.misc_type); },
+
   // Target cost % defaults per menu category. Plate dishes target 32%,
   // single-drink cocktails target 22%, catering targets 28%. Operators
   // override per item; this is the default applied when a new item is created.
