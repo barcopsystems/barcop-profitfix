@@ -611,7 +611,7 @@ S.HubSettings = {
         S2_DRAWER_RECON: 'Performed at close', S2_CASH_POLICY: 'Yes', S2_VOID_APPROVAL: 'Manager PIN required', S2_SPILLAGE_LOG: 'Yes',
         S2_MONTHLY_GAP: 506,
         S2_NARRATIVE: 'Void and comp rate is down to 1.6%, near the 1% benchmark, with only 8% of voids unapproved.',
-        S2_FINDING: 'The cash policy is finalized, drawers are reconciled at close, and a spillage log is running. Loss prevention is now a functioning system.',
+        S2_FINDING: 'The cash policy is finalized, drawers are reconciled at close, and a spillage log is running. Breakage now separates cleanly from theft.',
         S2_TOOL: 'Review the Void and Comps log monthly and refresh staff training each quarter.',
         S3_SCORE: 54, S3_FOOD_COST_PCT: 33.8, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 31300,
         S3_FOOD_VAR_PCT: 2.9, S3_FOOD_VAR_AMT: 908, S3_RECIPE_COVERAGE: '24 of 24 plates costed',
@@ -638,7 +638,7 @@ S.HubSettings = {
         S6_SIG1_TOOL: 'Run a weekly Spot Check on measured pours.',
         S6_SIG2_SCORE: 'MEDIUM', S6_SIG2_LABEL: 'Vendor price drift unreviewed',
         S6_SIG2_EVIDENCE: 'Two vendors logged price increases this period that have not been reviewed.',
-        S6_SIG2_GAP: 'Small increases compound and quietly give back the margin you just recovered.',
+        S6_SIG2_GAP: 'Small price increases quietly give back the margin you just recovered.',
         S6_SIG2_TOOL: 'Review the Price Changes tab in Vendor Tracker each month.'
       }})
     ];
@@ -1139,7 +1139,6 @@ S.HubSettings = {
       email_list_size:      [380,410,445,480,520,560,605,650,690,720,745,760],
       emails_sent:          [1,1,2,2,2,3,3,3,4,4,4,4],
       email_open_rate:      [18,19,20,21,22,24,25,26,27,27,28,28],
-      loyalty_members:      [0,0,0,0,0,0,60,140,220,300,370,420],
     };
     // The traffic metrics above are a 12-week hand-authored series (separate from
     // the 52-week P&L arc). Map them onto the most recent 12 weeks so recent
@@ -1164,7 +1163,6 @@ S.HubSettings = {
       delivery_avg_order_value: tw.delivery_avg_order_value[i],
       email_list_size: tw.email_list_size[i], emails_sent: tw.emails_sent[i],
       email_open_rate: tw.email_open_rate[i],
-      loyalty_active: i >= 6 ? 'yes' : 'no', loyalty_members: tw.loyalty_members[i],
       notes: ''
     }));
 
@@ -1174,7 +1172,7 @@ S.HubSettings = {
         'Google Business Profile': raw.S1_SCORE, 'Website': raw.S2_SCORE,
         'Reviews': raw.S3_SCORE, 'Search and SEO': raw.S4_SCORE,
         'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
-        'Email and Loyalty': raw.S7_SCORE
+        'Email Marketing': raw.S7_SCORE
       };
       const items = [];
       const push = (gap, label, gid) => { if (gap > 0) items.push({ action:label + ' $' + Math.round(gap) + '/month opportunity.', monthly_impact:gap, gap_id:gid }); };
@@ -1183,7 +1181,7 @@ S.HubSettings = {
       push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.', 'reviews');
       push(raw.S5_MONTHLY_GAP, 'Tighten posting schedule and content mix.', 'social');
       push(raw.S6_MONTHLY_GAP, 'Tighten delivery platform listings.', 'delivery');
-      push(raw.S7_MONTHLY_GAP, 'Activate the email list and loyalty program.', 'email-loyalty');
+      push(raw.S7_MONTHLY_GAP, 'Activate the email list and send consistently.', 'email-loyalty');
       items.sort((a, b) => (b.monthly_impact||0) - (a.monthly_impact||0));
       const totalMo = items.reduce((s, it) => s + (it.monthly_impact||0), 0);
       raw.OVERALL_SCORE = score;
@@ -1244,8 +1242,8 @@ S.HubSettings = {
         S6_TOOL:'Add 15 more food photos per platform and run a first-order promo on DoorDash.',
         S7_SCORE:30, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:380, S7_LIST_BENCHMARK:500,
         S7_LAST_SEND_DAYS_AGO:42, S7_SEND_FREQUENCY:'Rarely', S7_OPEN_RATE:18, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'No active mechanism', S7_LOYALTY_PROGRAM:'None', S7_MONTHLY_GAP:420,
-        S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks. No loyalty program is in place.',
+        S7_GROWTH_MECHANISM:'No active mechanism', S7_MONTHLY_GAP:420,
+        S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks.',
         S7_FINDING:'The list is going cold, opens are below benchmark, and there is no way for new guests to opt in.',
         S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.',
         S8_SIG1_SCORE:'HIGH', S8_SIG1_LABEL:'Review velocity dead',
@@ -1308,8 +1306,8 @@ S.HubSettings = {
         S6_TOOL:'Mirror the DoorDash promo on UberEats and add 8 more food photos to each.',
         S7_SCORE:46, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:560, S7_LIST_BENCHMARK:500,
         S7_LAST_SEND_DAYS_AGO:9, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:24, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Started', S7_MONTHLY_GAP:220,
-        S7_NARRATIVE:'List grew past 500 and a loyalty program launched. Open rate of 24% beats the 20% benchmark.',
+        S7_GROWTH_MECHANISM:'WiFi login capture', S7_MONTHLY_GAP:220,
+        S7_NARRATIVE:'List grew past 500 and sends became monthly. Open rate of 24% beats the 20% benchmark.',
         S7_FINDING:'Sending monthly works. Moving to weekly during event months grows revenue per send.',
         S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.',
         S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting schedule inconsistent',
@@ -1320,10 +1318,10 @@ S.HubSettings = {
         S8_SIG2_EVIDENCE:'UberEats rating 4.2 vs DoorDash 4.4.',
         S8_SIG2_GAP:'Lower rating means lower feed placement and fewer orders.',
         S8_SIG2_TOOL:'Mirror the DoorDash photo and promo plan on UberEats.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty slow start',
-        S8_SIG3_EVIDENCE:'60 members in the first month.',
-        S8_SIG3_GAP:'Sign-up conversion needs a small incentive to accelerate.',
-        S8_SIG3_TOOL:'Offer a free appetizer for the first 100 sign-ups.'
+        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Email cadence still monthly',
+        S8_SIG3_EVIDENCE:'Sending once a month, opens at 24%.',
+        S8_SIG3_GAP:'Weekly sends during event months would lift revenue per send.',
+        S8_SIG3_TOOL:'Add a weekly email during event-heavy weeks.'
       }),
       mkTrafficAudit(dateStr(8), daysAgoISO(8), 'TFA-2026-0017',
         'April 2026, 4 weeks ending Apr 24', 64,
@@ -1368,11 +1366,11 @@ S.HubSettings = {
         S6_TOOL:'Add a third promo type, free-delivery threshold, on DoorDash next month.',
         S7_SCORE:62, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:760, S7_LIST_BENCHMARK:500,
         S7_LAST_SEND_DAYS_AGO:5, S7_SEND_FREQUENCY:'Weekly', S7_OPEN_RATE:28, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture', S7_LOYALTY_PROGRAM:'Active, 420 members',
+        S7_GROWTH_MECHANISM:'WiFi login capture',
         S7_MONTHLY_GAP:80,
-        S7_NARRATIVE:'List grew to 760, weekly sends with 28% opens, and 420 loyalty members enrolled.',
-        S7_FINDING:'The email channel is now a real revenue line. Loyalty redemption rate is the next thing to track.',
-        S7_TOOL:'Add a redemption-rate report to the monthly review and run a member-only event quarterly.',
+        S7_NARRATIVE:'List grew to 760 with weekly sends and 28% opens.',
+        S7_FINDING:'The email channel is now a real revenue line. Keep the weekly cadence and keep growing the list.',
+        S7_TOOL:'Hold the weekly cadence and add a segmented email for your regulars.',
         S8_SIG1_SCORE:'LOW', S8_SIG1_LABEL:'Photo library steady',
         S8_SIG1_EVIDENCE:'138 photos current, with 54 added in the last 30 days.',
         S8_SIG1_GAP:'On track. Refresh photos seasonally.',
@@ -1381,10 +1379,10 @@ S.HubSettings = {
         S8_SIG2_EVIDENCE:'Grubhub listing remains off.',
         S8_SIG2_GAP:'Confirm this is intentional given local order mix.',
         S8_SIG2_TOOL:'Review Grubhub local order share annually before deciding.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Loyalty trajectory strong',
-        S8_SIG3_EVIDENCE:'420 members in 90 days, redemption rate not yet measured.',
-        S8_SIG3_GAP:'Redemption rate is the next leading indicator to watch.',
-        S8_SIG3_TOOL:'Add a monthly redemption report and run a member-only event quarterly.'
+        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Email channel strong',
+        S8_SIG3_EVIDENCE:'760 contacts, weekly sends, 28% opens.',
+        S8_SIG3_GAP:'On track. Keep the cadence and segment the list.',
+        S8_SIG3_TOOL:'Add a regulars-only email and a monthly performance check.'
       })
     ];
 
@@ -2578,7 +2576,7 @@ S.HubSettings = {
       { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business Profile', date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email and Loyalty',       date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email Marketing',          date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'delivery',      gap_name:'Delivery Platforms',      date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'reviews',       gap_name:'Reviews',                 date:fxStart, logged_at:fxStartISO },
     ]);
