@@ -142,6 +142,7 @@ S.AuditTracker = {
       + '</div>';
 
     AuditUI.attachOutlook('at', audit, 'profit');
+    this.container.querySelector('.at-export-btn')?.addEventListener('click', () => this.exportPDF(audit));
     this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
       btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('profit-fix'); });
     });
