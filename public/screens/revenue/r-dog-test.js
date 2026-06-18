@@ -134,7 +134,7 @@ S.RevenueDogTest = {
           + '<td>' + (finalCur != null ? finalCur.toFixed(0) : '-') + '</td>'
           + '<td class="' + (lift == null ? '' : lift >= 0 ? 'pos' : 'neg') + '">' + (lift == null ? '-' : (lift >= 0 ? '+' : '') + lift.toFixed(0)) + '</td>'
           + '<td>' + decision + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm dt-del" data-id="' + esc(t.id) + '">Remove</button></td></tr>';
+          + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dt-del" data-id="' + esc(t.id) + '">Remove</button></div></td></tr>';
       }).join('');
       history = '<div class="sh" style="margin:22px 0 10px;">Test History</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
