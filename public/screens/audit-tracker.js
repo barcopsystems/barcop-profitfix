@@ -371,7 +371,7 @@ S.AuditTracker = {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     // The form is always viewable so the operator can review/update inputs. The
-    // 30-day cadence gates only the Generate action.
+    // 30-day window gates only the Generate action.
     const _a = (App.data.audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = _since >= 30;
