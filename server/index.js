@@ -147,7 +147,7 @@ VOICE, follow exactly:
 - NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst offender, the concentration, the dollar gap. TOOL: a direct instruction that names the Bar Cop screen and the action, like "Jigger every well and watch pour variance in Spot Check." Never soft advice or "you should consider".
 - Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
 - Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
-- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy".
+- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy", "cadence", "package", "ecosystem".
 
 Respond with a single JSON object, no other text, with exactly these prose fields:
 {"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
@@ -267,7 +267,7 @@ VOICE, follow exactly:
 - NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst gap, the concentration. TOOL: a direct instruction naming the action, like "Reply to every review inside 48 hours." Never soft advice or "you should consider".
 - Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
 - Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
-- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy".
+- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy", "cadence", "package", "ecosystem".
 - CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount.
 
 Respond with a single JSON object, no other text, with exactly these prose fields:
@@ -356,7 +356,7 @@ VOICE, follow exactly:
 - NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst offender, the concentration, the gap. TOOL: a direct instruction that names the Bar Cop screen and the action, like "Track check average by server in Server Check and coach the bottom two." Never soft advice or "you should consider".
 - Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
 - Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
-- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy".
+- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy", "cadence", "package", "ecosystem".
 - Treat check-average, menu, server, and event figures as REVENUE OPPORTUNITY (potential growth), and labor as cost. Do not call opportunity "recovered" money.
 
 Respond with a single JSON object, no other text, with exactly these prose fields:
