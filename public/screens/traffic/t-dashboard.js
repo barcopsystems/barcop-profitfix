@@ -79,7 +79,6 @@ S.TrafficDashboard = {
       + '<div class="qa" style="padding:18px 20px;">'
       + '<button class="btn btn-primary" id="t-qa-week">Enter This Week</button>'
       + '<button class="btn btn-ghost" id="t-qa-audit">Traffic Audit</button>'
-      + '<button class="btn btn-ghost" id="t-qa-reports">View Reports</button>'
       + '</div>'
       + '</div>'
       + '</div>';
@@ -91,7 +90,6 @@ S.TrafficDashboard = {
 
     document.getElementById('t-qa-week')?.addEventListener('click',    () => App.navigate('t-this-week'));
     document.getElementById('t-qa-audit')?.addEventListener('click',   () => App.navigate('t-audit'));
-    document.getElementById('t-qa-reports')?.addEventListener('click', () => App.navigate('t-reports'));
     container.querySelectorAll('.t-db-action').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.gap) App._fixFocus = row.dataset.gap;
