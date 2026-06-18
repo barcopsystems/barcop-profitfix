@@ -278,6 +278,11 @@ S.LaborBuildSchedule = {
     const left = budget - T.cost;
     const pct = fc > 0 ? T.cost / fc * 100 : null;
     const rplh = T.hours > 0 && fc > 0 ? fc / T.hours : null;
+    // Target Hours = the labor hours this forecast can support at the RPLH target
+    // (the old Optimal Staffing Calculator, folded into the live budget card).
+    const rt = (App.data.revenue_settings && App.data.revenue_settings.targets) || {};
+    const rplhTgt = ((rt.rplh_lunch || 50) + (rt.rplh_dinner || 75) + (rt.rplh_bar || 65)) / 3;
+    const targetHrs = (fc > 0 && rplhTgt > 0) ? fc / rplhTgt : 0;
 
     // The budget numbers live in their own standalone card. It is ALWAYS
     // rendered in the same slot: the four budget stats once a forecast is set,
@@ -297,6 +302,7 @@ S.LaborBuildSchedule = {
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget)
         + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
+        + '<div class="calc-item"><div class="calc-label">Target Hours</div><div class="calc-val lg">' + (targetHrs > 0 ? targetHrs.toFixed(1) + ' hrs' : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div></div>';
@@ -737,7 +743,7 @@ S.LaborBuildSchedule = {
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Picking the Week', p: ['Build Schedule opens on the current week. Use the week chips and the arrows above the grid to move between weeks, or This Week to snap back. A week you have already posted opens ready to edit; an empty week is ready to build. Worksheet prints a blank staff-by-day grid to pencil in before you enter it here.'] },
       { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
-      { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast) and shows, live, what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
+      { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast), shows the Target Hours that forecast can support at your RPLH target, and shows live what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
       { h: 'Templates', p: ['To start from a typical week, Load one of your Saved Templates listed at the bottom of this page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched.'] },
       { h: 'Salaried Staff', p: ['Salaried managers show their shift times in the grid, but their pay is a fixed weekly salary, not an hourly cost, so it counts toward the budget as a flat amount no matter how many hours you schedule.'] }
