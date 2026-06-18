@@ -879,7 +879,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     else if (deliveryMarkup === false) s6 = clampScore(s6 - 10); // losing margin on every order
   }
 
-  // ── S7 — Email and Loyalty ──
+  // ── S7 — Email Marketing ──
   const listSize = num(extracted.list_size) != null ? num(extracted.list_size) : round0(wk(w => w.email_list_size));
   const openRate = num(extracted.open_rate) != null ? num(extracted.open_rate) : round1(wk(w => w.email_open_rate));
   const haveEmail = extracted.email_list_exists != null || listSize != null || openRate != null;
@@ -999,7 +999,6 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     S7_SEND_FREQUENCY: extracted.send_frequency || null,
     S7_LAST_SEND_DAYS_AGO: num(extracted.last_send_days),
     S7_GROWTH_MECHANISM: yn(extracted.growth_mechanism),
-    S7_LOYALTY_PROGRAM: yn(extracted.loyalty),
 
     action_items: items     // deficit-based, no dollar impact
   };
