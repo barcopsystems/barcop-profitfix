@@ -1,11 +1,11 @@
 'use strict';
 
 /* ── Revenue Recovery — Server Check + Server Scorecard ───────────────────────
-   One screen owns server-side performance end-to-end. A window selector drives
-   the stat strip + per-server scorecard + the shift log. Below the strip is the
-   New Shift Check form (logs one server's covers and sales) with auto staff_id +
-   shift_id capture; then the per-server Scorecard (data-card, exportable); then
-   the Shift Log (data-card).
+   One screen owns server-side performance end-to-end. A window selector (on the
+   scorecard heading row) drives the stat strip + per-server scorecard + the
+   Server Shift list. Top is the stat strip, then the New Shift Check form (logs
+   one server's covers and sales, with auto staff_id + shift_id capture), then the
+   per-server Scorecard (data-card, exportable), then the Server Shift list.
 
    Roster comes from lc_staff via App.staffOptions (audience 'service'). Comps
    flow in from sc_void_comps via staff_id; tips from lc_tip_pools / lc_tips via
@@ -134,18 +134,13 @@ S.RevenueServerCheck = {
   showHowTo() {
     App.showHelpModal('How Server Check Works', [
       { p: ['Log each server\'s covers and sales for a shift; Bar Cop turns it into a check average and tracks every server against your target. Comps pull in from Shift Control\'s Void and Comp log and tips from the Tip Pool or Tip Log, so you never enter the same number twice.'] },
-      { h: 'The Window', p: ['The chips set the window for the scorecard and the shift log: the last 7, 30 or 90 days, or all time. The team average, top performer, who is trending down, and the spread top to bottom all reflect the window you pick.'] },
+      { h: 'The Window', p: ['The chips set the window for the scorecard and the Server Shift list: the last 7, 30 or 90 days, or all time. The team average, top performer, who is trending down, and the spread top to bottom all reflect the window you pick.'] },
       { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. Worksheet prints a blank sheet to capture checks on paper during service and enter after close.'] },
       { h: 'The Scorecard', p: ['Per server: check average against target and against the team, covers, sales, comps and tips as a percent of sales, and a trend arrow comparing the last 7 days to the prior 7. TOP and DOWN call out the leader and anyone slipping. Add a coaching note on any row to log it on that server in Labor Control.'] }
     ]);
   },
 
-  // ── Window selector + stat strip ────────────────────────────────────────────
-  rangeRow() {
-    return '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
-      + App.filterChips(this._window, this.WINDOW_CHIPS, 'rsc-range-chip') + '</div>';
-  },
-
+  // ── Stat strip ──────────────────────────────────────────────────────────────
   statStrip(sc, targetCA) {
     const has = sc.rows.length;
     const top = has ? sc.rows[0] : null;
@@ -172,10 +167,7 @@ S.RevenueServerCheck = {
       .map(tp => '<option' + (f.shift === tp ? ' selected' : '') + '>' + esc(tp) + '</option>').join('');
     const editing = this._editing;
     return '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + (editing ? 'Edit Shift Check' : 'New Shift Check') + '</span>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="rsc-worksheet">Worksheet</button>'
-      + '</div>'
+      + '<div class="card-title">' + (editing ? 'Edit Shift Check' : 'New Shift Check') + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input class="form-input" type="date" id="rsc-date" value="' + esc(f.date || '') + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label><select class="form-input" id="rsc-shift">' + shiftOpts + '</select></div>'
@@ -183,21 +175,20 @@ S.RevenueServerCheck = {
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Covers</label><input class="form-input" type="number" id="rsc-cov" value="' + esc(f.cov || '') + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rsc-sales" value="' + esc(f.sales || '') + '"/></div></div>'
       + '</div>'
-      + '<div id="rsc-result" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--b2);">'
-        + '<div style="display:flex;align-items:center;gap:40px;flex-wrap:wrap;">'
-          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Check Average</div>'
-            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;" id="rsc-ca"> </div></div>'
-          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Target</div>'
-            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;color:var(--t3);">$' + targetCA + '</div></div>'
-          + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">vs Target</div>'
-            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:600;letter-spacing:-1px;line-height:1;" id="rsc-var"> </div></div>'
-          + '<div style="margin-left:auto;"><div id="rsc-badge" style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;"></div></div>'
+      + '<div id="rsc-result" style="margin-top:16px;">'
+        + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
+          + '<div style="display:flex;align-items:center;gap:36px;flex-wrap:wrap;">'
+            + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="rsc-ca">-</div></div>'
+            + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg" style="color:var(--t3);">$' + targetCA + '</div></div>'
+            + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val lg" id="rsc-var">-</div></div>'
+            + '<div style="margin-left:auto;"><div id="rsc-badge" style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;"></div></div>'
+          + '</div>'
         + '</div>'
       + '</div>'
       + '</div>'
       + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="rsc-submit">' + (editing ? 'Update Check' : 'Log Check') + '</button>'
-      + (editing ? '<button class="btn btn-ghost" id="rsc-cancel">Cancel</button>' : '')
+      + (editing ? '<button class="btn btn-ghost" id="rsc-cancel">Cancel</button>' : '<button class="btn btn-ghost" id="rsc-startover">Start Over</button>')
       + '<span id="rsc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
   },
@@ -205,8 +196,11 @@ S.RevenueServerCheck = {
   // ── Per-server scorecard (data-card, exportable) ─────────────────────────────
   scorecardSection(sc, targetCA) {
     const headingRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Server Scorecard</div>'
-      + '<button class="btn btn-ghost btn-sm" id="rsc-export">Export PDF</button></div>';
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this._window, this.WINDOW_CHIPS, 'rsc-range-chip') + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" id="rsc-export">Export PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="rsc-worksheet">Worksheet</button>'
+      + '</div></div>';
     if (!sc.rows.length) {
       return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above to build the scorecard.</div></div>';
     }
@@ -245,34 +239,30 @@ S.RevenueServerCheck = {
 
   // ── Shift log (data-card) ────────────────────────────────────────────────────
   logSection(log, targetCA) {
-    return '<div class="sh" style="margin:24px 0 10px;">Shift Log</div>'
-      + '<div class="no-print" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="rsc-sel-all">Select All</button>'
-      + '<button class="btn btn-danger btn-sm" id="rsc-del-sel" style="display:none;">Delete Selected</button>'
-      + '<span id="rsc-sel-count" style="font-size:11px;color:var(--t3);"></span>'
-      + '</div>'
+    return '<div class="sh" style="margin:24px 0 10px;">Server Shift</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th class="no-print" style="width:36px;"></th><th>Date</th><th>Shift</th><th>Server</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
+      + '<th>Date</th><th>Shift</th><th>Server</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
       + '</tr></thead><tbody id="rsc-log">' + this._buildRows(log, targetCA) + '</tbody></table></div></div>';
   },
 
   _buildRows(log, targetCA) {
-    if (!log.length) return '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--t4);">No shift checks in this range.</td></tr>';
+    if (!log.length) return '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--t4);">No shift checks in this range.</td></tr>';
     return log.map(c => {
       const ca = c.covers > 0 ? c.sales / c.covers : 0;
       const diff = ca - targetCA;
       const color = diff >= 0 ? 'var(--gold)' : diff >= -5 ? 'var(--amber)' : 'var(--red)';
       const status = diff >= 0 ? 'On Target' : diff >= -5 ? 'Watch' : 'Below Standard';
-      const linked = c.shift_id ? ' <span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">SHIFT LINKED</span>' : '';
       return '<tr>'
-        + '<td class="no-print"><input type="checkbox" class="rsc-chk" data-id="' + c.id + '" style="cursor:pointer;accent-color:var(--gold);width:15px;height:15px;"/></td>'
         + '<td>' + (c.date || '').slice(0, 10) + '</td>'
-        + '<td>' + esc(c.shift || '') + linked + '</td>'
+        + '<td>' + esc(c.shift || '') + '</td>'
         + '<td>' + esc(c.server_name || '') + '</td>'
         + '<td class="val">' + App.fmtCurrency(ca) + '</td>'
-        + '<td style="color:' + (diff >= 0 ? 'var(--gold)' : diff >= -5 ? 'var(--t2)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + App.fmtCurrency(diff) + '</td>'
+        + '<td style="color:' + color + ';">' + (diff >= 0 ? '+' : '') + App.fmtCurrency(diff) + '</td>'
         + '<td style="color:' + color + ';font-weight:600;">' + status + '</td>'
-        + '<td class="no-print"><button class="btn btn-ghost btn-sm rsc-edit" data-id="' + c.id + '">Edit</button></td>'
+        + '<td class="no-print"><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm rsc-edit" data-id="' + c.id + '">Edit</button>'
+          + '<button class="btn btn-danger btn-sm rsc-del" data-id="' + c.id + '">Delete</button>'
+        + '</div></td>'
         + '</tr>';
     }).join('');
   },
@@ -290,7 +280,6 @@ S.RevenueServerCheck = {
       .slice(0, 50);
 
     this.container.innerHTML = '<div class="screen">'
-      + this.rangeRow()
       + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
       + this.scorecardSection(scorecard, targetCA)
@@ -336,6 +325,7 @@ S.RevenueServerCheck = {
       this.captureForm(); this.calc(); this.save();
     });
     document.getElementById('rsc-cancel')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._editing = false; this.draw(); });
+    document.getElementById('rsc-startover')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._editing = false; this._calc = null; this.draw(); });
 
     c.querySelectorAll('.rsc-coach').forEach(btn => btn.addEventListener('click', () => {
       App._coachingFocus = { staff_id: btn.dataset.sid };
@@ -343,50 +333,39 @@ S.RevenueServerCheck = {
       App.navigate('lc-staff-roster');
     }));
     c.querySelectorAll('.rsc-edit').forEach(btn => btn.addEventListener('click', () => this.editEntry(btn.dataset.id)));
-
-    const updateSel = () => {
-      const checked = c.querySelectorAll('.rsc-chk:checked');
-      const delBtn = document.getElementById('rsc-del-sel');
-      const count = document.getElementById('rsc-sel-count');
-      if (delBtn) delBtn.style.display = checked.length ? '' : 'none';
-      if (count) count.textContent = checked.length ? checked.length + ' selected' : '';
-    };
-    c.querySelectorAll('.rsc-chk').forEach(chk => chk.addEventListener('change', updateSel));
-    document.getElementById('rsc-sel-all')?.addEventListener('click', () => {
-      const all = c.querySelectorAll('.rsc-chk');
-      const anyUnchecked = [...all].some(x => !x.checked);
-      all.forEach(x => { x.checked = anyUnchecked; });
-      updateSel();
-    });
-    document.getElementById('rsc-del-sel')?.addEventListener('click', async () => {
-      const ids = [...c.querySelectorAll('.rsc-chk:checked')].map(x => x.dataset.id);
-      if (!ids.length) return;
-      const ok = await App.confirmDelete(ids.length + ' check' + (ids.length > 1 ? 's' : ''));
+    c.querySelectorAll('.rsc-del').forEach(btn => btn.addEventListener('click', async () => {
+      const ok = await App.confirmDelete();
       if (!ok) return;
-      for (const id of ids) await App.removeRecord('core', 'revenue_server_check', id);
+      await App.removeRecord('core', 'revenue_server_check', btn.dataset.id);
       this.draw();
-    });
+    }));
   },
 
   calc() {
     const cov = parseFloat(document.getElementById('rsc-cov')?.value) || 0;
     const sales = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
     const target = App.data.revenue_settings?.targets?.check_avg || 35;
-    const res = document.getElementById('rsc-result');
-    if (!res || cov === 0) { if (res) res.style.display = 'none'; return; }
-    res.style.display = 'block';
+    const caEl = document.getElementById('rsc-ca');
+    const vEl  = document.getElementById('rsc-var');
+    const bEl  = document.getElementById('rsc-badge');
+    if (!caEl) return;
+    // The box is always visible; it reads "-" until covers and sales are entered.
+    if (cov === 0 || sales === 0) {
+      caEl.textContent = '-'; caEl.style.color = 'var(--t1)';
+      if (vEl) { vEl.textContent = '-'; vEl.style.color = 'var(--t1)'; }
+      if (bEl) bEl.textContent = '';
+      this._calc = null;
+      return;
+    }
     const ca = sales / cov;
     const diff = ca - target;
     let status, color;
     if (diff >= 0)       { status = 'On Target';      color = 'var(--gold)'; }
     else if (diff >= -5) { status = 'Watch';          color = 'var(--amber)'; }
     else                 { status = 'Below Standard'; color = 'var(--red)'; }
-    const caEl = document.getElementById('rsc-ca');
-    const vEl  = document.getElementById('rsc-var');
-    const bEl  = document.getElementById('rsc-badge');
-    if (caEl) { caEl.textContent = App.fmtCurrency(ca); caEl.style.color = color; }
-    if (vEl)  { vEl.textContent  = (diff >= 0 ? '+' : '') + App.fmtCurrency(diff); vEl.style.color = diff >= 0 ? 'var(--gold)' : 'var(--red)'; }
-    if (bEl)  { bEl.textContent  = status; bEl.style.color = color; }
+    caEl.textContent = App.fmtCurrency(ca); caEl.style.color = color;
+    if (vEl) { vEl.textContent = (diff >= 0 ? '+' : '') + App.fmtCurrency(diff); vEl.style.color = color; }
+    if (bEl) { bEl.textContent = status; bEl.style.color = color; }
     this._calc = { ca, diff, status };
   },
 
