@@ -34,17 +34,17 @@ FIX.revenue = [
           detail: 'Back in Menu Items, apply the price changes to the Plowhorses one item at a time. A targeted $2 increase on five Plowhorses is far less visible to guests than a 6% increase across the whole menu.' },
         { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
           title: 'Brief servers off the Stars list',
-          detail: 'Positioning and pricing only produce results when servers know what to suggest and why. Print the Pre-Shift Upsell Briefing and build it off the current Stars list. Every item you feature in the briefing comes from that list.' }
+          detail: 'Print the Pre-Shift Upsell Briefing and build it off the current Stars list. Pricing and position mean nothing if the servers do not know what to push, so every item you feature comes off that list.' }
       ]
     },
 
     commonMistakes: [
-      'Running the analysis on food cost percentage instead of contribution margin dollars. The percentage is structural efficiency. The dollar amount is what the item is worth.',
+      'Running it on food cost percent instead of margin dollars. Percent will not tell you a $4 item is outselling a $9 one ten to one.',
       'Engineering the menu once and treating it as done. Costs move and seasons shift, and a January menu can have three items below floor by August.',
       'Removing Dogs without a 90-day test in a repositioned slot. Some Dogs are buried items with a description problem, not bad items.',
       'Leaving Stars in mid-menu positions because they sell anyway. A Star in a prime position with server promotion typically lifts orders 15 to 25%.',
       'Announcing price increases across the board instead of surgically. A targeted increase on a few Plowhorses is far less visible than a blanket raise.',
-      'Running menu engineering without connecting it to the server briefing. Positioning and pricing only work when servers know what to suggest.'
+      'Running menu engineering without tying it to the server briefing. All the positioning work is wasted if nobody on the floor is pushing the items.'
     ]
   },
 
@@ -61,7 +61,7 @@ FIX.revenue = [
           detail: 'In Menu Items, refresh the yield-adjusted ingredient cost on every item whenever a supplier price moves. A protein priced on raw purchase cost is understated until trim loss is in it. Cost percent is only honest when the cost behind it is current.' },
         { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Read which items are priced below their floor',
-          detail: 'Menu Items shows each item\'s cost percent and contribution margin against your category target. An item running well over its target cost percent is priced below its floor. The worst offenders are the biggest annual margin leaks, so start there.' },
+          detail: 'Menu Items shows each item\'s cost percent and dollar margin. An item running well over its target cost percent is priced below its floor. The worst offenders are the biggest annual margin leaks, so start there.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Weigh the margin dollars before you reprice',
           detail: 'Open Menu Engineering and read the contribution margin in dollars on the items you flagged. The percentage tells you the item is underpriced. The dollar margin and the volume tell you how much a correction is actually worth, so weigh the biggest-dollar items first.' },
@@ -79,7 +79,7 @@ FIX.revenue = [
 
     commonMistakes: [
       'Setting prices once at opening and never reviewing them on a schedule. Costs change quarterly and a menu drifts below floor within 18 months.',
-      'Pricing by competition without calculating your own cost floor first. Competitor prices say what the market accepts. Your floor says what you need.',
+      'Pricing off the competition without working out your own cost floor first. Their price tells you what the market will take, not what you need to clear on the plate.',
       'Raising all prices at once in a visible refresh. A blanket increase reads as a price event. Surgical item-by-item increases rarely draw feedback.',
       'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is 38% once trim loss is in it.',
       'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
@@ -118,8 +118,8 @@ FIX.revenue = [
       'Building the schedule before checking the revenue forecast. The schedule should be built from a revenue number, not from who worked last week.',
       'Calculating labor percentage on wages only. Total labor cost runs 10 to 15% higher than wages, so a wages-only number understates the problem.',
       'Treating overtime as a staffing cost instead of a scheduling error. Almost all overtime is hours concentrated on too few people.',
-      'Overstaffing slow shifts because it feels safer. An idle server on a slow Tuesday is a labor percentage problem that costs you all year.',
-      'Building a schedule with no revenue reference at all. A schedule without a forecast is a guess.'
+      'Overstaffing slow shifts because it feels safer. That idle server on a dead Tuesday bleeds your labor percent every week you let it ride.',
+      'Building a schedule with no revenue number behind it. Staff to a forecast or you are just guessing at coverage.'
     ]
   },
 
@@ -147,11 +147,11 @@ FIX.revenue = [
     },
 
     commonMistakes: [
-      'Using labor percentage alone to evaluate scheduling. The percentage is the ratio, RPLH is the return, and a decision without both is missing half the picture.',
+      'Judging the schedule on labor percent alone. Percent is the cost side; RPLH is what those hours brought back. You need both to make the call.',
       'Cutting the schedule when RPLH is low without diagnosing the cause. Low RPLH from a check average problem needs an upsell response, not a staffing cut.',
       'Setting RPLH targets once and never updating them. Revenue mix shifts seasonally, so a July target may be too aggressive in January.',
       'Tracking RPLH as a blended number across departments. Bar, kitchen, and floor generate revenue differently and a blend hides the differences.',
-      'Not connecting RPLH data to the pre-shift briefing. Servers who know their check average goal change behavior, which moves RPLH.',
+      'Not connecting RPLH to the pre-shift briefing. Give servers a check average goal for the shift and the number moves.',
       'Treating a single week of low RPLH as a trend. One weak week is noise. Four consecutive weeks on the same shift is a structural problem.'
     ]
   },
@@ -172,13 +172,13 @@ FIX.revenue = [
           detail: 'The Server Scorecard at the top of Server Check shows team average, top performer, and any servers trending down. Four weeks of data gives you a real baseline. Servers running below team average get flagged. The spread tells you whether you have a few coaching cases or a system-wide gap.' },
         { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Train and post the upsell sequence',
-          detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Pre-dinner beverage, appetizer, dessert close, in that order. Upselling is a learned sequence, not a personality trait. Written down and trained, every server can follow it.' },
+          detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Pre-dinner beverage, appetizer, dessert close, in that order. It is a sequence, not a knack. Write it down and train it, and every server runs it.' },
         { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
           title: 'Run the pre-shift briefing every shift',
           detail: 'Print the Pre-Shift Upsell Briefing and run it five minutes before doors open: today\'s two or three Stars, one specific check average target for the shift, the upsell sequence, and one named beverage pairing. A written form keeps it consistent across managers.' },
         { kind: 'reference', target: 'Table_Visit_Audit.pdf', targetLabel: 'Table Visit Audit',
           title: 'Audit the floor with table visit audits',
-          detail: 'Run two unannounced table visit audits a week with the Table Visit Audit form. They confirm the briefing actually produced floor behavior. A briefing with no audit behind it is one-way communication.' },
+          detail: 'Run two unannounced table visit audits a week with the Table Visit Audit form. They tell you whether the briefing actually changed anything on the floor. Brief without auditing and you are just talking to yourself.' },
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Coach below-average servers from the data',
           detail: 'Server Check identifies the servers trending down two weeks in a row. Each one gets a coaching conversation that week. Coach the two who need it, not the whole team. A general sell-more message creates resistance from the servers already performing.' }
@@ -187,10 +187,10 @@ FIX.revenue = [
 
     commonMistakes: [
       'Tracking total server sales instead of check average per cover. Total sales hides the productivity difference when cover counts differ.',
-      'Running the briefing without a written form. A verbal briefing varies by manager and produces inconsistent execution.',
+      'Running the briefing without a written form. Do it from memory and it changes with whoever is running the shift.',
       'Coaching the whole team when only two servers are below average. A general message has no impact on the two who need it and creates resistance from the rest.',
-      'Setting check average targets without a four-week baseline. A target with no baseline is a guess.',
-      'Treating upselling as a personality trait rather than a learned sequence. Every server can follow a written, trained sequence.',
+      'Setting check average targets before you have four weeks of real numbers to set them off.',
+      'Waiting for servers who have the knack instead of training the sequence. Write it down and every server can run it.',
       'Forgetting the beverage pairing. A specific wine or cocktail pairing in the briefing and the menu description converts higher than any other upsell.',
       'Not watching beverage attachment. The Revenue Audit reads your drinks per guest off the POS. Below the benchmark means tables are sitting without a drink in front of them, the single biggest margin leak on the floor. Make the first-round drink the opening move at every table.',
       'Reading one blended check average. A healthy dinner can hide a bleeding lunch. The Revenue Audit splits check average by daypart when your POS breaks it out. A wide spread means the weak daypart needs its own menu, staffing, and upsell focus, not the same plan as your strong one.'
@@ -207,7 +207,7 @@ FIX.revenue = [
       steps: [
         { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Write and roll out the server standard',
-          detail: 'Download the Server Upsell Standards and Scripts, set your six touch points, and distribute it to every active server. Collect a signed acknowledgment, file the signed copies, and post a copy in the server area. Brief every manager on it so a server hears the same expectations from whoever is on the floor. New servers learn the written standard on day one, not by shadowing alone.' },
+          detail: 'Download the Server Upsell Standards and Scripts, set your six touch points, and distribute it to every active server. Collect a signed acknowledgment, file the signed copies, and post a copy in the server area. Brief every manager on it so a server hears the same expectations from whoever is on the floor. New servers learn the written standard on day one instead of picking up someone else\'s habits.' },
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Measure performance by individual check average',
           detail: 'Server Check tracks check average per server, not impression and not total sales. The server with the most covers often ranks lower on check average. Total sales hides the productivity difference, and individual check average is the one number that does not.' },
@@ -222,11 +222,11 @@ FIX.revenue = [
 
     commonMistakes: [
       'Managing server performance by impression and total sales instead of individual check average. Total sales hides the productivity difference.',
-      'Not having a written standard. An unwritten standard means something different to every manager and cannot be trained or enforced.',
+      'Running without a written standard. If it is not written down it means something different to every manager, and you cannot train to it or hold anyone to it.',
       'Coaching the whole team when only two or three servers are below average. A "sell more" speech has no impact on the people who need it and creates resistance from the ones already producing.',
       'Starting the coaching conversation with judgment rather than data. The numbers are a coaching conversation. "Your tables are not selling" is an accusation.',
       'Training new servers by shadowing without a written standard. They learn another server\'s personal style, not a consistent standard.',
-      'Not connecting the briefing Stars list to the upsell sequence. Servers who know what to suggest before the shift perform better than those deciding in the moment.'
+      'Not connecting the briefing Stars list to the upsell sequence. Servers who walk in knowing what to push beat the ones deciding table by table.'
     ]
   }
 
