@@ -19,7 +19,7 @@ S.TrafficAudit = {
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 30;
     const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'One comprehensive traffic audit every 30 days. It scores from your weekly traffic numbers plus screenshots of your Google Business, website, social, and delivery platforms, and the result shows on screen in a minute or two.';
+    const desc = 'One full traffic audit every 30 days. It scores from your weekly traffic numbers plus screenshots of your Google Business, website, social, and delivery platforms, and the result shows on screen in a minute or two.';
     const SECTION_NAMES = ['Google Business', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
