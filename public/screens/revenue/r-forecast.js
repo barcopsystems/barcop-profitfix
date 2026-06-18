@@ -125,7 +125,7 @@ S.RevenueForecast = {
     App.showHelpModal('How Revenue Forecast Works', [
       { p: ['Set what you expect to bring in next week, day by day, so Labor Control builds the schedule against a real number instead of a guess. Each day pre-fills from a weighted average of the same weekday over your last eight weeks of shifts; you adjust any day.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 8 - Jun 14. Step forward with the arrows to plan ahead, or back to revise; This Week snaps to the current week, tagged NOW. The forecast you save is keyed to the selected week, and both the schedule builder and the weekly confirm read it.'] },
-      { h: 'The Numbers', p: ['Forecast Total is the sum of your daily numbers, shown live against last week and against the suggested total. Cover Goal Total is the covers you need to hit, not just the dollars; Active Shift shows live progress against it during service.'] },
+      { h: 'The Numbers', p: ['Forecast Total is the sum of your daily numbers, shown live against your last confirmed week and against the suggested total. Cover Goal Total is the covers you need to hit, not just the dollars; Active Shift shows live progress against it during service.'] },
       { h: 'Filling It In', p: ['Use Suggested for All Days drops the same-weekday averages into every row at once; the Use button on a single row fills just that day. Override any number by hand. Start Over resets the week to where it began.'] }
     ]);
   },
@@ -157,7 +157,7 @@ S.RevenueForecast = {
     const vsSug = sugTotal > 0 ? (total - sugTotal >= 0 ? '+' : '') + this.fmt(total - sugTotal) : '-';
     return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
       + '<div class="calc-item"><div class="calc-label">Forecast Total</div><div class="calc-val lg" id="rf-total">' + this.fmt(total) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Last Week</div><div class="calc-val lg" id="rf-vsprior">' + vsPrior + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (prior != null ? 'last week ' + this.fmt(prior) : 'no prior week') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Last Confirmed</div><div class="calc-val lg" id="rf-vsprior">' + vsPrior + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (prior != null ? 'last confirmed ' + this.fmt(prior) : 'no prior week') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">vs Suggested</div><div class="calc-val lg" id="rf-vssug">' + vsSug + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (sugTotal > 0 ? 'suggested ' + this.fmt(sugTotal) : 'no shift history') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Cover Goal Total</div><div class="calc-val lg" id="rf-covertotal">' + this.totalCovers() + '</div></div>'
       + '</div></div>';

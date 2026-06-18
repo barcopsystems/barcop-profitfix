@@ -156,8 +156,9 @@ S.RevenuePriceCalc = {
         newPct = (item.cost / newPrice * 100).toFixed(1) + '%';
         newMargin = App.fmtCurrency(newCM); newMarginC = newCM > oldCM ? 'var(--gold)' : 'var(--red)';
         wk  = (wkImpact > 0 ? '+' : '') + App.fmtCurrency(wkImpact);  wkC  = wkImpact > 0 ? 'var(--gold)' : 'var(--red)';
-        ann = (annImpact > 0 ? '+' : '') + App.fmtCurrency(annImpact); annC = annImpact > 0 ? 'var(--gold)' : 'var(--red)';
-        be  = (oldCM > 0 && covers > 0) ? Math.round(covers * (1 - newCM / oldCM)) + ' covers' : D;
+        ann = (annImpact > 0 ? '+' : '') + App.fmtCurrency(annImpact, 0); annC = annImpact > 0 ? 'var(--gold)' : 'var(--red)';
+        // Covers you can lose before total weekly margin slips below current.
+        be  = (oldCM > 0 && newCM > 0 && covers > 0) ? Math.round(covers * (1 - oldCM / newCM)) + ' covers' : D;
       }
       el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
         + box('Old Cost %', oldPct)

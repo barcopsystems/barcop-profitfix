@@ -278,7 +278,10 @@ S.RevenueMenuItems = {
           const cost = App.menuItemCost(item) || 0;
           const cm   = (item.price && cost) ? (item.price - cost) : null;
           const pct  = (item.price && cost) ? (cost / item.price * 100) : null;
-          const tgt  = item.target_cost_pct || (this.classifyItem(item) === 'plate' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
+          const cls  = this.classifyItem(item);
+          // Inventory-linked beer/wine/NA have no cocktail/plate cost target, so
+          // leave their Cost % neutral rather than flagging it red vs 22%.
+          const tgt  = item.target_cost_pct || (cls === 'plate' ? App.MENU_TARGET_COST_PCT.plate : cls === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : null);
           const ok   = item.price && cost;
           const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
           const src  = hasRecipe ? 'from recipe' : (item.linked_product_id ? 'from linked product' : (item.cost ? 'manual cost' : ''));
@@ -288,7 +291,7 @@ S.RevenueMenuItems = {
             + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
             + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
             + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
-            + '<td class="' + (pct != null ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
+            + '<td class="' + (pct != null && tgt ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
             + '<td>' + (cm != null ? App.fmtCurrency(cm) : '-') + '</td>'
             + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
             + '<td><div class="row-actions">'
@@ -657,10 +660,8 @@ S.RevenueMenuItems = {
     const tpct = parseFloat(document.getElementById('ri-target-pct')?.value) || 0;
     const cpct = mp > 0 ? (cps / mp * 100) : null;
     const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-    set('ri-tc', tc > 0 ? App.fmtCurrency(tc) : '-');
     set('ri-cps', cps > 0 ? App.fmtCurrency(cps) : '-');
     set('ri-cpct', cpct != null ? cpct.toFixed(1) + '%' : '-', cpct != null && tpct > 0 ? (cpct > tpct ? 'warn' : 'good') : '');
-    set('ri-tgt-d', tpct > 0 ? tpct.toFixed(1) + '%' : '-');
     // Only let the recipe drive the cost field when a real ingredient is in
     // the builder (id + qty > 0). A blank starter row must NOT take over and
     // wipe a manually entered cost — otherwise opening a no-recipe item to

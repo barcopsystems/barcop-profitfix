@@ -12,7 +12,7 @@ S.RevenueDashboard = {
       { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you added back to the top line since each fix started running. Realized to date, not a projection. A figure appears once a couple of weeks of after-data exist and firms up from there.'] },
       { h: 'Where You\'re Leaking Now', p: ['Your revenue gaps as plain text, biggest dollar first. Check average and menu mix dollarize at this week\'s cover count; the rest read as a Review row you tap to work on their own screen. Tap any row to open its fix process.'] },
       { h: 'This Week vs Target', p: ['Your check average, labor cost, and revenue per labor hour from your latest confirmed week, each against its own target. Green is hitting it, red is missing it. Tap Bar Cop Insights for a written read on where the numbers are heading.'] },
-      { h: 'Revenue Forecast and Revenue Audit', p: ['Revenue Forecast shows what you expect to bring in next week so Labor can build the schedule to a real number. Revenue Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
+      { h: 'Revenue Forecast and Revenue Audit', p: ['Revenue Forecast shows what you expect to bring in for the coming week so Labor can build the schedule to a real number. Revenue Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
       { h: 'Initiative Tracker', p: ['Log a revenue experiment, a new menu push, a promotion, a service change, and pick the metric to watch. Bar Cop measures the eight weeks before against the eight weeks after and shows the lift, so you know what actually moved the number.'] }
     ]);
   },
@@ -29,7 +29,10 @@ S.RevenueDashboard = {
   renderFull(container) {
     const rs     = App.data.revenue_settings || {};
     const t      = rs.targets || {};
-    const weeks  = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0);
+    // Sort by period_end (revenue_weeks load order is not guaranteed chronological),
+    // so latest is genuinely the newest confirmed week, not the last array element.
+    const weeks  = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0)
+      .sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
     const latest = weeks.length ? weeks[weeks.length - 1] : null;
 
     const leak = FixPanel.leakRowsText('revenue');
@@ -79,7 +82,7 @@ S.RevenueDashboard = {
       value: App.fmtCurrency(ca), color: ca >= tCA ? 'var(--green)' : 'var(--red)'
     });
     if (lp != null) rows.push({
-      label: 'Labor Cost', sub: 'target ' + tLP.toFixed(1) + '%',
+      label: 'Labor %', sub: 'target ' + tLP.toFixed(1) + '%',
       value: lp.toFixed(1) + '%', color: lp <= tLP ? 'var(--green)' : 'var(--red)'
     });
     if (rplh != null) {
@@ -92,13 +95,13 @@ S.RevenueDashboard = {
     return rows;
   },
 
-  // Revenue Forecast panel — next week's planned revenue (the number the
+  // Revenue Forecast panel — the planning week's revenue (the number the
   // schedule builder reads), against last confirmed week. Ties to the real
   // Revenue Forecast planner so the dashboard and the full screen never disagree.
   forecastPanel(latest) {
     const ws = (S.RevenueForecast && S.RevenueForecast.defaultWeekStart) ? S.RevenueForecast.defaultWeekStart() : null;
     const fc = ws ? App.forecastForWeek(ws) : null;
-    const placeholder = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Set next week\'s revenue forecast so Labor builds the schedule against a real number, not a guess.</div>'
+    const placeholder = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Set your revenue forecast so Labor builds the schedule against a real number, not a guess.</div>'
       + '<button class="btn btn-ghost btn-sm db-qa" data-go="r-forecast">Open Revenue Forecast</button>';
     if (!fc || !(fc.total > 0)) return placeholder;
     const lastRev = latest ? (latest.bar_revenue || 0) + (latest.floor_revenue || 0) : null;
@@ -321,7 +324,7 @@ S.RevenueDashboard = {
   // Bar Cop Insights — a written read on the recent revenue + labor trend.
   showInsights() {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
-    const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).slice(-8);
+    const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
     const btn = document.getElementById('r-insights-btn');
     const orig = btn ? btn.textContent : '';
