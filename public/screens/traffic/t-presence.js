@@ -250,8 +250,9 @@ S.TrafficPresence = {
 
     const card = a => {
       const open = this._open.has(a.id);
-      const rows = a.stats.filter(s => s[1] !== '-' && s[1] != null && s[1] !== '').map(s =>
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--row-div);">'
+      const visible = a.stats.filter(s => s[1] !== '-' && s[1] != null && s[1] !== '');
+      const rows = visible.map((s, i) =>
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 14px;background:#0D181E;' + (i < visible.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '') + '">'
         + '<span style="font-size:12px;color:var(--t3);">' + s[0] + '</span>'
         + '<span style="font-size:13px;color:var(--t1);font-weight:600;text-align:right;">' + s[1]
         + (s[2] ? '<span style="font-size:11px;color:var(--t3);font-weight:400;"> &middot; ' + s[2] + '</span>' : '') + '</span></div>'
@@ -267,8 +268,7 @@ S.TrafficPresence = {
         +   '<span>' + esc(a.title) + '</span>'
         +   '<span style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:' + a.status.color + ';">' + a.status.label + '</span>'
         + '</div>'
-        + '<div>' + rows + '</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.55;margin:12px 0 0;">' + esc(a.action) + '</div>'
+        + '<div style="border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">' + rows + '</div>'
         + setup
         + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">'
         +   '<button class="btn btn-ghost btn-sm tp-toggle" data-area="' + a.id + '">' + (open ? 'Hide Setup' : 'Update Setup') + '</button>'
