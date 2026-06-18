@@ -11,15 +11,15 @@ FIX.traffic = [
 
   {
     id: 'gbp',
-    name: 'Google Business Profile',
+    name: 'Google Business',
     module: 'traffic',
     summary: 'Your Google Business Profile decides whether you show up in the local map results.',
 
     process: {
       steps: [
-        { kind: 'result', target: 't-gbp', targetLabel: 'Google Business Profile',
+        { kind: 'result', target: 't-gbp', targetLabel: 'Google Business',
           title: 'Audit where your profile stands',
-          detail: 'Open the Google Business Profile screen and read your completeness score, photo count, posts, and weekly insights. Start here before you change anything.' },
+          detail: 'Open the Google Business screen and read your completeness score, photo count, posts, and weekly insights. Start here before you change anything.' },
         { kind: 'reference', target: 'GBP_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
           title: 'Complete every field',
           detail: 'Work the GBP Optimization Checklist on Google: every field filled, primary and secondary categories set, the full 750-character description, ten seeded Q&A. Use your exact business name, never keyword-stuffed, that risks a suspension.' },
