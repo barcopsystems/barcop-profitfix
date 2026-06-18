@@ -12,6 +12,7 @@ S.TrafficThisWeek = {
   _editId: null,
   _histPreset: '',
   _entryOpen: true,
+  _scanMode: 'manual',
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
@@ -80,10 +81,9 @@ S.TrafficThisWeek = {
   },
 
   draw() {
-    const entry = this._entryOpen
-      ? this.selectorRow()
-        + this.formCard()
-        + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+    const open = this._entryOpen;
+    const saveRow = (open && this._scanMode === 'manual')
+      ? '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         +   '<button class="btn btn-primary" id="tw-save">' + (this._editId ? 'Update Week' : 'Save Week') + '</button>'
         +   '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
         +   '<span id="tw-err" style="font-size:12px;color:var(--red);display:none;margin-left:6px;"></span>'
@@ -91,8 +91,9 @@ S.TrafficThisWeek = {
       : '';
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip()
-      + this.scanCard()
-      + entry
+      + this.selectorRow()
+      + this.entryCard()
+      + saveRow
       + this.historyCard()
       + '</div>';
     this.wire();
@@ -202,7 +203,7 @@ S.TrafficThisWeek = {
     });
   },
 
-  formCard() {
+  manualBody() {
     const resvOn = this.reservationsOn();
     const groups = this.GROUPS.map(g =>
       this.sectionHeader(g[0])
@@ -211,11 +212,9 @@ S.TrafficThisWeek = {
           .map(f => (f[0] === 'yelp_rating' ? '<div style="flex:0 0 100%;height:0;"></div>' : '') + this.field(f)).join('')
       + '</div>'
     ).join('');
-    return '<div class="card form-card"><div class="card-title">' + (this._editId ? 'Edit Week' : 'Confirm This Week') + '</div>'
-      + groups
+    return groups
       + this.sectionHeader('Notes')
-      + '<div class="f" style="width:100%;"><textarea class="notes-ta" rows="2" id="tw-notes" placeholder="Optional">' + esc(this._form.notes || '') + '</textarea></div>'
-      + '</div>';
+      + '<div class="f" style="width:100%;"><textarea class="notes-ta" rows="2" id="tw-notes" placeholder="Optional">' + esc(this._form.notes || '') + '</textarea></div>';
   },
 
   // ── Weekly history (folded in from the old Reports page) ────────────────────
@@ -272,24 +271,37 @@ S.TrafficThisWeek = {
   // ── Scan a screenshot — vision prefill through the existing /api/claude proxy ─
   SCAN_PROMPT: 'You are reading one screenshot from a bar or restaurant\'s online dashboard. It could be Google Business Profile, Google Analytics, a Yelp page, Instagram, Facebook, a delivery platform (DoorDash, Uber Eats, Grubhub), or an email tool such as Mailchimp. Extract only the metrics you can clearly see. Respond with a single JSON object and nothing else, including only the keys you can read and omitting the rest. Keys: google_rating (star rating), google_total (total Google reviews), new_reviews (reviews this month), response_rate (percent), yelp_rating, yelp_total, monthly_sessions (website visits per month), monthly_reservations (online reservations per month), bounce_rate (percent), ig_followers, ig_posts_month (posts in the last 30 days), fb_followers, delivery_orders (orders this month), delivery_avg_order_value (dollars), email_list_size, emails_sent (this month), email_open_rate (percent). All values plain numbers, no symbols, no percent signs, no words.',
 
-  // The chevron on this card collapses the whole entry area together: this scan
-  // card's body and the Confirm This Week form, leaving the status strip and the
-  // weekly history in view.
-  scanCard() {
+  // Segmented toggle: type the numbers, or drop a screenshot and let Bar Cop read
+  // them. Gold-tint active, same look as the Void/Comp and Log Hours toggles.
+  modeToggle() {
+    const seg = (mode, label) => {
+      const on = this._scanMode === mode;
+      return '<button type="button" class="btn btn-sm tw-mode-btn" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    return '<div style="display:inline-flex;gap:6px;margin-bottom:16px;">'
+      + seg('manual', 'Update Manually') + seg('import', 'Import Screenshots') + '</div>';
+  },
+  importBody() {
+    return '<div id="tw-drop" style="border:1px dashed var(--b-edge);background:var(--input);border-radius:8px;padding:22px 18px;text-align:center;transition:background .15s,border-color .15s;">'
+      +   '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;">Drop a dashboard screenshot</div>'
+      +   '<div style="font-size:12px;color:var(--t3);line-height:1.5;max-width:480px;margin:0 auto 10px;">Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool. Bar Cop reads the numbers and fills the form for you to confirm.</div>'
+      +   '<button class="btn btn-ghost btn-sm" id="tw-scan-pick" type="button">Choose Image</button>'
+      +   '<input type="file" id="tw-scan-file" accept="image/png,image/jpeg" style="display:none;"/>'
+      + '</div>';
+  },
+  // One card, two ways in (toggle), with the chevron collapsing the whole card so
+  // the week selector and history stay in view.
+  entryCard() {
     const open = this._entryOpen;
     const chev = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (open ? '0' : '-90') + 'deg);transition:transform .15s;"><path d="M3.5 5.5L7 9l3.5-3.5"/></svg>';
     const title = '<div class="card-title" id="tw-entry-toggle" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;">'
-      + '<span>Scan a Screenshot</span><span style="color:var(--t3);display:inline-flex;">' + chev + '</span></div>';
-    const body = open
-      ? '<div id="tw-drop" style="border:1px dashed var(--b-edge);background:var(--input);border-radius:8px;padding:22px 18px;text-align:center;transition:background .15s,border-color .15s;">'
-        +   '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;">Drop a dashboard screenshot</div>'
-        +   '<div style="font-size:12px;color:var(--t3);line-height:1.5;max-width:480px;margin:0 auto 10px;">Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool. Bar Cop reads the numbers and fills the form below to confirm.</div>'
-        +   '<button class="btn btn-ghost btn-sm" id="tw-scan-pick" type="button">Choose Image</button>'
-        +   '<input type="file" id="tw-scan-file" accept="image/png,image/jpeg" style="display:none;"/>'
-        + '</div>'
-        + '<div id="tw-scan-status" style="display:none;font-size:12px;font-weight:600;margin-top:10px;"></div>'
-      : '';
-    return '<div class="card form-card" style="margin-bottom:14px;">' + title + body + '</div>';
+      + '<span>' + (this._editId ? 'Edit Week' : 'Confirm This Week') + '</span><span style="color:var(--t3);display:inline-flex;">' + chev + '</span></div>';
+    if (!open) return '<div class="card form-card" style="margin-bottom:14px;">' + title + '</div>';
+    const status = '<div id="tw-scan-status" style="display:none;font-size:12px;font-weight:600;margin:0 0 14px;"></div>';
+    const body = this._scanMode === 'import' ? this.importBody() : this.manualBody();
+    return '<div class="card form-card" style="margin-bottom:14px;">' + title + this.modeToggle() + status + body + '</div>';
   },
   _scanStatus(msg, color) {
     const el = document.getElementById('tw-scan-status');
@@ -347,8 +359,9 @@ S.TrafficThisWeek = {
       if (!obj) { this._scanStatus('Could not read numbers from that image. Try a clearer screenshot, or enter them by hand.', 'var(--red)'); return; }
       const n = this.applyScan(obj);
       if (!n) { this._scanStatus('No matching numbers in that screenshot. Try another, or enter them by hand.', 'var(--amber)'); return; }
+      this._scanMode = 'manual';
       this.draw();
-      this._scanStatus('Filled ' + n + ' number' + (n === 1 ? '' : 's') + ' from your screenshot. Check them below, then Save.', 'var(--gold)');
+      this._scanStatus('Filled ' + n + ' number' + (n === 1 ? '' : 's') + ' from your screenshot. Check them, then Save.', 'var(--gold)');
     } catch (e) { this._scanStatus('Scan failed. Check your connection, or enter the numbers by hand.', 'var(--red)'); }
   },
 
@@ -368,6 +381,13 @@ S.TrafficThisWeek = {
     const startBtn = document.getElementById('tw-start-over');
     if (startBtn) startBtn.onclick = () => { this._form = this.freshForm(); this._editId = null; this.draw(); };
     document.getElementById('tw-entry-toggle')?.addEventListener('click', () => { this._entryOpen = !this._entryOpen; this.draw(); });
+    this.container.querySelectorAll('.tw-mode-btn').forEach(b => b.addEventListener('click', () => {
+      const m = b.dataset.mode;
+      if (m === this._scanMode) return;
+      if (this._scanMode === 'manual') this.collect();
+      this._scanMode = m;
+      this.draw();
+    }));
     this.container.querySelectorAll('.tw-wk-chip').forEach(b => b.addEventListener('click', () => this.setWeek(b.dataset.pe)));
     this.container.querySelector('.tw-wk-prev')?.addEventListener('click', () => this.setWeek(this.addDays(this._form.period_end || App.nextSunday(), -7)));
     this.container.querySelector('.tw-wk-next')?.addEventListener('click', () => this.setWeek(this.addDays(this._form.period_end || App.nextSunday(), 7)));
