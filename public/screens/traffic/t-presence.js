@@ -108,9 +108,10 @@ S.TrafficPresence = {
       ],
       action: 'Post three times a week, mixing food, people, and the room.' });
 
-    const promos = (p.dd_promo ? 1 : 0) + (p.ue_promo ? 1 : 0) + (p.gh_promo ? 1 : 0);
-    const delFlags = [p.dd_menu, p.dd_promo, p.ue_menu, p.ue_promo];
-    A.push({ id: 'delivery', title: 'Delivery', status: this.pctStatus(delFlags.filter(Boolean).length, 4),
+    const delPlats = (App.TRAFFIC_DELIVERY_PLATFORMS || []).filter(pl => p[pl.key + '_active'] === 'yes');
+    const promos = delPlats.filter(pl => p[pl.key + '_promo']).length;
+    const delDone = delPlats.reduce((n, pl) => n + (p[pl.key + '_menu'] ? 1 : 0) + (p[pl.key + '_promo'] ? 1 : 0), 0);
+    A.push({ id: 'delivery', title: 'Delivery', status: delPlats.length ? this.pctStatus(delDone, delPlats.length * 2) : { label: 'No data yet', color: 'var(--t3)' },
       stats: [
         ['Orders this month', this.num(w.delivery_orders)],
         ['Avg order', w.delivery_avg_order_value != null ? App.fmtCurrency(w.delivery_avg_order_value, 0) : '-'],
@@ -232,7 +233,7 @@ S.TrafficPresence = {
     if (actions) actions.innerHTML = '';
     if (!this._open) this._open = new Set();
     // Arriving from a Fix step focuses one area's setup.
-    if (App._trackerFocus) { this._open.add(App._trackerFocus); this._focusOnce = App._trackerFocus; App._trackerFocus = null; }
+    if (App._fixFocus) { this._open.add(App._fixFocus); this._focusOnce = App._fixFocus; App._fixFocus = null; }
 
     const w = this.latestWeek();
     const p = this.profile();
