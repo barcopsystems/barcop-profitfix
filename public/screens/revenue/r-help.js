@@ -29,9 +29,9 @@ S.RevenueHelp = {
     ]},
     { t: 'How It Connects', qa: [
       { q: 'What flows from Shift Control into Revenue Recovery?',
-        a: 'Shift revenue (bar plus floor) feeds This Week\'s total revenue, the RPLH Tracker, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Revenue This Week sums it for you, so you confirm a week instead of typing it.' },
+        a: 'Shift revenue (bar plus floor) feeds This Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Revenue This Week sums it for you, so you confirm a week instead of typing it.' },
       { q: 'What flows from Labor Control into Revenue Recovery?',
-        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed the RPLH Tracker and This Week\'s labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Log as the fallback for shifts without a saved pool.' },
+        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Log as the fallback for shifts without a saved pool.' },
       { q: 'What flows from Inventory Control into Revenue Recovery?',
         a: 'Product prices flow into Menu Items: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
       { q: 'How does the Recovery Scoreboard pick up a price change?',
@@ -43,7 +43,7 @@ S.RevenueHelp = {
       { q: 'How often can I run an audit, and why 30 days?',
         a: 'One Revenue Audit every 30 days from your last one. The pace gives you time to actually act on a report before scoring yourself again; a number you check daily is just noise. The countdown on the Revenue Audit screen shows the days remaining.' },
       { q: 'What is a good RPLH, and how do I set my target?',
-        a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and let the RPLH Tracker hold you to it.' },
+        a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and track it on This Week and the Revenue dashboard.' },
       { q: 'Why are cost savings and revenue growth never combined into one number?',
         a: 'Because they are different jobs with different levers. Cutting labor cost and lifting check average both add to profit, but blending them into one "recovery" figure hides which one is actually moving and lets a win on one side paper over a loss on the other. Bar Cop keeps cost savings (labor) and revenue growth (check average, menu, servers) separate, and every figure is computed from your real data.' }
     ]}
