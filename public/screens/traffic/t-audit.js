@@ -19,8 +19,8 @@ S.TrafficAudit = {
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 30;
     const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'One comprehensive traffic audit every 30 days. It scores from your weekly traffic numbers plus screenshots of your Google Business Profile, website, social, and delivery platforms, and the result shows on screen in a minute or two.';
-    const SECTION_NAMES = ['Google Business Profile', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
+    const desc = 'One comprehensive traffic audit every 30 days. It scores from your weekly traffic numbers plus screenshots of your Google Business, website, social, and delivery platforms, and the result shows on screen in a minute or two.';
+    const SECTION_NAMES = ['Google Business', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
       + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ta') : AuditUI.emptyState())
@@ -61,7 +61,7 @@ S.TrafficAudit = {
     ].filter(s => s.label);
 
     const sections = [
-      AuditUI.sectionBlock(1, 'Google Business Profile', d.S1_SCORE, [
+      AuditUI.sectionBlock(1, 'Google Business', d.S1_SCORE, [
         ['Listing Claimed and Verified', yN(d.S1_LISTING_CLAIMED)],
         ['Hours Complete', yN(d.S1_HOURS_COMPLETE)],
         ['Website Linked', yN(d.S1_WEBSITE_LINKED)],
@@ -210,7 +210,7 @@ S.TrafficAudit = {
       if (finds.length) { b.heading('Findings', 10); finds.forEach(t => b.paragraph(t)); }
     };
 
-    section(1, 'Google Business Profile', d.S1_SCORE, [
+    section(1, 'Google Business', d.S1_SCORE, [
       ['Listing Claimed and Verified', yN(d.S1_LISTING_CLAIMED)],
       ['Hours Complete', yN(d.S1_HOURS_COMPLETE)],
       ['Website Linked', yN(d.S1_WEBSITE_LINKED)],
@@ -461,7 +461,7 @@ S.TrafficAudit = {
         sections: (() => {
           // Preserve N/A: only include a section when it actually scored, so
           // the landing list can show "N/A" for the ones with no data.
-          const map = { 'Google Business Profile': d.S1_SCORE, 'Website': d.S2_SCORE, 'Reviews': d.S3_SCORE, 'Search and SEO': d.S4_SCORE, 'Social Media': d.S5_SCORE, 'Delivery Platforms': d.S6_SCORE, 'Email Marketing': d.S7_SCORE };
+          const map = { 'Google Business': d.S1_SCORE, 'Website': d.S2_SCORE, 'Reviews': d.S3_SCORE, 'Search and SEO': d.S4_SCORE, 'Social Media': d.S5_SCORE, 'Delivery Platforms': d.S6_SCORE, 'Email Marketing': d.S7_SCORE };
           const out = {}; Object.keys(map).forEach(k => { if (map[k] != null) out[k] = map[k]; }); return out;
         })(),
         action_items: (Array.isArray(d.action_items) ? d.action_items : []).map(a => {
