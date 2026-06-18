@@ -228,12 +228,12 @@ S.RevenueServerCheck = {
         + '<td>' + (r.compsPct > 0 ? r.compsPct.toFixed(1) + '%' : '-') + '</td>'
         + '<td>' + (r.tipsPct > 0 ? r.tipsPct.toFixed(1) + '%' : '-') + '</td>'
         + '<td>' + r.entries + '</td>'
-        + '<td class="no-print">' + coachBtn + '</td>'
+        + '<td class="no-print"><div class="row-actions">' + coachBtn + '</div></td>'
         + '</tr>';
     }).join('');
     return headingRow
       + '<div id="rsc-sc-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Server</th><th></th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
+      + '<th>Server</th><th>Trend</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
   },
 
@@ -328,9 +328,11 @@ S.RevenueServerCheck = {
     document.getElementById('rsc-startover')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._editing = false; this._calc = null; this.draw(); });
 
     c.querySelectorAll('.rsc-coach').forEach(btn => btn.addEventListener('click', () => {
-      App._coachingFocus = { staff_id: btn.dataset.sid };
-      App.showApp('labor');
-      App.navigate('lc-staff-roster');
+      // Open the canonical coaching-note form in place (writes to this server's
+      // coaching log in Labor); re-draw Server Check on save. No section jump.
+      if (!S.LaborStaffRoster) return;
+      S.LaborStaffRoster.noteEditId = null;
+      S.LaborStaffRoster.openNoteModal(btn.dataset.sid, { onSaved: () => this.draw() });
     }));
     c.querySelectorAll('.rsc-edit').forEach(btn => btn.addEventListener('click', () => this.editEntry(btn.dataset.id)));
     c.querySelectorAll('.rsc-del').forEach(btn => btn.addEventListener('click', async () => {
