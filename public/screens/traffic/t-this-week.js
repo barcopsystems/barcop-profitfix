@@ -75,13 +75,14 @@ S.TrafficThisWeek = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    if (!this._form) this._form = this.freshForm();
+    if (!this._form) this.loadWeek(App.nextSunday());
     this.draw();
   },
 
   draw() {
     const entry = this._entryOpen
-      ? this.formCard()
+      ? this.selectorRow()
+        + this.formCard()
         + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         +   '<button class="btn btn-primary" id="tw-save">' + (this._editId ? 'Update Week' : 'Save Week') + '</button>'
         +   '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
@@ -90,7 +91,6 @@ S.TrafficThisWeek = {
       : '';
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip()
-      + this.selectorRow()
       + this.scanCard()
       + entry
       + this.historyCard()
@@ -169,7 +169,26 @@ S.TrafficThisWeek = {
       + '<button type="button" class="btn btn-ghost btn-sm" id="tw-worksheet">Worksheet</button>'
       + '</div>';
   },
-  setWeek(pe) { if (!pe) return; if (this._entryOpen) this.collect(); this._form.period_end = pe; this.draw(); },
+  setWeek(pe) { if (!pe) return; this._entryOpen = true; this.loadWeek(pe); this.draw(); },
+  // Load the selected week into the form: if a record exists for that week, edit
+  // it (so the saved numbers show and a save updates, not duplicates); otherwise
+  // start a fresh entry for that week, pre-filled from the most recent week before it.
+  loadWeek(pe) {
+    const weeks = this.weeks();
+    const rec = weeks.find(w => (w.period_end || '').slice(0, 10) === pe);
+    if (rec) {
+      const f = { week_num: rec.week_num, period_end: (rec.period_end || '').slice(0, 10), notes: rec.notes || '' };
+      this.allKeys().forEach(k => { f[k] = rec[k] != null ? String(rec[k]) : ''; });
+      this._form = f;
+      this._editId = rec.id;
+    } else {
+      const prior = weeks.filter(w => (w.period_end || '').slice(0, 10) < pe).pop();
+      const f = { week_num: ((prior && prior.week_num) || weeks.length) + 1, period_end: pe, notes: '' };
+      this.allKeys().forEach(k => { f[k] = (prior && prior[k] != null) ? String(prior[k]) : ''; });
+      this._form = f;
+      this._editId = null;
+    }
+  },
   printWorksheet() {
     const resvOn = this.reservationsOn();
     const rows = [];
@@ -378,6 +397,7 @@ S.TrafficThisWeek = {
     this.allKeys().forEach(k => { f[k] = rec[k] != null ? String(rec[k]) : ''; });
     this._form = f;
     this._editId = id;
+    this._entryOpen = true;
     this.draw();
     const sc = App._activeContentEl && App._activeContentEl();
     if (sc) sc.scrollTop = 0;
@@ -436,8 +456,7 @@ S.TrafficThisWeek = {
       if (App.markSetupDone) App.markSetupDone('gs_t_week');
     }
 
-    this._editId = null;
-    this._form = this.freshForm();
+    this.loadWeek(App.nextSunday());
     this.draw();
   }
 };
