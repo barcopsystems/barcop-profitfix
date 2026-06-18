@@ -195,7 +195,7 @@ FIX.traffic = [
 
     commonMistakes: [
       'Post mostly promo graphics. Lead with experience content, that is what pulls new guests.',
-      'Go dark after 30 days. Posting compounds, hold it 90.',
+      'Go dark after 30 days. Posting builds on itself, hold it 90.',
       'Push the same post to every platform without reformatting it.',
       'Never show the inside of the bar in video. Photos show what to order, video shows the feel.',
       'Chase followers and likes. Track profile visits and link clicks instead.'
