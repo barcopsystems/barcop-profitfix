@@ -49,9 +49,6 @@ S.TrafficEmail = {
     const open = monthCampOpens.length
       ? monthCampOpens.reduce((a,b) => a+b, 0) / monthCampOpens.length
       : (latest?.email_open_rate ?? null);
-    const loyal = latest ? latest.loyalty_active === 'yes' : false;
-    const members = latest?.loyalty_members ?? null;
-    const redemptions = latest?.loyalty_redemptions ?? null;
 
     const trend = (cur, was, suffix) => {
       if (cur == null || was == null) return ' ';
@@ -70,13 +67,7 @@ S.TrafficEmail = {
     const cards =
         card('Email List Size', list != null ? onTargetVal(list.toLocaleString(), list >= this.LIST_BENCHMARK) : noData, 'Benchmark: ' + this.LIST_BENCHMARK + '+', trend(list, prev?.email_list_size, ''))
       + card('Open Rate',       open != null ? onTargetVal(Math.round(open) + '%', open >= this.OPEN_RATE_BENCHMARK) : noData, 'Benchmark: ' + this.OPEN_RATE_BENCHMARK + '%+', trend(open, prev?.email_open_rate, '%'))
-      + card('Emails Sent/Mo',  sent != null ? onTargetVal(String(sent), sent >= 1) : noData, 'Send at least monthly', trend(sent, prev?.emails_sent, ''))
-      + card('Loyalty',         loyal
-            ? onTargetVal((members != null ? members.toLocaleString() : '0') + ' members'
-                + (redemptions != null ? ' · ' + redemptions + ' redemptions/mo' : ''),
-                members != null && members > 0)
-            : '<div class="metric-val" style="color:var(--t4);font-size:22px;">Not active</div>',
-          loyal ? 'Loyalty program active' : 'No loyalty program', ' ');
+      + card('Emails Sent/Mo',  sent != null ? onTargetVal(String(sent), sent >= 1) : noData, 'Send at least monthly', trend(sent, prev?.emails_sent, ''));
 
     // ── Trend charts ──
     const recent = weeks.slice(-8);
@@ -115,7 +106,6 @@ S.TrafficEmail = {
     if (sent != null && sent < 1) tips.push('No emails sent this month. A list you never email is a dead asset. Send at least monthly.');
     if (prof.email_frequency === 'Rarely' || prof.email_frequency === 'Never') tips.push('Send frequency is "' + prof.email_frequency + '". Move to at least monthly so the list stays warm.');
     if (!prof.email_growth || prof.email_growth === 'No active mechanism') tips.push('No active list-growth mechanism. Add a signup form on the website and a capture point in-store.');
-    if (!loyal) tips.push('No loyalty program active. A simple loyalty program turns one-time delivery and walk-in guests into regulars.');
     if (!latest) tips.push('No weekly data yet. Enter email metrics in This Week to score this section.');
 
     const tipsCard = tips.length
@@ -126,8 +116,8 @@ S.TrafficEmail = {
             + '<div style="font-size:13px;color:var(--t1);line-height:1.5;">' + esc(t) + '</div></div>'
           ).join('')
         + '</div>'
-      : '<div class="card"><div class="empty"><div class="empty-title">Email and Loyalty Are Working</div>'
-        + '<div class="empty-sub">List size, open rate, send frequency, and loyalty are all on track. Keep sending consistently.</div></div></div>';
+      : '<div class="card"><div class="empty"><div class="empty-title">Email Marketing Is Working</div>'
+        + '<div class="empty-sub">List size, open rate, and send frequency are all on track. Keep sending consistently.</div></div></div>';
 
     const logCard = this.campaignLogCard();
 
