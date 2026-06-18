@@ -37,7 +37,7 @@ S.FlowMap = {
     { id: 'revenue', label: 'Revenue', full: 'Revenue Recovery', layer: 'diagnose', go: 'r-dashboard',
       what: 'Diagnoses the top line: check average, menu engineering, pricing, labor productivity, and events.' },
     { id: 'traffic', label: 'Traffic', full: 'Traffic Recovery', layer: 'diagnose', go: 't-dashboard',
-      what: 'Diagnoses demand: reviews, Google profile, website, social, delivery, and email and loyalty.' },
+      what: 'Diagnoses demand: reviews, Google profile, website, social, delivery, and email marketing.' },
     { id: 'bca', label: 'Bar Cop Audit', full: 'Bar Cop Audit', layer: 'diagnose', action: 'audit',
       what: 'The cross-system score. Reads all three Control sections and grades operational discipline, cash integrity, inventory execution, and theft risk.' },
     { id: 'fix', label: 'Fix Process', full: 'The Fix Process', layer: 'fix', go: 'profit-fix',
