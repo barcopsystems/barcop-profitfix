@@ -133,10 +133,10 @@ const Traffic = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Traffic Forecast</span>
       </div>
-      <div class="nav-section">Online Presence</div>
+      <div class="nav-section">Online Tracker</div>
       <div class="nav-item" data-screen="t-presence" id="nav-t-presence">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 8.5h12.6M8.5 2.1c2.2 2.3 2.2 10.5 0 12.8M8.5 2.1c-2.2 2.3-2.2 10.5 0 12.8" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Online Presence</span>
+        <span class="nav-label">Online Tracker</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="t-help" id="nav-t-help">
