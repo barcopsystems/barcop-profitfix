@@ -1,7 +1,7 @@
 'use strict';
 // Traffic Recovery landing. Same skeleton as the Profit/Revenue dashboards, via
 // DashUI: Recovery Scoreboard hero, Live Links, a diagnosis row (Where You're
-// Leaking Now + This Week vs Target), an Online Presence + Traffic Audit row,
+// Leaking Now + This Week vs Target), an Online Tracker + Traffic Audit row,
 // then Quick Actions. No charts. Header off; nav-i carries the directions; full
 // day-one mirror before any data lands.
 S.TrafficDashboard = {
@@ -12,7 +12,7 @@ S.TrafficDashboard = {
       { h: 'Recovery Scoreboard', p: ['What Bar Cop has measured you added back since each fix started running. Website, email, and delivery turn into recovered dollars over time; the rest move your visibility without a clean dollar figure.'] },
       { h: 'Where You\'re Leaking Now', p: ['Your demand gaps, biggest first. The ones that dollarize show a number; the rest read as a Review row you tap to work on their own screen. Tap any row to open its fix.'] },
       { h: 'This Week vs Target', p: ['Your Google rating, review response, website visits, and posting from your latest logged week, each against target. Green is hitting it, red is missing it. Tap Bar Cop Insights for a written read on the trend.'] },
-      { h: 'Online Presence and Traffic Audit', p: ['Online Presence is the live Strong/Watch/Weak read across all seven areas. Traffic Audit shows your latest score and when the next one can run. Both open with a tap.'] }
+      { h: 'Online Tracker and Traffic Audit', p: ['Online Tracker is the live Strong/Watch/Weak read across all seven areas. Traffic Audit shows your latest score and when the next one can run. Both open with a tap.'] }
     ]);
   },
 
@@ -45,7 +45,7 @@ S.TrafficDashboard = {
           DashUI.shPanel('Where You\'re Leaking Now', leakBody),
           DashUI.shPanel('This Week vs Target', metricsBody, insightsBtn))
       + DashUI.row(
-          DashUI.shPanel('Online Presence', this.presencePanel()),
+          DashUI.shPanel('Online Tracker', this.presencePanel()),
           DashUI.shPanel('Traffic Audit', DashUI.auditPanel({
             audits: App.data.traffic_audits,
             screen: 't-audit',
@@ -55,7 +55,7 @@ S.TrafficDashboard = {
       + DashUI.quickActions([
           { go: 't-this-week', label: 'Enter This Week' },
           { go: 't-audit', label: 'Run Traffic Audit' },
-          { go: 't-presence', label: 'Online Presence' },
+          { go: 't-presence', label: 'Online Tracker' },
           { go: 't-fix', label: 'Traffic Fix' }
         ])
       + '</div>';
@@ -89,13 +89,13 @@ S.TrafficDashboard = {
     return rows;
   },
 
-  // Online Presence panel — the live Strong/Watch/Weak count across the seven
-  // areas, reusing the Online Presence page's own status logic.
+  // Online Tracker panel — the live Strong/Watch/Weak count across the seven
+  // areas, reusing the Online Tracker page's own status logic.
   presencePanel() {
-    const open = '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="t-presence">Open Online Presence</button></div>';
+    const open = '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="t-presence">Open Online Tracker</button></div>';
     if (!(window.S && S.TrafficPresence && S.TrafficPresence.areas) || !this.latest()) {
       return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Log a week and your seven online areas read Strong, Watch, or Weak here, each a tap into its fix.</div>'
-        + '<button class="btn btn-ghost btn-sm db-qa" data-go="t-presence">Open Online Presence</button>';
+        + '<button class="btn btn-ghost btn-sm db-qa" data-go="t-presence">Open Online Tracker</button>';
     }
     const w = S.TrafficPresence.latestWeek();
     const p = (App.data.traffic_settings && App.data.traffic_settings.profile) || {};
@@ -120,11 +120,11 @@ S.TrafficDashboard = {
 
     container.innerHTML = '<div class="screen">'
       + DashUI.dayOneStrip(
-          'Run your first Traffic Audit for a baseline, log a week in This Week, and check your Online Presence. As that data lands, this dashboard fills in with your recovered dollars and where your demand is leaking.',
+          'Run your first Traffic Audit for a baseline, log a week in This Week, and check your Online Tracker. As that data lands, this dashboard fills in with your recovered dollars and where your demand is leaking.',
           [
             { done: hasAudit, num: 1, label: 'Run your first Traffic Audit', go: 't-audit' },
             { done: hasWeek,  num: 2, label: 'Enter This Week', go: 't-this-week' },
-            { done: false,    num: 3, label: 'Check your Online Presence', go: 't-presence' }
+            { done: false,    num: 3, label: 'Check your Online Tracker', go: 't-presence' }
           ])
       + '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Recovery Scoreboard</div>'
         + ph('Your recovered dollars show here once you log your first fix. Website, email, and delivery dollarize; the rest move your visibility without a dollar figure.') + '</div>'
@@ -132,12 +132,12 @@ S.TrafficDashboard = {
           DashUI.shPanel('Where You\'re Leaking Now', ph('Your demand gaps rank here once a week of data lands, each a tap into the fix process.')),
           DashUI.shPanel('This Week vs Target', ph('Your Google rating, review response, website visits, and posting against target show here once you log a week.')))
       + DashUI.row(
-          DashUI.shPanel('Online Presence', ph('Your seven online areas read Strong, Watch, or Weak here once you log a week.')),
+          DashUI.shPanel('Online Tracker', ph('Your seven online areas read Strong, Watch, or Weak here once you log a week.')),
           DashUI.shPanel('Traffic Audit', ph('Your latest Traffic Audit score lands here once you run one.')))
       + DashUI.quickActions([
           { go: 't-this-week', label: 'Enter This Week' },
           { go: 't-audit', label: 'Run Traffic Audit' },
-          { go: 't-presence', label: 'Online Presence' },
+          { go: 't-presence', label: 'Online Tracker' },
           { go: 't-fix', label: 'Traffic Fix' }
         ])
       + '</div>';
