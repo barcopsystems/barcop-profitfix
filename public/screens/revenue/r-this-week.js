@@ -156,7 +156,7 @@ S.RevenueThisWeek = {
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one.'] },
       { h: 'The Money Picture', p: ['Total revenue, how the week tracked versus your forecast, check average against target, labor percent against target, and revenue per labor hour, all live as you confirm the numbers.'] },
       { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Every cell is pre-filled from Control and editable. Load from Control re-runs the pull and refills the cells; if you have edited a cell by hand it asks before overwriting.'] },
-      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first, with check average and labor percent colored against your targets. Edit loads a week back into the form; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
+      { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first, with check average and labor percent colored against your targets. Edit loads a week back into the form to correct it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
 

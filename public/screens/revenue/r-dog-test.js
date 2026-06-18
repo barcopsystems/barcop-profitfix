@@ -23,7 +23,7 @@ S.RevenueDogTest = {
 
   showHowTo() {
     App.showHelpModal('How the Dog Test Tracker Works', [
-      { p: ['A Dog (low margin and low volume on the Menu Engineering matrix) is not always a bad dish. Some are good items buried in a bad menu slot with a weak description. Before you pull one, give it a fair 90-day test in a better position with a rewritten description and watch whether volume moves.'] },
+      { p: ['A Dog (low margin and low volume in the Menu Engineering groups) is not always a bad dish. Some are good items buried in a bad menu slot with a weak description. Before you pull one, give it a fair 90-day test in a better position with a rewritten description and watch whether volume moves.'] },
       { h: 'Starting a Test', p: ['Pick the menu item and Bar Cop auto-fills the baseline from its current weekly covers on Menu Items. Note what you changed (new position, new description) and start. The test runs 90 days.'] },
       { h: 'Tracking It', p: ['Current weekly volume reads live from that item\'s weekly covers on the Menu Items screen, so keep that number current as service data comes in. The card shows the lift against baseline and counts down the 90 days.'] },
       { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Remove It if it did not. The decision snapshots the final volume and lands in Test History.'] }

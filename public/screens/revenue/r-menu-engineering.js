@@ -20,6 +20,7 @@ S.RevenueMenuEngineering = {
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering sorts every priced item that has a cost and weekly covers into four groups by margin and popularity, so you know exactly what to push, reprice, promote, or cut. It needs at least four complete items; finish any Incomplete ones in Menu Items.'] },
+      { h: 'The Numbers', p: ['The box up top reads your whole menu at a glance: how many items were analyzed, your average cost percent and average margin across them, and how many Plowhorses are sitting underpriced and waiting on a price bump.'] },
       { h: 'The Four Groups', p: ['Stars are high margin and high volume, your winners, so feature them and brief servers to push them. Plowhorses sell well but earn little, so raise the price. Puzzles earn well but sell slowly, so promote them and give them server attention. Dogs are low on both, candidates to rework or cut.'] },
       { h: 'Repricing', p: ['Reprice on any row opens the Price Calculator with that item ready, so you can model the new margin and weekly dollar impact before you commit, then log the change.'] }
     ]);
