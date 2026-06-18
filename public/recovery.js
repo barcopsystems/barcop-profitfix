@@ -94,7 +94,7 @@ window.Recovery = {
 
     // ── Traffic Recovery metrics ─────────────────────────────────────────────
     // Three Traffic gap-areas dollarize: Website (monthly_sessions), Email
-    // and Loyalty (list × open_rate × conv), and Delivery (orders × AOV).
+    // Marketing (list × open_rate × conv), and Delivery (orders × AOV).
     // Reviews, SEO, GBP, and Social stay absent and show as Fix Logged
     // markers on the chart without dollar credit. GBP + Social previously
     // dollarized from weekly gbp_views and social_profile_visits, but those
@@ -113,7 +113,7 @@ window.Recovery = {
       fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
     },
 
-    // Email and Loyalty — (list × open_rate% × email_open_to_visit%) ÷ 4.33 weekly visits × check_avg × 52
+    // Email Marketing — (list × open_rate% × email_open_to_visit%) ÷ 4.33 weekly visits × check_avg × 52
     'email-loyalty': {
       series: 'traffic_weeks', label: 'Email-Driven Visits', lowerBetter: false,
       value: w => {
