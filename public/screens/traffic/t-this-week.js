@@ -15,6 +15,7 @@ S.TrafficThisWeek = {
     App.showHelpModal('How This Week Works', [
       { p: ['Each week, confirm where your online numbers landed. Bar Cop pre-fills every field from last week, so you only touch what moved, then save. One page, no wizard.'] },
       { h: 'The Status Strip', p: ['Up top is where you stand right now: Google rating, review response, website visits, posting, delivery orders, and email open rate, each against target. The form below is the week you are confirming.'] },
+      { h: 'Reservations', p: ['If the Audit found that you take reservations online, a Reservations field shows under Website. Enter your monthly count so the Traffic Forecast can put a dollar value on your booking channel. No reservation link yet means no field, and the Forecast shows what standing one up would be worth instead.'] },
       { h: 'History', p: ['Every saved week lands in the list below. Edit loads a past week back into the form to correct it. These weeks feed your Traffic dashboard, the Forecast, and the Recovery Scoreboard.'] }
     ]);
   },
@@ -31,6 +32,7 @@ S.TrafficThisWeek = {
     ]],
     ['Website', [
       ['monthly_sessions', 'Visits / Mo', 'num', '1', '/mo'],
+      ['monthly_reservations', 'Reservations / Mo', 'num', '1', '/mo'],
       ['bounce_rate', 'Bounce Rate', 'num', '1', '%']
     ]],
     ['Social', [
@@ -53,6 +55,10 @@ S.TrafficThisWeek = {
   weeks() { return (App.data.traffic_weeks || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')); },
   latest() { const w = this.weeks(); return w.length ? w[w.length - 1] : null; },
   targets() { return (App.data.traffic_settings && App.data.traffic_settings.targets) || {}; },
+  profile() { return (App.data.traffic_settings && App.data.traffic_settings.profile) || {}; },
+  // Reservations are only tracked when the Audit says the operator takes them
+  // online; otherwise the field stays off the form (nothing to count).
+  reservationsOn() { return !!this.profile().web_reservations; },
 
   // A blank week pre-filled from the most recent one (confirm, not retype).
   freshForm() {
@@ -96,6 +102,7 @@ S.TrafficThisWeek = {
       + item('Google Rating', w.google_rating != null ? w.google_rating + '★' : null, 'target ' + (t.google_rating || 4.3) + '★', w.google_rating != null ? w.google_rating >= (t.google_rating || 4.3) : null)
       + item('Response Rate', w.response_rate != null ? w.response_rate + '%' : null, 'target ' + (t.response_rate || 75) + '%', w.response_rate != null ? w.response_rate >= (t.response_rate || 75) : null)
       + item('Website Visits', n(w.monthly_sessions), 'target ' + n(t.monthly_sessions || 2000), w.monthly_sessions != null ? w.monthly_sessions >= (t.monthly_sessions || 2000) : null)
+      + (this.reservationsOn() ? item('Reservations', n(w.monthly_reservations), 'per month', null) : '')
       + item('Posts / Mo', w.ig_posts_month != null ? String(w.ig_posts_month) : null, 'target ' + (t.social_posts_month || 12), w.ig_posts_month != null ? w.ig_posts_month >= (t.social_posts_month || 12) : null)
       + item('Delivery Orders', n(w.delivery_orders), 'per month', null)
       + item('Email Open', w.email_open_rate != null ? w.email_open_rate + '%' : null, 'benchmark 22%', w.email_open_rate != null ? w.email_open_rate >= 22 : null)
@@ -118,9 +125,12 @@ S.TrafficThisWeek = {
   },
 
   formCard() {
+    const resvOn = this.reservationsOn();
     const groups = this.GROUPS.map(g =>
       '<div class="sh" style="margin:16px 0 8px;">' + g[0] + '</div>'
-      + '<div class="form-row" style="gap:16px;">' + g[1].map(f => this.field(f)).join('') + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+      + g[1].filter(f => f[0] !== 'monthly_reservations' || resvOn).map(f => this.field(f)).join('')
+      + '</div>'
     ).join('');
     return '<div class="card form-card"><div class="card-title">' + (this._editId ? 'Edit Week' : 'Confirm This Week') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
@@ -217,7 +227,7 @@ S.TrafficThisWeek = {
       google_rating: numF(d.google_rating), google_total: numI(d.google_total),
       new_reviews: numI(d.new_reviews), response_rate: rr,
       yelp_rating: numF(d.yelp_rating), yelp_total: numI(d.yelp_total),
-      monthly_sessions: numI(d.monthly_sessions), bounce_rate: numF(d.bounce_rate),
+      monthly_sessions: numI(d.monthly_sessions), monthly_reservations: numI(d.monthly_reservations), bounce_rate: numF(d.bounce_rate),
       ig_followers: numI(d.ig_followers), ig_posts_month: numI(d.ig_posts_month),
       fb_followers: numI(d.fb_followers),
       delivery_orders: numI(d.delivery_orders), delivery_avg_order_value: numF(d.delivery_avg_order_value),
