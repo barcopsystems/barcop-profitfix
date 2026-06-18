@@ -685,7 +685,7 @@ S.HubSettings = {
         S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Saturday floor overstaffed',
         S6_SIG2_EVIDENCE: 'Saturday floor RPLH ran $48 against a $75 target while weeknight RPLH hit $72.',
         S6_SIG2_GAP: 'About $720 per Saturday in excess labor.',
-        S6_SIG2_TOOL: 'Drop one server from the Saturday floor for two weeks and watch RPLH in the RPLH Tracker.',
+        S6_SIG2_TOOL: 'Drop one server from the Saturday floor for two weeks and watch RPLH on This Week.',
         S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'One menu item drives complaints',
         S6_SIG3_EVIDENCE: 'House Burger appears in 41% of negative comments and 18% of comps.',
         S6_SIG3_GAP: 'Build, portion, or price is off.',
