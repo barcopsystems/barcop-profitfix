@@ -236,7 +236,7 @@ S.RevenueThisWeek = {
       : '';
 
     const rows = all.length
-      ? all.map(w => {
+      ? all.slice(0, App.listLimit('core', 'revenue_weeks_hist')).map(w => {
           const total = (w.bar_revenue || 0) + (w.floor_revenue || 0);
           const caCls = w.check_avg ? (w.check_avg >= targetCA ? 'pos' : 'neg') : '';
           const lpCls = w.labor_pct_blended ? (w.labor_pct_blended <= tgtLP ? 'pos' : 'neg') : '';
@@ -249,13 +249,13 @@ S.RevenueThisWeek = {
             + '<td>' + (w.covers || '-') + '</td>'
             + '<td class="' + caCls + '">' + (w.check_avg ? App.fmtCurrency(w.check_avg) : '-') + '</td>'
             + '<td class="' + lpCls + '">' + (w.labor_pct_blended ? App.fmtPct(w.labor_pct_blended) : '-') + '</td>'
+            + '<td>' + (w.total_hours ? w.total_hours.toFixed(1) : '-') + '</td>'
             + '<td class="val">' + (w.rplh_blended ? App.fmtCurrency(w.rplh_blended) : '-') + '</td>'
             + '<td><div class="row-actions">'
             + '<button class="btn btn-ghost btn-sm rw-edit" data-id="' + esc(w.id) + '">Edit</button>'
-            + '<button class="btn btn-danger btn-sm rw-del" data-id="' + esc(w.id) + '">Delete</button>'
             + '</div></td></tr>';
         }).join('')
-      : '<tr><td colspan="10" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Save a week above, or widen the range.</td></tr>';
+      : '<tr><td colspan="11" style="text-align:center;padding:22px;color:var(--t4);">No weeks saved in this range. Save a week above, or widen the range.</td></tr>';
 
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'rw-range-chip') + '</div>'
@@ -263,8 +263,9 @@ S.RevenueThisWeek = {
       + '</div>'
       + customRow
       + '<div id="rw-hist-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+      + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>Labor Hours</th><th>RPLH</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>'
+      + App.showOlderBar('core', 'revenue_weeks_hist', all, false);
   },
 
   draw() {
@@ -305,7 +306,7 @@ S.RevenueThisWeek = {
     document.getElementById('rw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
     document.getElementById('rw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: document.getElementById('rw-hist-export') || this.container }));
     this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
-    this.container.querySelectorAll('.rw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 
   gotoWeek(weekEnd) {
@@ -323,16 +324,6 @@ S.RevenueThisWeek = {
     if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
     else if (el) el.scrollTop = 0;
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
-  },
-
-  deleteWeek(id) {
-    App.confirmDelete().then(ok => {
-      if (!ok) return;
-      App.removeRecord('core', 'revenue_week', id).then(() => {
-        if (this._editId === id) this.loadWeek(this._weekEnd);
-        this.draw();
-      });
-    });
   },
 
   onInput() { this.collect(); this.saveDraft(); this.calc(); },
