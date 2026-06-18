@@ -10,6 +10,7 @@
 S.TrafficThisWeek = {
   _form: null,
   _editId: null,
+  _histPreset: '',
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
@@ -126,11 +127,21 @@ S.TrafficThisWeek = {
     return '<div class="f" style="width:170px;"><label>' + label + '</label>' + input + '</div>';
   },
 
+  // Full-width section divider: the area name + a hairline rule across, with
+  // generous space above. Groups the form by area through whitespace and a line,
+  // not a box.
+  sectionHeader(label) {
+    return '<div style="display:flex;align-items:center;gap:14px;margin:28px 0 14px;">'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t2);white-space:nowrap;">' + esc(label) + '</span>'
+      + '<span style="flex:1;height:1px;background:var(--b2);"></span>'
+      + '</div>';
+  },
+
   formCard() {
     const resvOn = this.reservationsOn();
     const groups = this.GROUPS.map(g =>
-      '<div class="sh" style="margin:16px 0 8px;">' + g[0] + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
+      this.sectionHeader(g[0])
+      + '<div class="form-row" style="gap:18px 22px;">'
       + g[1].filter(f => f[0] !== 'monthly_reservations' || resvOn).map(f => this.field(f)).join('')
       + '</div>'
     ).join('');
@@ -139,7 +150,7 @@ S.TrafficThisWeek = {
       +   '<div class="f" style="width:170px;"><label>Week ending</label><input class="form-input" type="date" id="tw-period_end" value="' + esc(this._form.period_end || '') + '"/></div>'
       + '</div>'
       + groups
-      + '<div class="sh" style="margin:16px 0 8px;">Notes</div>'
+      + this.sectionHeader('Notes')
       + '<div class="f" style="width:100%;"><textarea class="notes-ta" rows="2" id="tw-notes" placeholder="Optional">' + esc(this._form.notes || '') + '</textarea></div>'
       + '</div>';
   },
@@ -149,7 +160,8 @@ S.TrafficThisWeek = {
     const all = this.weeks().slice().reverse();   // newest first
     if (!all.length) return '<div style="font-size:12px;color:var(--t3);margin-top:8px;">No weeks saved yet. Confirm your first week above.</div>';
     const t = this.targets();
-    const shown = all.slice(0, App.listLimit('core', 'traffic_weeks_hist'));
+    const filtered = this.filterHistByPreset(all);
+    const shown = filtered.slice(0, App.listLimit('core', 'traffic_weeks_hist'));
     const rows = shown.map(w => {
       const cell = (val, good) => '<td' + (good != null && val != null ? ' style="color:' + (good ? 'var(--green)' : 'var(--red)') + ';"' : '') + '>' + (val != null && val !== '' ? val : '-') + '</td>';
       return '<tr>'
@@ -162,14 +174,36 @@ S.TrafficThisWeek = {
         + '<td style="text-align:right;"><div class="row-actions"><button class="btn btn-ghost btn-sm tw-edit" data-id="' + esc(String(w.id)) + '">Edit</button></div></td>'
         + '</tr>';
     }).join('');
-    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      +   '<div class="sh" style="margin:0;">Weekly History</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="tw-hist-export">Export PDF</button>'
-      + '</div>'
-      + '<div id="tw-hist-export-area"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
-      +   '<thead><tr><th>Week ending</th><th>Rating</th><th>Response</th><th>Visits</th><th>Posts</th><th>Orders</th><th></th></tr></thead>'
-      +   '<tbody>' + rows + '</tbody></table></div></div></div>'
-      + App.showOlderBar('core', 'traffic_weeks_hist', all, false);
+    const presetOpts = [
+      { v: 'this-month', label: 'This Month' },
+      { v: 'last-4', label: 'Last 4 Weeks' },
+      { v: 'last-12', label: 'Last 12 Weeks' },
+      { v: '', label: 'All' }
+    ];
+    const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + App.filterChips(this._histPreset || '', presetOpts, 'tw-hist-chip') + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="tw-hist-export">Export PDF</button>'
+      + '</div>';
+    const body = shown.length
+      ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
+        + '<thead><tr><th>Week ending</th><th>Rating</th><th>Response</th><th>Visits</th><th>Posts</th><th>Orders</th><th></th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div></div>'
+      : '<div style="font-size:12px;color:var(--t3);padding:10px 2px;">No weeks in this range.</div>';
+    return headRow
+      + '<div id="tw-hist-export-area">' + body + '</div>'
+      + App.showOlderBar('core', 'traffic_weeks_hist', filtered, !!this._histPreset);
+  },
+
+  filterHistByPreset(arr) {
+    const r = App.datePresetRange(this._histPreset || '');
+    if (!r.from && !r.to) return arr;
+    return arr.filter(w => {
+      const d = (w.period_end || '').slice(0, 10);
+      if (!d) return false;
+      if (r.from && d < r.from) return false;
+      if (r.to && d > r.to) return false;
+      return true;
+    });
   },
 
   // ── Scan a screenshot — vision prefill through the existing /api/claude proxy ─
@@ -264,6 +298,7 @@ S.TrafficThisWeek = {
     this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.loadForEdit(b.dataset.id)));
     document.getElementById('tw-hist-export')?.addEventListener('click', () => App.exportPDF({ title: 'Traffic Weekly History', root: document.getElementById('tw-hist-export-area') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
+    this.container.querySelectorAll('.tw-hist-chip').forEach(b => b.addEventListener('click', () => { this._histPreset = b.dataset.v || ''; this.draw(); }));
 
     // Screenshot scan dropzone
     const drop = document.getElementById('tw-drop');
