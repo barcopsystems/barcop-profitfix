@@ -391,10 +391,12 @@ S.TrafficAudit = {
 
   showHowTo() {
     App.showHelpModal('How the Traffic Audit Works', [
-      { p: ['The Traffic Audit scores your digital presence across seven areas. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers.'] },
-      { h: 'Reads live from a link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once in Settings and it is ready every audit.'] },
-      { h: 'Needs a screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email all sit behind a login or carry data a link cannot reach. Upload a screenshot in the Screenshots section to score those.'] },
-      { h: 'The steps', p: ['1. Confirm or paste your Website link.', '2. Upload a screenshot for your Google reviews, Yelp, and any other area you want scored.', '3. Answer the few quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
+      { p: ['The Traffic Audit scores your digital presence across seven areas: Google Business, website, reviews, search, social, delivery, and email. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers. One audit every 30 days.'] },
+      { h: 'What Bar Cop Already Has', p: ['The chips on the form show which areas your weekly This Week numbers already cover, so you do not re-enter them. The greyed ones fill in as you log more or drop a screenshot.'] },
+      { h: 'Reads Live From a Link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once and it is ready every audit.'] },
+      { h: 'Needs a Screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email sit behind a login or carry data a link cannot reach. Drop one screenshot per area you want scored; one drop zone takes them all, and PDF or CSV exports work too.'] },
+      { h: 'The Quick Questions', p: ['A few questions cover what no report shows, like whether you mark up delivery prices to offset commission or run a review-ask at the table. They shape the score and carry over to next time.'] },
+      { h: 'The Steps', p: ['1. Confirm your Website link.', '2. Drop a screenshot for each area you want scored.', '3. Answer the quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
     ]);
   },
 

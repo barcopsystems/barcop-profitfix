@@ -8,9 +8,10 @@ S.TrafficDashboard = {
 
   showHowTo() {
     App.showHelpModal('How the Traffic Dashboard Works', [
-      { p: ['The Traffic Recovery landing runs the whole loop on one page: how much you have recovered up top, where your demand is leaking right now and your numbers against target just under it, your online presence and audit below that. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and your weekly numbers.'] },
+      { p: ['The Traffic Recovery landing runs the whole loop on one page: how much you have recovered up top, where your demand is leaking right now and your numbers against target under it, then your Online Tracker read and audit. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and your weekly numbers.'] },
       { h: 'Recovery Scoreboard', p: ['What Bar Cop has measured you added back since each fix started running. Website, email, and delivery turn into recovered dollars over time; the rest move your visibility without a clean dollar figure.'] },
-      { h: 'Where You\'re Leaking Now', p: ['Your demand gaps, biggest first. The ones that dollarize show a number; the rest read as a Review row you tap to work on their own screen. Tap any row to open its fix.'] },
+      { h: 'Live Links', p: ['One-tap shortcuts to your live Google, Yelp, social, delivery, and email pages, pulled from the links you saved in Settings. Open any to check it without hunting for the URL.'] },
+      { h: 'Where You\'re Leaking Now', p: ['Your demand gaps, biggest first. The ones that dollarize show a number; the rest read as a Review row you tap to work on. Tap any row to open its fix.'] },
       { h: 'This Week vs Target', p: ['Your Google rating, review response, website visits, and posting from your latest logged week, each against target. Green is hitting it, red is missing it. Tap Bar Cop Insights for a written read on the trend.'] },
       { h: 'Online Tracker and Traffic Audit', p: ['Online Tracker is the live Strong/Watch/Weak read across all seven areas. Traffic Audit shows your latest score and when the next one can run. Both open with a tap.'] }
     ]);

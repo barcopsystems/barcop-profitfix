@@ -16,11 +16,14 @@ S.TrafficThisWeek = {
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
-      { p: ['Each week, confirm where your online numbers landed. Bar Cop pre-fills every field from last week, so you only touch what moved, then save. One page, no wizard.'] },
-      { h: 'Scan a Screenshot', p: ['Short on time, drop a screenshot of any dashboard, Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool, and Bar Cop reads the numbers off it and fills the form for you. Check what it pulled, then Save. Drop more than one to fill different areas.'] },
-      { h: 'The Status Strip', p: ['Up top is where you stand right now: Google rating, review response, website visits, posting, delivery orders, and email open rate, each against target. The form below is the week you are confirming.'] },
-      { h: 'Reservations', p: ['If the Audit found that you take reservations online, a Reservations field shows under Website. Enter your monthly count so the Traffic Forecast can put a dollar value on your booking channel. No reservation link yet means no field, and the Forecast shows what standing one up would be worth instead.'] },
-      { h: 'History', p: ['Every saved week lands in the list below. Edit loads a past week back into the form to correct it. These weeks feed your Traffic dashboard, the Forecast, and the Recovery Scoreboard.'] }
+      { p: ['Each week, confirm where your online numbers landed. Every field pre-fills from last week, so you only touch what moved, then save.'] },
+      { h: 'The Status Strip', p: ['Up top is where you stand right now: Google rating, review response, website visits, posting, delivery orders, and email open rate, each against target. Green is hitting it, red is missing it.'] },
+      { h: 'Pick The Week', p: ['The chips above the card set which week you are entering. Step back and forward with the arrows, or tap This Week to jump to the current one, marked NOW. Land on a week you already saved and its numbers load for you to edit; land on a new week and it starts fresh, pre-filled from the week before.'] },
+      { h: 'Two Ways In', p: ['Update Manually types the numbers by hand, grouped by area. Import Screenshots drops a screenshot of any dashboard, Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool, and Bar Cop reads the numbers off it and fills the form for you to check. Drop more than one to fill different areas.'] },
+      { h: 'The Worksheet', p: ['Worksheet prints a one-page sheet of every number for the week. Carry it, look each one up, write it down, then key them in all at once.'] },
+      { h: 'Reservations', p: ['When the Audit finds you take reservations online, a Reservations field shows under Website. Enter your monthly count so the Forecast can value your booking channel. No reservation link, no field.'] },
+      { h: 'Collapse The Form', p: ['The chevron on the Confirm This Week card folds it away, so you can read the history underneath without the form in the way.'] },
+      { h: 'Weekly History', p: ['Every saved week lands below, newest first. Filter it with the date chips, This Month, Last 4 Weeks, Last 12 Weeks, or All; Export PDF for the trail; and Edit to load any week back into the form. These weeks feed your Traffic dashboard, the Forecast, and the Recovery Scoreboard.'] }
     ]);
   },
 

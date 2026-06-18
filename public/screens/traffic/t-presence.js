@@ -18,10 +18,11 @@ S.TrafficPresence = {
 
   showHowTo() {
     App.showHelpModal('How Online Tracker Works', [
-      { p: ['Your whole online storefront on one page: Google Business, your website, reviews, search, social, delivery, and email, each with its current numbers, a plain read on where it stands, and the setup you control.'] },
-      { h: 'The Read', p: ['Each area shows Strong, Watch, or Weak off your live numbers against target. Strong is pulling its weight, Watch is slipping, Weak is costing you discovery and bookings right now. Work the Weak ones first.'] },
-      { h: 'Updating Setup', p: ['Tap Update Setup on any area to record what you have in place: the Google Business checklist, your website toggles, your local search items, delivery menus, email sending. Saving credits the Recovery Scoreboard when you cross a benchmark.'] },
-      { h: 'The Numbers vs The Setup', p: ['Your weekly numbers (rating, reviews, visits, orders) are entered in This Week. The setup here is the state that changes when you do the work, like claiming the listing or adding a reservation link. Full steps and the dollar value live in Traffic Fix.'] }
+      { p: ['Your whole online storefront on one page: Google Business, your website, reviews, search, social, delivery, and email. Each area shows its current numbers, a plain read on where it stands, and the setup you control.'] },
+      { h: 'The Read', p: ['The strip up top counts how many areas are Strong, Watch, or Weak. Each area card reads off your live numbers against target: Strong is pulling its weight, Watch is slipping, Weak is costing you discovery and bookings right now. Work the Weak ones first.'] },
+      { h: 'Update Setup', p: ['Tap Update Setup on any area to record what you have in place: the Google Business checklist, your website toggles, your local search items, delivery menus and ratings, email sending. Save This Area writes it. Crossing a benchmark, a finished checklist, your photo count, your citations, credits the Recovery Scoreboard on its own.'] },
+      { h: 'Numbers vs Setup', p: ['Your weekly numbers, rating, reviews, visits, orders, are entered in This Week. The setup here is the state that changes when you do the work, like claiming the listing or adding a reservation link.'] },
+      { h: 'Full Steps and Value', p: ['Full Steps and Value opens that area in Traffic Fix, where the ordered steps and the dollars on the table live.'] }
     ]);
   },
 

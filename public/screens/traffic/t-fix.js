@@ -405,6 +405,7 @@ S.TrafficFix = {
       { h: 'What Bar Cop Verifies', p: ['Every step that maps to a number or a setting on your Online Tracker card counts: your profile checklist, your photo and citation counts, your response and open rates, your posting. Each shows a live status, In place, Building, or Under target, and grades partial work so you see exactly what is left. Save a card past a benchmark and it credits the Recovery Scoreboard on its own.'] },
       { h: 'Guidance Steps', p: ['The off-platform craft, writing the description, replying in your voice, merging duplicate listings, is marked Guidance. Bar Cop cannot see it happen on Google or Instagram, so it shows the step and never counts it as proof.'] },
       { h: 'Watch Out For', p: ['At the bottom of each system are the mistakes that quietly cost you visibility, the things Bar Cop cannot catch for you. Worth a read before you chase a number that looks off.'] },
+      { h: 'Recovered To Date', p: ['The line under each system header reads how long it has been running and what it has recovered so far, in whole dollars. See Your Recovery Timeline charts that build from the day you started.'] },
       { h: 'It Starts On Its Own', p: ['There is no start button. The moment you log the first week, Bar Cop logs that day and measures from there. Website, email, and delivery turn into recovered dollars over time; the rest move your visibility without a clean dollar figure, and Bar Cop says so plainly instead of inventing one.'] }
     ]);
   }
