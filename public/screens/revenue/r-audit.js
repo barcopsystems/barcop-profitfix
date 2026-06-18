@@ -330,7 +330,7 @@ S.RevenueAudit = {
   renderIntake() {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
-    // Form viewable anytime; the 30-day cadence gates only Generate.
+    // Form viewable anytime; the 30-day window gates only Generate.
     const _a = (App.data.revenue_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = _since >= 30;
