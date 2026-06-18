@@ -16,20 +16,59 @@ const TF_TRACK = '#0D181E';
 const TF_DIM   = '#1B2630';
 const TF_TXT   = '#C9D3DA';
 
+// Operator-set Traffic target with a benchmark default (for metric steps).
+function tTgt(key, def) { return (((typeof App !== 'undefined' && App.data && App.data.traffic_settings) || {}).targets || {})[key] ?? def; }
+
 S.TrafficFix = {
   _workGap: null,
 
-  // Which steps Bar Cop can verify, keyed by gap id then step index. Steps not
-  // listed are Guidance. 'week' = the operator logged This Week (covers that
-  // area's numbers); setup = a profile state Bar Cop can read.
+  // Which steps Bar Cop can verify, keyed by gap id then step index. The tracked
+  // steps come FIRST in fix-traffic.js so these indices line up; a step not
+  // listed is Guidance. Kinds: setup = N of M profile toggles (graded); state =
+  // one profile flag set (or a select off its inactive set); count = a profile
+  // number vs a benchmark (graded); metric = the latest This Week number vs its
+  // target (graded); recur = you logged This Week recently; fn = a custom
+  // evaluator (delivery is per-platform).
   TRACK: {
-    'gbp':           { 1: { kind: 'setup', key: 'gbp_complete' }, 4: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'website':       { 1: { kind: 'setup', key: 'website_setup' }, 3: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'reviews':       { 5: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'search-seo':    { 3: { kind: 'setup', key: 'nap_setup' } },
-    'social':        { 4: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'delivery':      { 4: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'email-loyalty': { 3: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } }
+    'gbp': {
+      0: { kind: 'setup', flags: ['gbp_claimed', 'gbp_hours', 'gbp_phone', 'gbp_website', 'gbp_menu', 'gbp_category', 'gbp_attributes', 'gbp_qa'] },
+      1: { kind: 'count', get: p => p.gbp_photos, target: 100, unit: 'photos' },
+      2: { kind: 'count', get: p => p.gbp_posts, target: 8, unit: 'a month' },
+      3: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    },
+    'website': {
+      0: { kind: 'setup', flags: ['web_exists', 'web_mobile', 'web_menu', 'web_online_order', 'web_reservations', 'web_analytics'] },
+      1: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    },
+    'reviews': {
+      0: { kind: 'metric', field: 'response_rate', target: () => tTgt('response_rate', 75), unit: '%' },
+      1: { kind: 'metric', field: 'new_reviews', target: () => tTgt('review_velocity', 8), unit: ' a month' },
+      2: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    },
+    'search-seo': {
+      0: { kind: 'setup', flags: ['search_nap', 'search_name', 'search_address', 'search_phone'] },
+      1: { kind: 'state', key: 'search_maps_pack' },
+      2: { kind: 'state', key: 'search_keyword' },
+      3: { kind: 'count', get: p => p.search_citations, target: 40, unit: 'listings' },
+      4: { kind: 'state', key: 'search_titles' }
+    },
+    'social': {
+      0: { kind: 'setup', flags: ['social_stories', 'social_reels'] },
+      1: { kind: 'metric', field: 'ig_posts_month', target: () => tTgt('social_posts_month', 12), unit: ' a month' },
+      2: { kind: 'count', get: p => p.social_ig_engagement, target: 2, unit: '%' },
+      3: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    },
+    'delivery': {
+      0: { kind: 'fn', fn: 'deliverySetup' },
+      1: { kind: 'fn', fn: 'deliveryRating' },
+      2: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    },
+    'email-loyalty': {
+      0: { kind: 'state', key: 'email_growth', inactive: ['', 'No active mechanism'] },
+      1: { kind: 'state', key: 'email_frequency', inactive: ['', 'Rarely', 'Never'] },
+      2: { kind: 'metric', field: 'email_open_rate', target: () => 20, unit: '%' },
+      3: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }
+    }
   },
 
   gaps() { return (window.FIX && Array.isArray(FIX.traffic)) ? FIX.traffic : []; },
@@ -89,50 +128,91 @@ S.TrafficFix = {
   },
   agoText(ds) { return ds === 0 ? 'today' : ds === 1 ? 'yesterday' : ds + ' days ago'; },
 
-  setupState(key) {
-    const p = (App.data && App.data.traffic_settings && App.data.traffic_settings.profile) || {};
-    if (key === 'gbp_complete') {
-      const flags = [p.gbp_claimed, p.gbp_hours, p.gbp_phone, p.gbp_website, p.gbp_menu, p.gbp_category, p.gbp_attributes, p.gbp_qa];
-      return flags.filter(Boolean).length >= 6;
-    }
-    if (key === 'website_setup') {
-      return !!p.web_exists && !!p.web_mobile && (!!p.web_online_order || !!p.web_reservations);
-    }
-    if (key === 'nap_setup') {
-      return !!p.search_nap && !!p.search_maps_pack;
-    }
-    return false;
+  prof() { return (App.data && App.data.traffic_settings && App.data.traffic_settings.profile) || {}; },
+  latestWeek() {
+    const w = ((App.data && App.data.traffic_weeks) || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
+    return w.length ? w[w.length - 1] : null;
+  },
+  _stColor(state) {
+    return state === 'ontrack' ? 'var(--green)' : state === 'slipping' ? 'var(--amber)' : state === 'behind' ? 'var(--red)' : 'var(--t3)';
+  },
+
+  // Per-platform delivery is graded across the platforms the operator marked live.
+  deliverySetup() {
+    const p = this.prof();
+    const PL = App.TRAFFIC_DELIVERY_PLATFORMS || [];
+    const active = PL.filter(pl => p[pl.key + '_active'] === 'yes');
+    if (!active.length) return { state: 'never', good: false, label: 'No active platform', color: this._stColor('never') };
+    let done = 0; const total = active.length * 3;
+    active.forEach(pl => { if (p[pl.key + '_menu']) done++; if (p[pl.key + '_promo']) done++; if (p[pl.key + '_menu_synced_at']) done++; });
+    const state = done === total ? 'ontrack' : done > 0 ? 'slipping' : 'never';
+    return { state, good: state === 'ontrack', label: state === 'ontrack' ? 'In place' : state === 'slipping' ? 'Partly done' : 'Not set up', color: this._stColor(state), sub: done + ' of ' + total + ' in place' };
+  },
+  deliveryRating() {
+    const p = this.prof();
+    const PL = App.TRAFFIC_DELIVERY_PLATFORMS || [];
+    const rated = PL.filter(pl => p[pl.key + '_active'] === 'yes' && p[pl.key + '_rating'] != null);
+    if (!rated.length) return { state: 'never', good: false, label: 'No ratings logged', color: this._stColor('never') };
+    const below = rated.filter(pl => p[pl.key + '_rating'] < 4.5).length;
+    const state = below === 0 ? 'ontrack' : 'slipping';
+    return { state, good: state === 'ontrack', label: below === 0 ? 'In place' : 'Below 4.5', color: this._stColor(state), sub: below === 0 ? 'all 4.5 stars or higher' : below + ' under 4.5 stars' };
   },
 
   stepStatus(gapId, idx) {
     const t = (this.TRACK[gapId] || {})[idx];
     if (!t) return { kind: 'guide' };
+    const p = this.prof();
+
     if (t.kind === 'setup') {
-      const ok = this.setupState(t.key);
-      return { kind: 'setup', good: ok, label: ok ? 'In place' : 'Set this up', color: ok ? 'var(--green)' : 'var(--amber)' };
+      const total = t.flags.length, done = t.flags.filter(k => p[k]).length;
+      const state = done === total ? 'ontrack' : done > 0 ? 'slipping' : 'never';
+      return { kind: t.kind, state, good: state === 'ontrack', label: state === 'ontrack' ? 'In place' : state === 'slipping' ? 'Partly done' : 'Not set up', color: this._stColor(state), sub: done + ' of ' + total + ' in place' };
     }
+    if (t.kind === 'state') {
+      const ok = t.inactive ? !t.inactive.includes(p[t.key] || '') : !!p[t.key];
+      const state = ok ? 'ontrack' : 'never';
+      return { kind: t.kind, state, good: ok, label: ok ? 'In place' : 'Set this up', color: this._stColor(ok ? 'ontrack' : 'behind') };
+    }
+    if (t.kind === 'count') {
+      const v = t.get(p);
+      if (v == null || isNaN(v)) return { kind: t.kind, state: 'never', good: false, label: 'Not started', color: this._stColor('never'), sub: 'target ' + t.target + (t.unit ? ' ' + t.unit : '') };
+      const state = v >= t.target ? 'ontrack' : v > 0 ? 'slipping' : 'never';
+      return { kind: t.kind, state, good: state === 'ontrack', label: state === 'ontrack' ? 'In place' : state === 'slipping' ? 'Building' : 'Not started', color: this._stColor(state), sub: Math.round(v) + ' of ' + t.target + (t.unit ? ' ' + t.unit : '') };
+    }
+    if (t.kind === 'metric') {
+      const w = this.latestWeek(), v = w ? w[t.field] : null, tg = t.target();
+      const u = t.unit || '';
+      if (v == null || isNaN(v)) return { kind: t.kind, state: 'never', good: false, label: 'Not logged yet', color: this._stColor('never'), sub: 'target ' + tg + u };
+      const state = v >= tg ? 'ontrack' : v >= tg * 0.8 ? 'slipping' : 'behind';
+      return { kind: t.kind, state, good: state === 'ontrack', label: state === 'ontrack' ? 'On target' : state === 'slipping' ? 'Close' : 'Under target', color: this._stColor(state), sub: Math.round(v) + u + ', target ' + tg + u };
+    }
+    if (t.kind === 'fn') {
+      return Object.assign({ kind: 'fn' }, this[t.fn]());
+    }
+
+    // recur — you logged This Week recently
     const last = this.lastActivity(t.signal);
     const ds = this.daysSince(last);
-    if (ds == null) return { kind: 'recur', good: false, never: true, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No record yet, ' + t.every };
-    let state, label, color;
-    if (ds <= t.maxDays)          { state = 'ontrack';  label = 'On track'; color = 'var(--green)'; }
-    else if (ds <= t.maxDays * 2) { state = 'slipping'; label = 'Slipping'; color = 'var(--amber)'; }
-    else                          { state = 'behind';   label = 'Behind';   color = 'var(--red)'; }
-    return { kind: 'recur', good: state === 'ontrack', state, label, color, sub: 'Last done ' + this.agoText(ds) + ', ' + t.every };
+    if (ds == null) return { kind: 'recur', good: false, state: 'never', label: 'Not started', color: this._stColor('never'), sub: 'No record yet, ' + t.every };
+    let state, label;
+    if (ds <= t.maxDays)          { state = 'ontrack';  label = 'On track'; }
+    else if (ds <= t.maxDays * 2) { state = 'slipping'; label = 'Slipping'; }
+    else                          { state = 'behind';   label = 'Behind'; }
+    return { kind: 'recur', good: state === 'ontrack', state, label, color: this._stColor(state), sub: 'Last done ' + this.agoText(ds) + ', ' + t.every };
   },
 
   health(g) {
     const watched = this.steps(g).map((s, i) => this.stepStatus(g.id, i)).filter(st => st.kind !== 'guide');
     if (!watched.length) return { state: 'guide', label: 'Guidance', good: 0, watched: 0 };
-    const good = watched.filter(st => st.good).length;
-    const untouched = watched.every(st => (st.kind === 'recur' ? st.never : !st.good));
-    const behind = watched.filter(st => (st.kind === 'recur' && (st.state === 'behind' || st.never)) || (st.kind === 'setup' && !st.good)).length;
-    const slipping = watched.filter(st => st.kind === 'recur' && st.state === 'slipping').length;
+    const good = watched.filter(st => st.state === 'ontrack').length;
+    const anyData = watched.some(st => st.state !== 'never');
+    const behind = watched.filter(st => st.state === 'behind' || st.state === 'never').length;
+    const slipping = watched.filter(st => st.state === 'slipping').length;
     let state, label;
-    if (untouched)         { state = 'new';      label = 'Not started'; }
-    else if (behind > 0)   { state = 'atrisk';   label = behind + (behind === 1 ? ' step behind' : ' steps behind'); }
-    else if (slipping > 0) { state = 'slipping'; label = slipping + (slipping === 1 ? ' step slipping' : ' steps slipping'); }
-    else                   { state = 'running';  label = 'On track'; }
+    if (!anyData)        { state = 'new';      label = 'Not started'; }
+    else if (behind > 0) { state = 'atrisk';   label = behind + (behind === 1 ? ' step behind' : ' steps behind'); }
+    else if (slipping)   { state = 'slipping'; label = slipping + (slipping === 1 ? ' step slipping' : ' steps slipping'); }
+    else                 { state = 'running';  label = 'On track'; }
     return { state, label, good, watched: watched.length, behind, slipping };
   },
   healthColor(state) {
@@ -196,7 +276,7 @@ S.TrafficFix = {
     if (atrisk) sub.push(atrisk + ' behind');
     const subLine = sub.length ? '<span style="color:var(--t3);"> &middot; ' + sub.join(', ') + '</span>' : '';
 
-    const header = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Your Online Presence Systems</div>'
+    const header = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Your Online Systems</div>'
       + '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
       + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--t1);">' + running + '<span style="color:var(--t3);font-size:20px;"> / ' + total + '</span></span>'
       + '<span style="font-size:13px;color:var(--t2);">systems running' + subLine + '</span>'
@@ -321,9 +401,9 @@ S.TrafficFix = {
   showHowTo() {
     App.showHelpModal('How the Traffic Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you put in place and keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is happening.'] },
-      { h: 'Your Online Presence Systems', p: ['Each system in the left list is one demand lever, your Google profile, website, reviews, search, social, delivery, and email. The ring and status read off live data. Select one and its fix opens on the right, so you move between systems without leaving the page.'] },
-      { h: 'What Bar Cop Can Verify', p: ['Your digital presence lives on other platforms, so Bar Cop verifies the two things it can see: that you are logging the weekly numbers in This Week, and that your setup is in place (your Google profile filled in, online ordering and a reservation link live, your name and address consistent). Those show a live On track, Slipping, or Behind.'] },
-      { h: 'Guidance Steps', p: ['The platform work itself, optimizing the listing, writing the descriptions, posting, replying to reviews, is marked Guidance. Bar Cop cannot watch you do it on Google or Instagram, so it shows the steps and never counts them as proof.'] },
+      { h: 'Your Online Systems', p: ['Each system in the left list is one demand lever, your Google profile, website, reviews, search, social, delivery, and email. The ring and status read off live data. Select one and its fix opens on the right, so you move between systems without leaving the page.'] },
+      { h: 'What Bar Cop Verifies', p: ['Every step that maps to a number or a setting on your Online Tracker card counts: your profile checklist, your photo and citation counts, your response and open rates, your posting. Each shows a live status, In place, Building, or Under target, and grades partial work so you see exactly what is left. Save a card past a benchmark and it credits the Recovery Scoreboard on its own.'] },
+      { h: 'Guidance Steps', p: ['The off-platform craft, writing the description, replying in your voice, merging duplicate listings, is marked Guidance. Bar Cop cannot see it happen on Google or Instagram, so it shows the step and never counts it as proof.'] },
       { h: 'Watch Out For', p: ['At the bottom of each system are the mistakes that quietly cost you visibility, the things Bar Cop cannot catch for you. Worth a read before you chase a number that looks off.'] },
       { h: 'It Starts On Its Own', p: ['There is no start button. The moment you log the first week, Bar Cop logs that day and measures from there. Website, email, and delivery turn into recovered dollars over time; the rest move your visibility without a clean dollar figure, and Bar Cop says so plainly instead of inventing one.'] }
     ]);
