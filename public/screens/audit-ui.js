@@ -221,7 +221,7 @@ const AuditUI = {
   viewHero(audit, heroLabel) {
     const scoreColor = App.scoreColor(audit.overall_score||0);
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + esc(heroLabel) + '</div>'
       + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
@@ -229,8 +229,8 @@ const AuditUI = {
       + (audit.grade ? '<div style="margin-top:8px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
       + '</div>'
       + '<div style="text-align:right;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="width:270px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score||0) + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
+      + '<div style="width:200px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score||0) + '</div>'
       + '</div>'
       + '</div></div>';
   },
@@ -266,7 +266,10 @@ const AuditUI = {
     }).join('');
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">' + (actionItems ? 'Action Items, Ranked by Impact' : '') + '</div>'
-      + '<div id="' + pfx + '-outlook-mount"></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
+      +   '<div id="' + pfx + '-outlook-mount"></div>'
+      +   '<button class="btn btn-ghost btn-sm ' + pfx + '-export-btn">Export PDF</button>'
+      + '</div>'
       + '</div>'
       + (actionItems ? '<div class="card" style="margin-bottom:16px;">' + actionItems + '</div>' : '');
   },
