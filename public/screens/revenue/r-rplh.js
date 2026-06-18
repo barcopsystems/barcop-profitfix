@@ -7,6 +7,16 @@
    chart → Optimal Staffing Calculator (form-card) → RPLH History (data-card). */
 
 S.RevenueRPLH = {
+  // History range filter (replaces the old hard 12-week cap). Default "All" so
+  // nothing is hidden; show-older paginates a long list.
+  _histRange: 'all',
+  HIST_CHIPS: [
+    { v: '4',   label: 'Last 4 Weeks' },
+    { v: '12',  label: 'Last 12 Weeks' },
+    { v: '26',  label: 'Last 26 Weeks' },
+    { v: 'all', label: 'All' }
+  ],
+
   rplhTarget() {
     const t = (App.data.revenue_settings && App.data.revenue_settings.targets) || {};
     return ((t.rplh_lunch || 50) + (t.rplh_dinner || 75) + (t.rplh_bar || 65)) / 3;
@@ -28,6 +38,7 @@ S.RevenueRPLH = {
 
   render(container, actions) {
     this.container = container;
+    this.actions = actions;
     if (actions) actions.innerHTML = '';
     const weeks = (App.data.revenue_weeks || []).filter(w => this.weekRevenue(w) > 0);
     const last = weeks.length ? weeks[weeks.length - 1] : null;
@@ -79,7 +90,9 @@ S.RevenueRPLH = {
       + '</div></div>';
 
     // ── RPLH history (data-card + in-app PDF export) ────────────────────────────
-    const histRows = weeks.slice().reverse().slice(0, 12).map(w => {
+    const N = this._histRange === 'all' ? weeks.length : (parseInt(this._histRange) || weeks.length);
+    const histAll = weeks.slice(-N).reverse();   // selected range, newest first, no hard cap
+    const histRows = histAll.slice(0, App.listLimit('core', 'rplh_history')).map(w => {
       const rplh = this.weekRPLH(w);
       return '<tr><td>Wk ' + w.week_num + '</td>'
         + '<td>' + App.fmtCurrency(this.weekRevenue(w)) + '</td>'
@@ -91,12 +104,13 @@ S.RevenueRPLH = {
       + strip
       + calcHtml
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">RPLH History</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + App.filterChips(this._histRange, this.HIST_CHIPS, 'rplh-range-chip') + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="rplh-export">Export PDF</button>'
       + '</div>'
       + '<div id="rplh-hist-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Week</th><th>Revenue</th><th>Labor Hours</th><th>Blended RPLH</th>'
       + '</tr></thead><tbody>' + histRows + '</tbody></table></div></div></div>'
+      + App.showOlderBar('core', 'rplh_history', histAll, this._histRange !== 'all')
       + '</div>';
 
     const calcResult = () => {
@@ -114,5 +128,7 @@ S.RevenueRPLH = {
     ['rplh-rev', 'rplh-tgt', 'rplh-pct'].forEach(id => document.getElementById(id)?.addEventListener('input', calcResult));
     calcResult();   // render immediately (pre-filled forecast shows values; else "-")
     document.getElementById('rplh-export')?.addEventListener('click', () => App.exportPDF({ title: 'RPLH History', root: document.getElementById('rplh-hist-export') || this.container }));
+    this.container.querySelectorAll('.rplh-range-chip').forEach(b => b.addEventListener('click', () => { this._histRange = b.dataset.v; this.render(this.container, this.actions); }));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.render(this.container, this.actions)));
   }
 };
