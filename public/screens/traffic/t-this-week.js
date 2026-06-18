@@ -14,6 +14,7 @@ S.TrafficThisWeek = {
   showHowTo() {
     App.showHelpModal('How This Week Works', [
       { p: ['Each week, confirm where your online numbers landed. Bar Cop pre-fills every field from last week, so you only touch what moved, then save. One page, no wizard.'] },
+      { h: 'Scan a Screenshot', p: ['Short on time, drop a screenshot of any dashboard, Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool, and Bar Cop reads the numbers off it and fills the form for you. Check what it pulled, then Save. Drop more than one to fill different areas.'] },
       { h: 'The Status Strip', p: ['Up top is where you stand right now: Google rating, review response, website visits, posting, delivery orders, and email open rate, each against target. The form below is the week you are confirming.'] },
       { h: 'Reservations', p: ['If the Audit found that you take reservations online, a Reservations field shows under Website. Enter your monthly count so the Traffic Forecast can put a dollar value on your booking channel. No reservation link yet means no field, and the Forecast shows what standing one up would be worth instead.'] },
       { h: 'History', p: ['Every saved week lands in the list below. Edit loads a past week back into the form to correct it. These weeks feed your Traffic dashboard, the Forecast, and the Recovery Scoreboard.'] }
@@ -79,6 +80,7 @@ S.TrafficThisWeek = {
   draw() {
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip()
+      + this.scanCard()
       + this.formCard()
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       +   '<button class="btn btn-primary" id="tw-save">' + (this._editId ? 'Update Week' : 'Save Week') + '</button>'
@@ -170,6 +172,81 @@ S.TrafficThisWeek = {
       + App.showOlderBar('core', 'traffic_weeks_hist', all, false);
   },
 
+  // ── Scan a screenshot — vision prefill through the existing /api/claude proxy ─
+  SCAN_PROMPT: 'You are reading one screenshot from a bar or restaurant\'s online dashboard. It could be Google Business Profile, Google Analytics, a Yelp page, Instagram, Facebook, a delivery platform (DoorDash, Uber Eats, Grubhub), or an email tool such as Mailchimp. Extract only the metrics you can clearly see. Respond with a single JSON object and nothing else, including only the keys you can read and omitting the rest. Keys: google_rating (star rating), google_total (total Google reviews), new_reviews (reviews this month), response_rate (percent), yelp_rating, yelp_total, monthly_sessions (website visits per month), monthly_reservations (online reservations per month), bounce_rate (percent), ig_followers, ig_posts_month (posts in the last 30 days), fb_followers, delivery_orders (orders this month), delivery_avg_order_value (dollars), email_list_size, emails_sent (this month), email_open_rate (percent). All values plain numbers, no symbols, no percent signs, no words.',
+
+  scanCard() {
+    return '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">Scan a Screenshot</div>'
+      + '<div id="tw-drop" style="border:1px dashed var(--b-edge);background:var(--input);border-radius:8px;padding:22px 18px;text-align:center;transition:background .15s,border-color .15s;">'
+      +   '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;">Drop a dashboard screenshot</div>'
+      +   '<div style="font-size:12px;color:var(--t3);line-height:1.5;max-width:480px;margin:0 auto 10px;">Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool. Bar Cop reads the numbers and fills the form below to confirm.</div>'
+      +   '<button class="btn btn-ghost btn-sm" id="tw-scan-pick" type="button">Choose Image</button>'
+      +   '<input type="file" id="tw-scan-file" accept="image/png,image/jpeg" style="display:none;"/>'
+      + '</div>'
+      + '<div id="tw-scan-status" style="display:none;font-size:12px;font-weight:600;margin-top:10px;"></div>'
+      + '</div>';
+  },
+  _scanStatus(msg, color) {
+    const el = document.getElementById('tw-scan-status');
+    if (!el) return;
+    el.textContent = msg; el.style.color = color || 'var(--t2)'; el.style.display = 'block';
+  },
+  _readB64(file) {
+    return new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => { const s = String(fr.result || ''); const i = s.indexOf(','); res(i >= 0 ? s.slice(i + 1) : s); };
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+  },
+  _parseScan(raw) {
+    if (!raw) return null;
+    const s = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a < 0 || b < 0) return null;
+    try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }
+  },
+  applyScan(obj) {
+    const valid = new Set(this.allKeys());
+    let n = 0;
+    Object.keys(obj).forEach(k => {
+      if (!valid.has(k)) return;
+      const num = Number(obj[k]);
+      if (obj[k] == null || obj[k] === '' || isNaN(num)) return;
+      this._form[k] = String(num); n++;
+    });
+    return n;
+  },
+  async handleScan(file) {
+    if (!file) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) { this._scanStatus('Drop a PNG or JPG screenshot.', 'var(--red)'); return; }
+    this._scanStatus('Reading your screenshot...', 'var(--gold)');
+    let b64;
+    try { b64 = await this._readB64(file); } catch (e) { this._scanStatus('Could not read that file. Try another.', 'var(--red)'); return; }
+    const media_type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    try {
+      const r = await fetch('/api/claude', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6', max_tokens: 500,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type, data: b64 } },
+            { type: 'text', text: this.SCAN_PROMPT }
+          ] }]
+        })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      if (data.error) { this._scanStatus('Could not read it: ' + (data.error.message || 'try again') + '.', 'var(--red)'); return; }
+      const obj = this._parseScan(data.content && data.content[0] && data.content[0].text);
+      if (!obj) { this._scanStatus('Could not read numbers from that image. Try a clearer screenshot, or enter them by hand.', 'var(--red)'); return; }
+      const n = this.applyScan(obj);
+      if (!n) { this._scanStatus('No matching numbers in that screenshot. Try another, or enter them by hand.', 'var(--amber)'); return; }
+      this.draw();
+      this._scanStatus('Filled ' + n + ' number' + (n === 1 ? '' : 's') + ' from your screenshot. Check them below, then Save.', 'var(--gold)');
+    } catch (e) { this._scanStatus('Scan failed. Check your connection, or enter the numbers by hand.', 'var(--red)'); }
+  },
+
   collect() {
     const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
     this._form.period_end = v('tw-period_end');
@@ -187,6 +264,17 @@ S.TrafficThisWeek = {
     this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.loadForEdit(b.dataset.id)));
     document.getElementById('tw-hist-export')?.addEventListener('click', () => App.exportPDF({ title: 'Traffic Weekly History', root: document.getElementById('tw-hist-export-area') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
+
+    // Screenshot scan dropzone
+    const drop = document.getElementById('tw-drop');
+    const fileInput = document.getElementById('tw-scan-file');
+    document.getElementById('tw-scan-pick')?.addEventListener('click', () => fileInput && fileInput.click());
+    fileInput?.addEventListener('change', () => { if (fileInput.files && fileInput.files[0]) this.handleScan(fileInput.files[0]); });
+    if (drop) {
+      ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.background = 'var(--gold-tint)'; drop.style.borderColor = 'var(--gold-tint-bord)'; }));
+      ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.background = 'var(--input)'; drop.style.borderColor = 'var(--b-edge)'; }));
+      drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this.handleScan(f); });
+    }
   },
 
   loadForEdit(id) {
