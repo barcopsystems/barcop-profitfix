@@ -1082,7 +1082,7 @@ S.HubSettings = {
     // ════════════════════════════════════════════════════════════════════
     App.data.traffic_settings = App.data.traffic_settings || {};
     App.data.traffic_settings.targets = { google_rating:4.3, review_velocity:8,
-      response_rate:75, monthly_sessions:2000, social_posts_month:12 };
+      response_rate:75, monthly_sessions:3000, social_posts_month:12 };
     App.data.traffic_settings.profile = {
       // GBP scorecard
       gbp_claimed:true, gbp_hours:true, gbp_phone:true, gbp_website:true,
