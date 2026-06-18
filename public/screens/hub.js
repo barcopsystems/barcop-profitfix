@@ -1204,7 +1204,7 @@ S.Hub = {
         if (avg > 0 && latestT.new_reviews < avg * 0.8) out.push({
           sev: 'warn',
           text: 'Review velocity is sliding: ' + latestT.new_reviews + ' new reviews this period against a ' + avg.toFixed(0) + ' average. Reviews drive local ranking.',
-          screen: 't-reviews', mod: 'traffic'
+          screen: 't-presence', mod: 'traffic'
         });
       }
     }
@@ -1220,7 +1220,7 @@ S.Hub = {
         out.push({
           sev: gap > 20 ? 'bad' : 'warn',
           text: 'Review response rate at ' + latestT.response_rate + '%, ' + gap.toFixed(0) + ' points under your ' + respTarget + '% target. Unanswered reviews are visible to every guest searching you.',
-          screen: 't-reviews', mod: 'traffic'
+          screen: 't-presence', mod: 'traffic'
         });
       }
     }
@@ -1236,7 +1236,7 @@ S.Hub = {
         out.push({
           sev: latestT.new_reviews < velTarget / 2 ? 'bad' : 'warn',
           text: 'New reviews running at ' + latestT.new_reviews + ' a month, ' + gap + ' below your ' + velTarget + '/month target. Ask satisfied guests this week to close the gap.',
-          screen: 't-reviews', mod: 'traffic'
+          screen: 't-presence', mod: 'traffic'
         });
       }
     }
@@ -1266,7 +1266,7 @@ S.Hub = {
         out.push({
           sev: 'warn',
           text: 'No marketing emails sent this period against a list of ' + latestT.email_list_size + '. A list you never email goes cold inside 30 days.',
-          screen: 't-email', mod: 'traffic'
+          screen: 't-presence', mod: 'traffic'
         });
       }
     }
@@ -1280,7 +1280,7 @@ S.Hub = {
         out.push({
           sev: latestT.ig_posts_month < postTarget * 0.4 ? 'bad' : 'warn',
           text: 'Instagram posting ran ' + latestT.ig_posts_month + ' posts this period vs your ' + postTarget + '/month target. Quiet feeds lose the discovery algorithm fast.',
-          screen: 't-social', mod: 'traffic'
+          screen: 't-presence', mod: 'traffic'
         });
       }
     }
