@@ -48,8 +48,9 @@ S.EventsDashboard = {
     const pipeline = open.reduce((s, b) => s + (parseFloat(b.quoted_total) || 0), 0);
     const depositsDue = booked.filter(b => !b.deposit_paid_date).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
     const cutoff = (() => { const d = new Date(App.todayLocal() + 'T00:00:00'); d.setDate(d.getDate() - 90); return App.ymdLocal(d); })();
-    const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Lost') && (b.date_received || '') >= cutoff);
-    const wins = closed.filter(b => b.stage === 'Booked').length;
+    // A win is any booking that closed won (booked or already completed); a loss is Lost.
+    const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && (b.date_received || '') >= cutoff);
+    const wins = closed.filter(b => b.stage === 'Booked' || b.stage === 'Completed').length;
     const conv = closed.length >= 5 ? Math.round(100 * wins / closed.length) + '%' : (closed.length ? wins + ' of ' + closed.length : '-');
     return { open, stale, booked, soon, pipeline, depositsDue, conv };
   },
@@ -58,28 +59,26 @@ S.EventsDashboard = {
     const EB = this.EB(), s = this.stats(), today = App.todayLocal();
 
     const tiles = '<div class="metric-grid">'
-      + this.metricCard('Pipeline Value', App.fmtCurrency(s.pipeline, 0), s.open.length + ' open lead' + (s.open.length === 1 ? '' : 's'))
+      + this.metricCard('Pipeline Value', App.fmtCurrency(s.pipeline), s.open.length + ' open lead' + (s.open.length === 1 ? '' : 's'))
       + this.metricCard('Booked, Next 30d', String(s.soon.length), 'confirmed events')
-      + this.metricCard('Conversion (90d)', s.conv, 'booked vs lost')
-      + this.metricCard('Deposits Due', App.fmtCurrency(s.depositsDue, 0), 'on booked events', s.depositsDue ? 'over-target' : 'on-target')
+      + this.metricCard('Conversion (90d)', s.conv, 'won vs lost')
+      + this.metricCard('Deposits Due', App.fmtCurrency(s.depositsDue), 'on booked events', s.depositsDue ? 'over-target' : 'on-target')
       + '</div>';
 
-    // Hero — the next upcoming booked event
+    // Hero — the next upcoming booked event. The action button rides the header.
     const upcoming = this.bookings().filter(b => b.stage === 'Booked' && b.event_date && b.event_date >= today)
       .sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''));
     const next = upcoming[0];
-    let heroBody;
+    let heroBody, heroBtn;
     if (next) {
       const dU = EB.daysUntil(next.event_date);
       const bal = EB.balanceDue(next);
-      heroBody = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:18px;font-weight:800;color:var(--t1);">' + esc(EB.title(next)) + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">' + EB.fmtDate(next.event_date) + (dU != null ? ' &middot; ' + (dU === 0 ? 'today' : 'in ' + dU + ' day' + (dU === 1 ? '' : 's')) : '') + (next.party_size ? ' &middot; ' + next.party_size + ' guests' : '') + (bal > 0 ? ' &middot; ' + App.fmtCurrency(bal, 0) + ' balance due' : '') + '</div></div>'
-        + '<button class="btn btn-primary btn-sm ev-go" data-go="ev-bookings" data-focus="' + esc(next.id) + '" style="margin:0;">Open Booking</button></div>';
+      heroBtn = '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" data-focus="' + esc(next.id) + '" style="margin:0;">Open Booking</button>';
+      heroBody = '<div><div style="font-size:18px;font-weight:800;color:var(--t1);">' + esc(EB.title(next)) + '</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">' + EB.fmtDate(next.event_date) + (dU != null ? ' &middot; ' + (dU === 0 ? 'today' : 'in ' + dU + ' day' + (dU === 1 ? '' : 's')) : '') + (next.party_size ? ' &middot; ' + next.party_size + ' guests' : '') + (bal > 0 ? ' &middot; ' + App.fmtCurrency(bal) + ' balance due' : '') + '</div></div>';
     } else {
-      heroBody = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-        + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No events booked yet. Log a lead and work it through to Booked, and your next event shows here.</div>'
-        + '<button class="btn btn-primary btn-sm ev-go" data-go="ev-bookings" style="margin:0;">Open Bookings</button></div>';
+      heroBtn = '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" style="margin:0;">Open Bookings</button>';
+      heroBody = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No events booked yet. Log a lead and work it through to Booked, and your next event shows here.</div>';
     }
 
     // Upcoming + Leads
@@ -95,7 +94,7 @@ S.EventsDashboard = {
     const reach = regs.filter(r => RG.monthOf(r.birthday) === m || RG.monthOf(r.anniversary) === m);
     const quiet = regs.filter(r => RG.isQuiet(r));
     const regBody = (reach.length || quiet.length)
-      ? (reach.length ? '<div style="font-size:12px;color:var(--t1);margin-bottom:6px;"><span style="color:var(--gold);font-weight:700;">' + reach.length + '</span> with a birthday or anniversary this month</div>' : '')
+      ? (reach.length ? '<div style="font-size:12px;color:var(--t1);margin-bottom:6px;"><span style="color:var(--t1);font-weight:700;">' + reach.length + '</span> with a birthday or anniversary this month</div>' : '')
         + (quiet.length ? '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + quiet.length + '</span> gone quiet (' + RG.QUIET_DAYS + '+ days)</div>' : '')
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-regulars">Open Regulars</button></div>'
       : '<div style="font-size:12px;color:var(--t3);">No outreach due this month. Add regulars to build the list.</div><div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-regulars">Open Regulars</button></div>';
@@ -108,7 +107,7 @@ S.EventsDashboard = {
 
     this.container.innerHTML = '<div class="screen">'
       + tiles
-      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', heroBody) + '</div>'
+      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', heroBody, heroBtn) + '</div>'
       + this.row(this.shPanel('Upcoming Events', upRows), this.shPanel('Leads to Work', leadRows))
       + this.row(this.shPanel('Regulars to Reach', regBody), this.shPanel('This Month', calBody))
       + this.quickActions()
@@ -142,12 +141,12 @@ S.EventsDashboard = {
     const ph = msg => '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
     this.container.innerHTML = '<div class="screen">' + strip
       + '<div class="metric-grid">'
-        + this.metricCard('Pipeline Value', '$0', 'After your first lead')
+        + this.metricCard('Pipeline Value', App.fmtCurrency(0), 'After your first lead')
         + this.metricCard('Booked, Next 30d', '0', 'confirmed events')
-        + this.metricCard('Conversion (90d)', '-', 'booked vs lost')
-        + this.metricCard('Deposits Due', '$0', 'on booked events')
+        + this.metricCard('Conversion (90d)', '-', 'won vs lost')
+        + this.metricCard('Deposits Due', App.fmtCurrency(0), 'on booked events')
       + '</div>'
-      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', ph('Your next booked event shows here. Log a lead and work it to Booked to start.')) + '</div>'
+      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', ph('Your next booked event shows here. Log a lead and work it to Booked to start.'), '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" style="margin:0;">Open Bookings</button>') + '</div>'
       + this.row(this.shPanel('Upcoming Events', ph('Booked events show here, soonest first.')), this.shPanel('Leads to Work', ph('Open leads and the ones that have gone stale show here.')))
       + this.row(this.shPanel('Regulars to Reach', ph('Birthdays, anniversaries, and quiet regulars surface here once you build the book.')), this.shPanel('This Month', ph('Holidays and local dates you plan around show here.')))
       + this.quickActions()
@@ -165,7 +164,7 @@ S.EventsDashboard = {
   showHowTo() {
     App.showHelpModal('How the Events Dashboard Works', [
       { p: ['The Events landing, read top to bottom: the money in your pipeline and the deposits you are owed, your next event and the leads to work, who to reach out to this month, and what is coming on the calendar. Every number comes from your own bookings, regulars, and calendar.'] },
-      { h: 'The Numbers', p: ['Pipeline Value is the quoted total of every open lead. Booked Next 30d is your confirmed near-term events. Conversion is booked versus lost over 90 days (it waits for a real sample before showing a percent). Deposits Due is money still owed on booked events.'] },
+      { h: 'The Numbers', p: ['Pipeline Value is the quoted total of every open lead. Booked, Next 30d is your confirmed events in the next month. Conversion counts your wins (booked and completed) against the ones you lost over the last 90 days, and holds at a raw count until there is a real sample to show a percent. Deposits Due is money still owed on booked events.'] },
       { h: 'Working From Here', p: ['Next Event and the lead list open straight to the booking. Regulars to Reach is your monthly outreach list. This Month shows the dates you are planning around. The Quick Actions jump to Bookings, Calendar, Regulars, and Pricing.'] }
     ]);
   }
