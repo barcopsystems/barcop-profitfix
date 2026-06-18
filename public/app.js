@@ -2666,7 +2666,7 @@ const App = {
   VOID_COMP_CATEGORIES: ['Customer Comp', 'Service Recovery', 'Staff Meal', 'Shift Drink'],
 
   // Menu category groupings used across Revenue Recovery (r-menu-items,
-  // r-menu-engineering, r-pricing, r-dog-test, recipe-cost-analysis).
+  // r-menu-engineering, r-price-calc, r-dog-test, recipe-cost-analysis).
   // Promoted from per-file local arrays so the lists never drift.
   // Plate-side menu categories — what the operator picks on the Plate form.
   MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
@@ -2739,7 +2739,9 @@ const App = {
     const pour = (pourOz != null && pourOz > 0) ? pourOz : (parseFloat(p.pour_size_oz) || 0);
     if (container > 0 && pour > 0) return unit * pour / container;
     if (p.cost_per_pour != null) return parseFloat(p.cost_per_pour) || 0;
-    return unit;
+    // No pour basis yet: a poured beverage's menu cost is the cost of one pour,
+    // never the whole container, so report 0 (Incomplete) until pour data exists.
+    return 0;
   },
   // ── Sub-category (product style) ──────────────────────────────────────
   // Starter suggestions per category for the Sub-Category datalist. The
