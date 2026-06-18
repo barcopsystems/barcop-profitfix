@@ -17,7 +17,7 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'result', target: 't-gbp', targetLabel: 'Google Business',
+        { kind: 'result', target: 't-presence', targetLabel: 'Google Business',
           title: 'Audit where your profile stands',
           detail: 'Open the Google Business screen and read your completeness score, photo count, posts, and weekly insights. Start here before you change anything.' },
         { kind: 'reference', target: 'GBP_Checklist.pdf', targetLabel: 'GBP Optimization Checklist',
@@ -59,7 +59,7 @@ FIX.traffic = [
         { kind: 'reference', target: 'Website_Conversion_Audit.pdf', targetLabel: 'Restaurant Website Audit Form',
           title: 'Audit the site before you change anything',
           detail: 'Work the Restaurant Website Audit Form page by page: homepage and menu page speed, mobile elements, menu structure, calls to action. Run the eight-second test on your own phone, you should find the phone number, hours, and reservation link without scrolling. Do it before you change a thing.' },
-        { kind: 'result', target: 't-website', targetLabel: 'Website Scorecard',
+        { kind: 'result', target: 't-presence', targetLabel: 'Website',
           title: 'Score it and hold the baseline',
           detail: 'Enter the audit results into the Website Scorecard for a conversion score and a baseline. Set it before you touch anything.' },
         { kind: 'reference', target: 'Website_Copy_CTA_Standards.docx', targetLabel: 'Website Conversion Fix Checklist',
@@ -92,7 +92,7 @@ FIX.traffic = [
 
     process: {
       steps: [
-        { kind: 'result', target: 't-reviews', targetLabel: 'Review Tracker',
+        { kind: 'result', target: 't-presence', targetLabel: 'Reviews',
           title: 'Track velocity, not just the rating',
           detail: 'In the Review Tracker, watch new Google and Yelp reviews, the rolling 30-day rating, and response rate. Velocity ranks you; a high rating with no recent reviews looks stale next to a competitor with a steady flow.' },
         { kind: 'reference', target: 'Review_Response_Templates.pdf', targetLabel: 'Review Response Templates',
@@ -143,7 +143,7 @@ FIX.traffic = [
         { kind: 'reference', target: 'Platform_Claiming_Checklist.docx', targetLabel: 'Local SEO Quick-Start Guide',
           title: 'Merge duplicates, then build citations',
           detail: 'Follow the Local SEO Quick-Start Guide. Merge duplicate Google and Yelp listings first, two listings split your reviews and authority in half. Then build citations in order: Yelp, Facebook, Apple Maps, Foursquare, TripAdvisor. Do not skip Foursquare, its data feeds dozens of downstream directories.' },
-        { kind: 'result', target: 't-search', targetLabel: 'Search and SEO',
+        { kind: 'result', target: 't-presence', targetLabel: 'Search and SEO',
           title: 'Track keyword rank and citations',
           detail: 'In the Search and SEO screen, record your target keyword positions and citation count, and set a baseline before you change anything.' },
         { kind: 'result', target: 't-dashboard', targetLabel: 'Traffic Dashboard',
@@ -173,7 +173,7 @@ FIX.traffic = [
         { kind: 'reference', target: 'Social_Media_Profile_Audit.pdf', targetLabel: 'Social Media Profile Audit Form',
           title: 'Audit the profile',
           detail: 'Work the Social Media Profile Audit Form across bio, profile photo, link-in-bio, content mix, and posting frequency. Fix the bio, photo, and link-in-bio before you post anything new.' },
-        { kind: 'result', target: 't-social', targetLabel: 'Social Media',
+        { kind: 'result', target: 't-presence', targetLabel: 'Social Media',
           title: 'Set the baseline',
           detail: 'In the Social Media screen, record follower count, profile visits, link clicks, and posts per month as your baseline before you change anything.' },
         { kind: 'reference', target: 'Social_Content_Brief.pdf', targetLabel: 'Social Content Calendar',
@@ -212,7 +212,7 @@ FIX.traffic = [
         { kind: 'reference', target: 'Delivery_Platform_Audit.pdf', targetLabel: 'Delivery Platform Audit Checklist',
           title: 'Audit every active listing first',
           detail: 'Work the Delivery Platform Audit Checklist across DoorDash, Uber Eats, and Grubhub: photos, hours, menu items, descriptions, and reviews. Replace any photo of a discontinued item and match platform hours to kitchen hours exactly. A one-time project of three to four hours.' },
-        { kind: 'result', target: 't-delivery', targetLabel: 'Delivery Platforms',
+        { kind: 'result', target: 't-presence', targetLabel: 'Delivery Platforms',
           title: 'Score and baseline the listings',
           detail: 'In the Delivery Platforms screen, record each platform\'s active status, rating, and photo count as your baseline.' },
         { kind: 'reference', target: 'Delivery_Platform_Comparison.docx', targetLabel: 'Delivery Platform Comparison',
@@ -254,7 +254,7 @@ FIX.traffic = [
         { kind: 'reference', target: 'Email_Campaign_Templates.docx', targetLabel: 'Email Campaign Templates',
           title: 'Set up the three campaigns in owner voice',
           detail: 'Use the Email Campaign Templates for the three every bar needs: a welcome sequence, a monthly update, and an event announcement. Set up the welcome sequence before you collect a single address, it is the highest-opened email you will send. Write first person, one specific detail, signed with a name. "I wanted to tell you," not "We are thrilled to announce."' },
-        { kind: 'result', target: 't-email', targetLabel: 'Email Marketing',
+        { kind: 'result', target: 't-presence', targetLabel: 'Email Marketing',
           title: 'Track the list, the sends, and opens',
           detail: 'The Email Marketing screen tracks list size, emails sent, and open rate. Read it to see whether the list is growing and the sends are landing.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
