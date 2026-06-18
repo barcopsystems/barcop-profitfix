@@ -81,18 +81,6 @@ S.LaborStaffRoster = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
-    // Cross-system focus: Server Scorecard "+ Coaching Note" sets
-    // App._coachingFocus = { staff_id } and navigates here. Open the staff page
-    // and pop the note form so the manager writes it in one click.
-    if (App._coachingFocus && App._coachingFocus.staff_id) {
-      const sid = App._coachingFocus.staff_id;
-      App._coachingFocus = null;
-      this.detailId = sid;
-      App.pushView(() => this.renderUnified(sid));
-      this.noteEditId = null;
-      this.openNoteModal(sid);
-      return;
-    }
     // Cross-screen focus: Labor Reports (and others) set App._staffFocus =
     // { staff_id } and navigate here to open that person's page directly.
     if (App._staffFocus && App._staffFocus.staff_id) {
@@ -662,7 +650,11 @@ S.LaborStaffRoster = {
 
   // Note add/edit in a focused pop-up (own note- ids; no collision with the
   // coaching filter select behind it).
-  openNoteModal(staffId) {
+  openNoteModal(staffId, opts) {
+    // opts.onSaved lets another screen (Server Check) open this same canonical
+    // coaching-note form in place and return to its own page on save, instead of
+    // re-rendering the staff page — two doors, one coaching log.
+    this._noteOnSaved = (opts && opts.onSaved) || null;
     const n = this.noteEditId ? this.notes().find(x => x.id === this.noteEditId) : null;
     const today = App.todayLocal();
     const catOpts = this.NOTE_CATEGORIES.map(c =>
@@ -685,7 +677,7 @@ S.LaborStaffRoster = {
         + '<span id="note-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'note-modal', maxWidth: 540, noClose: true });
-    document.getElementById('note-cancel')?.addEventListener('click', () => { this.noteEditId = null; App.closeModal('note-modal'); });
+    document.getElementById('note-cancel')?.addEventListener('click', () => { this.noteEditId = null; this._noteOnSaved = null; App.closeModal('note-modal'); });
     document.getElementById('note-save')?.addEventListener('click', () => this.saveNote(staffId));
   },
 
@@ -718,7 +710,11 @@ S.LaborStaffRoster = {
     }
     const ok = await App.saveLabor();
     this.noteEditId = null;
-    if (ok) { App.closeModal('note-modal'); this.renderUnified(staffId); }
+    if (ok) {
+      App.closeModal('note-modal');
+      const cb = this._noteOnSaved; this._noteOnSaved = null;
+      if (cb) cb(); else this.renderUnified(staffId);
+    }
     else fail('Save failed. Try again.');
   },
 
