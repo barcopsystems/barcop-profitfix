@@ -2834,7 +2834,7 @@ const App = {
   //         Settings → Operation Links).
   TRAFFIC_PLATFORMS: [
     { key: 'website',        label: 'Website',         urlKey: 'website',        placeholder: 'https://yourbar.com' },
-    { key: 'gbp',            label: 'Google Business Profile', urlKey: 'gbp',    placeholder: 'https://g.page/your-bar' },
+    { key: 'gbp',            label: 'Google Business', urlKey: 'gbp',    placeholder: 'https://g.page/your-bar' },
     { key: 'yelp',           label: 'Yelp',            urlKey: 'yelp',           placeholder: 'https://yelp.com/biz/your-bar' },
     { key: 'instagram',      label: 'Instagram',       urlKey: 'instagram',      placeholder: 'https://instagram.com/yourbar' },
     { key: 'facebook',       label: 'Facebook',        urlKey: 'facebook',       placeholder: 'https://facebook.com/yourbar' },
@@ -3455,7 +3455,7 @@ const App = {
   // recovery.js + fix-panel.js both read for cutoff + chart markers) along
   // with the human-readable `gap_name` so chart tooltips render cleanly.
   TRAFFIC_GAP_NAMES: {
-    'gbp':            'Google Business Profile',
+    'gbp':            'Google Business',
     'website':        'Website',
     'reviews':        'Reviews',
     'search-seo':     'Search and SEO',
@@ -4011,7 +4011,7 @@ const App = {
         't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
         't-this-week':      ['This Week', 'Weekly Entry'],
         't-presence':       ['Online Presence', ''],
-        't-gbp':            ['Google Business Profile', ''],
+        't-gbp':            ['Google Business', ''],
         't-reviews':        ['Review Tracker', ''],
         't-search':         ['Search and SEO', ''],
         't-website':        ['Website Scorecard', ''],
