@@ -290,6 +290,7 @@ const DB = {
     't-reviews':'traffic-recovery','t-search':'traffic-recovery',
     't-social':'traffic-recovery','t-delivery':'traffic-recovery',
     't-email':'traffic-recovery','t-presence':'traffic-recovery',
+    't-forecast':'traffic-recovery',
     't-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
