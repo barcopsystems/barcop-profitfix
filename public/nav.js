@@ -129,35 +129,10 @@ const Traffic = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">This Week</span>
       </div>
-      <div class="nav-section">Digital Presence</div>
-      <div class="nav-item" data-screen="t-gbp" id="nav-t-gbp">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="7" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1M8.5 12v3M2 7h1M14 7h1M4.1 3.6l.7.7M12.2 11.7l.7.7M4.1 10.4l.7-.7M12.2 5.3l.7-.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Google Business Profile</span>
-      </div>
-      <div class="nav-item" data-screen="t-reviews" id="nav-t-reviews">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.8 3.6L14.5 6.2l-3 2.9.7 4.1L8.5 11.2 5.8 13.2l.7-4.1-3-2.9 4.2-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Review Tracker</span>
-      </div>
-      <div class="nav-item" data-screen="t-search" id="nav-t-search">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Search and SEO</span>
-      </div>
-      <div class="nav-item" data-screen="t-website" id="nav-t-website">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3" width="14" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 7h14" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="5" r="0.7" fill="currentColor"/><circle cx="6.5" cy="5" r="0.7" fill="currentColor"/></svg>
-        <span class="nav-label">Website Scorecard</span>
-      </div>
-      <div class="nav-section">Social and Delivery</div>
-      <div class="nav-item" data-screen="t-social" id="nav-t-social">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="4.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="4" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="13" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M6.4 7.6l4.2-2.1M6.4 9.4l4.2 2.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Social Media</span>
-      </div>
-      <div class="nav-item" data-screen="t-delivery" id="nav-t-delivery">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="5.5" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M11.5 8h2l2 2.5v3h-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13.5" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="13" cy="13.5" r="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.5V3.5a2 2 0 0 1 2-2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Delivery Platforms</span>
-      </div>
-      <div class="nav-item" data-screen="t-email" id="nav-t-email">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 6.5l7 4.5 7-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Email and Loyalty</span>
+      <div class="nav-section">Online Presence</div>
+      <div class="nav-item" data-screen="t-presence" id="nav-t-presence">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 8.5h12.6M8.5 2.1c2.2 2.3 2.2 10.5 0 12.8M8.5 2.1c-2.2 2.3-2.2 10.5 0 12.8" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Online Presence</span>
       </div>
       <div class="nav-section">History</div>
       <div class="nav-item" data-screen="t-reports" id="nav-t-reports">
