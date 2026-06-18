@@ -931,7 +931,7 @@ avg_bounce_rate=${avgBR?avgBR.toFixed(1)+'%':'not tracked'} | avg_ig_followers=$
 avg_ig_posts_mo=${avgIGP?avgIGP.toFixed(1):'not tracked'}
 ${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
 
-TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain real-world action. Never invent a Bar Cop worksheet, report, or feature. Real Bar Cop tools: Traffic Fix, This Week, Google Business Profile, Review Tracker, Search and SEO, Website Scorecard, Social Media, Delivery Platforms, Email Marketing. Plain real-world actions (respond to a review, post photos, fix NAP, run a delivery promo) are fine.
+TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain real-world action. Never invent a Bar Cop worksheet, report, or feature. Real Bar Cop tools: Traffic Fix, This Week, Google Business, Review Tracker, Search and SEO, Website Scorecard, Social Media, Delivery Platforms, Email Marketing. Plain real-world actions (respond to a review, post photos, fix NAP, run a delivery promo) are fine.
 
 Return this exact JSON (all values calculated):
 "BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"TFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":58,"TARGET_SCORE":65,
