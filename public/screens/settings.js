@@ -1169,14 +1169,14 @@ S.HubSettings = {
     // ── Traffic audits — three-audit recovery arc, Feb / Mar / Apr ──
     const mkTrafficAudit = (date, generated_at, audit_id, period, score, tier, raw) => {
       const sections = {
-        'Google Business Profile': raw.S1_SCORE, 'Website': raw.S2_SCORE,
+        'Google Business': raw.S1_SCORE, 'Website': raw.S2_SCORE,
         'Reviews': raw.S3_SCORE, 'Search and SEO': raw.S4_SCORE,
         'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
         'Email Marketing': raw.S7_SCORE
       };
       const items = [];
       const push = (gap, label, gid) => { if (gap > 0) items.push({ action:label + ' $' + Math.round(gap) + '/month opportunity.', monthly_impact:gap, gap_id:gid }); };
-      push(raw.S1_MONTHLY_GAP, 'Complete the Google Business Profile setup.', 'gbp');
+      push(raw.S1_MONTHLY_GAP, 'Complete the Google Business setup.', 'gbp');
       push(raw.S2_MONTHLY_GAP, 'Lift website conversion and reduce bounce.', 'website');
       push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.', 'reviews');
       push(raw.S5_MONTHLY_GAP, 'Tighten posting schedule and content mix.', 'social');
@@ -2573,7 +2573,7 @@ S.HubSettings = {
       { id:uid(), module:'revenue', gap_id:'check-average',    gap_name:'Check Average and Upsell',  date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling', date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business Profile', date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business',         date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            date:fxStart, logged_at:fxStartISO },
       { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email Marketing',          date:fxStart, logged_at:fxStartISO },
