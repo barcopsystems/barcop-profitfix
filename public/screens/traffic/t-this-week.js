@@ -11,6 +11,7 @@ S.TrafficThisWeek = {
   _form: null,
   _editId: null,
   _histPreset: '',
+  _entryOpen: true,
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
@@ -79,15 +80,19 @@ S.TrafficThisWeek = {
   },
 
   draw() {
+    const entry = this._entryOpen
+      ? this.formCard()
+        + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        +   '<button class="btn btn-primary" id="tw-save">' + (this._editId ? 'Update Week' : 'Save Week') + '</button>'
+        +   '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
+        +   '<span id="tw-err" style="font-size:12px;color:var(--red);display:none;margin-left:6px;"></span>'
+        + '</div>'
+      : '';
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip()
+      + this.selectorRow()
       + this.scanCard()
-      + this.formCard()
-      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      +   '<button class="btn btn-primary" id="tw-save">' + (this._editId ? 'Update Week' : 'Save Week') + '</button>'
-      +   '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
-      +   '<span id="tw-err" style="font-size:12px;color:var(--red);display:none;margin-left:6px;"></span>'
-      + '</div>'
+      + entry
       + this.historyCard()
       + '</div>';
     this.wire();
@@ -137,18 +142,57 @@ S.TrafficThisWeek = {
       + '</div>';
   },
 
+  addDays(ymd, n) { const d = new Date((ymd || App.todayLocal()) + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+
+  // Week-ending stepper (period_end is the Sunday): two range chips + arrows + a
+  // This Week snap, in place of a native calendar. Lives on a page row outside
+  // the form card, with the Worksheet button on its right.
+  weekSelector() {
+    const sel = this._form.period_end || App.nextSunday();
+    const now = App.nextSunday();
+    const older = this.addDays(sel, -7);
+    const label = pe => App.dateRangeLabel(this.addDays(pe, -6), pe);
+    const chip = (pe, active) => '<button type="button" class="tw-wk-chip btn btn-sm" data-pe="' + pe + '" style="'
+      + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+      + label(pe) + (pe === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
+      + chip(older, false) + chip(sel, true)
+      + '<button type="button" class="btn btn-ghost btn-sm tw-wk-next" aria-label="Next week">&rsaquo;</button>'
+      + (sel !== now ? '<button type="button" class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>' : '')
+      + '</div>';
+  },
+  selectorRow() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+      + this.weekSelector()
+      + '<button type="button" class="btn btn-ghost btn-sm" id="tw-worksheet">Worksheet</button>'
+      + '</div>';
+  },
+  setWeek(pe) { if (!pe) return; if (this._entryOpen) this.collect(); this._form.period_end = pe; this.draw(); },
+  printWorksheet() {
+    const resvOn = this.reservationsOn();
+    const rows = [];
+    this.GROUPS.forEach(g => g[1].filter(f => f[0] !== 'monthly_reservations' || resvOn).forEach(f => rows.push([f[1], ''])));
+    const sel = this._form.period_end || App.nextSunday();
+    App.printBlankSheet({
+      title: 'Traffic This Week Worksheet',
+      subtitle: 'Week of ' + App.dateRangeLabel(this.addDays(sel, -6), sel) + '.  Look up each number, write it here, then key them into Bar Cop all at once.',
+      columns: [{ label: 'Traffic Number', width: '60%' }, { label: 'Your Entry', width: '40%' }],
+      bodyRows: rows
+    });
+  },
+
   formCard() {
     const resvOn = this.reservationsOn();
     const groups = this.GROUPS.map(g =>
       this.sectionHeader(g[0])
       + '<div class="form-row" style="gap:18px 22px;">'
-      + g[1].filter(f => f[0] !== 'monthly_reservations' || resvOn).map(f => this.field(f)).join('')
+      + g[1].filter(f => f[0] !== 'monthly_reservations' || resvOn)
+          .map(f => (f[0] === 'yelp_rating' ? '<div style="flex:0 0 100%;height:0;"></div>' : '') + this.field(f)).join('')
       + '</div>'
     ).join('');
     return '<div class="card form-card"><div class="card-title">' + (this._editId ? 'Edit Week' : 'Confirm This Week') + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      +   '<div class="f" style="width:170px;"><label>Week ending</label><input class="form-input" type="date" id="tw-period_end" value="' + esc(this._form.period_end || '') + '"/></div>'
-      + '</div>'
       + groups
       + this.sectionHeader('Notes')
       + '<div class="f" style="width:100%;"><textarea class="notes-ta" rows="2" id="tw-notes" placeholder="Optional">' + esc(this._form.notes || '') + '</textarea></div>'
@@ -209,16 +253,24 @@ S.TrafficThisWeek = {
   // ── Scan a screenshot — vision prefill through the existing /api/claude proxy ─
   SCAN_PROMPT: 'You are reading one screenshot from a bar or restaurant\'s online dashboard. It could be Google Business Profile, Google Analytics, a Yelp page, Instagram, Facebook, a delivery platform (DoorDash, Uber Eats, Grubhub), or an email tool such as Mailchimp. Extract only the metrics you can clearly see. Respond with a single JSON object and nothing else, including only the keys you can read and omitting the rest. Keys: google_rating (star rating), google_total (total Google reviews), new_reviews (reviews this month), response_rate (percent), yelp_rating, yelp_total, monthly_sessions (website visits per month), monthly_reservations (online reservations per month), bounce_rate (percent), ig_followers, ig_posts_month (posts in the last 30 days), fb_followers, delivery_orders (orders this month), delivery_avg_order_value (dollars), email_list_size, emails_sent (this month), email_open_rate (percent). All values plain numbers, no symbols, no percent signs, no words.',
 
+  // The chevron on this card collapses the whole entry area together: this scan
+  // card's body and the Confirm This Week form, leaving the status strip and the
+  // weekly history in view.
   scanCard() {
-    return '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">Scan a Screenshot</div>'
-      + '<div id="tw-drop" style="border:1px dashed var(--b-edge);background:var(--input);border-radius:8px;padding:22px 18px;text-align:center;transition:background .15s,border-color .15s;">'
-      +   '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;">Drop a dashboard screenshot</div>'
-      +   '<div style="font-size:12px;color:var(--t3);line-height:1.5;max-width:480px;margin:0 auto 10px;">Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool. Bar Cop reads the numbers and fills the form below to confirm.</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="tw-scan-pick" type="button">Choose Image</button>'
-      +   '<input type="file" id="tw-scan-file" accept="image/png,image/jpeg" style="display:none;"/>'
-      + '</div>'
-      + '<div id="tw-scan-status" style="display:none;font-size:12px;font-weight:600;margin-top:10px;"></div>'
-      + '</div>';
+    const open = this._entryOpen;
+    const chev = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (open ? '0' : '-90') + 'deg);transition:transform .15s;"><path d="M3.5 5.5L7 9l3.5-3.5"/></svg>';
+    const title = '<div class="card-title" id="tw-entry-toggle" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;">'
+      + '<span>Scan a Screenshot</span><span style="color:var(--t3);display:inline-flex;">' + chev + '</span></div>';
+    const body = open
+      ? '<div id="tw-drop" style="border:1px dashed var(--b-edge);background:var(--input);border-radius:8px;padding:22px 18px;text-align:center;transition:background .15s,border-color .15s;">'
+        +   '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;">Drop a dashboard screenshot</div>'
+        +   '<div style="font-size:12px;color:var(--t3);line-height:1.5;max-width:480px;margin:0 auto 10px;">Google Business, Analytics, Yelp, Instagram, a delivery app, or your email tool. Bar Cop reads the numbers and fills the form below to confirm.</div>'
+        +   '<button class="btn btn-ghost btn-sm" id="tw-scan-pick" type="button">Choose Image</button>'
+        +   '<input type="file" id="tw-scan-file" accept="image/png,image/jpeg" style="display:none;"/>'
+        + '</div>'
+        + '<div id="tw-scan-status" style="display:none;font-size:12px;font-weight:600;margin-top:10px;"></div>'
+      : '';
+    return '<div class="card form-card" style="margin-bottom:14px;">' + title + body + '</div>';
   },
   _scanStatus(msg, color) {
     const el = document.getElementById('tw-scan-status');
@@ -283,7 +335,6 @@ S.TrafficThisWeek = {
 
   collect() {
     const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-    this._form.period_end = v('tw-period_end');
     this._form.notes = v('tw-notes');
     this.allKeys().forEach(k => { this._form[k] = v('tw-' + k); });
   },
@@ -293,8 +344,16 @@ S.TrafficThisWeek = {
     this.container.querySelectorAll('#tw-period_end, #tw-notes, [id^="tw-"]').forEach(el => {
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.addEventListener('input', () => this.collect());
     });
-    document.getElementById('tw-save').onclick = () => this.saveWeek();
-    document.getElementById('tw-start-over').onclick = () => { this._form = this.freshForm(); this._editId = null; this.draw(); };
+    const saveBtn = document.getElementById('tw-save');
+    if (saveBtn) saveBtn.onclick = () => this.saveWeek();
+    const startBtn = document.getElementById('tw-start-over');
+    if (startBtn) startBtn.onclick = () => { this._form = this.freshForm(); this._editId = null; this.draw(); };
+    document.getElementById('tw-entry-toggle')?.addEventListener('click', () => { this._entryOpen = !this._entryOpen; this.draw(); });
+    this.container.querySelectorAll('.tw-wk-chip').forEach(b => b.addEventListener('click', () => this.setWeek(b.dataset.pe)));
+    this.container.querySelector('.tw-wk-prev')?.addEventListener('click', () => this.setWeek(this.addDays(this._form.period_end || App.nextSunday(), -7)));
+    this.container.querySelector('.tw-wk-next')?.addEventListener('click', () => this.setWeek(this.addDays(this._form.period_end || App.nextSunday(), 7)));
+    this.container.querySelector('.tw-wk-now')?.addEventListener('click', () => this.setWeek(App.nextSunday()));
+    document.getElementById('tw-worksheet')?.addEventListener('click', () => this.printWorksheet());
     this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.loadForEdit(b.dataset.id)));
     document.getElementById('tw-hist-export')?.addEventListener('click', () => App.exportPDF({ title: 'Traffic Weekly History', root: document.getElementById('tw-hist-export-area') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
