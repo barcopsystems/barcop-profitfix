@@ -3,7 +3,7 @@
 /* ── Labor Control — Log Hours (writes lc_actuals) ────────────────────────────
    Records actual hours worked, by hand or by importing a timeclock CSV/Excel
    export through the shared csv-mapper component. lc_actuals feeds Revenue and
-   Profit Recovery weekly labor, prime cost, and the RPLH Tracker.
+   Profit Recovery weekly labor, prime cost, and This Week's RPLH.
 
    Landing = inline Log Hours form + an Import card + the logged-hours list.
    Editing a row opens it in a focused pop-up. */
