@@ -20,7 +20,7 @@ S.TrafficAudit = {
     const canRun = daysSince >= 30;
     const daysLeft = canRun ? 0 : 30 - daysSince;
     const desc = 'One comprehensive traffic audit every 30 days. It scores from your weekly traffic numbers plus screenshots of your Google Business Profile, website, social, and delivery platforms, and the result shows on screen in a minute or two.';
-    const SECTION_NAMES = ['Google Business Profile', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email and Loyalty'];
+    const SECTION_NAMES = ['Google Business Profile', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
       + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ta') : AuditUI.emptyState())
@@ -122,14 +122,13 @@ S.TrafficAudit = {
         ['Platform Commission', d.S6_DELIVERY_COMMISSION_PCT != null ? d.S6_DELIVERY_COMMISSION_PCT + '%' : ''],
         ['Monthly Gap', dol(d.S6_MONTHLY_GAP)],
       ], null, d),
-      AuditUI.sectionBlock(7, 'Email and Loyalty', d.S7_SCORE, [
+      AuditUI.sectionBlock(7, 'Email Marketing', d.S7_SCORE, [
         ['Email List Exists', yN(d.S7_EMAIL_LIST_EXISTS)],
         ['List Size', d.S7_LIST_SIZE ? num(d.S7_LIST_SIZE) + (d.S7_LIST_BENCHMARK ? ' (Benchmark: ' + d.S7_LIST_BENCHMARK + ')' : '') : ''],
         ['Last Send', d.S7_LAST_SEND_DAYS_AGO != null ? d.S7_LAST_SEND_DAYS_AGO + ' days ago' : ''],
         ['Send Frequency', d.S7_SEND_FREQUENCY || ''],
         ['Open Rate', d.S7_OPEN_RATE ? pct(d.S7_OPEN_RATE) + (d.S7_OPEN_BENCHMARK ? ' (Benchmark: ' + d.S7_OPEN_BENCHMARK + '%)' : '') : ''],
         ['Growth Mechanism', d.S7_GROWTH_MECHANISM || ''],
-        ['Loyalty Program', yN(d.S7_LOYALTY_PROGRAM)],
         ['Monthly Gap', dol(d.S7_MONTHLY_GAP)],
       ], null, d),
       ...(signals8.length ? [AuditUI.sectionBlock(8, 'Operational Risk Signals', null, [], signals8, d)] : []),
@@ -272,14 +271,13 @@ S.TrafficAudit = {
       ['Platform Commission', d.S6_DELIVERY_COMMISSION_PCT != null ? d.S6_DELIVERY_COMMISSION_PCT + '%' : ''],
       ['Monthly Gap', dol(d.S6_MONTHLY_GAP)],
     ]);
-    section(7, 'Email and Loyalty', d.S7_SCORE, [
+    section(7, 'Email Marketing', d.S7_SCORE, [
       ['Email List Exists', yN(d.S7_EMAIL_LIST_EXISTS)],
       ['List Size', d.S7_LIST_SIZE ? num(d.S7_LIST_SIZE) + (d.S7_LIST_BENCHMARK ? ' (Benchmark: ' + d.S7_LIST_BENCHMARK + ')' : '') : ''],
       ['Last Send', d.S7_LAST_SEND_DAYS_AGO != null ? d.S7_LAST_SEND_DAYS_AGO + ' days ago' : ''],
       ['Send Frequency', d.S7_SEND_FREQUENCY || ''],
       ['Open Rate', d.S7_OPEN_RATE ? pct(d.S7_OPEN_RATE) + (d.S7_OPEN_BENCHMARK ? ' (Benchmark: ' + d.S7_OPEN_BENCHMARK + '%)' : '') : ''],
       ['Growth Mechanism', d.S7_GROWTH_MECHANISM || ''],
-      ['Loyalty Program', yN(d.S7_LOYALTY_PROGRAM)],
       ['Monthly Gap', dol(d.S7_MONTHLY_GAP)],
     ]);
 
@@ -316,7 +314,7 @@ S.TrafficAudit = {
     const p = s.traffic_practices || {};
     const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
     this._intakeDraft = {
-      practices: { growth_mechanism: boolStr(p.growth_mechanism), loyalty: boolStr(p.loyalty), delivery_markup: boolStr(p.delivery_markup), review_generation: boolStr(p.review_generation) }
+      practices: { growth_mechanism: boolStr(p.growth_mechanism), delivery_markup: boolStr(p.delivery_markup), review_generation: boolStr(p.review_generation) }
     };
     this.actions.innerHTML = '';
     this.renderIntake();
@@ -375,7 +373,6 @@ S.TrafficAudit = {
     const questionsCard = AuditUI.formCard('A Few Quick Questions',
       '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These are not in your reports. Answer what applies; the rest carry over to next time.</div>'
       + AuditUI.intakeQRow('ta', 'Email signup or list-growth mechanism in place?', 'growth_mechanism', [['false','No'],['true','Yes']], pr.growth_mechanism)
-      + AuditUI.intakeQRow('ta', 'Loyalty or rewards program?', 'loyalty', [['false','No'],['true','Yes']], pr.loyalty)
       + AuditUI.intakeQRow('ta', 'Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false','No'],['true','Yes']], pr.delivery_markup)
       + AuditUI.intakeQRow('ta', 'Review generation system asking guests for reviews?', 'review_generation', [['false','No'],['true','Yes']], pr.review_generation));
 
@@ -385,7 +382,7 @@ S.TrafficAudit = {
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
     document.getElementById('ta-iz-submit')?.addEventListener('click', () => {
       const val = id => (document.getElementById('ta-q-' + id) || {}).value || '';
-      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), loyalty: val('loyalty'), delivery_markup: val('delivery_markup'), review_generation: val('review_generation') };
+      this._intakeDraft.practices = { growth_mechanism: val('growth_mechanism'), delivery_markup: val('delivery_markup'), review_generation: val('review_generation') };
       this.generateAudit();
     });
   },
@@ -428,7 +425,6 @@ S.TrafficAudit = {
     // Practices — unanswered ('') omitted so it has no score effect.
     const practices = {};
     if (draftP.growth_mechanism === 'true' || draftP.growth_mechanism === 'false') practices.growth_mechanism = draftP.growth_mechanism === 'true';
-    if (draftP.loyalty === 'true' || draftP.loyalty === 'false') practices.loyalty = draftP.loyalty === 'true';
     if (draftP.delivery_markup === 'true' || draftP.delivery_markup === 'false') practices.delivery_markup = draftP.delivery_markup === 'true';
     if (draftP.review_generation === 'true' || draftP.review_generation === 'false') practices.review_generation = draftP.review_generation === 'true';
     form.append('practices', JSON.stringify(practices));
@@ -465,7 +461,7 @@ S.TrafficAudit = {
         sections: (() => {
           // Preserve N/A: only include a section when it actually scored, so
           // the landing list can show "N/A" for the ones with no data.
-          const map = { 'Google Business Profile': d.S1_SCORE, 'Website': d.S2_SCORE, 'Reviews': d.S3_SCORE, 'Search and SEO': d.S4_SCORE, 'Social Media': d.S5_SCORE, 'Delivery Platforms': d.S6_SCORE, 'Email and Loyalty': d.S7_SCORE };
+          const map = { 'Google Business Profile': d.S1_SCORE, 'Website': d.S2_SCORE, 'Reviews': d.S3_SCORE, 'Search and SEO': d.S4_SCORE, 'Social Media': d.S5_SCORE, 'Delivery Platforms': d.S6_SCORE, 'Email Marketing': d.S7_SCORE };
           const out = {}; Object.keys(map).forEach(k => { if (map[k] != null) out[k] = map[k]; }); return out;
         })(),
         action_items: (Array.isArray(d.action_items) ? d.action_items : []).map(a => {
