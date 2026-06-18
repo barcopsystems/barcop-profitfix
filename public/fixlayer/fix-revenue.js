@@ -131,18 +131,18 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
-          title: 'Read RPLH by shift every Monday',
-          detail: 'The RPLH Tracker works out net revenue divided by labor hours for each shift and department, using hours pulled straight from Labor Control. Read it every Monday before the new schedule is built. Read it next to labor percentage. A shift can sit at an acceptable labor percent while its RPLH runs well below target.' },
+        { kind: 'result', target: 'r-this-week', targetLabel: 'This Week',
+          title: 'Read your weekly RPLH every Monday',
+          detail: 'This Week\'s history shows revenue per labor hour for each saved week, with the labor hours pulled straight from Labor Control, next to your labor percentage. Read it every Monday before the new schedule is built. A week can sit at an acceptable labor percent while its RPLH runs well below target.' },
         { kind: 'action', target: 'settings', targetLabel: 'Settings',
           title: 'Set targets off your own 13-week baseline',
           detail: 'Concept benchmarks are a starting orientation only. After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Your own baseline reflects your concept, your market, and your guest mix in a way a generic benchmark never will.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Build the schedule to the RPLH target',
-          detail: 'In Build Schedule, work backward from the revenue forecast and the RPLH target to the labor hours each shift can support, then staff to that number. Build Schedule shows projected RPLH live as you assign hours.' },
-        { kind: 'result', target: 'r-rplh', targetLabel: 'RPLH Tracker',
-          title: 'Diagnose every below-target shift',
-          detail: 'When the tracker shows a shift below target, decide what drove it. Labor hours above budget is a scheduling problem, fixed in next week\'s schedule. Revenue below what the staffing should produce is a check average problem, fixed in the pre-shift briefing. Cutting the schedule on a check average miss fixes nothing.' }
+          detail: 'In Build Schedule, the week\'s revenue forecast becomes a Target Hours number (the labor hours that revenue supports at your RPLH target) and a dollar labor budget. Staff to those, watching projected RPLH and budget-left update live as you assign hours.' },
+        { kind: 'result', target: 'r-this-week', targetLabel: 'This Week',
+          title: 'Diagnose every below-target week',
+          detail: 'When a week\'s RPLH comes in below target, decide what drove it. Labor hours above budget is a scheduling problem, fixed in next week\'s schedule. Revenue below what the staffing should produce is a check average problem, fixed in the pre-shift briefing. Cutting the schedule on a check average miss fixes nothing.' }
       ]
     },
 
