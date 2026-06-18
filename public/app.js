@@ -4011,14 +4011,7 @@ const App = {
         't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
         't-this-week':      ['This Week', 'Weekly Entry'],
         't-forecast':       ['Traffic Forecast', ''],
-        't-presence':       ['Online Presence', ''],
-        't-gbp':            ['Google Business', ''],
-        't-reviews':        ['Review Tracker', ''],
-        't-search':         ['Search and SEO', ''],
-        't-website':        ['Website Scorecard', ''],
-        't-social':         ['Social Media', ''],
-        't-delivery':       ['Delivery Platforms', ''],
-        't-email':          ['Email Marketing', ''],
+        't-presence':       ['Online Tracker', ''],
         't-help':           ['Help and FAQ', ''],
       };
       const trafficScreens = {
@@ -4028,13 +4021,6 @@ const App = {
         't-this-week':      S.TrafficThisWeek,
         't-forecast':       S.TrafficForecast,
         't-presence':       S.TrafficPresence,
-        't-gbp':            S.TrafficGBP,
-        't-reviews':        S.TrafficReviews,
-        't-search':         S.TrafficSearch,
-        't-website':        S.TrafficWebsite,
-        't-social':         S.TrafficSocial,
-        't-delivery':       S.TrafficDelivery,
-        't-email':          S.TrafficEmail,
         't-help':           S.TrafficHelp,
       };
       const [title, sub] = trafficTitles[id] || [id, ''];
