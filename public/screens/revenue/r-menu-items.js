@@ -497,7 +497,7 @@ S.RevenueMenuItems = {
   inventoryRestHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
     const linkedProd = linkedId ? this.prodById(linkedId) : null;
-    const autoCost = linkedProd ? (App.menuLinkCost(linkedProd) || 0) : 0;
+    const autoCost = linkedProd ? (App.menuLinkCost(linkedProd, item?.pour_size_oz) || 0) : 0;
     // Pour Size only matters for poured drinks (Beer/Wine). Packaged resale
     // items (NA beverages, Snacks) are sold whole, so the field is dropped.
     const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
@@ -516,14 +516,21 @@ S.RevenueMenuItems = {
   },
 
   wireInventoryFields() {
+    // Cost auto-fills from the linked product, honoring the Pour Size (poured
+    // beverages cost per pour, so a bigger pour costs more) — recomputed on both
+    // a product change and a pour change.
+    const recomputeCost = () => {
+      const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
+      const costInp = document.getElementById('ri-cost');
+      if (!costInp) return;
+      const pv = parseFloat(document.getElementById('ri-pour')?.value);
+      const bc = p ? (App.menuLinkCost(p, (!isNaN(pv) && pv > 0) ? pv : null) || 0) : 0;
+      costInp.value = bc > 0 ? bc.toFixed(2) : '';
+    };
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
       this.linkedProductId = e.target.value || '';
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
-      const costInp = document.getElementById('ri-cost');
-      if (costInp) {
-        const bc = p ? (App.menuLinkCost(p) || 0) : 0;
-        costInp.value = bc > 0 ? bc.toFixed(2) : '';
-      }
+      recomputeCost();
       // Auto-fill the menu price from the linked product's saved menu price,
       // the same way cost auto-fills. Beer + Wine carry a menu price in
       // Inventory; the operator can still override it here. Leave it editable.
@@ -533,6 +540,7 @@ S.RevenueMenuItems = {
       if (nameInp && p) nameInp.value = p.name;
       this.refreshFieldMissing();
     });
+    document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
   },
@@ -732,7 +740,9 @@ S.RevenueMenuItems = {
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
       category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
-      const tmp = { linked_product_id: linkedProductId };
+      // Include the pour override so the stored cost is the per-pour cost too.
+      const pv = parseFloat(document.getElementById('ri-pour')?.value);
+      const tmp = { linked_product_id: linkedProductId, pour_size_oz: (!isNaN(pv) && pv > 0) ? pv : null };
       computedCost = App.menuItemCost(tmp) || 0;
     }
 
