@@ -40,7 +40,7 @@ window.FileDrop = {
     const zone = '<div id="' + id + '-zone" style="border:1.5px dashed var(--b1);border-radius:6px;padding:28px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--input);">'
       + '<div style="pointer-events:none;">'
       + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">Drop your files here</div>'
-      + '<div style="font-size:11px;color:var(--t3);">or <span style="color:var(--gold);font-weight:700;">browse</span> to choose. PDF, Excel, CSV, or images. Add as many as you like.</div>'
+      + '<div style="font-size:11px;color:var(--t3);">or <span style="color:var(--gold);font-weight:700;">browse</span> to choose. ' + (opts.acceptText || 'PDF, Excel, CSV, or images') + '. Add as many as you like.</div>'
       + '</div></div>';
     const input = '<input type="file" id="' + id + '-input" multiple accept="' + (opts.accept || this.ACCEPT) + '" style="display:none;">';
     const chips = '<div id="' + id + '-chips" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;"></div>';
