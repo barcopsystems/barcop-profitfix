@@ -1175,16 +1175,20 @@ S.HubSettings = {
         'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
         'Email Marketing': raw.S7_SCORE
       };
+      // Traffic carries NO dollar gaps (matches the live computeTrafficAudit
+      // contract). Zero every section gap and build deficit-based action items
+      // with no dollar impact, so the demo never shows a recoverable-dollar strip
+      // the real product cannot produce.
+      [1, 2, 3, 4, 5, 6, 7].forEach(n => { raw['S' + n + '_MONTHLY_GAP'] = 0; });
       const items = [];
-      const push = (gap, label, gid) => { if (gap > 0) items.push({ action:label + ' $' + Math.round(gap) + '/month opportunity.', monthly_impact:gap, gap_id:gid }); };
-      push(raw.S1_MONTHLY_GAP, 'Complete the Google Business setup.', 'gbp');
-      push(raw.S2_MONTHLY_GAP, 'Lift website conversion and reduce bounce.', 'website');
-      push(raw.S3_MONTHLY_GAP, 'Close the review velocity and response gap.', 'reviews');
-      push(raw.S5_MONTHLY_GAP, 'Tighten posting schedule and content mix.', 'social');
-      push(raw.S6_MONTHLY_GAP, 'Tighten delivery platform listings.', 'delivery');
-      push(raw.S7_MONTHLY_GAP, 'Activate the email list and send consistently.', 'email-loyalty');
-      items.sort((a, b) => (b.monthly_impact||0) - (a.monthly_impact||0));
-      const totalMo = items.reduce((s, it) => s + (it.monthly_impact||0), 0);
+      const push = (n, action, gid) => { if (raw['S' + n + '_SCORE'] != null && raw['S' + n + '_SCORE'] < 65) items.push({ action: action, gap_id: gid }); };
+      push(1, 'Fill every Google Business field, load photos toward 100, and post weekly.', 'gbp');
+      push(2, 'Add online ordering and a reservation link, and make the menu load fast on a phone.', 'website');
+      push(3, 'Reply to every review and ask every happy table.', 'reviews');
+      push(4, 'Match your name, address, and phone everywhere and get into the Google Maps pack.', 'search-seo');
+      push(5, 'Post three times a week, mixing food, people, and the room.', 'social');
+      push(6, 'Run a first-order promo and load food photos on each delivery platform.', 'delivery');
+      push(7, 'Send at least monthly and add a sign-up so new guests opt in.', 'email-loyalty');
       raw.OVERALL_SCORE = score;
       raw.BAR_NAME = 'The Anchor Bar & Kitchen';
       raw.AUDIT_ID = audit_id;
@@ -1192,7 +1196,6 @@ S.HubSettings = {
       raw.DATA_TIER_LABEL = tier;
       raw.INDUSTRY_AVG = 58;
       raw.TARGET_SCORE = 65;
-      raw.WEEKLY_GAP_AMT = '$' + Math.round(totalMo/4.345).toLocaleString('en-US');
       return { id:uid(), date:date, bar_name:raw.BAR_NAME, overall_score:score,
         audit_id:audit_id, audit_period:period, grade:tier,
         sections:sections, action_items:items, raw:raw, generated_at:generated_at };
