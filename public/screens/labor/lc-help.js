@@ -61,7 +61,7 @@ S.LaborHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Labor Control to Revenue Recovery?',
-        a: 'Three connections, all read-only on the Revenue side, all always on. Logged hours feed Revenue This Week labor (the weekly labor cost line). The same hours feed the RPLH Tracker, which divides revenue by labor hours for each shift and department. And the Staff Roster, Front of House staff specifically, feeds the Server Check roster. Set the labor data once here and Revenue stays current.' },
+        a: 'Three connections, all read-only on the Revenue side, all always on. Logged hours feed Revenue This Week labor (the weekly labor cost line). The same hours feed This Week\'s RPLH, which divides revenue by labor hours. And the Staff Roster, Front of House staff specifically, feeds the Server Check roster. Set the labor data once here and Revenue stays current.' },
       { q: 'What flows from Labor Control to Profit Recovery?',
         a: 'Logged hours feed Profit This Week labor and the prime cost calculation, which combines labor and COGS as a percentage of revenue. Prime cost is the single most important number in a healthy operation, and Labor Control owns half of it. The other half comes from Inventory Control counts.' },
       { q: 'What flows from Labor Control to Shift Control?',
