@@ -29,8 +29,8 @@ S.RevenueFix = {
   TRACK: {
     'menu-engineering': { 0: { kind: 'setup', key: 'menudata' }, 1: { kind: 'recur', signal: 'view:r-menu-engineering', maxDays: 95, every: 'each quarter' }, 3: { kind: 'recur', signal: 'dogtest', maxDays: 100, every: 'a test running' }, 4: { kind: 'state', key: 'reprice' } },
     'pricing':          { 0: { kind: 'setup', key: 'menudata' }, 1: { kind: 'state', key: 'reprice' }, 4: { kind: 'recur', signal: 'pricelog', maxDays: 95, every: 'each quarter' } },
-    'labor-scheduling': { 0: { kind: 'recur', signal: 'forecast', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:lc-overtime-watch', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'view:lc-reports', maxDays: 9, every: 'every week' } },
-    'rplh':             { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 1: { kind: 'setup', key: 'rplhtarget' } },
+    'labor-scheduling': { 0: { kind: 'recur', signal: 'forecast', maxDays: 9, every: 'every week' }, 1: { kind: 'recur', signal: 'schedule', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:lc-overtime-watch', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'view:lc-reports', maxDays: 9, every: 'every week' } },
+    'rplh':             { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 1: { kind: 'setup', key: 'rplhtarget' }, 2: { kind: 'recur', signal: 'schedule', maxDays: 9, every: 'every week' } },
     'check-average':    { 0: { kind: 'recur', signal: 'servercheck', maxDays: 9, every: 'every week' } },
     'server-performance': { 1: { kind: 'recur', signal: 'servercheck', maxDays: 9, every: 'every week' } }
   },
@@ -48,7 +48,8 @@ S.RevenueFix = {
     forecast:    () => (App.data && App.data.revenue_forecasts)     || [],
     servercheck: () => (App.data && App.data.revenue_server_checks) || [],
     pricelog:    () => (App.data && App.data.revenue_price_log)     || [],
-    dogtest:     () => (App.data && App.data.menu_dog_tests)        || []
+    dogtest:     () => (App.data && App.data.menu_dog_tests)        || [],
+    schedule:    () => (App.laborData && App.laborData.lc_schedules) || []
   },
   _recDate(r) {
     return r.period_end || r.week_start || r.date || r.start_date
@@ -355,7 +356,7 @@ S.RevenueFix = {
     App.showHelpModal('How the Revenue Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you put in place and then keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is actually happening.'] },
       { h: 'Your Revenue Systems', p: ['Each system in the left list is one revenue lever. The ring and status read off live data: how many of the watched steps are on track. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads On track only while every watched step is current; the moment one lapses it tells you exactly how many steps are slipping or behind.'] },
-      { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. Setting next week\'s forecast, logging a server check, logging a price change, running a dog test, confirming a week, and opening the weekly reviews all leave a record. Steps like repricing read your live numbers, any menu item still over its target cost. This is the honest answer to whether the system is being worked, not just claimed.'] },
+      { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: On track, slipping, or behind, with when it was last done and how often it should happen. Setting next week\'s forecast, building the schedule, logging a server check, logging a price change, running a dog test, confirming a week, and opening the weekly reviews all leave a record. Steps like repricing read your live numbers, any menu item still over its target cost. This is the honest answer to whether the system is being worked, not just claimed.'] },
       { h: 'Guidance Steps', p: ['The things Bar Cop genuinely cannot see, a signed server standard, the pre-shift briefing, the table-visit audit on the floor, are marked Guidance. They still matter, but they are never counted as proof.'] },
       { h: 'Watch Out For', p: ['At the bottom of each system are the mistakes that quietly break its numbers, the things Bar Cop itself cannot catch for you. Worth a read before you chase a number that looks off.'] },
       { h: 'It Starts On Its Own', p: ['There is no start button. The moment you do the first tracked step, Bar Cop logs that day and measures from there. It takes your own first few weeks as the baseline and compares the weeks since against it, so the recovery number reads against where you started. Early on there is not enough logged to call anything recovered, and Bar Cop says so plainly instead of inventing a figure.'] }
