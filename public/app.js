@@ -3436,7 +3436,8 @@ const App = {
     ['web_mobile',       'Mobile optimized'],
     ['web_menu',         'Menu linked from the homepage'],
     ['web_online_order', 'Online ordering available'],
-    ['web_reservations', 'Reservation system in place']
+    ['web_reservations', 'Reservation system in place'],
+    ['web_analytics',    'Google Analytics installed']
   ],
 
   // Email program enums on t-email.
