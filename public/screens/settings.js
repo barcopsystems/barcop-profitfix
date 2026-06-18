@@ -1096,15 +1096,15 @@ S.HubSettings = {
       search_phone:true, search_titles:true, search_keyword:'austin sports bar',
       search_citations:42, search_reviewed_at:daysAgoISO(6),
       // Website scorecard
-      web_exists:true, web_mobile:true, web_menu:true, web_online_order:true, web_reservations:true,
+      web_exists:true, web_mobile:true, web_menu:true, web_online_order:true, web_reservations:true, web_analytics:true,
       web_avg_duration:96, web_top_source:'Organic Search', web_reviewed_at:daysAgoISO(7),
       // Social
       social_stories:true, social_reels:true, social_ig_engagement:2.4, social_fb_posts:6,
       social_content_mix:'Balanced', social_reviewed_at:daysAgoISO(5),
       // Delivery
-      dd_photos:26, dd_menu:true, dd_promo:true,
-      ue_photos:22, ue_menu:true, ue_promo:false,
-      gh_photos:null, gh_menu:false, gh_promo:false,
+      dd_active:'yes', dd_rating:4.6, dd_photos:26, dd_menu:true, dd_promo:true,
+      ue_active:'yes', ue_rating:4.4, ue_photos:22, ue_menu:true, ue_promo:false,
+      gh_active:'no', gh_photos:null, gh_menu:false, gh_promo:false,
       delivery_reviewed_at:daysAgoISO(8),
       // Email and loyalty
       email_last_send:dateStr(5), email_frequency:'Weekly', email_growth:'WiFi login capture',
