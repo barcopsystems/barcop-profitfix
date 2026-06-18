@@ -14,7 +14,7 @@ S.TrafficHelp = {
     App.showHelpModal('Traffic Help and FAQ', [
       { p: ['This page is the full Help and FAQ for Traffic Recovery: how to get started, how the online funnel feeds Revenue and Profit, and the judgment calls behind the numbers.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "reviews", "audit", or "sessions" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Traffic carries its own directions. Open the screen you have a question about, like Online Presence or This Week, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Traffic carries its own directions. Open the screen you have a question about, like Online Tracker or This Week, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
     ]);
   },
 
@@ -23,9 +23,9 @@ S.TrafficHelp = {
       { q: 'What does Traffic Recovery do?',
         a: 'Traffic is your online channel: the website, digital menu, online reservations and orders, and the Google Business, search, and reviews presence that gets people there. Profit Recovery works your costs and Revenue Recovery works what your team collects from the guests in the room. Traffic works the step before that, whether enough people find you online, pick you, and come back. Tight costs and a sharp service team still leave money on the table when the top of the funnel is dry. The info "i" on any Traffic screen explains how that screen works.' },
       { q: 'Where do I start?',
-        a: 'Open Online Presence. It puts every area (Google Business, website, reviews, search, social, delivery, email) on one page with your live number against the target and the one next move for each. Run the Traffic Audit on day one for a scored baseline. Then log This Week so your ratings, reviews, sessions, and orders start building a trend. Fix the weakest area first, the one Online Presence flags.' },
+        a: 'Open Online Tracker. It puts every area (Google Business, website, reviews, search, social, delivery, email) on one page with your live number against the target and the one next move for each. Run the Traffic Audit on day one for a scored baseline. Then log This Week so your ratings, reviews, sessions, and orders start building a trend. Fix the weakest area first, the one Online Tracker flags.' },
       { q: 'Do I need every area?',
-        a: 'No. Google Business, reviews, and your website carry most of the weight for a bar or restaurant. Get those three right and you have covered most of what a new guest sees before they decide. Add social, delivery, and email as you have time. Online Presence shows which area is costing you the most right now, so you always know what to work next.' }
+        a: 'No. Google Business, reviews, and your website carry most of the weight for a bar or restaurant. Get those three right and you have covered most of what a new guest sees before they decide. Add social, delivery, and email as you have time. Online Tracker shows which area is costing you the most right now, so you always know what to work next.' }
     ]},
     { t: 'How It Works', qa: [
       { q: 'How does the online funnel work?',
