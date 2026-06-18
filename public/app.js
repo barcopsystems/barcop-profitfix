@@ -2722,11 +2722,24 @@ const App = {
   // resale items use cost per serving, bottle beer divides the case, everything
   // else is the straight per-container cost. One source for menuItemCost and the
   // Menu Items linked-product forms so they never disagree.
-  menuLinkCost(p) {
+  menuLinkCost(p, pourOz) {
     if (!p) return 0;
     if (this.isResale(p)) return this.resaleCostPerServing(p);
-    const bc = this.bottleCost(p);
-    return bc != null ? bc : (parseFloat(p.unit_cost) || 0);
+    // Bottle beer is sold whole — one bottle is one serving — so the per-bottle
+    // cost (cost per case / case size) is the menu cost.
+    if (p.category === 'Bottle Beer') {
+      const bc = this.bottleCost(p);
+      return bc != null ? bc : (parseFloat(p.unit_cost) || 0);
+    }
+    // Poured beverages (Wine, Draft Beer, Liquor) are sold by the glass/pour, so
+    // the menu cost is the cost of ONE pour, NEVER the whole bottle or keg. Honor
+    // a per-item pour override, else the product's pour size.
+    const unit = parseFloat(p.unit_cost) || 0;
+    const container = parseFloat(p.container_size_oz) || 0;
+    const pour = (pourOz != null && pourOz > 0) ? pourOz : (parseFloat(p.pour_size_oz) || 0);
+    if (container > 0 && pour > 0) return unit * pour / container;
+    if (p.cost_per_pour != null) return parseFloat(p.cost_per_pour) || 0;
+    return unit;
   },
   // ── Sub-category (product style) ──────────────────────────────────────
   // Starter suggestions per category for the Sub-Category datalist. The
@@ -3518,7 +3531,7 @@ const App = {
     if (item.linked_product_id) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const p = prods.find(x => x.id === item.linked_product_id);
-      if (p) return this.menuLinkCost(p);
+      if (p) return this.menuLinkCost(p, item.pour_size_oz);
     }
 
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
