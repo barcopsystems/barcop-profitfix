@@ -242,7 +242,7 @@ FIX.traffic = [
 
   {
     id: 'email-loyalty',
-    name: 'Email and Loyalty',
+    name: 'Email Marketing',
     module: 'traffic',
     summary: 'Email is the one channel where you own the audience.',
 
@@ -250,13 +250,13 @@ FIX.traffic = [
       steps: [
         { kind: 'reference', target: 'Guest_Email_Capture.pdf', targetLabel: 'Email List Building Playbook',
           title: 'Build the list at every contact point',
-          detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the contact points two at a time so each one gets set up properly. A loyalty program sign-up is one of the strongest capture points, so run the two together.' },
+          detail: 'Work the Email List Building Playbook. Capture addresses at the POS, on table cards, through WiFi sign-in, at events, and through a QR code. Activate the contact points two at a time so each one gets set up properly.' },
         { kind: 'reference', target: 'Email_Campaign_Templates.docx', targetLabel: 'Email Campaign Templates',
           title: 'Set up the three campaigns in owner voice',
           detail: 'Use the Email Campaign Templates for the three campaigns every bar needs: a welcome sequence, a monthly update, and an event announcement. Set up the welcome sequence before you collect a single address, it is the highest-opened email you will ever send. Write first person, with one specific detail, signed with a name. I wanted to tell you reads like a person. We are thrilled to announce reads like a chain.' },
-        { kind: 'result', target: 't-email', targetLabel: 'Email and Loyalty',
-          title: 'Track the list, the sends, and loyalty',
-          detail: 'The Email and Loyalty screen tracks list size, emails sent, open rate, and loyalty members. Read it so you know whether the list is growing and whether the sends are landing.' },
+        { kind: 'result', target: 't-email', targetLabel: 'Email Marketing',
+          title: 'Track the list, the sends, and opens',
+          detail: 'The Email Marketing screen tracks list size, emails sent, and open rate. Read it so you know whether the list is growing and whether the sends are landing.' },
         { kind: 'action', target: 't-this-week', targetLabel: 'This Week',
           title: 'Log the monthly send',
           detail: 'Send on a consistent monthly rhythm, one email a month is the floor and more than two is where unsubscribes accelerate. In This Week, log open rate, click rate, and any covers a guest attributed to the email. Track estimated visit conversion, not just open rate. Open rate tells you who read it. Visit conversion tells you whether it drove anyone in.' },
