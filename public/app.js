@@ -4020,7 +4020,6 @@ const App = {
         't-social':         ['Social Media', ''],
         't-delivery':       ['Delivery Platforms', ''],
         't-email':          ['Email and Loyalty', ''],
-        't-reports':        ['Reports and History', ''],
         't-help':           ['Help and FAQ', ''],
       };
       const trafficScreens = {
@@ -4036,7 +4035,6 @@ const App = {
         't-social':         S.TrafficSocial,
         't-delivery':       S.TrafficDelivery,
         't-email':          S.TrafficEmail,
-        't-reports':        S.TrafficReports,
         't-help':           S.TrafficHelp,
       };
       const [title, sub] = trafficTitles[id] || [id, ''];
@@ -4255,11 +4253,8 @@ const App = {
      and opens a Save dialog. The set is every screen in a module's REPORTS
      section plus the three Recovery Reports and History screens. */
   _REPORT_SCREENS: {
-    // Screens that carry their own in-content Export PDF are intentionally NOT
-    // here (no duplicate topbar button): the four Inventory reports, plus the
-    // swept Labor reports (lc-reports / lc-overtime-watch export from the card;
-    // lc-callout-log needs no export).
-    't-reports': 1
+    // Every report/history screen now carries its own in-content Export PDF
+    // button, so none take the auto topbar export (no duplicate buttons).
   },
   _exportBtn(id, actions) {
     if (!this._REPORT_SCREENS[id] || !actions) return;
