@@ -145,8 +145,6 @@ const TT = {
     't-email-list':     {t:'Email List Size',b:'Total contacts on your email marketing list. An owned email list is the one marketing channel no algorithm controls. Benchmark is 500 or more for an established bar or restaurant.',e:'740 contacts on the list'},
     't-emails-sent':    {t:'Emails Sent Per Month',b:'How many marketing emails or campaigns you sent in the last month. A list you never email is a dead asset. Send at least once a month, and weekly when you have offers or events.',e:'4 emails sent this month, one per week'},
     't-email-open':     {t:'Email Open Rate',b:'Percentage of recipients who opened your most recent email. Industry benchmark is 20% or higher. A low open rate usually means weak subject lines or sending at the wrong time.',e:'28 of 100 recipients opened = 28% open rate'},
-    't-loyalty-active': {t:'Loyalty Program',b:'Whether you run a loyalty or rewards program for repeat guests. A simple loyalty program turns one-time delivery and walk-in guests into regulars and gives you a reason to collect contact info.',e:'Set Yes if you run points, punch cards, or a rewards app'},
-    't-loyalty-members':{t:'Loyalty Members',b:'How many guests are enrolled in your loyalty program. Track this weekly. A growing membership means your sign-up process is working at the table and at checkout.',e:'420 enrolled loyalty members'},
     't-gbp-photos':     {t:'Photo Count',b:'Total photos on your Google Business Profile. Listings with more photos get more clicks and direction requests. Benchmark is 100 or more across food, drinks, the room, and the exterior.',e:'GBP shows 134 photos across all categories'},
     't-gbp-posts':      {t:'GBP Posts Per Month',b:'How many Google Business Profile posts you published in the last month. Posts such as offers, events, and updates signal to Google that the listing is active. Benchmark is 8 or more per month.',e:'10 GBP posts this month: 4 events, 6 offers'},
     't-review-age':     {t:'Most Recent Review Age',b:'How many days ago your newest review was posted, on any platform. If the most recent review is more than 14 days old, your review flow has gone quiet. Prompt guests this week.',e:'Newest review posted 6 days ago'},
@@ -3463,7 +3461,7 @@ const App = {
     'search-seo':     'Search and SEO',
     'social':         'Social Media',
     'delivery':       'Delivery Platforms',
-    'email-loyalty':  'Email and Loyalty'
+    'email-loyalty':  'Email Marketing'
   },
   emitTrafficFix(gap_id, note) {
     const today = this.todayLocal();
@@ -4019,7 +4017,7 @@ const App = {
         't-website':        ['Website Scorecard', ''],
         't-social':         ['Social Media', ''],
         't-delivery':       ['Delivery Platforms', ''],
-        't-email':          ['Email and Loyalty', ''],
+        't-email':          ['Email Marketing', ''],
         't-help':           ['Help and FAQ', ''],
       };
       const trafficScreens = {
