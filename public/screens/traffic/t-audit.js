@@ -40,20 +40,9 @@ S.TrafficAudit = {
     if (!audit) return;
     this._view = idx;
 
-    // Add Print button to topbar actions
+    // Header off (in _CONVERTED): no topbar Back/Save PDF. Back is the sidebar
+    // nav; PDF export lives in the Action Items row next to Bar Cop Outlook.
     this.actions.innerHTML = '';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'btn btn-ghost btn-sm';
-    backBtn.textContent = '← Back';
-    backBtn.style.marginRight = '8px';
-    backBtn.onclick = () => this.renderMain();
-    this.actions.appendChild(backBtn);
-
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Save PDF';
-    printBtn.onclick = () => this.exportPDF(audit);
-    this.actions.appendChild(printBtn);
 
     const d = audit.raw || audit;
     const yN = v => v ? 'Yes' : 'No';
@@ -154,6 +143,7 @@ S.TrafficAudit = {
       + '</div>';
 
     AuditUI.attachOutlook('ta', audit, 'traffic');
+    this.container.querySelector('.ta-export-btn')?.addEventListener('click', () => this.exportPDF(audit));
     this.container.querySelectorAll('.ta-fix-btn').forEach(btn => {
       btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('t-fix'); });
     });
