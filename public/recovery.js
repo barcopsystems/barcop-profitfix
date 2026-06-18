@@ -109,7 +109,10 @@ window.Recovery = {
       value: w => w.monthly_sessions != null ? w.monthly_sessions / 4.33 : null,
       base:  () => ((Recovery._tconv().web_session_to_visit ?? 3) / 100) * Recovery._checkAvg(),
       baseKind: 'unit',
-      target: () => ((App.data.traffic_settings || {}).targets || {}).monthly_sessions ?? 2000,
+      // `value` is WEEKLY sessions (monthly / 4.33), so the target is normalized
+      // to weekly too — otherwise gapImpact compares a weekly value to a monthly
+      // target and the website leak reads ~4x too high.
+      target: () => ((((App.data.traffic_settings || {}).targets || {}).monthly_sessions ?? 2000)) / 4.33,
       fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
     },
 
