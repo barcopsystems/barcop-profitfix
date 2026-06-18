@@ -19,10 +19,10 @@ FIX.revenue = [
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Set up the menu data',
-          detail: 'In Menu Items, enter every item with its name, category, current price, and yield-adjusted food cost. The quadrant is only as accurate as this catalog, so refresh an item\'s cost whenever a supplier price moves more than 5%.' },
+          detail: 'In Menu Items, enter every item with its name, category, current price, and yield-adjusted food cost. Garbage in here means a garbage quadrant, so refresh an item\'s cost whenever a supplier price moves more than 5%.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Read the quadrant every quarter',
-          detail: 'Menu Engineering plots every item into Stars, Plowhorses, Puzzles, and Dogs, sorted on contribution margin in dollars and sales volume. The percentage tells you structural efficiency. The dollar margin tells you what the item is actually worth. Re-read it the first week of January, April, July, and October.' },
+          detail: 'Menu Engineering plots every item into Stars, Plowhorses, Puzzles, and Dogs, sorted on margin in dollars and sales volume. Watch the dollar margin, not just the cost percent, a tight-percent item can still be a small-dollar earner. Re-read it the first week of January, April, July, and October.' },
         { kind: 'reference', target: 'Menu_Engineering_Audit.pdf', targetLabel: 'Menu Engineering Review Worksheet',
           title: 'Work the quadrant decisions on the worksheet',
           detail: 'Download the Menu Engineering Review Worksheet and record a decision for every item. Move Stars and high-margin Puzzles into prime menu positions. Some Dogs are buried items with a description problem, not bad items.' },
@@ -58,19 +58,19 @@ FIX.revenue = [
       steps: [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Keep ingredient costs current',
-          detail: 'In Menu Items, refresh the yield-adjusted ingredient cost on every item whenever a supplier price moves. A protein priced on raw purchase cost is understated until trim loss is in it. Cost percent is only honest when the cost behind it is current.' },
+          detail: 'In Menu Items, refresh the yield-adjusted ingredient cost on every item whenever a supplier price moves. A protein priced on raw purchase cost reads cheaper than it really is until trim loss is in it.' },
         { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Read which items are priced below their floor',
           detail: 'Menu Items shows each item\'s cost percent and dollar margin. An item running well over its target cost percent is priced below its floor. The worst offenders are the biggest annual margin leaks, so start there.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Weigh the margin dollars before you reprice',
-          detail: 'Open Menu Engineering and read the contribution margin in dollars on the items you flagged. The percentage tells you the item is underpriced. The dollar margin and the volume tell you how much a correction is actually worth, so weigh the biggest-dollar items first.' },
+          detail: 'Open Menu Engineering and read the dollar margin on the items you flagged. Percent flags that an item is underpriced, but the dollar margin and the volume tell you which fix is actually worth chasing, so start with the biggest-dollar items.' },
         { kind: 'action', target: 'r-price-calc', targetLabel: 'Price Calculator',
           title: 'Model the change on the Price Calculator',
-          detail: 'Open the Price Calculator, or click Reprice on the item in Menu Engineering to land there with it preselected. Type the price you are considering and a volume change estimate. Bar Cop shows the cost floor, new margin, weekly and annual impact, and the break-even volume drop you can absorb before total margin slips. Knowing that number before you move a price is what makes the call confident. The Log Price Change button persists the entry for verification three weeks later.' },
+          detail: 'Open the Price Calculator, or click Reprice on the item in Menu Engineering to land there with it preselected. Type the price you are considering and a volume change estimate. Bar Cop shows the cost floor, new margin, weekly and annual impact, and the break-even volume drop you can absorb before total margin slips. Know that number before you touch the price. The Log Price Change button saves the entry so Bar Cop can check it against the real result three weeks later.' },
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Apply the change directly on Menu Items',
-          detail: 'Once you have the number, open the item on Menu Items and update the price field. Bar Cop auto-writes a revenue_price_log entry AND a Recovery Scoreboard fix_log entry tied to the Pricing gap area. The Scoreboard then watches check average and revenue for the 8 weeks after, and surfaces the recovered dollars without you marking anything implemented manually. Surgical, item-by-item changes rarely draw guest feedback; a blanket increase reads as a price event.' },
+          detail: 'Once you have the number, open the item on Menu Items and update the price. Bar Cop logs the change and ties it to the Pricing system on your Recovery Scoreboard on its own. The Scoreboard then watches check average and revenue for the eight weeks after and surfaces the recovered dollars, with nothing for you to mark done. Surgical, item-by-item changes rarely draw guest feedback; a blanket increase reads as a price event.' },
         { kind: 'reference', target: 'Quarterly_Pricing_Review.pdf', targetLabel: 'Quarterly Pricing Review Checklist',
           title: 'Run the full pricing review every quarter',
           detail: 'Download the Quarterly Pricing Review checklist and work it the first week of each quarter. It refreshes costs, lists the items to reprice and the items to remove, sets the menu print date, and confirms servers were briefed on the changes before the new menu goes live.' }
@@ -83,7 +83,7 @@ FIX.revenue = [
       'Raising all prices at once in a visible refresh. A blanket increase reads as a price event. Surgical item-by-item increases rarely draw feedback.',
       'Not yield-adjusting ingredient costs before setting floors. A protein at 30% on raw purchase cost is 38% once trim loss is in it.',
       'Treating the competitive price as a ceiling. If your floor is $16.50 and competitors charge $18, that is $1.50 of pricing room left on every plate.',
-      'Skipping the Price Calculator check on a high-volume item. Knowing the break-even volume before you change the price is what makes the decision confident.'
+      'Skipping the Price Calculator check on a high-volume item. Move the price without the break-even number and you are flying blind on your highest-volume plates.'
     ]
   },
 
@@ -136,7 +136,7 @@ FIX.revenue = [
           detail: 'This Week\'s history shows revenue per labor hour for each saved week, with the labor hours pulled straight from Labor Control, next to your labor percentage. Read it every Monday before the new schedule is built. A week can sit at an acceptable labor percent while its RPLH runs well below target.' },
         { kind: 'action', target: 'settings', targetLabel: 'Settings',
           title: 'Set targets off your own 13-week baseline',
-          detail: 'Concept benchmarks are a starting orientation only. After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Your own baseline reflects your concept, your market, and your guest mix in a way a generic benchmark never will.' },
+          detail: 'Concept benchmarks are a starting point only. After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Your own numbers fit your room better than any benchmark off a chart ever will.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Build the schedule to the RPLH target',
           detail: 'In Build Schedule, the week\'s revenue forecast becomes a Target Hours number (the labor hours that revenue supports at your RPLH target) and a dollar labor budget. Staff to those, watching projected RPLH and budget-left update live as you assign hours.' },
@@ -201,7 +201,7 @@ FIX.revenue = [
     id: 'server-performance',
     name: 'Server Performance',
     module: 'revenue',
-    summary: 'A written standard turns serving from personal style into a trained, measurable job.',
+    summary: 'A written standard makes serving a trained, measured job instead of whatever each server decides it is.',
 
     process: {
       steps: [
