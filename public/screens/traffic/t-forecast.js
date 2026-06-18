@@ -19,7 +19,7 @@ S.TrafficForecast = {
 
   // Disclosed conversion rates. Defaults are conservative; an operator can
   // override the first two in Settings (traffic_settings.conversion_rates).
-  CONV: { session_to_visit: 3, email_open_to_visit: 1, session_to_reservation: 1.5, session_to_order: 1.2 },
+  CONV: { web_session_to_visit: 3, email_open_to_visit: 1, session_to_reservation: 1.5, session_to_order: 1.2 },
   BAND_LOW: 0.7,
   BAND_HIGH: 1.3,
 
@@ -57,7 +57,7 @@ S.TrafficForecast = {
 
     // 1 — Website visits (gap to target if below)
     {
-      const conv = this.conv('session_to_visit');
+      const conv = this.conv('web_session_to_visit');
       const tgt = this.targets().monthly_sessions != null ? Number(this.targets().monthly_sessions) : 2000;
       const worth = sessions != null ? sessions * conv * ca * 12 : null;
       let oppLow = 0, oppHigh = 0, note = '', status = 'nodata';
