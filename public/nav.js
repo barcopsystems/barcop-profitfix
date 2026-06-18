@@ -25,7 +25,7 @@ const ProfitNav = {
       </div>
       <div class="nav-section">Leaks</div>
       <div class="nav-item" data-screen="vendor-tracker" id="nav-vendor-tracker">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5l6-2 6 2v5.5c0 3.5-6 5.5-6 5.5s-6-2-6-5.5v-5.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2 3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.2V3.2A.7.7 0 0 1 3.2 2.5H8.2L14.2 8.5 8.5 14.2 2.5 8.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" stroke="currentColor" stroke-width="1.2"/></svg>
         <span class="nav-label">Vendor Tracker</span>
       </div>
       <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
@@ -82,7 +82,7 @@ const Revenue = {
         <span class="nav-label">Menu Items</span>
       </div>
       <div class="nav-item" data-screen="r-menu-engineering" id="nav-r-menu-engineering">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.7-2-3.7 2 .7-4.3-3.1-3 4.3-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <span class="nav-label">Menu Engineering</span>
       </div>
       <div class="nav-item" data-screen="r-price-calc" id="nav-r-price-calc">
@@ -90,7 +90,7 @@ const Revenue = {
         <span class="nav-label">Price Calculator</span>
       </div>
       <div class="nav-item" data-screen="r-dog-test" id="nav-r-dog-test">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2.5v3.8L3.3 12a1.2 1.2 0 0 0 1.1 1.8h8.2a1.2 1.2 0 0 0 1.1-1.8L10.5 6.3V2.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2.5h6M5.6 10h5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Dog Test Tracker</span>
       </div>
       <div class="nav-item" data-screen="r-server-check" id="nav-r-server-check">
