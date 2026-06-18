@@ -259,7 +259,18 @@ async function extractTrafficInputs(apiKey, files) {
 }
 
 async function generateTrafficNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a digital-presence (TRAFFIC) audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount. Respond with a single JSON object, no other text, with exactly these prose fields:
+  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a digital-presence (TRAFFIC) audit that another seasoned owner will read. The NUMBERS BELOW ARE FINAL AND CORRECT. Never change, recompute, or contradict them, and reference them verbatim where relevant.
+
+VOICE, follow exactly:
+- Write operator to operator. The reader runs a bar and knows the trade. State findings and give direct orders. Never explain a concept, define a term, or justify why a metric matters. The reader already knows.
+- Banned framing that reads like teaching or a consultant: "this tells you", "this shows you", "what this means is", "the key is", "keep in mind", "remember that", "because", "reads as". Cut them. State the fact, not the lesson behind it.
+- NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst gap, the concentration. TOOL: a direct instruction naming the action, like "Reply to every review inside 48 hours." Never soft advice or "you should consider".
+- Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
+- Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
+- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy".
+- CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount.
+
+Respond with a single JSON object, no other text, with exactly these prose fields:
 {"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_NARRATIVE":"","S6_FINDING":"","S6_TOOL":"","S7_NARRATIVE":"","S7_FINDING":"","S7_TOOL":"","S8_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG1_LABEL":"","S8_SIG1_EVIDENCE":"","S8_SIG1_GAP":"","S8_SIG1_TOOL":"","S8_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG2_LABEL":"","S8_SIG2_EVIDENCE":"","S8_SIG2_GAP":"","S8_SIG2_TOOL":"","S8_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG3_LABEL":"","S8_SIG3_EVIDENCE":"","S8_SIG3_GAP":"","S8_SIG3_TOOL":"","S8_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG4_LABEL":"","S8_SIG4_EVIDENCE":"","S8_SIG4_GAP":"","S8_SIG4_TOOL":""}
 
 COMPUTED NUMBERS (final):
@@ -337,7 +348,18 @@ async function extractRevenueInputs(apiKey, files) {
 }
 
 async function generateRevenueNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a REVENUE audit. The NUMBERS BELOW ARE FINAL AND CORRECT — never change, recompute, or contradict them. Plain operator voice. No emdashes (use a period or comma). Avoid "leverage", "compounds", "robust", "seamless". Treat check-average, menu, server, and event figures as REVENUE OPPORTUNITY (potential growth), and labor as cost. Do not call opportunity "recovered" money. Respond with a single JSON object, no other text, with exactly these prose fields:
+  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a REVENUE audit that another seasoned owner will read. The NUMBERS BELOW ARE FINAL AND CORRECT. Never change, recompute, or contradict them, and reference them verbatim where relevant.
+
+VOICE, follow exactly:
+- Write operator to operator. The reader runs a bar and knows the trade. State findings and give direct orders. Never explain a concept, define a term, or justify why a metric matters. The reader already knows.
+- Banned framing that reads like teaching or a consultant: "this tells you", "this shows you", "what this means is", "the key is", "keep in mind", "remember that", "because", "reads as". Cut them. State the fact, not the lesson behind it.
+- NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst offender, the concentration, the gap. TOOL: a direct instruction that names the Bar Cop screen and the action, like "Track check average by server in Server Check and coach the bottom two." Never soft advice or "you should consider".
+- Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
+- Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
+- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy".
+- Treat check-average, menu, server, and event figures as REVENUE OPPORTUNITY (potential growth), and labor as cost. Do not call opportunity "recovered" money.
+
+Respond with a single JSON object, no other text, with exactly these prose fields:
 {"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG1_LABEL":"","S6_SIG1_EVIDENCE":"","S6_SIG1_GAP":"","S6_SIG1_TOOL":"","S6_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG2_LABEL":"","S6_SIG2_EVIDENCE":"","S6_SIG2_GAP":"","S6_SIG2_TOOL":"","S6_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG3_LABEL":"","S6_SIG3_EVIDENCE":"","S6_SIG3_GAP":"","S6_SIG3_TOOL":"","S6_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S6_SIG4_LABEL":"","S6_SIG4_EVIDENCE":"","S6_SIG4_GAP":"","S6_SIG4_TOOL":""}
 
 COMPUTED NUMBERS (final):
