@@ -664,7 +664,7 @@ S.HubSettings = {
         S2_TOOL: 'Build the schedule against your labor target in Build Schedule and watch Overtime Watch.',
         S3_SCORE: 24, S3_STARS_COUNT: 3, S3_PLOWHORSES_COUNT: 9, S3_DOGS_COUNT: 7, S3_PUZZLES_COUNT: 5,
         S3_TOP_CATEGORY: 'Draft Beer', S3_MONTHLY_GAP: 1820, S3_PRICING_OPPORTUNITY: 2640,
-        S3_NARRATIVE: 'The menu carries seven Dogs, which are low-margin and low-popularity items, against only three Stars.',
+        S3_NARRATIVE: 'The menu carries seven Dogs against only three Stars.',
         S3_FINDING: 'Revenue leans on low-margin draft beer. Repricing or cutting Dogs and promoting Stars is a $1,820/month mix opportunity, with $2,640 more available from pricing.',
         S3_TOOL: 'Use Menu Engineering and the Dog Test Tracker to rework the seven Dog items.',
         S4_SCORE: 30, S4_SERVER_COUNT: 9, S4_TOP_CHECK_AVG: 38.60, S4_BOTTOM_CHECK_AVG: 21.40,
@@ -677,7 +677,7 @@ S.HubSettings = {
         S5_MINIMUM_MET: false, S5_CATERING_REV_PERIOD: 0, S5_ANNUAL_EVENT_GAP: 64800, S5_MONTHLY_GAP: 5400,
         S5_NARRATIVE: 'Events brought in $2,400 from a single booking. There is no private dining minimum and no catering revenue at all.',
         S5_FINDING: 'For a venue this size, three to four events a month is realistic. The unbuilt event channel is the largest single opportunity in this audit at $5,400/month.',
-        S5_TOOL: 'Build a private dining package in Events and Catering with a spend minimum and a rate card.',
+        S5_TOOL: 'Build a private dining package in Events with a spend minimum and a rate card.',
         S6_SIG1_SCORE: 'HIGH', S6_SIG1_LABEL: 'Server comp concentration',
         S6_SIG1_EVIDENCE: 'One server accounts for 54% of comped checks over the audit period.',
         S6_SIG1_GAP: 'Pattern is consistent with discount abuse, not service recovery.',
@@ -692,7 +692,7 @@ S.HubSettings = {
         S6_SIG3_TOOL: 'Spec-check the burger every shift for a week and review its build in Menu Items.',
         S6_SIG4_SCORE: 'MEDIUM', S6_SIG4_LABEL: 'No pre-shift briefings',
         S6_SIG4_EVIDENCE: 'No briefings logged in the audit period.',
-        S6_SIG4_GAP: 'Bottom-third servers get no daily coaching, which is where check average leaks.',
+        S6_SIG4_GAP: 'Bottom-third servers get no daily coaching.',
         S6_SIG4_TOOL: 'Run a 5-minute pre-shift on every dinner shift, even when short-staffed.'
       }}),
       mkAudit('revenue', { date: dateStr(42), generated_at: daysAgoISO(42), raw: {
