@@ -321,13 +321,14 @@ S.TrafficAudit = {
   },
 
   // Single-page Traffic intake. Links are entered inline (no bouncing to
-  // Settings), saved back to Operation Links, and read live (PageSpeed, Google
-  // Places, Yelp). Screenshots are optional fallback. No revenue, no notes.
+  // Settings), saved back to Operation Links. Only the website is read live for
+  // its score (PageSpeed); Google and Yelp ratings come from screenshots by
+  // design (no rating API). No revenue, no notes.
   renderIntake() {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
-    // Form viewable anytime; the 30-day cadence gates only Generate.
+    // Form viewable anytime; the 30-day window gates only Generate.
     const _a = (App.data.traffic_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = _since >= 30;
@@ -341,7 +342,8 @@ S.TrafficAudit = {
       { label: 'Google Rating',   ok: has('google_rating') },
       { label: 'Review Response', ok: has('response_rate') },
       { label: 'Website Sessions',ok: has('monthly_sessions') },
-      { label: 'Social Posts',    ok: has('social_posts_month') },
+      { label: 'Social Posts',    ok: has('ig_posts_month') },
+      { label: 'Delivery Orders', ok: has('delivery_orders') },
       { label: 'Email',           ok: has('email_list_size') || has('email_open_rate') }
     ];
 
@@ -358,7 +360,7 @@ S.TrafficAudit = {
 
     const screenshotsCard = AuditUI.formCard('Screenshots',
       '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional, but this is where most of your score comes from. Drop in a screenshot for anything your website link cannot reach. One drop zone takes them all.</div>'
-      + FileDrop.render('ta-drop', { items: [
+      + FileDrop.render('ta-drop', { accept: '.png,.jpg,.jpeg,.pdf,.csv', acceptText: 'Screenshots, PDF, or CSV', items: [
           { t: 'Google Review Page (rating, reviews)',      s: 'Your Google rating, review count, response rate, and recency. This is how Bar Cop scores your Google reviews.', hi: true },
           { t: 'Yelp Listing (rating, reviews)',            s: 'Your Yelp rating and review count for cross-platform reputation.', hi: true },
           { t: 'Website Analytics (sessions, bounce rate)', s: 'Sessions and bounce live behind your analytics login, not in the public page.', hi: true },
