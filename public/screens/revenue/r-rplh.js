@@ -65,7 +65,7 @@ S.RevenueRPLH = {
     const calcHtml = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Optimal Staffing Calculator</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f w-md"><label>Revenue Forecast <span style="color:var(--t4);font-weight:400;">(next week)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rplh-rev" value="' + (fcTotal > 0 ? Math.round(fcTotal) : '') + '" placeholder="0"/></div></div>'
+      + '<div class="f w-md"><label>Revenue Forecast</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rplh-rev" value="' + (fcTotal > 0 ? Math.round(fcTotal) : '') + '" placeholder="0"/></div></div>'
       + '<div class="f w-md"><label>RPLH Target</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rplh-tgt" value="' + Math.round(target) + '"/></div></div>'
       + '<div class="f w-md"><label>Labor Cost Target %</label><div class="fw"><input class="form-input suf" type="number" id="rplh-pct" value="' + App.laborTargetPct() + '" step="0.5"/><span class="suf">%</span></div></div>'
       + '</div>'
