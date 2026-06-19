@@ -151,10 +151,9 @@ S.EventsBookings = {
   // popup never collide.
   fieldsHtml(b, p, compact) {
     const today = App.todayLocal();
-    const typeOpts = '<option value="">-</option>' + this.EVENT_TYPES.map(t => '<option' + (b && b.event_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const srcOpts = '<option value="">-</option>' + this.SOURCES.map(s => '<option' + (b && b.source === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
+    const typeOpts = '<option value="">Select type...</option>' + this.EVENT_TYPES.map(t => '<option' + (b && b.event_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const srcOpts = '<option value="">Select source...</option>' + this.SOURCES.map(s => '<option' + (b && b.source === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const stageOpts = this.STAGES.map(s => '<option' + ((b && b.stage === s) || (!(b && b.stage) && s === 'Lead') ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
-    const regOpts = '<option value="">-</option>' + this.regulars().map(r => '<option value="' + esc(r.id) + '"' + (b && b.regular_id === r.id ? ' selected' : '') + '>' + esc(r.name || '') + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
     const C = {
       name:   '<div class="f"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>',
@@ -169,17 +168,14 @@ S.EventsBookings = {
       party:  '<div class="f"><label>Party Size</label><input type="number" id="' + p + '-party" value="' + v(b?.party_size) + '"/></div>',
       space:  '<div class="f"><label>Space</label><input type="text" id="' + p + '-space" value="' + esc(b?.space || '') + '" placeholder="Private room"/></div>',
       recv:   '<div class="f"><label>Date Received</label><input type="date" id="' + p + '-recv" value="' + esc(b?.date_received || today) + '"/></div>',
-      reg:    '<div class="f"><label>Link a Regular</label><select id="' + p + '-reg" class="form-input">' + regOpts + '</select></div>',
       notes:  '<div class="f" style="width:100%;"><label>Requests / Notes</label><textarea id="' + p + '-req" class="notes-ta" rows="2" placeholder="What they asked for, follow-up notes, why it closed.">' + esc(b?.requests || '') + '</textarea></div>'
     };
     // Compact (the inline landing form): all data cells on two rows; notes below.
     if (compact) {
-      // First row: Event Name 15px wider, Stage 15px narrower (offsetting, so the
-      // other five cells keep their width).
-      const nameW  = '<div class="f" style="flex:1 1 145px;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
-      const stageW = '<div class="f" style="flex:1 1 115px;"><label>Stage</label><select id="' + p + '-stage" class="form-input">' + stageOpts + '</select></div>';
-      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.type + C.source + stageW + '</div>'
-        + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.date + C.time + C.party + C.space + C.recv + C.reg + '</div>'
+      // Event Name leads (wider); all data cells fit on two rows, notes below.
+      const nameW = '<div class="f" style="flex:2 1 170px;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
+      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.type + C.date + C.time + '</div>'
+        + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.space + C.recv + C.source + C.stage + '</div>'
         + C.notes;
     }
     // Default (the Edit popup): roomier stacked rows.
@@ -187,7 +183,7 @@ S.EventsBookings = {
       + '<div class="form-row" style="gap:14px;">' + C.cname + C.phone + C.email + '</div>'
       + '<div class="form-row" style="gap:14px;">' + C.type + C.source + C.stage + '</div>'
       + '<div class="form-row" style="gap:14px;">' + C.date + C.time + C.party + C.space + '</div>'
-      + '<div class="form-row" style="gap:14px;">' + C.recv + C.reg + '</div>'
+      + '<div class="form-row" style="gap:14px;">' + C.recv + '</div>'
       + C.notes;
   },
 
@@ -206,7 +202,6 @@ S.EventsBookings = {
       party_size:    parseInt(g('party')?.value) || null,
       space:         g('space')?.value.trim() || '',
       date_received: g('recv')?.value || App.todayLocal(),
-      regular_id:    g('reg')?.value || '',
       requests:      g('req')?.value.trim() || ''
     };
   },
