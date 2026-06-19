@@ -42,6 +42,17 @@ S.HubBooksHome = {
     const gross    = netRev - cogs;
     const ytdNet   = YTD ? (YTD.totalRev - (YTD.compsLoss || 0)) : 0;
 
+    // Hero card = the CURRENT calendar month, month-to-date, so it advances on
+    // its own as the months roll (no frozen month name). Filled by whatever
+    // weeks have been logged in the current month; empty early in a new month.
+    const curKey = (HB && HB._currentMonthKey) ? HB._currentMonthKey() : monthKey;
+    const curM   = (HB && HB._aggregateMonth)  ? HB._aggregateMonth(curKey) : M;
+    const cmRev   = curM ? (curM.totalRev - (curM.compsLoss || 0)) : 0;
+    const cmCogs  = curM ? curM.totalCogs : 0;
+    const cmLabor = curM ? curM.totalLabor : 0;
+    const cmPrime = cmCogs + cmLabor;
+    const cmGross = cmRev - cmCogs;
+
     // Permits / licenses coming due (overdue or within 30 days), soonest first.
     const HP = S.HubPermits;
     const permits = (App.data && App.data.permits_compliance) || [];
@@ -63,18 +74,18 @@ S.HubBooksHome = {
       + this._metric('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', dueCount ? 'over-target' : '')
       + '</div>';
 
-    // ── Hero band — the latest month's mini P&L + accountant CTA ──
+    // ── Hero band — the current month's mini P&L + accountant CTA ──
     const fig = (label, val) => '<div style="flex:1;min-width:110px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t1);line-height:1;">' + val + '</div></div>';
     const hero = '<div class="card form-card" style="margin-bottom:22px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      +   '<span>' + esc(monthName) + '</span>'
+      +   '<span>Current Month</span>'
       +   '<button class="btn btn-ghost btn-sm" data-act="books">Books for Accountant</button>'
       + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;">'
-      +   fig('Revenue', this._money(netRev)) + fig('COGS', this._money(cogs)) + fig('Labor', this._money(labor))
-      +   fig('Prime Cost', this._money(prime)) + fig('Gross Profit', this._money(gross))
+      +   fig('Revenue', this._money(cmRev)) + fig('COGS', this._money(cmCogs)) + fig('Labor', this._money(cmLabor))
+      +   fig('Prime Cost', this._money(cmPrime)) + fig('Gross Profit', this._money(cmGross))
       + '</div></div>';
 
     // ── Recent months ──
