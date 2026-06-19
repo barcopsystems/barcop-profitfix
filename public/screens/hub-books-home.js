@@ -68,10 +68,9 @@ S.HubBooksHome = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t1);line-height:1;">' + val + '</div></div>';
     const hero = '<div class="card form-card" style="margin-bottom:22px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px;">'
-      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">' + esc(monthName) + '</div>'
-      +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">Your latest month, rolled up from what you logged.</div></div>'
-      +   '<button class="btn btn-ghost" data-act="books">Books for Your Accountant</button>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      +   '<span>' + esc(monthName) + '</span>'
+      +   '<button class="btn btn-ghost btn-sm" data-act="books">Books for Accountant</button>'
       + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;">'
       +   fig('Revenue', this._money(netRev)) + fig('COGS', this._money(cogs)) + fig('Labor', this._money(labor))
@@ -83,40 +82,60 @@ S.HubBooksHome = {
       const mm = HB._aggregateMonth(mk);
       const nr = mm.totalRev - (mm.compsLoss || 0);
       const pp = mm.totalRev ? ((mm.totalCogs + mm.totalLabor) / mm.totalRev) : null;
-      return '<div class="bk-row" data-act="books" style="display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--b2);cursor:pointer;">'
+      return '<div style="display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--b2);">'
         + '<div style="flex:1;font-size:13px;font-weight:600;color:var(--t1);">' + esc(HB._monthLabel(mk)) + '</div>'
         + '<div style="font-size:13px;color:var(--t2);width:96px;text-align:right;">' + this._money(nr) + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);width:92px;text-align:right;">' + this._pct(pp) + ' prime</div>'
-        + '<span class="btn btn-ghost btn-sm">Open</span></div>';
+        + '<div style="font-size:12px;color:var(--t3);width:92px;text-align:right;">' + this._pct(pp) + ' prime</div></div>';
     }).join('');
     const monthsPanel = '<div style="display:flex;flex-direction:column;">'
       + '<div class="sh" style="margin:0 0 8px;">Recent Months</div>'
       + '<div class="card" style="padding:0;flex:1;">' + (monthRows || '<div style="padding:16px;font-size:12px;color:var(--t3);">No months yet.</div>') + '</div></div>';
 
-    // ── Coming due ──
-    let dueBody;
-    if (!dueCount) {
-      dueBody = '<div style="padding:16px 15px;font-size:12px;color:var(--t3);line-height:1.6;">Nothing due in the next 30 days. Renewal dates you enter in Permits and Licenses show up here as they approach.</div>';
-    } else {
-      dueBody = due.slice(0, 6).map(({ r, s }) => '<div class="bk-row" data-act="permits" style="display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--b2);cursor:pointer;">'
+    // ── Right panel: Coming Due when a renewal is near, otherwise Year to Date.
+    //    Renewals only fill this box inside 30 days, so the rest of the year it
+    //    carries the year-so-far bottom line instead of sitting empty. ──
+    let rightTitle, rightBody;
+    if (dueCount) {
+      rightTitle = 'Coming Due';
+      rightBody = due.slice(0, 6).map(({ r, s }) => '<div class="bk-row" data-act="permits" style="display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--b2);cursor:pointer;">'
         + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(r.name || '(unnamed)') + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (HP._fmtDate ? HP._fmtDate(r.renewal_date) : esc(r.renewal_date || '')) + '</div></div>'
         + '<div style="font-size:11px;font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</div></div>').join('');
+    } else {
+      rightTitle = 'Year to Date';
+      const opexY = (HB && HB._opExSums) ? HB._opExSums(monthKey, true) : {};
+      const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
+        + ((YTD && YTD.maintenance) || 0) + ((YTD && YTD.platformFees) || 0) + ((YTD && YTD.compsPolicy) || 0);
+      const cogsY  = YTD ? YTD.totalCogs  : 0;
+      const laborY = YTD ? YTD.totalLabor : 0;
+      const opInc  = ytdNet - cogsY - laborY - totalOpExY;
+      const yrow = (label, val, o) => { o = o || {};
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 15px;'
+          + (o.top ? 'border-top:1px solid var(--b2);' : 'border-bottom:1px solid var(--b2);') + '">'
+          + '<div style="font-size:13px;' + (o.strong ? 'font-weight:700;color:var(--t1);' : 'color:var(--t2);') + '">' + label + '</div>'
+          + '<div style="font-size:13px;font-weight:' + (o.strong ? '700' : '600') + ';color:' + (o.color || 'var(--t1)') + ';">' + val + '</div></div>';
+      };
+      rightBody = yrow('Revenue', this._money(ytdNet))
+        + yrow('COGS', this._money(cogsY))
+        + yrow('Labor', this._money(laborY))
+        + yrow('Operating Expenses', this._money(totalOpExY))
+        + yrow('Operating Income', this._money(opInc), { top: true, strong: true, color: (opInc < 0 ? 'var(--red)' : 'var(--t1)') });
     }
     const duePanel = '<div style="display:flex;flex-direction:column;">'
-      + '<div class="sh" style="margin:0 0 8px;">Coming Due</div>'
-      + '<div class="card" style="padding:0;flex:1;">' + dueBody + '</div></div>';
+      + '<div class="sh" style="margin:0 0 8px;">' + rightTitle + '</div>'
+      + '<div class="card" style="padding:0;flex:1;">' + rightBody + '</div></div>';
 
     const panelRow = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:stretch;margin-bottom:22px;">'
       + monthsPanel + duePanel + '</div>';
 
     // ── Quick actions ──
     const qa = (act, label) => '<button class="btn btn-primary" data-act="' + act + '" style="flex:1;min-width:150px;">' + label + '</button>';
-    const quick = '<div class="sh" style="margin:0 0 8px;">Quick Actions</div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+    const quick = '<div style="margin-top:20px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
+      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;flex-wrap:wrap;gap:10px;">'
       +   qa('books', 'Month-End Books') + qa('weekly-pnl', 'Weekly P&amp;L Brief') + qa('year-end', 'Year-End Review')
       +   qa('operating-expenses', 'Operating Expenses')
-      + '</div>';
+      + '</div></div>';
 
     mount.innerHTML = '<div class="screen">' + tiles + hero + panelRow + quick + '</div>';
     this._wire();
