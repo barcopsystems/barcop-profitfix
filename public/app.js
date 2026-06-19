@@ -1450,37 +1450,43 @@ const App = {
       { h: 'What this is', p: ['Your monthly read on how well the whole operation is being run. It scores six areas from the data you already log: operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and consistency.'] },
       { h: 'How to use it', p: ['Run one audit every 30 days. Each sub-score fills in as you log the data behind it, and shows Not Enough Data until then.', 'The sidebar links to your Profit, Revenue, and Traffic audits, which live with their Recovery Fix Systems.'] }
     ] },
-    'books-home': { title: 'Books', sections: [
-      { h: 'What this is', p: ['Books is your back office. The Accounting pages build the files your accountant needs (Weekly P&L Brief, Month-End Books, Year-End Review), and the Operations pages track permits, licenses, and operating expenses.'] },
-      { h: 'This page', p: ['The overview rolls up your latest month from what you logged, shows what is coming due, and links to every Books page. The numbers are built from your weekly records, so they match the Month-End file.'] }
+    'books-home': { title: 'How the Books Overview Works', sections: [
+      { h: 'What this page is', p: ['The Books overview: your back office at a glance. Books builds the files your accountant needs (Weekly P&L Brief, Month-End Books, Year-End Review) and tracks your permits, licenses, and operating expenses. This page rolls it all up from what you have logged, so the numbers match the Month-End file.'] },
+      { h: 'What you see', p: ['The tiles up top show this month\'s revenue net of comps, prime cost, year-to-date revenue, and how many permit renewals are due. The Current Month card is a mini P&L for the month so far. Recent Months lists the last several months, and the side panel shows Coming Due when a renewal is near, or your Year-to-Date bottom line when nothing is due.'] },
+      { h: 'How to use it', p: ['Use the Quick Actions to jump to Month-End Books, the Weekly P&L Brief, Year-End Review, or Operating Expenses. Books for Accountant on the Current Month card opens the month-end file. Everything here is read-only; the work happens on the pages it links to.'] }
     ] },
     'settings-home': { title: 'Settings', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
       { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
     ] },
-    'weekly-pnl': { title: 'Weekly P&L Brief', sections: [
+    'weekly-pnl': { title: 'How the Weekly P&L Brief Works', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books file.'] },
       { h: 'How to use it', p: ['Pick a range: the last completed week, the last four, the last thirteen for a quarter, year to date, all saved weeks, or a custom range. Click Download File to save it. What is in the file is listed on the page.'] },
       { h: 'Before you file', p: ['These numbers come from what you have logged. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.'] }
     ] },
-    'books': { title: 'Month-End Books', sections: [
+    'books': { title: 'How Month-End Books Works', sections: [
       { h: 'What this page is', p: ['Builds the month-end close: one Excel workbook plus a one-page owner summary PDF. It pulls every number together from what you already log, the accountant-grade deliverable behind the Books section.'] },
       { h: 'How to use it', p: ['Pick the month to close and click Generate File. The workbook holds an income statement (month and year to date), inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, and labor cost. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
       { h: 'Before you file', p: ['Bar Cop pulls these from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before you file anything or close the books.'] }
     ] },
-    'year-end': { title: 'Year-End Review', sections: [
-      { h: 'What this page is', p: ['The annual roll-up: your full year in one place for tax season and for your own read on how the year went.'] },
-      { h: 'How to use it', p: ['Pick the year, then Generate File for the annual workbook or Executive Summary for the PDF. It is built from the same logged data as your weekly and monthly numbers, so it ties out. What is in the file is listed on the page. Like everything in Books, hand it to your accountant to verify before filing.'] }
+    'year-end': { title: 'How the Year-End Review Works', sections: [
+      { h: 'What this page is', p: ['The annual roll-up: your full year in one place for tax season and for your own read on how the year went. It is built from the same logged data as your weekly and monthly numbers, so it ties out to the Month-End file.'] },
+      { h: 'How to use it', p: ['Pick the year, then Generate File for the annual workbook or Executive Summary for the PDF. What is in the file is listed on the page.'] },
+      { h: 'What is in it', p: ['The workbook holds an annual summary, a P&L by month, inventory valuation, a labor cost trend, the Form 8027 tip worksheet, a cash control summary, your audit history, and operational events. The PDF is a few-page executive read of the same year.'] },
+      { h: 'Before you file', p: ['These numbers come from what you have logged. It is a worksheet, not a filed tax return or audited statement. Hand it to your accountant to verify before you file anything or make a material decision.'] }
     ] },
-    'permits': { title: 'Permits and Licenses', sections: [
-      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its next renewal date and Bar Cop watches the calendar for you.'] },
-      { h: 'How the statuses work', p: ['A renewal more than 30 days out is Active. Within 30 days is Due Soon, within 14 is Critical, and once the date passes it is Overdue. Anything within 30 days or overdue also shows under Coming Due on the Books overview.'] },
+    'permits': { title: 'How Permits and Licenses Work', sections: [
+      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date, recurrence, and last cost, and Bar Cop watches the calendar for you.'] },
+      { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and under Coming Due on the Books overview. Use the chips to filter the list by status.'] },
+      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and enter the cost paid and the next renewal date (Bar Cop suggests it from the recurrence). That advances the renewal date and logs the cost to Operating Expenses under Licenses and Permits, so your bookkeeper does not enter it twice.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
-    'operating-expenses': { title: 'Operating Expenses', sections: [
-      { h: 'What this page is', p: ['Where you log the bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest, by category and month.'] },
-      { h: 'How to use it', p: ['Add each expense with its category, amount, and date, and log recurring bills each month. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
-      { h: 'Good to know', p: ['Duplicate a past bill to log a recurring one in two clicks. Export PDF saves the filtered list. Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
+    'operating-expenses': { title: 'How Operating Expenses Work', sections: [
+      { h: 'What this page is', p: ['Where you log the bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+      { h: 'Current vs History', p: ['Current shows this month and next month, each split into Recurring (fixed bills) and Variable (the ones that change). History has the full log by date range plus the by-category breakdown. Export PDF lives on both.'] },
+      { h: 'Recurring bills', p: ['Check Recurring on a fixed bill and set its term in months. Bar Cop logs it automatically each month through the term and warns you before the term ends; renew or change it from any of its entries. For bills that change each month, like utilities, use Duplicate to copy last month forward and set the new amount.'] },
+      { h: 'Importing', p: ['Switch the Add form to Import File and drop a CSV or Excel export. Map the columns once (date and amount are required), and the rows import; anything already logged is skipped.'] },
+      { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
     ] },
     'settings-profile': { title: 'Business Profile', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
