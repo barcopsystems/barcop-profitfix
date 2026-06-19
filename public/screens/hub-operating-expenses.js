@@ -30,6 +30,7 @@ S.HubOperatingExpenses = {
     'Other'
   ],
 
+  _tab:            'current',
   _filterCategory: 'all',
   _filterRange:    'this-month',
 
@@ -227,42 +228,147 @@ S.HubOperatingExpenses = {
   // ── Main render ────────────────────────────────────────────────────────
   renderMain() {
     this.catchUpRecurring();   // fill in any elapsed months for recurring bills
+    const tab = this._tab || 'current';
+    const tabBtn = (id, label) => '<button class="ch-tab' + (tab === id ? ' on' : '') + '" data-tab="' + id + '">' + label + '</button>';
+    const tabBar = '<div class="ch-tabs" style="margin-bottom:16px;">' + tabBtn('current', 'Current') + tabBtn('history', 'History') + '</div>';
+    const body = tab === 'history' ? this._renderHistory() : this._renderCurrent();
+    this.container.innerHTML = '<div class="screen">' + tabBar + body + '</div>';
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+
+    this.container.querySelectorAll('.ch-tab').forEach(t => {
+      t.addEventListener('click', () => { this._tab = t.dataset.tab; this.renderMain(); });
+    });
+    if (tab === 'history') this._wireHistory(); else this._wireCurrent();
+  },
+
+  _nextMonthKey(mk) {
+    const y = parseInt(mk.slice(0, 4), 10);
+    let m = parseInt(mk.slice(5, 7), 10) + 1, ny = y;
+    if (m > 12) { m = 1; ny = y + 1; }
+    return ny + '-' + String(m).padStart(2, '0');
+  },
+
+  // True when this entry's recurring series ends within ~2 months (or has ended).
+  _isSeriesEnding(r) {
+    const arr = this.records();
+    const p = r.recurring_parent ? arr.find(x => x.id === r.recurring_parent) : r;
+    if (!p || !p.recurring || !(parseInt(p.term_months, 10) > 0) || !p.date) return false;
+    const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
+    if (isNaN(s.getTime())) return false;
+    const now = new Date();
+    const endIdx = s.getFullYear() * 12 + s.getMonth() + parseInt(p.term_months, 10) - 1;
+    return (endIdx - (now.getFullYear() * 12 + now.getMonth())) <= 2;
+  },
+
+  _recurTag() {
+    return ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;white-space:nowrap;">Recurring</span>';
+  },
+
+  // One real-record row: Date, Category (+Recurring tag), Vendor, Amount, actions.
+  // Recurring rows have no Duplicate; they get Renew when the term is ending.
+  _logRowHtml(r) {
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const isRec = !!(r.recurring || r.recurring_parent);
+    let actions = '';
+    if (isRec) {
+      if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button> ';
+      actions += '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
+        + '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
+    } else {
+      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Duplicate</button> '
+        + '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
+        + '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
+    }
+    return '<tr>'
+      + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
+      + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag() : '') + '</td>'
+      + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
+      + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
+      + '<td class="no-print" style="text-align:right;white-space:nowrap;">' + actions + '</td>'
+      + '</tr>';
+  },
+
+  // Expected (not-yet-booked) recurring rows for a future month: a forecast only.
+  _expectedRecurring(monthKey) {
+    const arr = this.records();
+    const idx = parseInt(monthKey.slice(0, 4), 10) * 12 + (parseInt(monthKey.slice(5, 7), 10) - 1);
+    const out = [];
+    arr.filter(p => p.recurring && !p.recurring_parent && parseInt(p.term_months, 10) > 0 && p.date).forEach(p => {
+      const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
+      if (isNaN(s.getTime())) return;
+      const startIdx = s.getFullYear() * 12 + s.getMonth();
+      const endIdx = startIdx + parseInt(p.term_months, 10) - 1;
+      if (idx < startIdx || idx > endIdx) return;
+      if (arr.some(r => (r.id === p.id || r.recurring_parent === p.id) && String(r.date || '').slice(0, 7) === monthKey)) return;
+      out.push(p);
+    });
+    return out;
+  },
+
+  // One month's expenses as a data-card, split into Recurring and Variable.
+  // opts.next = the next-month card (recurring shows as Expected, not booked).
+  _monthCardHtml(monthKey, opts) {
+    opts = opts || {};
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const recs = this.records().filter(r => String(r.date || '').slice(0, 7) === monthKey);
+    const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''));
+    const recurring = recs.filter(r => r.recurring || r.recurring_parent).sort(byDate);
+    const variable  = recs.filter(r => !(r.recurring || r.recurring_parent)).sort(byDate);
+    const expected  = opts.next ? this._expectedRecurring(monthKey) : [];
+
+    const COLS = 5;
+    const labelRow = (txt) => '<tr><td colspan="' + COLS + '" style="background:var(--surface);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 12px;">' + txt + '</td></tr>';
+    const emptyRow = (txt) => '<tr><td colspan="' + COLS + '" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
+    const expectedRow = (p) => '<tr style="opacity:0.6;">'
+      + '<td style="color:var(--t3);white-space:nowrap;">Expected</td>'
+      + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
+      + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
+      + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
+      + '<td class="no-print"></td></tr>';
+
+    let body = labelRow('Recurring');
+    if (recurring.length || expected.length) {
+      body += recurring.map(r => this._logRowHtml(r)).join('') + expected.map(expectedRow).join('');
+    } else {
+      body += emptyRow('No recurring bills ' + (opts.next ? 'expected next month.' : 'this month.'));
+    }
+    body += labelRow('Variable');
+    body += variable.length ? variable.map(r => this._logRowHtml(r)).join('')
+      : emptyRow(opts.next ? 'Nothing logged for next month yet.' : 'No variable expenses logged this month yet.');
+
+    const heading = '<div class="sh" style="margin:24px 0 10px;">' + (opts.next ? 'Next Month' : 'This Month') + ' — ' + esc(this._monthLabel(monthKey)) + '</div>';
+    return heading + '<div class="card card-bleed data-card">'
+      + '<div class="card-bleed-tbl"><table class="tbl">'
+      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
+      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
+      +   '<tbody>' + body + '</tbody>'
+      + '</table></div></div>';
+  },
+
+  // ── Current tab: stats + add form + This Month / Next Month cards ─────────
+  _renderCurrent() {
     const mk = this._currentMonthKey();
-    const prevMk = this._priorMonthKey(mk);
     const monthTotal = this._sumMonth(mk);
     const ytdTotal   = this._sumYTD(mk);
-    const byCatMonth = this._sumMonthByCategory(mk);
-    const byCatLast  = this._sumMonthByCategory(prevMk);
-    const byCatYTD   = this._sumYTDByCategory(mk);
     const monthRev   = this._revenueForMonth(mk);
-    const ytdRev     = this._revenueYTD(mk);
     const monthOpExPct = monthRev > 0 ? (monthTotal / monthRev) : null;
-
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
 
-    // Stats strip — plain card + flex calc-items (calc-val lg).
-    const stat = (label, val) =>
-      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    const statsCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      +   stat('This Month', fmt$(monthTotal))
-      +   stat('Year to Date', fmt$(ytdTotal))
-      +   stat('OpEx % of Revenue', fmtPct(monthOpExPct))
+    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
+    const statsCard = '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + stat('This Month', fmt$(monthTotal)) + stat('Year to Date', fmt$(ytdTotal)) + stat('OpEx % of Revenue', fmtPct(monthOpExPct))
       + '</div></div>';
 
-    // Recurring terms ending soon (within ~2 months) or already ended.
     const warnBanner = this._termWarning();
 
-    // Inline Add Expense form on the page under the stats.
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
-    const dlOpts = this._vendorList().map(v => '<option value="' + esc(v) + '"></option>').join('');
     const addCard = '<div class="card form-card">'
       + '<div class="card-title">Add Expense</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
       +   '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
-      +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" list="oexa-vendor-list" placeholder="Who did you pay"/><datalist id="oexa-vendor-list">' + dlOpts + '</datalist></div>'
+      +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
       +   '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
       + '</div>'
       + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
@@ -275,11 +381,34 @@ S.HubOperatingExpenses = {
       + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
       + '</div>';
 
-    // By Category — current month, last month, YTD, YTD % of revenue.
+    return statsCard + warnBanner + addCard + addButtons
+      + this._monthCardHtml(mk, { next: false })
+      + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
+  },
+
+  _wireCurrent() {
+    document.getElementById('oexa-save')?.addEventListener('click', () => this._saveAdd());
+    document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
+    document.getElementById('oexa-recurring')?.addEventListener('change', (e) => {
+      const w = document.getElementById('oexa-term-wrap');
+      if (w) w.style.display = e.target.checked ? '' : 'none';
+    });
+    this._wireRows(this.container);
+  },
+
+  // ── History tab: By Category + the full filterable log + Export ──────────
+  _renderHistory() {
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
+    const mk = this._currentMonthKey();
+    const prevMk = this._priorMonthKey(mk);
+    const byCatMonth = this._sumMonthByCategory(mk);
+    const byCatLast  = this._sumMonthByCategory(prevMk);
+    const byCatYTD   = this._sumYTDByCategory(mk);
+    const ytdRev     = this._revenueYTD(mk);
+
     const catRows = this.CATEGORIES.map(c => {
-      const tm  = byCatMonth[c] || 0;
-      const lm  = byCatLast[c]  || 0;
-      const ytd = byCatYTD[c]   || 0;
+      const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
       const ytdRevPct = ytdRev > 0 ? (ytd / ytdRev) : null;
       const dim = (tm === 0 && lm === 0 && ytd === 0);
       return '<tr style="' + (dim ? 'opacity:0.55;' : '') + '">'
@@ -293,48 +422,9 @@ S.HubOperatingExpenses = {
     const byCatCard = '<div class="card card-bleed data-card">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<colgroup><col style="width:36%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>'
-      +   '<thead><tr>'
-      +     '<th>Category</th>'
-      +     '<th>This Month</th>'
-      +     '<th>Last Month</th>'
-      +     '<th>YTD</th>'
-      +     '<th>YTD % of Revenue</th>'
-      +   '</tr></thead>'
+      +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>YTD % of Revenue</th></tr></thead>'
       +   '<tbody>' + catRows + '</tbody>'
-      + '</table></div>'
-      + '</div>';
-
-    // Export PDF on a title-less row above the category card; exports the
-    // summary plus the detail log together.
-    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
-      + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + statsCard + warnBanner + addCard + addButtons + exportRow
-      + '<div id="oex-export-area">' + byCatCard + '<div id="oex-list-region"></div></div>'
-      + '</div>';
-    if (App.setHubTopbarActions) App.setHubTopbarActions('');
-
-    // Wire the inline add form + export; the chips + log re-render on their own.
-    document.getElementById('oexa-save')?.addEventListener('click', () => this._saveAdd());
-    document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
-    document.getElementById('oexa-recurring')?.addEventListener('change', (e) => {
-      const w = document.getElementById('oexa-term-wrap');
-      if (w) w.style.display = e.target.checked ? '' : 'none';
-    });
-    document.getElementById('oex-export')?.addEventListener('click', () => {
-      const el = document.getElementById('oex-export-area');
-      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
-    });
-    this._renderListRegion();
-  },
-
-  // Range filter chips + the data-card log. Re-rendered alone on a filter
-  // change so the inline Add form keeps any in-progress entry.
-  _renderListRegion() {
-    const region = document.getElementById('oex-list-region');
-    if (!region) return;
-    const fmt$ = (v) => App.fmtCurrency(v || 0);
+      + '</table></div></div>';
 
     const rangeChipOpts = [
       { v: 'this-month', label: 'This Month' },
@@ -344,52 +434,46 @@ S.HubOperatingExpenses = {
       { v: 'all',        label: 'All Time' }
     ];
     const rangeChips = App.filterChips(this._filterRange, rangeChipOpts);
-
     const recs = this._filteredRecords();
     const logRows = recs.length === 0
-      ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this view. Use the form above to add one.</td></tr>'
-      : recs.map(r => '<tr>'
-          + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
-          + '<td style="color:var(--t2);">' + esc(r.category || '') + ((r.recurring || r.recurring_parent) ? ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;white-space:nowrap;">Recurring</span>' : '') + '</td>'
-          + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
-          + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
-          + '<td class="no-print" style="text-align:right;white-space:nowrap;">'
-          +   '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
-          +   '<button class="btn btn-ghost btn-sm oex-dup"  data-id="' + esc(r.id) + '">Duplicate</button> '
-          +   '<button class="btn btn-ghost btn-sm oex-del"  data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>'
-          + '</td>'
-        + '</tr>').join('');
-
-    const rangeRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' + rangeChips + '</div>';
+      ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this range.</td></tr>'
+      : recs.map(r => this._logRowHtml(r)).join('');
     const logCard = '<div class="card card-bleed data-card" id="oex-log">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
-      +   '<colgroup><col style="width:13%"><col style="width:25%"><col style="width:26%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr>'
-      +     '<th>Date</th><th>Category</th><th>Vendor</th>'
-      +     '<th>Amount</th>'
-      +     '<th class="no-print"></th>'
-      +   '</tr></thead>'
+      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
+      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
-      + '</table></div>'
+      + '</table></div></div>';
+
+    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
       + '</div>';
+    const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + rangeChips + '</div>';
 
-    region.innerHTML = rangeRow + logCard;
+    return exportRow + '<div id="oex-export-area">'
+      + '<div class="sh" style="margin:0 0 10px;">By Category</div>' + byCatCard
+      + filterRow + logCard
+      + '</div>';
+  },
 
-    region.querySelectorAll('.fc-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._renderListRegion(); });
+  _wireHistory() {
+    document.getElementById('oex-export')?.addEventListener('click', () => {
+      const el = document.getElementById('oex-export-area');
+      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
     });
-    region.querySelectorAll('.oex-edit').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const rec = this.records().find(r => r.id === btn.dataset.id);
-        if (rec) this._openModal(rec);
-      });
+    this.container.querySelectorAll('.fc-chip').forEach(chip => {
+      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this.renderMain(); });
     });
-    region.querySelectorAll('.oex-dup').forEach(btn => {
-      btn.addEventListener('click', () => this._duplicate(btn.dataset.id));
-    });
-    region.querySelectorAll('.oex-del').forEach(btn => {
-      btn.addEventListener('click', () => this._delete(btn.dataset.id));
-    });
+    this._wireRows(this.container);
+  },
+
+  // Shared row-action wiring for both tabs.
+  _wireRows(scope) {
+    const openEdit = (b) => { const r = this.records().find(x => x.id === b.dataset.id); if (r) this._openModal(r); };
+    scope.querySelectorAll('.oex-edit').forEach(b => b.addEventListener('click', () => openEdit(b)));
+    scope.querySelectorAll('.oex-renew').forEach(b => b.addEventListener('click', () => openEdit(b)));
+    scope.querySelectorAll('.oex-dup').forEach(b => b.addEventListener('click', () => this._duplicate(b.dataset.id)));
+    scope.querySelectorAll('.oex-del').forEach(b => b.addEventListener('click', () => this._delete(b.dataset.id)));
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
@@ -441,7 +525,6 @@ S.HubOperatingExpenses = {
       amount: '',
       notes:  ''
     };
-    const dlOpts = this._vendorList().map(v => '<option value="' + esc(v) + '"></option>').join('');
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (rec.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     const id = 'oex-modal';
     // The recurring rule lives on the series parent, but it can be managed from
@@ -456,7 +539,7 @@ S.HubOperatingExpenses = {
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
       +   '<div class="f"><label>Category</label><select id="oex-f-cat">' + catOpts + '</select></div>'
-      +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" list="oex-f-vlist" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/><datalist id="oex-f-vlist">' + dlOpts + '</datalist></div>'
+      +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount ($)</label><input type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div>'
       + '</div>'
       + recurHtml
