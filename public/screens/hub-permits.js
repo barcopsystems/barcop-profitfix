@@ -131,23 +131,27 @@ S.HubPermits = {
 
     const fmt$ = (v) => App.fmtCurrency(v || 0, 0);
 
-    // Summary card
-    const summaryCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Permits and Licenses</div></div>'
-      +   '<button class="btn btn-primary btn-sm" id="hp-add">+ Add Permit</button>'
-      + '</div>'
-      + '<div class="calc">'
-      +   '<div class="calc-item"><div class="calc-label">Tracked</div><div class="calc-val">' + all.length + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">On Track</div><div class="calc-val ' + (activeCt > 0 ? 'good' : '') + '">' + activeCt + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Due in 30 Days</div><div class="calc-val" style="color:' + (dueSoonCt > 0 ? 'var(--gold)' : '') + ';">' + dueSoonCt + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Expired</div><div class="calc-val" style="color:' + (expiredCt > 0 ? 'var(--red)' : '') + ';">' + expiredCt + '</div></div>'
-      + '</div>'
+    // Stats strip — plain card + flex calc-items (calc-val lg), color = meaning.
+    const stat = (label, val, color) =>
+      '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div></div>';
+    const statsCard = '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      +   stat('Tracked', all.length)
+      +   stat('On Track', activeCt, activeCt > 0 ? 'var(--green)' : '')
+      +   stat('Due in 30 Days', dueSoonCt, dueSoonCt > 0 ? 'var(--gold)' : '')
+      +   stat('Expired', expiredCt, expiredCt > 0 ? 'var(--red)' : '')
+      + '</div></div>';
+
+    // Heads Up — legal disclaimer stays on the card (gold-tint, matches Books).
+    const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the renewal dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements, status, and deadlines with your issuing agency.</div>'
       + '</div>';
 
-    // Alerts card — only render if there are anything due/expired
+    // Needs Attention — only when something is due or expired.
     let alertsCard = '';
-    if (expiredCt + criticalCt + warnCt > 0) {
+    if (dueSoonCt + expiredCt > 0) {
       const flagged = all.map(r => ({ r, s: this._status(r) }))
         .filter(x => x.s.key === 'expired' || x.s.key === 'critical' || x.s.key === 'warn');
       const rank = { expired: 0, critical: 1, warn: 2 };
@@ -155,54 +159,57 @@ S.HubPermits = {
       const alertRows = flagged.map(({ r, s }) => {
         return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:flex-start;">'
           + '<div style="width:8px;height:8px;border-radius:50%;background:' + s.color + ';flex-shrink:0;margin-top:6px;"></div>'
-          + '<div style="flex:1;">'
+          + '<div style="flex:1;min-width:0;">'
           +   '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + esc(r.name || '(unnamed)') + '</div>'
           +   '<div style="font-size:11px;color:var(--t3);">' + esc(r.type || '') + (r.type ? ' · ' : '') + esc(s.label) + (r.cost ? ' · Last paid ' + fmt$(r.cost) : '') + '</div>'
           + '</div>'
-          + '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '" style="flex-shrink:0;font-size:10px;padding:5px 10px;">Mark Renewed</button>'
+          + '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '" style="flex-shrink:0;">Mark Renewed</button>'
           + '</div>';
       }).join('');
-      alertsCard = '<div class="card" style="margin-bottom:16px;">'
+      alertsCard = '<div class="card form-card" style="margin-bottom:16px;">'
         + '<div class="card-title">Needs Attention</div>'
         + alertRows
         + '</div>';
     }
 
-    // Filter + list table
-    const filterOpts = [
-      ['all',     'All Permits (' + all.length + ')'],
-      ['due',     'Due in 30 Days (' + dueSoonCt + ')'],
-      ['expired', 'Expired (' + expiredCt + ')'],
-      ['active',  'On Track (' + activeCt + ')']
-    ].map(([v, l]) => '<option value="' + v + '"' + (this._filter === v ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
+    // Filter chips + data-card list.
+    const chipOpts = [
+      { v: 'all',     label: 'All (' + all.length + ')' },
+      { v: 'due',     label: 'Due in 30 Days (' + dueSoonCt + ')' },
+      { v: 'expired', label: 'Expired (' + expiredCt + ')' },
+      { v: 'active',  label: 'On Track (' + activeCt + ')' }
+    ];
+    const chips = App.filterChips(this._filter, chipOpts);
 
     const recs = this._filtered();
     const logRows = recs.length === 0
       ? '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">' + (all.length === 0
-          ? 'No permits logged yet. Use + Add Permit to track your first one.'
+          ? 'No permits logged yet. Use Add Permit to track your first one.'
           : 'No permits match this filter.') + '</td></tr>'
       : recs.map(r => {
           const s = this._status(r);
           return '<tr>'
-            + '<td style="padding:8px 10px;color:var(--t1);">' + esc(r.name || '') + '</td>'
-            + '<td style="padding:8px 10px;color:var(--t2);font-size:11px;">' + esc(r.type || '') + '</td>'
-            + '<td style="padding:8px 10px;color:var(--t2);white-space:nowrap;">' + this._fmtDate(r.renewal_date) + '</td>'
-            + '<td style="padding:8px 10px;color:var(--t3);font-size:11px;">' + esc(r.recurrence || '') + '</td>'
-            + '<td style="padding:8px 10px;text-align:right;color:var(--t2);">' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
-            + '<td style="padding:8px 10px;font-size:11px;font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
-            + '<td style="padding:8px 10px;text-align:right;white-space:nowrap;">'
-            +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '" style="font-size:10px;padding:3px 9px;">Mark Renewed</button> '
-            +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '" style="font-size:10px;padding:3px 9px;">Edit</button> '
-            +   '<button class="btn btn-ghost btn-sm hp-del"  data-id="' + esc(r.id) + '" style="font-size:10px;padding:3px 9px;color:var(--red);">Delete</button>'
+            + '<td style="color:var(--t1);">' + esc(r.name || '') + '</td>'
+            + '<td style="color:var(--t2);">' + esc(r.type || '') + '</td>'
+            + '<td style="white-space:nowrap;">' + this._fmtDate(r.renewal_date) + '</td>'
+            + '<td style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
+            + '<td style="text-align:right;">' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
+            + '<td style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
+            + '<td style="text-align:right;white-space:nowrap;">'
+            +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button> '
+            +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button> '
+            +   '<button class="btn btn-ghost btn-sm hp-del"  data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>'
             + '</td>'
           + '</tr>';
         }).join('');
-    const listCard = '<div class="card">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">'
-      +   '<div class="card-title" style="margin:0;">Permit Log</div>'
-      +   '<select id="hp-filter" style="font-size:12px;padding:5px 8px;">' + filterOpts + '</select>'
-      + '</div>'
-      + '<div class="tbl-wrap"><table class="tbl">'
+
+    const headingRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Permit Log</div>'
+      + '<button class="btn btn-primary btn-sm" id="hp-add">+ Add Permit</button>'
+      + '</div>';
+    const chipsRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' + chips + '</div>';
+    const listCard = '<div class="card card-bleed data-card">'
+      + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<thead><tr>'
       +     '<th>Name</th><th>Type</th><th>Renewal Date</th><th>Recurrence</th>'
       +     '<th style="text-align:right;">Last Cost</th>'
@@ -212,19 +219,13 @@ S.HubPermits = {
       + '</table></div>'
       + '</div>';
 
-    const disclaimerCard = '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads up</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the renewal dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements, status, and deadlines with your issuing agency.</div>'
-      + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + summaryCard + disclaimerCard + alertsCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + headsUp + alertsCard + headingRow + chipsRow + listCard + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     // Wire
     document.getElementById('hp-add')?.addEventListener('click', () => this._openModal(null));
-    document.getElementById('hp-filter')?.addEventListener('change', (e) => {
-      this._filter = e.target.value;
-      this.renderMain();
+    this.container.querySelectorAll('.fc-chip').forEach(chip => {
+      chip.addEventListener('click', () => { this._filter = chip.dataset.v; this.renderMain(); });
     });
     this.container.querySelectorAll('.hp-edit').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -258,81 +259,56 @@ S.HubPermits = {
     };
     const typeOpts  = this.TYPES.map(t => '<option value="' + esc(t) + '"' + (rec.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const recurOpts = this.RECURRENCES.map(r => '<option value="' + esc(r) + '"' + (rec.recurrence === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
+    const id = 'hp-modal';
 
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;">' + (isEdit ? 'Edit Permit' : 'Add Permit') + '</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">' + (isEdit ? 'Edit Permit' : 'Add Permit') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="flex:1;min-width:240px;"><label>Name</label><input type="text" id="hp-f-name" value="' + esc(rec.name) + '" placeholder="State Liquor License"/></div>'
-      +   '<div class="f" style="width:200px;"><label>Type</label><select id="hp-f-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="width:100%;"><label>Name</label><input type="text" id="hp-f-name" value="' + esc(rec.name) + '" placeholder="Texas Mixed Beverage Permit"/></div>'
+      +   '<div class="f"><label>Type</label><select id="hp-f-type">' + typeOpts + '</select></div>'
+      +   '<div class="f"><label>Recurrence</label><select id="hp-f-recurrence">' + recurOpts + '</select></div>'
+      +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
+      +   '<div class="f"><label>Last Renewed</label><input type="date" id="hp-f-last" value="' + esc(rec.last_renewed || '') + '"/></div>'
+      +   '<div class="f"><label>Last Cost ($)</label><input type="number" id="hp-f-cost" step="0.01" min="0" value="' + esc(rec.cost === '' ? '' : String(rec.cost || '')) + '" placeholder="0.00"/></div>'
+      +   '<div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hp-f-notes" placeholder="Issuing agency, account number, contact">' + esc(rec.notes || '') + '</textarea></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<div class="f" style="width:180px;"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
-      +   '<div class="f" style="width:150px;"><label>Recurrence</label><select id="hp-f-recurrence">' + recurOpts + '</select></div>'
-      +   '<div class="f" style="width:140px;"><label>Last Cost ($)</label><input type="number" id="hp-f-cost" step="0.01" min="0" value="' + esc(rec.cost === '' ? '' : String(rec.cost || '')) + '" placeholder="0.00"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<div class="f" style="width:180px;"><label>Last Renewed</label><input type="date" id="hp-f-last" value="' + esc(rec.last_renewed || '') + '"/></div>'
-      +   '<div class="f" style="flex:1;min-width:240px;"><label>Notes</label><input type="text" id="hp-f-notes" value="' + esc(rec.notes || '') + '" placeholder="Issuing agency, account number, contact"/></div>'
-      + '</div>'
-      + '<div id="hp-f-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
-      + '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:20px;">'
-      +   '<div>' + (isEdit ? '<button class="btn btn-ghost" data-act="delete" style="color:var(--red);">Delete</button>' : '') + '</div>'
-      +   '<div style="display:flex;gap:10px;">'
-      +     '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
-      +     '<button class="btn btn-primary" data-act="save">' + (isEdit ? 'Save Changes' : 'Add Permit') + '</button>'
-      +   '</div>'
-      + '</div>'
-      + '</div>';
-    document.body.appendChild(overlay);
-    const close = () => document.body.removeChild(overlay);
-    const showErr = (m) => { const e = document.getElementById('hp-f-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
+      + '<div class="card-actions">'
+      +   '<button class="btn btn-primary" id="hp-save">' + (isEdit ? 'Save Changes' : 'Add Permit') + '</button>'
+      +   '<button class="btn btn-ghost" id="hp-cancel">Cancel</button>'
+      +   '<span id="hp-f-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
+      +   (isEdit ? '<button class="btn btn-ghost" id="hp-modal-del" style="margin-left:auto;color:var(--red);">Delete</button>' : '')
+      + '</div></div>';
+    App.openModal(html, { id, maxWidth: 540, noClose: true });
+    const showErr = (m) => { const e = document.getElementById('hp-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
-    overlay.addEventListener('click', async (ev) => {
-      const act = ev.target.closest('[data-act]')?.dataset.act;
-      if (!act) {
-        if (ev.target === overlay) close();
-        return;
+    document.getElementById('hp-cancel')?.addEventListener('click', () => App.closeModal(id));
+    if (isEdit) document.getElementById('hp-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
+    document.getElementById('hp-save')?.addEventListener('click', async () => {
+      const name         = (document.getElementById('hp-f-name')?.value || '').trim();
+      const type         = document.getElementById('hp-f-type')?.value || 'Other';
+      const renewal_date = document.getElementById('hp-f-renewal')?.value || '';
+      const recurrence   = document.getElementById('hp-f-recurrence')?.value || 'Annual';
+      const costRaw      = document.getElementById('hp-f-cost')?.value;
+      const cost         = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
+      const last_renewed = document.getElementById('hp-f-last')?.value || '';
+      const notes        = (document.getElementById('hp-f-notes')?.value || '').trim();
+      if (!name) { showErr('Give the permit a name.'); return; }
+      if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
+      const arr = this.records();
+      if (isEdit) {
+        const idx = arr.findIndex(r => r.id === rec.id);
+        if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], { name, type, renewal_date, recurrence, cost, last_renewed, notes });
+      } else {
+        arr.push({
+          id:         App.uid ? App.uid() : ('prm-' + Date.now()),
+          name, type, renewal_date, recurrence, cost, last_renewed, notes,
+          created_at: new Date().toISOString()
+        });
       }
-      if (act === 'cancel') { close(); return; }
-      if (act === 'delete') {
-        close();
-        if (isEdit) await this._delete(rec.id);
-        return;
-      }
-      if (act === 'save') {
-        const name         = (document.getElementById('hp-f-name')?.value || '').trim();
-        const type         = document.getElementById('hp-f-type')?.value || 'Other';
-        const renewal_date = document.getElementById('hp-f-renewal')?.value || '';
-        const recurrence   = document.getElementById('hp-f-recurrence')?.value || 'Annual';
-        const costRaw      = document.getElementById('hp-f-cost')?.value;
-        const cost         = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
-        const last_renewed = document.getElementById('hp-f-last')?.value || '';
-        const notes        = (document.getElementById('hp-f-notes')?.value || '').trim();
-        if (!name) { showErr('Give the permit a name.'); return; }
-        if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
-        const arr = this.records();
-        if (isEdit) {
-          const idx = arr.findIndex(r => r.id === rec.id);
-          if (idx >= 0) {
-            arr[idx] = Object.assign({}, arr[idx], { name, type, renewal_date, recurrence, cost, last_renewed, notes });
-          }
-        } else {
-          arr.push({
-            id:         App.uid ? App.uid() : ('prm-' + Date.now()),
-            name, type, renewal_date, recurrence, cost, last_renewed, notes,
-            created_at: new Date().toISOString()
-          });
-        }
-        await App.saveKey('permits_compliance');
-        close();
-        this.renderMain();
-      }
+      await App.saveKey('permits_compliance');
+      App.closeModal(id);
+      this.renderMain();
     });
-
-    const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
   },
 
   // ── Mark Renewed modal ─────────────────────────────────────────────────
@@ -342,73 +318,60 @@ S.HubPermits = {
   _openRenewModal(rec) {
     const today = App.todayLocal();
     const suggestedNext = this._nextRenewal(today, rec.recurrence) || rec.renewal_date || '';
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:480px;width:100%;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Mark Renewed</div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.6;">Logging this advances the renewal date and creates an Operating Expenses entry under Licenses and Permits for the cost paid. Edit any field before saving.</div>'
+    const id = 'hp-renew-modal';
+
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">Mark Renewed</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '. This advances the renewal date and logs the cost paid as an Operating Expenses entry under Licenses and Permits.</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="width:160px;"><label>Renewed On</label><input type="date" id="hp-r-renewed" value="' + today + '"/></div>'
-      +   '<div class="f" style="width:140px;"><label>Cost Paid ($)</label><input type="number" id="hp-r-cost" step="0.01" min="0" value="' + esc(rec.cost == null ? '' : String(rec.cost)) + '" placeholder="0.00"/></div>'
-      +   '<div class="f" style="width:160px;"><label>Next Renewal Date</label><input type="date" id="hp-r-next" value="' + esc(suggestedNext) + '"/></div>'
+      +   '<div class="f"><label>Renewed On</label><input type="date" id="hp-r-renewed" value="' + today + '"/></div>'
+      +   '<div class="f"><label>Cost Paid ($)</label><input type="number" id="hp-r-cost" step="0.01" min="0" value="' + esc(rec.cost == null ? '' : String(rec.cost)) + '" placeholder="0.00"/></div>'
+      +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-r-next" value="' + esc(suggestedNext) + '"/></div>'
       + '</div>'
-      + '<div id="hp-r-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
-      + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">'
-      +   '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
-      +   '<button class="btn btn-primary" data-act="confirm">Log Renewal</button>'
-      + '</div>'
-      + '</div>';
-    document.body.appendChild(overlay);
-    const close = () => document.body.removeChild(overlay);
-    const showErr = (m) => { const e = document.getElementById('hp-r-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
+      + '<div class="card-actions">'
+      +   '<button class="btn btn-primary" id="hp-r-go">Log Renewal</button>'
+      +   '<button class="btn btn-ghost" id="hp-r-cancel">Cancel</button>'
+      +   '<span id="hp-r-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id, maxWidth: 540, noClose: true });
+    const showErr = (m) => { const e = document.getElementById('hp-r-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
-    overlay.addEventListener('click', async (ev) => {
-      const act = ev.target.closest('[data-act]')?.dataset.act;
-      if (!act) {
-        if (ev.target === overlay) close();
-        return;
+    document.getElementById('hp-r-cancel')?.addEventListener('click', () => App.closeModal(id));
+    document.getElementById('hp-r-go')?.addEventListener('click', async () => {
+      const renewedOn = document.getElementById('hp-r-renewed')?.value || '';
+      const nextRen   = document.getElementById('hp-r-next')?.value || '';
+      const costRaw   = document.getElementById('hp-r-cost')?.value;
+      const cost      = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
+      if (!renewedOn) { showErr('Pick the renewed-on date.'); return; }
+      if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
+      // 1. Update the permit
+      const arr = this.records();
+      const idx = arr.findIndex(r => r.id === rec.id);
+      if (idx >= 0) {
+        arr[idx] = Object.assign({}, arr[idx], {
+          last_renewed: renewedOn,
+          renewal_date: nextRen || arr[idx].renewal_date,
+          cost: cost != null ? cost : arr[idx].cost
+        });
+        await App.saveKey('permits_compliance');
       }
-      if (act === 'cancel') { close(); return; }
-      if (act === 'confirm') {
-        const renewedOn = document.getElementById('hp-r-renewed')?.value || '';
-        const nextRen   = document.getElementById('hp-r-next')?.value || '';
-        const costRaw   = document.getElementById('hp-r-cost')?.value;
-        const cost      = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
-        if (!renewedOn) { showErr('Pick the renewed-on date.'); return; }
-        if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
-        // 1. Update the permit
-        const arr = this.records();
-        const idx = arr.findIndex(r => r.id === rec.id);
-        if (idx >= 0) {
-          arr[idx] = Object.assign({}, arr[idx], {
-            last_renewed: renewedOn,
-            renewal_date: nextRen || arr[idx].renewal_date,
-            cost: cost != null ? cost : arr[idx].cost
-          });
-          await App.saveKey('permits_compliance');
-        }
-        // 2. Auto-create the Operating Expenses entry if a cost was paid
-        if (cost != null && cost > 0) {
-          if (!Array.isArray(App.data.operating_expenses)) App.data.operating_expenses = [];
-          App.data.operating_expenses.push({
-            id:         App.uid ? App.uid() : ('oex-' + Date.now()),
-            date:       renewedOn,
-            category:   'Licenses and Permits',
-            vendor:     rec.type || '',
-            amount:     cost,
-            notes:      'From Permits Log: ' + (rec.name || 'permit') + ' renewal',
-            created_at: new Date().toISOString()
-          });
-          await App.saveKey('operating_expenses');
-        }
-        close();
-        this.renderMain();
+      // 2. Auto-create the Operating Expenses entry if a cost was paid
+      if (cost != null && cost > 0) {
+        if (!Array.isArray(App.data.operating_expenses)) App.data.operating_expenses = [];
+        App.data.operating_expenses.push({
+          id:         App.uid ? App.uid() : ('oex-' + Date.now()),
+          date:       renewedOn,
+          category:   'Licenses and Permits',
+          vendor:     rec.type || '',
+          amount:     cost,
+          notes:      'From Permits Log: ' + (rec.name || 'permit') + ' renewal',
+          created_at: new Date().toISOString()
+        });
+        await App.saveKey('operating_expenses');
       }
+      App.closeModal(id);
+      this.renderMain();
     });
-
-    const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
   },
 
   // ── Delete ─────────────────────────────────────────────────────────────
