@@ -21,13 +21,8 @@ S.HubBooksHome = {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     const weeks = (App.data && App.data.weeks) || [];
 
-    const head = '<div style="margin-bottom:20px;">'
-      + '<div style="font-size:22px;font-weight:800;color:var(--w);letter-spacing:0.3px;">Books</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">Your back office. The month your accountant needs, plus what is coming due.</div>'
-      + '</div>';
-
     if (!weeks.length) {
-      mount.innerHTML = '<div class="screen">' + head + this._dayOne() + '</div>';
+      mount.innerHTML = '<div class="screen">' + this._dayOne() + '</div>';
       this._wire();
       return;
     }
@@ -60,12 +55,12 @@ S.HubBooksHome = {
     }
     const dueCount = due.length;
 
-    // ── KPI tiles ──
-    const tiles = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;">'
-      + this._tile(monthName + ' Revenue', this._money(netRev), 'Net of comps')
-      + this._tile('Prime Cost', this._pct(primePct), 'COGS plus labor')
-      + this._tile('Year to Date Revenue', this._money(ytdNet), 'Through ' + monthName)
-      + this._tile('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', dueCount ? 'var(--amber)' : null)
+    // ── KPI tiles (standard metric grid) ──
+    const tiles = '<div class="metric-grid">'
+      + this._metric(monthName + ' Revenue', this._money(netRev), 'Net of comps')
+      + this._metric('Prime Cost', this._pct(primePct), 'COGS plus labor')
+      + this._metric('Year to Date Revenue', this._money(ytdNet), 'Through ' + monthName)
+      + this._metric('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', dueCount ? 'over-target' : '')
       + '</div>';
 
     // ── Hero band — the latest month's mini P&L + accountant CTA ──
@@ -76,7 +71,7 @@ S.HubBooksHome = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px;">'
       +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">' + esc(monthName) + '</div>'
       +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">Your latest month, rolled up from what you logged.</div></div>'
-      +   '<button class="btn btn-primary" data-act="books">Books for Your Accountant</button>'
+      +   '<button class="btn btn-ghost" data-act="books">Books for Your Accountant</button>'
       + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;">'
       +   fig('Revenue', this._money(netRev)) + fig('COGS', this._money(cogs)) + fig('Labor', this._money(labor))
@@ -116,22 +111,22 @@ S.HubBooksHome = {
       + monthsPanel + duePanel + '</div>';
 
     // ── Quick actions ──
-    const qa = (act, label) => '<button class="btn btn-ghost" data-act="' + act + '">' + label + '</button>';
+    const qa = (act, label) => '<button class="btn btn-primary" data-act="' + act + '" style="flex:1;min-width:150px;">' + label + '</button>';
     const quick = '<div class="sh" style="margin:0 0 8px;">Quick Actions</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
       +   qa('books', 'Month-End Books') + qa('weekly-pnl', 'Weekly P&amp;L Brief') + qa('year-end', 'Year-End Review')
-      +   qa('operating-expenses', 'Operating Expenses') + qa('permits', 'Permits and Licenses')
+      +   qa('operating-expenses', 'Operating Expenses')
       + '</div>';
 
-    mount.innerHTML = '<div class="screen">' + head + tiles + hero + panelRow + quick + '</div>';
+    mount.innerHTML = '<div class="screen">' + tiles + hero + panelRow + quick + '</div>';
     this._wire();
   },
 
-  _tile(label, val, sub, color) {
-    return '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:16px 18px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">' + esc(label) + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:700;color:' + (color || 'var(--w)') + ';line-height:1;">' + val + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:5px;">' + esc(sub) + '</div></div>';
+  _metric(label, val, target, cls) {
+    return '<div class="metric-card"><div class="metric-label">' + esc(label) + '</div>'
+      + '<div class="metric-val' + (cls ? ' ' + cls : '') + '">' + val + '</div>'
+      + '<div class="metric-target">' + (target ? esc(target) : '&nbsp;') + '</div>'
+      + '<div class="metric-trend">&nbsp;</div></div>';
   },
 
   _dayOne() {
