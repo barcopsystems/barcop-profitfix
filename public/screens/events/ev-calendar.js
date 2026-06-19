@@ -46,25 +46,72 @@ S.EventsCalendar = {
 
   clDone(cl) { return ['menu', 'promo', 'staffing', 'reservations'].filter(k => (cl || {})[k]).length; },
 
+  // ── Recognized holidays (shown automatically every year; tap one to plan it) ──
+  FIXED_HOLIDAYS: [
+    [1, 1, "New Year's Day"], [2, 14, "Valentine's Day"], [3, 17, "St. Patrick's Day"],
+    [5, 5, 'Cinco de Mayo'], [7, 4, 'Independence Day'], [10, 31, 'Halloween'],
+    [12, 24, 'Christmas Eve'], [12, 25, 'Christmas Day'], [12, 31, "New Year's Eve"]
+  ],
+  _nthWeekday(y, mo0, wd, n) {
+    const first = new Date(y, mo0, 1);
+    const offset = (wd - first.getDay() + 7) % 7;
+    return this.ymd(y, mo0, 1 + offset + (n - 1) * 7);
+  },
+  _lastWeekday(y, mo0, wd) {
+    const lastDate = new Date(y, mo0 + 1, 0).getDate();
+    const last = new Date(y, mo0, lastDate);
+    return this.ymd(y, mo0, lastDate - ((last.getDay() - wd + 7) % 7));
+  },
+  _easter(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4,
+      f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+      i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
+      mm = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * mm + 114) / 31),
+      day = ((h + l - 7 * mm + 114) % 31) + 1;
+    return this.ymd(y, mo - 1, day);
+  },
+  holidaysForYear(y) {
+    const list = this.FIXED_HOLIDAYS.map(([mo, d, name]) => ({ date: this.ymd(y, mo - 1, d), name }));
+    list.push({ date: this._easter(y), name: 'Easter' });
+    list.push({ date: this._nthWeekday(y, 4, 0, 2), name: "Mother's Day" });   // 2nd Sunday, May
+    list.push({ date: this._lastWeekday(y, 4, 1), name: 'Memorial Day' });      // last Monday, May
+    list.push({ date: this._nthWeekday(y, 5, 0, 3), name: "Father's Day" });    // 3rd Sunday, June
+    list.push({ date: this._nthWeekday(y, 8, 1, 1), name: 'Labor Day' });       // 1st Monday, September
+    list.push({ date: this._nthWeekday(y, 10, 4, 4), name: 'Thanksgiving' });   // 4th Thursday, November
+    return list;
+  },
+  holidaysForMonth(y, m) {
+    return this.holidaysForYear(y).filter(h => { const d = new Date(h.date + 'T00:00:00'); return d.getFullYear() === y && d.getMonth() === m; });
+  },
+
   draw() {
     const y = this._y, m = this._m, today = App.todayLocal();
     const map = this.itemsByDate();
+    // Recognized holidays, auto-shown, unless you've already added your own date that day.
+    this.holidaysForMonth(y, m).forEach(h => {
+      if ((map[h.date] || []).some(it => it.kind === 'date')) return;
+      (map[h.date] = map[h.date] || []).push({ kind: 'holiday', date: h.date, label: h.name });
+    });
     const startDow = new Date(y, m, 1).getDay();
     const daysIn = new Date(y, m + 1, 0).getDate();
 
-    const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      +   '<button class="btn btn-ghost btn-sm" id="evc-prev">&#8249;</button>'
-      +   '<div style="font-size:15px;font-weight:700;color:var(--t1);min-width:160px;text-align:center;">' + esc(this.monthLabel(y, m)) + '</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="evc-next">&#8250;</button>'
-      +   '<button class="btn btn-ghost btn-sm" id="evc-today">This Month</button>'
-      + '</div>'
-      + '<button class="btn btn-primary btn-sm" id="evc-add">Add Date</button>'
+    // Month chip styled like the week stepper: gold-tint on the current month, neutral otherwise.
+    const t = new Date(today + 'T00:00:00');
+    const isCurMonth = (y === t.getFullYear() && m === t.getMonth());
+    const monthChip = '<div style="display:inline-flex;align-items:center;justify-content:center;min-width:150px;padding:7px 14px;border-radius:var(--r2);font-size:13px;font-weight:700;'
+      + (isCurMonth ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(this.monthLabel(y, m)) + '</div>';
+    const headRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;">'
+      + '<button class="btn btn-ghost btn-sm" id="evc-prev">&#8249;</button>'
+      + monthChip
+      + '<button class="btn btn-ghost btn-sm" id="evc-next">&#8250;</button>'
+      + '<button class="btn btn-ghost btn-sm" id="evc-today">This Month</button>'
       + '</div>';
 
-    const chipHtml = it => it.kind === 'booking'
-      ? '<div class="evcal-chip evcal-booking" data-go="booking" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + '</div>'
-      : '<div class="evcal-chip evcal-date" data-go="date" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + ' <span style="opacity:0.7;">' + this.clDone(it.cl) + '/4</span></div>';
+    const chipHtml = it => {
+      if (it.kind === 'booking') return '<div class="evcal-chip evcal-booking" data-go="booking" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + '</div>';
+      if (it.kind === 'holiday') return '<div class="evcal-chip evcal-holiday" data-go="holiday" data-date="' + esc(it.date) + '" data-name="' + esc(it.label) + '" title="' + esc(it.label) + ' (tap to plan)">' + esc(it.label) + '</div>';
+      return '<div class="evcal-chip evcal-date" data-go="date" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + ' <span style="opacity:0.7;">' + this.clDone(it.cl) + '/4</span></div>';
+    };
 
     // Desktop grid
     const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -86,7 +133,9 @@ S.EventsCalendar = {
       ? '<div style="color:var(--t3);font-size:13px;padding:10px 2px;">Nothing on the calendar this month. Add a date or book an event.</div>'
       : agendaDays.map(([ds, d, items]) => '<div class="card" style="margin-bottom:8px;"><div style="font-weight:700;color:var(--t1);margin-bottom:6px;">' + monShort + ' ' + d + (ds === today ? ' &middot; Today' : '') + '</div>' + items.map(chipHtml).join('') + '</div>').join('')) + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + headRow + grid + agenda + '</div>';
+    this.container.innerHTML = '<div class="screen">' + headRow + grid + agenda
+      + '<div style="margin:16px 0 24px;"><button class="btn btn-primary" id="evc-add">Add New Date</button></div>'
+      + '</div>';
     this.wire();
   },
 
@@ -98,6 +147,7 @@ S.EventsCalendar = {
     this.container.querySelectorAll('.evcal-chip').forEach(ch => ch.addEventListener('click', ev => {
       ev.stopPropagation();
       if (ch.dataset.go === 'booking') { App._evBookingFocus = ch.dataset.id; App.navigate('ev-bookings'); }
+      else if (ch.dataset.go === 'holiday') this.showForm(null, ch.dataset.date, ch.dataset.name, 'Holiday');
       else this.showForm(ch.dataset.id, null);
     }));
     this.container.querySelectorAll('.evcal-cell[data-day]').forEach(c => c.addEventListener('click', ev => {
@@ -106,16 +156,16 @@ S.EventsCalendar = {
     }));
   },
 
-  showForm(id, presetDate) {
+  showForm(id, presetDate, presetName, presetType) {
     const e = id ? this.entries().find(x => x.id === id) : null;
     const cl = (e && e.checklist) || {};
-    const typeOpts = '<option value="">-</option>' + this.TYPES.map(t => '<option' + (e && e.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + '/> ' + label + '</label>';
+    const typeOpts = '<option value="">Select type...</option>' + this.TYPES.map(t => '<option' + (((e && e.type === t) || (!e && presetType === t)) ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> ' + label + '</label>';
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (id ? 'Edit Date' : 'Add a Date') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f"><label>Date</label><input type="date" id="evcf-date" value="' + esc(e?.date || presetDate || '') + '"/></div>'
-        + '<div class="f"><label>Name</label><input type="text" id="evcf-name" value="' + esc(e?.name || '') + '" placeholder="Valentine\'s Day"/></div>'
+        + '<div class="f"><label>Name</label><input type="text" id="evcf-name" value="' + esc(e?.name || presetName || '') + '" placeholder="Valentine\'s Day"/></div>'
         + '<div class="f"><label>Type</label><select id="evcf-type" class="form-input">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="sh" style="margin:6px 0 4px;">Planning Checklist</div>'
@@ -158,10 +208,11 @@ S.EventsCalendar = {
 
   showHowTo() {
     App.showHelpModal('How the Calendar Works', [
-      { p: ['One month view of everything that fills the room. Your booked events show automatically on their event date. The holidays and local dates you plan around you add yourself, each with a four-step planning checklist.'] },
-      { h: 'Moving Around', p: ['Step months with the arrows or jump back with This Month. Today is highlighted. On a phone the grid becomes a simple agenda list of the days that have something on them.'] },
-      { h: 'Booked Events', p: ['Every booking marked Booked or Completed appears on its event date. Tap it to open the booking and work it.'] },
-      { h: 'Planning Dates', p: ['Add Date drops a holiday, local event, big game, or promotion onto the calendar. The checklist (menu locked, promo created, staffing scheduled, reservations open) shows how ready you are, like 2 of 4. This is the screen you open once a month to see what is coming before it is too late to plan for it.'] }
+      { p: ['One month view of everything that fills the room: your booked events on their dates, the recognized holidays Bar Cop already knows, and the local dates you add yourself.'] },
+      { h: 'Moving Around', p: ['Step months with the arrows, or jump back with This Month. The current month is tagged gold and today is highlighted. On a phone the grid becomes an agenda list of the days that have something on them.'] },
+      { h: 'Booked Events', p: ['Every booking marked Booked or Completed shows on its event date. Tap it to open the booking.'] },
+      { h: 'Holidays', p: ['The big ones show up every year on their own: New Year\'s, Valentine\'s, St. Patrick\'s, Cinco de Mayo, Mother\'s and Father\'s Day, the Fourth, Halloween, Thanksgiving, Christmas, New Year\'s Eve, and more. Tap one to drop it onto your calendar with a planning checklist.'] },
+      { h: 'Planning Dates', p: ['Add New Date, below the calendar, drops a local event, big game, or promotion onto a day. The checklist (menu locked, promo created, staffing scheduled, reservations open) shows how ready you are, like 2 of 4, so a big date never sneaks up half-planned.'] }
     ]);
   }
 };
