@@ -149,35 +149,42 @@ S.EventsBookings = {
   // Light lead capture: who / what / when. Cost and P&L numbers come later, at
   // the Completed stage. `p` is the id prefix so the inline form and the edit
   // popup never collide.
-  fieldsHtml(b, p) {
+  fieldsHtml(b, p, compact) {
     const today = App.todayLocal();
     const typeOpts = '<option value="">-</option>' + this.EVENT_TYPES.map(t => '<option' + (b && b.event_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const srcOpts = '<option value="">-</option>' + this.SOURCES.map(s => '<option' + (b && b.source === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const stageOpts = this.STAGES.map(s => '<option' + ((b && b.stage === s) || (!(b && b.stage) && s === 'Lead') ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
     const regOpts = '<option value="">-</option>' + this.regulars().map(r => '<option value="' + esc(r.id) + '"' + (b && b.regular_id === r.id ? ' selected' : '') + '>' + esc(r.name || '') + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
-    return '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div></div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f"><label>Contact Name</label><input type="text" id="' + p + '-cname" value="' + esc(b?.contact_name || '') + '" placeholder="Jen Mitchell"/></div>'
-        + '<div class="f"><label>Phone</label><input type="tel" id="' + p + '-phone" value="' + esc(b?.contact_phone || '') + '" placeholder="Optional"/></div>'
-        + '<div class="f"><label>Email</label><input type="email" id="' + p + '-email" value="' + esc(b?.contact_email || '') + '" placeholder="For the quote"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f"><label>Event Type</label><select id="' + p + '-type" class="form-input">' + typeOpts + '</select></div>'
-        + '<div class="f"><label>Source</label><select id="' + p + '-source" class="form-input">' + srcOpts + '</select></div>'
-        + '<div class="f"><label>Stage</label><select id="' + p + '-stage" class="form-input">' + stageOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f"><label>Event Date</label><input type="date" id="' + p + '-date" value="' + esc(b?.event_date || '') + '"/></div>'
-        + '<div class="f"><label>Time</label><input type="text" id="' + p + '-time" value="' + esc(b?.event_time || '') + '" placeholder="6:00 PM"/></div>'
-        + '<div class="f"><label>Party Size</label><input type="number" id="' + p + '-party" value="' + v(b?.party_size) + '"/></div>'
-        + '<div class="f"><label>Space</label><input type="text" id="' + p + '-space" value="' + esc(b?.space || '') + '" placeholder="Private room"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f"><label>Date Received</label><input type="date" id="' + p + '-recv" value="' + esc(b?.date_received || today) + '"/></div>'
-        + '<div class="f"><label>Link a Regular</label><select id="' + p + '-reg" class="form-input">' + regOpts + '</select></div>'
-      + '</div>'
-      + '<div class="f" style="width:100%;"><label>Requests / Notes</label><textarea id="' + p + '-req" class="notes-ta" rows="2" placeholder="What they asked for, follow-up notes, why it closed.">' + esc(b?.requests || '') + '</textarea></div>';
+    const C = {
+      name:   '<div class="f"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>',
+      cname:  '<div class="f"><label>Contact Name</label><input type="text" id="' + p + '-cname" value="' + esc(b?.contact_name || '') + '" placeholder="Jen Mitchell"/></div>',
+      phone:  '<div class="f"><label>Phone</label><input type="tel" id="' + p + '-phone" value="' + esc(b?.contact_phone || '') + '" placeholder="Optional"/></div>',
+      email:  '<div class="f"><label>Email</label><input type="email" id="' + p + '-email" value="' + esc(b?.contact_email || '') + '" placeholder="For the quote"/></div>',
+      type:   '<div class="f"><label>Event Type</label><select id="' + p + '-type" class="form-input">' + typeOpts + '</select></div>',
+      source: '<div class="f"><label>Source</label><select id="' + p + '-source" class="form-input">' + srcOpts + '</select></div>',
+      stage:  '<div class="f"><label>Stage</label><select id="' + p + '-stage" class="form-input">' + stageOpts + '</select></div>',
+      date:   '<div class="f"><label>Event Date</label><input type="date" id="' + p + '-date" value="' + esc(b?.event_date || '') + '"/></div>',
+      time:   '<div class="f"><label>Time</label><input type="text" id="' + p + '-time" value="' + esc(b?.event_time || '') + '" placeholder="6:00 PM"/></div>',
+      party:  '<div class="f"><label>Party Size</label><input type="number" id="' + p + '-party" value="' + v(b?.party_size) + '"/></div>',
+      space:  '<div class="f"><label>Space</label><input type="text" id="' + p + '-space" value="' + esc(b?.space || '') + '" placeholder="Private room"/></div>',
+      recv:   '<div class="f"><label>Date Received</label><input type="date" id="' + p + '-recv" value="' + esc(b?.date_received || today) + '"/></div>',
+      reg:    '<div class="f"><label>Link a Regular</label><select id="' + p + '-reg" class="form-input">' + regOpts + '</select></div>',
+      notes:  '<div class="f" style="width:100%;"><label>Requests / Notes</label><textarea id="' + p + '-req" class="notes-ta" rows="2" placeholder="What they asked for, follow-up notes, why it closed.">' + esc(b?.requests || '') + '</textarea></div>'
+    };
+    // Compact (the inline landing form): all data cells on two rows; notes below.
+    if (compact) {
+      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.name + C.cname + C.phone + C.email + C.type + C.source + C.stage + '</div>'
+        + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.date + C.time + C.party + C.space + C.recv + C.reg + '</div>'
+        + C.notes;
+    }
+    // Default (the Edit popup): roomier stacked rows.
+    return '<div class="form-row" style="gap:14px;">' + C.name + '</div>'
+      + '<div class="form-row" style="gap:14px;">' + C.cname + C.phone + C.email + '</div>'
+      + '<div class="form-row" style="gap:14px;">' + C.type + C.source + C.stage + '</div>'
+      + '<div class="form-row" style="gap:14px;">' + C.date + C.time + C.party + C.space + '</div>'
+      + '<div class="form-row" style="gap:14px;">' + C.recv + C.reg + '</div>'
+      + C.notes;
   },
 
   collect(p) {
@@ -224,9 +231,10 @@ S.EventsBookings = {
 
     // Inline New Booking form (persists in-progress via _addDraft). Buttons below
     // the card, bottom-left.
-    const addCard = '<div class="card form-card"><div class="card-title">New Booking</div>'
-      + '<div id="eb-add-form">' + this.fieldsHtml(this._addDraft, 'ebn') + '</div></div>'
-      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    const addCard = '<div class="card form-card">'
+      + App.collapsibleCardTitle('eb-new-booking', 'New Booking')
+      + '<div class="collapse-body"><div id="eb-add-form">' + this.fieldsHtml(this._addDraft, 'ebn', true) + '</div></div></div>'
+      + '<div data-collapse-group="eb-new-booking" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="eb-add">Create Booking</button>'
       + '<button class="btn btn-ghost" id="eb-startover">Start Over</button>'
       + '<span id="eb-add-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>';
@@ -278,6 +286,8 @@ S.EventsBookings = {
   },
 
   wireList() {
+    this.container.querySelector('.card-collapse-head')?.addEventListener('click', e => App.toggleCollapse(e.currentTarget));
+    App.applyCollapsed(this.container);
     // Keep the inline add form's in-progress entry alive across re-renders.
     document.getElementById('eb-add-form')?.addEventListener('input', () => { this._addDraft = this.collect('ebn'); });
     document.getElementById('eb-add')?.addEventListener('click', () => this.addBooking());
