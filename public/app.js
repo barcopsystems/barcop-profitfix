@@ -1456,7 +1456,7 @@ const App = {
     ] },
     'settings-home': { title: 'How the Settings Overview Works', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
-      { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
+      { h: 'This page', p: ['While you are setting up, it shows how far along you are with a Continue Setup button. After that, it is a snapshot of how Bar Cop is tuned: your account and plan, your profile, sales, service periods, and links, and your targets, each with a quick Edit link so you can sanity-check it without opening every form. Getting Started walks you through setup step by step and drops off once you are done.'] }
     ] },
     'weekly-pnl': { title: 'How the Weekly P&L Brief Works', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books file.'] },
