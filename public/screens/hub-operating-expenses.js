@@ -219,9 +219,9 @@ S.HubOperatingExpenses = {
         + '<td style="text-align:right;color:var(--t3);">' + fmtPct(ytdRevPct) + '</td>'
         + '</tr>';
     }).join('');
-    const byCatHeading = '<div class="sh" style="margin:24px 0 10px;">By Category</div>';
     const byCatCard = '<div class="card card-bleed data-card">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
+      +   '<colgroup><col style="width:36%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>'
       +   '<thead><tr>'
       +     '<th>Category</th>'
       +     '<th style="text-align:right;">This Month</th>'
@@ -233,36 +233,34 @@ S.HubOperatingExpenses = {
       + '</table></div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + byCatHeading + byCatCard + '<div id="oex-list-region"></div>' + '</div>';
+    // Export PDF on a title-less row above the category card; exports the
+    // summary plus the detail log together.
+    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + exportRow
+      + '<div id="oex-export-area">' + byCatCard + '<div id="oex-list-region"></div></div>'
+      + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
-    // Wire the inline add form; the chips + log re-render on their own.
+    // Wire the inline add form + export; the chips + log re-render on their own.
     document.getElementById('oexa-save')?.addEventListener('click', () => this._saveAdd());
     document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
+    document.getElementById('oex-export')?.addEventListener('click', () => {
+      const el = document.getElementById('oex-export-area');
+      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
+    });
     this._renderListRegion();
   },
 
-  // Short chip labels for the category filter so 10 categories stay compact.
-  _shortCat(c) {
-    return ({
-      'Occupancy (Rent, Property Tax)': 'Occupancy',
-      'Marketing and Advertising':      'Marketing',
-      'Professional Fees':              'Professional',
-      'Bank and Credit Card Fees':      'Bank/CC',
-      'Licenses and Permits':           'Licenses',
-      'Software and Subscriptions':     'Software'
-    })[c] || c;
-  },
-
-  // Filter chips (category + range) + Export + the data-card log. Re-rendered
-  // alone on a filter change so the inline Add form keeps any in-progress entry.
+  // Range filter chips + the data-card log. Re-rendered alone on a filter
+  // change so the inline Add form keeps any in-progress entry.
   _renderListRegion() {
     const region = document.getElementById('oex-list-region');
     if (!region) return;
     const fmt$ = (v) => App.fmtCurrency(v || 0);
 
-    const catChipOpts = [{ v: 'all', label: 'All' }]
-      .concat(this.CATEGORIES.map(c => ({ v: c, label: this._shortCat(c) })));
     const rangeChipOpts = [
       { v: 'this-month', label: 'This Month' },
       { v: 'last-month', label: 'Last Month' },
@@ -270,18 +268,16 @@ S.HubOperatingExpenses = {
       { v: 'last-12',    label: 'Last 12 Months' },
       { v: 'all',        label: 'All Time' }
     ];
-    const catChips   = App.filterChips(this._filterCategory, catChipOpts);
     const rangeChips = App.filterChips(this._filterRange, rangeChipOpts);
 
     const recs = this._filteredRecords();
     const logRows = recs.length === 0
-      ? '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this view. Use the form above to add one.</td></tr>'
+      ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this view. Use the form above to add one.</td></tr>'
       : recs.map(r => '<tr>'
           + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
           + '<td style="color:var(--t2);">' + esc(r.category || '') + '</td>'
           + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
           + '<td style="text-align:right;font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
-          + '<td style="color:var(--t3);font-size:11px;">' + esc(r.notes || '') + '</td>'
           + '<td class="no-print" style="text-align:right;white-space:nowrap;">'
           +   '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
           +   '<button class="btn btn-ghost btn-sm oex-dup"  data-id="' + esc(r.id) + '">Duplicate</button> '
@@ -289,32 +285,22 @@ S.HubOperatingExpenses = {
           + '</td>'
         + '</tr>').join('');
 
-    const catRow = '<div class="no-print" style="margin-bottom:10px;"><div id="oex-cat-chips" style="display:flex;gap:8px;flex-wrap:wrap;">' + catChips + '</div></div>';
-    const rangeRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">'
-      + '<div id="oex-range-chips" style="display:flex;gap:8px;flex-wrap:wrap;">' + rangeChips + '</div>'
-      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
-      + '</div>';
+    const rangeRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' + rangeChips + '</div>';
     const logCard = '<div class="card card-bleed data-card" id="oex-log">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
+      +   '<colgroup><col style="width:13%"><col style="width:25%"><col style="width:26%"><col style="width:14%"><col style="width:22%"></colgroup>'
       +   '<thead><tr>'
       +     '<th>Date</th><th>Category</th><th>Vendor</th>'
       +     '<th style="text-align:right;">Amount</th>'
-      +     '<th>Notes</th><th class="no-print"></th>'
+      +     '<th class="no-print"></th>'
       +   '</tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
       + '</table></div>'
       + '</div>';
 
-    region.innerHTML = catRow + rangeRow + logCard;
+    region.innerHTML = rangeRow + logCard;
 
-    region.querySelector('#oex-export')?.addEventListener('click', () => {
-      const el = document.getElementById('oex-log');
-      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
-    });
-    region.querySelector('#oex-cat-chips')?.querySelectorAll('.fc-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filterCategory = chip.dataset.v; this._renderListRegion(); });
-    });
-    region.querySelector('#oex-range-chips')?.querySelectorAll('.fc-chip').forEach(chip => {
+    region.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._renderListRegion(); });
     });
     region.querySelectorAll('.oex-edit').forEach(btn => {
