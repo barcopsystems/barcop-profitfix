@@ -174,8 +174,8 @@ S.EventsBookings = {
     if (compact) {
       // Event Name leads (wider); all data cells fit on two rows, notes below.
       const nameW = '<div class="f" style="flex:2 1 170px;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
-      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.type + C.date + C.time + '</div>'
-        + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.space + C.recv + C.source + C.stage + '</div>'
+      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.date + C.time + '</div>'
+        + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.type + C.space + C.recv + C.source + C.stage + '</div>'
         + C.notes;
     }
     // Default (the Edit popup): roomier stacked rows.
