@@ -468,7 +468,6 @@ S.EventsBookings = {
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Bar Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-bar" value="' + (b.event_bar_cost != null && b.event_bar_cost !== 0 ? b.event_bar_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Other Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-other" value="' + (b.event_other_cost != null && b.event_other_cost !== 0 ? b.event_other_cost : '') + '"/></div></div>'
         + '</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-pl-save">Save P&amp;L</button></div>'
         + this.divider() + this.subLabel('Event Staff') + this.staffingHtml(b)
         + '</div>';
     }
@@ -491,7 +490,10 @@ S.EventsBookings = {
       act.push('<button class="btn btn-ghost" id="eb-resend">Resend Quote</button>');
     }
     if (stage === 'Booked')      act.push('<button class="btn btn-primary btn-lg eb-stage" data-to="Completed">Mark Completed</button>');
-    if (stage === 'Completed')   act.push('<button class="btn btn-ghost eb-stage" data-to="Booked">Reopen</button>');
+    if (stage === 'Completed') {
+      act.push('<button class="btn btn-primary" id="eb-pl-save">Save P&amp;L</button>');
+      act.push('<button class="btn btn-ghost eb-stage" data-to="Booked">Reopen</button>');
+    }
     if (stage === 'Lost')        act.push('<button class="btn btn-ghost eb-stage" data-to="Lead">Reopen</button>');
     if (stage !== 'Lost' && stage !== 'Completed') act.push('<button class="btn btn-ghost" id="eb-lost" style="color:var(--red);">Mark Lost</button>');
     return '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' + act.join('')
