@@ -246,14 +246,22 @@ S.HubUserAccounts = {
     if (sub.status === 'active') {
       el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Bar Cop Recovery Platform · '
         + 'Status: <span style="color:var(--green);font-weight:700;">Active</span></div>'
-        + '<div style="margin-top:10px;"><button class="btn btn-ghost" id="ua-billing-portal">Manage Billing</button></div>';
+        + '<div style="margin-top:10px;"><button class="btn btn-ghost" id="ua-billing-portal">Manage Billing</button></div>'
+        + '<div id="ua-billing-msg" style="display:none;font-size:11px;color:var(--red);margin-top:8px;"></div>';
       document.getElementById('ua-billing-portal')?.addEventListener('click', async () => {
-        const r = await fetch('/api/billing-portal', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: DB._user?.id })
-        });
-        const data = await r.json();
-        if (data.url) window.location.href = data.url;
+        const msg = document.getElementById('ua-billing-msg');
+        const showErr = (t) => { if (msg) { msg.textContent = t; msg.style.display = 'block'; } };
+        try {
+          const r = await fetch('/api/billing-portal', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: DB._user?.id })
+          });
+          const data = await r.json();
+          if (data.url) { window.location.href = data.url; return; }
+          showErr('Could not open billing right now. Try again, or contact support.');
+        } catch (e) {
+          showErr('Connection error. Check your connection and try again.');
+        }
       });
     } else {
       el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No active subscription on this account.</div>';
@@ -589,11 +597,11 @@ S.HubUserAccounts = {
           });
           const data = await r.json();
           if (!r.ok || !data.ok) {
-            alert(data.error || 'Could not save permissions.');
+            await App.confirm({ title: 'Could not save', message: data.error || 'Could not save permissions.', confirmText: 'OK', cancelText: '' });
           }
           this._teamRefresh();
         } catch (e) {
-          alert('Connection error.');
+          await App.confirm({ title: 'Connection error', message: 'Could not reach the server. Try again.', confirmText: 'OK', cancelText: '' });
           this._teamRefresh();
         }
       }
