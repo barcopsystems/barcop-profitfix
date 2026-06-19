@@ -25,10 +25,6 @@ S.HubSettingsHome = {
     const pct    = total ? Math.round(done / total * 100) : 0;
     const complete = total > 0 && done === total;
 
-    const head = '<div style="margin-bottom:20px;">'
-      + '<div style="font-size:22px;font-weight:800;color:var(--w);letter-spacing:0.3px;">Settings</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">Your account, your setup, and how Bar Cop is tuned to your operation.</div></div>';
-
     // ── Setup completeness ──
     const groupRows = GROUPS.map(g => {
       const gt   = TASKS.filter(t => t.group === g.id);
@@ -44,11 +40,9 @@ S.HubSettingsHome = {
     // step is done, Getting Started disappears (from the sidebar too), so the
     // card has nothing to be about and is dropped entirely.
     const setupCard = complete ? '' : ('<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">'
-      +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Setup</div>'
-      +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">' + done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.</div></div>'
-      +   '<button class="btn btn-primary" data-act="getting-started">Continue Setup</button>'
-      + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Setup</span>'
+      +   '<button class="btn btn-primary btn-sm" data-act="getting-started">Continue Setup</button></div>'
+      + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;">' + done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.</div>'
       + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="width:' + pct + '%;height:100%;background:var(--gold);"></div></div>'
       + '<div style="border:1px solid var(--b2);border-radius:6px;padding:4px 16px;">' + groupRows + '</div>'
       + '</div>');
@@ -58,11 +52,10 @@ S.HubSettingsHome = {
     const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--b2);">'
       + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
       + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
-    const card = (title, act, btnLabel, rowsHtml) => '<div class="card" style="margin-bottom:18px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
-      +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button>'
-      + '</div>' + rowsHtml + '</div>';
+    const card = (title, act, btnLabel, rowsHtml) => '<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>' + title + '</span>'
+      +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
+      + rowsHtml + '</div>';
 
     // ── Account (subscription + renewal + team for admins) ──
     const s       = (App.data && App.data.settings) || {};
@@ -113,7 +106,7 @@ S.HubSettingsHome = {
       + kvRow('Google Rating', (tg.google_rating ?? 4.3) + ' ★');
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 
-    mount.innerHTML = '<div class="screen">' + head + setupCard + acctCard + profileCard + targetCard + '</div>';
+    mount.innerHTML = '<div class="screen">' + setupCard + acctCard + profileCard + targetCard + '</div>';
     this._wire();
   },
 
