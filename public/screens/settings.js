@@ -460,6 +460,21 @@ S.HubSettings = {
     });
     App.data.operating_expenses = operatingExpenses;
 
+    // Permits and licenses: a realistic Austin bar/restaurant set so the page
+    // shows the full status spread (on track, due soon, expired) and the Needs
+    // Attention surface. Renewal dates are relative to today (dateStr negative =
+    // future), so the statuses stay meaningful whenever sample data is loaded.
+    App.data.permits_compliance = [
+      { id:uid(), name:'Texas Mixed Beverage Permit', type:'Liquor License',                renewal_date:dateStr(-205), recurrence:'Annual',   cost:1500, last_renewed:dateStr(160), notes:'TABC. Permit on file with the GM.',  created_at:new Date().toISOString() },
+      { id:uid(), name:'City of Austin Business License', type:'Business License',          renewal_date:dateStr(-92),  recurrence:'Annual',   cost:250,  last_renewed:dateStr(273), notes:'',                                  created_at:new Date().toISOString() },
+      { id:uid(), name:'Music and Entertainment License', type:'Music / Entertainment License', renewal_date:dateStr(-138), recurrence:'Annual', cost:300, last_renewed:dateStr(227), notes:'Covers Live Music Friday.',         created_at:new Date().toISOString() },
+      { id:uid(), name:'Sidewalk Cafe Permit', type:'Outdoor Seating Permit',               renewal_date:dateStr(-308), recurrence:'Annual',   cost:200,  last_renewed:dateStr(57),  notes:'Patio seating, 18 seats.',          created_at:new Date().toISOString() },
+      { id:uid(), name:'Workers Compensation Policy', type:'Workers Compensation',          renewal_date:dateStr(-61),  recurrence:'Annual',   cost:4200, last_renewed:dateStr(304), notes:'',                                  created_at:new Date().toISOString() },
+      { id:uid(), name:'Food Enterprise Permit', type:'Health Permit',                      renewal_date:dateStr(-23),  recurrence:'Annual',   cost:550,  last_renewed:dateStr(342), notes:'Austin Public Health.',             created_at:new Date().toISOString() },
+      { id:uid(), name:'Certified Food Manager', type:'Food Service Permit',                renewal_date:dateStr(-9),   recurrence:'Biennial', cost:120,  last_renewed:dateStr(721), notes:'',                                  created_at:new Date().toISOString() },
+      { id:uid(), name:'Certificate of Occupancy', type:'Fire Safety / Occupancy',          renewal_date:dateStr(7),    recurrence:'Annual',   cost:175,  last_renewed:dateStr(358), notes:'Annual fire inspection.',           created_at:new Date().toISOString() }
+    ];
+
     // ── Dead-array seeds removed (shifts / reconciliations / vendor_log):
     //    cash recon now lives in Shift Control; these were vestigial. ──
 
