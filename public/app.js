@@ -464,6 +464,9 @@ const App = {
   boot() {
     document.getElementById('auth-screen').style.display = 'none';
     this.updatePeriod();
+    // Recurring operating expenses: fill in any elapsed months on load so Books
+    // reflects them even if the operator never opens the Operating Expenses page.
+    try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
     // Sidebar toggle — assign (not addEventListener) so repeated boot() calls
     // don't stack handlers and cancel each other out
     const toggleBtn = document.getElementById('sidebar-toggle');
