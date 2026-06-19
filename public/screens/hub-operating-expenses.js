@@ -32,6 +32,7 @@ S.HubOperatingExpenses = {
 
   _tab:            'current',
   _entryMode:      'manual',   // manual | import (Add Expense form)
+  _histShown:      0,          // History log window (0 = default to LIST_PAGE)
   _filterCategory: 'all',
   _filterRange:    'this-month',
 
@@ -470,8 +471,8 @@ S.HubOperatingExpenses = {
     this.renderMain();
   },
 
-  // ── History tab: By Category + the full filterable log + Export ──────────
-  _renderHistory() {
+  // By Category data-card (current month, last month, YTD, YTD % of revenue).
+  _byCatCardHtml() {
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
     const mk = this._currentMonthKey();
@@ -480,7 +481,6 @@ S.HubOperatingExpenses = {
     const byCatLast  = this._sumMonthByCategory(prevMk);
     const byCatYTD   = this._sumYTDByCategory(mk);
     const ytdRev     = this._revenueYTD(mk);
-
     const catRows = this.CATEGORIES.map(c => {
       const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
       const ytdRevPct = ytdRev > 0 ? (ytd / ytdRev) : null;
@@ -493,13 +493,31 @@ S.HubOperatingExpenses = {
         + '<td style="color:var(--t3);">' + fmtPct(ytdRevPct) + '</td>'
         + '</tr>';
     }).join('');
-    const byCatCard = '<div class="card card-bleed data-card">'
+    return '<div class="card card-bleed data-card">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<colgroup><col style="width:36%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>'
       +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>YTD % of Revenue</th></tr></thead>'
       +   '<tbody>' + catRows + '</tbody>'
       + '</table></div></div>';
+  },
 
+  // The log data-card for a given set of records (optional id).
+  _logTableHtml(recs, id) {
+    const logRows = recs.length === 0
+      ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this range.</td></tr>'
+      : recs.map(r => this._logRowHtml(r)).join('');
+    return '<div class="card card-bleed data-card"' + (id ? ' id="' + id + '"' : '') + '>'
+      + '<div class="card-bleed-tbl"><table class="tbl">'
+      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
+      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
+      +   '<tbody>' + logRows + '</tbody>'
+      + '</table></div></div>';
+  },
+
+  // ── History tab: By Category + the filterable log (paged 50 at a time) ────
+  _renderHistory() {
+    const PAGE = App.LIST_PAGE || 50;
+    if (!this._histShown) this._histShown = PAGE;
     const rangeChipOpts = [
       { v: 'this-month', label: 'This Month' },
       { v: 'last-month', label: 'Last Month' },
@@ -509,36 +527,37 @@ S.HubOperatingExpenses = {
     ];
     const rangeChips = App.filterChips(this._filterRange, rangeChipOpts);
     const recs = this._filteredRecords();
-    const logRows = recs.length === 0
-      ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this range.</td></tr>'
-      : recs.map(r => this._logRowHtml(r)).join('');
-    const logCard = '<div class="card card-bleed data-card" id="oex-log">'
-      + '<div class="card-bleed-tbl"><table class="tbl">'
-      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
-      +   '<tbody>' + logRows + '</tbody>'
-      + '</table></div></div>';
+    const shown = recs.slice(0, this._histShown);
 
     const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + rangeChips + '</div>';
     const byCatHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;">'
       + '<div class="sh" style="margin:0;">By Category</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="oex-export">Export PDF</button>'
       + '</div>';
+    const olderBar = recs.length > this._histShown
+      ? '<div class="no-print" style="text-align:center;padding:14px 0 4px;"><button class="btn btn-ghost btn-sm" id="oex-older">Show older (' + (recs.length - this._histShown) + ' more)</button></div>'
+      : '';
 
     return '<div id="oex-export-area">'
-      + byCatHeading + byCatCard
-      + filterRow + logCard
-      + '</div>';
+      + byCatHeading + this._byCatCardHtml()
+      + filterRow + this._logTableHtml(shown, 'oex-log')
+      + '</div>' + olderBar;
   },
 
   _wireHistory() {
+    const PAGE = App.LIST_PAGE || 50;
     document.getElementById('oex-export')?.addEventListener('click', () => {
-      const el = document.getElementById('oex-export-area');
-      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
+      // Export the FULL filtered list (not just the on-screen 50), built off-screen.
+      const node = document.createElement('div');
+      node.style.cssText = 'position:absolute;left:-99999px;top:0;width:900px;';
+      node.innerHTML = this._byCatCardHtml() + this._logTableHtml(this._filteredRecords());
+      document.body.appendChild(node);
+      Promise.resolve(App.exportPDF({ title: 'Operating Expenses', root: node })).finally(() => node.remove());
     });
     this.container.querySelectorAll('.fc-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this.renderMain(); });
+      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this.renderMain(); });
     });
+    document.getElementById('oex-older')?.addEventListener('click', () => { this._histShown = (this._histShown || PAGE) + PAGE; this.renderMain(); });
     this._wireRows(this.container);
   },
 
