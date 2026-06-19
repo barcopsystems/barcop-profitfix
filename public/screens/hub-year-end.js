@@ -126,7 +126,7 @@ S.HubYearEnd = {
   // See [[legal-protection]].
   async _ackExport() {
     if (this._yeAckGiven) return true;
-    const ok = await App.confirm({
+    const ok = await App.confirmExport({
       title: 'Before You Export Your Year-End',
       message: 'This Year-End Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed tax return or audited financial statement. Your accountant should review and verify it before you file anything.',
       confirmText: 'I Understand, Continue',
