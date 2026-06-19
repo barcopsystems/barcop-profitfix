@@ -162,7 +162,7 @@ S.EventsCalendar = {
     const typeOpts = '<option value="">Select type...</option>' + this.TYPES.map(t => '<option' + (((e && e.type === t) || (!e && presetType === t)) ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> ' + label + '</label>';
     const html = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">' + (id ? 'Edit Date' : 'Add a Date') + '</div>'
+      + '<div class="card-title">' + (id ? 'Edit Date' : 'Add New Date') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f"><label>Date</label><input type="date" id="evcf-date" value="' + esc(e?.date || presetDate || '') + '"/></div>'
         + '<div class="f"><label>Name</label><input type="text" id="evcf-name" value="' + esc(e?.name || presetName || '') + '" placeholder="Valentine\'s Day"/></div>'
@@ -173,7 +173,7 @@ S.EventsCalendar = {
         + chk('menu', 'Menu locked') + chk('promo', 'Promo created') + chk('staffing', 'Staffing scheduled') + chk('reservations', 'Reservations open')
       + '</div>'
       + '<div class="f" style="width:100%;"><label>Notes</label><textarea id="evcf-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="evcf-save">' + (id ? 'Save' : 'Add Date') + '</button>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="evcf-save">' + (id ? 'Save' : 'Add New Date') + '</button>'
       +   '<button class="btn btn-ghost" id="evcf-cancel">Cancel</button>'
       +   (id ? '<button class="btn btn-danger" id="evcf-del" style="margin-left:auto;">Delete</button>' : '')
       +   '<span id="evcf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
@@ -212,7 +212,7 @@ S.EventsCalendar = {
       { h: 'Moving Around', p: ['Step months with the arrows, or jump back with This Month. The current month is tagged gold and today is highlighted. On a phone the grid becomes an agenda list of the days that have something on them.'] },
       { h: 'Booked Events', p: ['Every booking marked Booked or Completed shows on its event date. Tap it to open the booking.'] },
       { h: 'Holidays', p: ['The big ones show up every year on their own: New Year\'s, Valentine\'s, St. Patrick\'s, Cinco de Mayo, Mother\'s and Father\'s Day, the Fourth, Halloween, Thanksgiving, Christmas, New Year\'s Eve, and more. Tap one to drop it onto your calendar with a planning checklist.'] },
-      { h: 'Planning Dates', p: ['Add New Date, below the calendar, drops a local event, big game, or promotion onto a day. The checklist (menu locked, promo created, staffing scheduled, reservations open) shows how ready you are, like 2 of 4, so a big date never sneaks up half-planned.'] }
+      { h: 'Planning Dates', p: ['Add New Date, below the calendar, drops a local event, big game, or promotion onto a day. Work the checklist (menu locked, promo created, staffing scheduled, reservations open); the 2 of 4 read is your prep status for that date.'] }
     ]);
   }
 };

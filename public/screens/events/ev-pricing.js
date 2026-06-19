@@ -138,7 +138,9 @@ S.EventsPricing = {
     const totalCost = totalFood + totalBar + labor + other;
     const tgt = g('rpc-tgt') || 28;
     const perHeadCost = guests > 0 ? totalCost / guests : 0;
-    const perHeadPrice = (perHeadCost > 0 && tgt > 0) ? perHeadCost / (tgt / 100) : 0;
+    // Price off the food cost to hit the target food cost %; the margin below shows
+    // whether that price also covers bar, labor, and other.
+    const perHeadPrice = (g('rpc-food') > 0 && tgt > 0) ? g('rpc-food') / (tgt / 100) : 0;
     const totalRev = perHeadPrice * guests;
     const margin = totalRev - totalCost;
     const box = (label, val, gold) => '<div style="background:var(--input);border-radius:6px;padding:10px 12px;' + (gold ? 'border:1px solid var(--gold-tint-bord);' : '') + '"><div style="font-size:10px;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:' + (gold ? '20px' : '16px') + ';font-weight:' + (gold ? '800' : '700') + ';color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
@@ -155,7 +157,7 @@ S.EventsPricing = {
     App.showHelpModal('How Pricing Works', [
       { p: ['Your saved packages and a quick calculator, both feeding your booking quotes.'] },
       { h: 'Rate Card', p: ['Build your standard packages: the per-head price, the food and beverage minimum, any room fee, and the cover range each fits. On a booking, picking a package prefills the quote so you are not retyping prices every time. Export PDF prints the list to hand a client or keep on file.'] },
-      { h: 'Catering Calculator', p: ['Tap Catering Calculator for a one-off job. Enter the per-head food and bar cost, the staff hours, and a target food cost percent, and Bar Cop works backward to the per-head price that hits your margin. It pulls your average front-of-house wage from Labor Control to start. The same calculator is on every booking\'s quote.'] }
+      { h: 'Catering Calculator', p: ['Tap Catering Calculator for a one-off job. Enter the per-head food cost and a target food cost percent, and Bar Cop sets the per-head price. Add the bar cost, staff hours, and other costs, then check the Gross Margin to confirm the price covers everything. It starts from your average front-of-house wage from Labor Control. The same calculator is on every booking\'s quote.'] }
     ]);
   }
 };

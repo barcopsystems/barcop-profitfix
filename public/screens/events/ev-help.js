@@ -34,7 +34,7 @@ S.EventsHelp = {
       { q: 'How do quotes and deposits work?',
         a: 'On a booking, pick a Rate Card package to prefill the price or open the Catering Calculator to price per head, set the quoted total, and Send Quote. Once it is booked, track the deposit you took and the balance still due, and mark each paid as the money comes in. Deposits still owed roll up on the pipeline and the dashboard so nothing slips.' },
       { q: 'Where does the event revenue and P&L come from?',
-        a: 'Tag the event\'s shift in Build Schedule with the event name and its revenue and labor flow into the Event P&L automatically. If you are not tagging shifts, type the actual revenue on the booking. Food and bar cost are your estimates. The margin tells you whether the event was worth running.' }
+        a: 'Enter the actual revenue and the food, bar, and other cost on the booking. Labor pulls automatically from the staff you check as working the event in Build Schedule, so only their hours hit the Event P&L, not the whole day\'s crew. The margin is the event\'s bottom line.' }
     ]},
     { t: 'Calendar and Planning', qa: [
       { q: 'What is on the Calendar?',
@@ -44,15 +44,15 @@ S.EventsHelp = {
     ]},
     { t: 'Regulars', qa: [
       { q: 'What is the Regulars book for?',
-        a: 'It is the thing a big chain cannot do: knowing your guests by name, by drink, by date. Log a regular\'s contact, birthday, anniversary, drink preferences, and last visit. The screen surfaces who has a birthday or anniversary this month and who has gone quiet, so you have a monthly reach-out list and a win-back list.' },
+        a: 'Your guests by name, by drink, by date. Log a regular\'s contact, birthday, anniversary, drink preferences, and last visit. The screen surfaces who has a birthday or anniversary this month and who has gone quiet, so you have a monthly reach-out list and a win-back list.' },
       { q: 'Can I import a list?',
         a: 'Yes. Switch the add card to Import File and drop a CSV or Excel file. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them. Map the columns once and Bar Cop remembers it.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'What does Events feed into the rest of Bar Cop?',
-        a: 'Event and catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and Year-End. A booked event\'s tagged shifts feed its labor into the Event P&L. So the work you do here keeps the weekly numbers and the books current.' },
+        a: 'Offsite catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and Year-End. The staff you check as working an event feed their labor into its Event P&L. So the work you do here keeps the weekly numbers and the books current.' },
       { q: 'How does staffing an event work?',
-        a: 'There is no separate event scheduler. From a booking, Schedule Staff for this Event jumps to Build Schedule on the event date and tags the shift to the event, so everyone is scheduled in one place and the labor lands on the right Event P&L. Catering and offsite gigs use the Event shift so an odd-time job fits the schedule.' },
+        a: 'There is no separate event scheduler. From a booking, Schedule Staff for this Event jumps to Build Schedule on the event date, and you check the "Working [event]" box on each person working it. Only those hours land on the Event P&L. Catering and offsite gigs use the Event shift so an odd-time job fits the schedule.' },
       { q: 'Why is Events its own section now instead of part of Revenue and Traffic?',
         a: 'Because it is one job. The lead, the booking, the deposit, the event, and the guest relationship all belong together, and they were split across two sections before. Pulling them into one place means the lead becomes the booking with no re-entry, and it keeps Revenue and Traffic focused on what they do best.' }
     ]}

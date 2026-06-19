@@ -91,16 +91,24 @@ S.EventsBookings = {
   // Revenue is the event's own actual revenue (the banquet check). A shift's total
   // cannot be cleanly split for a shared-day event, so it is operator-entered.
   bookingRevenue(b) { return parseFloat(b.actual_revenue) || 0; },
-  bookingLabor(b) {
-    const roster = this.eventStaffShifts(b);
-    if (!roster.length) return 0;
+  // Group the event roster by staff: lc_actuals is one row per staff per day, but
+  // a person can have more than one event-tagged block that day, so each person is
+  // costed once (their logged actual if present, else the sum of their blocks).
+  eventStaffByPerson(b) {
+    const byStaff = {};
+    this.eventStaffShifts(b).forEach(sh => { (byStaff[sh.staff_id] = byStaff[sh.staff_id] || []).push(sh); });
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    return roster.reduce((sum, sh) => {
-      const act = actuals.find(a => a.staff_id === sh.staff_id && String(a.date || '').slice(0, 10) === sh._iso);
-      // Prefer the real logged hours; fall back to the scheduled estimate.
-      if (act) return sum + (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0));
-      return sum + (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0));
-    }, 0);
+    return Object.keys(byStaff).map(sid => {
+      const blocks = byStaff[sid];
+      const act = actuals.find(a => a.staff_id === sid && String(a.date || '').slice(0, 10) === blocks[0]._iso);
+      const hrs = act ? (parseFloat(act.hours) || 0) : blocks.reduce((s, sh) => s + (parseFloat(sh.hours) || 0), 0);
+      const cost = act ? (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0))
+                       : blocks.reduce((s, sh) => s + (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0)), 0);
+      return { name: blocks[0].name || '-', hours: hrs, cost: cost, logged: !!act };
+    });
+  },
+  bookingLabor(b) {
+    return this.eventStaffByPerson(b).reduce((sum, p) => sum + p.cost, 0);
   },
   balanceDue(b) {
     const quoted = parseFloat(b.quoted_total) || 0;
@@ -110,15 +118,11 @@ S.EventsBookings = {
 
   // The event-staff roster table (who is charged to this event, and their hours).
   staffingHtml(b) {
-    const roster = this.eventStaffShifts(b);
-    if (!roster.length) return '<div style="font-size:12px;color:var(--t4);">No staff checked for this event yet. In Build Schedule, open each person working it and check "Working ' + esc(this.title(b)) + '."</div>';
-    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    const rows = roster.map(sh => {
-      const act = actuals.find(a => a.staff_id === sh.staff_id && String(a.date || '').slice(0, 10) === sh._iso);
-      const hrs = act ? (parseFloat(act.hours) || 0) : (parseFloat(sh.hours) || 0);
-      const cost = act ? (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0)) : (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0));
-      return '<tr><td>' + esc(sh.name || '-') + '</td><td>' + hrs.toFixed(1) + 'h</td><td style="color:var(--t3);">' + (act ? 'logged' : 'scheduled') + '</td><td>' + App.fmtCurrency(cost) + '</td></tr>';
-    }).join('');
+    const people = this.eventStaffByPerson(b);
+    if (!people.length) return '<div style="font-size:12px;color:var(--t4);">No staff checked for this event yet. In Build Schedule, open each person working it and check "Working ' + esc(this.title(b)) + '."</div>';
+    const rows = people.map(p =>
+      '<tr><td>' + esc(p.name) + '</td><td>' + p.hours.toFixed(1) + 'h</td><td style="color:var(--t3);">' + (p.logged ? 'logged' : 'scheduled') + '</td><td>' + App.fmtCurrency(p.cost) + '</td></tr>'
+    ).join('');
     return '<div class="tbl-wrap"><table class="tbl eb-staff-tbl"><thead><tr><th>Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
@@ -425,11 +429,9 @@ S.EventsBookings = {
         + '<button class="btn btn-ghost btn-sm" id="eb-q-pdf">Quote PDF</button>'
       + '</div></div>';
 
-    const reg = b.regular_id ? this.regulars().find(r => r.id === b.regular_id) : null;
     const dispRow = (label, val) => '<div class="f"><label>' + label + '</label><div style="font-size:13px;color:var(--t1);">' + (val ? esc(val) : '<span style="color:var(--t4);">-</span>') + '</div></div>';
     const contact = this.subLabel('Contact and Event')
       + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">' + dispRow('Phone', b.contact_phone) + dispRow('Email', b.contact_email) + dispRow('Source', b.source) + dispRow('Time', b.event_time) + dispRow('Space', b.space) + '</div>'
-      + (reg ? '<div style="font-size:11px;color:var(--t2);margin-top:8px;">Linked regular: ' + esc(reg.name || '') + '</div>' : '')
       + (b.requests ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">' + esc(b.requests) + '</div>' : '');
 
     const statsRow = this.statsRow(b, viewStep);
@@ -694,10 +696,13 @@ S.EventsBookings = {
       const guests = g('qc-guests'), el = document.getElementById('qc-result');
       if (!el) return null;
       if (!guests) { el.innerHTML = ''; return null; }
-      const totalCost = g('qc-food') * guests + g('qc-bar') * guests + g('qc-hrs') * (g('qc-wage') || 13) + g('qc-other');
+      const foodPH = g('qc-food'), barPH = g('qc-bar');
+      const totalCost = (foodPH + barPH) * guests + g('qc-hrs') * (g('qc-wage') || 13) + g('qc-other');
       const t = g('qc-tgt') || 28;
       const perHeadCost = totalCost / guests;
-      const perHeadPrice = t > 0 ? perHeadCost / (t / 100) : 0;
+      // Price off the food cost to hit the target food cost %; the margin below
+      // shows whether that price also covers bar, labor, and other.
+      const perHeadPrice = (foodPH > 0 && t > 0) ? foodPH / (t / 100) : 0;
       const totalRev = perHeadPrice * guests;
       const box = (label, val, gold) => '<div style="background:var(--input);border-radius:6px;padding:10px 12px;' + (gold ? 'border:1px solid var(--gold-tint-bord);' : '') + '"><div style="font-size:10px;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:' + (gold ? '20px' : '16px') + ';font-weight:' + (gold ? '800' : '700') + ';color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
       el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;">'
@@ -797,13 +802,13 @@ S.EventsBookings = {
 
   showHowTo() {
     App.showHelpModal('How Bookings Works', [
-      { p: ['One record per party, worked from the first call to the paid invoice. The stat strip up top shows what is open, stale, booked soon, and the deposits you are owed. Log a lead in the New Booking form right on the page, or open any row to work it.'] },
-      { h: 'The Active Booking', p: ['Open a booking and the page follows its stage, like Active Shift follows a shift. The header shows where it stands, the progress rail shows the lifecycle, the tiles show the numbers that matter at this stage, and one big button moves it forward. You only see what the stage needs.'] },
-      { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; a lost booking stays in the pipeline so your conversion rate holds honest, and you can reopen it.'] },
+      { p: ['One record per party, worked from the first call to the paid invoice. Read the stat strip up top for what is open, stale, booked soon, and the deposits you are owed. Log a lead in the New Booking form on the page, or open any row to work it. Worksheet prints a blank inquiry pad to capture calls by the phone.'] },
+      { h: 'The Active Booking', p: ['Open a booking and the page follows its stage, like Active Shift follows a shift. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
+      { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; it stays in the pipeline and you can reopen it.'] },
       { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the quoted total, then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the quote in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
       { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
       { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
-      { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor is pulled automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is your read on whether the event paid off.'] },
+      { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
       { h: 'Getting Back', p: ['The back arrow at the bottom right returns you to the pipeline from any booking.'] }
     ]);
   }

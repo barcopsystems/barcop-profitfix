@@ -164,7 +164,7 @@ S.EventsDashboard = {
   showHowTo() {
     App.showHelpModal('How the Events Dashboard Works', [
       { p: ['The Events landing, read top to bottom: the money in your pipeline and the deposits you are owed, your next event and the leads to work, who to reach out to this month, and what is coming on the calendar. Every number comes from your own bookings, regulars, and calendar.'] },
-      { h: 'The Numbers', p: ['Pipeline Value is the quoted total of every open lead. Booked, Next 30d is your confirmed events in the next month. Conversion counts your wins (booked and completed) against the ones you lost over the last 90 days, and holds at a raw count until there is a real sample to show a percent. Deposits Due is money still owed on booked events.'] },
+      { h: 'The Numbers', p: ['Watch Deposits Due and clear it on each booking as the money comes in. Conversion counts your wins (booked and completed) against the ones you lost over 90 days, and holds a raw count until five bookings close, then shows a percent. Pipeline Value totals your open leads; Booked, Next 30d is your near-term confirmed events.'] },
       { h: 'Working From Here', p: ['Next Event and the lead list open straight to the booking. Regulars to Reach is your monthly outreach list. This Month shows the dates you are planning around. The Quick Actions jump to Bookings, Calendar, Regulars, and Pricing.'] }
     ]);
   }

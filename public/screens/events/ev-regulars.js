@@ -108,7 +108,7 @@ S.EventsRegulars = {
     const rows = list.slice(0, App.LIST_PAGE || 50).map(r => {
       const q = this.isQuiet(r);
       return '<tr class="rg-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
-        + '<td><div class="val" style="font-weight:600;">' + esc(r.name || '-') + (r.vip ? ' <span style="color:var(--gold);font-size:10px;font-weight:700;">VIP</span>' : '') + '</div>'
+        + '<td><div class="val" style="font-weight:600;">' + esc(r.name || '-') + (r.vip ? ' <span style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;">VIP</span>' : '') + '</div>'
         +   ((r.contact_phone || r.contact_email) ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.contact_phone || r.contact_email) + '</div>' : '') + '</td>'
         + '<td>' + (r.birthday ? this.fmtMD(r.birthday) : '-') + '</td>'
         + '<td>' + (r.anniversary ? this.fmtMD(r.anniversary) : '-') + '</td>'
@@ -207,9 +207,9 @@ S.EventsRegulars = {
 
   showHowTo() {
     App.showHelpModal('How Regulars Works', [
-      { p: ['Your regulars book, the thing a big chain cannot do: know your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The screen surfaces who to reach out to this month and who has gone quiet.'] },
-      { h: 'Outreach', p: ['Birthdays and anniversaries in the current month are counted up top, and the chips filter the list to them. A birthday or anniversary note is the highest-converting message an independent bar sends, so this is your monthly reach-out list.'] },
-      { h: 'Gone Quiet', p: ['A regular with no visit logged in the last ' + this.QUIET_DAYS + ' days reads as quiet. That is your win-back list: a regular who used to come in weekly and has not been seen is worth a text before they are gone for good. Log a last visit when they come in to keep it honest.'] },
+      { p: ['Your regulars book: your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The chips filter the list (birthdays, anniversaries, gone quiet, VIP), and Export PDF prints the book.'] },
+      { h: 'Outreach', p: ['Birthdays and anniversaries this month are counted up top, and the chips filter the list to them. Work this as your monthly reach-out list.'] },
+      { h: 'Gone Quiet', p: ['A regular with no visit logged in the last ' + this.QUIET_DAYS + ' days flags as quiet. Work that as your win-back list, and log a last visit when they come in to keep it honest.'] },
       { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them, and anything missing imports blank to fill later.'] }
     ]);
   }
