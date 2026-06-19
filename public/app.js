@@ -4772,6 +4772,31 @@ const App = {
     });
   },
 
+  // ── Standard EXPORT-acknowledgment gate — the ONE popup shown before any
+  //    high-stakes financial/payroll download (Payroll, Books, Year-End, Weekly
+  //    P&L). Form-card look, primary "I Understand, Continue" first, ghost
+  //    "Cancel"; no click-off or X so the notice is acted on. message may carry
+  //    inline HTML. Resolves true/false. Route every export gate through this so
+  //    they never drift apart. See [[legal-protection]].
+  confirmExport(opts) {
+    opts = opts || {};
+    const id = 'export-ack-modal';
+    return new Promise(resolve => {
+      const html = '<div class="card form-card" style="margin:0;">'
+        + '<div class="card-title">' + esc(opts.title || 'Before You Export') + '</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">' + (opts.message || '') + '</div>'
+        + '<div class="card-actions">'
+        +   '<button class="btn btn-primary" id="export-ack-go">' + esc(opts.confirmText || 'I Understand, Continue') + '</button>'
+        +   '<button class="btn btn-ghost" id="export-ack-cancel">' + esc(opts.cancelText || 'Cancel') + '</button>'
+        + '</div></div>';
+      this.openModal(html, { id, maxWidth: 540, noClose: true });
+      let done = false;
+      const finish = (val) => { if (done) return; done = true; this.closeModal(id); resolve(val); };
+      document.getElementById('export-ack-go')?.addEventListener('click', () => finish(true));
+      document.getElementById('export-ack-cancel')?.addEventListener('click', () => finish(false));
+    });
+  },
+
   // ── Standard delete confirmation — ONE wording, identical on every delete box
   //    across Bar Cop. Pass a subject for multi-select deletes (e.g. 'these 5
   //    checks'); defaults to 'this' for a single record. Resolves true/false.
