@@ -14,7 +14,7 @@ S.HubBooksHome = {
     App.openHubFullPage('Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
   },
 
-  _money(v)  { return (v == null || isNaN(v)) ? '-' : '$' + Math.round(Number(v)).toLocaleString('en-US'); },
+  _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
   _pct(v)    { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
 
   render(mount) {
@@ -39,13 +39,13 @@ S.HubBooksHome = {
     const YTD      = (HB && HB._aggregateYTD)   ? HB._aggregateYTD(monthKey)   : null;
     const monthName = (HB && HB._monthLabel) ? HB._monthLabel(monthKey) : monthKey;
 
-    const netRev   = M ? (M.totalRev - (M.comps || 0)) : 0;
+    const netRev   = M ? (M.totalRev - (M.compsLoss || 0)) : 0;
     const cogs     = M ? M.totalCogs : 0;
     const labor    = M ? M.totalLabor : 0;
     const prime    = cogs + labor;
     const primePct = (M && M.totalRev) ? (prime / M.totalRev) : null;
     const gross    = netRev - cogs;
-    const ytdNet   = YTD ? (YTD.totalRev - (YTD.comps || 0)) : 0;
+    const ytdNet   = YTD ? (YTD.totalRev - (YTD.compsLoss || 0)) : 0;
 
     // Permits / licenses coming due (overdue or within 30 days), soonest first.
     const HP = S.HubPermits;
@@ -68,7 +68,7 @@ S.HubBooksHome = {
       + this._tile('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', dueCount ? 'var(--amber)' : null)
       + '</div>';
 
-    // ── Hero band — the latest month's mini P&L + package CTA ──
+    // ── Hero band — the latest month's mini P&L + accountant CTA ──
     const fig = (label, val) => '<div style="flex:1;min-width:110px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t1);line-height:1;">' + val + '</div></div>';
@@ -76,7 +76,7 @@ S.HubBooksHome = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px;">'
       +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">' + esc(monthName) + '</div>'
       +   '<div style="font-size:14px;color:var(--t2);margin-top:4px;">Your latest month, rolled up from what you logged.</div></div>'
-      +   '<button class="btn btn-primary" data-act="books">Package for Accountant</button>'
+      +   '<button class="btn btn-primary" data-act="books">Books for Your Accountant</button>'
       + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;background:var(--input);border:1px solid var(--b2);border-radius:6px;padding:16px 18px;">'
       +   fig('Revenue', this._money(netRev)) + fig('COGS', this._money(cogs)) + fig('Labor', this._money(labor))
@@ -86,7 +86,7 @@ S.HubBooksHome = {
     // ── Recent months ──
     const monthRows = months.slice(0, 6).map(mk => {
       const mm = HB._aggregateMonth(mk);
-      const nr = mm.totalRev - (mm.comps || 0);
+      const nr = mm.totalRev - (mm.compsLoss || 0);
       const pp = mm.totalRev ? ((mm.totalCogs + mm.totalLabor) / mm.totalRev) : null;
       return '<div class="bk-row" data-act="books" style="display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--b2);cursor:pointer;">'
         + '<div style="flex:1;font-size:13px;font-weight:600;color:var(--t1);">' + esc(HB._monthLabel(mk)) + '</div>'

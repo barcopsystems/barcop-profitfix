@@ -158,6 +158,7 @@ S.ThisWeek = {
       bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
       food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
       catering: this.cateringFromBookings(periodEnd),
+      other: { revenue: '', cogs: '' },
       platform_fees: '',
       notes: ''
     };
@@ -169,6 +170,7 @@ S.ThisWeek = {
       bar:  { revenue: s(w.bar?.revenue),  labor: s(w.bar?.labor),  cogs: s(w.bar?.cogs) },
       food: { revenue: s(w.food?.revenue), labor: s(w.food?.labor), cogs: s(w.food?.cogs) },
       catering: { revenue: s(w.catering?.revenue), cogs: s(w.catering?.cogs), labor: s(w.catering?.labor) },
+      other: { revenue: s(w.other?.revenue), cogs: s(w.other?.cogs) },
       platform_fees: s(w.platform_fees),
       notes: w.notes || ''
     };
@@ -229,6 +231,7 @@ S.ThisWeek = {
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
       { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Load From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Other Revenue', p: ['Merch, vending, ticketed events, anything outside bar and food, goes in the Other / Ancillary Revenue box with its cost. It stays out of your prime cost but rolls into Books as its own income line.'] },
       { h: 'Operating Costs', p: ['Third-party platform fees, delivery commissions and the like, are an operating cost, not COGS or labor, so they sit in their own box and do not move the prime cost numbers above. Bar Cop captures the weekly figure here and Books reads it as an operating expense toward your true profit.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
     ]);
@@ -302,6 +305,21 @@ S.ThisWeek = {
       + '</div>';
   },
 
+  // Other / ancillary revenue (merch, vending, ticketed events, and the like).
+  // A separate income stream that Books rolls into the income statement; it is
+  // NOT part of the bar/food prime-cost grid above, so it does not move prime cost.
+  otherRevCard(d) {
+    const o = d.other || { revenue: '', cogs: '' };
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Other / Ancillary Revenue</div>'
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;">'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Revenue</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-or" value="' + esc(String(o.revenue || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
+      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Cost of Goods</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-oc" value="' + esc(String(o.cogs || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
+      + '</div></div>';
+  },
+
   // Operating costs are below-the-line (not COGS or labor), so they sit in their
   // own card and do NOT move the prime-cost numbers above. Captured weekly here
   // because Books reads the per-week figure.
@@ -373,6 +391,7 @@ S.ThisWeek = {
       + this.heroStrip()
       + this.selectorRow()
       + this.gridCard(d)
+      + this.otherRevCard(d)
       + this.opexCard(d)
       + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="tw-save">' + (editing ? 'Update Week' : 'Save Week') + '</button>'
@@ -448,6 +467,8 @@ S.ThisWeek = {
     d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
     if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
     if (this.cateringActive(d)) { d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl'); }
+    if (!d.other) d.other = { revenue: '', cogs: '' };
+    d.other.revenue = v('tw-or'); d.other.cogs = v('tw-oc');
     d.platform_fees = v('tw-pf');
     d.notes = v('tw-notes');
   },
@@ -542,6 +563,7 @@ S.ThisWeek = {
     const bRev = numF(d.bar.revenue), bCogs = numF(d.bar.cogs), bLab = numF(d.bar.labor);
     const fRev = numF(d.food.revenue), fCogs = numF(d.food.cogs), fLab = numF(d.food.labor);
     const cRev = numF(d.catering?.revenue), cCogs = numF(d.catering?.cogs), cLab = numF(d.catering?.labor);
+    const oRev = numF(d.other?.revenue), oCogs = numF(d.other?.cogs);
     const pFees = numF(d.platform_fees);
     if (bRev + fRev + cRev === 0) {
       if (err) { err.textContent = 'Enter at least one revenue figure before saving.'; err.style.display = 'inline'; }
@@ -563,6 +585,7 @@ S.ThisWeek = {
       bar: { revenue: bRev, cogs: bCogs, labor: bLab, cost_pct: bPct, labor_pct: bRev > 0 ? bLab / bRev * 100 : 0, vs_target_pct: bPct - bTarget, vs_target_dollar: ((bPct - bTarget) / 100) * bRev },
       food: { revenue: fRev, cogs: fCogs, labor: fLab, cost_pct: fPct, labor_pct: fRev > 0 ? fLab / fRev * 100 : 0, vs_target_pct: fPct - fTarget, vs_target_dollar: ((fPct - fTarget) / 100) * fRev },
       catering: { revenue: cRev, cogs: cCogs, labor: cLab, cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0, labor_pct: cRev > 0 ? cLab / cRev * 100 : 0 },
+      other: { revenue: oRev, cogs: oCogs },
       platform_fees: pFees,
       prime_cost_pct: tRev > 0 ? tCost / tRev * 100 : 0,
       notes: d.notes || ''

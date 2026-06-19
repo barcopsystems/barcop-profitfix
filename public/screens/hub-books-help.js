@@ -20,7 +20,7 @@ S.HubBooksHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Books section?',
-        a: 'Your back office. The Accounting pages turn what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books package, and a Year-End Review. The Operations pages track the things that keep the doors open: permits, licenses, and operating expenses. Nothing here asks you to re-enter numbers you have already logged.' },
+        a: 'Your back office. The Accounting pages turn what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and a Year-End Review. The Operations pages track the things that keep the doors open: permits, licenses, and operating expenses. Nothing here asks you to re-enter numbers you have already logged.' },
       { q: 'What is on the overview?',
         a: 'Your latest month rolled up from your weekly records (revenue, prime cost, gross profit), your year-to-date revenue, anything coming due, and a link to every Books page. The figures are built from the same data as the Month-End Books file, so they agree.' },
       { q: 'Is this a substitute for an accountant?',
@@ -28,9 +28,9 @@ S.HubBooksHelp = {
     ]},
     { t: 'Accounting', qa: [
       { q: 'What is in the Month-End Books file?',
-        a: 'One workbook your accountant can work straight from: an income statement (month and year to date), inventory valuation, a cash reconciliation audit trail, a void and comp log, a tip allocation worksheet for IRS Form 8027, variance and shrinkage, and labor cost analysis, plus your audit opportunities turned into dollars. A December close also adds a year-end tax helper. A one-page owner summary PDF comes alongside it.' },
+        a: 'One workbook your accountant can work straight from: an income statement (month and year to date), inventory valuation, a cash reconciliation trail, a void and comp log, a tip allocation worksheet for IRS Form 8027, variance and shrinkage, and labor cost analysis, plus your audit opportunities turned into dollars. A December close also adds a year-end tax helper. A one-page owner summary PDF comes alongside it.' },
       { q: 'What is the Weekly P&L Brief?',
-        a: 'Your weekly revenue, COGS, and labor as an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. Pick a range (last week, last four, the quarter, year to date, or custom) and download. It is the lighter, more frequent companion to the monthly package.' },
+        a: 'Your weekly revenue, COGS, and labor as an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. Pick a range (last week, last four, the quarter, year to date, or custom) and download. It is the lighter, more frequent companion to the Month-End Books file.' },
       { q: 'What is the Year-End Review?',
         a: 'The annual roll-up: the full year in one place for tax season and for your own read on how the year went. Like everything in Books, it is built from what you logged and meant for your accountant to verify.' }
     ]},

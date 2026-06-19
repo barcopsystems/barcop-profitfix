@@ -76,6 +76,7 @@ S.HubBooks = {
   async _openPdfSummary() {
     const monthKey = document.getElementById('hb-month')?.value;
     if (!monthKey) return;
+    if (!(await this._ackExport())) return;
     const monthLabel = this._monthLabel(monthKey);
     const M   = this._aggregateMonth(monthKey);
     const YTD = this._aggregateYTD(monthKey);
@@ -145,7 +146,7 @@ S.HubBooks = {
 
     b.sectionTitle('The Month in Dollars');
     b.table(null, [
-      ['Total Revenue (net of comps)', fmt$(M.totalRev - (M.comps || 0))],
+      ['Total Revenue (net of comps)', fmt$(M.totalRev - (M.compsLoss || 0))],
       ['  Bar Revenue', fmt$(M.barRev)],
       ['  Food Revenue', fmt$(M.foodRev)],
       ['Cost of Goods Sold', fmt$(M.totalCogs)],
@@ -163,7 +164,7 @@ S.HubBooks = {
 
     b.sectionTitle('Year to Date');
     b.table(null, [
-      ['Revenue (net of comps)', fmt$(YTD.totalRev - (YTD.comps || 0))],
+      ['Revenue (net of comps)', fmt$(YTD.totalRev - (YTD.compsLoss || 0))],
       ['COGS', fmt$(YTD.totalCogs)],
       ['Labor', fmt$(YTD.totalLabor)],
       ['Prime Cost', fmt$(YTD.totalCogs + YTD.totalLabor)]
@@ -272,10 +273,25 @@ S.HubBooks = {
     return (monthNames[m] || '') + ' ' + y;
   },
 
+  // Export-acknowledgment gate (once per visit) before a high-stakes Books
+  // download. See [[legal-protection]].
+  async _ackExport() {
+    if (this._booksAckGiven) return true;
+    const ok = await App.confirm({
+      title: 'Before You Export Your Books',
+      message: 'Month-End Books is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.',
+      confirmText: 'I Understand, Continue',
+      cancelText: 'Cancel'
+    });
+    if (ok) this._booksAckGiven = true;
+    return ok;
+  },
+
   // ── Generate the workbook ──────────────────────────────────────────────────
   async _generate() {
     const monthKey = document.getElementById('hb-month')?.value;
     if (!monthKey) return;
+    if (!(await this._ackExport())) return;
     const btn = document.getElementById('hb-generate');
     const status = document.getElementById('hb-status');
 
@@ -369,8 +385,9 @@ S.HubBooks = {
     rows.push(r('  Bar Revenue',      M.barRev,      YTD.barRev));
     rows.push(r('  Food Revenue',     M.foodRev,     YTD.foodRev));
     rows.push(r('  Catering Revenue', M.cateringRev, YTD.cateringRev));
-    rows.push(r('  Less: Comps',  M.comps != null ? -Math.abs(M.comps) : null, YTD.comps != null ? -Math.abs(YTD.comps) : null));
-    rows.push(r('Total Revenue (net of comps)', M.totalRev - (M.comps || 0), YTD.totalRev - (YTD.comps || 0)));
+    rows.push(r('  Other / Ancillary Revenue', M.otherRev, YTD.otherRev));
+    rows.push(r('  Less: Comps',  M.compsLoss != null ? -Math.abs(M.compsLoss) : null, YTD.compsLoss != null ? -Math.abs(YTD.compsLoss) : null));
+    rows.push(r('Total Revenue (net of comps)', M.totalRev - (M.compsLoss || 0), YTD.totalRev - (YTD.compsLoss || 0)));
     rows.push(blank());
 
     // COGS
@@ -378,10 +395,11 @@ S.HubBooks = {
     rows.push(r('  Bar COGS',      M.barCogs,      YTD.barCogs));
     rows.push(r('  Food COGS',     M.foodCogs,     YTD.foodCogs));
     rows.push(r('  Catering COGS', M.cateringCogs, YTD.cateringCogs));
+    rows.push(r('  Other COGS',    M.otherCogs,    YTD.otherCogs));
     rows.push(r('Total COGS', M.totalCogs, YTD.totalCogs));
     rows.push(blank());
 
-    rows.push(r('Gross Profit', M.totalRev - M.totalCogs - (M.comps || 0), YTD.totalRev - YTD.totalCogs - (YTD.comps || 0)));
+    rows.push(r('Gross Profit', M.totalRev - M.totalCogs - (M.compsLoss || 0), YTD.totalRev - YTD.totalCogs - (YTD.compsLoss || 0)));
     rows.push(blank());
 
     // Labor
@@ -402,11 +420,11 @@ S.HubBooks = {
     const opexM = this._opExSums(monthKey, false);
     const opexY = this._opExSums(monthKey, true);
     const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
-                      + (M.maintenance || 0) + (M.platformFees || 0);
+                      + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
     const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
-                      + (YTD.maintenance || 0) + (YTD.platformFees || 0);
-    const operatingIncomeM = (M.totalRev - (M.comps || 0)) - M.totalCogs - M.totalLabor - totalOpExM;
-    const operatingIncomeY = (YTD.totalRev - (YTD.comps || 0)) - YTD.totalCogs - YTD.totalLabor - totalOpExY;
+                      + (YTD.maintenance || 0) + (YTD.platformFees || 0) + (YTD.compsPolicy || 0);
+    const operatingIncomeM = (M.totalRev - (M.compsLoss || 0)) - M.totalCogs - M.totalLabor - totalOpExM;
+    const operatingIncomeY = (YTD.totalRev - (YTD.compsLoss || 0)) - YTD.totalCogs - YTD.totalLabor - totalOpExY;
 
     rows.push(['Operating Expenses', '', '']);
     rows.push(r('  Occupancy (rent, property tax)',                 opexM['Occupancy (Rent, Property Tax)']    || 0, opexY['Occupancy (Rent, Property Tax)']    || 0));
@@ -415,6 +433,7 @@ S.HubBooks = {
     rows.push(r('  Marketing and advertising',                      opexM['Marketing and Advertising']         || 0, opexY['Marketing and Advertising']         || 0));
     rows.push(r('  Repairs and maintenance',                        M.maintenance,                                  YTD.maintenance));
     rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees,                              YTD.platformFees));
+    rows.push(r('  Staff meals and shift drinks',                   M.compsPolicy,                                  YTD.compsPolicy));
     rows.push(r('  Professional fees',                              opexM['Professional Fees']                 || 0, opexY['Professional Fees']                 || 0));
     rows.push(r('  Bank and credit card fees',                      opexM['Bank and Credit Card Fees']         || 0, opexY['Bank and Credit Card Fees']         || 0));
     rows.push(r('  Licenses and permits',                           opexM['Licenses and Permits']              || 0, opexY['Licenses and Permits']              || 0));
@@ -437,7 +456,7 @@ S.HubBooks = {
     rows.push(blank());
     rows.push(this._lineRow('Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
-    rows.push(this._lineRow('Comps from Shift Control void and comp log. Maintenance from Shift Control maintenance log. Other operating expenses from your Operating Expenses log.', COL_COUNT));
+    rows.push(this._lineRow('Guest comps reduce revenue; staff meals and shift drinks are booked as an operating expense, both from the Shift Control void and comp log. Maintenance from the maintenance log. Operating expenses from your Operating Expenses log.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
 
     // Footer + disclaimer
@@ -1357,10 +1376,10 @@ S.HubBooks = {
 
     rows.push(['Schedule C Line', 'Amount', 'Source', '']);
     rows.push(['Line 1: Gross receipts', YTD.totalRev, 'Sum of Profit weekly revenue for ' + year, '']);
-    rows.push(['Line 2: Returns and allowances', YTD.comps, 'Sum of comps from Shift Control', '']);
-    rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev - (YTD.comps || 0), 'Calculated', '']);
+    rows.push(['Line 2: Returns and allowances', YTD.compsLoss, 'Guest comps from Shift Control (staff meals and shift drinks are booked as an expense, not a return)', '']);
+    rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev - (YTD.compsLoss || 0), 'Calculated', '']);
     rows.push(['Line 4: Cost of goods sold', calcCogs != null ? calcCogs : YTD.totalCogs, calcCogs != null ? 'Begin + purchases - end' : 'Sum of Profit weekly COGS (no end-of-year count on file)', '']);
-    rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', (YTD.totalRev - (YTD.comps || 0)) - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
+    rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', (YTD.totalRev - (YTD.compsLoss || 0)) - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
     rows.push(blank());
     rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
     rows.push(['Line 21: Repairs and maintenance', YTD.maintenance, 'Sum of Shift Control maintenance log for ' + year, '']);
@@ -1409,7 +1428,8 @@ S.HubBooks = {
     };
     const weeks = (App.data?.weeks || []).filter(w => inMonth(w.period_end));
     const agg = this._sumWeeks(weeks);
-    agg.comps = this._sumComps(monthKey);
+    const cc = this._sumCompsByClass(d => d && String(d).slice(0, 7) === monthKey);
+    agg.comps = cc.total; agg.compsLoss = cc.loss; agg.compsPolicy = cc.policy;
     agg.maintenance = this._sumMaintenance(monthKey);
     return agg;
   },
@@ -1427,40 +1447,55 @@ S.HubBooks = {
     const weeks = (App.data?.weeks || []).filter(w => inYearThroughMonth(w.period_end));
     const agg = this._sumWeeks(weeks);
 
-    // Comps and maintenance for the whole YTD window.
-    const vcs = (App.shiftData?.sc_void_comps || []).filter(v => inYearThroughMonth(v.date));
-    agg.comps = vcs.filter(v => (v.type === 'comp' || v.type === 'Comp')).reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
+    // Comps (split loss vs policy) and maintenance for the whole YTD window.
+    const cc = this._sumCompsByClass(inYearThroughMonth);
+    agg.comps = cc.total; agg.compsLoss = cc.loss; agg.compsPolicy = cc.policy;
     const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inYearThroughMonth(m.date_reported || m.date));
     agg.maintenance = mnts.reduce((s, m) => s + (parseFloat(m.cost || m.amount) || 0), 0);
     return agg;
   },
 
   _sumWeeks(weeks) {
-    let barRev = 0, foodRev = 0, cateringRev = 0;
-    let barCogs = 0, foodCogs = 0, cateringCogs = 0;
+    let barRev = 0, foodRev = 0, cateringRev = 0, otherRev = 0;
+    let barCogs = 0, foodCogs = 0, cateringCogs = 0, otherCogs = 0;
     let barLabor = 0, foodLabor = 0, cateringLabor = 0;
     let platformFees = 0;
     weeks.forEach(w => {
       barRev      += parseFloat(w.bar?.revenue)       || 0;
       foodRev     += parseFloat(w.food?.revenue)      || 0;
       cateringRev += parseFloat(w.catering?.revenue)  || 0;
+      otherRev    += parseFloat(w.other?.revenue)     || 0;
       barCogs     += parseFloat(w.bar?.cogs)          || 0;
       foodCogs    += parseFloat(w.food?.cogs)         || 0;
       cateringCogs+= parseFloat(w.catering?.cogs)     || 0;
+      otherCogs   += parseFloat(w.other?.cogs)        || 0;
       barLabor    += parseFloat(w.bar?.labor)         || 0;
       foodLabor   += parseFloat(w.food?.labor)        || 0;
       cateringLabor += parseFloat(w.catering?.labor)  || 0;
       platformFees+= parseFloat(w.platform_fees)      || 0;
     });
     return {
-      barRev, foodRev, cateringRev,
-      totalRev: barRev + foodRev + cateringRev,
-      barCogs, foodCogs, cateringCogs,
-      totalCogs: barCogs + foodCogs + cateringCogs,
+      barRev, foodRev, cateringRev, otherRev,
+      totalRev: barRev + foodRev + cateringRev + otherRev,
+      barCogs, foodCogs, cateringCogs, otherCogs,
+      totalCogs: barCogs + foodCogs + cateringCogs + otherCogs,
       barLabor, foodLabor, cateringLabor,
       totalLabor: barLabor + foodLabor + cateringLabor,
       platformFees
     };
+  },
+
+  // Comps split by class for the income statement: guest comps (loss) reduce
+  // revenue; staff meals and shift drinks (policy) are an operating expense.
+  // Keeps the income statement consistent with the Void and Comp Log sheet.
+  _sumCompsByClass(inWindow) {
+    const vcs = (App.shiftData?.sc_void_comps || []).filter(v => (v.type === 'comp' || v.type === 'Comp') && inWindow(v.date));
+    let loss = 0, policy = 0;
+    vcs.forEach(v => {
+      const amt = parseFloat(v.amount) || 0;
+      if (App.compReasonIsLoss(v.reason || v.category)) loss += amt; else policy += amt;
+    });
+    return { loss, policy, total: loss + policy };
   },
 
   // Sum void+comp records (comps only — voids are not a cost line, they are
@@ -1486,16 +1521,11 @@ S.HubBooks = {
   // categories fold into 'Other' so nothing gets dropped from the rollup.
   _opExSums(monthKey, ytd) {
     const out = {};
-    const known = [
-      'Occupancy (Rent, Property Tax)',
-      'Utilities',
-      'Insurance',
-      'Marketing and Advertising',
-      'Professional Fees',
-      'Bank and Credit Card Fees',
-      'Licenses and Permits',
-      'Software and Subscriptions',
-      'Other'
+    // One canonical category list, shared with the Operating Expenses log, so a
+    // category change there can never silently mis-bucket here.
+    const known = (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.CATEGORIES) || [
+      'Occupancy (Rent, Property Tax)', 'Utilities', 'Insurance', 'Marketing and Advertising',
+      'Professional Fees', 'Bank and Credit Card Fees', 'Licenses and Permits', 'Software and Subscriptions', 'Other'
     ];
     known.forEach(k => { out[k] = 0; });
     const records = App.data?.operating_expenses || [];

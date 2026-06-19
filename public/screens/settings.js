@@ -427,14 +427,38 @@ S.HubSettings = {
         const varU = +(actualPours - theo).toFixed(1);
         return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':(varU>0?'Over: Investigate':'Under: Investigate') };
       });
+      // Catering on roughly every fifth week (an offsite or private event), merch
+      // and vending as Other on every fourth, and weekly 3rd-party platform fees
+      // (~4.5% of food revenue). Keeps the Books income statement non-zero + real.
+      const catRev = (a.wk % 5 === 0) ? 1400 + (a.wk % 4) * 250 : 0;
+      const othRev = (a.wk % 4 === 0) ? 180 + (a.wk % 3) * 60 : 0;
       return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
         bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
               labor_pct:a.bar_labor/a.bar_rev*100, vs_target_pct:a.bar_pour_pct-22, vs_target_dollar:((a.bar_pour_pct-22)/100)*a.bar_rev },
         food:{ revenue:a.food_rev, cogs:a.food_cogs, labor:a.food_labor, cost_pct:a.food_cost_pct,
                labor_pct:a.food_labor/a.food_rev*100, vs_target_pct:a.food_cost_pct-32, vs_target_dollar:((a.food_cost_pct-32)/100)*a.food_rev },
+        catering: catRev > 0 ? { revenue:catRev, cogs:+(catRev*0.30).toFixed(2), labor:+(catRev*0.16).toFixed(2), cost_pct:30, labor_pct:16 } : { revenue:0, cogs:0, labor:0, cost_pct:0, labor_pct:0 },
+        other:{ revenue:othRev, cogs:+(othRev*0.45).toFixed(2) },
+        platform_fees:+(a.food_rev*0.045).toFixed(2),
         prime_cost_pct:a.prime_cost_pct, bar_count, bar_variance, food_count:[], notes:'' };
     });
     App.data.weeks = weeks;
+
+    // Operating expenses: a realistic monthly set across the sample window so the
+    // Books income statement shows true operating costs, not zeros.
+    const opexMonthly = [
+      ['Occupancy (Rent, Property Tax)', 12000], ['Utilities', 2600], ['Insurance', 1500],
+      ['Marketing and Advertising', 1200], ['Professional Fees', 650], ['Bank and Credit Card Fees', 2100],
+      ['Licenses and Permits', 300], ['Software and Subscriptions', 520], ['Other', 380]
+    ];
+    const opexMonths = [...new Set(weeks.map(w => String(w.period_end).slice(0, 7)))];
+    const operatingExpenses = [];
+    opexMonths.forEach(mk => {
+      opexMonthly.forEach(([cat, amt]) => {
+        operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), note:'' });
+      });
+    });
+    App.data.operating_expenses = operatingExpenses;
 
     // ── Dead-array seeds removed (shifts / reconciliations / vendor_log):
     //    cash recon now lives in Shift Control; these were vestigial. ──

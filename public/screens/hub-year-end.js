@@ -122,9 +122,24 @@ S.HubYearEnd = {
   },
 
   // ── Generate the workbook ──────────────────────────────────────────────────
+  // Export-acknowledgment gate (once per visit) before the year-end download.
+  // See [[legal-protection]].
+  async _ackExport() {
+    if (this._yeAckGiven) return true;
+    const ok = await App.confirm({
+      title: 'Before You Export Your Year-End',
+      message: 'This Year-End Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed tax return or audited financial statement. Your accountant should review and verify it before you file anything.',
+      confirmText: 'I Understand, Continue',
+      cancelText: 'Cancel'
+    });
+    if (ok) this._yeAckGiven = true;
+    return ok;
+  },
+
   async _generate() {
     const year = document.getElementById('hy-year')?.value;
     if (!year) return;
+    if (!(await this._ackExport())) return;
     const btn = document.getElementById('hy-generate');
 
     if (typeof XLSX === 'undefined') {
@@ -177,10 +192,10 @@ S.HubYearEnd = {
   _aggregateYear(year) {
     const months = [];
     let agg = {
-      barRev: 0, foodRev: 0, cateringRev: 0, totalRev: 0,
-      barCogs: 0, foodCogs: 0, cateringCogs: 0, totalCogs: 0,
+      barRev: 0, foodRev: 0, cateringRev: 0, otherRev: 0, totalRev: 0,
+      barCogs: 0, foodCogs: 0, cateringCogs: 0, otherCogs: 0, totalCogs: 0,
       barLabor: 0, foodLabor: 0, cateringLabor: 0, totalLabor: 0,
-      comps: 0, maintenance: 0, platformFees: 0
+      comps: 0, compsLoss: 0, compsPolicy: 0, maintenance: 0, platformFees: 0
     };
     // Annual OpEx by category. Operating Expenses log (App.data.operating_expenses)
     // is the canonical store; Books and Year-End both read from it via the
@@ -207,16 +222,20 @@ S.HubYearEnd = {
       agg.barRev        += M.barRev;
       agg.foodRev       += M.foodRev;
       agg.cateringRev   += M.cateringRev   || 0;
+      agg.otherRev      += M.otherRev      || 0;
       agg.totalRev      += M.totalRev;
       agg.barCogs       += M.barCogs;
       agg.foodCogs      += M.foodCogs;
       agg.cateringCogs  += M.cateringCogs  || 0;
+      agg.otherCogs     += M.otherCogs     || 0;
       agg.totalCogs     += M.totalCogs;
       agg.barLabor      += M.barLabor;
       agg.foodLabor     += M.foodLabor;
       agg.cateringLabor += M.cateringLabor || 0;
       agg.totalLabor    += M.totalLabor;
       agg.comps         += M.comps         || 0;
+      agg.compsLoss     += M.compsLoss     || 0;
+      agg.compsPolicy   += M.compsPolicy   || 0;
       agg.maintenance   += M.maintenance   || 0;
       agg.platformFees  += M.platformFees  || 0;
       opexCategories.forEach(c => { opex[c] += monthOpex[c] || 0; });
@@ -274,18 +293,20 @@ S.HubYearEnd = {
     row('  Bar Revenue',      Y.barRev,      P.barRev);
     row('  Food Revenue',     Y.foodRev,     P.foodRev);
     row('  Catering Revenue', Y.cateringRev, P.cateringRev);
-    row('  Less: Comps',  Y.comps != null ? -Math.abs(Y.comps) : null, P.comps != null ? -Math.abs(P.comps) : null);
-    row('Total Revenue (net of comps)', Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0));
+    row('  Other / Ancillary Revenue', Y.otherRev, P.otherRev);
+    row('  Less: Comps',  Y.compsLoss != null ? -Math.abs(Y.compsLoss) : null, P.compsLoss != null ? -Math.abs(P.compsLoss) : null);
+    row('Total Revenue (net of comps)', Y.totalRev - (Y.compsLoss || 0), P.totalRev - (P.compsLoss || 0));
     rows.push(blank());
 
     rows.push(['Cost of Goods Sold', '', '', '']);
     row('  Bar COGS',      Y.barCogs,      P.barCogs);
     row('  Food COGS',     Y.foodCogs,     P.foodCogs);
     row('  Catering COGS', Y.cateringCogs, P.cateringCogs);
+    row('  Other COGS',    Y.otherCogs,    P.otherCogs);
     row('Total COGS', Y.totalCogs, P.totalCogs);
     rows.push(blank());
 
-    row('Gross Profit', Y.totalRev - Y.totalCogs - (Y.comps || 0), P.totalRev - P.totalCogs - (P.comps || 0));
+    row('Gross Profit', Y.totalRev - Y.totalCogs - (Y.compsLoss || 0), P.totalRev - P.totalCogs - (P.compsLoss || 0));
     rows.push(blank());
 
     rows.push(['Labor', '', '', '']);
@@ -302,9 +323,9 @@ S.HubYearEnd = {
     // maintenance + weekly platform fees. Books and Year-End share the same
     // category enum so the numbers tie back across both deliverables.
     const totalOpExY = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (Y.maintenance || 0) + (Y.platformFees || 0);
+                      + (Y.maintenance || 0) + (Y.platformFees || 0) + (Y.compsPolicy || 0);
     const totalOpExP = Object.values(P.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (P.maintenance || 0) + (P.platformFees || 0);
+                      + (P.maintenance || 0) + (P.platformFees || 0) + (P.compsPolicy || 0);
     rows.push(['Operating Expenses', '', '', '']);
     row('  Occupancy (rent, property tax)',           (Y.opex?.['Occupancy (Rent, Property Tax)'] || 0), (P.opex?.['Occupancy (Rent, Property Tax)'] || 0));
     row('  Utilities',                                (Y.opex?.['Utilities']                      || 0), (P.opex?.['Utilities']                      || 0));
@@ -312,6 +333,7 @@ S.HubYearEnd = {
     row('  Marketing and advertising',                (Y.opex?.['Marketing and Advertising']      || 0), (P.opex?.['Marketing and Advertising']      || 0));
     row('  Repairs and maintenance',                  Y.maintenance,                                    P.maintenance);
     row('  3rd-party platform fees',                  Y.platformFees,                                   P.platformFees);
+    row('  Staff meals and shift drinks',             Y.compsPolicy,                                    P.compsPolicy);
     row('  Professional fees',                        (Y.opex?.['Professional Fees']              || 0), (P.opex?.['Professional Fees']              || 0));
     row('  Bank and credit card fees',                (Y.opex?.['Bank and Credit Card Fees']      || 0), (P.opex?.['Bank and Credit Card Fees']      || 0));
     row('  Licenses and permits',                     (Y.opex?.['Licenses and Permits']           || 0), (P.opex?.['Licenses and Permits']           || 0));
@@ -321,8 +343,8 @@ S.HubYearEnd = {
     rows.push(blank());
 
     row('Operating Income (Net Revenue - COGS - Labor - OpEx)',
-        (Y.totalRev - (Y.comps || 0)) - Y.totalCogs - Y.totalLabor - totalOpExY,
-        (P.totalRev - (P.comps || 0)) - P.totalCogs - P.totalLabor - totalOpExP);
+        (Y.totalRev - (Y.compsLoss || 0)) - Y.totalCogs - Y.totalLabor - totalOpExY,
+        (P.totalRev - (P.compsLoss || 0)) - P.totalCogs - P.totalLabor - totalOpExP);
     rows.push(blank());
 
     // Percentages
@@ -406,18 +428,20 @@ S.HubYearEnd = {
     seriesRow('  Bar Revenue',      M => M.barRev);
     seriesRow('  Food Revenue',     M => M.foodRev);
     seriesRow('  Catering Revenue', M => M.cateringRev || 0);
-    seriesRow('  Comps',            M => -Math.abs(M.comps || 0));
-    seriesRow('Total Revenue (net)', M => M.totalRev - (M.comps || 0));
+    seriesRow('  Other / Ancillary Revenue', M => M.otherRev || 0);
+    seriesRow('  Comps',            M => -Math.abs(M.compsLoss || 0));
+    seriesRow('Total Revenue (net)', M => M.totalRev - (M.compsLoss || 0));
     rows.push(blank());
 
     rows.push(['COGS', ...Array(13).fill('')]);
     seriesRow('  Bar COGS',      M => M.barCogs);
     seriesRow('  Food COGS',     M => M.foodCogs);
     seriesRow('  Catering COGS', M => M.cateringCogs || 0);
+    seriesRow('  Other COGS',    M => M.otherCogs || 0);
     seriesRow('Total COGS', M => M.totalCogs);
     rows.push(blank());
 
-    seriesRow('Gross Profit', M => M.totalRev - M.totalCogs - (M.comps || 0));
+    seriesRow('Gross Profit', M => M.totalRev - M.totalCogs - (M.compsLoss || 0));
     rows.push(blank());
 
     rows.push(['Labor', ...Array(13).fill('')]);
@@ -437,6 +461,7 @@ S.HubYearEnd = {
     seriesRow('  Marketing and advertising',        M => M.opex?.['Marketing and Advertising']      || 0);
     seriesRow('  Repairs and maintenance',          M => M.maintenance || 0);
     seriesRow('  3rd-party platform fees',          M => M.platformFees || 0);
+    seriesRow('  Staff meals and shift drinks',     M => M.compsPolicy || 0);
     seriesRow('  Professional fees',                M => M.opex?.['Professional Fees']              || 0);
     seriesRow('  Bank and credit card fees',        M => M.opex?.['Bank and Credit Card Fees']      || 0);
     seriesRow('  Licenses and permits',             M => M.opex?.['Licenses and Permits']           || 0);
@@ -444,14 +469,14 @@ S.HubYearEnd = {
     seriesRow('  Other operating expenses',         M => M.opex?.['Other']                          || 0);
     seriesRow('Total Operating Expenses', M => {
       const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
-      return opexSum + (M.maintenance || 0) + (M.platformFees || 0);
+      return opexSum + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
     });
     rows.push(blank());
 
     seriesRow('Operating Income', M => {
       const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
-      const totalOpEx = opexSum + (M.maintenance || 0) + (M.platformFees || 0);
-      return (M.totalRev - (M.comps || 0)) - M.totalCogs - M.totalLabor - totalOpEx;
+      const totalOpEx = opexSum + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
+      return (M.totalRev - (M.compsLoss || 0)) - M.totalCogs - M.totalLabor - totalOpEx;
     });
     rows.push(blank());
 
@@ -820,7 +845,7 @@ S.HubYearEnd = {
     mergeFull(0);
     rows.push(blank());
 
-    rows.push(['Date', 'System', 'Score', 'Monthly Opp $', 'Annual Opp $', 'Top Action Item']);
+    rows.push(['Date', 'System', 'Score', 'Monthly Opp $', 'Annual Opp $ (projected)', 'Top Action Item']);
 
     const inYear = (d) => d && String(d).slice(0, 4) === year;
     const buckets = [
@@ -966,6 +991,7 @@ S.HubYearEnd = {
   async _openPdfSummary() {
     const year = document.getElementById('hy-year')?.value;
     if (!year) return;
+    if (!(await this._ackExport())) return;
     const Y = this._aggregateYear(year);
     const priorYear = String(parseInt(year, 10) - 1);
     const P = this._aggregateYear(priorYear);
@@ -1008,7 +1034,7 @@ S.HubYearEnd = {
     const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
 
     // Strongest/weakest month
-    const netMonthlyRev = Y.months.map(M => M.totalRev - (M.comps || 0));
+    const netMonthlyRev = Y.months.map(M => M.totalRev - (M.compsLoss || 0));
     let strongIdx = -1, weakIdx = -1, strongVal = -Infinity, weakVal = Infinity;
     netMonthlyRev.forEach((v, i) => {
       if (v > strongVal) { strongVal = v; strongIdx = i; }
@@ -1045,16 +1071,20 @@ S.HubYearEnd = {
     b.header({ right: 'Year-End Review', meta: year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') });
 
     // ── Headline numbers ──
+    // True operating income (matches the workbook Annual Summary): net revenue
+    // less COGS, labor, and all operating expenses (incl. staff meals/shift drinks).
+    const opExYpdf = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0) + (Y.maintenance || 0) + (Y.platformFees || 0) + (Y.compsPolicy || 0);
+    const opIncomeYpdf = (Y.totalRev - (Y.compsLoss || 0)) - Y.totalCogs - Y.totalLabor - opExYpdf;
     b.sectionTitle('The Year in Dollars');
     b.table(null, [
-      ['Total Revenue (net of comps)', fmt$(Y.totalRev - (Y.comps || 0)) + fmtDeltaPct(Y.totalRev - (Y.comps || 0), P.totalRev - (P.comps || 0))],
+      ['Total Revenue (net of comps)', fmt$(Y.totalRev - (Y.compsLoss || 0)) + fmtDeltaPct(Y.totalRev - (Y.compsLoss || 0), P.totalRev - (P.compsLoss || 0))],
       ['  Bar Revenue', fmt$(Y.barRev)],
       ['  Food Revenue', fmt$(Y.foodRev)],
-      ['  Comps', fmt$(Y.comps)],
+      ['  Comps (guest)', fmt$(Y.compsLoss)],
       ['Cost of Goods Sold', fmt$(Y.totalCogs) + fmtDeltaPct(Y.totalCogs, P.totalCogs)],
       ['Labor', fmt$(Y.totalLabor) + fmtDeltaPct(Y.totalLabor, P.totalLabor)],
       ['Prime Cost (COGS + Labor)', fmt$(Y.totalCogs + Y.totalLabor) + fmtDeltaPct(Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor)],
-      ['Operating Margin', fmt$((Y.totalRev - (Y.comps || 0)) - (Y.totalCogs + Y.totalLabor))]
+      ['Operating Income (after operating expenses)', fmt$(opIncomeYpdf)]
     ], { columnStyles: { 1: { halign: 'right' } } });
 
     b.sectionTitle('The Year in Percentages');
@@ -1069,7 +1099,7 @@ S.HubYearEnd = {
     b.sectionTitle('Month by Month');
     b.table(['Month', 'Net Revenue', 'COGS', 'Labor', 'Prime', 'Prime %'],
       Y.months.map((M, i) => {
-        const netRev = M.totalRev - (M.comps || 0);
+        const netRev = M.totalRev - (M.compsLoss || 0);
         const prime = M.totalCogs + M.totalLabor;
         const primePct = M.totalRev ? (prime / M.totalRev) : null;
         return [this.MONTHS_SHORT[i], fmt$(netRev), fmt$(M.totalCogs), fmt$(M.totalLabor), fmt$(prime), fmtPct(primePct)];
