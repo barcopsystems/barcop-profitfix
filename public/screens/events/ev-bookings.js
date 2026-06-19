@@ -15,6 +15,7 @@
 S.EventsBookings = {
   _detailId: null,
   _addDraft: null,
+  _viewStep: null,   // a prior step being viewed/edited (null = the live current stage)
   filterStage: '',
 
   STAGES: ['Lead', 'Quote Sent', 'Booked', 'Completed', 'Lost'],
@@ -324,21 +325,30 @@ S.EventsBookings = {
   // ── Active Booking workspace ─────────────────────────────────────────────
   openDetail(id) {
     this._detailId = id;
+    this._viewStep = null;
     App.pushView(() => this.renderDetail(id));   // floating back returns to the pipeline
   },
 
-  progressRail(b) {
+  // The lifecycle rail. Every reached node (at or before the current stage) is
+  // clickable to jump back and edit that step, like the closing-shift stepper;
+  // the glow rides whichever step you are viewing. Same node design, just clickable.
+  progressRail(b, viewStep) {
     const flow = this.STAGE_FLOW;
     const lost = b.stage === 'Lost';
     const cur = flow.indexOf(b.stage);
+    const viewIdx = lost ? -1 : flow.indexOf(viewStep);
     const node = (s, i) => {
-      const done = !lost && i < cur, here = !lost && i === cur;
-      const fill = (done || here) ? 'var(--gold)' : 'var(--input)';
-      const bord = (done || here) ? 'var(--gold)' : 'var(--b1)';
-      const ink = (done || here) ? 'var(--bg)' : 'var(--t4)';
+      const reached = !lost && i <= cur;
+      const done = !lost && i < cur;
+      const here = !lost && i === viewIdx;
+      const fill = reached ? 'var(--gold)' : 'var(--input)';
+      const bord = reached ? 'var(--gold)' : 'var(--b1)';
+      const ink = reached ? 'var(--bg)' : 'var(--t4)';
       const glow = here ? 'box-shadow:0 0 0 4px var(--gold-tint);' : '';
-      const lbl = here ? 'var(--t1)' : done ? 'var(--t2)' : 'var(--t4)';
-      return '<div style="display:flex;flex-direction:column;align-items:center;gap:7px;flex:0 0 auto;">'
+      const lbl = here ? 'var(--t1)' : reached ? 'var(--t2)' : 'var(--t4)';
+      const wrap = 'display:flex;flex-direction:column;align-items:center;gap:7px;flex:0 0 auto;' + (reached ? 'cursor:pointer;' : '');
+      const attrs = reached ? ' class="eb-step" data-step="' + esc(s) + '"' : '';
+      return '<div' + attrs + ' style="' + wrap + '">'
         + '<span style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:' + fill + ';border:1px solid ' + bord + ';color:' + ink + ';' + glow + '">' + (done ? '&#10003;' : (i + 1)) + '</span>'
         + '<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + lbl + ';text-align:center;">' + esc(s) + '</span></div>';
     };
@@ -348,8 +358,8 @@ S.EventsBookings = {
     return '<div style="display:flex;align-items:flex-start;max-width:520px;">' + parts.join('') + '</div>';
   },
 
-  statsRow(b) {
-    const stage = b.stage;
+  statsRow(b, dispStage) {
+    const stage = dispStage || b.stage;
     const t = [];
     if (stage === 'Lead' || stage === 'Quote Sent') {
       const ds = this.daysSince(b.date_received);
@@ -389,6 +399,16 @@ S.EventsBookings = {
     const accent = this.stageAccent(stage);
     const live = stage === 'Lead' || stage === 'Quote Sent' || stage === 'Booked';
     const readout = { 'Lead': 'Build a quote and send it.', 'Quote Sent': 'Follow up. Mark it booked when they confirm.', 'Booked': 'Collect the deposit and lock in the staff.', 'Completed': 'Close out the numbers below.', 'Lost': 'Closed. Reopen it to put it back in play.' }[stage] || '';
+    // viewStep: the step the operator is looking at. Defaults to the live stage;
+    // clicking an earlier node in the rail opens that step to edit without changing
+    // the booking's real stage.
+    const curIdx = this.STAGE_FLOW.indexOf(stage);
+    let viewStep = stage, viewingPast = false;
+    if (this._viewStep && curIdx >= 0) {
+      const vi = this.STAGE_FLOW.indexOf(this._viewStep);
+      if (vi >= 0 && vi < curIdx) { viewStep = this._viewStep; viewingPast = true; }
+      else this._viewStep = null;
+    }
 
     // ── Card 1: The Booking (header + progress + stat tiles + contact) ──
     const header = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
@@ -412,17 +432,17 @@ S.EventsBookings = {
       + (reg ? '<div style="font-size:11px;color:var(--t2);margin-top:8px;">Linked regular: ' + esc(reg.name || '') + '</div>' : '')
       + (b.requests ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">' + esc(b.requests) + '</div>' : '');
 
-    const statsRow = this.statsRow(b);
+    const statsRow = this.statsRow(b, viewStep);
     let card1 = '<div class="card">' + header
-      + this.divider() + this.subLabel('Progress') + this.progressRail(b)
+      + this.divider() + this.subLabel('Progress') + this.progressRail(b, viewStep)
       + (statsRow ? this.divider() + this.subLabel('This Booking') + statsRow : '')
       + this.divider() + contact;
     if (stage === 'Lost' && b.lost_reason) card1 += this.divider() + this.subLabel('Why It Closed') + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + esc(b.lost_reason) + '</div>';
     card1 += '</div>';
 
-    // ── Card 2: Work It (stage-driven) ──
+    // ── Card 2: Work It (driven by the viewed step) ──
     let card2 = '';
-    if (stage === 'Lead' || stage === 'Quote Sent') {
+    if (viewStep === 'Lead' || viewStep === 'Quote Sent') {
       const rcs = this.rateCards();
       let rcPicker;
       if (rcs.length && rcs.length <= 6) {
@@ -445,7 +465,7 @@ S.EventsBookings = {
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
           + '<button class="btn btn-ghost btn-sm" id="eb-q-calc">Catering Calculator</button>'
         + '</div></div>';
-    } else if (stage === 'Booked') {
+    } else if (viewStep === 'Booked') {
       const bal = this.balanceDue(b);
       card2 = '<div class="card form-card">' + this.subLabel('Collect the Deposit')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
@@ -460,7 +480,7 @@ S.EventsBookings = {
         + this.staffingHtml(b)
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-staff">Schedule Staff for this Event</button></div>'
         + '</div>';
-    } else if (stage === 'Completed') {
+    } else if (viewStep === 'Completed') {
       card2 = '<div class="card form-card">' + this.subLabel('Close Out the P&amp;L')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
           + '<div class="f" style="width:170px;flex-shrink:0;"><label>Actual Revenue</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-actual" value="' + (b.actual_revenue != null && b.actual_revenue !== 0 ? b.actual_revenue : '') + '"/></div></div>'
@@ -472,14 +492,24 @@ S.EventsBookings = {
         + '</div>';
     }
 
-    const html = '<div class="screen">' + card1 + card2 + this.actionBar(stage) + '</div>';
+    const viewBanner = viewingPast
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--t1);">Editing your ' + esc(viewStep) + ' step. Save your changes, then Back to ' + esc(stage) + '.</div>'
+      : '';
+    const html = '<div class="screen">' + card1 + viewBanner + card2 + this.actionBar(stage, viewStep, viewingPast) + '</div>';
     this.container.innerHTML = html;
     this.wireDetail(b);
   },
 
-  // One big forward action for the stage, plus the quiet secondaries.
-  actionBar(stage) {
+  // One big forward action for the live stage, plus the quiet secondaries. When
+  // viewing a prior step, show that step's save and a way back instead.
+  actionBar(stage, viewStep, viewingPast) {
     const act = [];
+    if (viewingPast) {
+      if (viewStep === 'Lead' || viewStep === 'Quote Sent') act.push('<button class="btn btn-primary" id="eb-q-save">Save Quote</button>');
+      act.push('<button class="btn btn-ghost" id="eb-viewback">Back to ' + esc(stage) + '</button>');
+      return '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' + act.join('')
+        + '<button class="btn btn-danger btn-sm" id="eb-detail-del" style="margin-left:auto;">Delete</button></div>';
+    }
     if (stage === 'Lead') {
       act.push('<button class="btn btn-primary" id="eb-q-save">Save Quote</button>');
       act.push('<button class="btn btn-ghost" id="eb-send">Email Quote</button>');
@@ -525,6 +555,13 @@ S.EventsBookings = {
 
   wireDetail(b) {
     const id = b.id;
+    // Clickable lifecycle rail: jump back to a reached step to edit it.
+    this.container.querySelectorAll('.eb-step').forEach(el => el.addEventListener('click', () => {
+      const step = el.dataset.step;
+      this._viewStep = (step === b.stage) ? null : step;
+      this.renderDetail(id);
+    }));
+    document.getElementById('eb-viewback')?.addEventListener('click', () => { this._viewStep = null; this.renderDetail(id); });
     document.getElementById('eb-edit')?.addEventListener('click', () => this.showForm(id));
     document.getElementById('eb-q-pdf')?.addEventListener('click', () => this.quotePDF(this.bookings().find(x => x.id === id)));
     // Quote
