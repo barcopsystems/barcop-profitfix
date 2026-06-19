@@ -118,7 +118,7 @@ S.EventsBookings = {
       const cost = act ? (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0)) : (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0));
       return '<tr><td>' + esc(sh.name || '-') + '</td><td>' + hrs.toFixed(1) + 'h</td><td style="color:var(--t3);">' + (act ? 'logged' : 'scheduled') + '</td><td>' + App.fmtCurrency(cost) + '</td></tr>';
     }).join('');
-    return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return '<div class="tbl-wrap"><table class="tbl eb-staff-tbl"><thead><tr><th>Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   async patch(id, fields) {
@@ -443,7 +443,6 @@ S.EventsBookings = {
           + '<div class="f" style="width:160px;flex-shrink:0;"><label>Quoted Total</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-q-total" value="' + (b.quoted_total != null && b.quoted_total !== 0 ? b.quoted_total : '') + '"/></div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-          + '<button class="btn btn-ghost btn-sm" id="eb-q-save">Save Quote</button>'
           + '<button class="btn btn-ghost btn-sm" id="eb-q-calc">Catering Calculator</button>'
         + '</div></div>';
     } else if (stage === 'Booked') {
@@ -452,7 +451,7 @@ S.EventsBookings = {
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
           + '<div class="f" style="width:160px;flex-shrink:0;"><label>Deposit Amount</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-dep" value="' + (b.deposit_amount != null && b.deposit_amount !== 0 ? b.deposit_amount : '') + '"/></div></div>'
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-            + '<button class="btn btn-ghost btn-sm" id="eb-dep-save">Save Deposit</button>'
+            + '<button class="btn btn-primary btn-sm" id="eb-dep-save">Save Deposit</button>'
             + (b.deposit_amount && !b.deposit_paid_date ? '<button class="btn btn-ghost btn-sm" id="eb-dep-paid">Mark Deposit Paid</button>' : '')
             + (!b.balance_paid_date && bal > 0 ? '<button class="btn btn-ghost btn-sm" id="eb-bal-paid">Mark Balance Paid</button>' : '')
           + '</div>'
@@ -482,8 +481,15 @@ S.EventsBookings = {
   // One big forward action for the stage, plus the quiet secondaries.
   actionBar(stage) {
     const act = [];
-    if (stage === 'Lead')        act.push('<button class="btn btn-primary btn-lg" id="eb-send">Send Quote</button>');
-    if (stage === 'Quote Sent') { act.push('<button class="btn btn-primary btn-lg eb-stage" data-to="Booked">Mark Booked</button>'); act.push('<button class="btn btn-ghost" id="eb-resend">Resend Quote</button>'); }
+    if (stage === 'Lead') {
+      act.push('<button class="btn btn-primary" id="eb-q-save">Save Quote</button>');
+      act.push('<button class="btn btn-ghost" id="eb-send">Email Quote</button>');
+    }
+    if (stage === 'Quote Sent') {
+      act.push('<button class="btn btn-primary eb-stage" data-to="Booked">Mark Booked</button>');
+      act.push('<button class="btn btn-ghost" id="eb-q-update">Update Quote</button>');
+      act.push('<button class="btn btn-ghost" id="eb-resend">Resend Quote</button>');
+    }
     if (stage === 'Booked')      act.push('<button class="btn btn-primary btn-lg eb-stage" data-to="Completed">Mark Completed</button>');
     if (stage === 'Completed')   act.push('<button class="btn btn-ghost eb-stage" data-to="Booked">Reopen</button>');
     if (stage === 'Lost')        act.push('<button class="btn btn-ghost eb-stage" data-to="Lead">Reopen</button>');
@@ -523,6 +529,7 @@ S.EventsBookings = {
     this.container.querySelectorAll('.eb-rc-pill').forEach(p => p.addEventListener('click', () => this.applyRateCard(id, p.dataset.rc)));
     document.getElementById('eb-q-rc')?.addEventListener('change', e => this.applyRateCard(id, e.target.value));
     document.getElementById('eb-q-save')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
+    document.getElementById('eb-q-update')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
     document.getElementById('eb-q-calc')?.addEventListener('click', () => this.quoteCalc(id));
     // Money
     document.getElementById('eb-dep-save')?.addEventListener('click', () => this.patch(id, { deposit_amount: parseFloat(document.getElementById('eb-dep')?.value) || 0 }));
