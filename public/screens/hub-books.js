@@ -275,7 +275,7 @@ S.HubBooks = {
   // download. See [[legal-protection]].
   async _ackExport() {
     if (this._booksAckGiven) return true;
-    const ok = await App.confirm({
+    const ok = await App.confirmExport({
       title: 'Before You Export Your Books',
       message: 'Month-End Books is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.',
       confirmText: 'I Understand, Continue',
