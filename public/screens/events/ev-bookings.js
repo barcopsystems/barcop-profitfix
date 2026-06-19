@@ -63,25 +63,62 @@ S.EventsBookings = {
     return Math.round((new Date(App.todayLocal() + 'T00:00:00') - d) / 86400000);
   },
 
-  linkedShifts(b) {
-    const tag = String(b.event_name || '').trim().toLowerCase();
-    if (!tag) return [];
-    return ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => String(s.event_tag || '').trim().toLowerCase() === tag);
+  // The ISO date for a scheduled shift (its Monday week_start + Mon-first day idx).
+  _shiftIso(weekStart, day) {
+    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const idx = DAYS.indexOf(day);
+    if (idx < 0 || !weekStart) return '';
+    const d = new Date(weekStart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + idx);
+    return App.ymdLocal(d);
   },
-  bookingRevenue(b) {
-    const tagged = this.linkedShifts(b).reduce((s, x) => s + (parseFloat(x.bar_revenue) || 0) + (parseFloat(x.floor_revenue) || 0), 0);
-    return tagged > 0 ? tagged : (parseFloat(b.actual_revenue) || 0);
+  // The staff scheduled AND checked as working this event (Build Schedule). Only
+  // these people's labor counts toward the event, so a private party during normal
+  // service does not charge the whole day's crew to the event.
+  eventStaffShifts(b) {
+    if (!b || !b.id || !b.event_date) return [];
+    const iso = String(b.event_date).slice(0, 10);
+    const out = [];
+    ((App.laborData && App.laborData.lc_schedules) || []).forEach(s => {
+      (s.shifts || []).forEach(sh => {
+        if (sh.event === b.id && this._shiftIso(s.week_start, sh.day) === iso) out.push(Object.assign({}, sh, { _iso: iso }));
+      });
+    });
+    return out;
   },
+  // Revenue is the event's own actual revenue (the banquet check). A shift's total
+  // cannot be cleanly split for a shared-day event, so it is operator-entered.
+  bookingRevenue(b) { return parseFloat(b.actual_revenue) || 0; },
   bookingLabor(b) {
-    const dates = new Set(this.linkedShifts(b).map(s => s.date).filter(Boolean));
-    return ((App.laborData && App.laborData.lc_actuals) || [])
-      .filter(a => a.date && dates.has(a.date))
-      .reduce((s, a) => s + ((parseFloat(a.hours) || 0) * (parseFloat(a.wage) || 0)), 0);
+    const roster = this.eventStaffShifts(b);
+    if (!roster.length) return 0;
+    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
+    return roster.reduce((sum, sh) => {
+      const act = actuals.find(a => a.staff_id === sh.staff_id && String(a.date || '').slice(0, 10) === sh._iso);
+      // Prefer the real logged hours; fall back to the scheduled estimate.
+      if (act) return sum + (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0));
+      return sum + (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0));
+    }, 0);
   },
   balanceDue(b) {
     const quoted = parseFloat(b.quoted_total) || 0;
     const dep = parseFloat(b.deposit_amount) || 0;
     return Math.max(0, quoted - dep);
+  },
+
+  // The event-staff roster table (who is charged to this event, and their hours).
+  staffingHtml(b) {
+    const roster = this.eventStaffShifts(b);
+    if (!roster.length) return '<div style="font-size:12px;color:var(--t4);">No staff checked for this event yet. In Build Schedule, open each person working it and check "Working ' + esc(this.title(b)) + '."</div>';
+    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
+    const rows = roster.map(sh => {
+      const act = actuals.find(a => a.staff_id === sh.staff_id && String(a.date || '').slice(0, 10) === sh._iso);
+      const hrs = act ? (parseFloat(act.hours) || 0) : (parseFloat(sh.hours) || 0);
+      const cost = act ? (parseFloat(act.cost) || (parseFloat(act.hours) || 0) * (parseFloat(act.wage) || 0)) : (parseFloat(sh.cost) || (parseFloat(sh.hours) || 0) * (parseFloat(sh.wage) || 0));
+      return '<tr><td>' + esc(sh.name || '-') + '</td><td>' + hrs.toFixed(1) + 'h</td><td style="color:var(--t3);">' + (act ? 'logged' : 'scheduled') + '</td><td>' + App.fmtCurrency(cost) + '</td></tr>';
+    }).join('');
+    return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   async patch(id, fields) {
@@ -329,10 +366,10 @@ S.EventsBookings = {
       const cost = (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0) + (parseFloat(b.event_other_cost) || 0) + labor;
       const margin = rev - cost;
       const mp = rev > 0 ? margin / rev * 100 : null;
-      t.push(this.statTile('Revenue', App.fmtCurrency(rev), this.linkedShifts(b).length ? 'from tagged shifts' : 'actual entered'));
+      t.push(this.statTile('Revenue', App.fmtCurrency(rev), 'actual entered'));
       t.push(this.statTile('Margin', App.fmtCurrency(margin), 'after all costs', margin >= 0 ? 'good' : 'bad'));
       t.push(this.statTile('Margin %', mp != null ? mp.toFixed(0) + '%' : '-', '30% is a solid event', mp != null && mp >= 30 ? 'good' : mp != null ? 'warn' : ''));
-      t.push(this.statTile('Labor', App.fmtCurrency(labor), 'from Labor Control'));
+      t.push(this.statTile('Labor', App.fmtCurrency(labor), this.eventStaffShifts(b).length ? 'checked event staff' : 'check staff in schedule'));
     }
     return t.length ? '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + t.join('') + '</div>' : '';
   },
@@ -405,7 +442,6 @@ S.EventsBookings = {
         + '</div></div>';
     } else if (stage === 'Booked') {
       const bal = this.balanceDue(b);
-      const ls = this.linkedShifts(b);
       card2 = '<div class="card form-card">' + this.subLabel('Collect the Deposit')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
           + '<div class="f" style="width:160px;flex-shrink:0;"><label>Deposit Amount</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-dep" value="' + (b.deposit_amount != null && b.deposit_amount !== 0 ? b.deposit_amount : '') + '"/></div></div>'
@@ -416,27 +452,19 @@ S.EventsBookings = {
           + '</div>'
         + '</div>'
         + this.divider() + this.subLabel('Staffing')
-        + (ls.length === 0
-            ? '<div style="font-size:12px;color:var(--t4);">No shifts tagged to this event yet. Schedule the staff and tag the shift to pull its hours into the P&amp;L.</div>'
-            : '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Shift</th><th>Bar</th><th>Floor</th></tr></thead><tbody>'
-              + ls.map(s => '<tr><td>' + esc(s.date || '') + '</td><td>' + esc(s.shift_type || '') + '</td><td>' + App.fmtCurrency(s.bar_revenue || 0) + '</td><td>' + App.fmtCurrency(s.floor_revenue || 0) + '</td></tr>').join('')
-              + '</tbody></table></div>')
+        + this.staffingHtml(b)
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-staff">Schedule Staff for this Event</button></div>'
         + '</div>';
     } else if (stage === 'Completed') {
-      const ls = this.linkedShifts(b);
       card2 = '<div class="card form-card">' + this.subLabel('Close Out the P&amp;L')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
+          + '<div class="f" style="width:170px;flex-shrink:0;"><label>Actual Revenue</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-actual" value="' + (b.actual_revenue != null && b.actual_revenue !== 0 ? b.actual_revenue : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Food Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-food" value="' + (b.event_food_cost != null && b.event_food_cost !== 0 ? b.event_food_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Bar Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-bar" value="' + (b.event_bar_cost != null && b.event_bar_cost !== 0 ? b.event_bar_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Other Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-other" value="' + (b.event_other_cost != null && b.event_other_cost !== 0 ? b.event_other_cost : '') + '"/></div></div>'
-          + (ls.length ? '' : '<div class="f" style="width:170px;flex-shrink:0;"><label>Actual Revenue</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-actual" value="' + (b.actual_revenue != null && b.actual_revenue !== 0 ? b.actual_revenue : '') + '"/></div></div>')
         + '</div>'
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-pl-save">Save P&amp;L</button></div>'
-        + (ls.length ? this.divider() + this.subLabel('Staffing')
-            + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Shift</th><th>Bar</th><th>Floor</th></tr></thead><tbody>'
-            + ls.map(s => '<tr><td>' + esc(s.date || '') + '</td><td>' + esc(s.shift_type || '') + '</td><td>' + App.fmtCurrency(s.bar_revenue || 0) + '</td><td>' + App.fmtCurrency(s.floor_revenue || 0) + '</td></tr>').join('')
-            + '</tbody></table></div>' : '')
+        + this.divider() + this.subLabel('Event Staff') + this.staffingHtml(b)
         + '</div>';
     }
 
@@ -724,8 +752,8 @@ S.EventsBookings = {
       { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; a lost booking stays in the pipeline so your conversion rate holds honest, and you can reopen it.'] },
       { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the quoted total, then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the quote in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
       { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
-      { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date. Tag the shift with the event name and its hours flow into the Event P&L. Catering and offsite gigs use the Event shift so an odd-time job still fits the schedule.'] },
-      { h: 'Event P&L', p: ['On a Completed booking, enter the food, bar, and other cost. Revenue comes from the tagged shifts when you have them, otherwise enter the actual revenue. Labor pulls from Labor Control on the tagged shift dates. The margin is your read on whether the event paid off.'] },
+      { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
+      { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor is pulled automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is your read on whether the event paid off.'] },
       { h: 'Getting Back', p: ['The back arrow at the bottom right returns you to the pipeline from any booking.'] }
     ]);
   }
