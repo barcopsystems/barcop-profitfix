@@ -70,9 +70,9 @@ S.HubPermits = {
     const days = this._daysUntil(record.renewal_date);
     if (days == null) return { key: 'unknown', label: 'No renewal date', color: 'var(--t3)', days: null };
     if (days < 0) return { key: 'expired',  label: 'Expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago', color: 'var(--red)',   days };
-    if (days <= 14) return { key: 'critical', label: 'Due in ' + days + ' day' + (days===1?'':'s'),                              color: 'var(--red)',   days };
-    if (days <= 30) return { key: 'warn',     label: 'Due in ' + days + ' days',                                                  color: 'var(--gold)',  days };
-    return { key: 'active', label: 'Due in ' + days + ' days', color: 'var(--green)', days };
+    if (days <= 14) return { key: 'critical', label: 'Due in ' + days + ' day' + (days===1?'':'s'),                              color: 'var(--amber)', days };
+    if (days <= 30) return { key: 'warn',     label: 'Due in ' + days + ' days',                                                  color: 'var(--amber)', days };
+    return { key: 'active', label: 'Due in ' + days + ' days', color: 'var(--t2)', days };
   },
   _fmtDate(str) {
     if (!str) return '—';
@@ -138,8 +138,8 @@ S.HubPermits = {
     const statsCard = '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       +   stat('Tracked', all.length)
-      +   stat('On Track', activeCt, activeCt > 0 ? 'var(--green)' : '')
-      +   stat('Due in 30 Days', dueSoonCt, dueSoonCt > 0 ? 'var(--gold)' : '')
+      +   stat('On Track', activeCt)
+      +   stat('Due in 30 Days', dueSoonCt, dueSoonCt > 0 ? 'var(--amber)' : '')
       +   stat('Expired', expiredCt, expiredCt > 0 ? 'var(--red)' : '')
       + '</div></div>';
 
@@ -149,19 +149,17 @@ S.HubPermits = {
     const recurOpts = this.RECURRENCES.map(r => '<option value="' + esc(r) + '"' + (r === 'Annual' ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
     const headsUpInside = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the renewal dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements, status, and deadlines with your issuing agency.</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the dates you enter. It does not verify them and is not legal advice. Confirm requirements and deadlines with your issuing agency.</div>'
       + '</div>';
     const addCard = '<div class="card form-card">'
       + '<div class="card-title">Add Permit</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="flex:1;min-width:240px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
-      +   '<div class="f" style="width:200px;"><label>Type</label><select id="hpa-type">' + typeOpts + '</select></div>'
-      +   '<div class="f" style="width:150px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<div class="f" style="width:180px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
-      +   '<div class="f" style="width:180px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
-      +   '<div class="f" style="width:140px;"><label>Last Cost ($)</label><input type="number" id="hpa-cost" step="0.01" min="0" placeholder="0.00"/></div>'
+      +   '<div class="f" style="flex:1 1 180px;min-width:160px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
+      +   '<div class="f" style="width:160px;"><label>Type</label><select id="hpa-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="width:120px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
+      +   '<div class="f" style="width:150px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
+      +   '<div class="f" style="width:150px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
+      +   '<div class="f" style="width:110px;"><label>Last Cost ($)</label><input type="number" id="hpa-cost" step="0.01" min="0" placeholder="0.00"/></div>'
       + '</div>'
       + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hpa-notes" placeholder="Issuing agency, account number, contact"></textarea></div></div>'
       + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
@@ -195,21 +193,13 @@ S.HubPermits = {
         + '</div>';
     }
 
-    // Export PDF on a title-less heading row, right-aligned, above the list.
-    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="hp-export">Export PDF</button>'
-      + '</div>';
-
-    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + alertsCard + exportRow + '<div id="hp-list-region"></div>' + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + alertsCard + '<div style="margin-top:24px;"></div>' + '<div id="hp-list-region"></div>' + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
-    // Wire the static parts (form, export, the Needs Attention renew buttons).
+    // Wire the static parts (form + the Needs Attention renew buttons). The
+    // Export button rides the chips row inside the list region.
     document.getElementById('hpa-save')?.addEventListener('click', () => this._saveAdd());
     document.getElementById('hpa-clear')?.addEventListener('click', () => this._clearAdd());
-    document.getElementById('hp-export')?.addEventListener('click', () => {
-      const el = document.getElementById('hp-list');
-      if (el) App.exportPDF({ title: 'Permits and Licenses', root: el });
-    });
     this.container.querySelectorAll('.hp-renew').forEach(btn => {
       btn.addEventListener('click', () => {
         const rec = this.records().find(r => r.id === btn.dataset.id);
@@ -264,7 +254,10 @@ S.HubPermits = {
           + '</tr>';
         }).join('');
 
-    const chipsRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' + chips + '</div>';
+    const chipsRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + chips + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="hp-export">Export PDF</button>'
+      + '</div>';
     const listCard = '<div class="card card-bleed data-card" id="hp-list">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<thead><tr>'
@@ -278,6 +271,10 @@ S.HubPermits = {
 
     region.innerHTML = chipsRow + listCard;
 
+    region.querySelector('#hp-export')?.addEventListener('click', () => {
+      const el = document.getElementById('hp-list');
+      if (el) App.exportPDF({ title: 'Permits and Licenses', root: el });
+    });
     region.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filter = chip.dataset.v; this._renderListRegion(); });
     });
@@ -348,7 +345,7 @@ S.HubPermits = {
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Permit' : 'Add Permit') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="width:100%;"><label>Name</label><input type="text" id="hp-f-name" value="' + esc(rec.name) + '" placeholder="Texas Mixed Beverage Permit"/></div>'
+      +   '<div class="f"><label>Name</label><input type="text" id="hp-f-name" value="' + esc(rec.name) + '" placeholder="Texas Mixed Beverage Permit"/></div>'
       +   '<div class="f"><label>Type</label><select id="hp-f-type">' + typeOpts + '</select></div>'
       +   '<div class="f"><label>Recurrence</label><select id="hp-f-recurrence">' + recurOpts + '</select></div>'
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
