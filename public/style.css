@@ -358,6 +358,8 @@ input,select,textarea{color-scheme:dark;}
 .data-row{flex-wrap:nowrap;}
 /* Auto-fit input grid: several fields per row on desktop, one per row on mobile. */
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
+/* Events New Booking inline form: equal cells so all data fits on two rows. */
+.eb-crow>.f{flex:1 1 130px;min-width:0;}
 
 /* Individual field */
 .f{display:flex;flex-direction:column;gap:5px;}
