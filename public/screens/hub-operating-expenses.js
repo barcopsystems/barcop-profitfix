@@ -265,9 +265,9 @@ S.HubOperatingExpenses = {
       +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" list="oexa-vendor-list" placeholder="Who did you pay"/><datalist id="oexa-vendor-list">' + dlOpts + '</datalist></div>'
       +   '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
       + '</div>'
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
       + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
       + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
+      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
       + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
     const addButtons = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -443,8 +443,8 @@ S.HubOperatingExpenses = {
     const id = 'oex-modal';
     const isChild = !!rec.recurring_parent;
     const recurHtml = isChild
-      ? '<div style="margin-top:4px;font-size:11px;color:var(--t3);line-height:1.5;">This is a recurring entry. Change the cost or term on the first entry of this bill.</div>'
-      : '<div style="margin-top:4px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oex-f-recurring"' + (rec.recurring ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
+      ? '<div style="margin-top:14px;font-size:11px;color:var(--t3);line-height:1.5;">This is a recurring entry. Change the cost or term on the first entry of this bill.</div>'
+      : '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oex-f-recurring"' + (rec.recurring ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
         + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (rec.recurring ? '' : 'display:none;') + '"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(rec.term_months || '') + '" placeholder="12"/></div></div>';
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
@@ -454,9 +454,9 @@ S.HubOperatingExpenses = {
       +   '<div class="f"><label>Category</label><select id="oex-f-cat">' + catOpts + '</select></div>'
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" list="oex-f-vlist" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/><datalist id="oex-f-vlist">' + dlOpts + '</datalist></div>'
       +   '<div class="f"><label>Amount ($)</label><input type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div>'
-      +   '<div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oex-f-notes" placeholder="Optional context for the bookkeeper">' + esc(rec.notes || '') + '</textarea></div>'
       + '</div>'
       + recurHtml
+      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oex-f-notes" placeholder="Optional context for the bookkeeper">' + esc(rec.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="oex-save">' + (isEdit ? 'Save Changes' : 'Add Expense') + '</button>'
       +   '<button class="btn btn-ghost" id="oex-cancel">Cancel</button>'
