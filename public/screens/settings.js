@@ -70,10 +70,12 @@ S.HubSettings = {
     const s = App.data.settings || {};
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:195px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
-      + '<div class="f" style="width:100px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
+      + '<div class="f" style="width:150px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
+      + '<div class="f" style="flex:1 1 220px;min-width:180px;"><label>Street Address</label><input type="text" id="hs-address" value="' + esc(s.address||'') + '" placeholder="123 Main St"/></div>'
+      + '<div class="f" style="width:120px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:145px;"><label>Bar Revenue ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Revenue"/></div></div>'
-      + '<div class="f" style="width:145px;"><label>Food Revenue ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Revenue"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Bar Sales ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Food Sales ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
       + '</div>';
   },
 
@@ -92,7 +94,7 @@ S.HubSettings = {
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Labor Cost %</label><div class="fw"><input class="suf" type="number" id="hs-lc" value="' + (t.labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Labor Cost % ' + tt('sh-labor-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-lc" value="' + (t.labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
@@ -148,8 +150,6 @@ S.HubSettings = {
       + '</div>'
       + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:200px;"><label>Website Session to Visit ' + tt('hs-conv-web') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>GBP View to Visit ' + tt('hs-conv-gbp') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-gbp" value="' + (c.gbp_view_to_visit ?? 2) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Social Profile to Visit ' + tt('hs-conv-social') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-social" value="' + (c.social_profile_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:200px;"><label>Email Open to Visit ' + tt('hs-conv-email') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
@@ -184,10 +184,14 @@ S.HubSettings = {
       const city  = document.getElementById('hs-city')?.value.trim() || '';
       const state = document.getElementById('hs-state')?.value.trim() || '';
       s.bar_name            = document.getElementById('hs-name')?.value.trim() || '';
+      s.phone               = document.getElementById('hs-phone')?.value.trim() || '';
+      s.address             = document.getElementById('hs-address')?.value.trim() || '';
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
       s.annual_bar_revenue  = numOr('hs-abr', 0);
       s.annual_food_revenue = numOr('hs-afr', 0);
       keys.push('settings');
+      // Filling the profile here (not just via onboarding) checks off the setup step.
+      if (s.bar_name && App.markSetupDone) App.markSetupDone('gs_profile');
     } else if (which === 'service') {
       const all = this._spCtrl ? this._spCtrl.value() : [];
       const errEl = document.getElementById('hs-sp-err');
@@ -247,8 +251,6 @@ S.HubSettings = {
       const ts = App.data.traffic_settings = App.data.traffic_settings || {};
       ts.conversion_rates = Object.assign({}, ts.conversion_rates, {
         web_session_to_visit:    numOr('hs-conv-web',    3),
-        gbp_view_to_visit:       numOr('hs-conv-gbp',    2),
-        social_profile_to_visit: numOr('hs-conv-social', 1),
         email_open_to_visit:     numOr('hs-conv-email',  1)
       });
       keys.push('traffic_settings');
@@ -361,6 +363,8 @@ S.HubSettings = {
 
     // ── Settings ──
     App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
+    App.data.settings.phone              = '(512) 555-0142';
+    App.data.settings.address            = '1900 Barton Springs Rd';
     App.data.settings.city_state         = 'Austin, TX';
     App.data.settings.annual_bar_revenue = 624000;
     App.data.settings.annual_food_revenue= 374400;
