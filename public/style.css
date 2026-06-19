@@ -502,6 +502,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .card-bleed-tbl{margin-left:-20px;margin-right:-20px;overflow-x:auto;}
 .card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:20px;}
 .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:20px;}
+/* A non-table data-row block pulled flush to its card's left / right / bottom edges
+   (Settings home Account / Profile / Targets cards). Negative margin tracks the card
+   padding (20px, 14px on phones); the card must carry overflow:hidden to clip corners. */
+.kv-bleed{margin:0 -20px -20px;}
+@media (max-width:768px){.kv-bleed{margin:0 -14px -14px;}}
 /* ── STANDARD form card + data table (app-wide) ───────────────────────────────
    The Drawers page is the design base; every page is brought to these two classes
    page by page, so a look change here is one CSS edit everywhere they're used.
