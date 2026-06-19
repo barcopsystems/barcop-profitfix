@@ -14,6 +14,7 @@ const TT = {
     'sh-food-cost':   {t:'Food Cost % Target',b:'Food cost as a percentage of food revenue. Industry benchmark is 28-32% depending on concept. Full-service restaurants typically run 30-32%. Fast casual runs lower. Set this to your target, not your current number.',e:'32% is the standard starting benchmark'},
     'sh-bar-labor':   {t:'Bar Labor % Target',b:'Bar staff payroll divided by bar revenue. Includes bartenders, barbacks, and bar management. Does not include kitchen or floor staff. Industry benchmark is 25-30%.',e:'28% is the standard starting benchmark'},
     'sh-food-labor':  {t:'Food Labor % Target',b:'Kitchen and food staff payroll divided by food revenue. Includes cooks, prep, and kitchen management. Full-service kitchen benchmark is 28-32%.',e:'30% is the standard starting benchmark'},
+    'sh-labor-cost':  {t:'Labor Cost % Target',b:'Total labor (bar plus kitchen plus floor) divided by total revenue. Industry benchmark is around 30% for a full-service operation. Set this to your target, not your current number.',e:'30% is the standard starting benchmark'},
     'sh-prime-cost':  {t:'Prime Cost % Target',b:'Combined COGS and labor as a percentage of total revenue. The single most important number in your operation. Below 60% is healthy. Above 65% and you have a problem that weekly data will surface fast.',e:'60% is the standard starting benchmark'},
     'sh-cash-tol':    {t:'Cash Over/Short Tolerance',b:'The maximum dollar amount you treat as acceptable for a drawer to be off before flagging it. Cash Reconciliation uses this threshold to show green or red on each shift count.',e:'$10 is typical. Anything over $10 over or short triggers a flag'},
     'cc-pos-expected':{t:'Expected Cash (POS)',b:'What your POS says should be in the drawer: opening bank plus cash sales, minus any payouts or drops. Bar Cop compares your counted cash to this and flags the over or short.',e:'Opening bank $300 + $642 cash sales = $942 expected'},
@@ -164,8 +165,6 @@ const TT = {
     't-delivery-orders':{t:'Total Orders/Mo',b:'Total monthly delivery orders across all active platforms (DoorDash, Uber Eats, Grubhub). Pull from each merchant dashboard and sum. This is the volume metric the Recovery Scoreboard uses to dollarize delivery fixes.',e:'120 DoorDash + 80 Uber Eats + 30 Grubhub = 230 total monthly orders'},
     't-delivery-avg-order':{t:'Avg Order Value',b:'Average dollar value per delivery order, blended across all your active platforms. Pull from each platform\'s merchant dashboard. The Recovery Scoreboard multiplies your order volume by this value when calculating dollarized recovery from delivery improvements.',e:'$34 avg order across DoorDash, Uber Eats, and Grubhub'},
     'hs-conv-web':      {t:'Website Session to Visit %',b:'Of all visitors who land on your website, how many show up at the bar within a reasonable window. Industry default is 3% for bar and restaurant sites. The Recovery Scoreboard uses this to dollarize website traffic improvements: weekly session lift × this rate × your check average × 52 = annual recovered dollars. Override once you have your own data.',e:'3% default. A strong site with clear call-to-action buttons runs higher.'},
-    'hs-conv-gbp':      {t:'GBP View to Visit %',b:'Of all guests who view your Google Business Profile listing, how many actually visit the bar. Industry default is 2%. The Recovery Scoreboard uses this to dollarize GBP improvements: monthly view lift × this rate × your check average × 12 = annual recovered dollars.',e:'2% default. A complete profile with strong photos converts higher.'},
-    'hs-conv-social':   {t:'Social Profile to Visit %',b:'Of guests who click through from a social post to your IG or FB profile, how many actually visit. Industry default is 1%. Social-to-visit conversion is lower than search-based channels because the intent is weaker. The Recovery Scoreboard uses this to dollarize social growth.',e:'1% default. Local-content-heavy accounts run higher.'},
     'hs-conv-email':    {t:'Email Open to Visit %',b:'Of subscribers who open your marketing email, how many visit the bar within a reasonable window. Industry default is 1%. The Recovery Scoreboard uses this with list size and open rate to dollarize email work.',e:'1% default. Lists with strong personal-tone content and consistent monthly sends run higher.'},
     // Inventory Control tooltips
     'ic-par-level':     {t:'Par Level',b:'The target quantity to keep on hand for this product. When a count drops below par, the Order Sheet flags it for reordering. Set it to cover normal usage between deliveries plus a small safety buffer.',e:'You use 6 bottles of well vodka a week and order weekly, so par is 8'},
@@ -1455,7 +1454,7 @@ const App = {
       { h: 'What you see', p: ['The tiles up top show this month\'s revenue net of comps, prime cost, year-to-date revenue, and how many permit renewals are due. The Current Month card is a mini P&L for the month so far. Recent Months lists the last several months, and the side panel shows Coming Due when a renewal is near, or your Year-to-Date bottom line when nothing is due.'] },
       { h: 'How to use it', p: ['Use the Quick Actions to jump to Month-End Books, the Weekly P&L Brief, Year-End Review, or Operating Expenses. Books for Accountant on the Current Month card opens the month-end file. Everything here is read-only; the work happens on the pages it links to.'] }
     ] },
-    'settings-home': { title: 'Settings', sections: [
+    'settings-home': { title: 'How the Settings Overview Works', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
       { h: 'This page', p: ['The overview shows how far along your setup is and links to each settings page and your account. Getting Started walks you through setup step by step and drops off once you are done.'] }
     ] },
@@ -1488,27 +1487,27 @@ const App = {
       { h: 'Importing', p: ['Switch the Add form to Import File and drop a CSV or Excel export. Map the columns once (date and amount are required), and the rows import; anything already logged is skipped.'] },
       { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
     ] },
-    'settings-profile': { title: 'Business Profile', sections: [
+    'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
       { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, from Open the Floor to the schedule to the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] },
       { h: 'Operation links', p: ['Paste the public URL for each platform: your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data into the Traffic Audit.'] }
     ] },
-    'settings-targets': { title: 'Recovery Targets', sections: [
+    'settings-targets': { title: 'How Recovery Targets Work', sections: [
       { h: 'What this page is', p: ['The benchmarks Bar Cop grades you against across Profit, Revenue, and Traffic, plus the conversion rates behind the Traffic scoreboard. Industry defaults are pre-filled so you can start day one. Each section saves with its own Save button.'] },
       { h: 'How to use it', p: ['Adjust each target to your own operation: pour, food, labor, and prime cost percentages for Profit; check average and revenue per labor hour for Revenue; rating, reviews, and response rate for Traffic.'] },
       { h: 'Conversion rates', p: ['These turn a digital improvement into a dollar figure on the Recovery Scoreboard for Traffic fixes. The defaults are industry benchmarks; override them once your own data shows a different conversion.'] }
     ] },
-    'getting-started': { title: 'Getting Started', sections: [
+    'getting-started': { title: 'How Getting Started Works', sections: [
       { h: 'What this page is', p: ['The setup checklist that turns a blank account into a working one, grouped into four phases: Foundation, Baseline Diagnosis, Capture System, and Weekly Work.'] },
       { h: 'How to use it', p: ['Work the steps top to bottom. Each one has a Go button that drops you on the exact screen to do it, and you check it off when done. The phases build on each other: Foundation sets your profile and targets, Baseline runs your first audits, Capture builds the operational engine, and Weekly Work is the ongoing rhythm.'] },
       { h: 'When it is done', p: ['Once every step is checked, Getting Started drops off the Settings sidebar on its own so it is not in your way. Your setup status always lives on the Settings overview.'] }
     ] },
-    'user-account': { title: 'Your Account', sections: [
+    'user-account': { title: 'How Your Account Works', sections: [
       { h: 'What this page is', p: ['Your personal account controls: your password, your subscription, a full data backup, and, outside the demo, the testing tools.'] },
       { h: 'Password and backup', p: ['Set a new password any time. Export Backup saves everything in your account (settings, weekly numbers, audits, and all your Inventory, Labor, and Shift records) to one file you keep offsite. Restore from a backup to recover your data or move it.'] },
       { h: 'Testing tools', p: ['Load Sample Data fills every system with realistic records so you can see how the calculations and layouts behave. Clear All Data wipes every record and starts fresh. These are for setting up and testing, not daily use.'] }
     ] },
-    'user-team': { title: 'Team Members', sections: [
+    'user-team': { title: 'How Team Members Work', sections: [
       { h: 'What this page is', p: ['Where you invite the rest of your team and decide what each person can see. Admins only.'] },
       { h: 'Roles', p: ['Admin sees everything. Viewer is read-only on all data, useful for a bookkeeper. Staff gets only the sections you check, with optional edit and delete on each, so a bartender sees what they need and nothing more.'] },
       { h: 'Inviting and permissions', p: ['Enter an email, pick a role, and for Staff check the sections to grant. Check Access to give a section, and Allow Edit or Delete to let them change existing entries; left unchecked, Staff can add new entries but not alter past ones. Send the invite and they get an email to join. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.'] }
@@ -1912,6 +1911,8 @@ const App = {
     // navigate() already handles these but we still need to short-circuit so
     // showApp isn't called (which would briefly flash a module shell).
     if (id === 'settings') { S.HubSettings.open(); return; }
+    if (id === 'settings-profile') { S.HubSettings.open('business-profile'); return; }
+    if (id === 'settings-targets') { S.HubSettings.open('recovery-targets'); return; }
     if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
