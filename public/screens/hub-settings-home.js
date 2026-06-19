@@ -53,37 +53,67 @@ S.HubSettingsHome = {
       + '<div style="border:1px solid var(--b2);border-radius:6px;padding:4px 16px;">' + groupRows + '</div>'
       + '</div>');
 
-    // ── Account ──
-    const s       = (App.data && App.data.settings) || {};
-    const barName = s.bar_name || 'Your operation';
-    const email   = (window.DB && DB._user && DB._user.email) || (App.demoMode ? 'Demo account' : '');
-    const plan    = App.demoMode ? 'Demo' : 'Active';
-    const acctRow = (label, val) => '<div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="width:110px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;">' + label + '</div>'
-      + '<div style="flex:1;font-size:13px;color:var(--t1);">' + val + '</div></div>';
-    const acctCard = '<div class="card" style="margin-bottom:18px;">'
+    // ── Shared row + card helpers ──
+    const dash = '<span style="color:var(--t3);">Not set</span>';
+    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--b2);">'
+      + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
+      + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
+    const card = (title, act, btnLabel, rowsHtml) => '<div class="card" style="margin-bottom:18px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Account</div>'
-      +   '<button class="btn btn-ghost btn-sm" data-act="user-account">Manage</button>'
-      + '</div>'
-      + acctRow('Operation', esc(barName))
-      + (email ? acctRow('Signed in', esc(email)) : '')
-      + acctRow('Plan', plan)
-      + '</div>';
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
+      +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button>'
+      + '</div>' + rowsHtml + '</div>';
 
-    // ── Jump to ──
-    const link = (act, label, sub) => '<div class="set-link" data-act="' + act + '" style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:16px 18px;cursor:pointer;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + label + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + sub + '</div></div>';
-    const links = '<div class="sh" style="margin:0 0 8px;">Jump To</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">'
-      +   link('settings-profile', 'Business Profile', 'Name, sales, service periods, and your public links.')
-      +   link('settings-targets', 'Recovery Targets', 'Profit, revenue, and traffic benchmarks Bar Cop measures against.')
-      +   (complete ? '' : link('getting-started', 'Getting Started', 'The full setup checklist, step by step.'))
-      +   link('user-account', 'Your Account', 'Password, subscription, and backups.')
-      + '</div>';
+    // ── Account (subscription + renewal + team for admins) ──
+    const s       = (App.data && App.data.settings) || {};
+    const email   = (window.DB && DB._user && DB._user.email) || (App.demoMode ? 'Demo account' : '');
+    const isAdmin = !!(window.DB && DB.isAdmin && DB.isAdmin());
+    const sub     = App.subscription || {};
+    const planVal = App.demoMode ? 'Demo'
+      : (sub.status === 'active' ? '<span style="color:var(--green);font-weight:700;">Active</span>'
+        : (sub.status ? esc(String(sub.status)) : 'No active subscription'));
+    const renewRaw = sub.period_end || sub.current_period_end;
+    let renewVal = '';
+    if (renewRaw) {
+      const d = new Date(typeof renewRaw === 'number' ? (renewRaw > 1e12 ? renewRaw : renewRaw * 1000) : renewRaw);
+      if (!isNaN(d.getTime())) renewVal = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    const acctRows = kvRow('Operation', esc(s.bar_name || 'Your operation'))
+      + (email ? kvRow('Signed in', esc(email)) : '')
+      + kvRow('Plan', planVal)
+      + (renewVal ? kvRow('Renews', esc(renewVal)) : '')
+      + (isAdmin ? '<div style="display:flex;gap:14px;padding:9px 0;align-items:center;"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : '');
+    const acctCard = card('Account', 'user-account', 'Manage', acctRows);
 
-    mount.innerHTML = '<div class="screen">' + head + setupCard + acctCard + links + '</div>';
+    // ── Configuration snapshot — how Bar Cop is tuned, at a glance ──
+    const t    = s.targets || {};
+    const rt   = ((App.data.revenue_settings || {}).targets) || {};
+    const tg   = ((App.data.traffic_settings || {}).targets) || {};
+    const urls = ((App.data.traffic_settings || {}).urls) || {};
+    const fmt$0 = (v) => App.fmtCurrency(v || 0, 0);
+    const periods = (s.service_periods || []).map(p => p && p.name).filter(Boolean);
+    const platforms = App.TRAFFIC_PLATFORMS || [];
+    const connected = platforms.filter(p => urls[p.urlKey]).length;
+
+    const profileRows = kvRow('Operation', esc(s.bar_name || '') || dash)
+      + kvRow('Location', esc(s.city_state || '') || dash)
+      + kvRow('Phone', esc(s.phone || '') || dash)
+      + kvRow('Address', esc(s.address || '') || dash)
+      + kvRow('Bar Sales', s.annual_bar_revenue ? fmt$0(s.annual_bar_revenue) + '/yr' : dash)
+      + kvRow('Food Sales', s.annual_food_revenue ? fmt$0(s.annual_food_revenue) + '/yr' : dash)
+      + kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash)
+      + kvRow('Links', platforms.length ? (connected + ' of ' + platforms.length + ' connected') : dash);
+    const profileCard = card('Business Profile', 'settings-profile', 'Edit', profileRows);
+
+    const targetRows = kvRow('Prime Cost', (t.prime_cost_pct ?? 60) + '%')
+      + kvRow('Pour Cost', (t.bar_pour_cost_pct ?? 22) + '%')
+      + kvRow('Food Cost', (t.food_cost_pct ?? 32) + '%')
+      + kvRow('Labor Cost', (t.labor_cost_pct ?? 30) + '%')
+      + kvRow('Check Average', fmt$0(rt.check_avg ?? 35))
+      + kvRow('Google Rating', (tg.google_rating ?? 4.3) + ' ★');
+    const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
+
+    mount.innerHTML = '<div class="screen">' + head + setupCard + acctCard + profileCard + targetCard + '</div>';
     this._wire();
   },
 
