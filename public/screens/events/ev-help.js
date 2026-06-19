@@ -15,7 +15,7 @@ S.EventsHelp = {
     App.showHelpModal('Events Help and FAQ', [
       { p: ['This page is the full Help and FAQ for Events: how to get started, the booking lifecycle, the calendar and regulars, and how Events feeds This Week, the audits, Books, and Labor scheduling.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "deposit", "quote", or "regular" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Events carries its own directions. Open the screen you have a question about, like Bookings or the Calendar, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Events carries its own directions. Open the screen you have a question about, like Event Booking or the Event Calendar, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
     ]);
   },
 
@@ -24,9 +24,9 @@ S.EventsHelp = {
       { q: 'What does the Events section do?',
         a: 'Events is where you run the demand side of the business: parties, buyouts, catering, your regulars, and the dates you plan around. A booking is worked from the first phone call to the paid invoice, with its own profit and loss. It is a feeder, like the Control sections, so the revenue and labor from your events flow into This Week, the audits, and Books without you typing the numbers twice. The info "i" on any Events screen explains how that screen works.' },
       { q: 'Where do I start?',
-        a: 'Log your first booking when a lead comes in, even if all you have is a name and a date. Build a couple of packages on the Pricing screen so your quotes prefill. Add your regulars so birthday and anniversary outreach has a home. Then use the Calendar to see what is coming. None of it has to be perfect on day one; the value builds as you log.' },
+        a: 'Log your first booking when a lead comes in, even if all you have is a name and a date. Build a couple of packages on the Price Packages screen so your quotes prefill. Add your regulars so birthday and anniversary outreach has a home. Then use the Event Calendar to see what is coming. None of it has to be perfect on day one; the value builds as you log.' },
       { q: 'Do I need every screen?',
-        a: 'No. Bookings is the heart of it. The Calendar, Regulars, and Pricing make bookings easier and catch the money around them, but you can run the section on Bookings alone and add the rest as you go.' }
+        a: 'No. Event Booking is the heart of it. The Event Calendar, Track Regulars, and Price Packages make bookings easier and catch the money around them, but you can run the section on Event Booking alone and add the rest as you go.' }
     ]},
     { t: 'Bookings', qa: [
       { q: 'How does a booking move through the stages?',

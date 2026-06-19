@@ -154,7 +154,7 @@ S.EventsPricing = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Pricing Works', [
+    App.showHelpModal('How Price Packages Work', [
       { p: ['Your saved packages and a quick calculator, both feeding your booking quotes.'] },
       { h: 'Rate Card', p: ['Build your standard packages: the per-head price, the food and beverage minimum, any room fee, and the cover range each fits. On a booking, picking a package prefills the quote so you are not retyping prices every time. Export PDF prints the list to hand a client or keep on file.'] },
       { h: 'Catering Calculator', p: ['Tap Catering Calculator for a one-off job. Enter the per-head food cost and a target food cost percent, and Bar Cop sets the per-head price. Add the bar cost, staff hours, and other costs, then check the Gross Margin to confirm the price covers everything. It starts from your average front-of-house wage from Labor Control. The same calculator is on every booking\'s quote.'] }

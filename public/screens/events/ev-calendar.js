@@ -207,7 +207,7 @@ S.EventsCalendar = {
   },
 
   showHowTo() {
-    App.showHelpModal('How the Calendar Works', [
+    App.showHelpModal('How the Event Calendar Works', [
       { p: ['One month view of everything that fills the room: your booked events on their dates, the recognized holidays Bar Cop already knows, and the local dates you add yourself.'] },
       { h: 'Moving Around', p: ['Step months with the arrows, or jump back with This Month. The current month is tagged gold and today is highlighted. On a phone the grid becomes an agenda list of the days that have something on them.'] },
       { h: 'Booked Events', p: ['Every booking marked Booked or Completed shows on its event date. Tap it to open the booking.'] },

@@ -801,7 +801,7 @@ S.EventsBookings = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Bookings Works', [
+    App.showHelpModal('How Event Booking Works', [
       { p: ['One record per party, worked from the first call to the paid invoice. Read the stat strip up top for what is open, stale, booked soon, and the deposits you are owed. Log a lead in the New Booking form on the page, or open any row to work it. Worksheet prints a blank inquiry pad to capture calls by the phone.'] },
       { h: 'The Active Booking', p: ['Open a booking and the page follows its stage, like Active Shift follows a shift. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
       { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; it stays in the pipeline and you can reopen it.'] },
