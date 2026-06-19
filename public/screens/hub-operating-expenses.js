@@ -267,19 +267,22 @@ S.HubOperatingExpenses = {
   },
 
   // One real-record row: Date, Category (+Recurring tag), Vendor, Amount, actions.
-  // Recurring rows have no Duplicate; they get Renew when the term is ending.
-  _logRowHtml(r) {
+  // opts.minimal (History) = Edit + Delete only — Duplicate and Renew are
+  // forward-looking, so they live on the Current tab (this/next month) only.
+  _logRowHtml(r, opts) {
+    opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const isRec = !!(r.recurring || r.recurring_parent);
+    const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> ';
+    const del  = '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
     let actions = '';
-    if (isRec) {
+    if (opts.minimal) {
+      actions = edit + del;
+    } else if (isRec) {
       if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button> ';
-      actions += '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
-        + '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
+      actions += edit + del;
     } else {
-      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Duplicate</button> '
-        + '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> '
-        + '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
+      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Duplicate</button> ' + edit + del;
     }
     return '<tr>'
       + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
@@ -505,7 +508,7 @@ S.HubOperatingExpenses = {
   _logTableHtml(recs, id) {
     const logRows = recs.length === 0
       ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this range.</td></tr>'
-      : recs.map(r => this._logRowHtml(r)).join('');
+      : recs.map(r => this._logRowHtml(r, { minimal: true })).join('');
     return '<div class="card card-bleed data-card"' + (id ? ' id="' + id + '"' : '') + '>'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
