@@ -1467,7 +1467,7 @@ const App = {
     ] },
     'year-end': { title: 'Year-End Review', sections: [
       { h: 'What this page is', p: ['The annual roll-up: your full year in one place for tax season and for your own read on how the year went.'] },
-      { h: 'How to use it', p: ['Generate the review for the year you want. It is built from the same logged data as your weekly and monthly numbers, so it ties out, and like everything in Books it is meant to hand to your accountant to verify before filing.'] }
+      { h: 'How to use it', p: ['Pick the year, then Generate File for the annual workbook or Executive Summary for the PDF. It is built from the same logged data as your weekly and monthly numbers, so it ties out. What is in the file is listed on the page. Like everything in Books, hand it to your accountant to verify before filing.'] }
     ] },
     'permits': { title: 'Permits and Licenses', sections: [
       { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its next renewal date and Bar Cop watches the calendar for you.'] },
