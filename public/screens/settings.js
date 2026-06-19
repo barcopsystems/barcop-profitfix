@@ -458,6 +458,15 @@ S.HubSettings = {
         operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), note:'' });
       });
     });
+    // Two recurring-term bills (fixed cost + fixed term) so the page shows the
+    // recurring feature with data. Bar Cop fills in each elapsed month on load.
+    // The software subscription's term ends next month, so the "ending" banner
+    // shows; the alarm contract runs long, so it does not.
+    const monthAnchor = (back, day) => App.ymdLocal(new Date(today.getFullYear(), today.getMonth() - back, day));
+    operatingExpenses.push(
+      { id:uid(), date:monthAnchor(10, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(7, 5),  category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
+    );
     App.data.operating_expenses = operatingExpenses;
 
     // Permits and licenses: a realistic Austin bar/restaurant set so the page
