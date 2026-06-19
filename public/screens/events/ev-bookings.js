@@ -178,12 +178,11 @@ S.EventsBookings = {
         + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.type + C.space + C.recv + C.source + C.stage + '</div>'
         + C.notes;
     }
-    // Default (the Edit popup): roomier stacked rows.
-    return '<div class="form-row" style="gap:14px;">' + C.name + '</div>'
-      + '<div class="form-row" style="gap:14px;">' + C.cname + C.phone + C.email + '</div>'
-      + '<div class="form-row" style="gap:14px;">' + C.type + C.source + C.stage + '</div>'
-      + '<div class="form-row" style="gap:14px;">' + C.date + C.time + C.party + C.space + '</div>'
-      + '<div class="form-row" style="gap:14px;">' + C.recv + '</div>'
+    // Default (the Edit popup): narrow-form reflows these into a clean 2-up grid.
+    // Event Name and Notes stay full-width; the rest pair off two per row.
+    const nameFull = '<div class="f" style="width:100%;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">' + nameFull + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">' + C.cname + C.phone + C.email + C.type + C.source + C.stage + C.date + C.time + C.party + C.space + C.recv + '</div>'
       + C.notes;
   },
 
@@ -683,14 +682,14 @@ S.EventsBookings = {
   // ── Edit Details (popup; uses the shared field set) ──────────────────────
   showForm(id) {
     const b = id ? this.bookings().find(x => x.id === id) : null;
-    const html = '<div class="card form-card" style="margin:0;">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (id ? 'Edit Booking' : 'New Booking') + '</div>'
       + this.fieldsHtml(b, 'ebf')
       + '<div class="card-actions"><button class="btn btn-primary" id="ebf-save">' + (id ? 'Save Booking' : 'Create Booking') + '</button>'
       +   '<button class="btn btn-ghost" id="ebf-cancel">Cancel</button>'
       +   '<span id="ebf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
-    App.openModal(html, { id: 'eb-form', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'eb-form', maxWidth: 540, noClose: true });
     document.getElementById('ebf-cancel')?.addEventListener('click', () => App.closeModal('eb-form'));
     document.getElementById('ebf-save')?.addEventListener('click', () => this.saveForm(id));
   },
