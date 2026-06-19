@@ -43,26 +43,24 @@ S.HubBooks = {
 
     mount.innerHTML =
       '<div class="screen">'
-      + '<div class="card" style="margin-bottom:18px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Month-End Books</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Pick a month. Bar Cop pulls every number together into one file your accountant or bookkeeper can work from. Income statement, inventory value, cash variance, voids and comps, tip allocation worksheet for IRS Form 8027, shrinkage, and labor cost. All built from what you log in Bar Cop. Nothing to re-enter.</div>'
-        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
-          + '<div class="f" style="width:240px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
-          + '<div style="display:flex;align-items:flex-end;gap:10px;">'
-            + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
-            + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
-          + '</div>'
+      + '<div class="card form-card">'
+        + '<div class="card-title">Month-End Books</div>'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
+          + '<div class="f" style="width:300px;"><label>Close Month</label><select id="hb-month">' + monthOpts + '</select></div>'
         + '</div>'
-        + '<div id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        + '<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:18px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you file</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before filing anything or closing the books.</div>'
+        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+          + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a CPA, tax preparer, or legal advisor. This is a worksheet, not your official financial statement. Your accountant should review and verify every figure before you file anything or close the books.</div>'
         + '</div>'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
+        + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
+        + '<span id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
       + '</div>';
 
-    // No screen-specific topbar actions on this screen — buttons live in the card.
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
@@ -230,8 +228,8 @@ S.HubBooks = {
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
       + '<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">' + esc(r[1]) + '</td></tr>'
     ).join('');
-    return '<div class="card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">What is in the file</div>'
+    return '<div class="card form-card">'
+      + '<div class="card-title">What\'s In the File</div>'
       + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
       + '</div>';
   },
