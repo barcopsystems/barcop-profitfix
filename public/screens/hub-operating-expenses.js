@@ -305,8 +305,10 @@ S.HubOperatingExpenses = {
     return out;
   },
 
-  // One month's expenses as a data-card, split into Recurring and Variable.
-  // opts.next = the next-month card (recurring shows as Expected, not booked).
+  // One month's expenses, split into a Recurring card and a Variable card. The
+  // section name is the first column header (no separate header row), so the
+  // header reads "Recurring | Category | Vendor | Amount". opts.next = the
+  // next-month card (recurring shows as Expected, not booked).
   _monthCardHtml(monthKey, opts) {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
@@ -316,33 +318,34 @@ S.HubOperatingExpenses = {
     const variable  = recs.filter(r => !(r.recurring || r.recurring_parent)).sort(byDate);
     const expected  = opts.next ? this._expectedRecurring(monthKey) : [];
 
-    const COLS = 5;
-    const labelRow = (txt) => '<tr><td colspan="' + COLS + '" style="background:var(--surface);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 12px;">' + txt + '</td></tr>';
-    const emptyRow = (txt) => '<tr><td colspan="' + COLS + '" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
+    const emptyRow = (txt) => '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
     const expectedRow = (p) => '<tr style="opacity:0.6;">'
       + '<td style="color:var(--t3);white-space:nowrap;">Expected</td>'
       + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
       + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
       + '<td class="no-print"></td></tr>';
-
-    let body = labelRow('Recurring');
-    if (recurring.length || expected.length) {
-      body += recurring.map(r => this._logRowHtml(r)).join('') + expected.map(expectedRow).join('');
-    } else {
-      body += emptyRow('No recurring bills ' + (opts.next ? 'expected next month.' : 'this month.'));
-    }
-    body += labelRow('Variable');
-    body += variable.length ? variable.map(r => this._logRowHtml(r)).join('')
-      : emptyRow(opts.next ? 'Nothing logged for next month yet.' : 'No variable expenses logged this month yet.');
-
-    const heading = '<div class="sh" style="margin:24px 0 10px;">' + (opts.next ? 'Next Month' : 'This Month') + ' — ' + esc(this._monthLabel(monthKey)) + '</div>';
-    return heading + '<div class="card card-bleed data-card">'
+    // The first column header carries the section name; the rest are the columns.
+    const sectionCard = (name, rowsHtml) => '<div class="card card-bleed data-card" style="margin-bottom:14px;">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
-      +   '<tbody>' + body + '</tbody>'
+      +   '<thead><tr><th>' + name + '</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
+      +   '<tbody>' + rowsHtml + '</tbody>'
       + '</table></div></div>';
+
+    const recRows = (recurring.length || expected.length)
+      ? recurring.map(r => this._logRowHtml(r)).join('') + expected.map(expectedRow).join('')
+      : emptyRow('No recurring bills ' + (opts.next ? 'expected next month.' : 'this month.'));
+    const varRows = variable.length
+      ? variable.map(r => this._logRowHtml(r)).join('')
+      : emptyRow(opts.next ? 'Nothing logged for next month yet.' : 'No variable expenses logged this month yet.');
+
+    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">' + (opts.next ? 'Next Month' : 'This Month') + ' — ' + esc(this._monthLabel(monthKey)) + '</div>'
+      + (opts.exportId ? '<button class="btn btn-ghost btn-sm no-print" id="' + opts.exportId + '">Export PDF</button>' : '')
+      + '</div>';
+    const wrap = opts.wrapId ? ' id="' + opts.wrapId + '"' : '';
+    return heading + '<div' + wrap + '>' + sectionCard('Recurring', recRows) + sectionCard('Variable', varRows) + '</div>';
   },
 
   // ── Current tab: stats + add form + This Month / Next Month cards ─────────
@@ -364,25 +367,27 @@ S.HubOperatingExpenses = {
 
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
     const addCard = '<div class="card form-card">'
-      + '<div class="card-title">Add Expense</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
-      +   '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
-      +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
-      +   '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
+      + App.collapsibleCardTitle('oex-add', 'Add Expense')
+      + '<div class="collapse-body">'
+      +   '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      +     '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
+      +     '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
+      +     '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
+      +     '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
+      +   '</div>'
+      +   '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
+      +   '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
+      +   '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
+      +   '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>'
-      + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
-      + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
-      + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
-    const addButtons = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+    const addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
       + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
       + '</div>';
 
     return statsCard + warnBanner + addCard + addButtons
-      + this._monthCardHtml(mk, { next: false })
+      + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
       + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
   },
 
@@ -392,6 +397,12 @@ S.HubOperatingExpenses = {
     document.getElementById('oexa-recurring')?.addEventListener('change', (e) => {
       const w = document.getElementById('oexa-term-wrap');
       if (w) w.style.display = e.target.checked ? '' : 'none';
+    });
+    this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
+    App.applyCollapsed(this.container);
+    document.getElementById('oex-export-this')?.addEventListener('click', () => {
+      const el = document.getElementById('oex-thismonth');
+      if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
     });
     this._wireRows(this.container);
   },
@@ -445,13 +456,14 @@ S.HubOperatingExpenses = {
       +   '<tbody>' + logRows + '</tbody>'
       + '</table></div></div>';
 
-    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 10px;">'
-      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
-      + '</div>';
     const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + rangeChips + '</div>';
+    const byCatHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;">'
+      + '<div class="sh" style="margin:0;">By Category</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="oex-export">Export PDF</button>'
+      + '</div>';
 
-    return exportRow + '<div id="oex-export-area">'
-      + '<div class="sh" style="margin:0 0 10px;">By Category</div>' + byCatCard
+    return '<div id="oex-export-area">'
+      + byCatHeading + byCatCard
       + filterRow + logCard
       + '</div>';
   },
