@@ -174,7 +174,11 @@ S.EventsBookings = {
     };
     // Compact (the inline landing form): all data cells on two rows; notes below.
     if (compact) {
-      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.name + C.cname + C.phone + C.email + C.type + C.source + C.stage + '</div>'
+      // First row: Event Name 15px wider, Stage 15px narrower (offsetting, so the
+      // other five cells keep their width).
+      const nameW  = '<div class="f" style="flex:1 1 145px;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
+      const stageW = '<div class="f" style="flex:1 1 115px;"><label>Stage</label><select id="' + p + '-stage" class="form-input">' + stageOpts + '</select></div>';
+      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.type + C.source + stageW + '</div>'
         + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.date + C.time + C.party + C.space + C.recv + C.reg + '</div>'
         + C.notes;
     }
