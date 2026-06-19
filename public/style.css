@@ -360,6 +360,9 @@ input,select,textarea{color-scheme:dark;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
 /* Events New Booking inline form: equal cells so all data fits on two rows. */
 .eb-crow>.f{flex:1 1 130px;min-width:0;}
+/* Events staffing roster: the standard #0D181E data rows inside the workspace card. */
+.eb-staff-tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
+.eb-staff-tbl tbody tr:last-child td{border-bottom:none;}
 
 /* Individual field */
 .f{display:flex;flex-direction:column;gap:5px;}
