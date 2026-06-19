@@ -178,11 +178,9 @@ S.EventsBookings = {
         + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.type + C.space + C.recv + C.source + C.stage + '</div>'
         + C.notes;
     }
-    // Default (the Edit popup): narrow-form reflows these into a clean 2-up grid.
-    // Event Name and Notes stay full-width; the rest pair off two per row.
-    const nameFull = '<div class="f" style="width:100%;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
-    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">' + nameFull + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">' + C.cname + C.phone + C.email + C.type + C.source + C.stage + C.date + C.time + C.party + C.space + C.recv + '</div>'
+    // Default (the Edit popup): narrow-form reflows these into a clean 2-up grid,
+    // six cells per column. Event Name takes the first spot; Notes is full-width.
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">' + C.name + C.cname + C.phone + C.email + C.type + C.source + C.stage + C.date + C.time + C.party + C.space + C.recv + '</div>'
       + C.notes;
   },
 
