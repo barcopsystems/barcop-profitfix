@@ -60,6 +60,21 @@ S.LaborBuildSchedule = {
     d.setDate(d.getDate() + dayIdx);
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
   },
+  // The ISO (YYYY-MM-DD) date for a day column, used to match a day to a booking.
+  dayIso(weekStart, dayIdx) {
+    if (!weekStart) return '';
+    const d = new Date(weekStart + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + dayIdx);
+    return App.ymdLocal(d);
+  },
+  // Confirmed events (Booked / Completed) falling on a given calendar day.
+  bookingsOnDate(iso) {
+    if (!iso) return [];
+    return ((App.data && App.data.bookings) || []).filter(b =>
+      (b.stage === 'Booked' || b.stage === 'Completed') && String(b.event_date || '').slice(0, 10) === iso);
+  },
+  bookingName(b) { return (window.S && S.EventsBookings) ? S.EventsBookings.title(b) : (b.event_name || b.contact_name || 'the event'); },
   // A new, unsaved build (no editId, has shifts) would be discarded by loading
   // another week, so confirm first. Viewing/editing a posted week needs no
   // confirm — switching just re-reads the target week.
@@ -138,7 +153,7 @@ S.LaborBuildSchedule = {
       if (sched) {
         return {
           week_start: sched.week_start || '',
-          shifts: (sched.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end })),
+          shifts: (sched.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end, event: sh.event || '' })),
           notes: sched.notes || ''
         };
       }
@@ -160,7 +175,7 @@ S.LaborBuildSchedule = {
       this.editId = posted.id;
       this.draft = {
         week_start: posted.week_start || wk,
-        shifts: (posted.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end })),
+        shifts: (posted.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end, event: sh.event || '' })),
         notes: posted.notes || ''
       };
     } else {
@@ -312,8 +327,10 @@ S.LaborBuildSchedule = {
     const days = this.DAYS;
     const headCells = days.map((day, i) => {
       const dd = this.dayDate(d.week_start, i);
+      const ev = this.bookingsOnDate(this.dayIso(d.week_start, i));
+      const evChip = ev.length ? '<div style="margin-top:3px;"><span title="' + esc(ev.map(e => this.bookingName(e)).join(', ')) + '" style="font-size:8px;font-weight:800;letter-spacing:1px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:3px;padding:1px 5px;">EVENT</span></div>' : '';
       return '<th style="padding:8px 6px;text-align:center;font-size:10px;letter-spacing:1px;color:var(--t3);min-width:104px;">'
-        + day + (dd ? '<div style="font-size:10px;color:var(--t4);font-weight:400;letter-spacing:0;">' + dd + '</div>' : '') + '</th>';
+        + day + (dd ? '<div style="font-size:10px;color:var(--t4);font-weight:400;letter-spacing:0;">' + dd + '</div>' : '') + evChip + '</th>';
     }).join('');
 
     // Group active staff by department
@@ -425,7 +442,7 @@ S.LaborBuildSchedule = {
     const dt = new Date((c.date || '') + 'T00:00:00');
     const dStr = isNaN(dt.getTime()) ? esc(c.date || '') : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     return '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      + '<div style="font-size:12px;color:var(--t1);line-height:1.5;">Scheduling for <span style="font-weight:700;">' + esc(c.name || 'an event') + '</span>' + (c.date ? ' on ' + dStr : '') + '. Add the staff working it that day. When you log the shift, tag it to this event so its hours land on the Event P&amp;L.</div>'
+      + '<div style="font-size:12px;color:var(--t1);line-height:1.5;">Scheduling for <span style="font-weight:700;">' + esc(c.name || 'an event') + '</span>' + (c.date ? ' on ' + dStr : '') + '. Open each person working that day and check "Working ' + esc(c.name || 'the event') + '" so only their hours land on the Event P&amp;L.</div>'
       + '<button class="btn btn-ghost btn-sm" id="bs-ev-dismiss">Dismiss</button></div>';
   },
 
@@ -452,6 +469,7 @@ S.LaborBuildSchedule = {
     }
     const day = this._mobileDay;
     const dd = this.dayDate(d.week_start, this.DAYS.indexOf(day));
+    const dayEvents = this.bookingsOnDate(this.dayIso(d.week_start, this.DAYS.indexOf(day)));
 
     const chips = this.DAYS.map(dy => {
       const on = dy === day;
@@ -489,8 +507,9 @@ S.LaborBuildSchedule = {
     });
 
     const ddTot = (T.byDay && T.byDay[day]) || { hours: 0, count: 0 };
+    const evChip = dayEvents.length ? ' <span style="font-size:8px;font-weight:800;letter-spacing:1px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:3px;padding:1px 5px;vertical-align:middle;">EVENT</span>' : '';
     const header = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;">'
-      + '<div style="font-size:13px;color:var(--t1);font-weight:700;">' + esc(day) + (dd ? ' <span style="color:var(--t4);font-weight:400;">' + esc(dd) + '</span>' : '') + '</div>'
+      + '<div style="font-size:13px;color:var(--t1);font-weight:700;">' + esc(day) + (dd ? ' <span style="color:var(--t4);font-weight:400;">' + esc(dd) + '</span>' : '') + evChip + '</div>'
       + '<div style="font-size:11px;color:var(--t3);">' + ddTot.hours.toFixed(1) + 'h · ' + ddTot.count + ' shift' + (ddTot.count === 1 ? '' : 's') + '</div></div>';
 
     return '<div class="bs-dayview">'
@@ -570,7 +589,7 @@ S.LaborBuildSchedule = {
     const prior = this.priorSchedule();
     if (!prior) return;
     this.editId = null;
-    this.draft.shifts = (prior.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
+    this.draft.shifts = (prior.shifts || []).map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end, event: s.event || '' }));
     this.draft.from_template_name = '';
     this.saveDraft();
     this.draw();
@@ -581,14 +600,26 @@ S.LaborBuildSchedule = {
     const staff = this.staffById(staffId);
     if (!staff) return;
     const editing = idx != null && this.draft.shifts[idx];
-    const sh = editing ? this.draft.shifts[idx] : { staff_id: staffId, day, start: '', end: '' };
+    const sh = editing ? this.draft.shifts[idx] : { staff_id: staffId, day, start: '', end: '', event: '' };
     const sal = App.isSalaried(staff);
+    // Event tagging: only when a confirmed booking falls on this day. Checking it
+    // sends this person's hours to that event's P&L (and nobody else's).
+    const evs = this.bookingsOnDate(this.dayIso(this.draft.week_start, this.DAYS.indexOf(day)));
+    let eventField = '';
+    if (evs.length === 1) {
+      eventField = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">'
+        + '<input type="checkbox" id="bs-m-event" data-eid="' + esc(evs[0].id) + '"' + (sh.event === evs[0].id ? ' checked' : '') + '/> Working ' + esc(this.bookingName(evs[0])) + '</label>';
+    } else if (evs.length > 1) {
+      eventField = '<div class="f" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);"><label>Working an Event?</label><select id="bs-m-event-sel"><option value="">No</option>'
+        + evs.map(e => '<option value="' + esc(e.id) + '"' + (sh.event === e.id ? ' selected' : '') + '>' + esc(this.bookingName(e)) + '</option>').join('') + '</select></div>';
+    }
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
       + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">'
       + this._timeSelectFields('bs-m-start', sh.start, 'Start')
       + this._timeSelectFields('bs-m-end', sh.end, 'End')
       + '</div>'
       + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
+      + eventField
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button>'
       + '<button class="btn btn-ghost" id="bs-m-cancel">Cancel</button>'
@@ -616,8 +647,12 @@ S.LaborBuildSchedule = {
     document.getElementById('bs-m-save')?.addEventListener('click', () => {
       const start = this._readTime('bs-m-start'), end = this._readTime('bs-m-end');
       if (!start || !end) { errEl.textContent = 'Set a start and end time.'; errEl.style.display = 'inline'; return; }
-      if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end }; }
-      else { this.draft.shifts.push({ staff_id: staffId, day, start, end }); }
+      let event = sh.event || '';
+      const cb = document.getElementById('bs-m-event'), sel = document.getElementById('bs-m-event-sel');
+      if (cb) event = cb.checked ? cb.dataset.eid : '';
+      else if (sel) event = sel.value || '';
+      if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end, event }; }
+      else { this.draft.shifts.push({ staff_id: staffId, day, start, end, event }); }
       this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
     });
   },
@@ -829,7 +864,8 @@ S.LaborBuildSchedule = {
         staff_id: sh.staff_id, name: c.staff ? c.staff.name : '',
         position_id: c.staff ? c.staff.position_id : '',
         day: sh.day, start: sh.start, end: sh.end,
-        hours: c.hours, wage: c.wage, cost: c.cost
+        hours: c.hours, wage: c.wage, cost: c.cost,
+        event: sh.event || ''
       };
     });
     totalCost += this.salariedWeekCost(d.week_start);
