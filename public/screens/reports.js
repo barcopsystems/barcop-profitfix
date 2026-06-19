@@ -88,7 +88,7 @@ S.Reports = {
       // Export-acknowledgment gate (once per visit) — active notice before the
       // financial worksheet downloads. See [[legal-protection]].
       if(!this._pnlAckGiven){
-        const ok = await App.confirm({
+        const ok = await App.confirmExport({
           title: 'Before You Export Your P&L',
           message: 'This Weekly P&L Brief is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.',
           confirmText: 'I Understand, Continue',
