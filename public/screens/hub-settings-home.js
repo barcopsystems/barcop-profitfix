@@ -25,16 +25,37 @@ S.HubSettingsHome = {
     const pct    = total ? Math.round(done / total * 100) : 0;
     const complete = total > 0 && done === total;
 
-    // ── Setup completeness ──
+    // ── Shared #0D181E data-row block helpers ──
+    // finish(): stamp the --row-div divider on every row but the last (rows carry a {{div}} placeholder).
+    const finish = (rows) => {
+      const items = rows.filter(Boolean);
+      return items.map((r, i) => r.replace('{{div}}', i < items.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '')).join('');
+    };
+    // insetBlock = rows in a rounded --b-edge container (sits inside a card that has other content above it, e.g. Setup).
+    const insetBlock = (rows) => '<div style="border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">' + finish(rows) + '</div>';
+    // bleedBlock = rows pulled flush to the card's left / right / bottom edges (the card carries overflow:hidden).
+    const bleedBlock = (rows) => '<div class="kv-bleed">' + finish(rows) + '</div>';
+    const dash = '<span style="color:var(--t3);">Not set</span>';
+    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:11px 20px;background:#0D181E;{{div}}">'
+      + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
+      + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
+    // The Account / Profile / Targets cards bleed their data rows to the card edges (data-card look):
+    // overflow:hidden clips the rounded corners, the title's bottom margin is dropped so rows sit flush under the band.
+    const card = (title, act, btnLabel, rows) => '<div class="card form-card" style="margin-bottom:18px;overflow:hidden;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:0;"><span>' + title + '</span>'
+      +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
+      + bleedBlock(rows) + '</div>';
+
+    // ── Setup completeness ── (inset #0D181E block; it sits below the progress bar so it does not bleed)
     const groupRows = GROUPS.map(g => {
       const gt   = TASKS.filter(t => t.group === g.id);
       const gd   = gt.filter(t => prog[t.id]).length;
       const gpct = gt.length ? Math.round(gd / gt.length * 100) : 0;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;background:#0D181E;{{div}}">'
         + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(g.title) + '</div>'
         + '<div style="width:120px;height:5px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="width:' + gpct + '%;height:100%;background:' + (gpct === 100 ? 'var(--green)' : 'var(--gold)') + ';"></div></div>'
         + '<div style="width:44px;text-align:right;font-size:11px;color:var(--t3);">' + gd + '/' + gt.length + '</div></div>';
-    }).join('');
+    });
 
     // The setup card exists only while there is setup left to do. Once every
     // step is done, Getting Started disappears (from the sidebar too), so the
@@ -44,25 +65,8 @@ S.HubSettingsHome = {
       +   '<button class="btn btn-primary btn-sm" data-act="getting-started">Continue Setup</button></div>'
       + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;">' + done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.</div>'
       + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="width:' + pct + '%;height:100%;background:var(--gold);"></div></div>'
-      + '<div style="border:1px solid var(--b2);border-radius:6px;padding:4px 16px;">' + groupRows + '</div>'
+      + insetBlock(groupRows)
       + '</div>');
-
-    // ── Shared row + card helpers ──
-    const dash = '<span style="color:var(--t3);">Not set</span>';
-    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:10px 14px;background:#0D181E;{{div}}">'
-      + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
-      + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
-    // Standard #0D181E data-row block: rounded --b-edge container, --row-div dividers, last row clean.
-    const rowsBlock = (rows) => {
-      const items = rows.filter(Boolean);
-      return '<div style="border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">'
-        + items.map((r, i) => r.replace('{{div}}', i < items.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '')).join('')
-        + '</div>';
-    };
-    const card = (title, act, btnLabel, rows) => '<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>' + title + '</span>'
-      +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
-      + rowsBlock(rows) + '</div>';
 
     // ── Account (subscription + renewal + team for admins) ──
     const s       = (App.data && App.data.settings) || {};
@@ -83,7 +87,7 @@ S.HubSettingsHome = {
       email ? kvRow('Signed in', esc(email)) : '',
       kvRow('Plan', planVal),
       renewVal ? kvRow('Renews', esc(renewVal)) : '',
-      isAdmin ? '<div style="display:flex;gap:14px;padding:10px 14px;background:#0D181E;align-items:center;{{div}}"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : ''
+      isAdmin ? '<div style="display:flex;gap:14px;padding:11px 20px;background:#0D181E;align-items:center;{{div}}"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : ''
     ];
     const acctCard = card('Account', 'user-account', 'Manage', acctRows);
 
