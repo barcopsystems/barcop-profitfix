@@ -143,10 +143,33 @@ S.HubPermits = {
       +   stat('Expired', expiredCt, expiredCt > 0 ? 'var(--red)' : '')
       + '</div></div>';
 
-    // Heads Up — legal disclaimer stays on the card (gold-tint, matches Books).
-    const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-bottom:16px;">'
+    // Inline Add Permit form, on the page under the stats. Heads Up (the legal
+    // disclaimer) lives at the bottom inside the card; the buttons sit below it.
+    const typeOpts  = this.TYPES.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
+    const recurOpts = this.RECURRENCES.map(r => '<option value="' + esc(r) + '"' + (r === 'Annual' ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
+    const headsUpInside = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
       + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the renewal dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements, status, and deadlines with your issuing agency.</div>'
+      + '</div>';
+    const addCard = '<div class="card form-card">'
+      + '<div class="card-title">Add Permit</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      +   '<div class="f" style="flex:1;min-width:240px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
+      +   '<div class="f" style="width:200px;"><label>Type</label><select id="hpa-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="width:150px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +   '<div class="f" style="width:180px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
+      +   '<div class="f" style="width:180px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
+      +   '<div class="f" style="width:140px;"><label>Last Cost ($)</label><input type="number" id="hpa-cost" step="0.01" min="0" placeholder="0.00"/></div>'
+      + '</div>'
+      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hpa-notes" placeholder="Issuing agency, account number, contact"></textarea></div></div>'
+      + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
+      + headsUpInside
+      + '</div>';
+    const addButtons = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="hpa-save">Add Permit</button>'
+      + '<button class="btn btn-ghost" id="hpa-clear">Start Over</button>'
       + '</div>';
 
     // Needs Attention — only when something is due or expired.
@@ -172,7 +195,45 @@ S.HubPermits = {
         + '</div>';
     }
 
-    // Filter chips + data-card list.
+    // Export PDF on a title-less heading row, right-aligned, above the list.
+    const exportRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:24px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm" id="hp-export">Export PDF</button>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + alertsCard + exportRow + '<div id="hp-list-region"></div>' + '</div>';
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+
+    // Wire the static parts (form, export, the Needs Attention renew buttons).
+    document.getElementById('hpa-save')?.addEventListener('click', () => this._saveAdd());
+    document.getElementById('hpa-clear')?.addEventListener('click', () => this._clearAdd());
+    document.getElementById('hp-export')?.addEventListener('click', () => {
+      const el = document.getElementById('hp-list');
+      if (el) App.exportPDF({ title: 'Permits and Licenses', root: el });
+    });
+    this.container.querySelectorAll('.hp-renew').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rec = this.records().find(r => r.id === btn.dataset.id);
+        if (rec) this._openRenewModal(rec);
+      });
+    });
+
+    // The chips + list re-render on their own so a filter click never wipes the
+    // half-filled Add Permit form above.
+    this._renderListRegion();
+  },
+
+  // Chips + the data-card list. Re-rendered alone on a filter change so the
+  // inline Add form keeps any in-progress entry.
+  _renderListRegion() {
+    const region = document.getElementById('hp-list-region');
+    if (!region) return;
+    const all = this.records();
+    const statuses = all.map(r => this._status(r));
+    const expiredCt = statuses.filter(s => s.key === 'expired').length;
+    const activeCt  = statuses.filter(s => s.key === 'active').length;
+    const dueSoonCt = statuses.filter(s => s.key === 'critical' || s.key === 'warn').length;
+    const fmt$ = (v) => App.fmtCurrency(v || 0, 0);
+
     const chipOpts = [
       { v: 'all',     label: 'All (' + all.length + ')' },
       { v: 'due',     label: 'Due in 30 Days (' + dueSoonCt + ')' },
@@ -184,7 +245,7 @@ S.HubPermits = {
     const recs = this._filtered();
     const logRows = recs.length === 0
       ? '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">' + (all.length === 0
-          ? 'No permits logged yet. Use Add Permit to track your first one.'
+          ? 'No permits logged yet. Use the form above to add your first one.'
           : 'No permits match this filter.') + '</td></tr>'
       : recs.map(r => {
           const s = this._status(r);
@@ -195,7 +256,7 @@ S.HubPermits = {
             + '<td style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
             + '<td style="text-align:right;">' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
             + '<td style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
-            + '<td style="text-align:right;white-space:nowrap;">'
+            + '<td class="no-print" style="text-align:right;white-space:nowrap;">'
             +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button> '
             +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button> '
             +   '<button class="btn btn-ghost btn-sm hp-del"  data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>'
@@ -203,45 +264,68 @@ S.HubPermits = {
           + '</tr>';
         }).join('');
 
-    const headingRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Permit Log</div>'
-      + '<button class="btn btn-primary btn-sm" id="hp-add">+ Add Permit</button>'
-      + '</div>';
     const chipsRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' + chips + '</div>';
-    const listCard = '<div class="card card-bleed data-card">'
+    const listCard = '<div class="card card-bleed data-card" id="hp-list">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<thead><tr>'
       +     '<th>Name</th><th>Type</th><th>Renewal Date</th><th>Recurrence</th>'
       +     '<th style="text-align:right;">Last Cost</th>'
-      +     '<th>Status</th><th></th>'
+      +     '<th>Status</th><th class="no-print"></th>'
       +   '</tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
       + '</table></div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + headsUp + alertsCard + headingRow + chipsRow + listCard + '</div>';
-    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+    region.innerHTML = chipsRow + listCard;
 
-    // Wire
-    document.getElementById('hp-add')?.addEventListener('click', () => this._openModal(null));
-    this.container.querySelectorAll('.fc-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filter = chip.dataset.v; this.renderMain(); });
+    region.querySelectorAll('.fc-chip').forEach(chip => {
+      chip.addEventListener('click', () => { this._filter = chip.dataset.v; this._renderListRegion(); });
     });
-    this.container.querySelectorAll('.hp-edit').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const rec = this.records().find(r => r.id === btn.dataset.id);
-        if (rec) this._openModal(rec);
-      });
-    });
-    this.container.querySelectorAll('.hp-renew').forEach(btn => {
+    region.querySelectorAll('.hp-renew').forEach(btn => {
       btn.addEventListener('click', () => {
         const rec = this.records().find(r => r.id === btn.dataset.id);
         if (rec) this._openRenewModal(rec);
       });
     });
-    this.container.querySelectorAll('.hp-del').forEach(btn => {
+    region.querySelectorAll('.hp-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rec = this.records().find(r => r.id === btn.dataset.id);
+        if (rec) this._openModal(rec);
+      });
+    });
+    region.querySelectorAll('.hp-del').forEach(btn => {
       btn.addEventListener('click', () => this._delete(btn.dataset.id));
     });
+  },
+
+  // ── Inline add form save / start over ────────────────────────────────────
+  async _saveAdd() {
+    const g = (id) => document.getElementById(id);
+    const name         = (g('hpa-name')?.value || '').trim();
+    const type         = g('hpa-type')?.value || 'Other';
+    const recurrence   = g('hpa-recurrence')?.value || 'Annual';
+    const renewal_date = g('hpa-renewal')?.value || '';
+    const last_renewed = g('hpa-last')?.value || '';
+    const costRaw      = g('hpa-cost')?.value;
+    const cost         = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
+    const notes        = (g('hpa-notes')?.value || '').trim();
+    const showErr = (m) => { const e = g('hpa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
+    if (!name) { showErr('Give the permit a name.'); return; }
+    if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
+    this.records().push({
+      id: App.uid ? App.uid() : ('prm-' + Date.now()),
+      name, type, renewal_date, recurrence, cost, last_renewed, notes,
+      created_at: new Date().toISOString()
+    });
+    await App.saveKey('permits_compliance');
+    this.renderMain();
+  },
+
+  _clearAdd() {
+    ['hpa-name', 'hpa-renewal', 'hpa-last', 'hpa-cost', 'hpa-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const t = document.getElementById('hpa-type');       if (t) t.selectedIndex = 0;
+    const r = document.getElementById('hpa-recurrence'); if (r) r.value = 'Annual';
+    const e = document.getElementById('hpa-err');        if (e) e.style.display = 'none';
   },
 
   // ── Add / Edit modal ────────────────────────────────────────────────────
