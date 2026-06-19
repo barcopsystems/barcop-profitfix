@@ -1476,7 +1476,8 @@ const App = {
     ] },
     'operating-expenses': { title: 'Operating Expenses', sections: [
       { h: 'What this page is', p: ['Where you log the bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest, by category and month.'] },
-      { h: 'How to use it', p: ['Add each expense with its category, amount, and date, and log recurring bills each month. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] }
+      { h: 'How to use it', p: ['Add each expense with its category, amount, and date, and log recurring bills each month. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+      { h: 'Good to know', p: ['Duplicate a past bill to log a recurring one in two clicks. Export PDF saves the filtered list. Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
     ] },
     'settings-profile': { title: 'Business Profile', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
