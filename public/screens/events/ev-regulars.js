@@ -28,21 +28,21 @@ S.EventsRegulars = {
 
   // Shared field cells; p is the id prefix so the inline add form and the edit
   // modal never share ids.
-  formCells(r, p) {
-    const v = x => (x != null && x !== '') ? x : '';
-    return '<div class="form-row" style="gap:14px;">'
-      + '<div class="f"><label>Name</label><input type="text" id="' + p + '-name" value="' + esc(r?.name || '') + '" placeholder="Jen Mitchell"/></div>'
-      + '<div class="f"><label>Phone</label><input type="tel" id="' + p + '-phone" value="' + esc(r?.contact_phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f"><label>Email</label><input type="email" id="' + p + '-email" value="' + esc(r?.contact_email || '') + '" placeholder="Optional"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-      + '<div class="f"><label>Birthday</label><input type="date" id="' + p + '-bday" value="' + esc(r?.birthday || '') + '"/></div>'
-      + '<div class="f"><label>Anniversary</label><input type="date" id="' + p + '-anniv" value="' + esc(r?.anniversary || '') + '"/></div>'
-      + '<div class="f"><label>Last Visit</label><input type="date" id="' + p + '-visit" value="' + esc(r?.last_visit || '') + '"/></div>'
-      + '<div class="f" style="align-self:flex-end;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);"><input type="checkbox" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + '/> VIP</label></div>'
-      + '</div>'
-      + '<div class="f" style="width:100%;"><label>Drink Preferences</label><input type="text" id="' + p + '-prefs" value="' + esc(r?.drink_prefs || '') + '" placeholder="Negroni, Tito\'s soda, no IPAs"/></div>'
-      + '<div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + '-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
+  formCells(r, p, compact) {
+    const C = {
+      name:  '<div class="f"><label>Name</label><input type="text" id="' + p + '-name" value="' + esc(r?.name || '') + '" placeholder="Jen Mitchell"/></div>',
+      phone: '<div class="f"><label>Phone</label><input type="tel" id="' + p + '-phone" value="' + esc(r?.contact_phone || '') + '" placeholder="Optional"/></div>',
+      email: '<div class="f"><label>Email</label><input type="email" id="' + p + '-email" value="' + esc(r?.contact_email || '') + '" placeholder="Optional"/></div>',
+      bday:  '<div class="f"><label>Birthday</label><input type="date" id="' + p + '-bday" value="' + esc(r?.birthday || '') + '"/></div>',
+      anniv: '<div class="f"><label>Anniversary</label><input type="date" id="' + p + '-anniv" value="' + esc(r?.anniversary || '') + '"/></div>',
+      visit: '<div class="f"><label>Last Visit</label><input type="date" id="' + p + '-visit" value="' + esc(r?.last_visit || '') + '"/></div>'
+    };
+    const vipRow = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin:4px 0 14px;"><input type="checkbox" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> This customer is a VIP regular</label>';
+    const prefs = '<div class="f" style="width:100%;margin-bottom:14px;"><label>Drink Preferences</label><input type="text" id="' + p + '-prefs" value="' + esc(r?.drink_prefs || '') + '" placeholder="Negroni, Tito\'s soda, no IPAs"/></div>';
+    const notes = '<div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + '-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
+    const rowClass = compact ? 'form-row eb-crow' : 'form-row';
+    return '<div class="' + rowClass + '" style="gap:' + (compact ? '12' : '14') + 'px;flex-wrap:wrap;">' + C.name + C.phone + C.email + C.bday + C.anniv + C.visit + '</div>'
+      + vipRow + prefs + notes;
   },
 
   collect(p) {
@@ -67,19 +67,6 @@ S.EventsRegulars = {
     const annivs = all.filter(r => this.monthOf(r.anniversary) === thisMonth);
     const quiet  = all.filter(r => this.isQuiet(r));
 
-    const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
-      + (this.entryMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    let body;
-    if (this.entryMode === 'import') {
-      body = '<div id="rg-csv"></div><div id="rg-imp-actions" style="margin-top:8px;"></div>';
-    } else {
-      body = this.formCells(null, 'rg')
-        + '<div style="margin-top:4px;display:flex;gap:8px;"><button class="btn btn-primary" id="rg-add">Add Regular</button><button class="btn btn-ghost" id="rg-clear">Start Over</button><span id="rg-err" style="color:var(--red);font-size:12px;align-self:center;display:none;"></span></div>';
-    }
-    const addCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Add a Regular</div>'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
-      + body + '</div>';
-
     const stat = (l, v, cls) => '<div class="calc-item"><div class="calc-label">' + l + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + v + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
       + stat('Regulars', String(all.length))
@@ -88,10 +75,28 @@ S.EventsRegulars = {
       + stat('Gone Quiet (' + this.QUIET_DAYS + '+ Days)', String(quiet.length), quiet.length ? 'warn' : '')
       + '</div></div>';
 
+    const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
+      + (this.entryMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+    let body, belowButtons = '';
+    if (this.entryMode === 'import') {
+      body = segToggle + '<div id="rg-csv"></div><div id="rg-imp-actions" style="margin-top:8px;"></div>';
+    } else {
+      body = segToggle + this.formCells(null, 'rg', true);
+      belowButtons = '<div data-collapse-group="rg-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="rg-add">Add Regular</button>'
+        + '<button class="btn btn-ghost" id="rg-clear">Start Over</button>'
+        + '<span id="rg-err" style="color:var(--red);font-size:12px;display:none;"></span></div>';
+    }
+    const addCard = '<div class="card form-card">' + App.collapsibleCardTitle('rg-add', 'Add a Regular')
+      + '<div class="collapse-body">' + body + '</div></div>' + belowButtons;
+
     const chips = App.filterChips(this.filter, [
       { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' }, { v: 'quiet', label: 'Gone Quiet' }, { v: 'vip', label: 'VIP' }
     ], 'rg-fchip');
-    const headRow = '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 12px;">' + chips + '</div>';
+    const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rg-export">Export PDF</button></div>';
 
     let list = all.slice();
     if (this.filter === 'bday') list = bdays;
@@ -113,16 +118,19 @@ S.EventsRegulars = {
         + '</tr>';
     }).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No regulars match.</td></tr>';
 
-    const listCard = all.length === 0
-      ? '<div style="font-size:12px;color:var(--t3);padding:4px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
-      : statStrip + headRow + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    const listSection = all.length === 0
+      ? '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
+      : headRow + '<div id="rg-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
-    this.container.innerHTML = '<div class="screen">' + addCard + listCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';
     this.wire();
     if (this.entryMode === 'import') this.mountImporter();
   },
 
   wire() {
+    this.container.querySelector('.card-collapse-head')?.addEventListener('click', e => App.toggleCollapse(e.currentTarget));
+    App.applyCollapsed(this.container);
+    document.getElementById('rg-export')?.addEventListener('click', () => { const el = document.getElementById('rg-list'); if (el) App.exportPDF({ title: 'Regulars', root: el }); });
     this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
     document.getElementById('rg-add')?.addEventListener('click', () => this.add());
@@ -149,7 +157,7 @@ S.EventsRegulars = {
     const r = this.regulars().find(x => x.id === id); if (!r) return;
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Regular</div>' + this.formCells(r, 'rge')
       + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button><button class="btn btn-ghost" id="rge-cancel">Cancel</button></div></div>';
-    App.openModal(html, { id: 'rg-edit-modal', maxWidth: 620, noClose: true });
+    App.openModal(html, { id: 'rg-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('rge-cancel')?.addEventListener('click', () => App.closeModal('rg-edit-modal'));
     document.getElementById('rge-save')?.addEventListener('click', async () => {
       const rec = this.collect('rge'); if (!rec.name) return;
