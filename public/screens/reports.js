@@ -15,8 +15,9 @@ S.Reports = {
       if (App.setHubTopbarActions) App.setHubTopbarActions('');
       if(weeks.length===0){
         mount.innerHTML='<div class="screen">'
-          + '<div class="card">'
-            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks saved yet. Save at least one week from Profit > This Week before exporting.</div>'
+          + '<div class="card form-card">'
+            + '<div class="card-title">Weekly P&amp;L Brief</div>'
+            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks saved yet. Save at least one week from Profit, This Week before exporting.</div>'
           + '</div>'
         + '</div>';
         return;
@@ -27,75 +28,54 @@ S.Reports = {
 
   _renderQboPicker(panel, weeks){
     this._pnlAckGiven = false;   // gate once per visit
-    panel.innerHTML='<div class="screen">'
-      + '<div class="card" style="margin-bottom:18px;">'
-        +'<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Weekly P&amp;L Range</div>'
-        +'<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:18px;">Weekly revenue, COGS, and labor as an Excel file. Hand it to your bookkeeper or open in QuickBooks, Xero, or any spreadsheet software.</div>'
-        +'<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;">'
-          +'<div class="f" style="width:240px;"><label>Range</label>'
-            +'<select id="qbo-range">'
-              +'<option value="last1">Last completed week</option>'
-              +'<option value="last4">Last 4 weeks</option>'
-              +'<option value="last13" selected>Last 13 weeks (quarter)</option>'
-              +'<option value="ytd">Year to date</option>'
-              +'<option value="all">All saved weeks</option>'
-              +'<option value="custom">Custom range</option>'
-            +'</select>'
-          +'</div>'
-          +'<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" id="qbo-download">Download File</button></div>'
-        +'</div>'
-        +'<div id="qbo-custom" style="display:none;gap:12px;margin-top:14px;">'
-          +'<div class="f" style="flex:1;max-width:200px;"><label>From</label><input type="date" id="qbo-from"/></div>'
-          +'<div class="f" style="flex:1;max-width:200px;"><label>To</label><input type="date" id="qbo-to"/></div>'
-        +'</div>'
-        +'<div id="qbo-preview" style="font-size:11px;color:var(--t2);margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--b2);border-radius:4px;line-height:1.5;"></div>'
-        +'<div id="qbo-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:14px;display:none;"></div>'
-        +'<div style="border:1px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:14px;">'
-          +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Before you file</div>'
-          +'<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop pulls these numbers from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should review and verify before filing anything or closing the books.</div>'
-        +'</div>'
-      +'</div>'
-    +'</div>';
-
-    const rangeSel=document.getElementById('qbo-range');
-    const customRow=document.getElementById('qbo-custom');
-    const fromInp=document.getElementById('qbo-from');
-    const toInp=document.getElementById('qbo-to');
-    const dlBtn=document.getElementById('qbo-download');
 
     const lastDate=weeks[weeks.length-1]?.period_end||'';
     const firstCustomDate=weeks[Math.max(0,weeks.length-13)]?.period_end||'';
+
+    panel.innerHTML='<div class="screen">'
+      + '<div class="card form-card">'
+        + '<div class="card-title">Weekly P&amp;L Brief</div>'
+        + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
+          + '<div class="f" style="width:300px;"><label>Range</label>'
+            + '<select id="qbo-range">'
+              + '<option value="last1">Last completed week</option>'
+              + '<option value="last4">Last 4 weeks</option>'
+              + '<option value="last13" selected>Last 13 weeks (quarter)</option>'
+              + '<option value="ytd">Year to date</option>'
+              + '<option value="all">All saved weeks</option>'
+              + '<option value="custom">Custom range</option>'
+            + '</select>'
+          + '</div>'
+          + '<div class="f" id="qbo-from-f" style="width:170px;display:none;"><label>From</label><input type="date" id="qbo-from"/></div>'
+          + '<div class="f" id="qbo-to-f" style="width:170px;display:none;"><label>To</label><input type="date" id="qbo-to"/></div>'
+        + '</div>'
+        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+          + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a CPA, tax preparer, or legal advisor. This is a worksheet, not your official financial statement. Your accountant should review and verify every figure before you file anything or close the books.</div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="qbo-download">Download File</button>'
+        + '<span id="qbo-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
+      + '</div>'
+      + this._whatsInsideCard()
+    + '</div>';
+
+    const rangeSel=document.getElementById('qbo-range');
+    const fromInp=document.getElementById('qbo-from');
+    const toInp=document.getElementById('qbo-to');
+    const fromF=document.getElementById('qbo-from-f');
+    const toF=document.getElementById('qbo-to-f');
     if(fromInp) fromInp.value=firstCustomDate;
     if(toInp) toInp.value=lastDate;
 
-    const updatePreview=()=>{
-      const range=rangeSel.value;
-      customRow.style.display=(range==='custom')?'flex':'none';
-      const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
-      const previewEl=document.getElementById('qbo-preview');
-      if(filtered.length===0){
-        previewEl.innerHTML='<span style="color:var(--warn);">No weeks fall in that range.</span>';
-        dlBtn.disabled=true;
-        dlBtn.style.opacity='0.5';
-        dlBtn.style.cursor='not-allowed';
-      } else {
-        const first=filtered[0].period_end||'(no date)';
-        const last=filtered[filtered.length-1].period_end||'(no date)';
-        previewEl.innerHTML=filtered.length+' week'+(filtered.length===1?'':'s')+' will export. '+esc(first)+' through '+esc(last)+'.';
-        dlBtn.disabled=false;
-        dlBtn.style.opacity='';
-        dlBtn.style.cursor='';
-      }
-    };
-    rangeSel.addEventListener('change',updatePreview);
-    fromInp.addEventListener('change',updatePreview);
-    toInp.addEventListener('change',updatePreview);
-    updatePreview();
+    const syncCustom=()=>{ const c=rangeSel.value==='custom'; fromF.style.display=c?'':'none'; toF.style.display=c?'':'none'; };
+    rangeSel.addEventListener('change',syncCustom);
+    syncCustom();
 
-    dlBtn.addEventListener('click', async () => {
-      const range=rangeSel.value;
-      const filtered=this._filterWeeksByRange(weeks,range,fromInp.value,toInp.value);
-      if(filtered.length===0) return;
+    document.getElementById('qbo-download').addEventListener('click', async () => {
+      const filtered=this._filterWeeksByRange(weeks,rangeSel.value,fromInp.value,toInp.value);
+      if(filtered.length===0){ this._setStatus('No weeks fall in that range.','var(--red)'); return; }
       if(typeof XLSX==='undefined'){
         await App.confirm({
           title: 'File builder not loaded',
@@ -117,9 +97,35 @@ S.Reports = {
         if(!ok) return;
         this._pnlAckGiven = true;
       }
-      const today=App.todayLocal();
-      this._buildAndDownloadXlsx(filtered, today);
+      this._buildAndDownloadXlsx(filtered, App.todayLocal());
     });
+  },
+
+  _setStatus(msg, color){
+    const el=document.getElementById('qbo-status');
+    if(!el) return;
+    el.textContent=msg;
+    el.style.color=color||'var(--gold)';
+    el.style.display='block';
+  },
+
+  _whatsInsideCard(){
+    const rows=[
+      ['One row per week', 'Each saved week in your range, with the week ending date and week number.'],
+      ['Revenue', 'Bar revenue, food revenue, and total revenue for the week.'],
+      ['COGS', 'Bar COGS, food COGS, and total cost of goods sold.'],
+      ['Labor', 'Bar labor, food labor, and total labor cost.'],
+      ['Prime cost', 'Total prime cost, COGS plus labor, for the week.'],
+      ['Cost ratios', 'Bar pour cost %, food cost %, and prime cost % for the week.']
+    ];
+    const listHtml=rows.map(r=>
+      '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:220px;vertical-align:top;font-size:12px;">'+esc(r[0])+'</td>'
+      +'<td style="padding:8px 0;color:var(--t2);font-size:12px;line-height:1.6;">'+esc(r[1])+'</td></tr>'
+    ).join('');
+    return '<div class="card form-card">'
+      +'<div class="card-title">What\'s In the File</div>'
+      +'<table style="width:100%;border-collapse:collapse;"><tbody>'+listHtml+'</tbody></table>'
+      +'</div>';
   },
 
   _filterWeeksByRange(weeks,range,customFrom,customTo){
@@ -272,11 +278,6 @@ S.Reports = {
 
     const filename = barName + ' - Weekly P&L Brief - ' + today + '.xlsx';
     XLSX.writeFile(wb, filename);
-    const statusEl = document.getElementById('qbo-status');
-    if (statusEl) {
-      statusEl.textContent = 'Downloaded ' + filename;
-      statusEl.style.color = 'var(--gold)';
-      statusEl.style.display = 'block';
-    }
+    this._setStatus('Downloaded ' + filename, 'var(--gold)');
   }
 };
