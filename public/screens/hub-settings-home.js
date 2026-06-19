@@ -49,13 +49,20 @@ S.HubSettingsHome = {
 
     // ── Shared row + card helpers ──
     const dash = '<span style="color:var(--t3);">Not set</span>';
-    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--b2);">'
+    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:10px 14px;background:#0D181E;{{div}}">'
       + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
       + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
-    const card = (title, act, btnLabel, rowsHtml) => '<div class="card form-card" style="margin-bottom:18px;">'
+    // Standard #0D181E data-row block: rounded --b-edge container, --row-div dividers, last row clean.
+    const rowsBlock = (rows) => {
+      const items = rows.filter(Boolean);
+      return '<div style="border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">'
+        + items.map((r, i) => r.replace('{{div}}', i < items.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '')).join('')
+        + '</div>';
+    };
+    const card = (title, act, btnLabel, rows) => '<div class="card form-card" style="margin-bottom:18px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>' + title + '</span>'
       +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
-      + rowsHtml + '</div>';
+      + rowsBlock(rows) + '</div>';
 
     // ── Account (subscription + renewal + team for admins) ──
     const s       = (App.data && App.data.settings) || {};
@@ -71,11 +78,13 @@ S.HubSettingsHome = {
       const d = new Date(typeof renewRaw === 'number' ? (renewRaw > 1e12 ? renewRaw : renewRaw * 1000) : renewRaw);
       if (!isNaN(d.getTime())) renewVal = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
-    const acctRows = kvRow('Operation', esc(s.bar_name || 'Your operation'))
-      + (email ? kvRow('Signed in', esc(email)) : '')
-      + kvRow('Plan', planVal)
-      + (renewVal ? kvRow('Renews', esc(renewVal)) : '')
-      + (isAdmin ? '<div style="display:flex;gap:14px;padding:9px 0;align-items:center;"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : '');
+    const acctRows = [
+      kvRow('Operation', esc(s.bar_name || 'Your operation')),
+      email ? kvRow('Signed in', esc(email)) : '',
+      kvRow('Plan', planVal),
+      renewVal ? kvRow('Renews', esc(renewVal)) : '',
+      isAdmin ? '<div style="display:flex;gap:14px;padding:10px 14px;background:#0D181E;align-items:center;{{div}}"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : ''
+    ];
     const acctCard = card('Account', 'user-account', 'Manage', acctRows);
 
     // ── Configuration snapshot — how Bar Cop is tuned, at a glance ──
@@ -88,22 +97,26 @@ S.HubSettingsHome = {
     const platforms = App.TRAFFIC_PLATFORMS || [];
     const connected = platforms.filter(p => urls[p.urlKey]).length;
 
-    const profileRows = kvRow('Operation', esc(s.bar_name || '') || dash)
-      + kvRow('Location', esc(s.city_state || '') || dash)
-      + kvRow('Phone', esc(s.phone || '') || dash)
-      + kvRow('Address', esc(s.address || '') || dash)
-      + kvRow('Bar Sales', s.annual_bar_revenue ? fmt$0(s.annual_bar_revenue) + '/yr' : dash)
-      + kvRow('Food Sales', s.annual_food_revenue ? fmt$0(s.annual_food_revenue) + '/yr' : dash)
-      + kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash)
-      + kvRow('Links', platforms.length ? (connected + ' of ' + platforms.length + ' connected') : dash);
+    const profileRows = [
+      kvRow('Operation', esc(s.bar_name || '') || dash),
+      kvRow('Location', esc(s.city_state || '') || dash),
+      kvRow('Phone', esc(s.phone || '') || dash),
+      kvRow('Address', esc(s.address || '') || dash),
+      kvRow('Bar Sales', s.annual_bar_revenue ? fmt$0(s.annual_bar_revenue) + '/yr' : dash),
+      kvRow('Food Sales', s.annual_food_revenue ? fmt$0(s.annual_food_revenue) + '/yr' : dash),
+      kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash),
+      kvRow('Links', platforms.length ? (connected + ' of ' + platforms.length + ' connected') : dash)
+    ];
     const profileCard = card('Business Profile', 'settings-profile', 'Edit', profileRows);
 
-    const targetRows = kvRow('Prime Cost', (t.prime_cost_pct ?? 60) + '%')
-      + kvRow('Pour Cost', (t.bar_pour_cost_pct ?? 22) + '%')
-      + kvRow('Food Cost', (t.food_cost_pct ?? 32) + '%')
-      + kvRow('Labor Cost', (t.labor_cost_pct ?? 30) + '%')
-      + kvRow('Check Average', fmt$0(rt.check_avg ?? 35))
-      + kvRow('Google Rating', (tg.google_rating ?? 4.3) + ' ★');
+    const targetRows = [
+      kvRow('Prime Cost', (t.prime_cost_pct ?? 60) + '%'),
+      kvRow('Pour Cost', (t.bar_pour_cost_pct ?? 22) + '%'),
+      kvRow('Food Cost', (t.food_cost_pct ?? 32) + '%'),
+      kvRow('Labor Cost', (t.labor_cost_pct ?? 30) + '%'),
+      kvRow('Check Average', fmt$0(rt.check_avg ?? 35)),
+      kvRow('Google Rating', (tg.google_rating ?? 4.3) + ' ★')
+    ];
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 
     mount.innerHTML = '<div class="screen">' + setupCard + acctCard + profileCard + targetCard + '</div>';
