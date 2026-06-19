@@ -985,8 +985,8 @@ S.HubSettings = {
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote
-    //  -> booked -> completed/lost). "Live Music Friday" links to the tagged
-    //  Friday dinner shift so its Event P&L pulls real revenue + labor.
+    //  -> booked -> completed/lost). In-house events show $0 labor until staff
+    //  are checked to them in Build Schedule; offsite catering feeds This Week.
     // ════════════════════════════════════════════════════════════════════
     const monthDay = (day) => { const d = new Date(today); d.setDate(day); return App.ymdLocal(d); };
     const offMonth = (n, day) => { const d = new Date(today); d.setMonth(d.getMonth() + n, day); return App.ymdLocal(d); };
