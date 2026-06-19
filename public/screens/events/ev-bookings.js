@@ -630,18 +630,16 @@ S.EventsBookings = {
       '<div class="f"><label>' + lbl + '</label><div class="fw">' + (pre ? '<span class="pre">' + pre + '</span>' : '')
       + '<input class="form-input' + (pre ? ' pre' : suf ? ' suf' : '') + '" type="number" id="' + fid + '" value="' + (val != null ? val : '') + '" step="0.01"/>' + (suf ? '<span class="suf">' + suf + '</span>' : '') + '</div></div>';
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Catering Calculator</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+      + '<div class="form-grid">'
         + fld('Guest Count', 'qc-guests', b.party_size || '')
         + fld('Food Cost / Head', 'qc-food', '', '$')
         + fld('Bar Cost / Head', 'qc-bar', '', '$')
         + fld('Staff Hours', 'qc-hrs', '')
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + fld('Avg Staff Wage', 'qc-wage', wage, '$')
         + fld('Other Costs', 'qc-other', '', '$')
         + fld('Target Food Cost %', 'qc-tgt', tgt, null, '%')
       + '</div>'
-      + '<div id="qc-result" style="margin-top:6px;"></div>'
+      + '<div id="qc-result" style="margin-top:14px;"></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="qc-apply">Apply to Quote</button>'
       +   '<button class="btn btn-ghost" id="qc-cancel">Cancel</button></div></div>';
     App.openModal(html, { id: 'eb-calc-modal', maxWidth: 680, noClose: true });
@@ -656,7 +654,7 @@ S.EventsBookings = {
       const perHeadPrice = t > 0 ? perHeadCost / (t / 100) : 0;
       const totalRev = perHeadPrice * guests;
       const box = (label, val, gold) => '<div style="background:var(--input);border-radius:6px;padding:10px 12px;' + (gold ? 'border:1px solid var(--gold-tint-bord);' : '') + '"><div style="font-size:10px;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:' + (gold ? '20px' : '16px') + ';font-weight:' + (gold ? '800' : '700') + ';color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
-      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">'
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;">'
         + box('Total Cost', App.fmtCurrency(totalCost))
         + box('Cost Per Head', App.fmtCurrency(perHeadCost))
         + box('Suggested Per Head', App.fmtCurrency(perHeadPrice), true)
