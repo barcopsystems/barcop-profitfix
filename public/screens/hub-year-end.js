@@ -172,7 +172,7 @@ S.HubYearEnd = {
         CreatedDate:  new Date()
       };
 
-      const filename = barName + ' - Year-End Review - ' + year + '.xlsx';
+      const filename = barName + ' - Year-End Review Worksheet - ' + year + '.xlsx';
       XLSX.writeFile(wb, filename);
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {
@@ -870,7 +870,7 @@ S.HubYearEnd = {
         rows.push([
           audit.date || '',
           system,
-          audit.score != null ? Number(audit.score) : null,
+          audit.overall_score != null ? Number(audit.overall_score) : null,
           monthlyTotal,
           monthlyTotal * 12,
           topTitle
@@ -1140,6 +1140,6 @@ S.HubYearEnd = {
 
     b.disclaimer(App.deliverableFooter().workbookSubject);
 
-    await b.save('BarCop_YearEnd_' + year + '.pdf');
+    await b.save('BarCop_YearEnd_Worksheet_' + year + '.pdf');
   }
 };

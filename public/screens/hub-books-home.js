@@ -65,13 +65,15 @@ S.HubBooksHome = {
       due.sort((a, b) => (a.s.days == null ? 9999 : a.s.days) - (b.s.days == null ? 9999 : b.s.days));
     }
     const dueCount = due.length;
+    const expiredCt = due.filter(d => d.s.key === 'expired').length;
 
-    // ── KPI tiles (standard metric grid) ──
+    // ── KPI tiles (standard metric grid). Renewals Due is red only when one
+    //    has actually expired; merely due-soon reads amber (watch), not red. ──
     const tiles = '<div class="metric-grid">'
       + this._metric(monthName + ' Revenue', this._money(netRev), 'Net of comps')
       + this._metric('Prime Cost', this._pct(primePct), 'COGS plus labor')
       + this._metric('Year to Date Revenue', this._money(ytdNet), 'Through ' + monthName)
-      + this._metric('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', dueCount ? 'over-target' : '')
+      + this._metric('Renewals Due', String(dueCount), dueCount ? 'Overdue or within 30 days' : 'Nothing due soon', expiredCt ? 'var(--red)' : (dueCount ? 'var(--amber)' : ''))
       + '</div>';
 
     // ── Hero band — the current month's mini P&L + accountant CTA ──
@@ -152,9 +154,9 @@ S.HubBooksHome = {
     this._wire();
   },
 
-  _metric(label, val, target, cls) {
+  _metric(label, val, target, color) {
     return '<div class="metric-card"><div class="metric-label">' + esc(label) + '</div>'
-      + '<div class="metric-val' + (cls ? ' ' + cls : '') + '">' + val + '</div>'
+      + '<div class="metric-val"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div>'
       + '<div class="metric-target">' + (target ? esc(target) : '&nbsp;') + '</div>'
       + '<div class="metric-trend">&nbsp;</div></div>';
   },

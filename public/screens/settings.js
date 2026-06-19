@@ -455,7 +455,7 @@ S.HubSettings = {
     const operatingExpenses = [];
     opexMonths.forEach(mk => {
       opexMonthly.forEach(([cat, amt]) => {
-        operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), note:'' });
+        operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), vendor:'', notes:'' });
       });
     });
     // Two recurring-term bills (fixed cost + fixed term) so the page shows the

@@ -189,7 +189,7 @@ S.HubBooks = {
     b.disclaimer(App.deliverableFooter().workbookSubject);
 
     const period = String(monthKey).replace('-', '') || App._pdfDateStamp();
-    await b.save('BarCop_MonthEndBooks_' + period + '.pdf');
+    await b.save('BarCop_MonthEndBooks_Worksheet_' + period + '.pdf');
   },
 
   // Helper for the PDF summary: format a "(% vs prior month)" label.
@@ -332,7 +332,7 @@ S.HubBooks = {
         CreatedDate:  new Date()
       };
 
-      const filename = barName + ' - Books - ' + this._monthLabel(monthKey) + '.xlsx';
+      const filename = barName + ' - Month-End Books Worksheet - ' + this._monthLabel(monthKey) + '.xlsx';
       XLSX.writeFile(wb, filename);
 
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
@@ -1497,14 +1497,6 @@ S.HubBooks = {
   },
 
   // Sum void+comp records (comps only — voids are not a cost line, they are
-  // sales reversals, but the accountant wants comps as a contra-revenue or
-  // operating expense depending on their treatment).
-  _sumComps(monthKey) {
-    const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
-    const vcs = (App.shiftData?.sc_void_comps || []).filter(v => inMonth(v.date));
-    return vcs.filter(v => (v.type === 'comp' || v.type === 'Comp')).reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
-  },
-
   _sumMaintenance(monthKey) {
     const inMonth = (dateStr) => dateStr && String(dateStr).slice(0, 7) === monthKey;
     const mnts = (App.shiftData?.sc_maintenance || []).filter(m => inMonth(m.date_reported || m.date));

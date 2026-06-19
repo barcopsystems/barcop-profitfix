@@ -276,7 +276,7 @@ S.Reports = {
       CreatedDate: new Date()
     };
 
-    const filename = barName + ' - Weekly P&L Brief - ' + today + '.xlsx';
+    const filename = barName + ' - Weekly P&L Worksheet - ' + today + '.xlsx';
     XLSX.writeFile(wb, filename);
     this._setStatus('Downloaded ' + filename, 'var(--gold)');
   }

@@ -73,21 +73,25 @@ S.HubOperatingExpenses = {
     return (names[m] || '') + ' ' + y;
   },
 
-  // Revenue in a given calendar month from the Profit weekly rolls.
+  // Total revenue for a calendar month from the weekly rolls. Matches the
+  // income statement's revenue base (bar + food + catering + other) so the
+  // "% of Revenue" reads here agree with Books.
+  _weekRev(w) {
+    return (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0)
+      + (parseFloat(w.catering?.revenue) || 0) + (parseFloat(w.other?.revenue) || 0);
+  },
   _revenueForMonth(monthKey) {
-    const weeks = (App.data?.weeks || []).filter(w => this._monthKey(w.period_end) === monthKey);
-    return weeks.reduce((s, w) => s + (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0), 0);
+    return (App.data?.weeks || []).filter(w => this._monthKey(w.period_end) === monthKey)
+      .reduce((s, w) => s + this._weekRev(w), 0);
   },
 
   // Revenue year-to-date through the given month.
   _revenueYTD(monthKey) {
     const year = monthKey.slice(0, 4);
-    const cutoff = monthKey;
-    const weeks = (App.data?.weeks || []).filter(w => {
+    return (App.data?.weeks || []).filter(w => {
       const mk = this._monthKey(w.period_end);
-      return mk && mk.slice(0, 4) === year && mk <= cutoff;
-    });
-    return weeks.reduce((s, w) => s + (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0), 0);
+      return mk && mk.slice(0, 4) === year && mk <= monthKey;
+    }).reduce((s, w) => s + this._weekRev(w), 0);
   },
 
   // ── Aggregation ────────────────────────────────────────────────────────
@@ -123,18 +127,6 @@ S.HubOperatingExpenses = {
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
     return out;
-  },
-  _largestCategory(byCat) {
-    let top = null, topVal = 0;
-    Object.entries(byCat).forEach(([k, v]) => { if (v > topVal) { top = k; topVal = v; } });
-    return top ? { name: top, amount: topVal } : null;
-  },
-
-  // Distinct vendor names from the log, for autocomplete in the form.
-  _vendorList() {
-    const set = new Set();
-    this.records().forEach(r => { if (r.vendor) set.add(r.vendor); });
-    return Array.from(set).sort();
   },
 
   // ── Recurring bills ──────────────────────────────────────────────────────
@@ -220,7 +212,7 @@ S.HubOperatingExpenses = {
       recs = recs.filter(r => (r.date || '').slice(0, 4) === year);
     } else if (this._filterRange === 'last-12') {
       const cutoff = new Date(today); cutoff.setMonth(cutoff.getMonth() - 12);
-      recs = recs.filter(r => r.date && new Date(r.date) >= cutoff);
+      recs = recs.filter(r => r.date && new Date(r.date + 'T00:00:00') >= cutoff);
     }
     // Newest first.
     recs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -346,7 +338,7 @@ S.HubOperatingExpenses = {
       : emptyRow(opts.next ? 'Nothing logged for next month yet.' : 'No variable expenses logged this month yet.');
 
     const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">' + (opts.next ? 'Next Month' : 'This Month') + ' — ' + esc(this._monthLabel(monthKey)) + '</div>'
+      + '<div class="sh" style="margin:0;">' + (opts.next ? 'Next Month' : 'This Month') + ' · ' + esc(this._monthLabel(monthKey)) + '</div>'
       + (opts.exportId ? '<button class="btn btn-ghost btn-sm no-print" id="' + opts.exportId + '">Export PDF</button>' : '')
       + '</div>';
     const wrap = opts.wrapId ? ' id="' + opts.wrapId + '"' : '';
