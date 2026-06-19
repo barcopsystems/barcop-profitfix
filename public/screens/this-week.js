@@ -126,22 +126,22 @@ S.ThisWeek = {
   // shared App.dateRangeLabel so the format matches every other week selector.
   weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },
 
-  // Catering revenue from the Events section for this week — but ONLY standalone /
-  // offsite completed bookings. An in-house event tagged to a shift already lands
-  // in bar/food revenue above, so counting it here too would double-count; those
-  // are skipped (they have linked shifts). Revenue + food/bar cost prefill; labor
-  // stays for the operator to add (offsite labor is not auto-tracked).
+  // Catering revenue from the Events section for this week — but ONLY offsite
+  // catering jobs. An in-house event runs inside a normal shift, so its revenue
+  // already lands in bar/food revenue above; counting it here too would double it.
+  // Offsite jobs have no shift, so they are the separate catering line. Revenue +
+  // food/bar cost prefill; labor stays for the operator (offsite labor is manual).
   cateringFromBookings(periodEnd) {
     const blank = { revenue: '', cogs: '', labor: '' };
-    const EB = S.EventsBookings;
-    if (!EB || !periodEnd) return blank;
+    if (!periodEnd) return blank;
     const start = App.weekStartFor(periodEnd);
     let rev = 0, cogs = 0;
     (App.data.bookings || []).forEach(b => {
       if (b.stage !== 'Completed' || !b.event_date) return;
       const ed = String(b.event_date).slice(0, 10);
       if (ed < start || ed > periodEnd) return;
-      if (EB.linkedShifts(b).length) return;   // already in bar/food via the tagged shift
+      const offsite = b.event_type === 'Catering (Offsite)' || /offsite/i.test(b.space || '');
+      if (!offsite) return;   // in-house event revenue is already in the shift's bar/food revenue
       rev  += parseFloat(b.actual_revenue) || 0;
       cogs += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0);
     });
