@@ -131,15 +131,14 @@ S.EventsPricing = {
   calc() {
     const g = x => parseFloat(document.getElementById(x)?.value) || 0;
     const el = document.getElementById('rpc-result');
-    const guests = g('rpc-guests');
     if (!el) return;
-    if (!guests) { el.innerHTML = ''; return; }
+    const guests = g('rpc-guests');
     const totalFood = g('rpc-food') * guests, totalBar = g('rpc-bar') * guests;
     const labor = g('rpc-hrs') * (g('rpc-wage') || 13), other = g('rpc-other');
     const totalCost = totalFood + totalBar + labor + other;
     const tgt = g('rpc-tgt') || 28;
-    const perHeadCost = totalCost / guests;
-    const perHeadPrice = tgt > 0 ? perHeadCost / (tgt / 100) : 0;
+    const perHeadCost = guests > 0 ? totalCost / guests : 0;
+    const perHeadPrice = (perHeadCost > 0 && tgt > 0) ? perHeadCost / (tgt / 100) : 0;
     const totalRev = perHeadPrice * guests;
     const margin = totalRev - totalCost;
     const box = (label, val, gold) => '<div style="background:var(--input);border-radius:6px;padding:10px 12px;' + (gold ? 'border:1px solid var(--gold-tint-bord);' : '') + '"><div style="font-size:10px;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:' + (gold ? '20px' : '16px') + ';font-weight:' + (gold ? '800' : '700') + ';color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
