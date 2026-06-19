@@ -22,7 +22,7 @@ S.HubBooksHelp = {
       { q: 'What is the Books section?',
         a: 'Your back office. The Accounting pages turn what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and a Year-End Review. The Operations pages track the things that keep the doors open: permits, licenses, and operating expenses. Nothing here asks you to re-enter numbers you have already logged.' },
       { q: 'What is on the overview?',
-        a: 'Your latest month rolled up from your weekly records (revenue, prime cost, gross profit), your year-to-date revenue, anything coming due, and a link to every Books page. The figures are built from the same data as the Month-End Books file, so they agree.' },
+        a: 'The current month rolled up from your weekly records (revenue, prime cost, gross profit), your year-to-date bottom line, recent months, anything coming due, and a link to every Books page through the Quick Actions. The figures are built from the same data as the Month-End Books file, so they agree.' },
       { q: 'Is this a substitute for an accountant?',
         a: 'No. Bar Cop is a software tool, not a CPA or tax preparer. Everything here is built to hand to your accountant, who should review and verify it before you file anything or close your books. The outputs are worksheets, not filed statements.' }
     ]},
@@ -36,9 +36,9 @@ S.HubBooksHelp = {
     ]},
     { t: 'Operations', qa: [
       { q: 'How do Permits and Licenses work?',
-        a: 'Enter each permit or license with its next renewal date. Bar Cop tracks the date and flags it as it approaches: due soon within 30 days, critical within 14, and overdue once it passes. Anything within 30 days or overdue also shows under Coming Due on the overview so a lapse never sneaks up on you. Bar Cop tracks the dates you enter; it does not verify a permit is valid with any agency, and it is not legal advice.' },
+        a: 'Enter each permit or license with its next renewal date and Bar Cop tracks it, flagging it as the date nears: due soon within 30 days, more urgent within 14, and expired once it passes. Anything due soon or expired shows under Needs Attention here and under Coming Due on the overview, so a lapse never sneaks up on you. When you renew one, click Mark Renewed to advance the date and log the cost to Operating Expenses under Licenses and Permits in one step. Bar Cop tracks the dates you enter; it does not verify a permit is valid with any agency, and it is not legal advice.' },
       { q: 'What goes in Operating Expenses?',
-        a: 'Your fixed and recurring bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest, by category. Logging them is what lets the Month-End income statement show a real operating income instead of stopping at prime cost.' }
+        a: 'The bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest, by category. Logging them is what lets the Month-End income statement show a real operating income instead of stopping at prime cost. Check Recurring on a fixed bill and set a term in months and Bar Cop logs it automatically each month through the term; for bills that change, like utilities, use Duplicate to copy last month forward and set the new amount. You can also switch the form to Import File and drop a CSV or Excel export. Do not enter repairs and maintenance or 3rd-party platform fees here; those are tracked in Shift Control and the weekly P&L so Books does not count them twice.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'Where do the numbers come from?',
