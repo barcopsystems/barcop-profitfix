@@ -31,6 +31,7 @@ S.HubOperatingExpenses = {
   ],
 
   _tab:            'current',
+  _entryMode:      'manual',   // manual | import (Add Expense form)
   _filterCategory: 'all',
   _filterRange:    'this-month',
 
@@ -366,27 +367,36 @@ S.HubOperatingExpenses = {
     const warnBanner = this._termWarning();
 
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+    const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
+      + (this._entryMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+
+    let bodyInner, addButtons = '';
+    if (this._entryMode === 'import') {
+      bodyInner = segToggle + '<div id="oexa-csv"></div><div id="oexa-imp-actions" style="margin-top:8px;"></div>';
+    } else {
+      bodyInner = segToggle
+        + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+        +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
+        +   '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
+        +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
+        +   '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
+        + '</div>'
+        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
+        + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
+        + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
+        + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
+      addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
+        + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
+        + '</div>';
+    }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('oex-add', 'Add Expense')
-      + '<div class="collapse-body">'
-      +   '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +     '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
-      +     '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
-      +     '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
-      +     '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
-      +   '</div>'
-      +   '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
-      +   '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
-      +   '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
-      +   '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
-      + '</div>'
-      + '</div>';
-    const addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
-      + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
-      + '</div>';
+      + '<div class="collapse-body">' + bodyInner + '</div>'
+      + '</div>' + addButtons;
 
-    return statsCard + warnBanner + addCard + addButtons
+    return statsCard + warnBanner + addCard
       + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
       + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
   },
@@ -398,6 +408,7 @@ S.HubOperatingExpenses = {
       const w = document.getElementById('oexa-term-wrap');
       if (w) w.style.display = e.target.checked ? '' : 'none';
     });
+    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._entryMode = b.dataset.mode; this.renderMain(); }));
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
     document.getElementById('oex-export-this')?.addEventListener('click', () => {
@@ -405,6 +416,58 @@ S.HubOperatingExpenses = {
       if (el) App.exportPDF({ title: 'Operating Expenses', root: el });
     });
     this._wireRows(this.container);
+    if (this._entryMode === 'import') this._mountImporter();
+  },
+
+  _mountImporter() {
+    const el = document.getElementById('oexa-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your expenses file here',
+      dropSub: 'Needs columns for date and amount; category, vendor, and notes come in if your file has them. Categories that do not match yours import as Other.',
+      actionsEl: '#oexa-imp-actions',
+      fields: [
+        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'paid', 'posted', 'transaction date'] },
+        { key: 'category', label: 'Category', required: false, match: ['category', 'type', 'account'] },
+        { key: 'vendor',   label: 'Vendor',   required: false, match: ['vendor', 'payee', 'merchant', 'description', 'name'] },
+        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit'] },
+        { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note'] }
+      ],
+      confirmLabel: 'Import Expenses',
+      onComplete: rows => this._importRows(rows)
+    });
+  },
+
+  _normDate(s) {
+    if (!s) return '';
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+  },
+
+  _matchCat(s) {
+    if (!s) return '';
+    const t = String(s).toLowerCase().trim();
+    return this.CATEGORIES.find(c => c.toLowerCase() === t) || '';
+  },
+
+  async _importRows(rows) {
+    const arr = this.records();
+    (rows || []).forEach((r, i) => {
+      const date = this._normDate(r.date);
+      const amount = parseFloat(String(r.amount || '').replace(/[^0-9.\-]/g, ''));
+      if (!date || isNaN(amount) || amount <= 0) return;
+      const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
+      const vendor = (r.vendor || '').trim();
+      const notes = (r.notes || '').trim();
+      // Skip a row already logged (same date, amount, vendor, category).
+      if (arr.some(x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005 && (x.vendor || '') === vendor && (x.category || '') === category)) return;
+      arr.push({ id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() });
+    });
+    await App.saveKey('operating_expenses');
+    this._entryMode = 'manual';
+    this.renderMain();
   },
 
   // ── History tab: By Category + the full filterable log + Export ──────────
