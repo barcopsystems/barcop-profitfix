@@ -1002,8 +1002,8 @@ S.HubSettings = {
         contact_name:'', contact_phone:'', contact_email:'', source:'',
         date_received:dateStr(21), event_date:dateStr(3), event_time:'8:00 PM', party_size:0, space:'Main Floor',
         fb_minimum:0, per_head:0, quoted_total:0, deposit_amount:0,
-        actual_revenue:0, event_food_cost:0, event_bar_cost:0, event_other_cost:350,
-        requests:'Trio, 8 to 11. Revenue and labor pull from the tagged Friday dinner shift.', created_at:daysAgoISO(21) },
+        actual_revenue:3200, event_food_cost:0, event_bar_cost:820, event_other_cost:350,
+        requests:'Trio plays 8 to 11. Revenue is the night\'s take, the band is the other cost.', created_at:daysAgoISO(21) },
       { id:uid(), stage:'Completed', event_name:'Westlake Realty Lunch Catering', event_type:'Catering (Offsite)',
         contact_name:'Dana Whitfield', contact_phone:'512-555-0173', contact_email:'dana@westlakerealty.example', source:'Email',
         date_received:dateStr(12), event_date:dateStr(2), event_time:'12:00 PM', party_size:45, space:'Offsite',
@@ -2283,10 +2283,10 @@ S.HubSettings = {
           const floor = lastPart ? fLeft : Math.round(dayFloor * p[1]);
           const cov   = lastPart ? cLeft : Math.round(dayCov   * p[1]);
           bLeft -= bar; fLeft -= floor; cLeft -= cov;
-          // Phase 0: event_tag + weather_tag give the audits real context so a
-          // low-revenue Friday during a thunderstorm reads as bad luck, not bad
-          // ops. Salted onto the Dinner service of a couple of days.
-          const eventTag   = (isLastWeek && di === 4 && p[0] === 'Dinner') ? 'Live Music Friday' : '';
+          // Phase 0: weather_tag gives the audits real context so a low-revenue
+          // Friday during a thunderstorm reads as bad luck, not bad ops. (Event
+          // P&L no longer reads a shift tag; it uses the checked event staff in
+          // Build Schedule. See ev-bookings eventStaffShifts.)
           const weatherTag = (a.wk === ANCHS.weeks.length - 3 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
           const sIdx = scShifts.length;
           const cashRecon = seedCashRecon(p[0], bar + floor, sIdx);
@@ -2297,7 +2297,7 @@ S.HubSettings = {
             staff_on_floor:p[2], status:'Closed', notes:'',
             cash_recon:cashRecon, tip_recon:seedTipRecon(bar + floor, sIdx),
             handoff_notes:SEED_HANDOFFS[sIdx % SEED_HANDOFFS.length], shift_notes:seedShiftNotes(date, sIdx),
-            event_tag:eventTag, weather_tag:weatherTag,
+            weather_tag:weatherTag,
             created_at:new Date().toISOString()
           });
         });
