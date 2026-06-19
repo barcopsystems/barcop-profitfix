@@ -427,10 +427,13 @@ S.HubOperatingExpenses = {
     const e = document.getElementById('oexa-err');  if (e) e.style.display = 'none';
   },
 
-  // ── Add / Edit modal ────────────────────────────────────────────────────
-  _openModal(record) {
+  // ── Add (from Duplicate) / Edit modal ────────────────────────────────────
+  // record = the row being edited (edit mode). prefill = starting values for a
+  // brand-new entry (used by Duplicate, which never books a row until you save).
+  _openModal(record, prefill) {
     const isEdit = !!record;
-    const rec = record || {
+    const arr = this.records();
+    const rec = record || prefill || {
       id:    '',
       date:  App.todayLocal(),
       category: this.CATEGORIES[0],
@@ -441,11 +444,12 @@ S.HubOperatingExpenses = {
     const dlOpts = this._vendorList().map(v => '<option value="' + esc(v) + '"></option>').join('');
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (rec.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     const id = 'oex-modal';
-    const isChild = !!rec.recurring_parent;
-    const recurHtml = isChild
-      ? '<div style="margin-top:14px;font-size:11px;color:var(--t3);line-height:1.5;">This is a recurring entry. Change the cost or term on the first entry of this bill.</div>'
-      : '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oex-f-recurring"' + (rec.recurring ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
-        + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (rec.recurring ? '' : 'display:none;') + '"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(rec.term_months || '') + '" placeholder="12"/></div></div>';
+    // The recurring rule lives on the series parent, but it can be managed from
+    // ANY entry in the series (no hunting for the original 12-month-old row).
+    const parent = rec.recurring_parent ? (arr.find(r => r.id === rec.recurring_parent) || rec) : rec;
+    const seriesOn = !!parent.recurring;
+    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oex-f-recurring"' + (seriesOn ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
+      + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="12"/></div></div>';
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</div>'
@@ -482,22 +486,25 @@ S.HubOperatingExpenses = {
       if (!category) { showErr('Pick a category.'); return; }
       if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
       const updates = { date, category, vendor, amount, notes };
-      // Recurring rule lives on the parent only; a generated child edits as a
-      // single entry.
-      if (!isChild) {
-        const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
-        const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
-        if (recChecked && (!termV || termV < 1)) { showErr('Enter the term in months for a recurring bill.'); return; }
-        updates.recurring = recChecked;
-        updates.term_months = recChecked ? termV : null;
-        updates.recur_day = recChecked ? (parseInt(String(date).slice(8, 10), 10) || rec.recur_day || 1) : (rec.recur_day || null);
-      }
-      const arr = this.records();
+      const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
+      const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
+      if (recChecked && (!termV || termV < 1)) { showErr('Enter the term in months for a recurring bill.'); return; }
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
+        // Recurring on/off + term are series-level, so they always land on the
+        // series parent no matter which entry you edited.
+        const parentId = rec.recurring_parent || rec.id;
+        const pIdx = arr.findIndex(r => r.id === parentId);
+        if (pIdx >= 0) {
+          arr[pIdx] = recChecked
+            ? Object.assign({}, arr[pIdx], { recurring: true, term_months: termV, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
+            : Object.assign({}, arr[pIdx], { recurring: false, term_months: null });
+        }
       } else {
-        arr.push(Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates));
+        const newRec = Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates);
+        if (recChecked) { newRec.recurring = true; newRec.term_months = termV; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
+        arr.push(newRec);
       }
       await App.saveKey('operating_expenses');
       App.closeModal(id);
@@ -506,21 +513,20 @@ S.HubOperatingExpenses = {
   },
 
   // ── Duplicate ──────────────────────────────────────────────────────────
-  async _duplicate(id) {
-    const arr = this.records();
-    const src = arr.find(r => r.id === id);
+  // Opens the form pre-filled from the row, dated next month, as a NEW entry.
+  // Nothing is booked until the operator reviews the amount and saves, so an
+  // accidental click can never log an unconfirmed expense ([[output-honesty]]).
+  _duplicate(id) {
+    const src = this.records().find(r => r.id === id);
     if (!src) return;
-    arr.push({
-      id:         App.uid ? App.uid() : ('oex-' + Date.now()),
-      date:       App.todayLocal(),
-      category:   src.category,
-      vendor:     src.vendor,
-      amount:     src.amount,
-      notes:      src.notes,
-      created_at: new Date().toISOString()
-    });
-    await App.saveKey('operating_expenses');
-    this.renderMain();
+    let date = App.todayLocal();
+    const d = new Date(String(src.date).length <= 10 ? src.date + 'T00:00:00' : src.date);
+    if (!isNaN(d.getTime())) {
+      const base = new Date(d.getFullYear(), d.getMonth() + 1, 1);   // first of next month
+      const dim = this._daysInMonth(base.getFullYear(), base.getMonth());
+      date = App.ymdLocal(new Date(base.getFullYear(), base.getMonth(), Math.min(d.getDate(), dim)));
+    }
+    this._openModal(null, { date, category: src.category, vendor: src.vendor, amount: src.amount, notes: src.notes });
   },
 
   // ── Delete ─────────────────────────────────────────────────────────────
