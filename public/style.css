@@ -1254,7 +1254,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .evcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
 .evcal-dow{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);text-align:center;padding:4px 0;}
 .evcal-cell{min-height:90px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:5px 6px;overflow:hidden;cursor:pointer;}
-.evcal-cell:hover{border-color:var(--gold-tint-bord);}
+.evcal-cell:hover{background:#111E26;}
 .evcal-blank{background:transparent;border:none;cursor:default;}
 .evcal-today{border-color:var(--gold-tint-bord);background:var(--gold-tint);}
 .evcal-num{font-size:11px;font-weight:700;color:var(--t2);margin-bottom:4px;}
