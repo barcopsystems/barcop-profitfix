@@ -23,11 +23,11 @@ S.HubGettingStarted = {
 
   TASKS: [
     // ── Phase 1: Foundation ──────────────────────────────────────────────
-    { group:'foundation', id:'gs_profile', screen:'settings',
-      label:'Set your operation profile in Settings: bar name, location, and annual bar and food revenue.' },
-    { group:'foundation', id:'gs_service_periods', screen:'settings',
+    { group:'foundation', id:'gs_profile', screen:'settings-profile',
+      label:'Set your operation profile in Settings: bar name, location, and annual bar and food sales.' },
+    { group:'foundation', id:'gs_service_periods', screen:'settings-profile',
       label:'Set your service periods in Settings: the dayparts you run. These drive Open the Floor, schedules, and every shift-type field across Bar Cop.' },
-    { group:'foundation', id:'gs_targets', screen:'settings',
+    { group:'foundation', id:'gs_targets', screen:'settings-targets',
       label:'Set your Profit, Revenue, and Traffic targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
 
     // ── Phase 2: Baseline Diagnosis — three audits give immediate scored value
@@ -40,9 +40,9 @@ S.HubGettingStarted = {
 
     // ── Phase 3: Capture System — operational setup. Control feeds Recovery.
     { group:'capture', id:'gs_ic_products', screen:'ic-product-setup',
-      label:'Add your bar and kitchen products in Inventory Control. This is the product master the whole platform reads.' },
+      label:'Add your bar and kitchen products in Inventory Control. This is the product master the rest of Bar Cop reads.' },
     { group:'capture', id:'gs_ic_locations', screen:'ic-locations',
-      label:'Set your storage locations, then add your vendors.' },
+      label:'Set your storage locations for inventory counts.' },
     { group:'capture', id:'gs_ic_count', screen:'ic-take-inventory',
       label:'Run your first inventory count in Take Inventory.' },
     { group:'capture', id:'gs_ic_delivery', screen:'ic-receive-delivery',
