@@ -672,7 +672,7 @@ body.chrome-on .hub-app .topbar{display:none;}
 @media (min-width:769px){
   body.chrome-on.hub-dashboard .hub-app .sidebar{display:none;}
 }
-body.chrome-on .hub-app .sidebar{border-right:1px solid var(--b-edge);}
+body.chrome-on .hub-app .sidebar{border-right:1px solid var(--b-edge);height:100%;}
 body.chrome-on .hub-app .sidebar-logo{display:none;}
 body.chrome-on .hub-app .sec-switch{display:none;}
 body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
