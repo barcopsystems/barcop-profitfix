@@ -459,7 +459,7 @@ S.Hub = {
           + '</div>';
       }
 
-      return '<div style="padding:11px 0;' + (isFirst ? '' : 'border-top:1px solid var(--b2);') + '">'
+      return '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
         +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
         +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
