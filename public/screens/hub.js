@@ -344,7 +344,7 @@ S.Hub = {
     const tile = (label, big, bigColor, sub, subColor) => `
       <div style="min-width:0;">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;color:${bigColor};">${big}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:46px;font-weight:600;letter-spacing:-0.5px;line-height:0.9;color:${bigColor};">${big}</div>
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
@@ -358,7 +358,9 @@ S.Hub = {
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
     const tiles =
-        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:15px 22px;display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;">'
+        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;overflow:hidden;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);padding:13px 22px;border-bottom:1px solid var(--b2);">Where You Stand</div>'
+      + '<div style="display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;padding:18px 22px;">'
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
@@ -368,7 +370,7 @@ S.Hub = {
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
-      + '</div>';
+      + '</div></div>';
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
