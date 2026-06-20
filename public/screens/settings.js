@@ -88,32 +88,32 @@ S.HubSettings = {
   secProfit() {
     const t = (App.data.settings||{}).targets || {};
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;"><label>Bar Pour Cost % ' + tt('sh-bar-pour') + '</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Cost % ' + tt('sh-food-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Labor Cost % ' + tt('sh-labor-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-lc" value="' + (t.labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:130px;"><label>Prime Cost % ' + tt('sh-prime-cost') + '</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar Pour Cost %</label><div class="fw"><input class="suf" type="number" id="hs-bpc" value="' + (t.bar_pour_cost_pct ?? 22) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Food Cost %</label><div class="fw"><input class="suf" type="number" id="hs-fc" value="' + (t.food_cost_pct ?? 32) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Labor Cost %</label><div class="fw"><input class="suf" type="number" id="hs-lc" value="' + (t.labor_cost_pct ?? 30) + '" step="0.1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Prime Cost %</label><div class="fw"><input class="suf" type="number" id="hs-pc" value="' + (t.prime_cost_pct ?? 60) + '" step="0.1"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
 
   secRevenue() {
     const rt = ((App.data.revenue_settings||{}).targets) || {};
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:130px;"><label>Check Average ' + tt('r-check-avg') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Lunch RPLH ' + tt('r-lunch-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rl" value="' + (rt.rplh_lunch ?? 50) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Dinner RPLH ' + tt('r-dinner-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Bar RPLH ' + tt('r-bar-rplh') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Event Close Rate ' + tt('r-event-close') + '</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Check Average</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-ca" value="' + (rt.check_avg ?? 35) + '" step="0.5"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Lunch RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rl" value="' + (rt.rplh_lunch ?? 50) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Dinner RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Bar RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
+      + '<div class="f" style="width:130px;"><label>Event Close Rate</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
 
   secTraffic() {
     const tg = ((App.data.traffic_settings||{}).targets) || {};
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:140px;"><label>Google Rating ' + tt('t-google-rating') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5"/><span class="suf">&#9733;</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>New Reviews / Mo ' + tt('t-review-vel') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Response Rate ' + tt('t-response-rate') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Monthly Sessions ' + tt('t-monthly-sessions') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Social Posts / Mo ' + tt('t-social-posts') + '</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Google Rating</label><div class="fw"><input class="suf" type="number" id="hs-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5"/><span class="suf">&#9733;</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>New Reviews / Mo</label><div class="fw"><input class="suf" type="number" id="hs-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Response Rate</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Monthly Sessions</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
+      + '<div class="f" style="width:140px;"><label>Social Posts / Mo</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
       + '</div>';
   },
 
@@ -138,12 +138,9 @@ S.HubSettings = {
   // own data once they have it.
   secTrafficConv() {
     const c = ((App.data.traffic_settings || {}).conversion_rates) || {};
-    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
-      + 'How often each digital signal turns into an actual guest visit. These rates power dollar figures on the Recovery Scoreboard for Traffic fixes. Defaults are industry benchmarks for bar and restaurant operations. Override if your own data shows a different conversion.'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;"><label>Website Session to Visit ' + tt('hs-conv-web') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Email Open to Visit ' + tt('hs-conv-email') + '</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:200px;"><label>Website Session to Visit</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:200px;"><label>Email Open to Visit</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
 
