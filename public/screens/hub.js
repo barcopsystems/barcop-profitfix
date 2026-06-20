@@ -493,14 +493,12 @@ S.Hub = {
     const setupProg  = data.hub_setup_progress || {};
     const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
     const setupTotal = setupTasks.length;
-    const catchupBanner = (setupTotal > 0 && setupDone < setupTotal)
-      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:var(--r);padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t1);">Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">'
-        +   setupDone + ' of ' + setupTotal + ' setup tasks done. '
-        +   '<span style="color:var(--t1);font-weight:700;">Continue setup</span>'
-        + '</div>'
-        + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
+    const catchupBanner = (setupTotal > 0 && setupDone < setupTotal && !App._setupDismissed)
+      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:var(--r);padding:10px 16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">'
+        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t1);">Continue Setup</div>'
+        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">' + setupDone + ' of ' + setupTotal + ' setup tasks done.</div>'
+        + '<button class="btn btn-ghost btn-sm hub-catchup-go" type="button">Next Tasks</button>'
+        + '<button class="btn btn-ghost btn-sm hub-catchup-x" type="button">Dismiss</button>'
         + '</div>'
       : '';
     const fixLog = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
@@ -1037,8 +1035,12 @@ S.Hub = {
       await DB.signOut();
     });
 
-    container.querySelector('.hub-catchup')?.addEventListener('click', () => {
+    container.querySelector('.hub-catchup-go')?.addEventListener('click', () => {
       if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
+    });
+    container.querySelector('.hub-catchup-x')?.addEventListener('click', () => {
+      App._setupDismissed = true;   // per-login; resets on next loadAllData
+      container.querySelector('.hub-catchup')?.remove();
     });
 
     document.getElementById('hub-sidebar-toggle')?.addEventListener('click', () => {
