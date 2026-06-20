@@ -111,7 +111,7 @@ const AuditUI = {
     if (!sorted.length) return '';
     const CH = 130, USABLE = CH - 24;
     const last   = sorted[sorted.length-1] || {};
-    const target = (last.raw && last.raw.TARGET_SCORE) || last.TARGET_SCORE || 65;
+    const target = (last.raw && last.raw.TARGET_SCORE) || last.TARGET_SCORE || 70;
     const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const clamp = s => Math.max(0, Math.min(100, s));
     const ym = d => { const p = (d||'').slice(0,7).split('-'); return { y:+p[0], m:+p[1] }; };
