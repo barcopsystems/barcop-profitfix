@@ -891,9 +891,7 @@ S.HubBarCopAudit = {
       const col = isNA ? 'var(--t3)' : App.scoreColor(sc);
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
       const breakdown = detail.length
-        ? '<div style="margin-top:14px;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Score Breakdown</div>'
-          + '<div class="at-metrics"><table class="at-mtbl">'
+        ? '<div style="margin-top:14px;"><div class="at-metrics"><table class="at-mtbl">'
           + detail.map(c => {
               const naC = c.na || c.pct == null;
               return '<tr><td>' + esc(c.label) + (c.extra ? ' <span style="color:var(--t4);">(' + esc(c.extra) + ')</span>' : '') + '</td>'
@@ -909,9 +907,8 @@ S.HubBarCopAudit = {
           + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
           + '</div>';
       return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-        +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Sub-Score</div>'
-        +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div>'
         +   scoreBlock
         + '</div>'
         + breakdown
@@ -963,46 +960,31 @@ S.HubBarCopAudit = {
       + patternRows
       + '</div>';
 
-    // Recovery Activity Snapshot section
+    // Recovery Activity stat strip — the second-row stats (no title), the slot
+    // where the recovery audits show their recoverable strip under the hero.
     const snap = audit.recovery_snapshot || { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 };
-    const recoveryCard = '<div class="card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Recovery Activity Snapshot</div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      +   '<div class="calc-item"><div class="calc-label">Gaps Surfaced</div><div class="calc-val">' + snap.gaps + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Fixes Logged (30d)</div><div class="calc-val ' + (snap.fixesLogged > 0 ? 'good' : '') + '">' + snap.fixesLogged + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Recovered to date</div><div class="calc-val ' + (snap.dollarsRecovered > 0 ? 'good' : '') + '">' + App.fmtCurrency(snap.dollarsRecovered, 0) + '</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Still Measuring</div><div class="calc-val">' + snap.stillMeasuring + '</div></div>'
-      + '</div>'
-      + '</div>';
-
-    // Recovery audit one-liner reference
-    const lastP = App.latestEvent(App.data?.audits || []);
-    const lastR = App.latestEvent(App.data?.revenue_audits || []);
-    const lastT = App.latestEvent(App.data?.traffic_audits || []);
-    const refLine = '<div style="padding:14px 18px;background:var(--input);border:1px solid var(--b2);border-radius:6px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
-      + 'Latest scores from the three recovery audits: '
-      + 'Profit ' + (lastP ? lastP.overall_score || '-' : '-') + ', '
-      + 'Revenue ' + (lastR ? lastR.overall_score || '-' : '-') + ', '
-      + 'Traffic ' + (lastT ? lastT.overall_score || '-' : '-') + '. '
-      + 'Open each for fix detail.'
-      + '</div>';
+    const recoveryStrip = '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Gaps Surfaced</div><div class="calc-val lg">' + snap.gaps + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Fixes Logged (30d)</div><div class="calc-val lg ' + (snap.fixesLogged > 0 ? 'good' : '') + '">' + snap.fixesLogged + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Recovered to Date</div><div class="calc-val lg ' + (snap.dollarsRecovered > 0 ? 'good' : '') + '">' + App.fmtCurrency(snap.dollarsRecovered, 0) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Still Measuring</div><div class="calc-val lg">' + snap.stillMeasuring + '</div></div>'
+      + '</div></div>';
 
     const naNote = overallNA
       ? '<div style="font-size:11px;color:var(--t3);margin:-6px 0 16px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and Labor Control and the overall fills in.</div>'
       : '';
 
     // Detail page. The shared AuditUI.viewHero gives the same header as the three
-    // recovery audits; Top Operational Exposures (this audit's "what to act on")
-    // leads, followed by the six sub-scores, then Recurring Patterns and the
-    // Recovery Activity Snapshot.
+    // recovery audits, the Recovery Activity stat strip sits in the second row
+    // (their recoverable-strip slot), then Top Operational Exposures (this audit's
+    // "what to act on"), the six sub-scores, and Recurring Patterns.
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.viewHero(audit, 'Bar Cop Audit')
       + naNote
+      + recoveryStrip
       + exposureCard
       + subCards
       + patternCard
-      + refLine
-      + recoveryCard
       + '</div>';
 
     // Back to the audit landing + Print / Save PDF in the Hub topbar-right,
@@ -1053,15 +1035,6 @@ S.HubBarCopAudit = {
       b.paragraph((audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, '
         + 'Shift, and Labor Control and the overall fills in.', { gray: 90 });
     }
-
-    // Recovery-audit reference line (mirrors the on-screen refLine).
-    const lastP = App.latestEvent(App.data?.audits || []);
-    const lastR = App.latestEvent(App.data?.revenue_audits || []);
-    const lastT = App.latestEvent(App.data?.traffic_audits || []);
-    b.paragraph('Latest scores from the three recovery audits: '
-      + 'Profit ' + (lastP ? (lastP.overall_score || '-') : '-') + ', '
-      + 'Revenue ' + (lastR ? (lastR.overall_score || '-') : '-') + ', '
-      + 'Traffic ' + (lastT ? (lastT.overall_score || '-') : '-') + '.', { italic: true, gray: 110 });
 
     // Six sub-scores, each with its score and breakdown (same as subBlock).
     const SUB_NAMES = [
