@@ -121,7 +121,7 @@ S.TrafficDashboard = {
 
     container.innerHTML = '<div class="screen">'
       + DashUI.dayOneStrip(
-          'Run your first Traffic Audit for a baseline, log a week in This Week, and check your Online Tracker. As that data lands, this dashboard fills in with your recovered dollars and where your demand is leaking.',
+          'Three steps and this dashboard fills in with your recovered dollars, where demand is leaking, and your weekly trend.',
           [
             { done: hasAudit, num: 1, label: 'Run your first Traffic Audit', go: 't-audit' },
             { done: hasWeek,  num: 2, label: 'Enter This Week', go: 't-this-week' },
