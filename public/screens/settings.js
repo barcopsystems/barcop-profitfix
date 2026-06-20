@@ -537,7 +537,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 21,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: 'February 2026, 4 weeks ending Feb 27', AUDIT_ID: 'PFA-2026-0031',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 63, TARGET_SCORE: 70,
         S1_SCORE: 16, S1_BAR_COST_PCT: 29.4, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 51200,
         S1_BEV_COGS_PERIOD: 15053, S1_INV_VARIANCE_PCT: 6.8, S1_INV_VARIANCE_AMT: 1024,
         S1_POUR_METHOD: 'Free pour, no jiggers in use', S1_RECIPE_COVERAGE: '0 of 18 cocktails costed',
@@ -591,7 +591,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 39,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: 'March 2026, 4 weeks ending Mar 27', AUDIT_ID: 'PFA-2026-0036',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 63, TARGET_SCORE: 70,
         S1_SCORE: 38, S1_BAR_COST_PCT: 26.1, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 52400,
         S1_BEV_COGS_PERIOD: 13676, S1_INV_VARIANCE_PCT: 4.2, S1_INV_VARIANCE_AMT: 612,
         S1_POUR_METHOD: 'Jiggers on wells, free pour still used on call drinks',
@@ -641,7 +641,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 57,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: 'April 2026, 4 weeks ending Apr 24', AUDIT_ID: 'PFA-2026-0042',
-        INDUSTRY_AVG: 63, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 63, TARGET_SCORE: 70,
         S1_SCORE: 62, S1_BAR_COST_PCT: 23.4, S1_TARGET_PCT: 22, S1_BAR_REV_MONTHLY: 53100,
         S1_BEV_COGS_PERIOD: 12425, S1_INV_VARIANCE_PCT: 2.1, S1_INV_VARIANCE_AMT: 312,
         S1_POUR_METHOD: 'Measured pours on all spirits', S1_RECIPE_COVERAGE: '18 of 18 cocktails costed',
@@ -691,7 +691,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 26,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: 'February 2026, 4 weeks ending Feb 27', AUDIT_ID: 'RVA-2026-0014',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 22, S1_CHECK_AVG: 28.40, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 22.10,
         S1_FOOD_CHECK_AVG: 34.80, S1_COVER_COUNT: 2890, S1_MONTHLY_REVENUE: 82100,
         S1_MONTHLY_GAP: 4910, S1_ANNUAL_GAP: 58920,
@@ -741,7 +741,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 42,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: 'March 2026, 4 weeks ending Mar 27', AUDIT_ID: 'RVA-2026-0019',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 40, S1_CHECK_AVG: 30.20, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 24.60,
         S1_FOOD_CHECK_AVG: 36.10, S1_COVER_COUNT: 2960, S1_MONTHLY_REVENUE: 84300,
         S1_MONTHLY_GAP: 3256, S1_ANNUAL_GAP: 39072,
@@ -787,7 +787,7 @@ S.HubSettings = {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 60,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: 'April 2026, 4 weeks ending Apr 24', AUDIT_ID: 'RVA-2026-0024',
-        INDUSTRY_AVG: 61, TARGET_SCORE: 65,
+        INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 61, S1_CHECK_AVG: 33.10, S1_CHECK_AVG_TARGET: 32.00, S1_BAR_CHECK_AVG: 27.40,
         S1_FOOD_CHECK_AVG: 38.90, S1_COVER_COUNT: 3010, S1_MONTHLY_REVENUE: 86700,
         S1_MONTHLY_GAP: 0, S1_ANNUAL_GAP: 0,
@@ -1237,7 +1237,7 @@ S.HubSettings = {
       raw.AUDIT_PERIOD = period;
       raw.DATA_TIER_LABEL = tier;
       raw.INDUSTRY_AVG = 58;
-      raw.TARGET_SCORE = 65;
+      raw.TARGET_SCORE = 70;
       return { id:uid(), date:date, bar_name:raw.BAR_NAME, overall_score:score,
         audit_id:audit_id, audit_period:period, grade:tier,
         sections:sections, action_items:items, raw:raw, generated_at:generated_at };
