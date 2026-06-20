@@ -722,9 +722,9 @@ S.Hub = {
             Traffic: { c: 'var(--t3)', bg: 'transparent' }
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
-          return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
-            + 'style="display:flex;align-items:center;gap:14px;padding:10px 4px;'
-            + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+          return '<div class="hd-row hd-arow" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
+            + 'style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid var(--row-div);'
+            + (i === 0 ? 'border-top:1px solid var(--row-div);' : '') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
             +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--t1);line-height:1;">' + dollar + '</span>'
             +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
@@ -757,10 +757,17 @@ S.Hub = {
       + ghStep(1, 'Finish your setup', 'Add your bar\'s basics so the audits have real numbers to measure against.', 'Continue Setup', 'if(window.S&&S.HubGettingStarted)S.HubGettingStarted.open()')
       + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Traffic. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
       + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
+    const aiCount = itemRows.length;
+    const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--t1);line-height:1;">' + aiCount + '</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
+      +   'action item' + (aiCount === 1 ? '' : 's')
+      +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">From your audits</div>'
+      + '</div></div>';
     const actionPanel = !anyAudit
       ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
-      : `${shWrapOpen('Priority Action Items')}${cardSub('From your audits')}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
+      : `${shWrapOpen('Priority Action Items')}${actionHead}
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
