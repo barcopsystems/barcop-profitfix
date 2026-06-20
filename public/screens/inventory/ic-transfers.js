@@ -108,7 +108,7 @@ S.InventoryTransfers = {
     if (this.products().length === 0 || this.locations().length < 2) {
       App.setupCard(this.container, {
         title: 'Set Up Transfers',
-        lead: 'Transfers move product between locations and build an audit trail of every move. Two quick setup steps and you can start logging.',
+        lead: 'Transfers move product between locations and build a clean record of every move. Two quick setup steps and you can start logging.',
         steps: [
           { title: 'Add your products', desc: 'Add the products you stock so a transfer has something to move.', btn: 'Add Products', screen: 'ic-product-setup', done: this.products().length > 0 },
           { title: 'Set your locations', desc: 'You need at least two storage locations to move product between, like a stockroom and the front bar.', btn: 'Set Locations', screen: 'ic-locations', done: this.locations().length >= 2 }
