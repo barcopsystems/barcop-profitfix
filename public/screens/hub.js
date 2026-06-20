@@ -664,13 +664,13 @@ S.Hub = {
         + '<div style="position:relative;flex:1;min-height:0;">'
         +   '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" height="100%" style="display:block;position:absolute;inset:0;">'
         +     '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +       '<stop offset="0%" stop-color="#070E15" stop-opacity="0.9"/>'
-        +       '<stop offset="100%" stop-color="#070E15" stop-opacity="0.05"/>'
+        +       '<stop offset="0%" stop-color="#151C1C" stop-opacity="1"/>'
+        +       '<stop offset="100%" stop-color="#151C1C" stop-opacity="0"/>'
         +     '</linearGradient></defs>'
         +     markerSvg
         +     tgtLine
         +     (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +     '<path d="'+d+'" fill="none" stroke="#DBAB46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        +     '<path d="'+d+'" fill="none" stroke="#363523" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
         +   '</svg>'
         +   dots
         + '</div>');
