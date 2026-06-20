@@ -534,20 +534,19 @@ S.Hub = {
     if (alerts.length) {
       // Triage: split into Critical (bad) and Watch (warn) under their own
       // headers so the operator instantly sees what matters today.
-      const rowOf = (a, isLast, dotCol) => '<div class="hd-row" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
+      const rowOf = (a, isLast, dotCol) => '<div class="hd-row hd-arow" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
         + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
         + (isLast ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
         + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
         + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
         + '</div>';
       const groupHead = (label, col) => '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + col + ';margin:14px 0 7px;">' + label + '</div>';
-      const groupBox = (rows) => '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">' + rows + '</div>';
       const critical = alerts.filter(a => a.sev === 'bad');
       const watch    = alerts.filter(a => a.sev === 'warn');
       const alertRows =
-          (critical.length ? groupHead('Critical', 'var(--red)') + groupBox(critical.map((a, i) => rowOf(a, i === critical.length - 1, 'var(--red)')).join('')) : '')
-        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + groupBox(watch.map((a, i) => rowOf(a, i === watch.length - 1, 'var(--amber)')).join('')) : '');
-      const alertHead = '<div style="display:flex;align-items:flex-start;gap:12px;flex-shrink:0;">'
+          (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === critical.length - 1, 'var(--red)')).join('') : '')
+        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === watch.length - 1, 'var(--amber)')).join('') : '');
+      const alertHead = '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
         +   'item' + (alerts.length===1?'':'s') + ' to address'
@@ -918,6 +917,8 @@ S.Hub = {
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
+        .hub-app .hd-arow{background:#0D181E;}
+        .hub-app .hd-arow:hover{background:#0F1A21;}
         .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
         .hub-app .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
         /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
