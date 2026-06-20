@@ -743,9 +743,14 @@ S.HubBarCopAudit = {
       ? Math.round(scored.reduce((s, x) => s + x, 0) / scored.length)
       : null;
 
+    const now = new Date();
+    const serial = String(Math.floor(Math.random() * 9000) + 1000);
     return {
       id:          App.uid ? App.uid() : ('bca-' + Date.now()),
-      date:        new Date().toISOString(),
+      date:        now.toISOString(),
+      audit_id:    'BCA-' + now.getFullYear() + '-' + serial,
+      audit_period: 'Last 30 days',
+      grade:       'Complete Operational Analysis',
       bar_name:    (App.data?.settings?.bar_name) || 'Your Operation',
       overall_score: overall,
       TARGET_SCORE: 70,
