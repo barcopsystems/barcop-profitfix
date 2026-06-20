@@ -825,9 +825,7 @@ S.HubBarCopAudit = {
     const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    const desc = enough
-      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. It scores your whole operation from your Control data, no upload needed, and the result shows on screen in a minute or two.'
-      : 'The Bar Cop Audit scores your whole operation from your Control data, nothing to upload. Log in Inventory, Shift, and Labor Control and it scores what it can.';
+    const desc = 'Get a new audit every 30 days. Run first audit on day 30.';
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
