@@ -149,7 +149,7 @@ S.RecoveryPlaybook = {
     const head = '<thead><tr>' + b.head.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>';
     const rows = b.rows.map(r => '<tr>' + r.map((c, i) =>
       '<td data-label="' + esc(b.head[i] || '') + '">' + esc(c) + '</td>').join('') + '</tr>').join('');
-    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl">'
+    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl' + (b.nowrap1 ? ' pb-tbl-nowrap1' : '') + '">'
       + head + '<tbody>' + rows + '</tbody></table></div></div>'
       + (b.note ? '<p class="pb-note">' + esc(b.note) + '</p>' : '');
   },
@@ -260,11 +260,11 @@ S.RecoveryPlaybook = {
     return '<style>'
       + '.pb-row{display:flex;gap:28px;align-items:flex-start;}'
       + '.pb-body{flex:1;min-width:0;border:1px solid var(--b-edge);border-radius:var(--r);padding:20px 22px;}'
-      + '.pb-rail{flex:0 0 200px;position:sticky;top:0;padding-top:2px;}'
+      + '.pb-rail{flex:0 0 200px;position:sticky;top:24px;padding-top:2px;}'
       + '.pb-rail-label{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t4);padding:2px 10px 8px;}'
       + '.pb-rail-item{display:block;width:100%;text-align:left;background:none;border:none;border-left:2px solid var(--b2);color:var(--t3);font-size:12.5px;font-weight:600;padding:6px 12px;cursor:pointer;line-height:1.3;transition:color .12s,border-color .12s;}'
       + '.pb-rail-item:hover{color:var(--w);}'
-      + '.pb-rail-item.active{color:var(--w);border-left-color:var(--gold);}'
+      + '.pb-rail-item.active{color:var(--w);border-left-color:var(--focus);}'
       + '.pb-section{margin-bottom:40px;scroll-margin-top:14px;}'
       + '.pb-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}'
       + '.pb-h1{font-size:22px;margin-bottom:14px;}'
@@ -281,10 +281,11 @@ S.RecoveryPlaybook = {
       + '.pb-box-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:7px;line-height:1.3;}'
       + '.pb-box-text{font-size:13px;color:var(--t2);line-height:1.7;}'
       + '.pb-tbl-card{margin:0 0 18px;}'
+      + '.pb-tbl-nowrap1 td:first-child,.pb-tbl-nowrap1 th:first-child{white-space:nowrap;}'
       + '.pb-cross-leak{font-weight:700;color:var(--t1);}'
       + '.pb-diag{border-left:2px solid var(--b-edge);padding:2px 0 2px 14px;margin:0 0 16px;}'
       + '.pb-diag-q{font-size:14px;font-weight:600;color:var(--t1);line-height:1.5;margin-bottom:8px;}'
-      + '.pb-diag-n{color:var(--gold);font-weight:700;}'
+      + '.pb-diag-n{color:inherit;font-weight:700;}'
       + '.pb-diag-a{font-size:12.5px;line-height:1.65;color:var(--t2);margin-top:5px;padding-left:2px;}'
       + '.pb-diag-a span{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;margin-right:7px;padding:1px 6px;border-radius:3px;}'
       + '.pb-diag-yes span{color:var(--green);border:1px solid var(--green);}'
@@ -298,7 +299,7 @@ S.RecoveryPlaybook = {
       + '.pb-docs{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;}'
       + '.pb-go,.pb-docs a{justify-content:flex-start;white-space:normal;text-align:left;line-height:1.35;height:auto;}'
       + '.pb-footer{font-size:11px;color:var(--t3);line-height:1.7;border-top:1px solid var(--b2);padding-top:14px;margin-top:24px;max-width:780px;}'
-      + '@media(max-width:900px){.pb-row{flex-direction:column;}.pb-rail{position:static;flex-basis:auto;width:100%;order:-1;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;border-bottom:1px solid var(--b-edge);padding:0 0 8px;}.pb-rail-label{display:none;}.pb-rail-item{width:auto;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;padding:7px 10px;}.pb-rail-item.active{border-left:none;border-bottom-color:var(--gold);}.pb-parts{grid-template-columns:1fr;}.pb-docs{flex-direction:column;}.pb-docs a,.pb-go{width:100%;}}'
+      + '@media(max-width:900px){.pb-row{flex-direction:column;}.pb-rail{position:static;flex-basis:auto;width:100%;order:-1;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;border-bottom:1px solid var(--b-edge);padding:0 0 8px;}.pb-rail-label{display:none;}.pb-rail-item{width:auto;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;padding:7px 10px;}.pb-rail-item.active{border-left:none;border-bottom-color:var(--focus);}.pb-parts{grid-template-columns:1fr;}.pb-docs{flex-direction:column;}.pb-docs a,.pb-go{width:100%;}}'
       + '</style>';
   },
 
@@ -646,7 +647,7 @@ S.RecoveryPlaybook = {
             { t: 'lead', text: 'An owner buys three cost control books over two years. She starts all three and finishes none. The first week of each feels productive. By week three service gets busy, a manager calls in sick, and the spreadsheet sits unopened. Three years later she still does not know her pour cost. The problem was never the system. It was the absence of a sequenced plan with owners, deadlines, and one number to confirm it is working. Motivation fades in about ten days. Process does not.' },
             { t: 'p', text: 'Most efforts fail at the 45-day mark, not week one. A daily log stops getting filled. A Friday audit gets skipped twice. The invoice audit falls two weeks behind. None of it feels like failure, each feels like a one-time exception. A system that only runs when you are running it is a personal habit, and personal habits do not survive a vacation, an illness, or a volume spike. The fix is a sequence with names and dates on it.' },
             { t: 'h', text: 'The first four weeks' },
-            { t: 'table',
+            { t: 'table', nowrap1: true,
               head: ['Week', 'Focus', 'What goes live'],
               rows: [
                 ['Week 1', 'Establish baselines', 'Run your first count, read your real pour cost, food cost, and prime cost. Change nothing. Know the numbers.'],
