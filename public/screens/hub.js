@@ -359,7 +359,10 @@ S.Hub = {
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);padding:13px 22px;border-bottom:1px solid var(--b2);">Where You Stand</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Where You Stand</div>'
+      +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
+      + '</div>'
       + '<div style="display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;padding:18px 22px;">'
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
@@ -839,6 +842,30 @@ S.Hub = {
     }
     const readoutPanel = `${shWrapOpen('Weekly Gaps')}${readoutBody}<div style="margin-top:auto;padding-top:12px;font-size:10px;color:var(--t4);flex-shrink:0;">From this week's numbers</div>${shWrapClose}`;
 
+    // Snapshot for the Bar Cop Briefing (weekly cross-system narrative button in
+    // the Where You Stand card). Mirrors the displayed numbers so the written
+    // read never contradicts the dashboard.
+    this._briefingData = {
+      bar: barName,
+      opportunity: anyAudit ? totalOpp : null,
+      recovered: recoveryTotal.dollars,
+      fixes: recoveryTotal.fixes,
+      audits: {
+        profit:  pA ? pA.overall_score : null,
+        revenue: rA ? rA.overall_score : null,
+        traffic: tA ? tA.overall_score : null,
+        barCop:  bcScore,
+        target:  (pA && pA.raw && pA.raw.TARGET_SCORE) || 70
+      },
+      weekly: {
+        leak: readout.leakTotal,
+        opp:  readout.oppTotal,
+        items: (readout.items || []).slice(0, 6).map(it => ({ label: it.label, weekly: it.weekly, module: it.module }))
+      },
+      metrics: metrics.map(m => ({ label: m.label, val: m.disp, target: m.tgt, status: m.status })),
+      critical: alerts.filter(a => a.sev === 'bad').map(a => a.text).slice(0, 8)
+    };
+
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
@@ -1000,6 +1027,9 @@ S.Hub = {
 
     // Default sidebar active state on the Hub Dashboard view.
     if (App.setActiveHubNav) App.setActiveHubNav('hub-home');
+
+    // Mount the Bar Cop Briefing button (weekly cross-system narrative).
+    if (window.BarCopBriefing) BarCopBriefing.attach(document.getElementById('hub-briefing-slot'), this._briefingData);
 
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
