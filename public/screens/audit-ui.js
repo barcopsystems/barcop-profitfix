@@ -13,7 +13,7 @@ const AuditUI = {
   // Data-quality tier badge — app colors only (gold-tint full / neutral else).
   tierChip(grade) {
     if (!grade) return '';
-    const full = grade.includes('3') || grade.toLowerCase().includes('full');
+    const full = grade.includes('3') || grade.toLowerCase().includes('full') || grade.toLowerCase().includes('complete');
     return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;'
       + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(grade) + '</span>';
