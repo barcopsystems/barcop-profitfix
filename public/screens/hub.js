@@ -309,10 +309,8 @@ S.Hub = {
     collect(rA, 'Revenue', 'revenue');
     collect(tA, 'Traffic', 'traffic');
     itemRows.sort((a,b) => b.impact - a.impact);
-    // Cap visible PAIs at 8 — top by impact — so the most important items are
-    // never hidden behind a scrollbar. Overflow flagged in a small footer.
-    const topItems = itemRows.slice(0, 8);
-    const overflowItems = Math.max(0, itemRows.length - topItems.length);
+    // Show every action item, ranked by impact, scrolling like the Alerts list.
+    const topItems = itemRows;
 
     const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
@@ -737,10 +735,7 @@ S.Hub = {
             + '</div>';
         }).join('')
       : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
-    const overflowFooter = overflowItems > 0
-      ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
-      : '';
-    // First-run guide: with no audit run yet, the Priority Action Items panel
+    // First-run guide: with no audit run yet, the Priority Actions panel
     // becomes a welcoming "Start Here" with the three steps to a first recovery
     // number, so a brand-new operator is never left wondering what to do.
     const ghStep = (n, t, d, btn, onclick) =>
@@ -766,8 +761,8 @@ S.Hub = {
       + '</div></div>';
     const actionPanel = !anyAudit
       ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
-      : `${shWrapOpen('Priority Action Items')}${actionHead}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
+      : `${shWrapOpen('Priority Actions')}${actionHead}
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${shWrapClose}`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
