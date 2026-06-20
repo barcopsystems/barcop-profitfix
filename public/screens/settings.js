@@ -38,8 +38,7 @@ S.HubSettings = {
     container.scrollTop = 0;
 
     const cards = secs.map(s =>
-      '<div class="hs-card" data-section="' + s.id + '" '
-      + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
+      '<div class="card form-card" data-section="' + s.id + '" style="margin-bottom:16px;">'
       + this.sectionHead(s.id, s.title, s.save)
       + s.body
       + '</div>'
@@ -56,11 +55,11 @@ S.HubSettings = {
   // Card header: title left, Saved indicator + Save Data button right.
   // Save button styled like the "Go" buttons in Getting Started (ghost, small).
   sectionHead(id, title, hasSave) {
-    return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-      + '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
+    return '<div class="card-title" style="display:flex;align-items:center;gap:12px;">'
+      + '<span style="flex:1;">' + esc(title) + '</span>'
       + (hasSave
           ? '<span class="hs-msg" data-msg="' + id + '" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
-            + '<button class="btn btn-ghost btn-sm hs-save" data-save="' + id + '" style="flex-shrink:0;font-size:10px;padding:4px 10px;">Save Data</button>'
+            + '<button class="btn btn-ghost btn-sm hs-save" data-save="' + id + '">Save Data</button>'
           : '')
       + '</div>';
   },
@@ -70,22 +69,19 @@ S.HubSettings = {
     const s = App.data.settings || {};
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:195px;"><label>Bar / Restaurant Name</label><input type="text" id="hs-name" value="' + esc(s.bar_name||'') + '" placeholder="The Rusty Nail"/></div>'
-      + '<div class="f" style="width:150px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
-      + '<div class="f" style="flex:1 1 220px;min-width:180px;"><label>Street Address</label><input type="text" id="hs-address" value="' + esc(s.address||'') + '" placeholder="123 Main St"/></div>'
+      + '<div class="f" style="width:200px;"><label>Street Address</label><input type="text" id="hs-address" value="' + esc(s.address||'') + '" placeholder="123 Main St"/></div>'
       + '<div class="f" style="width:120px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:150px;"><label>Bar Sales ' + tt('hs-ann-bar-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
-      + '<div class="f" style="width:150px;"><label>Food Sales ' + tt('hs-ann-food-rev') + '</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
+      + '<div class="f" style="width:150px;"><label>Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
+      + '<div class="f" style="width:150px;"><label>Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
       + '</div>';
   },
 
   // Service Periods — which dayparts the operator runs. Mounts the shared
   // ServicePeriods selector (mounted in wire()); Save writes settings.service_periods.
   secServicePeriods() {
-    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
-      + 'Turn on the services you run. These set every shift-type field across Bar Cop: Open the Floor, schedules, cash tolerances, and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'
-      + '</div>'
-      + '<div id="hs-sp-mount"></div>'
+    return '<div id="hs-sp-mount"></div>'
       + '<span id="hs-sp-err" style="color:var(--red);font-size:12px;display:none;margin-top:8px;"></span>';
   },
 
@@ -133,10 +129,7 @@ S.HubSettings = {
     const rows = App.TRAFFIC_PLATFORMS.map(p =>
       field('hs-url-' + p.urlKey, p.label, u[p.urlKey], p.placeholder)
     ).join('');
-    return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
-      + 'Paste the public URL for each platform. Bar Cop uses these for one-click access to your live listings and pulls public data from them into the Traffic Audit.'
-      + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;">' + rows + '</div>';
+    return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;">' + rows + '</div>';
   },
 
   // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
