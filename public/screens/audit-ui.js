@@ -26,16 +26,19 @@ const AuditUI = {
   //   no button and no countdown.
   requestCard(pfx, title, desc, canRun, hasLatest, daysLeft, opts) {
     opts = opts || {};
-    const countdown = '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>';
     let right;
     const label = hasLatest ? 'Generate New Audit' : 'Generate First Audit';
     if (canRun) {
       right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">' + label + '</button>';
     } else {
-      // Locked: the button shows disabled with the countdown below it. The intake
-      // form is reachable ONLY through the active button, so a locked audit cannot
-      // be re-opened until its 30-day window is up.
-      right = '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">' + label + '</button>' + (daysLeft > 0 ? countdown : '');
+      // Locked: the disabled button itself carries the countdown ("Next audit in
+      // N days"), or the generic label when there is no day count (e.g. the Bar
+      // Cop Audit before it has enough data). The intake is reachable only
+      // through the active button, so a locked audit cannot be re-opened.
+      const lockedLabel = daysLeft > 0
+        ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's')
+        : label;
+      right = '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">' + lockedLabel + '</button>';
     }
     return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
