@@ -40,11 +40,11 @@ S.TrafficDashboard = {
     const metricsBody = DashUI.metricsPanel(this.metricsRows(latest, t), 'Log a week to see your numbers');
 
     container.innerHTML = '<div class="screen">'
-      + FixPanel._scoreboardCard('traffic')
+      + FixPanel._scoreboardCard('traffic', insightsBtn)
       + this.buildLiveLinks()
       + DashUI.row(
           DashUI.shPanel('Where You\'re Leaking Now', leakBody),
-          DashUI.shPanel('This Week vs Target', metricsBody, insightsBtn))
+          DashUI.shPanel('This Week vs Target', metricsBody))
       + DashUI.row(
           DashUI.shPanel('Online Tracker', this.presencePanel()),
           DashUI.shPanel('Traffic Audit', DashUI.auditPanel({
@@ -172,6 +172,8 @@ S.TrafficDashboard = {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
     const weeks = this.weeks().slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
+    const rec = DashUI._insRec('traffic');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
     const btn = document.getElementById('t-insights-btn');
     const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || 'Bar Cop Insights'; } };
     const ts  = this.targets();
@@ -200,7 +202,8 @@ S.TrafficDashboard = {
         if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        DashUI.insightsModal('Bar Cop Insights', '<p style="margin:0;">' + safe + '</p>');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('traffic', html));
         restore();
       })
       .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
