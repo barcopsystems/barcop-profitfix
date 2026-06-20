@@ -546,7 +546,7 @@ S.Hub = {
       const alertRows =
           (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
         + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
-      const alertHead = '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+      const alertHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
         +   'item' + (alerts.length===1?'':'s') + ' to address'
