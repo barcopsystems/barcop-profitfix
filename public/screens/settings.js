@@ -72,7 +72,7 @@ S.HubSettings = {
       + '<div class="f" style="width:200px;"><label>Street Address</label><input type="text" id="hs-address" value="' + esc(s.address||'') + '" placeholder="123 Main St"/></div>'
       + '<div class="f" style="width:120px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:150px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
+      + '<div class="f" style="width:120px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
       + '<div class="f" style="width:150px;"><label>Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
       + '<div class="f" style="width:150px;"><label>Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
       + '</div>';
