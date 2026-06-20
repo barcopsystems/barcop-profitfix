@@ -239,13 +239,16 @@ const AuditUI = {
   },
 
   // ── Full view: score hero (name/grade left, big score + scale bar right) ───
-  viewHero(audit, heroLabel) {
+  viewHero(audit, heroLabel, pfx) {
     const naO = audit.overall_score == null;
     const scoreColor = naO ? 'var(--t3)' : App.scoreColor(audit.overall_score||0);
     return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      +   '<span>' + esc(heroLabel) + '</span>'
+      +   '<div id="' + (pfx || 'audit') + '-outlook-mount" style="flex-shrink:0;"></div>'
+      + '</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + esc(heroLabel) + '</div>'
       + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '') + '</div>'
       + (audit.grade ? '<div style="margin-top:8px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
@@ -291,7 +294,6 @@ const AuditUI = {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">' + (actionItems ? 'Action Items, Ranked by Impact' : '') + '</div>'
       + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-      +   '<div id="' + pfx + '-outlook-mount"></div>'
       +   '<button class="btn btn-ghost btn-sm ' + pfx + '-export-btn">Export PDF</button>'
       + '</div>'
       + '</div>'
