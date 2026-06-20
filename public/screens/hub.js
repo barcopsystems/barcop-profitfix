@@ -278,7 +278,7 @@ S.Hub = {
     ].forEach(d => {
       if (!d.a) { auditAlerts.push({ sev:'warn', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
       const score  = d.a.overall_score;
-      const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 65;
+      const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 70;
       if (score != null && score < target) {
         auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen:d.screen, mod:d.mod });
       }
@@ -403,7 +403,7 @@ S.Hub = {
           + '<div style="display:flex;align-items:baseline;gap:12px;">'
           +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
           +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
-          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Your target ' + ((audit && audit.raw && audit.raw.TARGET_SCORE) || 65) + ' or higher</div>'
+          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Your target ' + ((audit && audit.raw && audit.raw.TARGET_SCORE) || 70) + ' or higher</div>'
           + '</div>'
           // Status bar shortened on the right so it clears the "Next Audit"
           // countdown / "Run Audit" button area (~85px wide on the right
