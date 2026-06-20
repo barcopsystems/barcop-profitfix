@@ -833,7 +833,7 @@ S.Hub = {
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `${shWrapOpen('Weekly Gaps')}${cardSub('From this week\'s numbers')}${readoutBody}${shWrapClose}`;
+    const readoutPanel = `${shWrapOpen('Weekly Gaps')}${readoutBody}<div style="margin-top:auto;padding-top:12px;font-size:10px;color:var(--t4);flex-shrink:0;">From this week's numbers</div>${shWrapClose}`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
