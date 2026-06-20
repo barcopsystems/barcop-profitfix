@@ -697,8 +697,8 @@ S.Hub = {
         + '</div>');
     };
 
-    const w8p = pWeeks.slice(-8);
-    const w8r = rWeeks.slice(-8);
+    const w8p = _newest(pWeeks).slice(0, 8).reverse();
+    const w8r = _newest(rWeeks).slice(0, 8).reverse();
     const pourSeries  = w8p.map(w => w?.bar?.cost_pct ?? null);
     const caSeries    = w8r.map(w => w?.check_avg ?? null);
     const primeSeries = w8p.map(w => w?.prime_cost_pct ?? null);
@@ -725,7 +725,7 @@ S.Hub = {
     const actionBody = topItems.length
       ? topItems.map((it,i) => {
           const isLast = i === topItems.length - 1;
-          const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '—';
+          const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '-';
           const modBadgeColors = {
             Profit:  { c: 'var(--t3)', bg: 'transparent' },
             Revenue: { c: 'var(--t3)', bg: 'transparent' },
@@ -785,19 +785,9 @@ S.Hub = {
     const readout = this.weeklyReadout();
     const hasWeekData = pWeeks.length > 0 || rWeeks.length > 0;
 
-    // Per-module color-tinted badge (PROFIT gold, REVENUE green, TRAFFIC blue)
-    // — adds visual variation per module on each row.
-    const modBadge = (mod) => {
-      const map = {
-        profit:  { c: 'var(--t2)', bg: 'var(--c3)' },
-        revenue: { c: 'var(--t2)', bg: 'var(--c3)' },
-        traffic: { c: 'var(--t2)', bg: 'var(--c3)' }
-      };
-      const m = map[mod] || map.profit;
-      return '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:'
-        + m.c + ';background:' + m.bg + ';padding:3px 6px;border-radius:3px;flex-shrink:0;min-width:62px;text-align:center;">'
-        + (mod || '').toUpperCase() + '</span>';
-    };
+    // Neutral per-module label (color = meaning only; no category tint).
+    const modBadge = (mod) => '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:var(--t3);flex-shrink:0;min-width:62px;">'
+      + (mod || '').toUpperCase() + '</span>';
 
     let readoutBody;
     if (!hasWeekData) {
@@ -838,8 +828,7 @@ S.Hub = {
         +   (readout.oppTotal  > 0 ? heroNum(readout.oppTotal,  'var(--gold)', 'opportunity') : '')
         + '</div>'
         + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.4;">'
-        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's') + '. '
-        +   'Leaks are recoverable cost, opportunity is projected revenue growth.'
+        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's') + '.'
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
@@ -1221,6 +1210,10 @@ S.Hub = {
   forwardAlerts() {
     const data = App.data || {};
     const out = [];
+    // Event stores load newest-first; sort defensively by date DESC so the
+    // latest week is index 0 regardless of source order (event-store gotcha).
+    const _byDateDesc = a => a.slice().sort((x, y) =>
+      String((y && (y.period_end || y.date)) || '').localeCompare(String((x && (x.period_end || x.date)) || '')));
     const iso = d => App.ymdLocal(d);
     const mondayOf = d => { const x = new Date(d); const day = x.getDay();
       x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return iso(x); };
@@ -1256,8 +1249,8 @@ S.Hub = {
     });
 
     // 2. Projected month-end prime cost — latest week's pace held to month end
-    const weeks = data.weeks || [];
-    const lw = weeks.length ? weeks[weeks.length - 1] : null;
+    const weeks = _byDateDesc(data.weeks || []);
+    const lw = weeks.length ? weeks[0] : null;
     const primeT = ((data.settings || {}).targets || {}).prime_cost_pct ?? 60;
     if (lw && lw.prime_cost_pct != null && lw.prime_cost_pct > primeT) {
       const gap = lw.prime_cost_pct - primeT;
@@ -1271,10 +1264,10 @@ S.Hub = {
     }
 
     // 3. Declining review velocity — latest period below its recent average
-    const tw = data.traffic_weeks || [];
+    const tw = _byDateDesc(data.traffic_weeks || []);
     if (tw.length >= 3) {
-      const latestT = tw[tw.length - 1];
-      const prior = tw.slice(-5, -1).map(w => w.new_reviews).filter(v => v != null);
+      const latestT = tw[0];
+      const prior = tw.slice(1, 5).map(w => w.new_reviews).filter(v => v != null);
       if (latestT && latestT.new_reviews != null && prior.length >= 2) {
         const avg = prior.reduce((a, b) => a + b, 0) / prior.length;
         if (avg > 0 && latestT.new_reviews < avg * 0.8) out.push({
@@ -1290,7 +1283,7 @@ S.Hub = {
     const tTar = (data.traffic_settings || {}).targets || {};
     const respTarget = tTar.response_rate ?? 75;
     if (tw.length) {
-      const latestT = tw[tw.length - 1];
+      const latestT = tw[0];
       if (latestT && latestT.response_rate != null && latestT.response_rate < respTarget) {
         const gap = respTarget - latestT.response_rate;
         out.push({
@@ -1306,7 +1299,7 @@ S.Hub = {
     // has been consistently low rather than recently dropping.
     const velTarget = tTar.review_velocity ?? 8;
     if (tw.length) {
-      const latestT = tw[tw.length - 1];
+      const latestT = tw[0];
       if (latestT && latestT.new_reviews != null && latestT.new_reviews < velTarget) {
         const gap = velTarget - latestT.new_reviews;
         out.push({
@@ -1320,7 +1313,7 @@ S.Hub = {
     // 3b-3. Traffic data going stale — the latest logged period is more than
     // 10 days old. The dashboard stops being useful once data ages out.
     if (tw.length) {
-      const latestT = tw[tw.length - 1];
+      const latestT = tw[0];
       if (latestT && latestT.period_end) {
         const dt = new Date(String(latestT.period_end).length <= 10 ? latestT.period_end + 'T00:00:00' : latestT.period_end);
         const age = isNaN(dt.getTime()) ? null : Math.floor((Date.now() - dt.getTime()) / 86400000);
@@ -1337,7 +1330,7 @@ S.Hub = {
     // 3d. No marketing emails logged this period — a list you never email
     // goes cold within 30 days.
     if (tw.length) {
-      const latestT = tw[tw.length - 1];
+      const latestT = tw[0];
       if (latestT && latestT.email_list_size && (!latestT.emails_sent || latestT.emails_sent === 0)) {
         out.push({
           sev: 'warn',
@@ -1351,7 +1344,7 @@ S.Hub = {
     // discovery on Instagram and Facebook fast.
     const postTarget = tTar.social_posts_month ?? 12;
     if (tw.length) {
-      const latestT = tw[tw.length - 1];
+      const latestT = tw[0];
       if (latestT && latestT.ig_posts_month != null && latestT.ig_posts_month < postTarget * 0.7) {
         out.push({
           sev: latestT.ig_posts_month < postTarget * 0.4 ? 'bad' : 'warn',
