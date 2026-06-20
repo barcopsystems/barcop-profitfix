@@ -325,7 +325,7 @@ S.Hub = {
 
     const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
     const titleWithSub = (t, sub) => `<div style="margin-bottom:10px;flex-shrink:0;"><div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">${t}</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">${sub}</div></div>`;
-    const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
+    const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
     // Heading-outside panel (matches the Control + Recovery dashboards): the
     // title is a single-line .sh heading ABOVE the card (standard 10px gap to
@@ -358,7 +358,7 @@ S.Hub = {
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
     const tiles =
-        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;overflow:hidden;">'
+        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);padding:13px 22px;border-bottom:1px solid var(--b2);">Where You Stand</div>'
       + '<div style="display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;padding:18px 22px;">'
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
@@ -463,7 +463,7 @@ S.Hub = {
           + '</div>';
       }
 
-      return '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;">'
+      return '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
         +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
         +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
@@ -491,7 +491,7 @@ S.Hub = {
     const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
     const setupTotal = setupTasks.length;
     const catchupBanner = (setupTotal > 0 && setupDone < setupTotal)
-      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
+      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:var(--r);padding:10px 16px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:14px;">'
         + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t1);">Setup</div>'
         + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">'
         +   setupDone + ' of ' + setupTotal + ' setup tasks done. '
@@ -550,7 +550,7 @@ S.Hub = {
       const alertRows =
           (critical.length ? groupHead('Critical', 'var(--red)', true) + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
         + (watch.length    ? groupHead('Watch', 'var(--amber)', !critical.length) + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
-      const alertHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+      const alertHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
         +   'item' + (alerts.length===1?'':'s') + ' to address'
@@ -583,7 +583,7 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
       const tgtDisp  = valFmt(target);
 
-      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
 
       const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -762,7 +762,7 @@ S.Hub = {
       + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Traffic. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
       + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
     const aiCount = itemRows.length;
-    const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+    const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--t1);line-height:1;">' + aiCount + '</div>'
       + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
       +   'action item' + (aiCount === 1 ? '' : 's')
@@ -924,7 +924,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b-edge);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
