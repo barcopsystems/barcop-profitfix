@@ -366,7 +366,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     DATA_TIER_LABEL: dataTier,
     OVERALL_SCORE: overall,
     INDUSTRY_AVG: 63,          // internal Bar Cop benchmark (relabeled in chunk 5)
-    TARGET_SCORE: 65,
+    TARGET_SCORE: 70,
 
     S1_SCORE: s1Out,
     S1_BAR_COST_PCT: barCostPct,
@@ -651,7 +651,7 @@ function computeRevenueAudit(appData, controlData, extracted) {
     DATA_TIER_LABEL: dataTier,
     OVERALL_SCORE: overall,
     INDUSTRY_AVG: 61,
-    TARGET_SCORE: 65,
+    TARGET_SCORE: 70,
 
     S1_SCORE: s1,
     S1_CHECK_AVG: checkAvg,
@@ -930,7 +930,7 @@ function computeTrafficAudit(appData, controlData, extracted, urlData) {
     DATA_TIER_LABEL: dataTier,
     OVERALL_SCORE: overall,
     INDUSTRY_AVG: 58,         // internal Bar Cop benchmark (relabeled in client)
-    TARGET_SCORE: 65,
+    TARGET_SCORE: 70,
 
     S1_SCORE: s1,
     S1_LISTING_CLAIMED: yn(extracted.listing_claimed),
