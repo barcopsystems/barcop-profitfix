@@ -18,30 +18,23 @@
 S.RecoveryPlaybook = {
   _module: 'profit',
 
+  // Kept as a convenience for the "Read the Recovery Playbook" button on the
+  // Profit Fix screen. The playbook is a real Profit Recovery module screen now,
+  // so it just routes there and inherits the section sidebar, topbar, and shell.
   open(module) {
     this._module = module || 'profit';
-    App.openHubFullPage('Recovery Playbook', (mount) => {
-      this.container = mount;
-      this.render();
-    }, 'playbook');
-    if (App.setHubTopbarActions) {
-      App.setHubTopbarActions(
-        '<button class="btn btn-ghost btn-sm" id="pb-back" style="margin-right:8px;">&larr; Back</button>'
-        + '<button class="btn btn-ghost btn-sm" id="pb-pdf">Save PDF</button>'
-      );
-      document.getElementById('pb-back')?.addEventListener('click', () => App.showHub());
-      document.getElementById('pb-pdf')?.addEventListener('click', () => this._exportPDF());
-    }
+    App.openScreen('recovery-playbook');
   },
 
   doc() { return this.CONTENT[this._module] || this.CONTENT.profit; },
   docPath(file) { return 'assets/resources/' + encodeURIComponent(file); },
 
-  // ── HTML reader ─────────────────────────────────────────────────────────────
-  render() {
+  // ── Module screen: standard .screen width + a sticky right-hand section rail ──
+  render(content, actions) {
+    this.container = content;
     const d = this.doc();
-    const nav = d.sections.map(sec =>
-      '<button class="pb-side-item" data-id="' + esc(sec.id) + '">' + esc(sec.nav) + '</button>').join('');
+    const rail = d.sections.map(sec =>
+      '<button class="pb-rail-item" data-id="' + esc(sec.id) + '">' + esc(sec.nav) + '</button>').join('');
 
     const body = d.sections.map(sec => {
       const blocks = sec.blocks.map(b => this.blockHtml(b)).join('');
@@ -51,22 +44,54 @@ S.RecoveryPlaybook = {
         + blocks + '</section>';
     }).join('');
 
-    this.container.innerHTML = this.styleTag()
-      + '<div class="pb-shell">'
-      +   '<nav class="pb-side"><div class="pb-side-label">In this playbook</div>' + nav + '</nav>'
-      +   '<div class="pb-main"><div class="pb-body">' + body + this.footerHtml() + '</div></div>'
+    content.innerHTML = this.styleTag()
+      + '<div class="screen">'
+      +   '<div class="pb-row">'
+      +     '<div class="pb-body">' + body + this.footerHtml() + '</div>'
+      +     '<nav class="pb-rail"><div class="pb-rail-label">In this playbook</div>' + rail + '</nav>'
+      +   '</div>'
       + '</div>';
 
-    this.container.querySelectorAll('.pb-side-item').forEach(btn =>
+    if (actions) {
+      actions.innerHTML = '<button class="btn btn-ghost btn-sm no-print" id="pb-pdf">Save PDF</button>';
+      document.getElementById('pb-pdf')?.addEventListener('click', () => this._exportPDF());
+    }
+
+    content.querySelectorAll('.pb-rail-item').forEach(btn =>
       btn.addEventListener('click', () => {
         const el = document.getElementById('pb-' + btn.dataset.id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }));
-    this.container.querySelectorAll('.pb-go').forEach(btn =>
+    content.querySelectorAll('.pb-go').forEach(btn =>
       btn.addEventListener('click', () => {
         if (btn.dataset.focus) App._fixFocus = btn.dataset.focus;
         App.openScreen(btn.dataset.screen);
       }));
+    this._wireRail();
+  },
+
+  // Highlight the rail item for the section currently at the top of the reader.
+  _wireRail() {
+    if (this._railObs) { this._railObs.disconnect(); this._railObs = null; }
+    if (typeof IntersectionObserver === 'undefined') return;
+    const scroller = this.container.closest('.content') || null;
+    const items = {};
+    this.container.querySelectorAll('.pb-rail-item').forEach(i => { items[i.dataset.id] = i; });
+    const setActive = id => Object.keys(items).forEach(k => items[k].classList.toggle('active', k === id));
+    this._railObs = new IntersectionObserver(entries => {
+      const vis = entries.filter(e => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (vis[0]) setActive(vis[0].target.id.replace('pb-', ''));
+    }, { root: scroller, rootMargin: '0px 0px -75% 0px', threshold: 0 });
+    this.container.querySelectorAll('.pb-section').forEach(s => this._railObs.observe(s));
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Profit Playbook Works', [
+      { p: ['The strategic read behind your Profit Fix System: where the money leaks, what each leak quietly costs, and the exact Bar Cop screen that captures, measures, and closes it.'] },
+      { h: 'Reading it', p: ['Use the list on the right to jump to any section. Every Open button drops you straight on the live screen it names, and every Download pulls the policy or worksheet for that step.'] },
+      { h: 'Save PDF', p: ['Save PDF up top prints the whole playbook as a clean reference to hand a manager. The dollar figures in it are illustrative examples of what these gaps commonly cost, not a promise.'] }
+    ]);
   },
 
   blockHtml(b) {
@@ -233,13 +258,13 @@ S.RecoveryPlaybook = {
 
   styleTag() {
     return '<style>'
-      + '.pb-shell{display:flex;align-items:flex-start;min-height:calc(100vh - 110px);}'
-      + '.pb-side{position:sticky;top:0;align-self:flex-start;flex:0 0 232px;border-right:1px solid var(--b-edge);padding:20px 0 40px;}'
-      + '.pb-side-label{padding:6px 20px 10px;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t4);}'
-      + '.pb-side-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--t2);font-size:13.5px;font-weight:600;padding:9px 20px;cursor:pointer;line-height:1.35;transition:color .12s;}'
-      + '.pb-side-item:hover{color:var(--w);}'
-      + '.pb-main{flex:1;min-width:0;padding:22px 32px 64px;}'
-      + '.pb-body{max-width:900px;border:1px solid var(--b-edge);border-radius:var(--r);padding:20px;}'
+      + '.pb-row{display:flex;gap:28px;align-items:flex-start;}'
+      + '.pb-body{flex:1;min-width:0;border:1px solid var(--b-edge);border-radius:var(--r);padding:20px 22px;}'
+      + '.pb-rail{flex:0 0 200px;position:sticky;top:0;padding-top:2px;}'
+      + '.pb-rail-label{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t4);padding:2px 10px 8px;}'
+      + '.pb-rail-item{display:block;width:100%;text-align:left;background:none;border:none;border-left:2px solid var(--b2);color:var(--t3);font-size:12.5px;font-weight:600;padding:6px 12px;cursor:pointer;line-height:1.3;transition:color .12s,border-color .12s;}'
+      + '.pb-rail-item:hover{color:var(--w);}'
+      + '.pb-rail-item.active{color:var(--w);border-left-color:var(--gold);}'
       + '.pb-section{margin-bottom:40px;scroll-margin-top:14px;}'
       + '.pb-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}'
       + '.pb-h1{font-size:22px;margin-bottom:14px;}'
@@ -273,7 +298,7 @@ S.RecoveryPlaybook = {
       + '.pb-docs{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;}'
       + '.pb-go,.pb-docs a{justify-content:flex-start;white-space:normal;text-align:left;line-height:1.35;height:auto;}'
       + '.pb-footer{font-size:11px;color:var(--t3);line-height:1.7;border-top:1px solid var(--b2);padding-top:14px;margin-top:24px;max-width:780px;}'
-      + '@media(max-width:900px){.pb-shell{flex-direction:column;}.pb-side{position:static;flex-basis:auto;width:100%;border-right:none;border-bottom:1px solid var(--b-edge);display:flex;flex-wrap:wrap;gap:2px;padding:10px 6px;}.pb-side-label{width:100%;}.pb-side-item{width:auto;border-left:none;border-radius:4px;padding:7px 12px;}.pb-main{padding:18px 16px 60px;}.pb-parts{grid-template-columns:1fr;}.pb-docs{flex-direction:column;}.pb-docs a,.pb-go{width:100%;}}'
+      + '@media(max-width:900px){.pb-row{flex-direction:column;}.pb-rail{position:static;flex-basis:auto;width:100%;order:-1;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;border-bottom:1px solid var(--b-edge);padding:0 0 8px;}.pb-rail-label{display:none;}.pb-rail-item{width:auto;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;padding:7px 10px;}.pb-rail-item.active{border-left:none;border-bottom-color:var(--gold);}.pb-parts{grid-template-columns:1fr;}.pb-docs{flex-direction:column;}.pb-docs a,.pb-go{width:100%;}}'
       + '</style>';
   },
 
