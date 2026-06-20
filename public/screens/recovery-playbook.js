@@ -44,18 +44,20 @@ S.RecoveryPlaybook = {
         + blocks + '</section>';
     }).join('');
 
+    // This is a _CONVERTED page (topbar hidden), so the action lives in the page,
+    // not the topbar. Top-right of the reading body, like the other converted screens.
+    const pdfBtn = '<div class="pb-actions"><button class="btn btn-ghost btn-sm" id="pb-pdf">'
+      + this._icon('reference') + 'Save PDF</button></div>';
+
     content.innerHTML = this.styleTag()
       + '<div class="screen">'
       +   '<div class="pb-row">'
-      +     '<div class="pb-body">' + body + this.footerHtml() + '</div>'
+      +     '<div class="pb-body">' + pdfBtn + body + this.footerHtml() + '</div>'
       +     '<nav class="pb-rail"><div class="pb-rail-label">In this playbook</div>' + rail + '</nav>'
       +   '</div>'
       + '</div>';
 
-    if (actions) {
-      actions.innerHTML = '<button class="btn btn-ghost btn-sm no-print" id="pb-pdf">Save PDF</button>';
-      document.getElementById('pb-pdf')?.addEventListener('click', () => this._exportPDF());
-    }
+    content.querySelector('#pb-pdf')?.addEventListener('click', () => this._exportPDF());
 
     content.querySelectorAll('.pb-rail-item').forEach(btn =>
       btn.addEventListener('click', () => {
@@ -261,6 +263,7 @@ S.RecoveryPlaybook = {
 
   styleTag() {
     return '<style>'
+      + '.pb-actions{display:flex;justify-content:flex-end;margin-bottom:12px;}'
       + '.pb-row{display:flex;gap:28px;align-items:flex-start;}'
       + '.pb-body{flex:1;min-width:0;border:1px solid var(--b-edge);border-radius:var(--r);padding:20px 22px;}'
       + '.pb-rail{flex:0 0 200px;position:sticky;top:24px;padding-top:2px;}'
