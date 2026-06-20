@@ -748,6 +748,7 @@ S.HubBarCopAudit = {
       date:        new Date().toISOString(),
       bar_name:    (App.data?.settings?.bar_name) || 'Your Operation',
       overall_score: overall,
+      TARGET_SCORE: 70,
       sub_scores_covered: scored.length,
       sub_scores: {
         operational_discipline:   disc.score,
