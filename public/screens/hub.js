@@ -341,8 +341,8 @@ S.Hub = {
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
     // throughout the rest of the app (module dashboards, etc.). Big number in
     // Barlow Condensed, colored by status (green for good, red for bad).
-    const tile = (label, big, bigColor, sub, subColor, box) => `
-      <div style="${box || 'background:var(--surface);border:1px solid var(--b-edge);'}border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+    const tile = (label, big, bigColor, sub, subColor) => `
+      <div style="min-width:0;">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;color:${bigColor};">${big}</div>
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
@@ -358,7 +358,8 @@ S.Hub = {
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
     const tiles =
-        tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
+        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:15px 22px;display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;">'
+      + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
       + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
@@ -366,7 +367,8 @@ S.Hub = {
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any recovery system to start')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
-             bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit');
+             bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
+      + '</div>';
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
@@ -897,12 +899,12 @@ S.Hub = {
     const NEW_HUB_LAYOUT = false;
     const hubGrid = NEW_HUB_LAYOUT
       ? `<div class="hub-grid" style="display:grid;grid-template-rows:auto 500px 430px;gap:18px;padding-bottom:18px;">
-          <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
+          <div class="hub-grid-tiles">${tiles}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${alertsPanel}${readoutPanel}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${auditPanel}${metricsPanel}${chartPanel}</div>
         </div>`
       : `<div class="hub-grid" style="display:grid;grid-template-rows:auto 464px 470px;gap:18px;padding-bottom:18px;">
-          <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
+          <div class="hub-grid-tiles">${tiles}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
         </div>`;
