@@ -417,7 +417,7 @@ S.AuditTracker = {
       + AuditUI.intakeQRow('at', 'Drawer reconciled every shift?', 'drawer_recon', [['false','No'],['true','Yes']], pr.drawer_recon)
       + AuditUI.intakeQRow('at', 'Invoices matched to orders?', 'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']], pr.invoice_vs_po));
 
-    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('at', canRun, daysLeft) + '</div>';
+    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('at') + '</div>';
     FileDrop.attach('at-drop');
 
     document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
