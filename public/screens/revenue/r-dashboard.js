@@ -41,10 +41,10 @@ S.RevenueDashboard = {
     const metricsBody = DashUI.metricsPanel(this.metricsRows(latest, t), 'Confirm a week to see your numbers');
 
     container.innerHTML = '<div class="screen">'
-      + FixPanel._scoreboardCard('revenue')
+      + FixPanel._scoreboardCard('revenue', insightsBtn)
       + DashUI.row(
           DashUI.shPanel('Where You\'re Leaking Now', leakBody),
-          DashUI.shPanel('This Week vs Target', metricsBody, insightsBtn))
+          DashUI.shPanel('This Week vs Target', metricsBody))
       + DashUI.row(
           DashUI.shPanel('Revenue Forecast', this.forecastPanel(latest)),
           DashUI.shPanel('Revenue Audit', DashUI.auditPanel({
@@ -326,6 +326,8 @@ S.RevenueDashboard = {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
     const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
+    const rec = DashUI._insRec('revenue');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
     const btn = document.getElementById('r-insights-btn');
     const orig = btn ? btn.textContent : '';
     const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
@@ -359,7 +361,8 @@ S.RevenueDashboard = {
         if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        DashUI.insightsModal('Bar Cop Insights', '<p style="margin:0;">' + safe + '</p>');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('revenue', html));
         restore();
       })
       .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
