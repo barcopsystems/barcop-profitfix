@@ -328,14 +328,15 @@ S.Hub = {
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
     // Heading-outside panel (matches the Control + Recovery dashboards): the
-    // title becomes a .sh heading ABOVE the card and the PANEL card flexes to
-    // fill the grid cell. The heading reserves a fixed height so the three card
-    // tops in a row line up whether or not a panel carries a sub line.
-    const shWrapOpen = (t, sub) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
-      + '<div style="min-height:28px;margin:0 0 9px;flex-shrink:0;"><div class="sh" style="margin:0;">' + t + '</div>'
-      + (sub ? '<div style="font-size:10px;color:var(--t4);margin-top:3px;">' + sub + '</div>' : '') + '</div>'
+    // title is a single-line .sh heading ABOVE the card (standard 10px gap to
+    // its card; the grid's 18px row gap gives the larger gap above) and the
+    // PANEL card flexes to fill the grid cell. Any sub line lives inside the
+    // card, not under the heading.
+    const shWrapOpen = (t) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
+      + '<div class="sh" style="margin:0 0 10px;">' + t + '</div>'
       + '<div style="' + PANEL + 'flex:1;">';
     const shWrapClose = '</div></div>';
+    const cardSub = (s) => '<div style="font-size:10px;color:var(--t4);margin:0 0 8px;flex-shrink:0;">' + s + '</div>';
 
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
     // throughout the rest of the app (module dashboards, etc.). Big number in
@@ -759,7 +760,7 @@ S.Hub = {
       + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
     const actionPanel = !anyAudit
       ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
-      : `${shWrapOpen('Priority Action Items', 'From your audits')}
+      : `${shWrapOpen('Priority Action Items')}${cardSub('From your audits')}
       <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
@@ -826,7 +827,7 @@ S.Hub = {
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `${shWrapOpen('Weekly Gaps', 'From this week\'s numbers')}${readoutBody}${shWrapClose}`;
+    const readoutPanel = `${shWrapOpen('Weekly Gaps')}${cardSub('From this week\'s numbers')}${readoutBody}${shWrapClose}`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
