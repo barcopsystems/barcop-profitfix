@@ -327,6 +327,16 @@ S.Hub = {
     const titleWithSub = (t, sub) => `<div style="margin-bottom:10px;flex-shrink:0;"><div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">${t}</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">${sub}</div></div>`;
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
+    // Heading-outside panel (matches the Control + Recovery dashboards): the
+    // title becomes a .sh heading ABOVE the card and the PANEL card flexes to
+    // fill the grid cell. The heading reserves a fixed height so the three card
+    // tops in a row line up whether or not a panel carries a sub line.
+    const shWrapOpen = (t, sub) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
+      + '<div style="min-height:28px;margin:0 0 9px;flex-shrink:0;"><div class="sh" style="margin:0;">' + t + '</div>'
+      + (sub ? '<div style="font-size:10px;color:var(--t4);margin-top:3px;">' + sub + '</div>' : '') + '</div>'
+      + '<div style="' + PANEL + 'flex:1;">';
+    const shWrapClose = '</div></div>';
+
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
     // throughout the rest of the app (module dashboards, etc.). Big number in
     // Barlow Condensed, colored by status (green for good, red for bad).
@@ -457,12 +467,12 @@ S.Hub = {
         + summaryLine
         + '</div>';
     };
-    const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
+    const auditPanel = `${shWrapOpen('Audit Scores')}
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
         ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
         ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
-      </div></div>`;
+      </div>${shWrapClose}`;
 
     // recoveryTotal is computed above the tiles now (used by the Recovery
     // Scoreboard top card). The old recoveryPanel/middleColumn vars below are
@@ -508,8 +518,8 @@ S.Hub = {
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
-    const metricsPanel = `<div style="${PANEL}">${panelTitle('Key Metrics')}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;margin-top:9px;">${metricCells}</div></div>`;
+    const metricsPanel = `${shWrapOpen('Key Metrics')}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;margin-top:9px;">${metricCells}</div>${shWrapClose}`;
 
     // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
     // 50/50 split so the metric tiles get a usable but compact footprint.
@@ -542,15 +552,15 @@ S.Hub = {
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
         + '</div></div>';
       const holdingHtml = '';   // removed: the "N metrics holding the line" counter
-      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}</div>`;
+      alertsPanel = `${shWrapOpen('Alerts')}${alertHead}
+        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}${shWrapClose}`;
     } else {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;">All Clear</div>'
         + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Weekly metrics on target and every recovery audit run, current, and at or above target.</div>'
         + '</div>';
-      alertsPanel = `<div style="${PANEL}">${panelTitle('Alerts')}${allClear}</div>`;
+      alertsPanel = `${shWrapOpen('Alerts')}${allClear}${shWrapClose}`;
     }
 
     // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
@@ -695,8 +705,8 @@ S.Hub = {
         + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  false);
     }
     const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
-    const chartPanel = `<div style="${PANEL}">${panelTitle('Cost & Revenue Trend')}${chartSubtitle}
-      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div></div>`;
+    const chartPanel = `${shWrapOpen('Cost & Revenue Trend')}${chartSubtitle}
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div>${shWrapClose}`;
 
     // Priority Action Items panel — dollar amount is the magnet (big gold
     // Barlow Condensed on the left), then a small module badge above the
@@ -748,9 +758,9 @@ S.Hub = {
       + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Traffic. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
       + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
     const actionPanel = !anyAudit
-      ? `<div style="${PANEL}">${panelTitle('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div></div>`
-      : `<div style="${PANEL}">${titleWithSub('Priority Action Items', 'From your audits')}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}</div>`;
+      ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
+      : `${shWrapOpen('Priority Action Items', 'From your audits')}
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
@@ -816,7 +826,7 @@ S.Hub = {
         + '</div>'
         + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
     }
-    const readoutPanel = `<div style="${PANEL}">${titleWithSub('Weekly Gaps', 'From this week\'s numbers')}${readoutBody}</div>`;
+    const readoutPanel = `${shWrapOpen('Weekly Gaps', 'From this week\'s numbers')}${readoutBody}${shWrapClose}`;
 
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
