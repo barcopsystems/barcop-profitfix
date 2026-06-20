@@ -28,14 +28,14 @@ const AuditUI = {
     opts = opts || {};
     const countdown = '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>';
     let right;
+    const label = hasLatest ? 'Generate New Audit' : 'Generate First Audit';
     if (canRun) {
-      right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">' + (hasLatest ? 'Generate New Audit' : 'Generate First Audit') + '</button>';
-    } else if (opts.notReady) {
-      right = '';
-    } else if (opts.lockedNoInputs) {
-      right = countdown;
+      right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">' + label + '</button>';
     } else {
-      right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">Review / Update Inputs</button>' + countdown;
+      // Locked: the button shows disabled with the countdown below it. The intake
+      // form is reachable ONLY through the active button, so a locked audit cannot
+      // be re-opened until its 30-day window is up.
+      right = '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">' + label + '</button>' + (daysLeft > 0 ? countdown : '');
     }
     return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
@@ -345,13 +345,11 @@ const AuditUI = {
       + '</div>';
   },
 
-  // Generate row below the cards (standard placement) + status + not-ready note.
-  intakeSubmit(pfx, canRun, daysLeft, note) {
-    return '<div style="margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + (canRun
-          ? '<button class="btn btn-primary" id="' + pfx + '-iz-submit">Generate Audit</button>'
-          : '<button class="btn btn-primary" id="' + pfx + '-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
-      + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:24px;">' + (canRun ? '' : 'Review and update your inputs now. The next audit can run in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ', and your changes save when you generate it.') + '</div>';
+  // Generate row below the intake cards. The intake is reachable only when the
+  // audit can run (the landing button gates access), so this is always active.
+  intakeSubmit(pfx) {
+    return '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="' + pfx + '-iz-submit">Generate Audit</button>'
+      + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>';
   }
 };
