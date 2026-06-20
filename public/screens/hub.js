@@ -397,7 +397,7 @@ S.Hub = {
 
       // Action area: button when ready, countdown otherwise
       const actionHtml = canRun
-        ? '<button class="hd-btn" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
+        ? '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
         : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
           + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow\',sans-serif;font-weight:700;font-size:12px;letter-spacing:0;text-transform:none;">in '
           + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
@@ -754,7 +754,7 @@ S.Hub = {
       +   '<div style="flex:1;min-width:0;">'
       +     '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + t + '</div>'
       +     '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:10px;">' + d + '</div>'
-      +     '<button class="hd-btn" onclick="' + onclick + '" style="color:var(--gold);border-color:rgba(219,171,70,0.4);">' + btn + '</button>'
+      +     '<button class="btn btn-primary btn-sm" onclick="' + onclick + '">' + btn + '</button>'
       +   '</div>'
       + '</div>';
     const startHereGuide =
@@ -799,7 +799,7 @@ S.Hub = {
       readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">-- / wk</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
-        + '<button class="hd-btn" onclick="S.Hub._enter(\'this-week\',\'profit\')" style="color:var(--gold);border-color:rgba(219,171,70,0.4);margin-top:4px;">Enter This Week</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'this-week\',\'profit\')" style="margin-top:4px;">Enter This Week</button>'
         + '</div>';
     } else if (readout.items.length === 0) {
       readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;">'
@@ -955,8 +955,6 @@ S.Hub = {
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
         .hub-app .hd-arow{background:#0D181E;}
         .hub-app .hd-arow:hover{background:#0F1A21;}
-        .hub-app .hd-btn{background:none;border:1px solid rgba(255,255,255,0.12);color:var(--t2);font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;}
-        .hub-app .hd-btn:hover{border-color:var(--gold);color:var(--gold);}
         /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
            when row count exceeds card height. Thin scrollbar so it does not
            visually overwhelm the small lists. */
