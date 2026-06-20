@@ -7,16 +7,14 @@
    measure, and the Hub + Accounting report. Tap a node to see exactly what
    feeds it and what it feeds.
 
-   v1 — built from the connections wired today, with the Profit spine detailed.
-   Gets a final pass once Recovery and the Hub are finished (and the Playbook
-   is folded in). The NODES/EDGES below are the single source of truth; the
-   layout + detail panel derive from them. */
+   The NODES/EDGES below are the single source of truth; the layout + detail
+   panel derive from them. */
 
 S.FlowMap = {
   _sel: null,
 
   LAYERS: [
-    { key: 'control',  title: 'Capture · Control' },
+    { key: 'control',  title: 'Capture' },
     { key: 'weekly',   title: 'Weekly' },
     { key: 'diagnose', title: 'Diagnose' },
     { key: 'fix',      title: 'Fix & Measure' },
@@ -30,16 +28,18 @@ S.FlowMap = {
       what: 'Captures the schedule, logged hours, wages, and tips. The data source for labor cost and the payroll worksheet.' },
     { id: 'shift', label: 'Shift', full: 'Shift Control', layer: 'control', go: 'sc-dashboard',
       what: 'Captures each shift: revenue, cash drops, drawer variances, voids and comps, checklists. The data source for sales and most theft signals.' },
+    { id: 'events', label: 'Events', full: 'Events', layer: 'control', go: 'ev-dashboard',
+      what: 'Captures bookings, catering, and your event regulars. A forward-looking feeder, not a diagnose loop: it pushes confirmed business into the week and the Revenue Audit.' },
     { id: 'this-week', label: 'This Week', full: 'This Week (Weekly P&L)', layer: 'weekly', go: 'this-week',
       what: 'Rolls the week up from Control into one P&L: revenue from Shift, COGS from Inventory, labor from Labor. The hub every weekly number flows out of.' },
     { id: 'profit', label: 'Profit', full: 'Profit Recovery', layer: 'diagnose', go: 'dashboard',
       what: 'Diagnoses where margin leaks: pour cost, food cost, theft and loss, vendor control, prime cost. Runs the Profit Audit and the leak board off Control plus This Week.' },
     { id: 'revenue', label: 'Revenue', full: 'Revenue Recovery', layer: 'diagnose', go: 'r-dashboard',
-      what: 'Diagnoses the top line: check average, menu engineering, pricing, labor productivity, and events.' },
+      what: 'Diagnoses the top line: check average, menu engineering, pricing, and labor productivity.' },
     { id: 'traffic', label: 'Traffic', full: 'Traffic Recovery', layer: 'diagnose', go: 't-dashboard',
-      what: 'Diagnoses demand: reviews, Google profile, website, social, delivery, and email marketing.' },
+      what: 'Diagnoses online demand: reviews, Google Business, website, social, delivery, and email. It reads your weekly online numbers and screenshots rather than Control data, so nothing upstream feeds it.' },
     { id: 'bca', label: 'Bar Cop Audit', full: 'Bar Cop Audit', layer: 'diagnose', action: 'audit',
-      what: 'The cross-system score. Reads all three Control sections and grades operational discipline, cash integrity, inventory execution, and theft risk.' },
+      what: 'The cross-system score. Reads all three Control sections and grades six areas: operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and operational consistency.' },
     { id: 'fix', label: 'Fix Process', full: 'The Fix Process', layer: 'fix', go: 'profit-fix',
       what: 'Turns each diagnosed gap into an ordered set of steps that deep-link into the exact screen that does the work. Mark a fix implemented to start measuring it.' },
     { id: 'scoreboard', label: 'Scoreboard', full: 'Recovery Scoreboard', layer: 'fix', go: 'dashboard',
@@ -52,7 +52,7 @@ S.FlowMap = {
 
   EDGES: [
     { from: 'inventory', to: 'this-week', desc: 'Weekly counts plus deliveries between them become bar and food COGS on This Week.' },
-    { from: 'inventory', to: 'profit',    desc: 'Counts feed Variance; deliveries feed Vendor Watch, Scorecard, and Discrepancies; spot checks and theft adjustments feed Theft Risk; product prices feed Recipe Cost.' },
+    { from: 'inventory', to: 'profit',    desc: 'Counts feed Variance; deliveries and prices feed Vendor Tracker and Recipe Summary; spot checks and theft adjustments feed Loss Prevention.' },
     { from: 'inventory', to: 'revenue',   desc: 'Product prices cost out every menu item recipe in Revenue Recovery.' },
     { from: 'inventory', to: 'bca',       desc: 'Counts, spot checks, and discrepancies feed the audit inventory execution and theft sub-scores.' },
     { from: 'labor', to: 'this-week',     desc: 'Logged hours, costed and split bar versus food, become the labor line.' },
@@ -60,14 +60,17 @@ S.FlowMap = {
     { from: 'labor', to: 'books',         desc: 'Hours and tips feed the payroll worksheet, the tip credit, and Form 8027.' },
     { from: 'labor', to: 'bca',           desc: 'Schedules and actual hours feed the audit labor sub-score.' },
     { from: 'shift', to: 'this-week',     desc: 'Each shift logged revenue is summed for the week.' },
-    { from: 'shift', to: 'profit',        desc: 'Cash drops and drawer variances feed Cash Reconciliation; voids, comps, and cash variance feed Theft Risk.' },
+    { from: 'shift', to: 'revenue',       desc: 'Logged covers and sales drive check average and the Server Check scorecard.' },
+    { from: 'shift', to: 'profit',        desc: 'Cash drops and drawer variances feed Over and Short; voids, comps, and cash variance feed Loss Prevention.' },
     { from: 'shift', to: 'bca',           desc: 'Cash variances, voids and comps, and checklist completion feed the audit.' },
+    { from: 'events', to: 'this-week',    desc: 'Offsite catering revenue flows into the week as its own line, counted once so it never doubles an onsite event already rung through Shift.' },
+    { from: 'events', to: 'revenue',      desc: 'Booked events and your close rate feed the Revenue Audit events section.' },
     { from: 'this-week', to: 'profit',    desc: 'The saved week powers the Profit dashboard, the eight-week trend, and the live cost percentages.' },
     { from: 'this-week', to: 'scoreboard',desc: 'Weekly pour, food, and prime cost are the metrics the Scoreboard measures fixes against.' },
     { from: 'this-week', to: 'books',     desc: 'Weekly revenue, COGS, and labor feed Books and the Weekly P&L Brief.' },
     { from: 'profit', to: 'fix',          desc: 'Audit gaps open the Fix Process for pour cost, food cost, theft, vendor, and prime.' },
     { from: 'revenue', to: 'fix',         desc: 'Revenue gaps open their fix processes: pricing, menu, labor, events.' },
-    { from: 'traffic', to: 'fix',         desc: 'Traffic gaps open their fix processes: reviews, GBP, website, social, delivery, email.' },
+    { from: 'traffic', to: 'fix',         desc: 'Traffic gaps open their fix processes: reviews, Google Business, website, social, delivery, and email.' },
     { from: 'fix', to: 'scoreboard',      desc: 'Marking a fix implemented stamps the date and starts the eight-week before-and-after measurement.' },
     { from: 'scoreboard', to: 'hub',      desc: 'Recovered dollars across all three Recovery sections roll up to the Hub.' },
     { from: 'bca', to: 'hub',             desc: 'The Bar Cop Audit score and top exposures surface on the Hub Dashboard.' }
@@ -146,8 +149,7 @@ S.FlowMap = {
     if (!sel) {
       return '<div class="card form-card"><div class="card-title">How your data flows</div>'
         + '<div style="font-size:13px;color:var(--t2);line-height:1.7;">Tap any box above to see exactly what feeds it and what it feeds. Bar Cop runs in three moves: your Control sections <strong>capture</strong> the data, Recovery and the Bar Cop Audit <strong>diagnose</strong> where the money is leaking, and the Fix Process <strong>closes</strong> the gaps while the Recovery Scoreboard measures what came back.</div>'
-        + '<div style="margin-top:14px;font-size:12px;color:var(--t3);line-height:1.8;"><strong style="color:var(--t2);">Capture / Control</strong> is Inventory, Labor, and Shift. <strong style="color:var(--t2);">Weekly</strong> is This Week, which rolls them into your P&L. <strong style="color:var(--t2);">Diagnose</strong> is the three Recovery sections plus the Bar Cop Audit. <strong style="color:var(--t2);">Fix &amp; Measure</strong> is the Fix Process and the Recovery Scoreboard. <strong style="color:var(--t2);">Report</strong> is the Hub Dashboard and Accounting.</div>'
-        + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);font-size:11px;color:var(--t3);line-height:1.6;">This shows the connections wired today. It gets a final pass once Recovery and the Hub are finished.</div>'
+        + '<div style="margin-top:14px;font-size:12px;color:var(--t3);line-height:1.8;"><strong style="color:var(--t2);">Capture</strong> is your Control sections, Inventory, Labor, and Shift, plus Events. <strong style="color:var(--t2);">Weekly</strong> is This Week, which rolls them into your P&L. <strong style="color:var(--t2);">Diagnose</strong> is the three Recovery sections plus the Bar Cop Audit. <strong style="color:var(--t2);">Fix &amp; Measure</strong> is the Fix Process and the Recovery Scoreboard. <strong style="color:var(--t2);">Report</strong> is the Hub Dashboard and Accounting.</div>'
         + '</div>';
     }
     const n = this.NODES.find(x => x.id === sel);
