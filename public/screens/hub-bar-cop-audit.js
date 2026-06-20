@@ -843,8 +843,8 @@ S.HubBarCopAudit = {
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
     const desc = enough
-      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. An executive read across every system: six sub-scores, your top operational exposures, recurring patterns, and your recovery activity. Each sub-score fills in as you log the data behind it and shows N/A until then. Print or save as a PDF from your browser.'
-      : 'The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Start logging in Inventory, Shift, and Labor Control and it scores what it can, filling in the rest over time.';
+      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. It scores your whole operation from your Control data, no upload needed, and the result shows on screen in a minute or two.'
+      : 'The Bar Cop Audit scores your whole operation from your Control data, nothing to upload. Log in Inventory, Shift, and Labor Control and it scores what it can.';
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
@@ -884,21 +884,20 @@ S.HubBarCopAudit = {
       ['operational_consistency', 'Operational Consistency']
     ];
 
-    const subBlock = (key, name) => {
+    const subBlock = (key, name, num) => {
       const raw = audit.sub_scores && audit.sub_scores[key];
       const isNA = raw == null;
       const sc = isNA ? null : raw;
       const col = isNA ? 'var(--t3)' : App.scoreColor(sc);
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
       const breakdown = detail.length
-        ? '<div style="margin-top:14px;"><div class="at-metrics"><table class="at-mtbl">'
+        ? '<div class="at-metrics"><table class="at-mtbl">'
           + detail.map(c => {
               const naC = c.na || c.pct == null;
               return '<tr><td>' + esc(c.label) + (c.extra ? ' <span style="color:var(--t4);">(' + esc(c.extra) + ')</span>' : '') + '</td>'
                 + '<td style="color:' + (naC ? 'var(--t3)' : App.scoreColor(c.pct)) + ';">' + (naC ? 'N/A' : c.pct) + '</td></tr>';
             }).join('')
           + '</table></div>'
-          + '</div>'
         : '';
       const scoreBlock = isNA
         ? '<div style="text-align:right;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
@@ -907,15 +906,16 @@ S.HubBarCopAudit = {
           + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
           + '</div>';
       return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div>'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
+        +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
+        +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
         +   scoreBlock
         + '</div>'
         + breakdown
         + '</div>';
     };
 
-    const subCards = SUB_NAMES.map(([k, n]) => subBlock(k, n)).join('');
+    const subCards = SUB_NAMES.map(([k, n], i) => subBlock(k, n, i + 1)).join('');
 
     // Top Operational Exposures section
     const exposures = audit.exposures || [];
