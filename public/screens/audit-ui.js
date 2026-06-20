@@ -178,8 +178,7 @@ const AuditUI = {
   },
 
   emptyState() {
-    return '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px;">No audits yet</div>'
-      + '<div style="font-size:12px;color:var(--t3);">Generate your first audit above. It scores from your Control data plus anything you upload.</div></div></div>';
+    return '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);">No audits yet</div></div></div>';
   },
 
   // ── Full view: findings text under a section ───────────────────────────────
