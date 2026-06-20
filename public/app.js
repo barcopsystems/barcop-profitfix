@@ -1446,9 +1446,23 @@ const App = {
       { h: 'How to use it', p: ['Tap any box to see exactly what feeds it and what it feeds, with a button to open that screen. Use it to trace where a number you logged ends up, or how one part of Bar Cop connects to another.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
-      { h: 'What this is', p: ['Your monthly read on how well the whole operation is being run. It scores six areas from the data you already log: operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and consistency.'] },
-      { h: 'How to use it', p: ['Run one audit every 30 days. Each sub-score fills in as you log the data behind it, and shows Not Enough Data until then.', 'The sidebar links to your Profit, Revenue, and Traffic audits, which live with their Recovery Fix Systems.'] },
-      { h: 'Reading your results', p: ['Below the six scores, Top Operational Exposures calls out your weakest spots first, and recurring patterns flag a problem that keeps showing up audit to audit. The score-trend chart tracks your overall score over time, and the Audit History table lists past runs to open. Print or save any audit as a PDF from your browser.'] }
+      { h: 'What this is', p: [
+        'Your monthly read on how well the whole operation is being run, separate from the Profit, Revenue, and Traffic audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and Labor Control, so there is nothing to upload.',
+        'The Operational Health score up top is the average of the six sub-scores that have enough data behind them. It needs at least three of the six covered to show a number; below that it reads N/A and fills in as you log more.'
+      ] },
+      { h: 'The six sub-scores', p: [
+        'Operational Discipline: are the daily and weekly procedures getting done. Opening and closing checklists, inventory counts and spot checks on schedule, shifts logged, your recovery audits run on time, and the maintenance backlog kept clear.',
+        'Cash Integrity: your cash variance trend against the revenue handled, a drawer counted on every shift, large voids and comps authorized, and cash dropped on the shifts that take real money.',
+        'Inventory Execution: counts and spot checks on schedule, vendor discrepancies resolved instead of aging, and spot checks coming back clean.',
+        'Labor Hygiene: scheduled hours matching actual, callouts and overtime under control, certifications current, coaching notes being written, and your wage policy set.',
+        'Recovery Action: did you act on what Bar Cop surfaced. Fixes logged against the gaps your recovery audits raised, and how many of those produced real favorable movement.',
+        'Operational Consistency: how steady the operation runs week to week. Low swing in covers, labor percent, and pour cost over the last eight weeks is the mark of a disciplined operation.'
+      ] },
+      { h: 'How each one is scored', p: ['Open any Section to see its breakdown: every component that fed the sub-score, with its own number and the count behind it. A component with no data to judge shows N/A and is left out of the math, never counted as a zero, so a barely-used system never drags down a score it could not see. A sub-score needs at least two scorable components before it shows a number.'] },
+      { h: 'Recovery Activity', p: ['The stat strip under the score tracks whether the recovery loop is moving: gaps surfaced by your latest audits, fixes you logged in the last 30 days, dollars recovered to date, and fixes still being measured before their result is in.'] },
+      { h: 'Top Operational Exposures', p: ['The action list: the cross-system items worth handling now, worst first. Red is act-now (a high-priority maintenance item, an aging vendor credit, a permit about to lapse), amber is a watch. Open jumps you to the exact screen to work it. Bar Cop Outlook is a short written read of the whole audit, and Export PDF saves it.'] },
+      { h: 'Recurring Patterns', p: ['Problems that keep showing up over a rolling 90 days: the same cashier short again and again, voids stacking on one shift type, chronic shrinkage on one product, a vendor with repeated discrepancies, or labor blowing out on the same day of week. Each names the pattern and a screen to act on it.'] },
+      { h: 'Landing and history', p: ['The landing holds the Generate button (locked to once every 30 days), the latest audit with its six section scores, the score-history bars, and the Audit History list of past runs to reopen. Every audit is saved so you can watch the trend. The sidebar links across to your Profit, Revenue, and Traffic audits, which live with their Recovery Fix Systems.'] }
     ] },
     'books-home': { title: 'How the Books Overview Works', sections: [
       { h: 'What this page is', p: ['The Books overview: your back office at a glance. Books builds the files your accountant needs (Weekly P&L Brief, Month-End Books, Year-End Review) and tracks your permits, licenses, and operating expenses. This page rolls it all up from what you have logged, so the numbers match the Month-End file.'] },
