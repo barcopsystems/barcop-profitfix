@@ -368,7 +368,7 @@ S.Hub = {
       const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
       return Math.max(0, 30 - d);
     };
-    const auditRow = (name, audit, trend, screen, mod, isFirst, indAvg) => {
+    const auditRow = (name, audit, trend, screen, mod, isFirst) => {
       const score      = audit?.overall_score ?? null;
       // Number stays a quiet neutral; the score bar + marker below carry the
       // red/amber/green so the color is not doubled up on the number.
@@ -384,7 +384,7 @@ S.Hub = {
           + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow\',sans-serif;font-weight:700;font-size:12px;letter-spacing:0;text-transform:none;">in '
           + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
 
-      // Score block: big number / 100 + industry/target line + bar with marker
+      // Score block: big number / 100 + target line + bar with marker
       let scoreBlock;
       if (score != null) {
         const barPct = Math.max(0, Math.min(100, Math.round(score)));
@@ -392,7 +392,7 @@ S.Hub = {
           + '<div style="display:flex;align-items:baseline;gap:12px;">'
           +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
           +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
-          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Bar Cop benchmark ' + indAvg + ' &middot; Your target 65+</div>'
+          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Your target ' + ((audit && audit.raw && audit.raw.TARGET_SCORE) || 65) + ' or higher</div>'
           + '</div>'
           // Status bar shortened on the right so it clears the "Next Audit"
           // countdown / "Run Audit" button area (~85px wide on the right
@@ -459,9 +459,9 @@ S.Hub = {
     };
     const auditPanel = `<div style="${PANEL}">${panelTitle('Audit Scores')}
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
-        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true,  63)}
-        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false, 61)}
-        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false, 58)}
+        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
+        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
+        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
       </div></div>`;
 
     // recoveryTotal is computed above the tiles now (used by the Recovery
@@ -870,6 +870,26 @@ S.Hub = {
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
 
+    // ── Hub landing layout ──────────────────────────────────────────────────
+    // NEW_HUB_LAYOUT groups the panels into the owner's reading order: where you
+    // stand (the three tiles) -> what to do now (Priority Action Items, Alerts,
+    // Weekly Gaps) -> the supporting detail (Audit Scores, Key Metrics, Trend),
+    // with the action band taller than the detail band so the eye lands on the
+    // win and the next move first. Flip to false to restore the prior
+    // equal-weight grid exactly (kept intact below; panels are unchanged).
+    const NEW_HUB_LAYOUT = true;
+    const hubGrid = NEW_HUB_LAYOUT
+      ? `<div class="hub-grid" style="display:grid;grid-template-rows:auto 500px 430px;gap:18px;padding-bottom:18px;">
+          <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${alertsPanel}${readoutPanel}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${auditPanel}${metricsPanel}${chartPanel}</div>
+        </div>`
+      : `<div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
+          <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
+        </div>`;
+
     // ── Compose ──
     // Reuses the same .app / .sidebar / .topbar / .content classes as the
     // module shells so the Hub sidebar matches them exactly in width, logo
@@ -947,11 +967,7 @@ S.Hub = {
           </header>
           <main class="content">
             ${catchupBanner}
-            <div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
-              <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
-              <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
-            </div>
+            ${hubGrid}
           </main>
         </div>
         <div class="sidebar-backdrop" id="hub-sidebar-backdrop"></div>
