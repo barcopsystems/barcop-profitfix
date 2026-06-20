@@ -333,7 +333,7 @@ S.Hub = {
     const tile = (label, big, bigColor, sub, subColor, box) => `
       <div style="${box || 'background:var(--surface);border:1px solid var(--b-edge);'}border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">${label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;line-height:1;color:${bigColor};">${big}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;color:${bigColor};">${big}</div>
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
@@ -899,6 +899,7 @@ S.Hub = {
       <style>
         .hub-app{min-height:100% !important;}
         .hub-app .content{padding:24px;min-width:0;}
+        @media (max-width:768px){.hub-app .content{padding:14px 8px 72px;}}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
