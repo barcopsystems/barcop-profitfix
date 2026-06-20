@@ -332,9 +332,9 @@ S.Hub = {
     // its card; the grid's 18px row gap gives the larger gap above) and the
     // PANEL card flexes to fill the grid cell. Any sub line lives inside the
     // card, not under the heading.
-    const shWrapOpen = (t) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
+    const shWrapOpen = (t, cardPad) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
       + '<div class="sh" style="margin:0 0 10px;">' + t + '</div>'
-      + '<div style="' + PANEL + 'flex:1;">';
+      + '<div style="' + PANEL + 'flex:1;' + (cardPad ? 'padding:' + cardPad + ';' : '') + '">';
     const shWrapClose = '</div></div>';
     const cardSub = (s) => '<div style="font-size:10px;color:var(--t4);margin:0 0 8px;flex-shrink:0;">' + s + '</div>';
 
@@ -519,8 +519,8 @@ S.Hub = {
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
         <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
       </div>`).join('');
-    const metricsPanel = `${shWrapOpen('Key Metrics')}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;margin-top:9px;">${metricCells}</div>${shWrapClose}`;
+    const metricsPanel = `${shWrapOpen('Key Metrics', '14px')}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div>${shWrapClose}`;
 
     // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
     // 50/50 split so the metric tiles get a usable but compact footprint.
@@ -705,8 +705,7 @@ S.Hub = {
         + miniChart('Check Average',   w8r, w => w?.check_avg ?? null,        caT,    v => App.fmtCurrency(v), 'high', false)
         + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  false);
     }
-    const chartSubtitle = '<div style="font-size:9px;color:var(--t4);margin-bottom:6px;flex-shrink:0;text-align:right;">Last 8 weeks</div>';
-    const chartPanel = `${shWrapOpen('Cost & Revenue Trend')}${chartSubtitle}
+    const chartPanel = `${shWrapOpen('Cost & Revenue Trend', '14px')}
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div>${shWrapClose}`;
 
     // Priority Action Items panel — dollar amount is the magnet (big gold
