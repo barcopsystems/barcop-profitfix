@@ -32,31 +32,33 @@ S.RecoveryPlaybook = {
   // ── Module screen: standard .screen width + a sticky right-hand section rail ──
   render(content, actions) {
     this.container = content;
+    this._diag = {};   // diagnostic answers, session-only (fresh each visit)
     const d = this.doc();
     const rail = d.sections.map(sec =>
       '<button class="pb-rail-item" data-id="' + esc(sec.id) + '">' + esc(sec.nav) + '</button>').join('');
 
-    const body = d.sections.map(sec => {
-      const blocks = sec.blocks.map(b => this.blockHtml(b)).join('');
-      return '<section class="pb-section" id="pb-' + esc(sec.id) + '">'
-        + (sec.eyebrow ? '<div class="pb-eyebrow">' + esc(sec.eyebrow) + '</div>' : '')
-        + '<div class="card-title pb-h1">' + esc(sec.title) + '</div>'
-        + blocks + '</section>';
-    }).join('');
+    // Converted page (topbar hidden), so Save PDF lives in the page. It rides the
+    // right of the first section's title line so the header stays at the top.
+    const pdfBtn = '<button class="btn btn-ghost btn-sm pb-pdf-btn" id="pb-pdf">' + this._icon('reference') + 'Save PDF</button>';
 
-    // This is a _CONVERTED page (topbar hidden), so the action lives in the page,
-    // not the topbar. Top-right of the reading body, like the other converted screens.
-    const pdfBtn = '<div class="pb-actions"><button class="btn btn-ghost btn-sm" id="pb-pdf">'
-      + this._icon('reference') + 'Save PDF</button></div>';
+    const body = d.sections.map((sec, idx) => {
+      const blocks = sec.blocks.map(b => this.blockHtml(b)).join('');
+      const eyebrow = sec.eyebrow ? '<div class="pb-eyebrow">' + esc(sec.eyebrow) + '</div>' : '';
+      const titleRow = idx === 0
+        ? '<div class="pb-h1row"><div class="card-title pb-h1">' + esc(sec.title) + '</div>' + pdfBtn + '</div>'
+        : '<div class="card-title pb-h1">' + esc(sec.title) + '</div>';
+      return '<section class="pb-section" id="pb-' + esc(sec.id) + '">' + eyebrow + titleRow + blocks + '</section>';
+    }).join('');
 
     content.innerHTML = this.styleTag()
       + '<div class="screen">'
       +   '<div class="pb-row">'
-      +     '<div class="pb-body">' + pdfBtn + body + this.footerHtml() + '</div>'
+      +     '<div class="pb-body">' + body + this.footerHtml() + '</div>'
       +     '<nav class="pb-rail"><div class="pb-rail-label">In this playbook</div>' + rail + '</nav>'
       +   '</div>'
       + '</div>';
 
+    const bodyEl = content.querySelector('.pb-body');
     content.querySelector('#pb-pdf')?.addEventListener('click', () => this._exportPDF());
 
     content.querySelectorAll('.pb-rail-item').forEach(btn =>
@@ -69,6 +71,20 @@ S.RecoveryPlaybook = {
         if (btn.dataset.focus) App._fixFocus = btn.dataset.focus;
         App.openScreen(btn.dataset.screen);
       }));
+
+    // Interactive diagnostic: Yes/No per question reveals its outcome and scores
+    // live. Delegated on the fresh .pb-body (recreated each render, so no leak).
+    if (bodyEl) bodyEl.addEventListener('click', e => {
+      const yn = e.target.closest('.pb-yn');
+      if (!yn) return;
+      const n = +yn.dataset.q, v = yn.dataset.v;
+      this._diag[n] = (this._diag[n] === v) ? null : v;
+      const dyn = bodyEl.querySelector('[data-qwrap="' + n + '"] .pb-diag-dyn');
+      if (dyn) dyn.innerHTML = this._diagDyn(n);
+      const sc = bodyEl.querySelector('#pb-diagscore');
+      if (sc) sc.innerHTML = this._diagScoreHtml();
+    });
+
     this._wireRail();
   },
 
@@ -119,6 +135,8 @@ S.RecoveryPlaybook = {
         return this.tableHtml(b);
       case 'diag':
         return this.diagHtml(b);
+      case 'diagscore':
+        return '<div class="pb-box pb-box-steel" id="pb-diagscore">' + this._diagScoreHtml() + '</div>';
       case 'cross':
         return this.crossHtml(b);
       case 'parts':
@@ -159,13 +177,64 @@ S.RecoveryPlaybook = {
   },
 
   diagHtml(b) {
-    const items = b.items.map(q =>
-      '<div class="pb-diag">'
+    this._diagItems = b.items;
+    return b.items.map(q =>
+      '<div class="pb-diag" data-qwrap="' + q.n + '">'
       + '<div class="pb-diag-q"><span class="pb-diag-n">' + q.n + '.</span> ' + esc(q.q) + '</div>'
-      + '<div class="pb-diag-a pb-diag-yes"><span>YES</span>' + esc(q.yes) + '</div>'
-      + '<div class="pb-diag-a pb-diag-no"><span>NO &middot; about ' + esc(q.cost) + '/mo</span>' + esc(q.no) + '</div>'
+      + '<div class="pb-diag-dyn">' + this._diagDyn(q.n) + '</div>'
       + '</div>').join('');
-    return items;
+  },
+
+  // The Yes/No toggle + the revealed outcome for one question, from current state.
+  _diagDyn(n) {
+    const q = (this._diagItems || []).find(x => x.n === n);
+    if (!q) return '';
+    const ans = this._diag[n];
+    const toggle = '<div class="pb-diag-toggle">'
+      + '<button class="pb-yn' + (ans === 'yes' ? ' on yes' : '') + '" data-q="' + n + '" data-v="yes">Yes</button>'
+      + '<button class="pb-yn' + (ans === 'no' ? ' on no' : '') + '" data-q="' + n + '" data-v="no">No</button>'
+      + '</div>';
+    const reveal = ans === 'yes'
+      ? '<div class="pb-diag-reveal yes">' + esc(q.yes) + '</div>'
+      : ans === 'no'
+        ? '<div class="pb-diag-reveal no">' + esc(q.no) + ' <span class="pb-diag-cost">commonly about ' + esc(q.cost) + ' a month</span></div>'
+        : '';
+    return toggle + reveal;
+  },
+
+  // The live score box: their Yes count, the band meaning once all are answered,
+  // and the illustrative combined monthly figure for the gaps they flagged No.
+  _diagScoreHtml() {
+    const items = this._diagItems || [];
+    const ans = this._diag || {};
+    let yes = 0, no = 0, answered = 0, dollars = 0;
+    items.forEach(q => {
+      const a = ans[q.n];
+      if (!a) return;
+      answered++;
+      if (a === 'yes') yes++;
+      else { no++; dollars += parseInt(String(q.cost).replace(/[^0-9]/g, ''), 10) || 0; }
+    });
+    const head = '<div class="pb-box-label">Score your answers</div>';
+    if (answered === 0) {
+      return head + '<div class="pb-box-text">Tap Yes or No on each question above and your score builds here.</div>';
+    }
+    const money = '$' + dollars.toLocaleString();
+    let html = head + '<div class="pb-score-num">' + yes + ' <span>of ' + items.length + ' Yes</span></div>';
+    if (no > 0) {
+      html += '<div class="pb-box-text">The gaps you marked No commonly run about <strong>' + money
+        + ' a month</strong> combined. That is an illustrative example of typical loss, not your measured number.</div>';
+    }
+    if (answered === items.length) {
+      let band;
+      if (yes >= 8) band = 'You are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month.';
+      else if (yes >= 5) band = 'You have profitable holes. The combined figure above is what this system is built to recover.';
+      else band = 'This system pays for itself in the first 30 days. Instinct and experience both have limits. A system does not.';
+      html += '<div class="pb-box-text" style="margin-top:9px;">' + band + '</div>';
+    } else {
+      html += '<div class="pb-box-text" style="margin-top:6px;color:var(--t3);">' + answered + ' of ' + items.length + ' answered. Answer them all for your full read.</div>';
+    }
+    return html;
   },
 
   crossHtml(b) {
@@ -249,6 +318,12 @@ S.RecoveryPlaybook = {
         b.table(['The leak', 'Where you capture it', 'Where Bar Cop shows it', 'Where you fix it'],
           blk.rows.map(r => [r.leak, r.capture, r.show, r.fixLabel + ' (open in Bar Cop)']));
         break;
+      case 'diagscore':
+        b.heading('Score your answers', 11);
+        b.paragraph('8 to 10 Yes: you are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month.', { gray: 55 });
+        b.paragraph('5 to 7 Yes: you have profitable holes. Add up the monthly figures next to your No answers. That is what this system is built to recover.', { gray: 55 });
+        b.paragraph('0 to 4 Yes: this system pays for itself in the first 30 days. Instinct and experience both have limits. A system does not.', { gray: 55 });
+        break;
       case 'parts':
         b.table(['System', 'What it does'], blk.items.map(it => [it.label + ' - ' + it.name, it.desc]));
         break;
@@ -263,7 +338,9 @@ S.RecoveryPlaybook = {
 
   styleTag() {
     return '<style>'
-      + '.pb-actions{display:flex;justify-content:flex-end;margin-bottom:12px;}'
+      + '.pb-h1row{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px;}'
+      + '.pb-h1row .pb-h1{margin-bottom:0;}'
+      + '.pb-pdf-btn{flex-shrink:0;}'
       + '.pb-row{display:flex;gap:28px;align-items:flex-start;}'
       + '.pb-body{flex:1;min-width:0;border:1px solid var(--b-edge);border-radius:var(--r);padding:20px 22px;}'
       + '.pb-rail{flex:0 0 200px;position:sticky;top:24px;padding-top:2px;}'
@@ -295,10 +372,17 @@ S.RecoveryPlaybook = {
       + '.pb-diag{border-left:2px solid var(--b-edge);padding:2px 0 2px 14px;margin:0 0 16px;}'
       + '.pb-diag-q{font-size:14px;font-weight:600;color:var(--t1);line-height:1.5;margin-bottom:8px;}'
       + '.pb-diag-n{color:inherit;font-weight:700;}'
-      + '.pb-diag-a{font-size:12.5px;line-height:1.65;color:var(--t2);margin-top:5px;padding-left:2px;}'
-      + '.pb-diag-a span{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;margin-right:7px;padding:1px 6px;border-radius:3px;}'
-      + '.pb-diag-yes span{color:var(--green);border:1px solid var(--green);}'
-      + '.pb-diag-no span{color:var(--red);border:1px solid var(--red);}'
+      + '.pb-diag-toggle{display:flex;gap:8px;margin-top:10px;}'
+      + '.pb-yn{background:transparent;border:1px solid var(--b1);color:var(--t2);font-family:\'Barlow\',sans-serif;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:5px 18px;border-radius:var(--r);cursor:pointer;transition:border-color .12s,color .12s;}'
+      + '.pb-yn:hover{color:var(--w);border-color:rgba(255,255,255,0.28);}'
+      + '.pb-yn.on.yes{color:var(--green);border-color:var(--green);}'
+      + '.pb-yn.on.no{color:var(--red);border-color:var(--red);}'
+      + '.pb-diag-reveal{margin-top:10px;font-size:12.5px;line-height:1.65;color:var(--t2);background:#0D181E;border-radius:var(--r);padding:10px 12px;}'
+      + '.pb-diag-reveal.yes{border-left:2px solid var(--green);}'
+      + '.pb-diag-reveal.no{border-left:2px solid var(--red);}'
+      + '.pb-diag-cost{color:var(--red);font-weight:700;}'
+      + '.pb-score-num{font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--t1);margin:8px 0;}'
+      + '.pb-score-num span{font-size:15px;color:var(--t3);}'
       + '.pb-parts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px;}'
       + '.pb-part{background:#0D181E;border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;}'
       + '.pb-part-label{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:3px;}'
@@ -419,7 +503,7 @@ S.RecoveryPlaybook = {
                 yes: 'You are not relying on motivation. Tasks have names and dates. The system runs because the plan is written, not because someone feels like running it.',
                 no: 'The plan lives in your head, which means it dies the first busy Friday and gets pushed to next week. It is always next week. Write it, assign it, date it. That is the whole difference between a bar that implements and one that intends to.' }
             ] },
-            { t: 'box', tone: 'steel', label: 'Score your answers', title: 'Add up your Yes answers', text: '8 to 10 Yes: you are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month. 5 to 7 Yes: you have profitable holes. Add up the monthly figures next to your No answers. That number is what this is built to recover. 0 to 4 Yes: the system pays for itself in the first 30 days. Instinct and experience both have limits. A system does not.' },
+            { t: 'diagscore' },
             { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
               'Your POS does not catch theft. It records it.',
               'A bartender who free-pours is not a bad employee, they are an untrained one in an uncontrolled system.',
