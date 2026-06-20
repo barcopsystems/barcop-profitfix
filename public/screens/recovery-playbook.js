@@ -110,7 +110,9 @@ S.RecoveryPlaybook = {
         return '<div class="pb-box pb-box-' + (b.tone || 'steel') + '">'
           + (b.label ? '<div class="pb-box-label">' + esc(b.label) + '</div>' : '')
           + (b.title ? '<div class="pb-box-title">' + esc(b.title) + '</div>' : '')
-          + '<div class="pb-box-text">' + esc(b.text) + '</div></div>';
+          + (b.text ? '<div class="pb-box-text">' + esc(b.text) + '</div>' : '')
+          + (b.items ? '<ol class="pb-box-list">' + b.items.map(i => '<li>' + esc(i) + '</li>').join('') + '</ol>' : '')
+          + '</div>';
       case 'table':
         return this.tableHtml(b);
       case 'diag':
@@ -227,7 +229,8 @@ S.RecoveryPlaybook = {
       case 'box':
         if (blk.title) b.heading(blk.title, 11);
         else if (blk.label) b.heading(blk.label, 10);
-        b.paragraph(blk.text, { gray: 55 });
+        if (blk.text) b.paragraph(blk.text, { gray: 55 });
+        if (blk.items) blk.items.forEach((i, n) => b.paragraph((n + 1) + '. ' + i, { gray: 55 }));
         break;
       case 'table':
         b.table(blk.head, blk.rows);
@@ -280,6 +283,9 @@ S.RecoveryPlaybook = {
       + '.pb-box-label{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:6px;}'
       + '.pb-box-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:7px;line-height:1.3;}'
       + '.pb-box-text{font-size:13px;color:var(--t2);line-height:1.7;}'
+      + '.pb-box-list{margin:4px 0 0;padding-left:20px;font-size:13px;color:var(--t2);line-height:1.65;}'
+      + '.pb-box-list li{margin-bottom:7px;}'
+      + '.pb-box-list li:last-child{margin-bottom:0;}'
       + '.pb-tbl-card{margin:0 0 18px;}'
       + '.pb-tbl-nowrap1 td:first-child,.pb-tbl-nowrap1 th:first-child{white-space:nowrap;}'
       + '.pb-cross-leak{font-weight:700;color:var(--t1);}'
@@ -411,7 +417,13 @@ S.RecoveryPlaybook = {
                 no: 'The plan lives in your head, which means it dies the first busy Friday and gets pushed to next week. It is always next week. Write it, assign it, date it. That is the whole difference between a bar that implements and one that intends to.' }
             ] },
             { t: 'box', tone: 'steel', label: 'Score your answers', title: 'Add up your Yes answers', text: '8 to 10 Yes: you are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month. 5 to 7 Yes: you have profitable holes. Add up the monthly figures next to your No answers. That number is what this is built to recover. 0 to 4 Yes: the system pays for itself in the first 30 days. Instinct and experience both have limits. A system does not.' },
-            { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', text: '1. Your POS does not catch theft. It records it. 2. A bartender who free-pours is not a bad employee, they are an untrained one in an uncontrolled system. 3. Every vendor assumes you are not checking the invoice, and most of the time they are right. 4. Prime cost is the only number that tells you if the whole machine is working. Every other metric is a piece of it. 5. The bar that controls its costs is not the most popular on the block. It is the one still open in year five.' }
+            { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
+              'Your POS does not catch theft. It records it.',
+              'A bartender who free-pours is not a bad employee, they are an untrained one in an uncontrolled system.',
+              'Every vendor assumes you are not checking the invoice, and most of the time they are right.',
+              'Prime cost is the only number that tells you if the whole machine is working. Every other metric is a piece of it.',
+              'The bar that controls its costs is not the most popular on the block. It is the one still open in year five.'
+            ] }
           ]
         },
         {
