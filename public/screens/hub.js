@@ -568,7 +568,7 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
       const tgtDisp  = valFmt(target);
 
-      const card = (inner) => '<div style="border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
 
       const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -664,13 +664,13 @@ S.Hub = {
         + '<div style="position:relative;flex:1;min-height:0;">'
         +   '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" height="100%" style="display:block;position:absolute;inset:0;">'
         +     '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +       '<stop offset="0%" stop-color="#DBAB46" stop-opacity="0.08"/>'
-        +       '<stop offset="100%" stop-color="#DBAB46" stop-opacity="0.005"/>'
+        +       '<stop offset="0%" stop-color="#070E15" stop-opacity="0.9"/>'
+        +       '<stop offset="100%" stop-color="#070E15" stop-opacity="0.05"/>'
         +     '</linearGradient></defs>'
         +     markerSvg
         +     tgtLine
         +     (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +     '<path d="'+d+'" fill="none" stroke="rgba(219,171,70,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        +     '<path d="'+d+'" fill="none" stroke="#DBAB46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
         +   '</svg>'
         +   dots
         + '</div>');
