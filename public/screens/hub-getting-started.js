@@ -101,9 +101,10 @@ S.HubGettingStarted = {
       const tasks = this.TASKS.filter(t => t.group === g.id);
       if (!tasks.length) return '';
       const gDone = tasks.filter(t => prog[t.id]).length;
-      const rows = tasks.map(t => {
+      const rows = tasks.map((t, idx) => {
         const d = !!prog[t.id];
-        return '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--b2);">'
+        const div = idx < tasks.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 20px;background:#0D181E;' + div + '">'
           + '<input type="checkbox" class="gs-chk" data-id="' + esc(t.id) + '"' + (d ? ' checked' : '')
           + ' style="margin-top:2px;flex-shrink:0;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;"/>'
           + '<div style="flex:1;font-size:12px;line-height:1.55;color:' + (d ? 'var(--t3)' : 'var(--t1)') + ';'
@@ -119,7 +120,7 @@ S.HubGettingStarted = {
         +   '<div style="flex:1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + esc(g.title) + '</div>'
         +   '<div style="font-size:11px;font-weight:700;color:' + (allDone ? 'var(--gold)' : 'var(--t3)') + ';">' + gDone + ' / ' + tasks.length + '</div>'
         + '</div>'
-        + '<div class="hg-body" style="padding:2px 20px 14px;border-top:1px solid var(--b2);">' + rows + '</div>'
+        + '<div class="hg-body" style="border-top:1px solid var(--b2);">' + rows + '</div>'
         + '</div>';
     }).join('');
 
