@@ -396,7 +396,8 @@ S.TrafficAudit = {
       { h: 'Reads Live From a Link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once and it is ready every audit.'] },
       { h: 'Needs a Screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email sit behind a login or carry data a link cannot reach. Drop one screenshot per area you want scored; one drop zone takes them all, and PDF or CSV exports work too.'] },
       { h: 'The Quick Questions', p: ['A few questions cover what no report shows, like whether you mark up delivery prices to offset commission or run a review-ask at the table. They shape the score and carry over to next time.'] },
-      { h: 'The Steps', p: ['1. Confirm your Website link.', '2. Drop a screenshot for each area you want scored.', '3. Answer the quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] }
+      { h: 'The Steps', p: ['1. Confirm your Website link.', '2. Drop a screenshot for each area you want scored.', '3. Answer the quick questions.', '4. Generate. Anything with no data shows N/A and fills in next time.'] },
+      { h: 'Reading Your Results', p: ['Generate gives you a scored breakdown: an overall score up top and a score for each area (N/A where there is no data yet). Below that sit your Action Items, ranked by impact, each with a Fix This button that drops you into Traffic Fix on that exact gap. Bar Cop Outlook is a short written read of where you stand, and Export PDF saves the whole audit. The Traffic Audit does not put a dollar figure on a gap; the Traffic Forecast does that. Each audit is saved so you can watch the score trend on the audit landing.'] }
     ]);
   },
 
