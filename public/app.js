@@ -486,6 +486,8 @@ const App = {
     if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); };
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
+    const tnDate = document.getElementById('tn-date');
+    if (tnDate) tnDate.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     // Mobile sidebar: hamburger button in the topbar opens the off-canvas
     // sidebar below the 768px breakpoint. Backdrop click closes it. Module
     // nav clicks also close it (wired in _renderNav). No-op on desktop where
@@ -880,9 +882,9 @@ const App = {
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
       slot.style.display = 'flex';
-      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:14px;';
+      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:8px;';
       slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
-        + '<select class="acct-switcher" style="background:var(--input);border:1px solid var(--b1);border-radius:4px;color:var(--w);font-family:inherit;font-size:12px;font-weight:600;padding:6px 10px;cursor:pointer;outline:none;">' + options + '</select>';
+        + '<select class="acct-switcher at-qsel" style="font-weight:600;">' + options + '</select>';
       const sel = slot.querySelector('.acct-switcher');
       sel.addEventListener('change', (ev) => {
         const newId = ev.target.value;
@@ -1437,9 +1439,14 @@ const App = {
   // page's activeAction; openHubFullPage/showHub install the matching shim.
   // Pages not listed fall back to the full Help and FAQ. Sections: {h, p:[...]}.
   _HUB_HELP: {
-    'hub': { title: 'The Hub', sections: [
-      { h: 'What this is', p: ['Your home screen. The Hub pulls the most important numbers from every part of Bar Cop into one view: what you have recovered, your Bar Cop Audit score, and the issues that need attention right now.'] },
-      { h: 'How to use it', p: ['Tap any tile or row to jump to the screen behind it. The weekly readout shows where money is leaking this week, biggest first. The alerts surface anything worth a look across Inventory, Labor, and Shift.'] }
+    'hub': { title: 'How the Hub Works', sections: [
+      { h: 'What this is', p: ['Your home screen and the cross-system command center. The Hub pulls the headline number from every part of Bar Cop into one view so you read the whole operation at a glance: what you have recovered, what is still on the table, your operation health, and what to work on right now. Tap any tile or row to jump straight to the screen behind it.'] },
+      { h: 'The three tiles up top', p: ['Total Monthly Opportunity is every recovery and revenue dollar your audits have surfaced but you have not closed yet. Recovery Scoreboard, in gold, is the proven dollars you have actually put back, counted only after a fix is marked implemented and measured. Bar Cop Audit is your latest operation-health score with the days until the next one is due.'] },
+      { h: 'Audit Scores', p: ['Your Profit, Revenue, and Traffic audit scores side by side, each with its score bar, the leak or opportunity it carries per week, the change since the last audit, and a Run Audit button when one is due. Run each on the 30-day rhythm to keep the trend honest.'] },
+      { h: 'Weekly Gaps and Priority Action Items', p: ['Weekly Gaps reads off this week\'s numbers: the dollars leaking now, ranked biggest first, each one a tap from its fix. Priority Action Items ranks every move your audits surfaced by monthly dollar impact, so the highest-value work is always on top. Before you have run an audit, this becomes a Start Here guide with the three steps to your first recovery number.'] },
+      { h: 'Alerts', p: ['Everything worth a look today, split into Critical and Watch: a metric off target, or an audit scoring low, overdue, or never run. All Clear shows only when your weekly metrics are on target and every audit is current and at or above target.'] },
+      { h: 'Key Metrics and Trend', p: ['Key Metrics is your six headline numbers, each against its target and colored only when it slips. The Cost and Revenue Trend charts bar pour cost, check average, and prime cost over the last eight weeks; hover a point for that week\'s reading.'] },
+      { h: 'Setup and multiple bars', p: ['While setup is unfinished, a banner up top tracks how far along you are and jumps to the checklist. If you run more than one bar, a Viewing switcher and a Group button appear in the top bar: switch the active bar, or open the Group Dashboard to compare headline numbers across all of them.'] }
     ] },
     'flowmap': { title: 'Blueprint', sections: [
       { h: 'What this is', p: ['The Blueprint shows how your data moves through Bar Cop, left to right: your Control sections capture it, This Week rolls it into a P&L, Recovery and the Bar Cop Audit diagnose where money is leaking, the Fix Process closes the gaps, and the Hub and Books report it.'] },
