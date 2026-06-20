@@ -267,7 +267,7 @@ window.FixPanel = {
 
   // The Scoreboard: realized-to-date recovered dollars once fixes are measured,
   // or the loop teach (run audit, pick a gap, mark implemented) before then.
-  _scoreboardCard(moduleKey) {
+  _scoreboardCard(moduleKey, titleRight) {
     const s = Recovery.moduleSummary(moduleKey);
     const fixScreen = this.fixScreen(moduleKey);
     let body = '';
@@ -307,7 +307,9 @@ window.FixPanel = {
     }
 
     return '<div class="card form-card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Recovery Scoreboard</div>'
+      + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
+      +   (titleRight ? '<span>Recovery Scoreboard</span>' + titleRight : 'Recovery Scoreboard')
+      + '</div>'
       + body + '</div>';
   },
 
