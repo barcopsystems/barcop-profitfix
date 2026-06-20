@@ -30,10 +30,10 @@ S.Dashboard = {
     const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
     const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>';
     container.innerHTML = '<div class="screen">'
-      + FixPanel._scoreboardCard('profit')
+      + FixPanel._scoreboardCard('profit', insightsBtn)
       + DashUI.row(
           DashUI.shPanel('Where You\'re Leaking Now', leakBody),
-          DashUI.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets), insightsBtn))
+          DashUI.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets)))
       + DashUI.row(
           DashUI.shPanel('Profit Forecast', this.forecastPanel()),
           DashUI.shPanel('Profit Audit', DashUI.auditPanel({
@@ -145,10 +145,10 @@ S.Dashboard = {
     const weeks = (App.data.weeks || []).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
-    // Session cache keyed on the data signature, so a re-click opens instantly
-    // but a newly confirmed week regenerates. Mirrors Bar Cop Outlook.
-    const sig = weeks.length + ':' + (weeks[weeks.length - 1].period_end || '');
-    if (this._insightsCache && this._insightsCache.sig === sig) { DashUI.insightsModal('Bar Cop Insights', this._insightsCache.html); return; }
+    // Once-a-week cache (shared with Revenue and Traffic): re-open the stored
+    // read for free, regenerate only when it is a week old. No manual refresh.
+    const rec = DashUI._insRec('profit');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
 
     const t = App.data.settings.targets || {};
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
@@ -208,8 +208,7 @@ S.Dashboard = {
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
         const html = '<p style="margin:0;">' + safe + '</p>';
-        this._insightsCache = { sig, html };
-        DashUI.insightsModal('Bar Cop Insights', html);
+        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('profit', html));
         restore();
       })
       .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
