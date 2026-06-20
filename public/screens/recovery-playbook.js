@@ -35,6 +35,7 @@ S.RecoveryPlaybook = {
   },
 
   doc() { return this.CONTENT[this._module] || this.CONTENT.profit; },
+  docPath(file) { return 'assets/resources/' + encodeURIComponent(file); },
 
   // ── HTML reader ─────────────────────────────────────────────────────────────
   render() {
@@ -97,6 +98,9 @@ S.RecoveryPlaybook = {
         return this.partsHtml(b);
       case 'go':
         return '<div class="pb-gorow">' + this.goBtn(b) + '</div>';
+      case 'docs':
+        return '<div class="pb-docs">' + b.items.map(it =>
+          '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download>' + esc(it.label) + ' &darr;</a>').join('') + '</div>';
       default:
         return '';
     }
@@ -211,6 +215,9 @@ S.RecoveryPlaybook = {
       case 'go':
         b.paragraph('-> Open ' + (blk.label || '') + ' in Bar Cop.', { gray: 110, italic: true, size: 9 });
         break;
+      case 'docs':
+        blk.items.forEach(it => b.paragraph('Download in Bar Cop: ' + it.label, { gray: 110, italic: true, size: 9 }));
+        break;
     }
   },
 
@@ -255,6 +262,7 @@ S.RecoveryPlaybook = {
       + '.pb-part-name{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px;}'
       + '.pb-part-desc{font-size:12.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;}'
       + '.pb-gorow{margin:0 0 16px;}'
+      + '.pb-docs{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;}'
       + '.pb-footer{font-size:11px;color:var(--t3);line-height:1.7;border-top:1px solid var(--b2);padding-top:14px;margin-top:24px;max-width:780px;}'
       + '@media(max-width:900px){.pb-grid{flex-direction:column;}.pb-toc{position:static;flex-basis:auto;flex-direction:row;flex-wrap:wrap;width:100%;}.pb-toc-label{width:100%;}.pb-parts{grid-template-columns:1fr;}}'
       + '</style>';
@@ -453,6 +461,183 @@ S.RecoveryPlaybook = {
               { label: 'System 6', name: 'Keep It Running', desc: 'Bar Cop tracks whether each system is still running and flags the moment one slips.', focus: 'prime-cost' }
             ] },
             { t: 'box', tone: 'gold', label: 'The logic in plain language', text: 'Pour cost variance contains your theft number, you cannot separate them without the variance report. Vendor prices flow into recipe costs the day an invoice changes, so food cost is wrong the day after a price increase you did not catch. Prime cost is the sum of everything: if it is high, one of the first four systems is broken. Start with pour cost. Every other number is downstream of the count and the pour cost calculation. Get that right first and the rest follows.' },
+            { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
+          ]
+        },
+        {
+          id: 'p1', nav: 'System 1: Pour Cost', eyebrow: 'System 1 - the biggest recoverable number',
+          title: 'Pour Cost Control',
+          blocks: [
+            { t: 'lead', text: 'A bar in Nashville, 180 seats, sports concept, about 900,000 a year in beverage. Open four years, never a real count. The owner figured pour cost was around 23 percent. We counted everything and ran it: actual pour cost 34 percent. On 900,000 in bar sales that gap is 99,000 a year. Not stolen, not fraud. Just never counted.' },
+            { t: 'p', text: 'Your POS is a sales tool. It records what was rung. It does not know the bartender poured 2.1 ounces into a 1.5 ounce drink, or the comp that went out without a signature, or the bottle that left in a bag. Pour cost is an operations tool, and you cannot run one without the other. Most bars with no system run 6 to 12 points above where they should be.' },
+            { t: 'p', text: 'A 0.3 ounce average overage sounds like nothing. On a well spirit it is about 27 cents a drink. At 250 drinks a night, 300 nights a year, that is roughly 20,000 a year from over-pouring alone, and that is the conservative version. It is not malice. A bartender in the weeds at 10pm is thinking about the eight tickets on the rail, not the extra quarter ounce. The problem is a system that lets accuracy depend on attention during the busiest hour of the night.' },
+            { t: 'h', text: 'How a variance turns into a name' },
+            { t: 'p', text: 'Pour cost has one job: measure the gap between what you spent on product and what you collected. Inside that gap is over-pouring, waste, theft, and unrecorded comps. A blended number tells you the house is on fire. The SKU-level variance tells you which room, which shift, and who was behind the bar. The work is to pull the flagged SKU, check its counts and shift records against POS sales, and close every investigation with a written finding, even an inconclusive one.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You count in Take Inventory. The moment it saves, your real pour cost by category reads on the Profit dashboard, no formula to build. The Variance Report flags the SKUs over target so you know exactly where to look, and This Week carries the blended cost into your weekly P&L. The Pour Cost system in your Profit Fix walks each step and tracks whether it is actually happening.' },
+            { t: 'go', label: 'Take Inventory', screen: 'ic-take-inventory' },
+            { t: 'go', label: 'Pour Cost system', screen: 'profit-fix', focus: 'pour-cost' },
+            { t: 'h', text: 'Quick Reference: every week' },
+            { t: 'list', items: [
+              'Run the full bar count in Take Inventory. Every week, without exception.',
+              'Read pour cost by category on the Profit dashboard the moment the count saves.',
+              'Open the Variance Report and flag any SKU over 3 percent.',
+              'Investigate every flag within 48 hours: pull its counts, check the shift records, confirm POS sales.',
+              'Confirm opening and closing counts were done every shift.',
+              'If a SKU stays unexplained after that, it moves to Loss Prevention (theft).'
+            ] },
+            { t: 'docs', items: [
+              { file: 'Measured_Pour_Standards_Policy.docx', label: 'Measured Pour Standards Policy' },
+              { file: 'Bar_Inventory_Procedures_Manual.docx', label: 'Bar Inventory Procedures Manual' }
+            ] }
+          ]
+        },
+        {
+          id: 'p2', nav: 'System 2: Theft and Loss', eyebrow: 'System 2 - the quiet leak',
+          title: 'Theft and Loss Prevention',
+          blocks: [
+            { t: 'lead', text: 'A manager pulls the void report for the first time in eight months. One bartender is running four times the comp rate of everyone else, always Friday nights, always after 11pm, always on spirits, always when the floor is busy. She is not malicious. She is building regulars. But the bar is absorbing the cost and nobody was watching. Eight months of Friday nights.' },
+            { t: 'p', text: 'Theft in bars is rarely dramatic. It looks like a void at 11:47pm on a busy Saturday. A comp that never got a signature. A delivery two cases short that nobody counted. Each one is small enough to rationalize. Together they are the difference between a bar that makes money and one that cannot figure out where it went. Your POS records theft. It does not catch it.' },
+            { t: 'p', text: 'Run the math on one bartender voiding six 18 dollar transactions a shift, three shifts a week: about 16,000 a year, from one person, on one method, invisible without a report that breaks voids out by employee. The no-ring scheme is simpler and harder to catch: cash in, drink out, nothing rung, drawer comes up over, the overage gets pulled before the count. The comp game is legal on its face, which is what makes it expensive: the bar pays for a relationship the bartender is using to build their own following.' },
+            { t: 'p', text: 'The shift audit is not mainly a detection tool, it is a behavior tool. Audit every Tuesday at 3pm and you have trained the staff to behave on Tuesdays at 3pm. Audit twice a week at times nobody can predict and you have a real deterrent: everybody knows it happens, nobody knows when, and that uncertainty changes behavior on every shift.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Void and Comp Log shows every void, comp, and no-sale by employee as a rate against their sales, so a bartender running triple the staff is visible by Wednesday. Cash Control reconciles every drawer against expected, and tracks overages as hard as shortages. Spot checks and Receive Delivery close the product and short-count holes. Loss Prevention scores the risk and is where an unexplained pour-cost variance lands.' },
+            { t: 'go', label: 'Void and Comp Log', screen: 'sc-void-comp' },
+            { t: 'go', label: 'Loss Prevention', screen: 'theft-risk' },
+            { t: 'go', label: 'Theft and Loss system', screen: 'profit-fix', focus: 'theft-loss' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Every day: reconcile every drawer in Cash Control before it leaves the floor, and log every void, comp, and no-sale by employee.',
+              'Every day: confirm the delivery inspection was done on anything received.',
+              'Every week: review voids and comps by employee in Loss Prevention. Flag anyone over 3 percent of their sales.',
+              'Every week: review drawer history. Flag anyone with recurring same-direction variance.',
+              'Every week: run a shift audit at least twice, different shifts, different times. Document what you saw in writing.',
+              'Escalate: one incident, document and watch. Two in 30 days on the same person, written corrective action. Confirmed cash theft, document fully and talk to your attorney before the conversation.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'Theft_Loss_Prevention_Policy.docx', label: 'Theft and Loss Prevention Policy' },
+              { file: 'Employee_Corrective_Action_Template.docx', label: 'Employee Corrective Action Template' }
+            ] }
+          ]
+        },
+        {
+          id: 'p3', nav: 'System 3: Food Cost', eyebrow: 'System 3 - the other half of COGS',
+          title: 'Food Cost Control',
+          blocks: [
+            { t: 'lead', text: 'A chef builds a beautiful menu. Creative, seasonal, priced against the competition. He never costs a single item. Eight months in, the owner pulls food cost: 42 percent. The menu is popular, the room is full most nights, and the restaurant loses money on every plate it sells. The food was not the problem. The math was, and the math was never done.' },
+            { t: 'p', text: 'A chef who cannot tell you the cost of a dish to the penny is running your kitchen on feel, and feel runs 30,000 to 50,000 a year on 500,000 in food sales. The fix is three documents: a cost on every menu item, a portion standard posted at every station, and a waste log filled out every shift. That is the whole system.' },
+            { t: 'p', text: 'Here is the number that surprises operators most. What you pay per pound at delivery and what you actually use per pound are different. A tenderloin bought at 18 dollars a pound with 70 percent usable yield after trim truly costs 25.71 a pound. Cost your cards against purchase price instead of yield and every protein item is understated. Build your costs on the highest-volume items first: a 4 dollar over-cost on a bestseller running 200 covers a week is over 40,000 a year.' },
+            { t: 'p', text: 'Portion drift is not theft, it is eyes. Cooks plate by eye and eyes vary cook to cook and hour to hour. A 1.5 ounce average overage on your top protein at 200 covers can run 40,000 a year on one item. And a waste entry without a reason code is just a count. With reason codes (over-production, spoilage, prep error, return, quality) it is a diagnosis you can act on.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You build recipes on Menu Items and they cost out automatically off your product prices, yield included. Take Inventory food counts feed your real food cost to the Profit dashboard and This Week. The Waste and Spill Log captures waste with reason codes. Recipe Summary shows every item priced below its floor so you can move a price or change a recipe.' },
+            { t: 'go', label: 'Menu Items', screen: 'r-menu-items' },
+            { t: 'go', label: 'Recipe Summary', screen: 'recipe-cost-analysis' },
+            { t: 'go', label: 'Food Cost system', screen: 'profit-fix', focus: 'food-cost' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Review the waste log weekly: top three categories by dollar, one action each, with the kitchen manager.',
+              'Run a portion audit on at least two stations: weigh five plates each against the posted spec.',
+              'Update recipe costs for any ingredient whose price moved.',
+              'Confirm reason codes are being used on every waste entry.',
+              'Cost every special before service, not after.',
+              'Targets are in the Benchmarks section. Run the category breakdown the moment blended food cost is above target.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'Daily_Food_Waste_Tracking.pdf', label: 'Daily Food Waste Sheet' },
+              { file: 'Portion_Control_Audit.pdf', label: 'Portion Control Audit' },
+              { file: 'Food_Handling_Portion_Standards.docx', label: 'Food Handling and Portion Standards' }
+            ] }
+          ]
+        },
+        {
+          id: 'p4', nav: 'System 4: Vendor Control', eyebrow: 'System 4 - the leak nobody audits',
+          title: 'Vendor Control',
+          blocks: [
+            { t: 'lead', text: 'An owner audits six months of invoices on a slow Tuesday with nothing else to do. She lays her orders against the invoices and checks line by line. By the time she finishes three vendors she has found 11,400 in overcharges. Not fraud. Price drift, substitutions billed at premium, and one delivery that came up a case short every week for four months. She had been signing without checking a single line.' },
+            { t: 'p', text: 'Vendor overcharging is the quietest loss in the business. It does not spike and it does not flag in your POS. It accumulates one invoice at a time. Vendors do not volunteer their best price to a customer who never asks. That is not malice, it is rational behavior, and it costs you until you start checking.' },
+            { t: 'p', text: 'Short counts are the clearest example. The conversation is over the moment the driver leaves. You cannot call two days later and say you think a case was missing. Your only advantage is the count you did at the door before you signed. A verbal complaint is a story. A written discrepancy with the invoice number, date, ordered and received quantity, and the dollar gap is a credit request, and vendors process credit requests.' },
+            { t: 'p', text: 'Small drift compounds. A 1 liter spirit that creeps from 22.40 to 24.50 over a quarter at 18 bottles a week is a couple hundred dollars on that one SKU alone, and you usually have twenty. The quarterly review is where you get it back: sit down with the rep with your variance history and a competitor price sheet, and ask for a match or an explanation. Show up with data and the conversation changes.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Receive Delivery is the door: you check the invoice against the order line by line and flag anything over your price before you sign. Vendor Tracker keeps the cumulative variance by vendor, surfaces the items that drifted, files discrepancies, and builds the scorecard you bring to the quarterly review.' },
+            { t: 'go', label: 'Receive Delivery', screen: 'ic-receive-delivery' },
+            { t: 'go', label: 'Vendor Tracker', screen: 'vendor-tracker' },
+            { t: 'go', label: 'Vendor Control system', screen: 'profit-fix', focus: 'vendor-control' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Every delivery: pull the order before the truck arrives. Know what you ordered and at what price.',
+              'Every delivery: count every case before you sign. Short counts not caught at the door are not recovered.',
+              'Every delivery: check the invoice against the order in Receive Delivery. Flag anything over 2 percent above your price.',
+              'File a discrepancy the moment you find one, while the driver is still there.',
+              'Monthly: review your top spend items in Vendor Tracker. Flag anything up over 5 percent, or where another vendor is 8 percent cheaper.',
+              'Quarterly: sit down with each rep with your variance history and competitor pricing. Ask for a match or an explanation. Confirm terms in writing after.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'Vendor_Agreement_Terms_Checklist.docx', label: 'Vendor Agreement Terms Checklist' },
+              { file: 'Vendor_Delivery_Inspection.pdf', label: 'Vendor Delivery Inspection' },
+              { file: 'Vendor_Delivery_Discrepancy.pdf', label: 'Vendor Discrepancy Report' }
+            ] }
+          ]
+        },
+        {
+          id: 'p5', nav: 'System 5: Prime Cost', eyebrow: 'System 5 - the one number that tells all',
+          title: 'Prime Cost',
+          blocks: [
+            { t: 'lead', text: 'An owner has been open three years. The room is full most nights, sales up 18 percent over last year. An accountant asks him his prime cost. He does not know what that means. She works it from six months of P&Ls: 71 percent. He has run a full bar and a busy kitchen for three years keeping less than 29 cents of every dollar. The room was full. The business was not working.' },
+            { t: 'p', text: 'Prime cost is COGS plus labor as a percent of net sales, and it is the most complete read on the operation you have. Every other number in this playbook, pour cost, food cost, vendor savings, theft, lands here. If prime cost is right, the machine is working. If it is wrong, one of the first four systems is broken, and prime cost is how you know before the P&L tells you a month later.' },
+            { t: 'p', text: 'A monthly number tells you what happened. A weekly number gives you time to do something about it. A 5 point spike on 300,000 in monthly sales is 15,000, gone before you see it if you wait for the accountant. Catch it Monday of week three and you cap the damage at seven days instead of thirty.' },
+            { t: 'p', text: 'Two traps. First, labor is not just the wages you paid, it is wages plus payroll taxes plus benefits plus any owner time on the floor. Run prime against wages only and you understate labor 10 to 15 percent and flatter the number. Second, when prime jumps, run the split test: did COGS move more or did labor move more. The bigger mover is your driver. A one-week bump with a reason can wait a week. Three weeks trending up is structural.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'This Week rolls your COGS and labor into prime cost for you every week, after comps and discounts, the way it should be calculated. The Profit dashboard trends it, the Profit Audit and the Hub confirm it, and the Weekly P&L Brief and Month-End Books carry it cleanly to your accountant.' },
+            { t: 'go', label: 'This Week', screen: 'this-week' },
+            { t: 'go', label: 'Prime Cost system', screen: 'profit-fix', focus: 'prime-cost' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Read prime cost in This Week every Monday on last week numbers.',
+              'If it is above target, find whether COGS or labor moved more. That is your driver.',
+              'If COGS: which category. If labor: which shifts or department.',
+              'Act this week. One week with a reason can wait. Three weeks up is structural.',
+              'Net sales means after comps and discounts, never register totals.',
+              'Targets by concept type are in the Benchmarks section.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'Weekly_PL_Snapshot.pdf', label: 'Weekly P&L Snapshot' },
+              { file: 'Monthly_Cost_Control_Review_Agenda.docx', label: 'Monthly Cost Control Review Agenda' }
+            ] }
+          ]
+        },
+        {
+          id: 'p6', nav: 'System 6: Keep It Running', eyebrow: 'System 6 - make it survive a busy Friday',
+          title: 'Putting It In Place and Keeping It Running',
+          blocks: [
+            { t: 'lead', text: 'An owner buys three cost control books over two years. She starts all three and finishes none. The first week of each feels productive. By week three service gets busy, a manager calls in sick, and the spreadsheet sits unopened. Three years later she still does not know her pour cost. The problem was never the system. It was the absence of a sequenced plan with owners, deadlines, and one number to confirm it is working. Motivation fades in about ten days. Process does not.' },
+            { t: 'p', text: 'Most efforts fail at the 45-day mark, not week one. A daily log stops getting filled. A Friday audit gets skipped twice. The invoice audit falls two weeks behind. None of it feels like failure, each feels like a one-time exception. A system that only runs when you are running it is a personal habit, and personal habits do not survive a vacation, an illness, or a volume spike. The fix is a sequence with names and dates on it.' },
+            { t: 'h', text: 'The first four weeks' },
+            { t: 'table',
+              head: ['Week', 'Focus', 'What goes live'],
+              rows: [
+                ['Week 1', 'Establish baselines', 'Run your first count, read your real pour cost, food cost, and prime cost. Change nothing. Know the numbers.'],
+                ['Week 2', 'Install the counting', 'Opening and closing counts every shift, daily voids and comps, drawer reconciliation, delivery checks. Count again.'],
+                ['Week 3', 'Install the standards', 'Sign the pour policy, post portion specs, hold the accountability talk, start recipe costs on your top items, run your first shift audit.'],
+                ['Week 4', 'Full run', 'Every system at once: count, pour and food cost, variance, prime cost, voids by employee, delivery audits, waste review.']
+              ],
+              note: 'Week 3 feels uncomfortable the first time you tell experienced bartenders to use a jigger or post specs in a kitchen that has run on feel for years. Do it anyway. Professional, direct, not apologetic. This is how the bar runs now.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You do not track any of this on paper. The moment you do the first real step in Control, your Profit Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month P&L. Your setup checklist lives in Getting Started.' },
+            { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' },
+            { t: 'docs', items: [
+              { file: '90Day_Cost_Control_Roadmap.docx', label: '90-Day Cost Control Roadmap' },
+              { file: 'Monthly_Cost_Control_Review_Agenda.docx', label: 'Monthly Cost Control Review Agenda' }
+            ] }
+          ]
+        },
+        {
+          id: 'close', nav: 'Start Tonight', eyebrow: 'Start tonight',
+          title: 'The Numbers Do Not Lie',
+          blocks: [
+            { t: 'lead', text: 'A full-service bar in Cincinnati, about 1.1 million a year. The owner ran the whole system: weekly pour cost, a variance report every Monday, daily counts, void tracking, an invoice audit on every delivery, prime cost pulled before she looked at anything else. After 90 days she sat down with her accountant. Pour cost down 4.2 points. Food cost down 3.1. Two vendor disputes recovered 2,300 in the first six weeks. Prime cost 57 percent, under 60 for the first time in three years. She added no new revenue. She stopped losing the revenue she was already bringing in.' },
+            { t: 'p', text: 'What separates bars that make money from bars that wonder where it went is not location, concept, or talent behind the bar. It is measurement and process. The tools are not complicated and the math is not advanced. What it takes is showing up Monday and pulling the number whether or not you feel like it. The week it feels least urgent is almost always the week something is quietly going wrong.' },
+            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Take Inventory and schedule your first count. Read your prime cost in This Week. Pull your last month of voids and comps in the Void and Comp Log. Then open your Profit Fix System and do the first step, so Bar Cop logs the day and starts measuring what you win back.' },
+            { t: 'p', text: 'The gap between what you are making and what you should be making is not a mystery. It is a measurement problem. Start measuring tonight.' },
             { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
           ]
         }
