@@ -164,12 +164,16 @@ S.FlowMap = {
           + '<div style="font-size:11px;color:var(--t3);line-height:1.55;margin-top:2px;">' + esc(f.desc) + '</div></div></div>').join('')
       : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Nothing yet.</div>';
     const goBtn = (n.go || n.action)
-      ? '<button class="btn btn-primary btn-sm" id="fm-go" data-go="' + esc(n.go || '') + '" data-action="' + esc(n.action || '') + '" style="margin-top:16px;">Go to ' + esc(n.full || n.label) + '</button>'
+      ? '<button class="btn btn-primary" id="fm-go" data-go="' + esc(n.go || '') + '" data-action="' + esc(n.action || '') + '" style="margin-top:16px;">Go to ' + esc(n.full || n.label) + '</button>'
       : '';
+    // Only show a Feeds / Fed by section when it actually has connections: an
+    // origin (Control / Events) has no inputs, a terminal (Hub / Books) has no
+    // outputs, so an empty side is structural, not "not wired yet."
+    const feedsSec = feeds.length ? '<div class="sh" style="margin:0 0 4px;">Feeds</div>' + flowList(feeds, '→') : '';
+    const fedBySec = fedBy.length ? '<div class="sh" style="margin:' + (feeds.length ? '18px' : '0') + ' 0 4px;">Fed by</div>' + flowList(fedBy, '←') : '';
     return '<div class="card form-card"><div class="card-title">' + esc(n.full || n.label) + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px;">' + esc(n.what) + '</div>'
-      + '<div class="sh" style="margin:0 0 4px;">Feeds</div>' + flowList(feeds, '→')
-      + '<div class="sh" style="margin:18px 0 4px;">Fed by</div>' + flowList(fedBy, '←')
+      + feedsSec + fedBySec
       + goBtn + '</div>';
   },
 
