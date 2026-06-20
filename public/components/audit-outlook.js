@@ -18,10 +18,11 @@
 
 window.AuditOutlook = {
 
-  // Session cache: keyed by auditType:auditId, value is the rendered HTML.
-  // Resets on page reload. Same audit re-opened in the same session restores
-  // the previously-generated paragraph without another API call.
-  _cache: {},
+  // Persisted per-audit cache: the rendered HTML is stored on
+  // App.data.audit_outlooks keyed by auditType:auditId. Generated once per
+  // audit; re-opening reuses it (no API spend) and a newly-run audit (new id)
+  // generates fresh. Survives reloads via App.save.
+  _stored(key) { const s = App.data && App.data.audit_outlooks; return (s && s[key]) ? s[key] : null; },
 
   _cacheKey(auditType, audit) {
     const id = audit?.audit_id || audit?.date || (audit?.id || '');
@@ -65,8 +66,7 @@ window.AuditOutlook = {
   },
 
   _handleClick(auditType, audit, btn) {
-    const key = this._cacheKey(auditType, audit);
-    const cached = this._cache[key];
+    const cached = this._stored(this._cacheKey(auditType, audit));
     if (cached) {
       this._showModal(auditType, audit, cached);
       return;
@@ -115,7 +115,9 @@ window.AuditOutlook = {
       const paragraphs = sanitized.split(/\n\n+/).map(p =>
         '<div style="margin-bottom:14px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
       ).join('');
-      this._cache[this._cacheKey(auditType, audit)] = paragraphs;
+      App.data.audit_outlooks = App.data.audit_outlooks || {};
+      App.data.audit_outlooks[this._cacheKey(auditType, audit)] = paragraphs;
+      App.save();
       this._showModal(auditType, audit, paragraphs);
       btn.textContent = originalLabel;
       btn.disabled = false;
