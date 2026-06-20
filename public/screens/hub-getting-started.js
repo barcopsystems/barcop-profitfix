@@ -114,7 +114,7 @@ S.HubGettingStarted = {
       }).join('');
       const allDone = gDone === tasks.length;
       const badge = '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</div>';
-      return '<div class="hg-card" data-group="' + g.id + '" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;margin-bottom:10px;overflow:hidden;">'
+      return '<div class="hg-card" data-group="' + g.id + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);margin-bottom:10px;overflow:hidden;">'
         + '<div class="hg-head" style="display:flex;align-items:center;gap:12px;padding:15px 20px;">'
         +   badge
         +   '<div style="flex:1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t1);">' + esc(g.title) + '</div>'
