@@ -882,7 +882,7 @@ const App = {
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
       slot.style.display = 'flex';
-      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:8px;';
+      slot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-right:4px;';
       slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
         + '<select class="acct-switcher at-qsel" style="font-weight:600;">' + options + '</select>';
       const sel = slot.querySelector('.acct-switcher');
