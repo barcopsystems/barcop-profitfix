@@ -345,14 +345,13 @@ const AuditUI = {
       + '</div>';
   },
 
-  // Generate + Back row below the cards (standard placement) + status + note.
+  // Generate row below the cards (standard placement) + status + not-ready note.
   intakeSubmit(pfx, canRun, daysLeft, note) {
     return '<div style="margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + (canRun
           ? '<button class="btn btn-primary" id="' + pfx + '-iz-submit">Generate Audit</button>'
           : '<button class="btn btn-primary" id="' + pfx + '-iz-submit" disabled style="opacity:0.5;cursor:default;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</button>')
-      + '<button class="btn btn-ghost" id="' + pfx + '-iz-cancel">Back</button>'
       + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:24px;">' + (canRun ? (note || 'Analysis takes 60 to 90 seconds.') : 'Review and update your inputs now. The next audit can run in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ', and your changes save when you generate it.') + '</div>';
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:24px;">' + (canRun ? '' : 'Review and update your inputs now. The next audit can run in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ', and your changes save when you generate it.') + '</div>';
   }
 };
