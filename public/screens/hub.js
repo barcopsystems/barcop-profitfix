@@ -877,7 +877,7 @@ S.Hub = {
     // with the action band taller than the detail band so the eye lands on the
     // win and the next move first. Flip to false to restore the prior
     // equal-weight grid exactly (kept intact below; panels are unchanged).
-    const NEW_HUB_LAYOUT = true;
+    const NEW_HUB_LAYOUT = false;
     const hubGrid = NEW_HUB_LAYOUT
       ? `<div class="hub-grid" style="display:grid;grid-template-rows:auto 500px 430px;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
