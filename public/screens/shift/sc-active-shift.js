@@ -417,6 +417,7 @@ S.ShiftActiveShift = {
   showHowToOpen() {
     App.showHelpModal('How Open the Floor Works', [
       { p: ['This is how you start a shift. Tap through it: pick the daypart, tap who is running it, turn on the registers in play tonight and set each bank, then open the floor. The line up top fills in as you go so you watch the shift come together.'] },
+      { h: 'Theft flags before you open', p: ['If recent shifts threw theft flags, a banner sits at the top of the opener with the count and how many need acting on now. Tap Review to jump to Theft Risk and dig in, or Dismiss to clear it for the day. A flag serious enough to act on stays put even after you dismiss, so it does not slip past you.'] },
       { h: '1. Daypart', p: ['Tap the service you are opening: Brunch, Lunch, Dinner, or Late Night. Bar Cop pre-picks one by the time of day; tap another chip to change it. The daypart also sets this shift\'s cash tolerance.'] },
       { h: '2. Running It', p: ['Tap the manager on duty. The list is your managers and bartenders, the people who actually run a shift.'] },
       { h: '3. Registers', p: ['Every register you set up shows as a tile, turned on with its default bank. Tap a tile to turn it off if it is not running tonight, and type each register\'s starting cash right on the tile. Run one register or ten.'] },

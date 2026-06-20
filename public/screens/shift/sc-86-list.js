@@ -187,7 +187,7 @@ S.Shift86List = {
     App.showHelpModal('How the 86 List Works', [
       { p: ['The 86 List is your running list of what ran out during service. 86 an item the moment it is gone so the next bartender, the servers, and the kitchen all see it, and so the par-alert and the audit catch the repeat offenders.'] },
       { h: '86 an item', p: ['Pick a menu item OR an inventory item (products and prep batches). If Bar Cop does not track it, add it as a custom item. When you pick an inventory item, Bar Cop flags the menu items and batches that use it so you can 86 those in the same save.'] },
-      { h: 'Currently 86\'d', p: ['Everything that is out right now. Back In Stock clears it and drops it to the list below. An item 86\'d more than once in 30 days gets flagged so you can chase the real cause.'] },
+      { h: 'Currently 86\'d', p: ['Everything that is out right now. Back In Stock clears it and drops it to the Back In Stock list below; if it runs out again before close, hit Re-86 on that row to put it right back up. An item 86\'d more than once in 30 days gets flagged so you can chase the real cause.'] },
       { h: 'Worksheet and Export', p: ['Worksheet prints a blank sheet to mark 86s by hand during the rush, then enter them after close. Export PDF saves the current list.'] }
     ]);
   },
