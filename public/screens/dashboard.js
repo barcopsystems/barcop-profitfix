@@ -92,7 +92,7 @@ S.Dashboard = {
 
     container.innerHTML = '<div class="screen">'
       + DashUI.dayOneStrip(
-          'Run your first Profit Audit for a baseline, and set up the Control sections that feed Recovery. As that data lands, this dashboard fills in with your recovered dollars and where the operation is leaking.',
+          'Four steps and this dashboard fills in with your recovered dollars, where you are leaking, and your costs against target.',
           [
             { done: hasAudit, num: 1, label: 'Run your first Profit Audit', go: 'audit-tracker' },
             { done: hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
