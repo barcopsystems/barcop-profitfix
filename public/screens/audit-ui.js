@@ -20,13 +20,27 @@ const AuditUI = {
   },
 
   // ── Landing: request card ─────────────────────────────────────────────────
-  requestCard(pfx, title, desc, canRun, hasLatest, daysLeft) {
+  // opts.lockedNoInputs: this audit reads from logged data (no intake to edit),
+  //   so when locked show only the countdown, never a "Review / Update Inputs".
+  // opts.notReady: not enough data to score yet — the description carries it,
+  //   no button and no countdown.
+  requestCard(pfx, title, desc, canRun, hasLatest, daysLeft, opts) {
+    opts = opts || {};
+    const countdown = '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>';
+    let right;
+    if (canRun) {
+      right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">' + (hasLatest ? 'Generate New Audit' : 'Generate First Audit') + '</button>';
+    } else if (opts.notReady) {
+      right = '';
+    } else if (opts.lockedNoInputs) {
+      right = countdown;
+    } else {
+      right = '<button class="btn btn-primary" id="' + pfx + '-new-btn">Review / Update Inputs</button>' + countdown;
+    }
     return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
       + '<div style="font-size:12px;color:var(--t3);max-width:520px;line-height:1.6;">' + desc + '</div>'
-      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'
-      + '<button class="btn btn-primary" id="' + pfx + '-new-btn">' + (canRun ? (hasLatest ? 'Generate New Audit' : 'Generate First Audit') : 'Review / Update Inputs') + '</button>'
-      + (canRun ? '' : '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>')
+      + (right ? '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">' + right + '</div>' : '')
       + '</div></div></div>';
   },
 
@@ -34,11 +48,12 @@ const AuditUI = {
   // Summary on top, the section breakdown folded in as a compact row list (bar
   // beside the score; one row per section on mobile). View button sits above.
   landingCard(latest, prev, sectionNames, pfx) {
-    const scoreColor = App.scoreColor(latest.overall_score);
-    const scoreLabel = App.scoreLabel(latest.overall_score);
+    const naO = latest.overall_score == null;
+    const scoreColor = naO ? 'var(--t3)' : App.scoreColor(latest.overall_score);
+    const scoreLabel = naO ? 'Not enough data yet' : App.scoreLabel(latest.overall_score);
     let vsLine = '';
-    if (prev) {
-      const diff = (latest.overall_score||0) - (prev.overall_score||0);
+    if (prev && latest.overall_score != null && prev.overall_score != null) {
+      const diff = latest.overall_score - prev.overall_score;
       vsLine = '<div style="font-size:12px;margin-top:8px;"><span style="color:' + (diff>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + (diff>=0?'+':'') + diff + ' pts</span><span style="color:var(--t3);"> vs last audit (' + prev.overall_score + ' to ' + latest.overall_score + ')</span></div>';
     }
     const sections = latest.sections || {};
@@ -79,7 +94,7 @@ const AuditUI = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
       + vsLine + '</div>'
       + '<div style="text-align:right;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (latest.overall_score||0) + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (naO ? 'N/A' : latest.overall_score) + '</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
       + '<div style="margin:16px -20px -20px;">' + secHeader + secRows + '</div>'
@@ -114,7 +129,7 @@ const AuditUI = {
       if (idx >= 0 && idx < 12) cols[idx].audit = a;
     });
     const bars = cols.map(c => {
-      if (!c.audit) return '<div style="flex:0 0 40px;height:100%;"></div>';
+      if (!c.audit || c.audit.overall_score == null) return '<div style="flex:0 0 40px;height:100%;"></div>';
       const s = c.audit.overall_score || 0;
       const h = Math.round(clamp(s)/100*USABLE);
       return '<div style="flex:0 0 40px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
@@ -140,19 +155,25 @@ const AuditUI = {
   },
 
   // ── Landing: Audit History data-card ───────────────────────────────────────
-  historyCard(audits, listKey, pfx) {
+  // opts.hideGrade drops the Data Quality column for audits with no grade tier
+  // (the Bar Cop Audit, which reads from logged data and has no upload tier).
+  historyCard(audits, listKey, pfx, opts) {
+    opts = opts || {};
     const rows = audits.slice(0, App.listLimit('core', listKey)).map((a,i) => {
       const p    = audits[i+1];
-      const diff = p ? (a.overall_score||0) - (p.overall_score||0) : null;
+      const naA  = a.overall_score == null;
+      const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
       return '<tr><td><div class="val">' + (a.date||'').slice(0,10) + '</div></td>'
-        + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score||0) + ';">' + (a.overall_score||0) + '</td>'
+        + (naA
+            ? '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);">N/A</td>'
+            : '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score) + ';">' + a.overall_score + '</td>')
         + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff+' pts':'') + '</td>'
-        + '<td>' + AuditUI.tierChip(a.grade) + '</td>'
+        + (opts.hideGrade ? '' : '<td>' + AuditUI.tierChip(a.grade) + '</td>')
         + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '">View</button></td></tr>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<th>Date</th><th>Score</th><th>Change</th>' + (opts.hideGrade ? '' : '<th>Data Quality</th>') + '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
       + App.showOlderBar('core', listKey, audits, false);
   },
 
@@ -219,7 +240,8 @@ const AuditUI = {
 
   // ── Full view: score hero (name/grade left, big score + scale bar right) ───
   viewHero(audit, heroLabel) {
-    const scoreColor = App.scoreColor(audit.overall_score||0);
+    const naO = audit.overall_score == null;
+    const scoreColor = naO ? 'var(--t3)' : App.scoreColor(audit.overall_score||0);
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
       + '<div>'
@@ -228,10 +250,12 @@ const AuditUI = {
       + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '') + '</div>'
       + (audit.grade ? '<div style="margin-top:8px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
       + '</div>'
-      + '<div style="text-align:right;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (audit.overall_score||0) + '</div>'
-      + '<div style="width:200px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score||0) + '</div>'
-      + '</div>'
+      + (naO
+          ? '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:4px;">Not enough data yet</div></div>'
+          : '<div style="text-align:right;">'
+            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + audit.overall_score + '</div>'
+            + '<div style="width:200px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score) + '</div>'
+            + '</div>')
       + '</div></div>';
   },
 
