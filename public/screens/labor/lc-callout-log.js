@@ -106,8 +106,9 @@ S.LaborCalloutLog = {
     App.showHelpModal('How the Call-Out Log Works', [
       { p: ['The Call-Out Log tracks attendance exceptions, no-shows, sick calls, late arrivals, and early-outs, so reliability patterns surface instead of living in your head.'] },
       { h: 'Logging A Call-Out', p: ['Fill the row at the top: date, staff member, what happened, the shift, and whether it got covered and by whom. Reason and notes are optional but worth a line if it might matter later.'] },
+      { h: 'Schedule Connection', p: ['Pick the staff member and the date and Bar Cop reads the posted schedule for that week. If they were on the floor that day it reads "Scheduled [day] [time]. Needs cover." in amber, so you can see at a glance what shift just opened up. If they were not on the schedule that day it says so. When you then name who is covering, Bar Cop checks the same schedule and warns "[name] is also scheduled that day" so you do not patch one hole by double-booking somebody already working.'] },
       { h: 'Repeat Flags', p: ['When someone has more than one call-out in the last 60 days, the list flags the count in red next to their name, so a pattern is easy to spot before it becomes a problem.'] },
-      { h: 'Coverage', p: ['Marking whether a call-out was covered, and by whom, builds a record of who picks up the slack, which is useful at review time.'] }
+      { h: 'Coverage', p: ['Set Shift Covered? to Covered or Not Covered, and pick the coverer from the Covered By list, which is your roster. That builds a record of who picks up the slack and who left you short, useful at review time and the spot where the double-booked warning fires.'] }
     ]);
   },
 

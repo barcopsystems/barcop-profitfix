@@ -55,7 +55,8 @@ S.LaborTipPool = {
       { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Pick the shift, enter the pool amount, and Bar Cop works out each person\'s share live.'] },
       { h: 'Pick The Shift', p: ['Choosing the shift pre-loads the crew straight from the posted schedule, call-out adjusted, with hours from their logged actuals or their scheduled hours. That is the same crew the Shift Close pulls, so the two match. Add or remove a person and adjust hours, and the shares recompute. Enter the pool amount yourself, since the pool is the total tips you are splitting.'] },
       { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
-      { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] }
+      { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] },
+      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit loads it back into the calculator to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] }
     ]);
   },
 
