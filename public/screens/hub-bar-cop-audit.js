@@ -891,15 +891,15 @@ S.HubBarCopAudit = {
       const col = isNA ? 'var(--t3)' : App.scoreColor(sc);
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
       const breakdown = detail.length
-        ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+        ? '<div style="margin-top:14px;">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Score Breakdown</div>'
+          + '<div class="at-metrics"><table class="at-mtbl">'
           + detail.map(c => {
               const naC = c.na || c.pct == null;
-              return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-size:12px;color:var(--t2);">'
-                + '<div style="flex:1;">' + esc(c.label) + (c.extra ? ' <span style="color:var(--t3);font-size:11px;">(' + esc(c.extra) + ')</span>' : '') + '</div>'
-                + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:' + (naC ? 'var(--t3)' : App.scoreColor(c.pct)) + ';width:50px;text-align:right;font-size:' + (naC ? '11px' : '14px') + ';">' + (naC ? 'N/A' : c.pct) + '</div>'
-                + '</div>';
+              return '<tr><td>' + esc(c.label) + (c.extra ? ' <span style="color:var(--t4);">(' + esc(c.extra) + ')</span>' : '') + '</td>'
+                + '<td style="color:' + (naC ? 'var(--t3)' : App.scoreColor(c.pct)) + ';">' + (naC ? 'N/A' : c.pct) + '</td></tr>';
             }).join('')
+          + '</table></div>'
           + '</div>'
         : '';
       const scoreBlock = isNA
@@ -967,7 +967,7 @@ S.HubBarCopAudit = {
     const snap = audit.recovery_snapshot || { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 };
     const recoveryCard = '<div class="card" style="margin-bottom:14px;">'
       + '<div class="card-title">Recovery Activity Snapshot</div>'
-      + '<div class="calc">'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       +   '<div class="calc-item"><div class="calc-label">Gaps Surfaced</div><div class="calc-val">' + snap.gaps + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Fixes Logged (30d)</div><div class="calc-val ' + (snap.fixesLogged > 0 ? 'good' : '') + '">' + snap.fixesLogged + '</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Recovered to date</div><div class="calc-val ' + (snap.dollarsRecovered > 0 ? 'good' : '') + '">' + App.fmtCurrency(snap.dollarsRecovered, 0) + '</div></div>'
