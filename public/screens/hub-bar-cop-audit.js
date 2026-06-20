@@ -915,7 +915,7 @@ S.HubBarCopAudit = {
     // PDF, the way the recovery audits' Action Items area does.
     const exposureCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Top Operational Exposures</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><div id="bca-outlook-mount"></div><button class="btn btn-ghost btn-sm bca-export-btn">Export PDF</button></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><button class="btn btn-ghost btn-sm bca-export-btn">Export PDF</button></div>'
       + '</div>'
       + '<div class="card" style="margin-bottom:14px;">' + exposureRows + '</div>';
 
@@ -955,7 +955,7 @@ S.HubBarCopAudit = {
     // (their recoverable-strip slot), then Top Operational Exposures (this audit's
     // "what to act on"), the six sub-scores, and Recurring Patterns.
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.viewHero(audit, 'Bar Cop Audit')
+      + AuditUI.viewHero(audit, 'Bar Cop Audit', 'bca')
       + naNote
       + recoveryStrip
       + exposureCard
