@@ -43,6 +43,12 @@ S.HubGroupDashboard = {
   async _renderAsync(panel) {
     const accounts = await DB.listMyAccounts();
     const dataByAccount = await this._fetchAccountData(accounts);
+    // The active bar's data lives in memory (App.data) and is the source of
+    // truth on this device: it can be newer than the last Supabase snapshot, or
+    // sample data that was never synced. Always use it for the active bar's row
+    // so the bar you are currently in never shows up blank.
+    const activeId = (window.DB && DB._accountId) || null;
+    if (activeId && App.data) dataByAccount[activeId] = App.data;
     this._render(panel, accounts, dataByAccount);
   },
 
