@@ -468,8 +468,8 @@ S.Hub = {
         + summaryLine
         + '</div>';
     };
-    const auditPanel = `${shWrapOpen('Audit Scores')}
-      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;">
+    const auditPanel = `${shWrapOpen('Audit Scores', '14px')}
+      <div style="display:flex;flex-direction:column;gap:14px;flex:1;">
         ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
         ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
@@ -894,7 +894,7 @@ S.Hub = {
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${alertsPanel}${readoutPanel}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${auditPanel}${metricsPanel}${chartPanel}</div>
         </div>`
-      : `<div class="hub-grid" style="display:grid;grid-template-rows:auto 510px 470px;gap:18px;padding-bottom:18px;">
+      : `<div class="hub-grid" style="display:grid;grid-template-rows:auto 430px 470px;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">${tiles}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
