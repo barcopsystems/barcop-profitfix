@@ -40,8 +40,8 @@ S.RecoveryPlaybook = {
   // ── HTML reader ─────────────────────────────────────────────────────────────
   render() {
     const d = this.doc();
-    const toc = d.sections.map(sec =>
-      '<button class="pb-toc-item" data-id="' + esc(sec.id) + '">' + esc(sec.nav) + '</button>').join('');
+    const nav = d.sections.map(sec =>
+      '<button class="pb-side-item" data-id="' + esc(sec.id) + '">' + esc(sec.nav) + '</button>').join('');
 
     const body = d.sections.map(sec => {
       const blocks = sec.blocks.map(b => this.blockHtml(b)).join('');
@@ -52,14 +52,12 @@ S.RecoveryPlaybook = {
     }).join('');
 
     this.container.innerHTML = this.styleTag()
-      + '<div class="screen pb-wrap" style="max-width:none;">'
-      + '<div class="pb-intro">' + esc(d.intro) + '</div>'
-      + '<div class="pb-grid">'
-      +   '<nav class="pb-toc"><div class="pb-toc-label">In this playbook</div>' + toc + '</nav>'
-      +   '<div class="pb-body">' + body + this.footerHtml() + '</div>'
-      + '</div></div>';
+      + '<div class="pb-shell">'
+      +   '<nav class="pb-side"><div class="pb-side-label">In this playbook</div>' + nav + '</nav>'
+      +   '<div class="pb-main"><div class="pb-body">' + body + this.footerHtml() + '</div></div>'
+      + '</div>';
 
-    this.container.querySelectorAll('.pb-toc-item').forEach(btn =>
+    this.container.querySelectorAll('.pb-side-item').forEach(btn =>
       btn.addEventListener('click', () => {
         const el = document.getElementById('pb-' + btn.dataset.id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -223,14 +221,13 @@ S.RecoveryPlaybook = {
 
   styleTag() {
     return '<style>'
-      + '.pb-wrap{padding-bottom:60px;}'
-      + '.pb-intro{font-size:14px;color:var(--t2);line-height:1.7;max-width:760px;margin:0 0 20px;}'
-      + '.pb-grid{display:flex;gap:32px;align-items:flex-start;}'
-      + '.pb-toc{position:sticky;top:0;flex:0 0 196px;display:flex;flex-direction:column;gap:2px;padding-top:2px;}'
-      + '.pb-toc-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;padding-left:10px;}'
-      + '.pb-toc-item{text-align:left;background:none;border:none;border-left:2px solid var(--b2);color:var(--t2);font-size:13px;padding:7px 10px;cursor:pointer;line-height:1.3;border-radius:0 4px 4px 0;}'
-      + '.pb-toc-item:hover{color:var(--t1);background:var(--gold-tint);border-left-color:var(--gold);}'
-      + '.pb-body{flex:1;min-width:0;max-width:780px;}'
+      + '.pb-shell{display:flex;align-items:flex-start;min-height:calc(100vh - 110px);}'
+      + '.pb-side{position:sticky;top:0;align-self:flex-start;flex:0 0 232px;border-right:1px solid var(--b-edge);padding:20px 0 40px;}'
+      + '.pb-side-label{padding:6px 20px 10px;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t4);}'
+      + '.pb-side-item{display:block;width:100%;text-align:left;background:none;border:none;border-left:2px solid transparent;color:var(--t2);font-size:13.5px;font-weight:600;padding:9px 20px;cursor:pointer;line-height:1.35;transition:background .12s,color .12s;}'
+      + '.pb-side-item:hover{background:var(--c3);color:var(--w);border-left-color:var(--gold);}'
+      + '.pb-main{flex:1;min-width:0;padding:22px 32px 64px;}'
+      + '.pb-body{max-width:800px;}'
       + '.pb-section{margin-bottom:40px;scroll-margin-top:14px;}'
       + '.pb-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}'
       + '.pb-h1{font-size:22px;margin-bottom:14px;}'
@@ -264,7 +261,7 @@ S.RecoveryPlaybook = {
       + '.pb-gorow{margin:0 0 16px;}'
       + '.pb-docs{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;}'
       + '.pb-footer{font-size:11px;color:var(--t3);line-height:1.7;border-top:1px solid var(--b2);padding-top:14px;margin-top:24px;max-width:780px;}'
-      + '@media(max-width:900px){.pb-grid{flex-direction:column;}.pb-toc{position:static;flex-basis:auto;flex-direction:row;flex-wrap:wrap;width:100%;}.pb-toc-label{width:100%;}.pb-parts{grid-template-columns:1fr;}}'
+      + '@media(max-width:900px){.pb-shell{flex-direction:column;}.pb-side{position:static;flex-basis:auto;width:100%;border-right:none;border-bottom:1px solid var(--b-edge);display:flex;flex-wrap:wrap;gap:2px;padding:10px 6px;}.pb-side-label{width:100%;}.pb-side-item{width:auto;border-left:none;border-radius:4px;padding:7px 12px;}.pb-main{padding:18px 16px 60px;}.pb-parts{grid-template-columns:1fr;}}'
       + '</style>';
   },
 
