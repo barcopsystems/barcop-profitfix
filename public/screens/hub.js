@@ -540,12 +540,12 @@ S.Hub = {
         + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
         + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
         + '</div>';
-      const groupHead = (label, col) => '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + col + ';margin:14px 0 7px;">' + label + '</div>';
+      const groupHead = (label, col, first) => '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + col + ';margin:' + (first ? '0' : '14px') + ' 0 7px;">' + label + '</div>';
       const critical = alerts.filter(a => a.sev === 'bad');
       const watch    = alerts.filter(a => a.sev === 'warn');
       const alertRows =
-          (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
-        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
+          (critical.length ? groupHead('Critical', 'var(--red)', true) + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
+        + (watch.length    ? groupHead('Watch', 'var(--amber)', !critical.length) + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
       const alertHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
@@ -554,7 +554,7 @@ S.Hub = {
         + '</div></div>';
       const holdingHtml = '';   // removed: the "N metrics holding the line" counter
       alertsPanel = `${shWrapOpen('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;">${alertRows}</div>${holdingHtml}${shWrapClose}`;
+        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${alertRows}</div>${holdingHtml}${shWrapClose}`;
     } else {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
