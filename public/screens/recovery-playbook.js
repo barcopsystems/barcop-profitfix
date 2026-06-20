@@ -98,16 +98,26 @@ S.RecoveryPlaybook = {
         return '<div class="pb-gorow">' + this.goBtn(b) + '</div>';
       case 'docs':
         return '<div class="pb-docs">' + b.items.map(it =>
-          '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download>' + esc(it.label) + ' &darr;</a>').join('') + '</div>';
+          '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download style="text-decoration:none;">'
+          + this._icon('reference') + 'Download: ' + esc(it.label) + '</a>').join('') + '</div>';
       default:
         return '';
     }
   },
 
+  // Matches the Profit Fix step icons so the playbook buttons read identically to
+  // the rest of the app: arrow for an in-app jump, document for a download.
+  _icon(kind) {
+    const p = kind === 'reference'
+      ? '<path d="M3.5 1.5h4l3 3v8h-7z"/><path d="M7.5 1.5v3h3"/>'
+      : '<path d="M2.5 7h7M7 4l3 3-3 3"/>';
+    return '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">' + p + '</svg>';
+  },
+
   goBtn(b) {
     return '<button class="btn btn-ghost btn-sm pb-go" data-screen="' + esc(b.screen) + '"'
       + (b.focus ? ' data-focus="' + esc(b.focus) + '"' : '') + '>'
-      + esc(b.label || 'Open') + ' &rarr;</button>';
+      + this._icon('action') + 'Open: ' + esc(b.label || '') + '</button>';
   },
 
   tableHtml(b) {
@@ -146,7 +156,7 @@ S.RecoveryPlaybook = {
       + '<div class="pb-part-label">' + esc(it.label) + '</div>'
       + '<div class="pb-part-name">' + esc(it.name) + '</div>'
       + '<div class="pb-part-desc">' + esc(it.desc) + '</div>'
-      + '<div class="pb-part-go">' + this.goBtn({ label: 'Open System', screen: 'profit-fix', focus: it.focus }) + '</div>'
+      + '<div class="pb-part-go">' + this.goBtn({ label: it.name, screen: 'profit-fix', focus: it.focus }) + '</div>'
       + '</div>').join('');
     return '<div class="pb-parts">' + cards + '</div>';
   },
@@ -231,8 +241,8 @@ S.RecoveryPlaybook = {
       + '.pb-section{margin-bottom:40px;scroll-margin-top:14px;}'
       + '.pb-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}'
       + '.pb-h1{font-size:22px;margin-bottom:14px;}'
-      + '.pb-lead{font-size:15px;color:var(--t1);line-height:1.7;margin:0 0 14px;}'
-      + '.pb-p{font-size:13.5px;color:var(--t2);line-height:1.75;margin:0 0 14px;}'
+      + '.pb-lead{font-size:15px;font-style:italic;color:var(--t1);line-height:1.7;margin:0 0 14px;}'
+      + '.pb-p{font-size:13.5px;font-style:italic;color:var(--t2);line-height:1.75;margin:0 0 14px;}'
       + '.pb-sh{margin:24px 0 12px;}'
       + '.pb-note{font-size:12px;color:var(--t3);line-height:1.6;font-style:italic;margin:8px 0 14px;}'
       + '.pb-list{margin:0 0 14px;padding-left:18px;color:var(--t2);font-size:13.5px;line-height:1.8;}'
@@ -244,6 +254,8 @@ S.RecoveryPlaybook = {
       + '.pb-box-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:7px;line-height:1.3;}'
       + '.pb-box-text{font-size:13px;color:var(--t2);line-height:1.7;}'
       + '.pb-tbl{width:100%;margin:0 0 8px;}'
+      + '.pb-body .tbl-wrap{background:#0D181E;}'
+      + '.pb-body .tbl th{background:#0D181E;}'
       + '.pb-cross-leak{font-weight:700;color:var(--t1);white-space:nowrap;}'
       + '.pb-cross td{vertical-align:middle;}'
       + '.pb-diag{border-left:2px solid var(--b-edge);padding:2px 0 2px 14px;margin:0 0 16px;}'
@@ -260,8 +272,9 @@ S.RecoveryPlaybook = {
       + '.pb-part-desc{font-size:12.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;}'
       + '.pb-gorow{margin:0 0 16px;}'
       + '.pb-docs{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;}'
+      + '.pb-go,.pb-docs a{justify-content:flex-start;white-space:normal;text-align:left;line-height:1.35;height:auto;}'
       + '.pb-footer{font-size:11px;color:var(--t3);line-height:1.7;border-top:1px solid var(--b2);padding-top:14px;margin-top:24px;max-width:780px;}'
-      + '@media(max-width:900px){.pb-shell{flex-direction:column;}.pb-side{position:static;flex-basis:auto;width:100%;border-right:none;border-bottom:1px solid var(--b-edge);display:flex;flex-wrap:wrap;gap:2px;padding:10px 6px;}.pb-side-label{width:100%;}.pb-side-item{width:auto;border-left:none;border-radius:4px;padding:7px 12px;}.pb-main{padding:18px 16px 60px;}.pb-parts{grid-template-columns:1fr;}}'
+      + '@media(max-width:900px){.pb-shell{flex-direction:column;}.pb-side{position:static;flex-basis:auto;width:100%;border-right:none;border-bottom:1px solid var(--b-edge);display:flex;flex-wrap:wrap;gap:2px;padding:10px 6px;}.pb-side-label{width:100%;}.pb-side-item{width:auto;border-left:none;border-radius:4px;padding:7px 12px;}.pb-main{padding:18px 16px 60px;}.pb-parts{grid-template-columns:1fr;}.pb-docs{flex-direction:column;}.pb-docs a,.pb-go{width:100%;}}'
       + '</style>';
   },
 
@@ -275,7 +288,7 @@ S.RecoveryPlaybook = {
           id: 'worth', nav: 'What It Costs You', eyebrow: 'What running without systems costs',
           title: 'The Money Leaving Before You See It',
           blocks: [
-            { t: 'lead', text: 'You know your sales number. You check it nightly, against last year and against your gut for how busy the room felt. What you probably cannot say to the dollar is how much of that sales number you hand right back out the door through pour cost nobody is watching, food cost with no recipe behind it, vendor invoices nobody audits, and theft that never shows on the P&L.' },
+            { t: 'lead', text: 'You know your sales number cold, against last year, last month, and your gut for how the room felt. The money that never shows up on a report is what walks back out the door: pour cost nobody is watching, food cost with no recipe behind it, vendor invoices nobody audits, and theft that never hits the P&L.' },
             { t: 'p', text: 'A bar running without real cost controls gives back roughly 8 to 14 percent of sales to preventable gaps. Not from a bad location. Not from slow nights. From the absence of a system. The money is recoverable. It takes a system to pull it back, and that system is what Bar Cop runs for you.' },
             { t: 'box', tone: 'gold', label: 'The stakes', title: '8 to 14 percent of sales walks out the door', text: 'On a million-dollar bar that is 80,000 to 140,000 a year. On a 500,000 bar, 40,000 to 70,000. These are illustrative ranges for a bar running with no pour tracking, no recipe cost cards, no vendor audits, and no weekly prime cost review. Your real number is whatever Bar Cop measures once you start.' },
             { t: 'h', text: 'The Four Places It Disappears' },
@@ -320,7 +333,7 @@ S.RecoveryPlaybook = {
           id: 'timeline', nav: 'The First 90 Days', eyebrow: 'What to expect and when',
           title: 'Recovery Has a Timeline',
           blocks: [
-            { t: 'p', text: 'The first 30 days are about baselines, not results. You run your first real count and see your actual pour cost, probably for the first time. The number will likely be worse than you thought. That is the system working, showing you the bar without the comfortable fog of not measuring.' },
+            { t: 'p', text: 'The first 30 days are about baselines, not results. You run a real count and read your actual pour cost. It usually lands higher than the estimate. That is the system doing its job: the bar without the comfortable fog of not measuring.' },
             { t: 'p', text: 'Days 30 to 60 are where the first real movement happens. Measured pours are in. Counts are running on a schedule. The variance report is flagging items to chase. Pour cost usually starts moving here, a point or two at first, more if free-pouring was bad. Food cost moves slower because recipe costs take time to build, so expect food results in the 60 to 90 day window.' },
             { t: 'p', text: 'By day 90 every system should be running. Pour cost trending to target, food cost measurably below the day-1 baseline, the first vendor credits requested, prime cost reviewed every week. The operation looks different from the inside.' },
             { t: 'table',
@@ -458,7 +471,7 @@ S.RecoveryPlaybook = {
               { label: 'System 6', name: 'Keep It Running', desc: 'Bar Cop tracks whether each system is still running and flags the moment one slips.', focus: 'prime-cost' }
             ] },
             { t: 'box', tone: 'gold', label: 'The logic in plain language', text: 'Pour cost variance contains your theft number, you cannot separate them without the variance report. Vendor prices flow into recipe costs the day an invoice changes, so food cost is wrong the day after a price increase you did not catch. Prime cost is the sum of everything: if it is high, one of the first four systems is broken. Start with pour cost. Every other number is downstream of the count and the pour cost calculation. Get that right first and the rest follows.' },
-            { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
+            { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
           ]
         },
         {
@@ -523,7 +536,7 @@ S.RecoveryPlaybook = {
           blocks: [
             { t: 'lead', text: 'A chef builds a beautiful menu. Creative, seasonal, priced against the competition. He never costs a single item. Eight months in, the owner pulls food cost: 42 percent. The menu is popular, the room is full most nights, and the restaurant loses money on every plate it sells. The food was not the problem. The math was, and the math was never done.' },
             { t: 'p', text: 'A chef who cannot tell you the cost of a dish to the penny is running your kitchen on feel, and feel runs 30,000 to 50,000 a year on 500,000 in food sales. The fix is three documents: a cost on every menu item, a portion standard posted at every station, and a waste log filled out every shift. That is the whole system.' },
-            { t: 'p', text: 'Here is the number that surprises operators most. What you pay per pound at delivery and what you actually use per pound are different. A tenderloin bought at 18 dollars a pound with 70 percent usable yield after trim truly costs 25.71 a pound. Cost your cards against purchase price instead of yield and every protein item is understated. Build your costs on the highest-volume items first: a 4 dollar over-cost on a bestseller running 200 covers a week is over 40,000 a year.' },
+            { t: 'p', text: 'What you pay per pound at delivery and what you actually use per pound are two different numbers. A tenderloin bought at 18 dollars a pound with 70 percent usable yield after trim truly costs 25.71 a pound. Cost your cards against purchase price instead of yield and every protein item is understated. Build your costs on the highest-volume items first: a 4 dollar over-cost on a bestseller running 200 covers a week is over 40,000 a year.' },
             { t: 'p', text: 'Portion drift is not theft, it is eyes. Cooks plate by eye and eyes vary cook to cook and hour to hour. A 1.5 ounce average overage on your top protein at 200 covers can run 40,000 a year on one item. And a waste entry without a reason code is just a count. With reason codes (over-production, spoilage, prep error, return, quality) it is a diagnosis you can act on.' },
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'You build recipes on Menu Items and they cost out automatically off your product prices, yield included. Take Inventory food counts feed your real food cost to the Profit dashboard and This Week. The Waste and Spill Log captures waste with reason codes. Recipe Summary shows every item priced below its floor so you can move a price or change a recipe.' },
@@ -580,7 +593,7 @@ S.RecoveryPlaybook = {
           title: 'Prime Cost',
           blocks: [
             { t: 'lead', text: 'An owner has been open three years. The room is full most nights, sales up 18 percent over last year. An accountant asks him his prime cost. He does not know what that means. She works it from six months of P&Ls: 71 percent. He has run a full bar and a busy kitchen for three years keeping less than 29 cents of every dollar. The room was full. The business was not working.' },
-            { t: 'p', text: 'Prime cost is COGS plus labor as a percent of net sales, and it is the most complete read on the operation you have. Every other number in this playbook, pour cost, food cost, vendor savings, theft, lands here. If prime cost is right, the machine is working. If it is wrong, one of the first four systems is broken, and prime cost is how you know before the P&L tells you a month later.' },
+            { t: 'p', text: 'Prime cost, COGS plus labor against net sales, is the gauge that covers the whole operation at once. Every other number in this playbook, pour cost, food cost, vendor savings, theft, lands here. If prime cost is right, the machine is working. If it is wrong, one of the first four systems is broken, and you see it before the P&L says so a month later.' },
             { t: 'p', text: 'A monthly number tells you what happened. A weekly number gives you time to do something about it. A 5 point spike on 300,000 in monthly sales is 15,000, gone before you see it if you wait for the accountant. Catch it Monday of week three and you cap the damage at seven days instead of thirty.' },
             { t: 'p', text: 'Two traps. First, labor is not just the wages you paid, it is wages plus payroll taxes plus benefits plus any owner time on the floor. Run prime against wages only and you understate labor 10 to 15 percent and flatter the number. Second, when prime jumps, run the split test: did COGS move more or did labor move more. The bigger mover is your driver. A one-week bump with a reason can wait a week. Three weeks trending up is structural.' },
             { t: 'h', text: 'How Bar Cop runs it' },
@@ -620,7 +633,7 @@ S.RecoveryPlaybook = {
               note: 'Week 3 feels uncomfortable the first time you tell experienced bartenders to use a jigger or post specs in a kitchen that has run on feel for years. Do it anyway. Professional, direct, not apologetic. This is how the bar runs now.' },
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'You do not track any of this on paper. The moment you do the first real step in Control, your Profit Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month P&L. Your setup checklist lives in Getting Started.' },
-            { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' },
+            { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' },
             { t: 'docs', items: [
               { file: '90Day_Cost_Control_Roadmap.docx', label: '90-Day Cost Control Roadmap' },
               { file: 'Monthly_Cost_Control_Review_Agenda.docx', label: 'Monthly Cost Control Review Agenda' }
@@ -635,7 +648,7 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'What separates bars that make money from bars that wonder where it went is not location, concept, or talent behind the bar. It is measurement and process. The tools are not complicated and the math is not advanced. What it takes is showing up Monday and pulling the number whether or not you feel like it. The week it feels least urgent is almost always the week something is quietly going wrong.' },
             { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Take Inventory and schedule your first count. Read your prime cost in This Week. Pull your last month of voids and comps in the Void and Comp Log. Then open your Profit Fix System and do the first step, so Bar Cop logs the day and starts measuring what you win back.' },
             { t: 'p', text: 'The gap between what you are making and what you should be making is not a mystery. It is a measurement problem. Start measuring tonight.' },
-            { t: 'go', label: 'Open your Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
+            { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
           ]
         }
       ]
