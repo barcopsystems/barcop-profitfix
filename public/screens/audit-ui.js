@@ -41,7 +41,7 @@ const AuditUI = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
       + '<div style="font-size:12px;color:var(--t3);max-width:520px;line-height:1.6;">' + desc + '</div>'
       + (right ? '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">' + right + '</div>' : '')
-      + '</div></div></div>';
+      + '</div></div>';
   },
 
   // ── Landing: View-Full-Audit button + merged Latest-Audit card ─────────────
