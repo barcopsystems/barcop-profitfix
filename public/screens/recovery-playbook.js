@@ -283,7 +283,7 @@ S.RecoveryPlaybook = {
       + '.pb-box-label{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:6px;}'
       + '.pb-box-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:7px;line-height:1.3;}'
       + '.pb-box-text{font-size:13px;color:var(--t2);line-height:1.7;}'
-      + '.pb-box-list{margin:4px 0 0;padding-left:20px;font-size:13px;color:var(--t2);line-height:1.65;}'
+      + '.pb-box-list{margin:11px 0 0;padding-left:0;list-style-position:inside;font-size:13px;color:var(--t2);line-height:1.65;}'
       + '.pb-box-list li{margin-bottom:7px;}'
       + '.pb-box-list li:last-child{margin-bottom:0;}'
       + '.pb-tbl-card{margin:0 0 18px;}'
