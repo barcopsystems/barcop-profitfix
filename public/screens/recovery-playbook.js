@@ -122,8 +122,10 @@ S.RecoveryPlaybook = {
 
   tableHtml(b) {
     const head = '<thead><tr>' + b.head.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>';
-    const rows = b.rows.map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
-    return '<div class="tbl-wrap"><table class="tbl pb-tbl">' + head + '<tbody>' + rows + '</tbody></table></div>'
+    const rows = b.rows.map(r => '<tr>' + r.map((c, i) =>
+      '<td data-label="' + esc(b.head[i] || '') + '">' + esc(c) + '</td>').join('') + '</tr>').join('');
+    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl">'
+      + head + '<tbody>' + rows + '</tbody></table></div></div>'
       + (b.note ? '<p class="pb-note">' + esc(b.note) + '</p>' : '');
   },
 
@@ -140,14 +142,14 @@ S.RecoveryPlaybook = {
   crossHtml(b) {
     const rows = b.rows.map(r =>
       '<tr>'
-      + '<td class="pb-cross-leak">' + esc(r.leak) + '</td>'
-      + '<td>' + esc(r.capture) + '</td>'
-      + '<td>' + esc(r.show) + '</td>'
-      + '<td>' + this.goBtn({ label: r.fixLabel, screen: r.screen, focus: r.focus }) + '</td>'
+      + '<td data-label="The leak" class="pb-cross-leak">' + esc(r.leak) + '</td>'
+      + '<td data-label="Where you capture it">' + esc(r.capture) + '</td>'
+      + '<td data-label="Where Bar Cop shows it">' + esc(r.show) + '</td>'
+      + '<td data-label="Where you fix it">' + this.goBtn({ label: r.fixLabel, screen: r.screen, focus: r.focus }) + '</td>'
       + '</tr>').join('');
-    return '<div class="tbl-wrap"><table class="tbl pb-tbl pb-cross">'
+    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl">'
       + '<thead><tr><th>The leak</th><th>Where you capture it</th><th>Where Bar Cop shows it</th><th>Where you fix it</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div>';
+      + '<tbody>' + rows + '</tbody></table></div></div>';
   },
 
   partsHtml(b) {
@@ -234,8 +236,8 @@ S.RecoveryPlaybook = {
       + '.pb-shell{display:flex;align-items:flex-start;min-height:calc(100vh - 110px);}'
       + '.pb-side{position:sticky;top:0;align-self:flex-start;flex:0 0 232px;border-right:1px solid var(--b-edge);padding:20px 0 40px;}'
       + '.pb-side-label{padding:6px 20px 10px;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--t4);}'
-      + '.pb-side-item{display:block;width:100%;text-align:left;background:none;border:none;border-left:2px solid transparent;color:var(--t2);font-size:13.5px;font-weight:600;padding:9px 20px;cursor:pointer;line-height:1.35;transition:background .12s,color .12s;}'
-      + '.pb-side-item:hover{background:var(--c3);color:var(--w);border-left-color:var(--gold);}'
+      + '.pb-side-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--t2);font-size:13.5px;font-weight:600;padding:9px 20px;cursor:pointer;line-height:1.35;transition:color .12s;}'
+      + '.pb-side-item:hover{color:var(--w);}'
       + '.pb-main{flex:1;min-width:0;padding:22px 32px 64px;}'
       + '.pb-body{max-width:800px;}'
       + '.pb-section{margin-bottom:40px;scroll-margin-top:14px;}'
@@ -253,11 +255,8 @@ S.RecoveryPlaybook = {
       + '.pb-box-label{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:6px;}'
       + '.pb-box-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:7px;line-height:1.3;}'
       + '.pb-box-text{font-size:13px;color:var(--t2);line-height:1.7;}'
-      + '.pb-tbl{width:100%;margin:0 0 8px;}'
-      + '.pb-body .tbl-wrap{background:#0D181E;}'
-      + '.pb-body .tbl th{background:#0D181E;}'
-      + '.pb-cross-leak{font-weight:700;color:var(--t1);white-space:nowrap;}'
-      + '.pb-cross td{vertical-align:middle;}'
+      + '.pb-tbl-card{margin:0 0 18px;}'
+      + '.pb-cross-leak{font-weight:700;color:var(--t1);}'
       + '.pb-diag{border-left:2px solid var(--b-edge);padding:2px 0 2px 14px;margin:0 0 16px;}'
       + '.pb-diag-q{font-size:14px;font-weight:600;color:var(--t1);line-height:1.5;margin-bottom:8px;}'
       + '.pb-diag-n{color:var(--gold);font-weight:700;}'
