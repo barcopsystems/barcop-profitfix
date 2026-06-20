@@ -377,7 +377,7 @@ S.TrafficAudit = {
       + AuditUI.intakeQRow('ta', 'Delivery menu prices marked up to offset commission?', 'delivery_markup', [['false','No'],['true','Yes']], pr.delivery_markup)
       + AuditUI.intakeQRow('ta', 'Review generation system asking guests for reviews?', 'review_generation', [['false','No'],['true','Yes']], pr.review_generation));
 
-    this.container.innerHTML = '<div class="screen">' + websiteCard + screenshotsCard + questionsCard + AuditUI.intakeSubmit('ta', canRun, daysLeft) + '</div>';
+    this.container.innerHTML = '<div class="screen">' + websiteCard + screenshotsCard + questionsCard + AuditUI.intakeSubmit('ta') + '</div>';
     FileDrop.attach('ta-drop');
 
     document.getElementById('ta-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
