@@ -357,24 +357,24 @@ S.Hub = {
     const bcScore  = bcA ? bcA.overall_score : null;
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
-    const recScores = [pA, rA, tA].map(a => (a && a.overall_score != null && !isNaN(a.overall_score)) ? a.overall_score : null).filter(s => s != null);
-    const overallRecovery = recScores.length ? Math.round(recScores.reduce((a, b) => a + b, 0) / recScores.length) : null;
+    // Faint vertical divider between the stats (desktop only; hidden on mobile
+    // where the stats stack — see .hub-stat-div in the hub style block).
+    const statDiv = '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;"></div>';
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Where You Stand</div>'
       +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
-      + '<div style="display:flex;align-items:flex-start;gap:44px;flex-wrap:wrap;padding:18px 22px;">'
+      + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
+      + statDiv
       + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any recovery system to start')
-      + tile('Overall Recovery Score', overallRecovery != null ? overallRecovery : 'None',
-             overallRecovery != null ? softScore(overallRecovery) : 'var(--t4)',
-             overallRecovery != null ? recScores.length + ' of 3 systems audited' : 'Run a recovery audit')
+      + statDiv
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
@@ -960,6 +960,7 @@ S.Hub = {
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
         .hub-app .hd-arow{background:#0D181E;}
         .hub-app .hd-arow:hover{background:#0F1A21;}
+        @media (max-width:768px){.hub-app .hub-stat-div{display:none;}}
         /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
            when row count exceeds card height. Thin scrollbar so it does not
            visually overwhelm the small lists. */
