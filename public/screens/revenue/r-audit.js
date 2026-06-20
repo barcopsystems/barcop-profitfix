@@ -371,7 +371,7 @@ S.RevenueAudit = {
       + AuditUI.intakeQRow('ra', 'When did you last raise menu prices?', 'last_price_increase', [['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']], pr.last_price_increase)
       + AuditUI.intakeQRow('ra', 'Labor scheduled to a sales forecast?', 'labor_to_forecast', [['false','No'],['true','Yes']], pr.labor_to_forecast));
 
-    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('ra', canRun, daysLeft) + '</div>';
+    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('ra') + '</div>';
     FileDrop.attach('ra-drop');
 
     document.getElementById('ra-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
