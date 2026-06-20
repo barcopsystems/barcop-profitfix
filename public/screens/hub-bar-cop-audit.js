@@ -18,12 +18,12 @@
      6. Operational Consistency — week-over-week variance in stable metrics
 
    One audit every 30 days, hard-locked, same as the three recovery audits.
-   Empty state when there is not yet ~60 days of logged data because most
-   sub-scores need history to mean anything.
+   It scores as soon as there is anything real to show; each sub-score reads
+   N/A until the data behind it exists.
 
-   Single-page audit detail layout (no Scores/Findings tab split). Bar Cop
-   Outlook button lives in the audit detail header card next to the score
-   via the shared AuditOutlook helper. */
+   Single-page audit detail built on the shared AuditUI so it matches the three
+   recovery audits. Bar Cop Outlook + Export PDF sit in the Top Operational
+   Exposures heading. */
 
 S.HubBarCopAudit = {
   WINDOW_DAYS:           30,   // scoring window for most sub-scores
@@ -127,7 +127,7 @@ S.HubBarCopAudit = {
   _canRunAudit() {
     const a = this.audits();
     if (!a.length) return { ok: true, daysUntil: 0 };
-    const latest = a[a.length - 1];
+    const latest = App.latestEvent(a);
     const since = this._daysSince(latest.date);
     if (since == null) return { ok: true, daysUntil: 0 };
     const remaining = this.AUDIT_INTERVAL_DAYS - since;
@@ -190,7 +190,7 @@ S.HubBarCopAudit = {
     ];
     recoveryAudits.forEach(r => {
       const arr = r.list || [];
-      const latest = arr.length ? arr[arr.length - 1] : null;
+      const latest = App.latestEvent(arr);
       const since = latest ? this._daysSince(latest.date) : null;
       const onTime = since != null && since <= 35; // 30-day rule with 5-day grace
       components.push({ label: r.name + ' audit on time', ratio: onTime ? 1 : 0, na: arr.length === 0, extra: arr.length === 0 ? 'No audit run yet' : (onTime ? 'Current' : 'Overdue') });
@@ -234,24 +234,27 @@ S.HubBarCopAudit = {
     const varPct      = totalRev > 0 ? (totalAbsVar / totalRev) * 100 : 0;
     const varRatio    = Math.max(0, 1 - (varPct / 1)); // 1%+ → 0, 0% → 1
 
-    // Drawer count completion: expected one per shift.
-    const drawerRatio = wkShifts.length > 0 ? Math.min(1, wkDrawers.length / wkShifts.length) : null;
+    // Drawer count completion: expected one per operating day (drawers are counted
+    // at close, not once per daypart-revenue split, so the denominator is the
+    // distinct days the operation ran, not the per-daypart shift records).
+    const operatingDays = new Set(wkShifts.map(s => s.date)).size;
+    const drawerRatio = operatingDays > 0 ? Math.min(1, wkDrawers.length / operatingDays) : null;
 
     // Authorization compliance on large voids/comps (over threshold).
     const overThresh = wkVoids.filter(v => (parseFloat(v.amount) || 0) >= threshold);
     const authorized = overThresh.filter(v => v.authorized_by);
     const authRatio  = overThresh.length === 0 ? 1 : authorized.length / overThresh.length;
 
-    // Cash drops activity (at least one drop per shift where revenue > $500).
-    const cashShifts = wkShifts.filter(s => (parseFloat(s.total_revenue) || 0) > 500);
-    const wkDrops    = drops.filter(d => this._withinWindow(d.date, this.WINDOW_DAYS));
-    const dropRatio  = cashShifts.length > 0 ? Math.min(1, wkDrops.length / cashShifts.length) : null;
+    // Cash drops activity: a drop on each operating day that took real money.
+    const cashDays = new Set(wkShifts.filter(s => (parseFloat(s.total_revenue) || 0) > 500).map(s => s.date)).size;
+    const wkDrops  = drops.filter(d => this._withinWindow(d.date, this.WINDOW_DAYS));
+    const dropRatio = cashDays > 0 ? Math.min(1, wkDrops.length / cashDays) : null;
 
     const components = [
       { label: 'Cash variance trend (lower is better)', ratio: varRatio,    na: totalRev === 0,         extra: totalRev > 0 ? varPct.toFixed(2) + '% of revenue handled' : 'No revenue logged in window' },
-      { label: 'Drawer counts per shift',               ratio: drawerRatio, na: wkShifts.length === 0,  extra: wkDrawers.length + ' counts on ' + wkShifts.length + ' shifts' },
+      { label: 'Drawer counts per operating day',       ratio: drawerRatio, na: operatingDays === 0,    extra: wkDrawers.length + ' counts on ' + operatingDays + ' operating days' },
       { label: 'Large void/comp authorization',         ratio: authRatio,   na: wkVoids.length === 0,   extra: wkVoids.length === 0 ? 'No voids/comps logged' : (authorized.length + ' of ' + overThresh.length + ' over $' + threshold + ' authorized') },
-      { label: 'Cash drops on revenue shifts',          ratio: dropRatio,   na: cashShifts.length === 0, extra: wkDrops.length + ' drops on ' + cashShifts.length + ' shifts over $500' }
+      { label: 'Cash drops on revenue days',            ratio: dropRatio,   na: cashDays === 0,         extra: wkDrops.length + ' drops on ' + cashDays + ' days over $500' }
     ];
     return this._rollup(components);
   },
@@ -313,8 +316,8 @@ S.HubBarCopAudit = {
     let schedScore = null, schedExtra = 'No logged hours in window';
     if (laborActive) {
       const totalActual = wkActuals.reduce((s, a) => s + (parseFloat(a.hours) || 0), 0);
-      const wkSchedules = schedules.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
-      const totalSched  = wkSchedules.reduce((s, x) => s + (parseFloat(x.hours) || 0), 0);
+      const wkSchedules = schedules.filter(s => this._withinWindow(s.week_start, this.WINDOW_DAYS));
+      const totalSched  = wkSchedules.reduce((s, x) => s + (parseFloat(x.total_hours) || 0), 0);
       if (totalSched > 0) {
         const dev = Math.abs(totalActual - totalSched) / totalSched;
         schedScore = Math.max(0, 1 - (dev / 0.10));
@@ -426,7 +429,7 @@ S.HubBarCopAudit = {
     const coversCV = cvScore(revWeeks.map(w => (parseFloat(w.covers) || 0)));
     const laborPctCV = cvScore(weeks.map(w => {
       const rev = (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0);
-      const lab = parseFloat(w.labor_total) || 0;
+      const lab = (parseFloat(w.bar?.labor) || 0) + (parseFloat(w.food?.labor) || 0) + (parseFloat(w.catering?.labor) || 0);
       return rev > 0 ? (lab / rev) * 100 : null;
     }));
     const pourCostCV = cvScore(weeks.map(w => parseFloat(w.bar?.cost_pct)));
@@ -488,33 +491,29 @@ S.HubBarCopAudit = {
       });
     }
 
-    // Certifications expiring in next 30 days.
-    const expSoon = certs.filter(c => {
-      if (!c.expiration_date) return false;
-      const days = this._daysSince(c.expiration_date) * -1;
-      return days >= 0 && days <= 30;
-    });
-    expSoon.forEach(c => {
-      const daysLeft = this._daysSince(c.expiration_date) * -1;
+    // Certifications already expired, or expiring in the next 30 days.
+    const certFlags = certs.filter(c => c.expiration_date && (this._daysSince(c.expiration_date) * -1) <= 30);
+    certFlags.forEach(c => {
+      const left = this._daysSince(c.expiration_date) * -1;   // <0 already expired, >0 days left
+      const expired = left < 0;
+      const n = Math.abs(left);
       out.push({
-        label:    (c.cert_type || c.cert_name || c.name || 'Certification') + ' expiring in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's'),
-        detail:   (c.staff_name ? 'For ' + c.staff_name + '. ' : '') + 'Renew before lapse to stay compliant.',
-        severity: daysLeft <= 7 ? 'critical' : 'warn'
+        label:    (c.cert_type || c.cert_name || c.name || 'Certification') + (expired ? ' expired ' + n + ' day' + (n === 1 ? '' : 's') + ' ago' : ' expiring in ' + n + ' day' + (n === 1 ? '' : 's')),
+        detail:   (c.staff_name ? 'For ' + c.staff_name + '. ' : '') + (expired ? 'Out of compliance now. Renew before this person works again.' : 'Renew before lapse to stay compliant.'),
+        severity: (expired || left <= 7) ? 'critical' : 'warn'
       });
     });
 
-    // Permits and compliance items due in next 30 days.
-    const permitsSoon = permits.filter(p => {
-      if (!p.renewal_date) return false;
-      const days = this._daysSince(p.renewal_date) * -1;
-      return days >= 0 && days <= 30;
-    });
-    permitsSoon.forEach(p => {
-      const daysLeft = this._daysSince(p.renewal_date) * -1;
+    // Permits and compliance items already expired, or due in the next 30 days.
+    const permitFlags = permits.filter(p => p.renewal_date && (this._daysSince(p.renewal_date) * -1) <= 30);
+    permitFlags.forEach(p => {
+      const left = this._daysSince(p.renewal_date) * -1;
+      const expired = left < 0;
+      const n = Math.abs(left);
       out.push({
-        label:    (p.name || 'Permit') + ' renewal in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's'),
-        detail:   (p.type ? p.type + '. ' : '') + (p.cost ? 'Last cost $' + p.cost + '. ' : '') + 'Operation-level compliance item.',
-        severity: daysLeft <= 14 ? 'critical' : 'warn'
+        label:    (p.name || 'Permit') + (expired ? ' expired ' + n + ' day' + (n === 1 ? '' : 's') + ' ago' : ' renewal in ' + n + ' day' + (n === 1 ? '' : 's')),
+        detail:   (p.type ? p.type + '. ' : '') + (p.cost ? 'Last cost $' + p.cost + '. ' : '') + (expired ? 'Out of compliance. Renew now.' : 'Operation-level compliance item.'),
+        severity: (expired || left <= 14) ? 'critical' : 'warn'
       });
     });
 
@@ -557,7 +556,7 @@ S.HubBarCopAudit = {
       { name: 'Traffic Recovery', list: App.data?.traffic_audits, screen: 't-audit' }
     ].forEach(r => {
       const arr = r.list || [];
-      const latest = arr.length ? arr[arr.length - 1] : null;
+      const latest = App.latestEvent(arr);
       const since = latest ? this._daysSince(latest.date) : null;
       if (since == null) {
         out.push({
@@ -635,32 +634,10 @@ S.HubBarCopAudit = {
       }
     });
 
-    // Rule 3: same product plus chronic shrinkage (3+ months of variance)
-    // Simplified: products appearing in 3+ ic_counts with negative variance.
-    // (Full implementation would join across counts; for v1 we count distinct
-    //  product mentions with adverse variance in the last 90 days.)
-    const wkCounts = counts.filter(c => since90(c.date));
-    const adverseByProduct = {};
-    wkCounts.forEach(c => {
-      (c.items || []).forEach(it => {
-        const variance = parseFloat(it.variance) || 0;
-        if (variance < -1) { // shrinkage > 1 unit
-          const name = it.product_name || it.name || it.product_id;
-          if (!name) return;
-          if (!adverseByProduct[name]) adverseByProduct[name] = 0;
-          adverseByProduct[name]++;
-        }
-      });
-    });
-    Object.keys(adverseByProduct).forEach(name => {
-      if (adverseByProduct[name] >= 3) {
-        out.push({
-          label: 'Chronic shrinkage: ' + name,
-          detail: adverseByProduct[name] + ' adverse variance events in last 90 days. Investigate pour, theft, or recipe.',
-          screen: 'theft-risk'
-        });
-      }
-    });
+    // (Chronic per-product shrinkage is not a pattern rule here: variance is not
+    // stored on a count item, it is computed by the Variance Report. The Loss
+    // Prevention screen owns per-product shrinkage; surfacing it here would mean
+    // re-deriving theoretical usage, so it lives there, not in this rule set.)
 
     // Rule 4: same day-of-week plus labor overage
     const wkActuals = actuals.filter(a => since90(a.date));
@@ -858,7 +835,7 @@ S.HubBarCopAudit = {
 
     document.getElementById('bca-new-btn')?.addEventListener('click', () => this._generate());
     this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
-      btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx)));
+      btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx, 10)));
     });
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
       App.handleShowOlder(e.target, () => this.renderMain()));
@@ -955,10 +932,8 @@ S.HubBarCopAudit = {
             + '</div>';
         }).join('')
       : '<div style="padding:18px 0;font-size:12px;color:var(--t3);line-height:1.6;">No recurring patterns surfaced this month. Bar Cop watches for same-staff, same-shift, same-vendor, and same-day-of-week patterns over rolling 90-day windows.</div>';
-    const patternCard = '<div class="card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Recurring Patterns</div>'
-      + patternRows
-      + '</div>';
+    const patternCard = '<div class="sh" style="margin:24px 0 10px;">Recurring Patterns</div>'
+      + '<div class="card" style="margin-bottom:14px;">' + patternRows + '</div>';
 
     // Recovery Activity stat strip — the second-row stats (no title), the slot
     // where the recovery audits show their recoverable strip under the hero.
