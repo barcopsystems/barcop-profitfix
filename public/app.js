@@ -1493,9 +1493,34 @@ const App = {
       { h: 'Operation links', p: ['Paste the public URL for each platform: your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data into the Traffic Audit.'] }
     ] },
     'settings-targets': { title: 'How Recovery Targets Work', sections: [
-      { h: 'What this page is', p: ['The benchmarks Bar Cop grades you against across Profit, Revenue, and Traffic, plus the conversion rates behind the Traffic scoreboard. Industry defaults are pre-filled so you can start day one. Each section saves with its own Save button.'] },
-      { h: 'How to use it', p: ['Adjust each target to your own operation: pour, food, labor, and prime cost percentages for Profit; check average and revenue per labor hour for Revenue; rating, reviews, and response rate for Traffic.'] },
-      { h: 'Conversion rates', p: ['These turn a digital improvement into a dollar figure on the Recovery Scoreboard for Traffic fixes. The defaults are industry benchmarks; override them once your own data shows a different conversion.'] }
+      { h: 'What this page is', p: [
+        'Every target here sets the line your real numbers get measured against across the Profit, Revenue, and Traffic systems: the audits, the dashboards, This Week, and the Fix steps. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
+        'Industry defaults are pre-filled so you have a working line on day one. Set each one to your own goal as you learn your numbers. Each section saves on its own with its Save Data button.'
+      ] },
+      { h: 'Profit targets', p: [
+        'Bar Pour Cost %: your liquor, beer, and wine cost as a share of bar sales. The lower the number, the more you keep on every pour. Most bars run 18 to 24 percent; the default is 22. Bar Cop grades your real pour cost against this on the Profit Audit and flags the categories running over.',
+        'Food Cost %: your food cost as a share of food sales. Full-service kitchens usually run 28 to 35 percent; the default is 32. Set it to the margin your menu is priced for.',
+        'Labor Cost %: total labor, hourly and salary, as a share of total sales. Most full-service operations target 28 to 32 percent; the default is 30. This is the line Labor Control and the schedule build toward.',
+        'Prime Cost %: pour cost plus food cost plus labor, the one number that decides whether the doors stay open. Keep it under 60 to 65 percent of sales; the default is 60. Get prime cost right and the rest of the P&L usually follows.'
+      ] },
+      { h: 'Revenue targets', p: [
+        'Check Average: the average guest check you are aiming for. Bar Cop measures your real check average against it and sizes the upsell opportunity in dollars. Raise it as your menu and service push add-ons.',
+        'Lunch, Dinner, and Bar RPLH: revenue per labor hour, the sales each worked labor hour brings in, set separately for each daypart since a slow lunch and a packed bar are not the same job. Build Schedule uses these to set target hours, so a higher RPLH target tightens the schedule.',
+        'Event Close Rate: the share of event inquiries you turn into booked events. The Events system grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
+      ] },
+      { h: 'Traffic targets', p: [
+        'Google Rating: the star rating you are holding the line at, 1 to 5. The default is 4.3. Slip below it and Traffic flags reputation as a leak.',
+        'New Reviews / Mo: how many fresh reviews you want coming in each month. Steady new reviews keep the rating current and the listing active; the default is 8.',
+        'Response Rate: the share of reviews you reply to. Answering the good and the bad signals an owner paying attention; the default is 75 percent.',
+        'Monthly Sessions: the website sessions you are targeting each month, the top of the funnel that feeds reservations and orders. The default is 2,000. Set it against what your site actually does.',
+        'Social Posts / Mo: how many posts you want out each month to stay in front of regulars. The default is 12, about three a week.'
+      ] },
+      { h: 'Conversion rates', p: [
+        'These two rates turn a digital gain into a dollar figure on the Traffic scoreboard, so a fix carries its real value. Each one is multiplied by your check average to price the visit it would drive.',
+        'Website Session to Visit: the share of website sessions that become an actual guest visit. The default is 3 percent.',
+        'Email Open to Visit: the share of email opens that become a visit. The default is 1 percent.',
+        'The defaults are industry benchmarks. Override them once your own data shows a different conversion, and every Traffic dollar figure re-prices to match.'
+      ] }
     ] },
     'getting-started': { title: 'How Getting Started Works', sections: [
       { h: 'What this page is', p: ['The setup checklist that turns a blank account into a working one, grouped into four phases: Foundation, Baseline Diagnosis, Capture System, and Weekly Work.'] },
