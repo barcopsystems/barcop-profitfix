@@ -135,7 +135,7 @@ S.TrafficAudit = {
     ].join('');
 
     this.container.innerHTML = '<div class="screen" id="ta-audit-view">'
-      + AuditUI.viewHero(audit, 'Traffic Recovery Audit')
+      + AuditUI.viewHero(audit, 'Traffic Recovery Audit', 'ta')
       + AuditUI.recoverStrip(audit)
       + AuditUI.actionsArea(audit, 'traffic', 'ta')
       + sections
