@@ -2161,6 +2161,7 @@ const App = {
 
   // Load Recovery data plus the three Control data stores (Rule 21)
   async loadAllData() {
+    this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
     this.inventoryData = await DB.readInventoryData();
     this.laborData     = await DB.readLaborData();
