@@ -171,7 +171,7 @@ function computeProfitAudit(appData, controlData, extracted) {
   // Scored on actual loss behavior: void/comp rate vs benchmark, unauthorized
   // void rate, and cash short rate. Documented controls give modest capped
   // credit that cannot rescue a bad rate. (Decision 8, audit-honesty-rebuild.)
-  const haveCashRecon = (num(cd.cash_reconciliations) > 0) || recons.length > 0 || extracted.drawer_recon === true;
+  const haveCashRecon = (num(cd.cash_reconciliations) > 0) || recons.length > 0 || extracted.drawer_recon === true || num(extracted.cash_recon_count) > 0;
   const haveShiftChecks = shifts.length > 0 || num(cd.spot_checks) > 0;
   const haveApprovalPolicy = !!extracted.void_approval || num(cd.void_comp_unauthorized) != null;
   // Void/comp rate from period-scoped Control sum vs period total revenue.
@@ -397,7 +397,7 @@ function computeProfitAudit(appData, controlData, extracted) {
     S2_NO_SALE_COUNT: noSaleCount,
     S2_CASH_POLICY: haveCashRecon ? 'Reconciliation performed' : 'Not documented',
     S2_VOID_APPROVAL: haveApprovalPolicy ? 'Manager approval tracked' : 'Not documented',
-    S2_DRAWER_RECON: num(cd.cash_reconciliations) > 0 ? `Yes — ${cd.cash_reconciliations} entries` : (recons.length ? `Yes — ${recons.length} entries` : 'No'),
+    S2_DRAWER_RECON: num(cd.cash_reconciliations) > 0 ? `Yes — ${cd.cash_reconciliations} entries` : (recons.length ? `Yes — ${recons.length} entries` : (num(extracted.cash_recon_count) > 0 ? `Yes — ${round0(extracted.cash_recon_count)} entries` : 'No')),
     S2_SPILLAGE_LOG: haveShiftChecks ? 'Yes' : 'Not documented',
     S2_MONTHLY_GAP: s2MonthlyGap,
     S2_ANNUAL_GAP: round0(s2MonthlyGap * 12),
