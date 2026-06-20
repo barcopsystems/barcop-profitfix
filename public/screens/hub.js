@@ -534,9 +534,9 @@ S.Hub = {
     if (alerts.length) {
       // Triage: split into Critical (bad) and Watch (warn) under their own
       // headers so the operator instantly sees what matters today.
-      const rowOf = (a, isLast, dotCol) => '<div class="hd-row hd-arow" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
-        + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
-        + (isLast ? '' : 'border-bottom:1px solid var(--row-div);') + '">'
+      const rowOf = (a, isFirst, dotCol) => '<div class="hd-row hd-arow" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
+        + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--row-div);'
+        + (isFirst ? 'border-top:1px solid var(--row-div);' : '') + '">'
         + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
         + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
         + '</div>';
@@ -544,11 +544,11 @@ S.Hub = {
       const critical = alerts.filter(a => a.sev === 'bad');
       const watch    = alerts.filter(a => a.sev === 'warn');
       const alertRows =
-          (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === critical.length - 1, 'var(--red)')).join('') : '')
-        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === watch.length - 1, 'var(--amber)')).join('') : '');
+          (critical.length ? groupHead('Critical', 'var(--red)') + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
+        + (watch.length    ? groupHead('Watch', 'var(--amber)')  + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
       const alertHead = '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.35;">'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
         +   'item' + (alerts.length===1?'':'s') + ' to address'
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
         + '</div></div>';
