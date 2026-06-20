@@ -309,8 +309,10 @@ S.Hub = {
     collect(rA, 'Revenue', 'revenue');
     collect(tA, 'Traffic', 'traffic');
     itemRows.sort((a,b) => b.impact - a.impact);
-    // Show every action item, ranked by impact, scrolling like the Alerts list.
-    const topItems = itemRows;
+    // Cap visible PAIs at 8 — top by impact — so the most important items are
+    // never hidden behind a scrollbar. Overflow flagged in a small footer.
+    const topItems = itemRows.slice(0, 8);
+    const overflowItems = Math.max(0, itemRows.length - topItems.length);
 
     const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
@@ -577,7 +579,7 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
       const tgtDisp  = valFmt(target);
 
-      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b2);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
 
       const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -735,6 +737,9 @@ S.Hub = {
             + '</div>';
         }).join('')
       : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
+    const overflowFooter = overflowItems > 0
+      ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
+      : '';
     // First-run guide: with no audit run yet, the Priority Actions panel
     // becomes a welcoming "Start Here" with the three steps to a first recovery
     // number, so a brand-new operator is never left wondering what to do.
@@ -762,7 +767,7 @@ S.Hub = {
     const actionPanel = !anyAudit
       ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
       : `${shWrapOpen('Priority Actions')}${actionHead}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${shWrapClose}`;
+      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
 
     // Weekly money readout panel — big red weekly leak total up top, then a
     // ranked list of the gap areas producing it. Same emotional language as
@@ -915,7 +920,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b2);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b-edge);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
