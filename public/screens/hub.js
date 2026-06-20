@@ -357,6 +357,8 @@ S.Hub = {
     const bcScore  = bcA ? bcA.overall_score : null;
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
     const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
+    const recScores = [pA, rA, tA].map(a => (a && a.overall_score != null && !isNaN(a.overall_score)) ? a.overall_score : null).filter(s => s != null);
+    const overallRecovery = recScores.length ? Math.round(recScores.reduce((a, b) => a + b, 0) / recScores.length) : null;
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
@@ -370,6 +372,9 @@ S.Hub = {
       + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any recovery system to start')
+      + tile('Overall Recovery Score', overallRecovery != null ? overallRecovery : 'None',
+             overallRecovery != null ? softScore(overallRecovery) : 'var(--t4)',
+             overallRecovery != null ? recScores.length + ' of 3 systems audited' : 'Run a recovery audit')
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
