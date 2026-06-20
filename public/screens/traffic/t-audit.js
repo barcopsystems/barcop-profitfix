@@ -179,8 +179,7 @@ S.TrafficAudit = {
     b.header({ right: 'Traffic Recovery Audit', meta: metaBits.join('   ·   ') });
     b.kv('Bar', audit.bar_name || App.data.settings.bar_name || 'Your Bar');
     b.kv('Digital Presence Score', overall + ' of 100  (' + App.scoreLabel(overall) + ')');
-    if (d.INDUSTRY_AVG != null) b.kv('Bar Cop Benchmark', String(d.INDUSTRY_AVG));
-    b.kv('Target', String(d.TARGET_SCORE || 65));
+    b.kv('Target', String(d.TARGET_SCORE || 70));
     if (d.WEEKLY_GAP_AMT) b.kv('Estimated Weekly Gap', String(d.WEEKLY_GAP_AMT));
 
     // Ranked action items (same source + ordering as the screen).
