@@ -135,7 +135,7 @@ S.AuditTracker = {
     ].join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.viewHero(audit, 'Profit Recovery Audit')
+      + AuditUI.viewHero(audit, 'Profit Recovery Audit', 'at')
       + AuditUI.recoverStrip(audit)
       + AuditUI.actionsArea(audit, 'profit', 'at')
       + sections
