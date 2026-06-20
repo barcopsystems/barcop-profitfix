@@ -182,7 +182,7 @@ S.AuditTracker = {
     if (audit.grade) b.kv('Data Quality', audit.grade);
     b.kv('Benchmark / Target',
       (d.INDUSTRY_AVG != null ? 'Bar Cop Benchmark ' + d.INDUSTRY_AVG + '  ·  ' : '')
-      + 'Target ' + (d.TARGET_SCORE || 65));
+      + 'Target ' + (d.TARGET_SCORE || 70));
 
     // Total recoverable summary (mirrors the on-screen recoverable banner).
     const totalMonthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
