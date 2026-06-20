@@ -899,7 +899,7 @@ S.Hub = {
       <style>
         .hub-app{min-height:100% !important;}
         .hub-app .content{padding:24px;min-width:0;}
-        @media (max-width:768px){.hub-app .content{padding:14px 8px 72px;}}
+        @media (max-width:768px){.hub-app .content{padding:16px 14px 72px;}}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
