@@ -128,7 +128,7 @@ S.RevenueDashboard = {
 
     container.innerHTML = '<div class="screen">'
       + DashUI.dayOneStrip(
-          'Run your first Revenue Audit for a baseline, enter a week in This Week, and set up the Control sections that feed Revenue. As that data lands, this dashboard fills in with your recovered dollars and where the top line is leaking.',
+          'Four steps and this dashboard fills in with your recovered dollars, where the top line is leaking, and this week against target.',
           [
             { done: hasAudit, num: 1, label: 'Run your first Revenue Audit', go: 'r-audit' },
             { done: hasWeek,  num: 2, label: 'Enter This Week', go: 'r-this-week' },
