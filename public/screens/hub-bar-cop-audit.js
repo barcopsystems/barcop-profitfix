@@ -33,6 +33,11 @@ S.HubBarCopAudit = {
   RETENTION_CAP:         12,   // keep last 12 audits (1 year), match recovery audits
   MIN_SUBS_FOR_OVERALL:  3,    // need this many of 6 sub-scores covered for an honest overall
 
+  // Display names for the six sub-scores, in order. Matches the keys in the
+  // audit `sections` map so the shared AuditUI.landingCard renders them as the
+  // section-breakdown rows, identical to the three recovery audits.
+  SECTION_NAMES: ['Operational Discipline', 'Cash Integrity', 'Inventory Execution', 'Labor Hygiene', 'Recovery Action', 'Operational Consistency'],
+
   audits() {
     if (!Array.isArray(App.data.bar_cop_audits)) App.data.bar_cop_audits = [];
     return App.data.bar_cop_audits;
@@ -820,152 +825,33 @@ S.HubBarCopAudit = {
   },
 
   // ── Render: landing ─────────────────────────────────────────────────────
-  // ── Render: landing ─────────────────────────────────────────────────────
-  // Mirrors the audit-tracker.js renderMain pattern exactly so all four
-  // audits feel familiar: requestCard at the top with description and
-  // countdown or Generate button, latestCard with score and View Full
-  // Audit, score history chart, audit history table.
+  // Uses the shared AuditUI helpers so the Bar Cop Audit landing is identical to
+  // the Profit / Revenue / Traffic audits: request card, merged Latest-Audit card
+  // with the six sub-scores as the section rows, the 12-month score-history bars,
+  // and the Audit History data-card. This audit reads from logged data (no upload),
+  // so the request card shows only a countdown when locked, and the history hides
+  // the Data Quality (upload tier) column.
   renderMain() {
     const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0] || null;
     const enough = this._hasEnoughData();
-    const earliest = this._earliestDataDate();
-    const daysOfData = earliest ? this._daysSince(earliest) : 0;
 
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date).getTime()) / 86400000)
       : Infinity;
-    const canRunAudit = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
-    const daysLeft    = canRunAudit ? 0 : (enough ? this.AUDIT_INTERVAL_DAYS - daysSince : 0);
+    const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
+    const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    let requestRight = '';
-    if (!enough) {
-      requestRight = '<div style="text-align:right;flex-shrink:0;max-width:240px;">'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;">Log some Inventory, Shift, or Labor Control data and the audit can score it.</div></div>';
-    } else if (canRunAudit) {
-      requestRight = '<button class="btn btn-primary" id="bca-new-btn" style="flex-shrink:0;">' + (latest ? 'Generate New Audit' : 'Generate First Audit') + '</button>';
-    } else {
-      requestRight = '<div style="text-align:right;flex-shrink:0;">'
-        + '<div style="font-size:30px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;color:var(--gold);">' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;">Until next audit</div></div>';
-    }
-
-    const requestBody = enough
-      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. Executive operational read across every system. Each of the six sub-scores fills in as you log the data behind it, and shows N/A until then. Top exposures, recurring patterns, and recovery activity included. Print or save as a PDF from your browser.'
+    const desc = enough
+      ? 'One Bar Cop Audit every ' + this.AUDIT_INTERVAL_DAYS + ' days. An executive read across every system: six sub-scores, your top operational exposures, recurring patterns, and your recovery activity. Each sub-score fills in as you log the data behind it and shows N/A until then. Print or save as a PDF from your browser.'
       : 'The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Start logging in Inventory, Shift, and Labor Control and it scores what it can, filling in the rest over time.';
 
-    const requestCard = '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      + '<div style="flex:1;min-width:200px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Bar Cop Audit</div>'
-      + '<div style="font-size:13px;color:var(--t1);line-height:1.6;max-width:560px;">' + requestBody + '</div>'
-      + '</div>'
-      + requestRight
-      + '</div></div>';
-
-    let latestCard = '';
-    if (latest) {
-      const prev = audits[1] || null;
-      const overallNA = latest.overall_score == null;
-      const scoreColor = overallNA ? 'var(--t3)' : App.scoreColor(latest.overall_score);
-      const scoreLabel = overallNA ? 'Not enough data yet' : App.scoreLabel(latest.overall_score);
-
-      let progressBanner = '';
-      if (prev && latest.overall_score != null && prev.overall_score != null) {
-        const diff = latest.overall_score - prev.overall_score;
-        progressBanner = '<div style="background:var(--input);border:1px solid var(--b2);border-radius:3px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">vs Previous Audit</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</div>'
-          + '<div style="font-size:12px;color:var(--t2);">' + prev.overall_score + ' to ' + latest.overall_score + '</div>'
-          + '</div>';
-      }
-
-      const sections = latest.sections || {};
-      const sectionRows = Object.entries(sections).map(([name, score]) => {
-        // N/A sub-score: same "Not enough data" treatment the detail page uses,
-        // never a raw red "null". No bar, no change arrow.
-        if (score == null) {
-          return '<tr>'
-            + '<td style="color:var(--t2);padding:8px 12px;">' + esc(name) + '</td>'
-            + '<td style="padding:8px 12px;width:140px;"></td>'
-            + '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);padding:8px 12px;">N/A</td>'
-            + '<td style="font-size:11px;color:var(--t4);padding:8px 12px;">Not enough data</td>'
-            + '</tr>';
-        }
-        const ps   = prev?.sections?.[name];
-        const diff = (ps != null) ? score - ps : null;
-        const bar  = Math.min(100, Math.max(0, score));
-        return '<tr>'
-          + '<td style="color:var(--t1);padding:8px 12px;">' + esc(name) + '</td>'
-          + '<td style="padding:8px 12px;width:140px;"><div style="background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + App.scoreColor(score) + ';border-radius:3px;"></div></div></td>'
-          + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(score) + ';padding:8px 12px;">' + score + '</td>'
-          + (diff != null ? '<td style="font-size:12px;color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';padding:8px 12px;">' + (diff >= 0 ? '+' : '') + diff + '</td>' : '<td></td>')
-          + '</tr>';
-      }).join('');
-
-      latestCard = '<div class="card" style="margin-bottom:16px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b2);flex-wrap:wrap;gap:10px;">'
-        + '<div>'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Bar Cop Audit</div>'
-        + '<div style="font-size:16px;font-weight:700;color:var(--w);">' + esc(latest.bar_name || App.data.settings.bar_name || 'Your Operation') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div>'
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:56px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (overallNA ? 'N/A' : latest.overall_score) + '</div>'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + scoreLabel + '</div>'
-        + '<button class="btn btn-ghost btn-sm bca-view-btn" data-idx="0">View Full Audit</button>'
-        + '</div>'
-        + '</div>'
-        + progressBanner
-        + (sectionRows ? '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
-          + '<thead><tr>'
-          + '<th style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Section</th>'
-          + '<th style="width:140px;padding:6px 12px;border-bottom:1px solid var(--b2);"></th>'
-          + '<th style="width:60px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Score</th>'
-          + (prev ? '<th style="width:70px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:6px 12px;border-bottom:1px solid var(--b2);">Change</th>' : '<th></th>')
-          + '</tr></thead><tbody>' + sectionRows + '</tbody></table>' : '')
-        + '</div>';
-    }
-
-    const emptyState = !latest && enough
-      ? '<div class="empty"><div class="empty-title">No Audits Yet</div>'
-        + '<div class="empty-sub">Generate your first Bar Cop Audit above. Sub-scores, exposures, and recurring patterns appear once the snapshot is built.</div></div>'
-      : '';
-
-    let historyCard = '';
-    if (audits.length > 1) {
-      const rows = audits.slice(0, App.listLimit('core', 'bar_cop_audit')).map((a, i) => {
-        const p    = audits[i + 1];
-        const naA  = a.overall_score == null;
-        const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
-        return '<tr>'
-          + '<td>' + (a.date || '').slice(0, 10) + '</td>'
-          + (naA
-              ? '<td style="font-size:11px;font-weight:800;color:var(--t3);">N/A</td>'
-              : '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score) + ';">' + a.overall_score + '</td>')
-          + (diff != null ? '<td style="color:' + (diff >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (diff >= 0 ? '+' : '') + diff + ' pts</td>' : '<td></td>')
-          + '<td>' + (a.exposures ? a.exposures.length : 0) + '</td>'
-          + '<td>' + (a.patterns ? a.patterns.length : 0) + '</td>'
-          + '<td><button class="btn btn-ghost btn-sm bca-view-btn" data-idx="' + i + '" style="font-size:10px;padding:4px 10px;">View</button></td>'
-          + '</tr>';
-      }).join('');
-      historyCard = '<div class="card">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Audit History</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Full history kept. Print any audit to save as PDF.</div>'
-        + '</div>'
-        + '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Exposures</th><th>Patterns</th><th></th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('core', 'bar_cop_audit', audits, false)
-        + '</div>';
-    }
-
-    let scoreChart = '';
-    if (audits.length >= 2) {
-      scoreChart = this._renderScoreChart(audits);
-    }
-
-    this.container.innerHTML = '<div class="screen">' + requestCard + (latest ? latestCard : emptyState) + scoreChart + historyCard + '</div>';
+    this.container.innerHTML = '<div class="screen">'
+      + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
+      + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : (enough ? AuditUI.emptyState() : ''))
+      + (latest ? AuditUI.scoreChart(audits, 'Bar Cop Score History') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
+      + '</div>';
 
     // Landing has no screen-specific topbar actions.
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -984,74 +870,10 @@ S.HubBarCopAudit = {
     if (audit) this._renderDetail(audit);
   },
 
-  // Audit score history chart. Mirrors the audit-tracker renderScoreChart
-  // pattern so the visual matches across all four audits.
-  _renderScoreChart(audits) {
-    const sorted = audits.slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    const W = 700, H = 180, PAD = { t: 24, r: 20, b: 36, l: 40 };
-    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
-    const scores = sorted.map(a => a.overall_score == null ? null : a.overall_score);
-    const validScores = scores.filter(v => v != null);
-    const minY = validScores.length ? Math.max(0, Math.min(...validScores) - 10) : 0;
-    const maxY = validScores.length ? Math.min(100, Math.max(...validScores) + 10) : 100;
-    const xs = i => PAD.l + (sorted.length > 1 ? (i / (sorted.length - 1)) * cw : cw / 2);
-    const ys = v => PAD.t + ch - ((v - minY) / (maxY - minY || 1)) * ch;
-
-    const smoothPath = pts => {
-      const valid = pts.map((v, i) => v != null ? { x: xs(i), y: ys(v) } : null).filter(Boolean);
-      if (valid.length < 2) return valid.length === 1 ? 'M' + valid[0].x + ',' + valid[0].y : '';
-      let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
-      for (let i = 1; i < valid.length; i++) {
-        const cp = (valid[i].x - valid[i - 1].x) * 0.35;
-        d += ' C' + (valid[i - 1].x + cp).toFixed(1) + ',' + valid[i - 1].y.toFixed(1) + ' ' + (valid[i].x - cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
-      }
-      return d;
-    };
-    const areaPath = pts => {
-      const valid = pts.map((v, i) => v != null ? { x: xs(i), y: ys(v) } : null).filter(Boolean);
-      if (valid.length < 2) return '';
-      let d = 'M' + valid[0].x.toFixed(1) + ',' + ys(minY).toFixed(1) + ' L' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
-      for (let i = 1; i < valid.length; i++) {
-        const cp = (valid[i].x - valid[i - 1].x) * 0.35;
-        d += ' C' + (valid[i - 1].x + cp).toFixed(1) + ',' + valid[i - 1].y.toFixed(1) + ' ' + (valid[i].x - cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
-      }
-      d += ' L' + valid[valid.length - 1].x.toFixed(1) + ',' + ys(minY).toFixed(1) + ' Z';
-      return d;
-    };
-
-    const ticks = [minY, Math.round((minY + maxY) / 2), maxY].filter((v, i, a) => a.indexOf(v) === i);
-    const uid  = 'bcasc' + Math.random().toString(36).slice(2, 6);
-    const linePath = smoothPath(scores);
-    const fillPath = areaPath(scores);
-    const xLabels  = sorted.map((a, i) =>
-      '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (a.date || '').slice(0, 7) + '</text>'
-    ).join('');
-    const dots = sorted.map((a, i) => {
-      const v   = a.overall_score;
-      if (v == null) return '';   // no dot for an N/A audit
-      const col = App.scoreHex(v);
-      return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(v).toFixed(1) + '" r="5" fill="#0A1520" stroke="' + col + '" stroke-width="2.5"/>'
-        + '<text x="' + xs(i).toFixed(1) + '" y="' + (ys(v) - 10).toFixed(1) + '" text-anchor="middle" fill="' + col + '" font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="700">' + v + '</text>';
-    }).join('');
-
-    return '<div class="card" style="margin-bottom:16px;padding:20px 24px 16px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Bar Cop Score History</div>'
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
-      + '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
-      + ticks.map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l - 6) + '" y="' + (ys(v) + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + Math.round(v) + '</text>').join('')
-      + (fillPath ? '<path d="' + fillPath + '" fill="url(#' + uid + ')"/>' : '')
-      + (linePath ? '<path d="' + linePath + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' : '')
-      + dots + xLabels
-      + '</svg></div>';
-  },
-
   // ── Render: single audit detail (single-page layout) ────────────────────
   _renderDetail(audit) {
     this._viewingId = audit.id;
     const overallNA = audit.overall_score == null;
-    const overall = overallNA ? null : audit.overall_score;
-    const scoreColor = overallNA ? 'var(--t3)' : App.scoreColor(overall);
-    const scoreLabel = overallNA ? 'Not Enough Data Yet' : App.scoreLabel(overall);
 
     const SUB_NAMES = [
       ['operational_discipline',  'Operational Discipline'],
@@ -1114,10 +936,13 @@ S.HubBarCopAudit = {
             + '</div>';
         }).join('')
       : '<div style="padding:18px 0;font-size:12px;color:var(--t3);line-height:1.6;">No operational exposures flagged this month. Operation is clean across the cross-system checks.</div>';
-    const exposureCard = '<div class="card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Top Operational Exposures</div>'
-      + exposureRows
-      + '</div>';
+    // The Top Operational Exposures heading carries the Bar Cop Outlook + Export
+    // PDF, the way the recovery audits' Action Items area does.
+    const exposureCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Top Operational Exposures</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><div id="bca-outlook-mount"></div><button class="btn btn-ghost btn-sm bca-export-btn">Export PDF</button></div>'
+      + '</div>'
+      + '<div class="card" style="margin-bottom:14px;">' + exposureRows + '</div>';
 
     // Recurring Patterns section
     const patterns = audit.patterns || [];
@@ -1162,48 +987,33 @@ S.HubBarCopAudit = {
       + 'Open each for fix detail.'
       + '</div>';
 
-    // Detail page. No in-content action row: Back to Dashboard lives in the
-    // topbar (sidebar stays mounted so re-entering audit history is one
-    // click on the sidebar). Print / Save PDF lives in topbar-right.
+    const naNote = overallNA
+      ? '<div style="font-size:11px;color:var(--t3);margin:-6px 0 16px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and Labor Control and the overall fills in.</div>'
+      : '';
+
+    // Detail page. The shared AuditUI.viewHero gives the same header as the three
+    // recovery audits; Top Operational Exposures (this audit's "what to act on")
+    // leads, followed by the six sub-scores, then Recurring Patterns and the
+    // Recovery Activity Snapshot.
     this.container.innerHTML = '<div class="screen">'
-
-      // Header card (mirrors recovery audit detail pattern, single-page layout)
-      + '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-      +   '<div>'
-      +     '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Bar Cop Audit</div>'
-      +     '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name || (App.data?.settings?.bar_name) || 'Your Operation') + '</div>'
-      +     '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + this._fmtDate(audit.date) + '</div>'
-      +   '</div>'
-      +   '<div style="text-align:right;">'
-      +     '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Operational Health</div>'
-      +     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:72px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (overallNA ? 'N/A' : overall) + '</div>'
-      +   '</div>'
-      + '</div>'
-      + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
-      +   '<div style="flex:1;min-width:240px;">'
-      +     '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin-bottom:2px;">' + esc(scoreLabel) + (overallNA ? '' : ' Operational Health') + '</div>'
-      +     (overallNA ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and Labor Control and the overall fills in.</div>' : App.scoreBar(overall))
-      +   '</div>'
-      +   '<div id="bca-outlook-mount" style="flex-shrink:0;"></div>'
-      + '</div>'
-      + '</div>'
-
-      + refLine
-      + subCards
+      + AuditUI.viewHero(audit, 'Bar Cop Audit')
+      + naNote
       + exposureCard
+      + subCards
       + patternCard
+      + refLine
       + recoveryCard
-
       + '</div>';
 
-    // Print button lives in the Hub topbar-right, mirroring how module
-    // audit screens put their Print action in topbar-right.
+    // Back to the audit landing + Print / Save PDF in the Hub topbar-right,
+    // matching the recovery audits' detail action row.
     if (App.setHubTopbarActions) {
-      App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="bca-print-top">Print / Save PDF</button>');
+      App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="bca-back-top" style="margin-right:8px;">&larr; Back</button><button class="btn btn-ghost btn-sm" id="bca-print-top">Print / Save PDF</button>');
+      document.getElementById('bca-back-top')?.addEventListener('click', () => this.renderMain());
       document.getElementById('bca-print-top')?.addEventListener('click', () => this.exportPDF(audit));
     }
 
+    this.container.querySelector('.bca-export-btn')?.addEventListener('click', () => this.exportPDF(audit));
     this.container.querySelectorAll('.bca-nav').forEach(btn => {
       btn.addEventListener('click', () => this._navTo(btn.dataset.screen));
     });
