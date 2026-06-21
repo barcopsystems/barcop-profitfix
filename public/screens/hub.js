@@ -317,14 +317,6 @@ S.Hub = {
     const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
     // ── UI builders ──
-    const ring = (score, size) => {
-      if (score == null) return `<div style="width:${size}px;height:${size}px;border-radius:50%;border:3px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;"><span style="font-size:8px;color:var(--t4);text-align:center;line-height:1.2;">No<br>Data</span></div>`;
-      const r = (size/2)-5, circ = 2*Math.PI*r, dash = (Math.min(score,100)/100)*circ, col = softScore(score);
-      return `<div style="position:relative;width:${size}px;height:${size}px;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3.5"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="3.5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><span style="font-size:15px;font-weight:800;color:${col};">${score}</span></div></div>`;
-    };
-
-    const panelTitle = (t) => `<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;flex-shrink:0;">${t}</div>`;
-    const titleWithSub = (t, sub) => `<div style="margin-bottom:10px;flex-shrink:0;"><div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">${t}</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">${sub}</div></div>`;
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
 
     // Heading-outside panel (matches the Control + Recovery dashboards): the
@@ -368,7 +360,7 @@ S.Hub = {
       + '</div>'
       + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
       + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
+             anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
              anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
       + statDiv
       + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
@@ -487,10 +479,6 @@ S.Hub = {
         ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
       </div>${shWrapClose}`;
 
-    // recoveryTotal is computed above the tiles now (used by the Recovery
-    // Scoreboard top card). The old recoveryPanel/middleColumn vars below are
-    // left defined but no longer rendered in the grid.
-
     // Setup catch-up banner — shows above the dashboard whenever the Hub
     // Getting Started checklist is incomplete. One click opens the checklist
     // so the operator can pick up where they left off. Hides at 100% done.
@@ -506,20 +494,6 @@ S.Hub = {
         + '<button class="btn btn-ghost btn-sm hub-catchup-x" type="button">Dismiss</button>'
         + '</div>'
       : '';
-    const fixLog = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    const oldestFix = fixLog.map(e => e.date).filter(Boolean).sort()[0];
-    const sinceTxt = oldestFix
-      ? ' since ' + new Date(oldestFix + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      : '';
-    const recoveryPanel = `<div style="${PANEL}">${panelTitle('Recovery Scoreboard')}
-      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;gap:6px;">
-        ${recoveryTotal.dollars > 0
-          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-0.01em;">${App.fmtCurrency(recoveryTotal.dollars, 0)}<span style="font-size:14px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> recovered</span></div>
-             <div style="font-size:11px;color:var(--t3);">across ${recoveryTotal.fixes} measured fix${recoveryTotal.fixes === 1 ? '' : 'es'} in Profit, Revenue, and Traffic${sinceTxt}</div>`
-          : `<div style="font-size:12px;color:var(--t3);line-height:1.55;">Mark fixes implemented in any recovery system and the running total recovered shows here.</div>`
-        }
-      </div></div>`;
-
     // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
     // and a 22px number so each tile fits in the shorter container that now
     // shares the middle column with the Recovery Scoreboard above it.
@@ -531,10 +505,6 @@ S.Hub = {
       </div>`).join('');
     const metricsPanel = `${shWrapOpen('Key Metrics', '14px')}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div>${shWrapClose}`;
-
-    // Middle column stacks Recovery Scoreboard on top and Key Metrics below,
-    // 50/50 split so the metric tiles get a usable but compact footprint.
-    const middleColumn = `<div style="display:grid;grid-template-rows:1fr 1fr;gap:18px;min-height:0;">${recoveryPanel}${metricsPanel}</div>`;
 
     // Alerts panel — focal headline up top (big red count if alerts exist,
     // big green check + "All Clear" headline if not), then the alert rows
@@ -562,9 +532,8 @@ S.Hub = {
         +   'item' + (alerts.length===1?'':'s') + ' to address'
         +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
         + '</div></div>';
-      const holdingHtml = '';   // removed: the "N metrics holding the line" counter
       alertsPanel = `${shWrapOpen('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${alertRows}</div>${holdingHtml}${shWrapClose}`;
+        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${alertRows}</div>${shWrapClose}`;
     } else {
       const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
         + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -724,7 +693,6 @@ S.Hub = {
     // two list cards feel like a pair.
     const actionBody = topItems.length
       ? topItems.map((it,i) => {
-          const isLast = i === topItems.length - 1;
           const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '-';
           const modBadgeColors = {
             Profit:  { c: 'var(--t3)', bg: 'transparent' },
@@ -946,7 +914,7 @@ S.Hub = {
         .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
-        .hub-app .hd-row:hover{background:rgba(255,255,255,0.03);}
+        .hub-app .hd-row:hover{background:var(--hover);}
         .hub-app .hd-arow{background:#0D181E;}
         .hub-app .hd-arow:hover{background:#0F1A21;}
         @media (max-width:768px){.hub-app .hub-stat-div{display:none;}}
