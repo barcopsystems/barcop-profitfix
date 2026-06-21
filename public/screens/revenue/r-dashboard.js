@@ -54,7 +54,7 @@ S.RevenueDashboard = {
             emptyText: 'Run your first Revenue Audit for a baseline across check average, menu mix, server performance, and labor efficiency.'
           })))
       + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
-      + this.buildInitiativesCard()
+      + InitiativeTracker.card('revenue')
       + DashUI.quickActions([
           { go: 'r-this-week', label: 'Enter This Week' },
           { go: 'r-audit', label: 'Run Revenue Audit' },
@@ -66,7 +66,7 @@ S.RevenueDashboard = {
     FixPanel.wireFixAreas(container);
     DashUI.wireQuick(container);
     document.getElementById('r-insights-btn')?.addEventListener('click', () => this.showInsights());
-    this.wireInitiatives(container);
+    InitiativeTracker.wire('revenue', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
   },
 
   // This Week vs Target — latest confirmed week's check average, labor cost, and
@@ -151,178 +151,6 @@ S.RevenueDashboard = {
         ])
       + '</div>';
     DashUI.wireQuick(container);
-  },
-
-  // ── Initiative Tracker ─────────────────────────────────────────────────
-  // Operator-typed revenue experiments. Each captures start date, what changed,
-  // and which metric to watch; Bar Cop computes the 8-week-before vs 8-week-after
-  // average of the watched metric and shows the lift. Distinct from the Recovery
-  // Scoreboard (audit-action-item fixes) — this tracks revenue experiments.
-  INITIATIVE_TYPES: ['Menu Change', 'Promotion', 'Service Change', 'Operational Change', 'Other'],
-  INITIATIVE_METRICS: [
-    { key: 'revenue',    label: 'Total Revenue (weekly)' },
-    { key: 'covers',     label: 'Covers (weekly)' },
-    { key: 'check_avg',  label: 'Check Average' },
-    { key: 'labor_pct',  label: 'Labor % (lower is better)' }
-  ],
-
-  initiatives() {
-    if (!Array.isArray(App.data.initiatives)) App.data.initiatives = [];
-    return App.data.initiatives;
-  },
-
-  _metricFor(week, key) {
-    if (!week) return null;
-    if (key === 'revenue')   return (parseFloat(week.bar_revenue) || 0) + (parseFloat(week.floor_revenue) || 0);
-    if (key === 'covers')    return parseFloat(week.covers) || 0;
-    if (key === 'check_avg') return parseFloat(week.check_avg) || 0;
-    if (key === 'labor_pct') return parseFloat(week.labor_pct_blended) || 0;
-    return null;
-  },
-
-  _measureInitiative(init) {
-    // Sort ascending by period_end so the before/after slices pick the weeks
-    // adjacent to the start date (the array loads date-DESC from the event store).
-    const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end)
-      .sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
-    const sd = init.start_date;
-    if (!sd) return { before: null, after: null, lift: null, weeksAfter: 0 };
-    const before = weeks.filter(w => w.period_end < sd).slice(-8);
-    const after  = weeks.filter(w => w.period_end >= sd).slice(0, 8);
-    const avg = arr => {
-      const vals = arr.map(w => this._metricFor(w, init.metric)).filter(v => v != null && !isNaN(v));
-      if (!vals.length) return null;
-      return vals.reduce((s, v) => s + v, 0) / vals.length;
-    };
-    const beforeAvg = avg(before);
-    const afterAvg  = avg(after);
-    const lift = (beforeAvg != null && afterAvg != null) ? (afterAvg - beforeAvg) : null;
-    return { before: beforeAvg, after: afterAvg, lift, weeksAfter: after.length };
-  },
-
-  buildInitiativesCard() {
-    const all = this.initiatives();
-    const fmtDate = d => { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-    const active = all.filter(i => i.status === 'Active');
-    const closed = all.filter(i => i.status !== 'Active');
-
-    const formatLift = (lift, metric) => {
-      if (lift == null) return '<span style="color:var(--t4);">no data yet</span>';
-      const isLowerBetter = metric === 'labor_pct';
-      const positive = isLowerBetter ? lift < 0 : lift > 0;
-      const color = positive ? 'var(--gold)' : (lift === 0 ? 'var(--t2)' : 'var(--red)');
-      const fmt = (metric === 'revenue' || metric === 'check_avg') ? App.fmtCurrency(lift) : (metric === 'covers' ? lift.toFixed(0) : lift.toFixed(1) + '%');
-      return '<span style="color:' + color + ';font-weight:700;">' + (lift >= 0 ? '+' : '') + fmt + '</span>';
-    };
-
-    const activeRows = active.length ? active.map(i => {
-      const m = this._measureInitiative(i);
-      const metricLabel = (this.INITIATIVE_METRICS.find(x => x.key === i.metric) || {}).label || i.metric;
-      const windowMsg = m.weeksAfter < 2 ? 'Measuring (week ' + m.weeksAfter + ' of 8)' : m.weeksAfter + ' weeks in';
-      const fmtV = v => v == null ? '-' : (i.metric === 'revenue' || i.metric === 'check_avg' ? App.fmtCurrency(v) : i.metric === 'covers' ? Math.round(v) : v.toFixed(1) + '%');
-      return '<div style="border-top:1px solid var(--b2);padding:12px 20px;">'
-        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(i.name) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);">' + esc(i.type || '') + ' &middot; started ' + esc(fmtDate(i.start_date)) + ' &middot; ' + esc(windowMsg) + '</div>'
-        + '</div>'
-        + (i.hypothesis ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + esc(i.hypothesis) + '</div>' : '')
-        + '<div style="display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;align-items:baseline;">'
-        + '<div style="font-size:11px;color:var(--t3);">Watching: <span style="color:var(--t1);">' + esc(metricLabel) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">Before: <span style="color:var(--t1);">' + fmtV(m.before) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">After: <span style="color:var(--t1);">' + fmtV(m.after) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">Lift: ' + formatLift(m.lift, i.metric) + '</div>'
-        + '<div style="margin-left:auto;display:flex;gap:6px;">'
-        + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Mark Complete</button>'
-        + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Delete</button>'
-        + '</div></div></div>';
-    }).join('') : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">No active initiatives. Start one when you launch a new menu item, run a promotion, or make a service change you want to measure.</div>';
-
-    const closedRows = closed.length ? '<div style="padding:8px 20px 4px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);border-top:1px solid var(--b2);">Completed</div>'
-      + closed.slice().reverse().slice(0, 5).map(i => {
-        const m = this._measureInitiative(i);
-        return '<div style="padding:8px 20px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--b2);font-size:11px;">'
-          + '<span style="color:var(--t2);flex:1;">' + esc(i.name) + '</span>'
-          + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
-          + '<span>' + formatLift(m.lift, i.metric) + '</span>'
-          + '<button class="btn btn-ghost btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
-          + '</div>';
-      }).join('') : '';
-
-    return '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<div style="padding:14px 20px;display:flex;align-items:center;justify-content:flex-end;">'
-      + '<button class="btn btn-ghost btn-sm" id="init-add">+ Start Initiative</button>'
-      + '</div>'
-      + activeRows + closedRows + '</div>';
-  },
-
-  wireInitiatives(container) {
-    document.getElementById('init-add')?.addEventListener('click', () => this.showInitiativeForm());
-    container.querySelectorAll('.init-complete').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const i = this.initiatives().find(x => x.id === btn.dataset.id);
-        if (!i) return;
-        i.status = 'Completed';
-        i.completed_at = new Date().toISOString();
-        await App.saveKey('initiatives');
-        this.render(container, document.getElementById('topbar-actions') || document.createElement('div'));
-      });
-    });
-    container.querySelectorAll('.init-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const ok = await App.confirmDelete();
-        if (!ok) return;
-        App.data.initiatives = this.initiatives().filter(x => x.id !== btn.dataset.id);
-        await App.saveKey('initiatives');
-        this.render(container, document.getElementById('topbar-actions') || document.createElement('div'));
-      });
-    });
-  },
-
-  showInitiativeForm() {
-    const typeOpts = this.INITIATIVE_TYPES.map(t => '<option>' + esc(t) + '</option>').join('');
-    const metricOpts = this.INITIATIVE_METRICS.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + '</option>').join('');
-    const today = App.todayLocal();
-    const body = '<div class="card form-card narrow-form" style="margin:0;">'
-      + '<div class="card-title">Start Initiative</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Name</label><input type="text" id="init-name" placeholder="New Cocktail Menu"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Start Date</label><input type="date" id="init-date" value="' + today + '"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f" style="width:180px;"><label>Type</label><select id="init-type">' + typeOpts + '</select></div>'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Watch Metric</label><select id="init-metric">' + metricOpts + '</select></div>'
-      + '</div>'
-      + '<div class="f" style="width:100%;"><label>What you changed (optional)</label><textarea class="notes-ta" id="init-hyp" rows="2" placeholder="Launched 6 new cocktails Aug 1, expecting a check average lift"></textarea></div>'
-      + '<div class="card-actions">'
-        + '<button type="button" id="init-save" class="btn btn-primary">Start Initiative</button>'
-        + '<button type="button" id="init-cancel" class="btn btn-ghost">Cancel</button>'
-        + '<span id="init-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-    App.openModal(body, { id: 'init-modal', maxWidth: 540, noClose: true });
-    document.getElementById('init-cancel').addEventListener('click', () => App.closeModal('init-modal'));
-    document.getElementById('init-save').addEventListener('click', async () => {
-      const name = document.getElementById('init-name')?.value.trim();
-      const date = document.getElementById('init-date')?.value;
-      const err = document.getElementById('init-err');
-      const fail = msg => { if (err) { err.textContent = msg; err.style.display = 'inline'; } };
-      if (!name) { fail('Name is required.'); return; }
-      if (!date) { fail('Start date is required.'); return; }
-      this.initiatives().push({
-        id: App.uid(),
-        name,
-        start_date: date,
-        type: document.getElementById('init-type')?.value || 'Other',
-        metric: document.getElementById('init-metric')?.value || 'revenue',
-        hypothesis: document.getElementById('init-hyp')?.value.trim() || '',
-        status: 'Active',
-        created_at: new Date().toISOString()
-      });
-      await App.saveKey('initiatives');
-      App.closeModal('init-modal');
-      const c = this.container || document.getElementById('content-area') || document.querySelector('.content');
-      const a = document.getElementById('topbar-actions') || document.createElement('div');
-      if (c) this.render(c, a);
-    });
   },
 
   // Bar Cop Insights — a written read on the recent revenue + labor trend.
