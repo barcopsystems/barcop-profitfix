@@ -90,6 +90,7 @@ S.FlowMap = {
     App.openHubFullPage('Blueprint', (mount) => {
       this.container = mount;
       this._sel = null;
+      this._scrollLeft = 0;
       this.render();
     }, 'flowmap');
   },
@@ -145,12 +146,22 @@ S.FlowMap = {
       + edgeEls + colTitles + nodeEls + '</svg>';
 
     this.container.innerHTML = '<div class="screen" style="max-width:none;">'
-      + '<div class="card" style="padding:16px 18px;margin-bottom:14px;overflow-x:auto;">' + svg + '</div>'
+      + '<div class="card fm-scroll" style="padding:16px 18px;margin-bottom:14px;overflow-x:auto;">' + svg + '</div>'
       + this.panelHtml(sel)
       + '</div>';
 
+    // Re-render rebuilds the card, which resets its horizontal scroll. Restore the
+    // position captured on click so tapping a node does not jump you back to the left.
+    const scroller = this.container.querySelector('.fm-scroll');
+    if (scroller && this._scrollLeft) scroller.scrollLeft = this._scrollLeft;
+
     this.container.querySelectorAll('.fm-node').forEach(g =>
-      g.addEventListener('click', () => { this._sel = (this._sel === g.dataset.node) ? null : g.dataset.node; this.render(); }));
+      g.addEventListener('click', () => {
+        const sc = this.container.querySelector('.fm-scroll');
+        this._scrollLeft = sc ? sc.scrollLeft : 0;
+        this._sel = (this._sel === g.dataset.node) ? null : g.dataset.node;
+        this.render();
+      }));
     const goBtn = this.container.querySelector('#fm-go');
     if (goBtn) goBtn.addEventListener('click', () => this.goTo(goBtn.dataset.go, goBtn.dataset.action));
   },
