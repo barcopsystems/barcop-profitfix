@@ -399,9 +399,9 @@ S.HubSettings = {
     // Recipes are built further down, once ic_products exists — see
     // "── Recipes" after the Inventory Control block.
 
-    // ── 52 Weeks of Data — derived from the locked Anchor profile ──
+    // ── 13 Weeks of Data (the first 90 days on Bar Cop) — from the Anchor profile ──
     // Every figure traces to window.ANCHOR so Profit, Revenue and the Control
-    // modules all describe one operation. Week 1 is oldest, week 52 most recent.
+    // modules all describe one operation. Week 1 is oldest, week 13 most recent.
     // Align the seeded weeks to the app's Sunday week-ending (This Week steps by
     // Sundays via nextSunday), so This Week loads each saved week instead of
     // re-deriving it from Control. sunOff = today's weekday (0=Sun..6=Sat); the
