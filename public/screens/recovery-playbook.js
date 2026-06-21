@@ -1142,6 +1142,405 @@ S.RecoveryPlaybook = {
           ]
         }
       ]
+    },
+
+    traffic: {
+      label: 'Traffic',
+      intro: 'The strategic read behind your Traffic Fix System. The Fix screens tell you what to do this week. This is the why behind it: where your online presence leaks the guests who are already searching, what each gap quietly costs, and the exact Bar Cop screen that captures, measures, and closes it. Traffic runs on your online numbers and screenshots, not your Control data, so you enter or import them and Bar Cop does the rest.',
+      sections: [
+        {
+          id: 'worth', nav: 'What It Costs You', eyebrow: 'What an invisible online presence costs',
+          title: 'The Guests You Never See',
+          blocks: [
+            { t: 'lead', text: 'There is a guest searching for a bar right now in your neighborhood, on a phone, looking at the map results. Your listing shows up with no photos, an incomplete profile, and a 3.9 rating with six unanswered reviews. The bar two blocks away has 47 photos, a 4.4 with a response on every review, and a website that loaded in two seconds with a reservation button. The guest does not know your food is better. They decided in eight seconds on what they could see. That happens dozens of times a week and never shows on the P&L. It just shows up as a table that was never seated.' },
+            { t: 'p', text: 'A bar without a real online presence captures only 60 to 80 percent of the traffic already searching for it. On 750,000 a year, closing half of that gap is 37,000 to 75,000 in business you were already in line for. It is not a marketing problem, it is a visibility problem, and a system is what fixes it.' },
+            { t: 'box', tone: 'gold', label: 'The stakes', title: 'A fifth to a third of your searching guests never choose you', text: 'On a million-dollar bar that is 50,000 to 80,000 a year, captured by the bar with the more complete profile, the faster site, and the fresher reviews. These are illustrative ranges, not a promise. Your real number is whatever Bar Cop measures once you start.' },
+            { t: 'h', text: 'The Four Gaps a Searching Guest Sees' },
+            { t: 'p', text: 'None of it feels urgent because nothing obviously broke. The profile just sat there, slowly working against you, while you wondered why a good month was quiet.' },
+            { t: 'table',
+              head: ['The gap', 'What the guest sees', 'Illustrative cost'],
+              rows: [
+                ['Google profile', 'Incomplete fields, stale photos, unanswered questions. The signal of an inactive business.', 'Most of your local-search discovery, gone'],
+                ['Website', 'Slow on a phone, a PDF menu, no reservation button. The click bounces back to Google.', 'Most mobile visitors leave before the menu loads'],
+                ['Reviews', 'A lower rating and fewer recent reviews than the bar three blocks away.', 'Guests pick the listing that looks more trusted'],
+                ['Email', 'No list, so every first visit depends on the guest deciding to come back alone.', 'The one channel you own, never built']
+              ] },
+            { t: 'h', text: 'What 90 Days Looks Like' },
+            { t: 'p', text: 'A worked example, not a promise. A bar doing about 900,000 a year, busy most weekends, good food. The Google profile is 55 percent complete by the platform own score. The website was last updated years ago. Zero email list. A 4.1 rating with 28 unanswered reviews from the last six months. Not a struggling bar, a bar leaving a real share of its traffic on the table because none of it felt urgent. Here is the arc the first 90 days tends to follow.' },
+            { t: 'table',
+              head: ['Metric', 'Where it stood', 'Day 90'],
+              rows: [
+                ['Google profile', '55% complete', '100%, profile views up sharply'],
+                ['Reviews', '0% answered, 3.9 rating', 'Every review answered, 4.3 rating'],
+                ['Website', '9 seconds on mobile, 74% bounce', '2.4 seconds, bounce nearly halved'],
+                ['Email list', '0 subscribers', '380, first campaign drove 41 covers on a Tuesday']
+              ],
+              note: 'Day 1 is always the same. The profile is worse than the owner thought. That is not a problem with the bar. It is the first accurate picture it has had of its digital presence.' },
+            { t: 'p', text: 'Week one: the profile goes to 100 percent, holiday hours fixed, photos added, two posts up. Weeks two and three: the website hero image is compressed, the phone number moves into the mobile header, the PDF menu is replaced, a Reserve button goes in, and the review backlog gets answered. By day 90 profile views are up several hundred percent, the rating has climbed, the site loads in under three seconds, and an email list that started at zero is driving covers on a slow Tuesday. No new ad spend. The same building, a digital presence that finally makes it easy to choose you.' },
+            { t: 'box', tone: 'steel', title: 'The guests are deciding right now', text: 'They are comparing your profile to the bar three blocks away and noticing nobody has answered a review in eight months. The only question is whether your online presence makes it easy to choose you or easy to choose someone else. That is the whole job Bar Cop does here.' }
+          ]
+        },
+        {
+          id: 'timeline', nav: 'The First 90 Days', eyebrow: 'What to expect and when',
+          title: 'Recovery Has a Timeline',
+          blocks: [
+            { t: 'p', text: 'The first 30 days are foundation, not results. You complete the Google profile, audit the website and fix the top few things, set the review-response standard, and clear the backlog. No traffic increase yet. You fixed what was broken and laid the base.' },
+            { t: 'p', text: 'Days 30 to 60 are early signals: profile views rise as the completed listing ranks better, review velocity picks up once you ask, and the social calendar replaces inspiration. Days 60 to 90 the systems activate: delivery listings optimized, citations consistent, the email list past a few hundred with the first campaign sent. The full presence is now visible to a searching guest.' },
+            { t: 'table',
+              head: ['Phase', 'What is happening', 'What to expect'],
+              rows: [
+                ['Days 1-30', 'Profile completed, website audited and fixed, review backlog cleared', 'No traffic increase yet. Foundation laid, broken things fixed.'],
+                ['Days 30-60', 'Profile ranking better, review velocity up, social on a calendar', 'Profile views up, new-guest calls increasing, rating moving'],
+                ['Days 60-90', 'Delivery optimized, citations consistent, first email campaign sent', 'Delivery discovery up, email driving return visits'],
+                ['Day 90+', 'All seven systems on a weekly rhythm, monthly scorecard', 'Compounding traffic as each system reinforces the others']
+              ],
+              note: 'The most common place it breaks is weeks three to six, after the first push is done but before the weekly rhythm is habit. Review responses slip, the post does not go out. Bar Cop tracks whether each system is still running and flags the moment one starts slipping, so it restarts before the habit dies.' }
+          ]
+        },
+        {
+          id: 'diagnostic', nav: 'Traffic Diagnostic', eyebrow: 'Traffic diagnostic',
+          title: 'How Findable Are You Right Now?',
+          blocks: [
+            { t: 'lead', text: 'Ten questions. Yes or no, no partial credit. If it is somewhere between, that is a No. The system is either running this week or it is not.' },
+            { t: 'p', text: 'Most operators can tell you last Saturday revenue to the dollar. Ask the completeness score on the Google profile and it gets quiet. Ask the last time anyone answered a review and the subject changes. Ask the mobile bounce rate and it has never been checked. That gap, between what you know and what the guest sees before they decide, is where this diagnostic lives. The monthly figure next to each No is an illustrative example of what that gap commonly costs, not your number.' },
+            { t: 'diag', items: [
+              { n: 1, cost: '$1,400', q: 'Is your Google Business Profile 100 percent complete, with current hours, photos updated in the last 90 days, and at least two posts live in the last 30?',
+                yes: 'Every field is filled, hours are accurate including holidays, photos were refreshed within 90 days, and you have posted at least twice this month.',
+                no: 'Your profile is partially complete, maybe with stale hours, few photos, and no recent posts. Guests who find you see an incomplete profile that reads as an inactive business.' },
+              { n: 2, cost: '$1,200', q: 'Does your website load in under 3 seconds on mobile, show your phone and address above the fold, and have a working reservation or order link on the home page?',
+                yes: 'It scores under 3 seconds on mobile, your contact info is visible without scrolling, and a guest can act from the home page without hunting.',
+                no: 'It is slow on a phone, the contact info takes scrolling to find, or there is no clear action. Most guests searching on a phone leave before they see your content.' },
+              { n: 3, cost: '$900', q: 'Do you respond to every Google review within 48 hours with a personalized reply that addresses what they actually wrote?',
+                yes: 'Every review, good or bad, gets a response within 48 hours that uses the name and references something specific.',
+                no: 'Reviews go unanswered, or you reply only to the good ones. Unanswered reviews tell both guests and Google nobody is managing the business.' },
+              { n: 4, cost: '$1,600', q: 'Do you appear in the Google Maps top 3 for at least two searches a new guest in your neighborhood would actually run?',
+                yes: 'You have checked your real ranking for at least two high-intent local searches, you are in the top 3 for both, and you track it weekly.',
+                no: 'You have never checked your real ranking for the searches guests run, or you know you are not in the top 3 for any neighborhood search. The top 3 takes most of the clicks.' },
+              { n: 5, cost: '$800', q: 'Do you post on at least one social platform three times a week with content that shows the actual experience inside your bar, not just promo graphics?',
+                yes: 'You post at least three times a week with a mix of experience content, video, and timely updates that show the space, the team, and what it feels like to be there.',
+                no: 'You post irregularly, mostly promo graphics, or not at all. Content that does not show the experience does not drive new guests through the door.' },
+              { n: 6, cost: '$1,100', q: 'Are you listed on at least two delivery platforms with current photos, accurate hours, and a menu that matches what you actually serve right now?',
+                yes: 'You are live on at least two platforms with current photos, accurate hours, and no discontinued items on the menu.',
+                no: 'You are not on delivery, or the listings have old photos, wrong hours, or dead menu items. Delivery platforms are discovery platforms now.' },
+              { n: 7, cost: '$1,300', q: 'Do you have a guest email list with at least 300 active subscribers, and have you sent a campaign in the last 30 days?',
+                yes: 'You collect emails at multiple touchpoints, your list has at least 300 recent opt-ins, and you sent a campaign this month.',
+                no: 'You have no list, a small dormant one, or you collect addresses but never send. Email is the only channel where you own the audience.' },
+              { n: 8, cost: '$700', q: 'Is your name, address, and phone identical across Google, Yelp, Facebook, and your website, with no variations in spelling or format?',
+                yes: 'Every listing uses the exact same name, address format, and phone. No abbreviations on some and spelled out on others, no old numbers anywhere.',
+                no: 'Your listing details vary across platforms. That inconsistency directly suppresses your local search ranking.' },
+              { n: 9, cost: '$1,000', q: 'Do you have a written process for asking guests for a review at the moment of highest satisfaction, with at least one staff member trained on it this month?',
+                yes: 'You have a written ask process, it specifies when and how, and you trained at least one staff member on it in the last 30 days.',
+                no: 'You rely on happy guests to review on their own. Without an active ask, velocity stalls and your rating drifts down against competitors who do ask.' },
+              { n: 10, cost: '$600', q: 'Do you review your profile insights, website clicks, and review count every week against the prior week?',
+                yes: 'You have a Monday tracking review where you check profile views, calls, directions, website visits, and review count against last week.',
+                no: 'You check these occasionally or never. Without weekly tracking you cannot see whether your work is paying off or whether something broke on your profile.' }
+            ] },
+            { t: 'diagscore' },
+            { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
+              'Your Google profile has at least three incomplete fields suppressing your local ranking right now.',
+              'Your website loads slower on a phone than you think, and most guests who click your link leave before it finishes.',
+              'At least four reviews from the last six months have gone unanswered, and every guest who reads them notices.',
+              'Your best guests would give you their email if you asked correctly, and you have never built a way to ask.',
+              'The bar ranking above you in Maps for your neighborhood is not better than you. They just have a more complete profile and more recent reviews.'
+            ] }
+          ]
+        },
+        {
+          id: 'what', nav: 'What Bar Cop Does', eyebrow: 'What Bar Cop does for you',
+          title: 'Every Gap: Captured, Measured, Closed',
+          blocks: [
+            { t: 'lead', text: 'The old way was a folder full of spreadsheets and a vague sense your online presence needed work. Bar Cop runs it for you. You log your online numbers in the Online Tracker and This Week, by hand or by dropping in a screenshot, Bar Cop diagnoses where the searching guest is slipping away, and the Fix System walks you into the exact screen that closes it.' },
+            { t: 'p', text: 'Here is the map. Every gap, where you capture it, where Bar Cop shows it to you, and where you fix it. Tap any Fix button to jump straight there.' },
+            { t: 'cross', rows: [
+              { leak: 'Google profile', capture: 'Online Tracker profile fields', show: 'Traffic dashboard + Audit', fixLabel: 'Google Business system', screen: 't-fix', focus: 'gbp' },
+              { leak: 'Website', capture: 'Online Tracker website check', show: 'Traffic dashboard', fixLabel: 'Website system', screen: 't-fix', focus: 'website' },
+              { leak: 'Reviews', capture: 'This Week rating and review counts', show: 'Traffic dashboard', fixLabel: 'Reviews system', screen: 't-fix', focus: 'reviews' },
+              { leak: 'Search and SEO', capture: 'Online Tracker search, citations, NAP', show: 'Traffic dashboard', fixLabel: 'Search and SEO system', screen: 't-fix', focus: 'search-seo' },
+              { leak: 'Social media', capture: 'Online Tracker + This Week social numbers', show: 'Traffic dashboard', fixLabel: 'Social Media system', screen: 't-fix', focus: 'social' },
+              { leak: 'Delivery platforms', capture: 'Online Tracker + This Week delivery numbers', show: 'Traffic dashboard', fixLabel: 'Delivery Platforms system', screen: 't-fix', focus: 'delivery' },
+              { leak: 'Email', capture: 'Online Tracker list size + This Week growth', show: 'Traffic dashboard', fixLabel: 'Email Marketing system', screen: 't-fix', focus: 'email-loyalty' }
+            ] },
+            { t: 'p', text: 'The paper a system still needs lives inside it too. The GBP checklist and photo brief, the review response templates and recovery protocol, the keyword worksheet, the social standards, the delivery comparison, and the email templates all download right from the step that calls for them in your Traffic Fix System. And on This Week you can drop in a screenshot of your platform dashboards and Bar Cop reads the numbers off it.' },
+            { t: 'p', text: 'You do not read the numbers alone either. Bar Cop Outlook writes a plain-language narrative on every audit, and Bar Cop Insights reads your trend on the Traffic dashboard, so the story behind the numbers is already written for you.' }
+          ]
+        },
+        {
+          id: 'benchmarks', nav: 'Benchmarks', eyebrow: 'Benchmarks',
+          title: 'The Numbers to Run Against',
+          blocks: [
+            { t: 'p', text: 'These are your reference points. Bar Cop measures against them for you every week, but know them cold. Find the metric, know your target, and know the line where a number turns into a problem.' },
+            { t: 'h', text: 'Google Business and Local Search' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'Common cause'],
+              rows: [
+                ['GBP completeness', '100%', '85-99%', 'Under 85%', 'Every incomplete field reduces local pack ranking'],
+                ['Total photos', '40+', '20-39', 'Under 20', 'Profiles with 40+ photos get more click-throughs'],
+                ['Photos added, last 90 days', '5+', '2-4', '0-1', 'Photo recency is a ranking activity signal'],
+                ['GBP posts, last 30 days', '4+', '2-3', '0-1', 'Posts signal active management'],
+                ['Local pack ranking', 'Top 3', '4-7', '8+', 'Top 3 takes over 75% of clicks; position 4+ under 10%']
+              ] },
+            { t: 'h', text: 'Website Conversion' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'Common cause'],
+              rows: [
+                ['Mobile load time', 'Under 3s', '3-5s', 'Over 5s', 'Most mobile visitors leave if load exceeds 3 seconds'],
+                ['Mobile bounce rate', 'Under 40%', '40-60%', 'Over 60%', 'The page is not answering what the search promised'],
+                ['Click-to-call rate', '8-15%', '4-7%', 'Under 4%', 'Phone not above the fold or not tap-to-call'],
+                ['Reservation link clicks', '6-12%', '3-5%', 'Under 3%', 'CTA not above the fold or the path has too many steps']
+              ] },
+            { t: 'h', text: 'Reviews and Reputation' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'Common cause'],
+              rows: [
+                ['Average Google rating', '4.3+', '4.0-4.2', 'Under 4.0', 'Under 4.0 drops inquiry conversion vs a 4.3+ competitor'],
+                ['Review response rate', '100%', '70-99%', 'Under 70%', 'Unanswered reviews signal a business nobody manages'],
+                ['Review response time', 'Under 24h', '24-48h', 'Over 48h', 'Response time feeds guest perception and ranking'],
+                ['New reviews, last 30 days', '8+', '4-7', 'Under 4', 'Review velocity is a ranking signal']
+              ] },
+            { t: 'h', text: 'Social and Email' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'Common cause'],
+              rows: [
+                ['Social posting frequency', '3+/week', '1-2/week', 'Under 1/week', 'Algorithms deprioritize accounts posting under 3x a week'],
+                ['Experience content ratio', '60%+', '40-59%', 'Under 40%', 'Promo content alone does not drive new-guest visits'],
+                ['Email list size, active', '500+', '200-499', 'Under 200', 'Under 200 produces unreliable campaign data'],
+                ['Email open rate', '28%+', '18-27%', 'Under 18%', 'Subject line problems or list quality']
+              ] }
+          ]
+        },
+        {
+          id: 'connect', nav: 'How It Connects', eyebrow: 'How the systems connect',
+          title: 'Seven Systems, One Front Door',
+          blocks: [
+            { t: 'p', text: 'These are not independent fixes. A complete Google profile that sends traffic to a slow website loses most of those visitors before they act. A high review count with no response standard tells the next guest nobody is managing the place. A social following with no email capture builds an audience on a platform you do not own. Each system produces the visibility that makes the next one worth doing.' },
+            { t: 'p', text: 'The systems are sequenced on purpose. Google Business comes first because most new-guest discovery for a bar starts there, and every other system produces better results once the profile sending traffic is complete and ranking. Each one feeds the next.' },
+            { t: 'parts', items: [
+              { label: 'System 1', name: 'Google Business', desc: 'Complete every field, post weekly. The single highest-return action in this system.', focus: 'gbp' },
+              { label: 'System 2', name: 'Website', desc: 'If your profile sends them to a slow site with a PDF menu, the visit is lost.', focus: 'website' },
+              { label: 'System 3', name: 'Reviews', desc: 'Rating, velocity, and response rate. All three drive ranking and the decision.', focus: 'reviews' },
+              { label: 'System 4', name: 'Search and SEO', desc: 'Own your neighborhood searches. NAP consistency and citations are the base.', focus: 'search-seo' },
+              { label: 'System 5', name: 'Social Media', desc: 'Experience content drives walk-ins. Promo graphics drive likes. Not the same thing.', focus: 'social' },
+              { label: 'System 6', name: 'Delivery Platforms', desc: 'Discovery, not just orders. A delivery guest becomes a dine-in regular.', focus: 'delivery' },
+              { label: 'System 7', name: 'Email Marketing', desc: 'The one channel you own. No algorithm can take it away.', focus: 'email-loyalty' }
+            ] },
+            { t: 'box', tone: 'gold', label: 'The logic in plain language', text: 'Google Business and local search get you found. The website and reviews decide whether the guest who found you chooses you. Social and delivery widen the discovery. Email is the only channel that brings them back on your terms. Start with Google Business. Every other system produces more once the profile sending the traffic is complete and ranking.' },
+            { t: 'go', label: 'Traffic Fix System', screen: 't-fix', focus: 'gbp' }
+          ]
+        },
+        {
+          id: 't1', nav: 'System 1: Google Business', eyebrow: 'System 1 - where discovery starts',
+          title: 'Google Business',
+          blocks: [
+            { t: 'lead', text: 'A bar owner in Phoenix, 68 seats, solid following, open four years. A regular stopped in to ask why Google said they were permanently closed. She pulled up her profile right there at the bar. Permanently closed. She had no idea, and it had been showing that for six weeks. Six weeks of guests who searched, saw permanently closed, and went somewhere else. No notification, nobody told her. The listing just sat there saying the wrong thing while she wondered why October was slow.' },
+            { t: 'p', text: 'For an independent bar, most new-guest discovery starts on Google Maps, and the three results at the top of the map take over 75 percent of the clicks. Everything below position three gets under 10 percent combined. The guests searching are already in buying mode, already deciding where to go. A complete, photo-rich, active profile with a strong rating is the most efficient conversion tool you have, and it costs nothing to finish.' },
+            { t: 'p', text: 'Complete every field. Get to 40-plus photos and refresh at least five every 90 days. Post weekly with a photo, because a post without one gets half the click-through. Seed the questions section with the ten things guests actually ask. An incomplete profile is not neutral, it is a profile that has been quietly working against you for months while you assumed it was fine because nothing obviously broke.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker holds your profile field-by-field with a completeness read, so you see exactly what is missing. You log your weekly profile views, calls, and direction requests in This Week, by hand or from a screenshot, and the Traffic dashboard and Audit grade where you stand.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Google Business system', screen: 't-fix', focus: 'gbp' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Complete every field: name, categories, hours including holidays, phone, website, attributes, menu link.',
+              'Get to 40-plus photos across interior, bar, food, cocktails, team, and exterior. Add five every 90 days.',
+              'Post at least twice a month, every post with a photo.',
+              'Seed the questions section with the ten things guests ask, and answer new ones within 24 hours.',
+              'Every Monday, read profile views, calls, and direction requests against last week.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/GBP_Checklist.pdf', label: 'GBP Optimization Checklist' },
+              { file: 'traffic/Photo_Brief_25_Shots.pdf', label: 'Photo Brief, 25 Shots' },
+              { file: 'traffic/GBP_Yelp_Description_Template.docx', label: 'Description Template' }
+            ] }
+          ]
+        },
+        {
+          id: 't2', nav: 'System 2: Website', eyebrow: 'System 2 - open the door you got them to',
+          title: 'Website and Online Menu',
+          blocks: [
+            { t: 'lead', text: 'A bar in Austin, 90 seats, a beautiful website, professionally designed, gorgeous on a desktop. We ran a mobile speed test: nine seconds to load, 74 percent bounce on mobile. Three of every four people who clicked the link from Google left before the home page finished loading. The bar was paying for a website that worked as a filter, eliminating most of its mobile traffic before they ever saw a menu, a phone number, or a way to reserve.' },
+            { t: 'p', text: 'Your website is where your Google profile sends its clicks. Two-thirds or more of that traffic is on a phone, and a guest on a phone has four questions: are you open, where are you, can I reserve, what is the menu. If those are not answered in about eight seconds, a big share of guests bounce back to the search results, and your competitor is one tap away.' },
+            { t: 'p', text: 'The fix is rarely a rebuild. Compress the images, put a tap-to-call number in the mobile header, replace the PDF menu with a web-readable page, and add a Reserve button above the fold. A PDF menu is a conversion failure: slow on a phone, impossible to read without pinching, and invisible to Google. Those few changes often move the page from losing half its mobile visitors to keeping most of them, in one afternoon.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker carries your website conversion check, the handful of things that decide whether a phone visitor stays. You log the weekly numbers in This Week, and the Traffic dashboard grades the trend.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Website system', screen: 't-fix', focus: 'website' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Run a mobile speed test on your home and menu page. Target under 3 seconds.',
+              'Compress every image to a few hundred KB. This alone moves the score the most.',
+              'Put a tap-to-call number, the address, and today hours above the fold on mobile.',
+              'Replace the PDF menu with a web-readable page. Google cannot index a PDF.',
+              'Add one clear action above the fold: Reserve a Table, Order Online, or View Menu.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Website_Conversion_Audit.pdf', label: 'Website Conversion Audit' },
+              { file: 'traffic/Website_Copy_CTA_Standards.docx', label: 'Website Copy and CTA Standards' }
+            ] }
+          ]
+        },
+        {
+          id: 't3', nav: 'System 3: Reviews', eyebrow: 'System 3 - rating, velocity, response',
+          title: 'Reviews and Reputation',
+          blocks: [
+            { t: 'lead', text: 'A bar in Denver, 4.2 rating, 180 reviews, solid reputation. A competitor three blocks away: 4.4, 340 reviews. Same neighborhood, similar concept and price. When guests compared the two listings side by side, they almost always chose the competitor. Not because the competitor was better, but because 340 reviews at 4.4 looked more trustworthy than 180 at 4.2. The Denver bar had not asked a single guest for a review in six months. The competitor had a written process and got 12 to 15 a month. The gap was not quality. It was process.' },
+            { t: 'p', text: 'Rating is what guests see when they compare you. Velocity is what Google sees when it decides which listings to surface, because recent activity is a prominence signal and a stale review profile reads as a less active business. Response rate counts too: an owner who answers every review, including the good ones, signals a business that is actively managed.' },
+            { t: 'p', text: 'The ask works at the moment of highest satisfaction, when a guest tells a server the food was great, not when the bill arrives. A trained server asking with specific language converts several times better than a card alone. And asking guests to leave a review sounds transactional, while saying you would really appreciate hearing about their experience on Google sounds like a genuine request. For a bad review, a calm four-sentence reply, acknowledge, address the specific issue, state your standard, invite them back, protects the rating in front of every future reader.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You log your rating and new-review counts in This Week, by hand or from a screenshot, and the Traffic dashboard tracks your velocity and response rate against target so a slip shows up the same week.' },
+            { t: 'go', label: 'This Week', screen: 't-this-week' },
+            { t: 'go', label: 'Reviews system', screen: 't-fix', focus: 'reviews' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Respond to every review, good or bad, within 48 hours, using the name and a specific detail.',
+              'Put a written ask in place and train the floor to ask at the moment a guest is clearly happy.',
+              'Track new-review velocity weekly. Below target, find the shift with the lowest ask compliance.',
+              'Answer a negative review in four calm sentences: acknowledge, address, state your standard, invite them back.',
+              'Ask Google first. Yelp filters reviews from accounts with no history.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Review_Response_Templates.pdf', label: 'Review Response Templates' },
+              { file: 'traffic/Review_Request_Script_Card.pdf', label: 'Review Request Script Card' },
+              { file: 'traffic/Negative_Review_Recovery_Protocol.docx', label: 'Negative Review Recovery Protocol' }
+            ] }
+          ]
+        },
+        {
+          id: 't4', nav: 'System 4: Search and SEO', eyebrow: 'System 4 - own your neighborhood',
+          title: 'Search Visibility and SEO',
+          blocks: [
+            { t: 'lead', text: 'A bar in Chicago, strong concept, good profile, ranking number one for best bar Chicago in organic search. The owner was proud of it. We pulled the searches that actually drove first visits: 85 percent were neighborhood-specific, bar Wicker Park, cocktails near Wicker Park, happy hour Wicker Park. For those, they were not in the top ten. They had spent a year optimizing for a vanity search almost no real customer ran, and ignored the neighborhood searches that drove nearly all their new traffic.' },
+            { t: 'p', text: 'Local SEO is not about ranking for the broadest terms. It is about being findable for the specific searches a new guest in your neighborhood runs on a phone deciding where to go tonight. The map pack, the three results above the blue links, takes about three times the clicks of the organic results. Position one of the local pack is worth more than position one organic for a bar.' },
+            { t: 'p', text: 'Two levers you control: relevance (your categories, description, and attributes) and prominence (reviews plus citations). A citation is any mention of your name, address, and phone, and Google uses how many and how consistent as a proxy for how established you are. The variations that hurt most are the ones that seem trivial: Street versus St, Suite versus Ste, a phone with dashes versus parentheses. Each tells Google two different businesses may be at that address, and splits the ranking credit instead of consolidating it.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker holds your search and citation checklist, your name-address-phone consistency, and your neighborhood keyword tracking, so you see which terms are moving and which directories still need claiming.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Search and SEO system', screen: 't-fix', focus: 'search-seo' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Pick your ten target searches: the neighborhood and occasion terms a new guest actually runs.',
+              'Make your name, address, and phone identical across every platform. Fix every variant.',
+              'Build toward 40 directory citations with consistent details. Claim Foursquare early, it feeds others.',
+              'Merge any duplicate Google or Yelp listings that split your review credit.',
+              'Check your ranking for the ten terms weekly from your own neighborhood.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Keyword_Research_Worksheet.docx', label: 'Keyword Research Worksheet' },
+              { file: 'traffic/Platform_Claiming_Checklist.docx', label: 'Local SEO Quick-Start' }
+            ] }
+          ]
+        },
+        {
+          id: 't5', nav: 'System 5: Social Media', eyebrow: 'System 5 - show what it feels like',
+          title: 'Social Media and Content',
+          blocks: [
+            { t: 'lead', text: 'A bar manager in Nashville, 90 seats, spending four hours a week on Instagram. Over six months her followers grew from 1,400 to 1,900. Nobody on the team could point to one new guest who came in because of a post. The content was professional and consistent, and it was built entirely on promo graphics, menu announcements, and drink specials. Nothing showed what it felt like to be in the bar.' },
+            { t: 'p', text: 'Social for a bar is not a brand exercise or a follower campaign, it is a decision-influencing tool. The post that drives a Saturday visit is almost always a video of the room on a busy night or a close-up of a cocktail worth ordering, not a graphic announcing the Tuesday special. You have two audiences: regulars who already know you, and potential guests who never heard of you. Promo content gets engagement from the regulars. Experience content gets shared to people who have never visited.' },
+            { t: 'p', text: 'The highest-reach post most bars can make is a 60-second walkthrough on a busy Friday, phone vertical, no narration. It shows guests exactly what they are missing. Run a simple mix of three experience posts to one promo to one community post a week, hand a content captain on each shift a short shot list, and track profile visits, link clicks, and shares, not likes. Likes are vanity. Shares are discovery.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker holds your social profile audit and your posting cadence, and you log the weekly numbers that matter, profile visits and link clicks, in This Week. The Traffic dashboard shows which content is actually driving guests.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Social Media system', screen: 't-fix', focus: 'social' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Post at least three times a week, at least 60 percent of it experience content, not promo graphics.',
+              'Lead with video: a 60-second busy-night walkthrough outperforms any graphic you can design.',
+              'Run a 3-1-1 week: three experience, one promo, one community post.',
+              'Name a content captain each shift with a short shot list so the clips actually get captured.',
+              'Track profile visits, link clicks, and shares. Likes do not bring anyone in.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Social_Content_Brief.pdf', label: 'Social Content Calendar' },
+              { file: 'traffic/Social_Media_Content_Standards.docx', label: 'Social Standards Policy' }
+            ] }
+          ]
+        },
+        {
+          id: 't6', nav: 'System 6: Delivery', eyebrow: 'System 6 - a discovery storefront',
+          title: 'Delivery Platforms',
+          blocks: [
+            { t: 'lead', text: 'A bar in Seattle, listed on three delivery platforms. Two profiles had photos from 2020 showing a menu that no longer existed. Its rating on one platform had dropped to 3.7 without the owner noticing, because nobody was checking it. The platform fault was accepting the order. The bar fault was not catching it four months earlier.' },
+            { t: 'p', text: 'Delivery platforms are live, rated, reviewed digital storefronts that run independent of your website and your profile, and they are now discovery channels, not just order channels. A guest who finds you on delivery, orders once with a good experience, and then comes in is worth far more than a single order. A listing with current photos and a 4.3-plus rating is an acquisition channel for dine-in guests. A listing with 2020 photos and a 3.7 rating deters both.' },
+            { t: 'p', text: 'The delivery menu is a separate product, not a copy of the in-house one. Commission compresses your margin, so it is usually 40 to 60 percent of the full menu, curated for margin at commission and for travel quality. An item that makes money but arrives looking nothing like the photo earns a bad review that describes the restaurant. And every delivery bag is a marketing touchpoint: a small card with your photo, address, and a QR code turns a delivery order into a future visit.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker holds your platform listing audit, photos, hours, menu, rating, and you log your weekly ratings and order volume in This Week so a rating drop shows up before it costs you a month.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Delivery Platforms system', screen: 't-fix', focus: 'delivery' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Audit every platform: current photos, accurate hours, no discontinued items, a description on every item over 12 dollars.',
+              'Build the delivery menu for margin at commission and travel quality, not as a copy of the full menu.',
+              'Respond to every platform review the same way you do on Google.',
+              'Check every platform dashboard weekly for rating and order volume. A rating drifts to 3.7 unnoticed.',
+              'Put a card in every delivery bag with your photo and a QR to reserve or join the list.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Delivery_Platform_Comparison.docx', label: 'Delivery Platform Comparison' },
+              { file: 'traffic/Online_Menu_Audit.pdf', label: 'Delivery Menu Builder' }
+            ] }
+          ]
+        },
+        {
+          id: 't7', nav: 'System 7: Email', eyebrow: 'System 7 - the channel you own',
+          title: 'Email Marketing',
+          blocks: [
+            { t: 'lead', text: 'A bar in Boston, 3,800 Instagram followers, 290 email subscribers. A slow Tuesday in February, they sent one email: we miss you, here is what is new. Three sentences about a new cocktail, the live music Friday, and a note that Tuesday and Wednesday were quiet if they wanted a table. No discount. Forty-one covers came in that Tuesday, tracked because they asked every table. Their Instagram post that same day got 84 likes and zero covers. The channel with thirteen times fewer followers drove every person who walked in.' },
+            { t: 'p', text: 'Social gives you reach: your post might appear if the algorithm shows it and someone is scrolling. Email gives you access: you land in the inbox, with permission, at a time you choose. Every other system in this playbook is about the first visit. Email is the system that brings them back, and it is the one digital asset you own outright. No algorithm can interrupt it, no platform can de-prioritize it.' },
+            { t: 'p', text: 'Capture at multiple touchpoints, the server ask and event signup convert highest, the table card and receipt are easiest to systematize. Write the monthly email in the owner voice, first person, under 200 words, one real detail and one invitation, signed with a name, not a marketing newsletter. Send once or twice a month, never the burst-and-silence cycle. Segment regulars from new guests, and clean the list every 90 days so your sends keep landing in the primary inbox.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Online Tracker holds your list size and your active capture touchpoints, and you log weekly subscriber growth in This Week, so a touchpoint that stops producing shows up fast.' },
+            { t: 'go', label: 'Online Tracker', screen: 't-presence' },
+            { t: 'go', label: 'Email Marketing system', screen: 't-fix', focus: 'email-loyalty' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Turn on at least two capture touchpoints this week: a table card and a receipt insert at minimum.',
+              'Set up a two-email welcome sequence before the first subscriber joins.',
+              'Send one owner-voice email a month, under 200 words, one detail and one invitation, signed with a name.',
+              'Send once or twice a month. Never four times in two weeks and then silence.',
+              'Clean the list every 90 days: re-engage non-openers, then remove them so your open rate holds.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'traffic/Email_Campaign_Templates.docx', label: 'Email Campaign Templates' },
+              { file: 'traffic/Guest_Email_Capture.pdf', label: 'Email List Building Playbook' }
+            ] }
+          ]
+        },
+        {
+          id: 't8', nav: 'System 8: Keep It Running', eyebrow: 'System 8 - make it survive a busy week',
+          title: 'Putting It In Place and Keeping It Running',
+          blocks: [
+            { t: 'lead', text: 'A bar owner in Portland, good instincts, strong team, motivated. She had read two operations guides before this one. Started both, highlighted, made lists, got through week one with real energy, abandoned both at week two. Not because the systems were wrong, but because neither told her in what order to do what, on what day, with what tool, assigned to whom. They told her what good looked like. They did not tell her how to get there from a Tuesday with a full bar and three things already on fire. Motivation lasts about ten days. A task list with names and dates does not expire.' },
+            { t: 'p', text: 'Most efforts fail around the 45-day mark, not week one. The Monday tracking review slides to Tuesday, the content captain role quietly disappears, the email send does not happen because nobody has anything to write. Each feels like a one-time exception. None of them are. The order matters: complete the Google profile before chasing citations, fix your name-address-phone before building new ones, set the review-response standard before pushing for more reviews.' },
+            { t: 'h', text: 'The first four weeks' },
+            { t: 'table', nowrap1: true,
+              head: ['Week', 'Focus', 'What goes live'],
+              rows: [
+                ['Week 1', 'Complete the foundation', 'Finish the Google profile, claim every directory, add photos, run the first post. Record your baselines.'],
+                ['Week 2', 'Audit and standardize', 'Audit the website, fix your name-address-phone everywhere, clear the review backlog, build the content calendar.'],
+                ['Week 3', 'Activate the channels', 'Fix the delivery listings, stand up the email list and capture, load your keywords, send the first email.'],
+                ['Week 4', 'Full run', 'All seven systems live: the Monday tracking review, posts on the calendar, reviews answered, the list growing.']
+              ],
+              note: 'The Monday tracking review is the system that runs the system. Twenty minutes before the week starts, it is the only thing that confirms the other six are producing. Block it as a non-movable appointment.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You do not track this on paper. The moment you do the first real step, your Traffic Fix System logs that day and measures from there. It reads your logged numbers and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a slow quiet you cannot explain. Your setup checklist lives in Getting Started.' },
+            { t: 'go', label: 'Traffic Fix System', screen: 't-fix', focus: 'gbp' },
+            { t: 'docs', items: [
+              { file: 'traffic/30Day_Traffic_Implementation.pdf', label: '30-Day Traffic Implementation' },
+              { file: 'traffic/90Day_Traffic_Growth_Roadmap.docx', label: '90-Day Traffic Growth Roadmap' }
+            ] }
+          ]
+        },
+        {
+          id: 'close', nav: 'Start Tonight', eyebrow: 'Start tonight',
+          title: 'The Guests Are Out There',
+          blocks: [
+            { t: 'lead', text: 'A bar in Minneapolis, 64 seats, good food, loyal regulars. Three months into the system. The Google profile was 54 percent complete when she started, at 100 by the end of week one. Profile views went from 340 a month to 1,140. Review velocity went from one or two a month to eleven. Rating moved from 4.1 to 4.4. The email list was zero in January and 380 in March. One Tuesday in February they emailed 290 subscribers and 41 people came in, more than the bar had ever done on a February Tuesday, and she could point to the exact email because her hosts asked. None of it was complicated. She just never had a system that made her look at these things every week.' },
+            { t: 'p', text: 'What separates bars that get found from bars that stay invisible is not location, concept, or budget. It is whether someone checked the profile this month, whether there are new photos, whether the reviews have responses, whether there is an email list with an actual send this week. None of it is complicated. All of it requires a system instead of a feeling.' },
+            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open the Online Tracker and run your Google profile completeness. Log your rating and review count in This Week. Check the rating on every delivery platform you are on. Then open your Traffic Fix System and do the first step, so Bar Cop logs the day and starts measuring what you capture.' },
+            { t: 'p', text: 'The guests are already searching. They are already choosing. This system makes sure they choose you.' },
+            { t: 'go', label: 'Traffic Fix System', screen: 't-fix', focus: 'gbp' }
+          ]
+        }
+      ]
     }
   }
 };
