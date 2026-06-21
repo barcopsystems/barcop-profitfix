@@ -284,7 +284,7 @@ S.TrafficFix = {
       + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div>'
       + this.measureLine(this.gap(this._workGap)) + '</div>';
 
-    const timelineLink = '<div style="margin:-4px 0 16px;"><button class="btn btn-ghost btn-sm pf-timeline">See Your Recovery Timeline</button></div>';
+    const timelineLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm pf-timeline">See Your Recovery Timeline</button><button class="btn btn-ghost btn-sm pf-playbook">Read the Traffic Playbook</button></div>';
 
     const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
     const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
@@ -297,6 +297,8 @@ S.TrafficFix = {
       t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
     this.container.querySelector('.pf-timeline')?.addEventListener('click', () =>
       App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'traffic'); }));
+    this.container.querySelector('.pf-playbook')?.addEventListener('click', () =>
+      { if (window.S && S.RecoveryPlaybook) S.RecoveryPlaybook.open('traffic'); });
     this.wireWorkspace();
   },
 
