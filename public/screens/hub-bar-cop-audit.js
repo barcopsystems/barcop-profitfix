@@ -830,7 +830,7 @@ S.HubBarCopAudit = {
     const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    const desc = 'Get a new audit every 30 days. Run first audit on day 30.';
+    const desc = 'Generate a new audit every 30 days. Run first audit on day 30.';
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
