@@ -2559,27 +2559,30 @@ S.HubSettings = {
     });
     App.shiftData.sc_checklists = scChecklists;
 
-    // Drawer reconciliations — variance tightens after the fix week.
+    // Drawer reconciliations — a drawer is counted at every close, so one variance
+    // record per operating day (that is how Bar Cop reads "drawer counted"). Most
+    // land within tolerance; the loose early weeks run wider over/short and tighten
+    // after the fixes. Cash counting is day-one discipline, so no adoption ramp.
     const scVariances = [];
     ANCHS.weeks.forEach(a => {
       const baseAgo = sunOff + ANCHS.endAgo(a);
       const improving = !a.loose;
-      [1, 4].forEach((dayOff, vi) => {
+      for (let di = 0; di < 7; di++) {
         const exp = 600 + Math.round(Math.random() * 350);
         const variance = improving
           ? Math.round((Math.random() - 0.55) * 12)
           : Math.round((Math.random() - 0.75) * 30);
         scVariances.push({
-          id:uid(), date:dateStr(baseAgo + dayOff), shift_type:'Close',
-          drawer_id: scDrawers[vi % scDrawers.length].id,
-          drawer:    scDrawers[vi % scDrawers.length].name,
-          cashier:mgrs[(a.wk + vi) % 3],
+          id:uid(), date:dateStr(baseAgo + 6 - di), shift_type:'Close',
+          drawer_id: scDrawers[di % scDrawers.length].id,
+          drawer:    scDrawers[di % scDrawers.length].name,
+          cashier:mgrs[(a.wk + di) % 3],
           source:'shift-close',
           expected_cash:exp, counted_cash:exp + variance, variance:variance,
           tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
           reason:'', notes:'', created_at:new Date().toISOString()
         });
-      });
+      }
     });
     App.shiftData.sc_variances = scVariances;
 
@@ -2851,6 +2854,12 @@ S.HubSettings = {
     ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
+
+    // Wage Policy — Texas state minimum wage (matches the federal $7.25). Drives
+    // the tip-credit check on Pay Periods and the Bar Cop Audit's wage-policy
+    // component (which reads as "not configured" until this is set).
+    if (!App.laborData.settings) App.laborData.settings = {};
+    App.laborData.settings.state_min_wage = 7.25;
 
     // Phase 0: wage_history captures every wage change so historical labor
     // cost reads correctly off the wage in effect on the entry date, not the
@@ -3537,51 +3546,23 @@ S.HubSettings = {
           { label: 'Void/comp concentration on Late Night shifts', detail: '11 events in last 90 days on Late Night. Pattern worth investigating.', screen: 'sc-void-comp' }
         ],
         { gaps: 7, fixesLogged: 4, dollarsRecovered: 1840, stillMeasuring: 2 }
-      ),
-      // ── Day 90 (1 day ago) — overall 71, the freshest read and the one the live
-      //    engine reproduces on the current seed. Discipline is high (procedures and
-      //    audits all current); cash, recovery, and reputation are still climbing.
-      bcaRec(1, 'BCA-2026-0017',
-        [85, 68, 72, 70, 64, 67],
-        [
-          [ d('Opening checklist completion', '22 opening checklists logged', 73),
-            d('Closing checklist completion', '20 closing checklists logged', 67),
-            d('Inventory counts completed', '3 of 4 expected weekly', 75),
-            d('Spot checks completed', '3 of 4 expected weekly', 75),
-            d('Shifts logged', '26 shifts in window', 87),
-            d('Profit Recovery audit on time', 'Current', 100),
-            d('Revenue Recovery audit on time', 'Current', 100),
-            d('Traffic Recovery audit on time', 'Current', 100),
-            d('Maintenance backlog cleared', '1 open over 14 days', 80) ],
-          [ d('Cash variance trend (lower is better)', '0.46% of revenue handled', 54),
-            d('Drawer counts per operating day', '18 counts on 24 operating days', 75),
-            d('Large void/comp authorization', '13 of 18 over $25 authorized', 72),
-            d('Cash drops on revenue days', '16 drops on 22 days over $500', 73) ],
-          [ d('Inventory counts on schedule', '3 of 4 expected weekly counts', 75),
-            d('Spot checks completed', '3 of 4 expected weekly', 75),
-            d('Vendor discrepancy resolution rate', '4 of 6 resolved in last 90 days', 67),
-            d('No discrepancies aging past 60 days', '1 open discrepancy aging', 80),
-            d('Spot check clean variance rate', '2 of 3 under $5 variance', 67) ],
-          [ d('Schedule adherence', '120 actual vs 118 scheduled hours', 58),
-            d('Callout frequency', '2 callouts in window', 58),
-            d('Overtime incidents under control', '1 shift over 40 hours', 60),
-            d('Certifications current', '0 expired, 2 expiring in 30 days', 50),
-            d('Coaching log activity', '5 coaching notes in last 90 days', 100),
-            d('Wage policy configured', 'State minimum wage set in Wage Policies', 100) ],
-          [ d('Acting on surfaced gaps', '8 fixes logged in last 30 days against 10 surfaced gaps', 80),
-            d('Fixes that produced movement', '6 of 13 logged fixes produced favorable movement', 46) ],
-          [ d('Weekly covers consistency', '8 weeks of revenue data (need 3+)', 70),
-            d('Weekly labor % consistency', '8 weeks of P&L data (need 3+)', 64),
-            d('Weekly pour cost % consistency', '8 weeks of P&L data (need 3+)', 66) ]
-        ],
-        [
-          { label: 'ServSafe Food Handler Certification expired 3 days ago', detail: 'For Hector M. Out of compliance now. Renew before this person works again.', severity: 'critical' },
-          { label: 'TABC (Texas) Certification expiring in 28 days', detail: 'For Jake T. Renew before lapse to stay compliant.', severity: 'warn' }
-        ],
-        [],
-        { gaps: 7, fixesLogged: 6, dollarsRecovered: 5630, stillMeasuring: 3 }
       )
     ];
+
+    // ── Day 90 (current) — generated by the LIVE engine on the seeded data, so
+    // every component line is true by construction (the seed-roundtrip rule). The
+    // engine only scores the current 30-day window, so the day-30 and day-60
+    // records above stay hand-authored history. Stamped to 1 day ago so it sits at
+    // the day-90 mark on the cadence; id fixed for a stable display.
+    if (window.S && S.HubBarCopAudit && S.HubBarCopAudit._computeAuditSnapshot) {
+      const bca90 = S.HubBarCopAudit._computeAuditSnapshot();
+      if (bca90) {
+        bca90.id = uid();
+        bca90.date = dateStr(1);
+        bca90.audit_id = 'BCA-2026-0017';
+        App.data.bar_cop_audits.push(bca90);
+      }
+    }
 
     await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
     App.updatePeriod();
