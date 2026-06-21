@@ -596,7 +596,8 @@ S.AuditTracker = {
     const cd  = { sources: [] };
 
     // Bar / food / prime cost — the weeks already derive from Control feeds
-    const weeks = (App.data.weeks || []).filter(w => w.period_end).slice(-4);
+    const weeks = (App.data.weeks || []).filter(w => w.period_end)
+      .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-4);
     if (weeks.length) {
       const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
         return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
