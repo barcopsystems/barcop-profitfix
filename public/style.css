@@ -192,6 +192,9 @@ input,select,textarea{color-scheme:dark;}
 }
 .nav-item:hover{background:var(--hover);}
 .nav-item.active{background:var(--nav-act);}
+/* Tappable leak-board rows (Where You're Leaking Now + the Fix-screen leak board). */
+.fp-fixarea{transition:background 0.12s;}
+.fp-fixarea:hover{background:var(--hover);}
 
 /* In collapsed mode center the icon */
 .app.sidebar-collapsed .nav-item{
