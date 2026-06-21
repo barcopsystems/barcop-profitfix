@@ -181,7 +181,10 @@ S.RevenueDashboard = {
   },
 
   _measureInitiative(init) {
-    const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end);
+    // Sort ascending by period_end so the before/after slices pick the weeks
+    // adjacent to the start date (the array loads date-DESC from the event store).
+    const weeks = (App.data.revenue_weeks || []).filter(w => w.period_end)
+      .sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
     const sd = init.start_date;
     if (!sd) return { before: null, after: null, lift: null, weeksAfter: 0 };
     const before = weeks.filter(w => w.period_end < sd).slice(-8);
@@ -199,6 +202,7 @@ S.RevenueDashboard = {
 
   buildInitiativesCard() {
     const all = this.initiatives();
+    const fmtDate = d => { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
     const active = all.filter(i => i.status === 'Active');
     const closed = all.filter(i => i.status !== 'Active');
 
@@ -219,7 +223,7 @@ S.RevenueDashboard = {
       return '<div style="border-top:1px solid var(--b2);padding:12px 20px;">'
         + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(i.name) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);">' + esc(i.type || '') + ' &middot; started ' + esc(i.start_date || '') + ' &middot; ' + esc(windowMsg) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);">' + esc(i.type || '') + ' &middot; started ' + esc(fmtDate(i.start_date)) + ' &middot; ' + esc(windowMsg) + '</div>'
         + '</div>'
         + (i.hypothesis ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + esc(i.hypothesis) + '</div>' : '')
         + '<div style="display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;align-items:baseline;">'
