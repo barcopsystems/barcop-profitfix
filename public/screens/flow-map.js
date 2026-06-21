@@ -17,6 +17,7 @@ S.FlowMap = {
     { key: 'control',  title: 'Capture' },
     { key: 'weekly',   title: 'Weekly' },
     { key: 'diagnose', title: 'Diagnose' },
+    { key: 'plan',     title: 'Plan' },
     { key: 'fix',      title: 'Fix & Measure' },
     { key: 'report',   title: 'Report' }
   ],
@@ -40,6 +41,12 @@ S.FlowMap = {
       what: 'Diagnoses online demand: reviews, Google Business, website, social, delivery, and email. It reads your weekly online numbers and screenshots rather than Control data, so nothing upstream feeds it.' },
     { id: 'bca', label: 'Bar Cop Audit', full: 'Bar Cop Audit', layer: 'diagnose', action: 'audit',
       what: 'The cross-system score. Reads all three Control sections and grades six areas: operational discipline, cash integrity, inventory execution, labor hygiene, recovery action, and operational consistency.' },
+    { id: 'profit-playbook', label: 'Profit Playbook', full: 'Profit Playbook', layer: 'plan', go: 'recovery-playbook',
+      what: 'The strategic read for Profit Recovery, sitting between the Profit Audit and the Profit Fix. Where margin leaks (pour cost, food cost, theft, vendor, prime), what each leak costs, and a link straight into the screen that fixes it. One of three: every Recovery section has its own.' },
+    { id: 'revenue-playbook', label: 'Revenue Playbook', full: 'Revenue Playbook', layer: 'plan', go: 'r-playbook',
+      what: 'The strategic read for Revenue Recovery, between the Revenue Audit and the Revenue Fix. Where the top line leaks (menu, pricing, labor productivity, check average) and the screen that closes each gap.' },
+    { id: 'traffic-playbook', label: 'Traffic Playbook', full: 'Traffic Playbook', layer: 'plan', go: 't-playbook',
+      what: 'The strategic read for Traffic Recovery, between the Traffic Audit and the Traffic Fix. Where your online presence leaks the guests already searching (Google Business, website, reviews, search, social, delivery, email) and the screen that closes each gap.' },
     { id: 'fix', label: 'Fix Process', full: 'The Fix Process', layer: 'fix', go: 'profit-fix',
       what: 'Turns each diagnosed gap into an ordered set of steps that deep-link into the exact screen that does the work. Mark a fix implemented to start measuring it.' },
     { id: 'scoreboard', label: 'Scoreboard', full: 'Recovery Scoreboard', layer: 'fix', go: 'dashboard',
@@ -68,9 +75,12 @@ S.FlowMap = {
     { from: 'this-week', to: 'profit',    desc: 'The saved week powers the Profit dashboard, the eight-week trend, and the live cost percentages.' },
     { from: 'this-week', to: 'scoreboard',desc: 'Weekly pour, food, and prime cost are the metrics the Scoreboard measures fixes against.' },
     { from: 'this-week', to: 'books',     desc: 'Weekly revenue, COGS, and labor feed Books and the Weekly P&L Brief.' },
-    { from: 'profit', to: 'fix',          desc: 'Audit gaps open the Fix Process for pour cost, food cost, theft, vendor, and prime.' },
-    { from: 'revenue', to: 'fix',         desc: 'Revenue gaps open their fix processes: pricing, menu, labor, events.' },
-    { from: 'traffic', to: 'fix',         desc: 'Traffic gaps open their fix processes: reviews, Google Business, website, social, delivery, and email.' },
+    { from: 'profit', to: 'profit-playbook',   desc: 'The Profit Audit flags the gaps; the Profit Playbook is the strategic read on pour cost, food cost, theft, vendor, and prime that sits between the audit and the fix.' },
+    { from: 'revenue', to: 'revenue-playbook', desc: 'The Revenue Audit flags the gaps; the Revenue Playbook is the strategic read on menu, pricing, labor, and check average.' },
+    { from: 'traffic', to: 'traffic-playbook', desc: 'The Traffic Audit flags the gaps; the Traffic Playbook is the strategic read on Google Business, website, reviews, search, social, delivery, and email.' },
+    { from: 'profit-playbook', to: 'fix',      desc: 'Its Go-to buttons open the Profit Fix to close each gap, plus the capture screens that feed it.' },
+    { from: 'revenue-playbook', to: 'fix',     desc: 'Its Go-to buttons open the Revenue Fix to close each gap, plus the screens that feed it.' },
+    { from: 'traffic-playbook', to: 'fix',     desc: 'Its Go-to buttons open the Traffic Fix to close each gap, plus the screens that feed it.' },
     { from: 'fix', to: 'scoreboard',      desc: 'Marking a fix implemented stamps the date and starts the eight-week before-and-after measurement.' },
     { from: 'scoreboard', to: 'hub',      desc: 'Recovered dollars across all three Recovery sections roll up to the Hub.' },
     { from: 'bca', to: 'hub',             desc: 'The Bar Cop Audit score and top exposures surface on the Hub Dashboard.' }
@@ -86,8 +96,8 @@ S.FlowMap = {
 
   render() {
     const NODES = this.NODES, EDGES = this.EDGES, LAYERS = this.LAYERS;
-    const W = 1180, H = 600, NW = 146, NH = 52, top = 70, usable = H - top - 24;
-    const colX = c => 40 + c * 238;
+    const W = 1280, H = 600, NW = 132, NH = 52, top = 70, usable = H - top - 24;
+    const colX = c => 36 + c * 208;
 
     const pos = {};
     LAYERS.forEach((L, ci) => {
@@ -123,8 +133,8 @@ S.FlowMap = {
 
     const nodeEls = NODES.map(n => {
       const p = pos[n.id], isSel = sel === n.id, dim = sel && !connected.has(n.id);
-      const fill = isSel ? '#151C1C' : '#0B141C';
-      const stroke = isSel ? '#504829' : '#1d3340';
+      const fill = isSel ? '#151C1C' : '#070E15';
+      const stroke = isSel ? '#504829' : '#16252E';
       return '<g class="fm-node" data-node="' + n.id + '" style="cursor:pointer;opacity:' + (dim ? '0.28' : '1') + ';">'
         + '<rect x="' + p.x + '" y="' + p.y.toFixed(1) + '" width="' + NW + '" height="' + NH + '" rx="8" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1"/>'
         + '<text x="' + (p.x + NW / 2) + '" y="' + (p.y + NH / 2 + 4).toFixed(1) + '" text-anchor="middle" fill="#E8EDF0" font-family="Barlow,system-ui,sans-serif" font-size="12.5" font-weight="600">'
