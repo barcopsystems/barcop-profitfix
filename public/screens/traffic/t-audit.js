@@ -19,7 +19,7 @@ S.TrafficAudit = {
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 30;
     const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'Get a new audit every 30 days. Run first audit on day 1.';
+    const desc = 'Generate a new audit every 30 days. Run first audit on day 1.';
     const SECTION_NAMES = ['Google Business', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
