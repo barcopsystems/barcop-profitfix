@@ -1131,6 +1131,21 @@ S.HubSettings = {
     });
     App.data.revenue_server_checks = rSC;
 
+    // ── Revenue Initiative Tracker — operator-typed experiments, each watching a
+    // metric that genuinely moved across the recovery arc, so the 8-week-before vs
+    // 8-week-after lift computes to a real, believable number (a win, in gold).
+    // Mid-window start dates give each one weeks on both sides of the change.
+    App.data.initiatives = [
+      { id:uid(), name:'New Cocktail Menu', start_date:dateStr(45), type:'Menu Change', metric:'check_avg',
+        hypothesis:'Launched eight new craft cocktails to lift the bar check average.', status:'Active', created_at:daysAgoISO(45) },
+      { id:uid(), name:'Tighter Weeknight Scheduling', start_date:dateStr(52), type:'Operational Change', metric:'labor_pct',
+        hypothesis:'Cut one floor position Monday through Wednesday and cross-trained the bar to the well.', status:'Active', created_at:daysAgoISO(52) },
+      { id:uid(), name:'Weeknight Happy Hour Extension', start_date:dateStr(31), type:'Promotion', metric:'revenue',
+        hypothesis:'Pushed happy hour to 7pm Tuesday through Thursday to lift weeknight revenue.', status:'Active', created_at:daysAgoISO(31) },
+      { id:uid(), name:'Daily Pre-Shift Briefings', start_date:dateStr(70), type:'Service Change', metric:'check_avg',
+        hypothesis:'Added a daily pre-shift upsell briefing on every dinner shift.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(8) }
+    ];
+
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote
