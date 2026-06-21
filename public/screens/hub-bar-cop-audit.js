@@ -835,7 +835,6 @@ S.HubBarCopAudit = {
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : (enough ? AuditUI.emptyState() : ''))
-      + (latest ? AuditUI.scoreChart(audits, 'Bar Cop Score History') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
       + '</div>';
 
