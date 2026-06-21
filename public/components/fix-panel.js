@@ -214,7 +214,7 @@ window.FixPanel = {
     const BAND = { over:{label:'Over',color:'var(--red)'}, watch:{label:'Watch',color:'var(--amber)'}, ok:{label:'On target',color:'var(--gold)'} };
     const rank = e => (e.band === 'ok') ? 2 : (e.hasMetric && e.dollars > 0) ? 0 : 1;
     entries.sort((a,b) => rank(a) - rank(b) || b.dollars - a.dollars);
-    return entries.map((e,i) => {
+    const rows = entries.map((e,i) => {
       const b = BAND[e.band] || BAND.over;
       const last = i === entries.length - 1;
       const right = (e.hasMetric && e.dollars > 0)
@@ -228,6 +228,8 @@ window.FixPanel = {
         + '<div style="display:flex;align-items:center;gap:9px;min-width:0;"><span style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(e.name) + '</span>' + tag + '</div>'
         + right + '</div>';
     }).join('');
+    if (!rows) return '';
+    return rows + '<div style="font-size:11px;color:var(--t4);padding-top:10px;border-top:1px solid var(--row-div);">Tap any line to dig in.</div>';
   },
 
   auditScreen(moduleKey) {
