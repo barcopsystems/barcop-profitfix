@@ -16,7 +16,7 @@ S.AuditTracker = {
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 30;
     const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'Get a new audit every 30 days. Run first audit on day 1.';
+    const desc = 'Generate a new audit every 30 days. Run first audit on day 1.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('at', 'Profit Audit', desc, canRun, !!latest, daysLeft)
       + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
