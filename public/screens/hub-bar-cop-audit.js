@@ -596,8 +596,13 @@ S.HubBarCopAudit = {
 
     const since90 = (dateStr) => this._withinWindow(dateStr, 90);
 
-    // Rule 1: same staff plus recurring cash variance (3+ in 90 days)
-    const wkVar = variances.filter(v => since90(v.date));
+    // Rule 1: same staff plus recurring cash variance (3+ OUT-OF-TOLERANCE in 90
+    // days). Counting the drawer nightly is good discipline, not a red flag, so
+    // only over/short events outside tolerance count here, never within-tolerance
+    // counts.
+    const wkVar = variances.filter(v => since90(v.date)
+      && (v.status === 'Short' || v.status === 'Over'
+          || Math.abs(parseFloat(v.variance) || 0) > (parseFloat(v.tolerance) || 10)));
     const byManager = {};
     wkVar.forEach(v => {
       const id = v.cashier_id || v.cashier || 'unknown';
