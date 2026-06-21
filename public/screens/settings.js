@@ -3272,6 +3272,172 @@ S.HubSettings = {
     recalScale(App.data.revenue_audits, [{ d:74, o:38 }, { d:42, o:54 }, { d:8, o:71 }]);
     recalScale(App.data.traffic_audits, [{ d:74, o:34 }, { d:42, o:50 }, { d:8, o:67 }]);
 
+    // ── Bar Cop Audit — the Hub executive audit's 3-month operational arc ──────
+    // The only audit type with no seeded history. Three monthly snapshots climb
+    // from a bad-but-normal start to near the 70 target as the Anchor tightens up:
+    // discipline, cash control, inventory cadence, labor hygiene, recovery
+    // follow-through, and week-over-week consistency all improve. Hand-authored
+    // sample narrative by necessity (the live engine only scores the current
+    // 30-day window, so it cannot reproduce a record dated weeks back). Each
+    // record is internally consistent: the component detail rolls up to its
+    // sub-score, and the six sub-scores average to the overall. The trajectory
+    // (35 -> 53 -> 69) tracks the recovery audits' own arcs. The live engine in
+    // hub-bar-cop-audit.js stays honest for any real operation; this is demo only.
+    const BCA_LABELS = ['Operational Discipline','Cash Integrity','Inventory Execution','Labor Hygiene','Recovery Action','Operational Consistency'];
+    const BCA_KEYS   = ['operational_discipline','cash_integrity','inventory_execution','labor_hygiene','recovery_action','operational_consistency'];
+    const d  = (label, extra, pct) => ({ label, extra, pct });           // scored component row
+    const bcaRec = (daysAgo, auditId, subs, detail, exposures, patterns, snap) => {
+      const sections = {}, sub_scores = {}, sub_score_detail = {};
+      BCA_LABELS.forEach((l, i) => { sections[l] = subs[i]; });
+      BCA_KEYS.forEach((k, i) => { sub_scores[k] = subs[i]; sub_score_detail[k] = detail[i]; });
+      const overall = Math.round(subs.reduce((s, x) => s + x, 0) / subs.length);
+      return {
+        id: uid(), date: dateStr(daysAgo), audit_id: auditId, audit_period: 'Last 30 days',
+        grade: 'Complete Operational Analysis', bar_name: 'The Anchor Bar & Kitchen',
+        overall_score: overall, TARGET_SCORE: 70, sub_scores_covered: 6,
+        sub_scores, sub_score_detail, exposures, patterns,
+        recovery_snapshot: snap, sections,
+        action_items: exposures.map(e => ({ action: e.label + '. ' + e.detail, gap_id: e.gap_id || null, monthly_impact: 0 }))
+      };
+    };
+    App.data.bar_cop_audits = [
+      // ── Month 1 (74 days ago) — overall 35. Just adopted Bar Cop, ran every
+      //    audit on day one, and the bad pre-Bar-Cop operation shows up everywhere.
+      bcaRec(74, 'BCA-2026-0007',
+        [53, 25, 30, 38, 25, 37],
+        [
+          [ d('Opening checklist completion', '8 opening checklists logged', 27),
+            d('Closing checklist completion', '7 closing checklists logged', 23),
+            d('Inventory counts completed', '1 of 4 expected weekly', 25),
+            d('Spot checks completed', '1 of 4 expected weekly', 25),
+            d('Shifts logged', '16 shifts in window', 53),
+            d('Profit Recovery audit on time', 'Current', 100),
+            d('Revenue Recovery audit on time', 'Current', 100),
+            d('Traffic Recovery audit on time', 'Current', 100),
+            d('Maintenance backlog cleared', '4 open over 14 days', 20) ],
+          [ d('Cash variance trend (lower is better)', '0.84% of revenue handled', 16),
+            d('Drawer counts per operating day', '6 counts on 18 operating days', 33),
+            d('Large void/comp authorization', '3 of 14 over $25 authorized', 21),
+            d('Cash drops on revenue days', '5 drops on 16 days over $500', 31) ],
+          [ d('Inventory counts on schedule', '1 of 4 expected weekly counts', 25),
+            d('Spot checks completed', '1 of 4 expected weekly', 25),
+            d('Vendor discrepancy resolution rate', '1 of 4 resolved in last 90 days', 25),
+            d('No discrepancies aging past 60 days', '1 open discrepancy aging', 80),
+            d('Spot check clean variance rate', '0 of 1 under $5 variance', 0) ],
+          [ d('Schedule adherence', '235 actual vs 214 scheduled hours', 28),
+            d('Callout frequency', '5 callouts in window', 30),
+            d('Overtime incidents under control', '4 shifts over 40 hours', 33),
+            d('Certifications current', '1 expired, 2 expiring in 30 days', 35),
+            d('Coaching log activity', '2 coaching notes in last 90 days', 100),
+            d('Wage policy configured', 'Wage Policies not configured', 0) ],
+          [ d('Acting on surfaced gaps', '2 fixes logged in last 30 days against 8 surfaced gaps', 25),
+            d('Fixes that produced movement', '1 of 4 logged fixes produced favorable movement', 25) ],
+          [ d('Weekly covers consistency', '8 weeks of revenue data (need 3+)', 39),
+            d('Weekly labor % consistency', '8 weeks of P&L data (need 3+)', 35),
+            d('Weekly pour cost % consistency', '8 weeks of P&L data (need 3+)', 37) ]
+        ],
+        [
+          { label: '2 high-priority maintenance items open', detail: 'Equipment flagged urgent and still unresolved. A failing walk-in or ice machine is lost product and an emergency repair bill. Close these first.', severity: 'critical', screen: 'sc-maintenance' },
+          { label: 'ServSafe Food Handler Certification expired 6 days ago', detail: 'For Hector M. Out of compliance now. Renew before this person works again.', severity: 'critical' },
+          { label: '5 cash variances over $20 in last 30 days', detail: 'Pattern suggests a drawer or close-out process gap. Review who counted and when.', severity: 'warn', screen: 'sc-cash-control' },
+          { label: 'Opening checklist run only 8 times in last 30 days', detail: 'Below 20 of an expected 30 runs. Day starts without the opening sweep can mean missed restock or setup issues.', severity: 'warn', screen: 'sc-checklists' },
+          { label: 'Closing checklist run only 7 times in last 30 days', detail: 'Below 20 of an expected 30 runs. Missed closes invite cash-handling and clean-up gaps.', severity: 'warn', screen: 'sc-checklists' }
+        ],
+        [
+          { label: 'Recurring cash variance: Maria G.', detail: '4 variance events in last 90 days. Coach or rotate the close.', screen: 'sc-cash-control' },
+          { label: 'Void/comp concentration on Late Night shifts', detail: '14 events in last 90 days on Late Night. Pattern worth investigating.', screen: 'sc-void-comp' }
+        ],
+        { gaps: 8, fixesLogged: 2, dollarsRecovered: 0, stillMeasuring: 2 }
+      ),
+      // ── Month 2 (42 days ago) — overall 53. Mid-recovery: jiggers in, void
+      //    auth required, counts now weekly, fixes logged and starting to pay.
+      bcaRec(42, 'BCA-2026-0011',
+        [63, 48, 51, 53, 50, 53],
+        [
+          [ d('Opening checklist completion', '11 opening checklists logged', 37),
+            d('Closing checklist completion', '10 closing checklists logged', 33),
+            d('Inventory counts completed', '2 of 4 expected weekly', 50),
+            d('Spot checks completed', '1 of 4 expected weekly', 25),
+            d('Shifts logged', '17 shifts in window', 57),
+            d('Profit Recovery audit on time', 'Current', 100),
+            d('Revenue Recovery audit on time', 'Current', 100),
+            d('Traffic Recovery audit on time', 'Current', 100),
+            d('Maintenance backlog cleared', '2 open over 14 days', 60) ],
+          [ d('Cash variance trend (lower is better)', '0.51% of revenue handled', 49),
+            d('Drawer counts per operating day', '12 counts on 22 operating days', 55),
+            d('Large void/comp authorization', '7 of 17 over $25 authorized', 41),
+            d('Cash drops on revenue days', '9 drops on 20 days over $500', 45) ],
+          [ d('Inventory counts on schedule', '2 of 4 expected weekly counts', 50),
+            d('Spot checks completed', '2 of 4 expected weekly', 50),
+            d('Vendor discrepancy resolution rate', '3 of 6 resolved in last 90 days', 50),
+            d('No discrepancies aging past 60 days', '2 open discrepancies aging', 60),
+            d('Spot check clean variance rate', '1 of 2 under $5 variance', 50) ],
+          [ d('Schedule adherence', '226 actual vs 216 scheduled hours', 54),
+            d('Callout frequency', '3 callouts in window', 55),
+            d('Overtime incidents under control', '2 shifts over 40 hours', 60),
+            d('Certifications current', '0 expired, 2 expiring in 30 days', 50),
+            d('Coaching log activity', '4 coaching notes in last 90 days', 100),
+            d('Wage policy configured', 'Wage Policies not configured', 0) ],
+          [ d('Acting on surfaced gaps', '4 fixes logged in last 30 days against 7 surfaced gaps', 57),
+            d('Fixes that produced movement', '3 of 7 logged fixes produced favorable movement', 43) ],
+          [ d('Weekly covers consistency', '8 weeks of revenue data (need 3+)', 55),
+            d('Weekly labor % consistency', '8 weeks of P&L data (need 3+)', 51),
+            d('Weekly pour cost % consistency', '8 weeks of P&L data (need 3+)', 53) ]
+        ],
+        [
+          { label: 'ServSafe Food Handler Certification expiring in 14 days', detail: 'For Hector M. Renew before lapse to stay compliant.', severity: 'warn' },
+          { label: 'Closing checklist run only 13 times in last 30 days', detail: 'Below 20 of an expected 30 runs. Missed closes invite cash-handling and clean-up gaps.', severity: 'warn', screen: 'sc-checklists' },
+          { label: '3 cash variances over $20 in last 30 days', detail: 'Pattern suggests a drawer or close-out process gap. Review who counted and when.', severity: 'warn', screen: 'sc-cash-control' }
+        ],
+        [
+          { label: 'Void/comp concentration on Late Night shifts', detail: '11 events in last 90 days on Late Night. Pattern worth investigating.', screen: 'sc-void-comp' }
+        ],
+        { gaps: 7, fixesLogged: 4, dollarsRecovered: 1840, stillMeasuring: 2 }
+      ),
+      // ── Month 3 (8 days ago) — overall 69, just under the 70 target. Procedures
+      //    and audits all current; cash, inventory, and recovery still climbing.
+      bcaRec(8, 'BCA-2026-0015',
+        [82, 62, 72, 70, 64, 64],
+        [
+          [ d('Opening checklist completion', '20 opening checklists logged', 67),
+            d('Closing checklist completion', '18 closing checklists logged', 60),
+            d('Inventory counts completed', '3 of 4 expected weekly', 75),
+            d('Spot checks completed', '3 of 4 expected weekly', 75),
+            d('Shifts logged', '24 shifts in window', 80),
+            d('Profit Recovery audit on time', 'Current', 100),
+            d('Revenue Recovery audit on time', 'Current', 100),
+            d('Traffic Recovery audit on time', 'Current', 100),
+            d('Maintenance backlog cleared', '1 open over 14 days', 80) ],
+          [ d('Cash variance trend (lower is better)', '0.48% of revenue handled', 52),
+            d('Drawer counts per operating day', '17 counts on 24 operating days', 71),
+            d('Large void/comp authorization', '11 of 19 over $25 authorized', 58),
+            d('Cash drops on revenue days', '14 drops on 22 days over $500', 64) ],
+          [ d('Inventory counts on schedule', '3 of 4 expected weekly counts', 75),
+            d('Spot checks completed', '3 of 4 expected weekly', 75),
+            d('Vendor discrepancy resolution rate', '4 of 6 resolved in last 90 days', 67),
+            d('No discrepancies aging past 60 days', '1 open discrepancy aging', 80),
+            d('Spot check clean variance rate', '2 of 3 under $5 variance', 67) ],
+          [ d('Schedule adherence', '226 actual vs 216 scheduled hours', 54),
+            d('Callout frequency', '3 callouts in window', 55),
+            d('Overtime incidents under control', '2 shifts over 40 hours', 60),
+            d('Certifications current', '0 expired, 2 expiring in 30 days', 51),
+            d('Coaching log activity', '5 coaching notes in last 90 days', 100),
+            d('Wage policy configured', 'State minimum wage set in Wage Policies', 100) ],
+          [ d('Acting on surfaced gaps', '7 fixes logged in last 30 days against 9 surfaced gaps', 78),
+            d('Fixes that produced movement', '6 of 12 logged fixes produced favorable movement', 50) ],
+          [ d('Weekly covers consistency', '8 weeks of revenue data (need 3+)', 66),
+            d('Weekly labor % consistency', '8 weeks of P&L data (need 3+)', 62),
+            d('Weekly pour cost % consistency', '8 weeks of P&L data (need 3+)', 64) ]
+        ],
+        [
+          { label: 'ServSafe Food Handler Certification expired 4 days ago', detail: 'For Hector M. Out of compliance now. Renew before this person works again.', severity: 'critical' },
+          { label: 'TABC (Texas) Certification expiring in 26 days', detail: 'For Jake T. Renew before lapse to stay compliant.', severity: 'warn' }
+        ],
+        [],
+        { gaps: 7, fixesLogged: 6, dollarsRecovered: 5630, stillMeasuring: 3 }
+      )
+    ];
+
     await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
     App.updatePeriod();
 
