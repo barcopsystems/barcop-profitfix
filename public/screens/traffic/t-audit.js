@@ -23,9 +23,7 @@ S.TrafficAudit = {
     const SECTION_NAMES = ['Google Business', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
-      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ta') : AuditUI.emptyState())
-      + (latest ? AuditUI.scoreChart(audits, 'Traffic Score History') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'traffic_audit', 'ta') : '')
+      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ta') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'traffic_audit', 'ta') : '')
       + '</div>';
     document.getElementById('ta-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ta-view-btn').forEach(btn =>
