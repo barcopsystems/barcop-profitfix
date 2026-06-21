@@ -53,6 +53,8 @@ S.TrafficDashboard = {
             runText: 'Run Traffic Audit',
             emptyText: 'Run your first Traffic Audit for a baseline across your Google profile, website, reviews, search, social, delivery, and email.'
           })))
+      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
+      + InitiativeTracker.card('traffic')
       + DashUI.quickActions([
           { go: 't-this-week', label: 'Enter This Week' },
           { go: 't-audit', label: 'Run Traffic Audit' },
@@ -64,6 +66,7 @@ S.TrafficDashboard = {
     FixPanel.wireFixAreas(container);
     DashUI.wireQuick(container);
     document.getElementById('t-insights-btn')?.addEventListener('click', () => this.showInsights());
+    InitiativeTracker.wire('traffic', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
   },
 
   // This Week vs Target — latest logged week's headline numbers against target.
