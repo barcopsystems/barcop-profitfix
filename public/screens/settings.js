@@ -3281,6 +3281,46 @@ S.HubSettings = {
       buildSchedule(mondayISO(0),  19150),
     ];
 
+    // Offsite catering crew — tag a small crew to the Completed offsite booking on
+    // its event date so the Events line on Profit > This Week shows real event
+    // labor (otherwise the demo's catering job reads $0 labor). Their floor actual
+    // that day is replaced by an event "logged" actual: bookingLabor reads it as
+    // the Event P&L labor, and This Week excludes it from bar/food (no double count).
+    (() => {
+      const offBk = (App.data.bookings || []).find(b => b.event_type === 'Catering (Offsite)' && b.stage === 'Completed');
+      if (!offBk || !offBk.event_date) return;
+      const iso = String(offBk.event_date).slice(0, 10);
+      const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const ed = new Date(iso + 'T00:00:00');
+      if (isNaN(ed.getTime())) return;
+      const wd = ed.getDay();
+      const dayName = DAYS[(wd + 6) % 7];
+      const monD = new Date(ed); monD.setDate(monD.getDate() + (wd === 0 ? -6 : 1 - wd));
+      const sched = App.laborData.lc_schedules.find(s => s.week_start === App.ymdLocal(monD));
+      if (!sched) return;
+      const cook = lcStaff.find(st => posNameOf(st.position_id) === 'Line Cook')
+                || lcStaff.find(st => posNameOf(st.position_id) === 'Prep Cook');
+      const server = lcStaff.find(st => posNameOf(st.position_id) === 'Server');
+      const crew = [];
+      if (cook)   crew.push({ st: cook,   start: '08:00', end: '14:00', hours: 6 });
+      if (server) crew.push({ st: server, start: '09:30', end: '14:00', hours: 4.5 });
+      crew.forEach(c => {
+        const cost = +(c.hours * c.st.wage).toFixed(2);
+        sched.shifts.push({ staff_id: c.st.id, name: c.st.name, position_id: c.st.position_id, day: dayName,
+          start: c.start, end: c.end, hours: c.hours, wage: c.st.wage, cost: cost, event: offBk.id });
+        // Replace any floor actual for this person that day with the event's logged actual.
+        App.laborData.lc_actuals = App.laborData.lc_actuals.filter(a => !(a.staff_id === c.st.id && String(a.date || '').slice(0, 10) === iso));
+        App.laborData.lc_actuals.push({ id: uid(), date: iso, staff_id: c.st.id, name: c.st.name,
+          position_id: c.st.position_id, shift_type: 'Lunch', hours: c.hours, wage: c.st.wage, cost: cost, notes: 'Offsite catering' });
+      });
+      sched.total_hours = +sched.shifts.reduce((s, x) => s + (x.hours || 0), 0).toFixed(1);
+      sched.total_cost  = +sched.shifts.reduce((s, x) => s + (x.cost || 0), 0).toFixed(2);
+      if (sched.revenue_forecast) {
+        sched.labor_pct = +(sched.total_cost / sched.revenue_forecast * 100).toFixed(2);
+        sched.rplh = +(sched.revenue_forecast / sched.total_hours).toFixed(2);
+      }
+    })();
+
     // ── Tips — recent shifts for every tipped staff member ──
     // Phase 0: every tip carries shift_id linked to the sc_shifts record on
     // the same date. Shift Close (Phase 2-3) reconciles tips against this link;
