@@ -453,13 +453,12 @@ S.HubSettings = {
       });
     });
     // Two recurring-term bills (fixed cost + fixed term) so the page shows the
-    // recurring feature with data. Bar Cop fills in each elapsed month on load.
-    // The software subscription's term ends next month, so the "ending" banner
-    // shows; the alarm contract runs long, so it does not.
+    // recurring feature with data. Both were entered when the operator set up Books
+    // at the start of the 90-day window; Bar Cop fills in each elapsed month on load.
     const monthAnchor = (back, day) => App.ymdLocal(new Date(today.getFullYear(), today.getMonth() - back, day));
     operatingExpenses.push(
-      { id:uid(), date:monthAnchor(10, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(7, 5),  category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
+      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
     );
     App.data.operating_expenses = operatingExpenses;
 
