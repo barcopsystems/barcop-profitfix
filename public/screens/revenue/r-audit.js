@@ -23,9 +23,7 @@ S.RevenueAudit = {
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ra', 'Revenue Audit', desc, canRun, !!latest, daysLeft)
-      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : AuditUI.emptyState())
-      + (latest ? AuditUI.scoreChart(audits, 'Revenue Score History') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra') : '')
+      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra') : '')
       + '</div>';
     document.getElementById('ra-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.ra-view-btn').forEach(btn =>
