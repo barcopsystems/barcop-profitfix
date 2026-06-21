@@ -1271,3 +1271,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .evcal-holiday{background:transparent;border:1px dashed var(--b1);color:var(--t3);}
 .evcal-agenda{display:none;}
 @media(max-width:768px){.evcal-grid{display:none;}.evcal-agenda{display:block;}.evcal-agenda .evcal-chip{display:inline-block;margin:3px 4px 0 0;}}
+
+/* Audit landing — last-3-audits section comparison bars (AuditUI.scoreChart) */
+.acmp-bar{transition:opacity .12s ease, box-shadow .12s ease;cursor:default;}
+.acmp-bar:hover{opacity:1 !important;box-shadow:inset 0 0 0 1px var(--b1);}
