@@ -83,12 +83,6 @@ const AuditUI = {
         + '<div style="width:48px;text-align:right;flex-shrink:0;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</div>'
         + '</div>';
     }).join('');
-    const secHeader = '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;border-top:1px solid var(--b2);border-bottom:1px solid var(--row-div);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">'
-      + '<div style="flex:1;min-width:0;">Section</div>'
-      + '<div style="width:80px;flex-shrink:0;"></div>'
-      + '<div style="width:42px;text-align:right;flex-shrink:0;">Score</div>'
-      + '<div style="width:48px;text-align:right;flex-shrink:0;">Change</div>'
-      + '</div>';
     return '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
       + '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
@@ -100,77 +94,8 @@ const AuditUI = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (naO ? 'N/A' : latest.overall_score) + '</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
-      + '<div style="margin:16px -20px -20px;">' + secHeader + secRows + '</div>'
+      + '<div style="margin:16px -20px -20px;">' + secRows + '</div>'
       + '</div>';
-  },
-
-  // ── Landing: compare the last 3 audits, section by section ─────────────────
-  // A grouped bar chart: one group per audit section, up to three bars inside
-  // each (oldest to newest, left to right), so you see which areas climbed and
-  // which stalled across your three most recent audits. Each new audit pushes in
-  // on the right and the oldest drops off, no calendar dependency. Bars are the
-  // neutral navy (var(--c4)) shaded by recency (newest solid, older ghosted);
-  // only the newest value carries the tier color (var(--green)/amber/red), with
-  // a dashed target line. Groups grow to fill the card on desktop and scroll on
-  // a narrow screen. Hover a bar for a styled readout of its date and score.
-  scoreChart(audits, title) {
-    const recent = (audits || []).slice()
-      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-      .slice(0, 3);
-    if (!recent.length) return '';
-    const ord  = recent.slice().reverse();          // oldest -> newest, left to right
-    const n    = ord.length;
-    const opac = p => (n <= 1 ? 1 : 0.4 + 0.6 * (p / (n - 1)));
-    const fmtDate = d => { const dt = new Date((d || '').slice(0, 10) + 'T00:00:00');
-      return isNaN(dt.getTime()) ? (d || '').slice(0, 10) : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-    const target = (recent[0].raw && recent[0].raw.TARGET_SCORE) || recent[0].TARGET_SCORE || 70;
-
-    const secNames = Object.keys(recent[0].sections || {});
-    if (!secNames.length) return '';                // nothing to compare on
-
-    const CH = 156, USABLE = CH - 28, GROUP_MIN = 102;
-    const clamp = s => Math.max(0, Math.min(100, s));
-    const colStyle = 'flex:1 1 ' + GROUP_MIN + 'px;min-width:' + GROUP_MIN + 'px;';
-
-    const legend = ord.map((a, p) => '<div style="display:flex;align-items:center;gap:6px;">'
-      + '<span style="width:11px;height:11px;border-radius:2px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';"></span>'
-      + '<span style="font-size:11px;color:var(--t3);">' + esc(fmtDate(a.date)) + '</span>'
-      + (p === n - 1 ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);">Latest</span>' : '')
-      + '</div>').join('');
-
-    const barsRow = secNames.map(name => {
-      const bars = ord.map((a, p) => {
-        const s = (a.sections && a.sections[name] != null) ? a.sections[name] : null;
-        const isNew = p === n - 1;
-        if (s == null) return '<div style="width:28px;"></div>';
-        const h = Math.round(clamp(s) / 100 * USABLE);
-        return '<div style="display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
-          + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isNew ? '15px' : '11px') + ';font-weight:' + (isNew ? '700' : '600') + ';line-height:1;margin-bottom:5px;color:' + (isNew ? App.scoreColor(s) : 'var(--t4)') + ';">' + s + '</span>'
-          + '<div class="acmp-bar" data-tip="' + esc(name) + ' · ' + esc(fmtDate(a.date)) + ' · ' + s + '" style="width:28px;height:' + h + 'px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';border-radius:3px 3px 0 0;"></div>'
-          + '</div>';
-      }).join('');
-      return '<div style="' + colStyle + 'display:flex;align-items:flex-end;justify-content:center;gap:10px;height:100%;">' + bars + '</div>';
-    }).join('');
-
-    const labelsRow = secNames.map(name => '<div style="' + colStyle + 'font-size:10px;font-weight:600;color:var(--t3);text-align:center;line-height:1.3;">' + esc(name) + '</div>').join('');
-
-    const tgt = Math.round(clamp(target) / 100 * USABLE);
-    return '<div class="card" style="margin-bottom:16px;padding:18px 22px 16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
-      +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">' + legend + '</div>'
-      + '</div>'
-      + '<div style="overflow-x:auto;">'
-      +   '<div style="width:max-content;min-width:100%;">'
-      +     '<div style="position:relative;height:' + CH + 'px;border-bottom:1px solid var(--b2);">'
-      +       '<div style="position:absolute;left:0;right:0;bottom:' + tgt + 'px;border-top:1px dashed var(--b1);z-index:0;">'
-      +         '<span style="position:absolute;right:0;top:-7px;font-size:9px;color:var(--t3);background:var(--surface);padding:0 5px;letter-spacing:1px;text-transform:uppercase;">Target ' + target + '</span>'
-      +       '</div>'
-      +       '<div style="position:relative;z-index:1;display:flex;align-items:flex-end;gap:30px;height:100%;">' + barsRow + '</div>'
-      +     '</div>'
-      +     '<div style="display:flex;gap:30px;margin-top:10px;">' + labelsRow + '</div>'
-      +   '</div>'
-      + '</div></div>';
   },
 
   // ── Landing: Audit History data-card ───────────────────────────────────────
@@ -372,30 +297,3 @@ const AuditUI = {
       + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>';
   }
 };
-
-// Styled hover readout for the audit comparison bars (AuditUI.scoreChart). One
-// shared position:fixed tooltip, delegated off document so it works for every
-// rendered chart with no per-screen wiring and is never clipped by the chart's
-// horizontal scroll container. Bars carry the text in data-tip.
-(function () {
-  if (typeof document === 'undefined' || window._acmpTipBound) return;
-  window._acmpTipBound = true;
-  let tip = null;
-  const show = bar => {
-    if (!tip) { tip = document.createElement('div'); tip.id = 'acmp-tip'; document.body.appendChild(tip); }
-    tip.textContent = bar.getAttribute('data-tip') || '';
-    const r = bar.getBoundingClientRect();
-    tip.style.left = (r.left + r.width / 2) + 'px';
-    tip.style.top  = r.top + 'px';
-    tip.style.display = 'block';
-  };
-  const hide = () => { if (tip) tip.style.display = 'none'; };
-  document.addEventListener('pointerover', e => {
-    const bar = e.target && e.target.closest && e.target.closest('.acmp-bar[data-tip]');
-    if (bar) show(bar);
-  });
-  document.addEventListener('pointerout', e => {
-    const bar = e.target && e.target.closest && e.target.closest('.acmp-bar[data-tip]');
-    if (bar) hide();
-  });
-})();
