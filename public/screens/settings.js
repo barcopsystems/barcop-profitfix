@@ -531,6 +531,79 @@ S.HubSettings = {
       };
     };
 
+    // ── Year-long audit story (Shape A) ──────────────────────────────────────
+    // The three hand-written audits anchor the recovery arc; these helpers spread
+    // it across a full 12 months so the score-history chart and history list tell
+    // the story (rough start, dips, steady climb to near target). Generated months
+    // interpolate every metric between the worst (~score 21) and best (~57)
+    // profiles, so the numbers stay consistent with the narrative. Honesty note:
+    // historical seed audits are sample narrative; the LIVE engine on real data
+    // still produces honest scores.
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const periodLabel = (daysAgo) => {
+      const e = new Date(today); e.setDate(e.getDate() - daysAgo);
+      return MONTHS[e.getMonth()] + ' ' + e.getFullYear() + ', 4 weeks ending ' + MONTHS[e.getMonth()].slice(0,3) + ' ' + e.getDate();
+    };
+    const lp = (a, b, t) => a + (b - a) * t;
+    const r1 = (n) => Math.round(n * 10) / 10;
+    const genProfitRaw = (daysAgo, overall) => {
+      const t = Math.max(0, Math.min(1, (overall - 21) / (57 - 21)));
+      const band = (lo, mid, hi) => t < 0.34 ? lo : t < 0.7 ? mid : hi;
+      const barCost = r1(lp(29.4,23.4,t)), foodCost = r1(lp(39.8,33.8,t)), prime = r1(lp(70.3,59.2,t));
+      const voidPct = r1(lp(4.6,1.6,t)), laborPct = r1(lp(37.0,32.0,t));
+      const s1gap = Math.round(lp(3789,743,t)), s2gap = Math.round(lp(2995,506,t)),
+            s3gap = Math.round(lp(2402,563,t)), s4exp = Math.round(lp(1140,210,t));
+      const e = new Date(today); e.setDate(e.getDate() - daysAgo);
+      return {
+        BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: overall,
+        DATA_TIER_LABEL: t < 0.5 ? 'Tier 2 Analysis, Standard Data Submitted' : 'Tier 3 Analysis, Full Data Submitted',
+        AUDIT_PERIOD: periodLabel(daysAgo), AUDIT_ID: 'PFA', INDUSTRY_AVG: 63, TARGET_SCORE: 70,
+        S1_SCORE: Math.round(lp(16,62,t)), S1_BAR_COST_PCT: barCost, S1_TARGET_PCT: 22,
+        S1_BAR_REV_MONTHLY: Math.round(lp(51200,53100,t)), S1_INV_VARIANCE_PCT: r1(lp(6.8,2.1,t)),
+        S1_POUR_METHOD: band('Free pour, no jiggers','Jiggers on wells, call drinks still free poured','Measured pours on all spirits'),
+        S1_RECIPE_COVERAGE: band('0 of 18 cocktails costed','11 of 18 cocktails costed','18 of 18 cocktails costed'),
+        S1_MONTHLY_GAP: s1gap, S1_ANNUAL_GAP: s1gap*12,
+        S1_NARRATIVE: 'Bar pour cost ran ' + barCost + '% against a 22% target.' + band(' Free pouring with no costed recipes makes every drink a guess.',' Wells are measured but call drinks and several cocktails are not.',' Pour discipline is holding within a point or two of target.'),
+        S1_FINDING: 'The ' + r1(barCost-22) + '-point overage works out to about $' + s1gap.toLocaleString() + ' a month at current bar volume.',
+        S1_TOOL: band('Jigger every well and call drink, then watch pour variance in Spot Check.','Extend measured pours to call liquor and finish costing the cocktails.','Maintain the discipline and review pour cost monthly.'),
+        S2_SCORE: Math.round(lp(9,58,t)), S2_VOID_COMP_PCT: voidPct, S2_VOIDS_NO_APPROVAL_PCT: Math.round(lp(71,8,t)),
+        S2_DRAWER_RECON: band('Not performed','Performed at close','Performed at close'),
+        S2_CASH_POLICY: band('No','Draft','Yes'), S2_VOID_APPROVAL: band('No','Manager PIN required','Manager PIN required'),
+        S2_SPILLAGE_LOG: band('No','No','Yes'), S2_MONTHLY_GAP: s2gap,
+        S2_NARRATIVE: 'Voids and comps were ' + voidPct + '% of sales against a 1% benchmark.',
+        S2_FINDING: 'Roughly $' + s2gap.toLocaleString() + ' a month sits in excess voids and comps.',
+        S2_TOOL: band('Log every void in Void and Comps and require manager authorization.','Finalize the cash policy in Shift Policies and log breakage in Waste and Spills.','Review the Void and Comps log monthly and refresh training each quarter.'),
+        S3_SCORE: Math.round(lp(14,54,t)), S3_FOOD_COST_PCT: foodCost, S3_TARGET_PCT: 32,
+        S3_FOOD_REV_MONTHLY: Math.round(lp(30800,31300,t)), S3_FOOD_VAR_PCT: r1(lp(7.1,2.9,t)),
+        S3_RECIPE_COVERAGE: band('0 of 24 plates costed','16 of 24 plates costed','24 of 24 plates costed'),
+        S3_INV_FREQ: band('Never','Monthly','Weekly'), S3_WASTE_LOG: band('No','Started','Yes'),
+        S3_MONTHLY_GAP: s3gap, S3_ANNUAL_GAP: s3gap*12,
+        S3_NARRATIVE: 'Food cost landed at ' + foodCost + '% against a 32% target.',
+        S3_FINDING: 'The ' + r1(foodCost-32) + '-point overage costs about $' + s3gap.toLocaleString() + ' a month.',
+        S3_TOOL: band('Cost your top 10 plates in Menu Items and track variance in the Variance Report.','Finish the remaining plate cards and move counts from monthly to weekly.','Use Menu Engineering to reprice the lowest-margin plates.'),
+        S4_SCORE: Math.round(lp(12,56,t)), S4_VENDOR_SPEND_MONTHLY: Math.round(lp(29400,27600,t)),
+        S4_INVOICE_VS_PO: band('Never matched','Spot checked','Matched on every delivery'), S4_PRICE_VERIFY: band('No','Started','Yes'),
+        S4_EXPOSURE_MONTHLY: s4exp, S4_EXPOSURE_ANNUAL: s4exp*12,
+        S4_NARRATIVE: band('Invoices are never matched against orders and prices are never verified.','Invoice spot-checking has begun and one backup vendor is identified.','Every delivery is matched to its order and price drift is tracked.'),
+        S4_FINDING: 'Vendor exposure runs about $' + s4exp.toLocaleString() + ' a month.',
+        S4_TOOL: band('Match every delivery to its order in Receive Delivery and file shortfalls in Vendor Tracker.','Match every delivery, not a sample, and track price drift in Vendor Tracker.','Keep matching deliveries and review price changes in Vendor Tracker.'),
+        S5_SCORE: Math.round(lp(18,57,t)), S5_LABOR_PCT: laborPct, S5_BAR_COST_PCT: barCost, S5_FOOD_COST_PCT: foodCost,
+        S5_PRIME_COST_PCT: prime, S5_TARGET_PCT: 60, S5_RPLH_TRACKED: band('No','Started','Yes'), S5_LABOR_BY_DEPT: band('No','Yes','Yes'),
+        S5_COMBINED_COGS_GAP: Math.round(lp(6191,1306,t)),
+        S5_NARRATIVE: 'Prime cost was ' + prime + '% against a 60% target.',
+        S5_FINDING: band('Both COGS and labor are well out of range.','COGS controls are taking hold and labor is now tracked by department.','Prime cost is at or near target, with COGS and labor both in range.'),
+        S5_TOOL: band('Fix pour cost and food cost first to pull prime cost down fastest.','Hold the COGS course; the last points close as recipe coverage completes.','Hold prime cost here and shift focus to revenue growth.'),
+        S6_SIG1_SCORE: band('HIGH','MEDIUM','LOW'), S6_SIG1_LABEL: band('Premium spirit variance','Call-liquor free pour','Pour discipline holding'),
+        S6_SIG1_EVIDENCE: band('Top-shelf bottles show double-digit negative variance against POS sales.','Wells are jiggered but call and premium drinks are still free poured.','Inventory variance has stayed low for consecutive periods.'),
+        S6_SIG1_GAP: band('Unaccounted premium pours.','Most of the remaining pour-cost gap sits here.','No action required, this is the target state.'),
+        S6_SIG1_TOOL: 'Run a Spot Check on those bottles every close.',
+        S6_SIG2_SCORE: band('HIGH','MEDIUM','MEDIUM'), S6_SIG2_LABEL: band('Void concentration','No spillage log','Vendor price drift unreviewed'),
+        S6_SIG2_EVIDENCE: band('Most voids were rung without a manager code.','Breakage and spillage are not recorded anywhere.','A couple of vendors logged price increases that have not been reviewed.'),
+        S6_SIG2_GAP: band('Consistent with comped-drink theft, not training error.','Legitimate loss cannot be separated from variance.','Small increases quietly give back recovered margin.'),
+        S6_SIG2_TOOL: band('Review the unapproved voids in Loss Prevention.','Log breakage in Waste and Spills.','Review the Price Changes tab in Vendor Tracker monthly.')
+      };
+    };
+
     // ── Profit Audits ──
     App.data.audits = [
       mkAudit('profit', { date: dateStr(74), generated_at: daysAgoISO(74), raw: {
@@ -684,6 +757,23 @@ S.HubSettings = {
         S6_SIG2_TOOL: 'Review the Price Changes tab in Vendor Tracker each month.'
       }})
     ];
+
+    // Spread the recovery across a full year (Shape A): re-date the two earlier
+    // anchors, fix the most-recent period label, generate the nine months between,
+    // order oldest-first, and renumber IDs chronologically so the score-history
+    // chart and history list read a clean 12-month climb.
+    const reDateAudit = (rec, d) => {
+      rec.date = dateStr(d); rec.generated_at = daysAgoISO(d);
+      rec.audit_period = periodLabel(d); rec.raw.AUDIT_PERIOD = rec.audit_period;
+    };
+    reDateAudit(App.data.audits[0], 340);   // score 21 -> ~11 months ago
+    reDateAudit(App.data.audits[1], 190);   // score 39 -> ~6 months ago
+    App.data.audits[2].audit_period = periodLabel(8);
+    App.data.audits[2].raw.AUDIT_PERIOD = App.data.audits[2].audit_period;
+    [{d:310,o:26},{d:280,o:24},{d:250,o:31},{d:220,o:35},{d:160,o:41},{d:130,o:47},{d:100,o:44},{d:70,o:50},{d:40,o:54}]
+      .forEach(pt => App.data.audits.push(mkAudit('profit', { date: dateStr(pt.d), generated_at: daysAgoISO(pt.d), raw: genProfitRaw(pt.d, pt.o) })));
+    App.data.audits.sort((a, b) => a.date.localeCompare(b.date));
+    App.data.audits.forEach((rec, i) => { const id = 'PFA-' + new Date(rec.date).getFullYear() + '-' + String(20 + i).padStart(4, '0'); rec.audit_id = id; rec.raw.AUDIT_ID = id; });
 
     // ── Revenue Audits ──
     App.data.revenue_audits = [
