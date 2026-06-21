@@ -488,6 +488,8 @@ const App = {
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     const tnDate = document.getElementById('tn-date');
     if (tnDate) tnDate.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const tnLogo = document.querySelector('.tn-logo');
+    if (tnLogo) { tnLogo.style.cursor = 'pointer'; tnLogo.title = 'Go to The Hub'; tnLogo.onclick = () => this.showHub(); }
     // Mobile sidebar: hamburger button in the topbar opens the off-canvas
     // sidebar below the 768px breakpoint. Backdrop click closes it. Module
     // nav clicks also close it (wired in _renderNav). No-op on desktop where
