@@ -298,7 +298,8 @@ S.RevenueAudit = {
     let barRev  = s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '';
     let foodRev = s.annual_food_revenue != null ? String(s.annual_food_revenue) : '';
     if (!barRev || !foodRev) {
-      const weeks = (App.data?.revenue_weeks || []).slice(-12);
+      const weeks = (App.data?.revenue_weeks || [])
+        .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-12);
       if (weeks.length >= 1) {
         const avgBar  = weeks.reduce((s, w) => s + (parseFloat(w.bar_revenue)   || 0), 0) / weeks.length;
         const avgFood = weeks.reduce((s, w) => s + (parseFloat(w.floor_revenue) || 0), 0) / weeks.length;
@@ -540,7 +541,8 @@ S.RevenueAudit = {
     // figure is fed from Labor Control and revenue/covers from Shift Control,
     // so the confirmed week is verified Control data.
     const weeks = (App.data.revenue_weeks || [])
-      .filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0).slice(-4);
+      .filter(w => (w.bar_revenue||0) + (w.floor_revenue||0) > 0)
+      .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-4);
     if (weeks.length) {
       const avg = fn => { const v = weeks.map(fn).filter(x => x != null && !isNaN(x));
         return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
