@@ -104,60 +104,71 @@ const AuditUI = {
       + '</div>';
   },
 
-  // ── Landing: compare the 3 most recent audits ──────────────────────────────
-  // The three newest audits, newest on top. Each new audit pushes in at the top
-  // and the oldest of the three drops off, regardless of when it ran (no calendar
-  // dependency, so the latest score is always visible). The overall score carries
-  // the tier color; the change vs the next older audit shows as a +/- delta
-  // (green up, red down). With fewer than three audits the open spots show a dim
-  // "run another audit to compare" placeholder.
+  // ── Landing: compare the last 3 audits, section by section ─────────────────
+  // A grouped bar chart: one group per audit section, up to three bars inside
+  // each (oldest to newest, left to right), so you see which areas climbed and
+  // which stalled across your three most recent audits. Each new audit pushes in
+  // on the right and the oldest drops off, no calendar dependency. Bars are the
+  // neutral navy (var(--c4)) shaded by recency (newest solid, older ghosted);
+  // only the newest value carries the tier color (var(--green)/amber/red), with
+  // a dashed target line. Hover a bar to highlight it and read its exact score.
   scoreChart(audits, title) {
     const recent = (audits || []).slice()
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
       .slice(0, 3);
     if (!recent.length) return '';
-    const fmtDate = d => {
-      const dt = new Date((d || '').slice(0, 10) + 'T00:00:00');
-      return isNaN(dt.getTime()) ? (d || '').slice(0, 10) : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
-    const scoreOf = a => (a && a.overall_score != null) ? a.overall_score : null;
+    const ord  = recent.slice().reverse();          // oldest -> newest, left to right
+    const n    = ord.length;
+    const opac = p => (n <= 1 ? 1 : 0.4 + 0.6 * (p / (n - 1)));
+    const fmtDate = d => { const dt = new Date((d || '').slice(0, 10) + 'T00:00:00');
+      return isNaN(dt.getTime()) ? (d || '').slice(0, 10) : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    const target = (recent[0].raw && recent[0].raw.TARGET_SCORE) || recent[0].TARGET_SCORE || 70;
 
-    const slots = [];
-    for (let i = 0; i < 3; i++) {
-      const a = recent[i];
-      const border = i < 2 ? 'border-bottom:1px solid var(--row-div);' : '';
-      if (!a) {
-        slots.push('<div style="display:flex;align-items:center;gap:14px;padding:14px 20px;background:#0D181E;' + border + '">'
-          + '<div style="flex:1;font-size:12px;color:var(--t4);">Run another audit to compare</div>'
-          + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:700;line-height:1;color:var(--t4);">-</span>'
-          + '</div>');
-        continue;
-      }
-      const s = scoreOf(a);
-      const os = scoreOf(recent[i + 1]);          // the next older of the shown three
-      const delta = (s != null && os != null) ? s - os : null;
-      const deltaHtml = delta == null ? ''
-        : '<span style="font-size:12px;font-weight:700;color:' + (delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--t3)') + ';">' + (delta > 0 ? '+' : '') + delta + '</span>';
-      const meta = [];
-      if (a.audit_period) meta.push(esc(a.audit_period));
-      if (a.audit_id) meta.push(esc(a.audit_id));
-      const latestTag = i === 0 ? '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-left:8px;">Latest</span>' : '';
-      slots.push('<div style="display:flex;align-items:center;gap:14px;padding:14px 20px;background:#0D181E;' + border + '">'
-        + '<div style="flex:1;min-width:0;">'
-        +   '<div style="font-size:13px;font-weight:600;color:var(--t1);">' + fmtDate(a.date) + latestTag + '</div>'
-        +   (meta.length ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + meta.join('  |  ') + '</div>' : '')
-        + '</div>'
-        + '<div style="display:flex;align-items:baseline;gap:10px;">'
-        +   deltaHtml
-        +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:700;line-height:1;color:' + (s != null ? App.scoreColor(s) : 'var(--t3)') + ';">' + (s != null ? s : '-') + '</span>'
-        + '</div>'
-        + '</div>');
-    }
+    const secNames = Object.keys(recent[0].sections || {});
+    if (!secNames.length) return '';                // nothing to compare on
 
-    return '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);padding:16px 20px 12px;">' + esc(title) + '</div>'
-      + slots.join('')
-      + '</div>';
+    const CH = 130, USABLE = CH - 26, GROUP_W = 62;
+    const clamp = s => Math.max(0, Math.min(100, s));
+
+    const legend = ord.map((a, p) => '<div style="display:flex;align-items:center;gap:6px;">'
+      + '<span style="width:11px;height:11px;border-radius:2px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';"></span>'
+      + '<span style="font-size:11px;color:var(--t3);">' + esc(fmtDate(a.date)) + '</span>'
+      + (p === n - 1 ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);">Latest</span>' : '')
+      + '</div>').join('');
+
+    const barsRow = secNames.map(name => {
+      const bars = ord.map((a, p) => {
+        const s = (a.sections && a.sections[name] != null) ? a.sections[name] : null;
+        const isNew = p === n - 1;
+        if (s == null) return '<div style="width:16px;"></div>';
+        const h = Math.round(clamp(s) / 100 * USABLE);
+        return '<div style="display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
+          + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isNew ? '12px' : '10px') + ';font-weight:' + (isNew ? '700' : '600') + ';line-height:1;margin-bottom:4px;color:' + (isNew ? App.scoreColor(s) : 'var(--t4)') + ';">' + s + '</span>'
+          + '<div class="acmp-bar" title="' + esc(name) + ' — ' + esc(fmtDate(a.date)) + ': ' + s + '" style="width:16px;height:' + h + 'px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';border-radius:3px 3px 0 0;"></div>'
+          + '</div>';
+      }).join('');
+      return '<div style="flex:0 0 ' + GROUP_W + 'px;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:100%;">' + bars + '</div>';
+    }).join('');
+
+    const labelsRow = secNames.map(name => '<div style="flex:0 0 ' + GROUP_W + 'px;font-size:10px;font-weight:600;color:var(--t3);text-align:center;line-height:1.25;">' + esc(name) + '</div>').join('');
+
+    const tgt = Math.round(clamp(target) / 100 * USABLE);
+    return '<div class="card" style="margin-bottom:16px;padding:18px 20px 16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">' + legend + '</div>'
+      + '</div>'
+      + '<div style="overflow-x:auto;">'
+      +   '<div style="width:max-content;min-width:100%;">'
+      +     '<div style="position:relative;height:' + CH + 'px;border-bottom:1px solid var(--b2);">'
+      +       '<div style="position:absolute;left:0;right:0;bottom:' + tgt + 'px;border-top:1px dashed var(--b1);z-index:0;">'
+      +         '<span style="position:absolute;right:0;top:-7px;font-size:9px;color:var(--t3);background:var(--surface);padding:0 5px;letter-spacing:1px;text-transform:uppercase;">Target ' + target + '</span>'
+      +       '</div>'
+      +       '<div style="position:relative;z-index:1;display:flex;align-items:flex-end;gap:20px;height:100%;">' + barsRow + '</div>'
+      +     '</div>'
+      +     '<div style="display:flex;gap:20px;margin-top:8px;">' + labelsRow + '</div>'
+      +   '</div>'
+      + '</div></div>';
   },
 
   // ── Landing: Audit History data-card ───────────────────────────────────────
