@@ -111,7 +111,8 @@ const AuditUI = {
   // on the right and the oldest drops off, no calendar dependency. Bars are the
   // neutral navy (var(--c4)) shaded by recency (newest solid, older ghosted);
   // only the newest value carries the tier color (var(--green)/amber/red), with
-  // a dashed target line. Hover a bar to highlight it and read its exact score.
+  // a dashed target line. Groups grow to fill the card on desktop and scroll on
+  // a narrow screen. Hover a bar for a styled readout of its date and score.
   scoreChart(audits, title) {
     const recent = (audits || []).slice()
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
@@ -127,8 +128,9 @@ const AuditUI = {
     const secNames = Object.keys(recent[0].sections || {});
     if (!secNames.length) return '';                // nothing to compare on
 
-    const CH = 130, USABLE = CH - 26, GROUP_W = 62;
+    const CH = 156, USABLE = CH - 28, GROUP_MIN = 102;
     const clamp = s => Math.max(0, Math.min(100, s));
+    const colStyle = 'flex:1 1 ' + GROUP_MIN + 'px;min-width:' + GROUP_MIN + 'px;';
 
     const legend = ord.map((a, p) => '<div style="display:flex;align-items:center;gap:6px;">'
       + '<span style="width:11px;height:11px;border-radius:2px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';"></span>'
@@ -140,21 +142,21 @@ const AuditUI = {
       const bars = ord.map((a, p) => {
         const s = (a.sections && a.sections[name] != null) ? a.sections[name] : null;
         const isNew = p === n - 1;
-        if (s == null) return '<div style="width:16px;"></div>';
+        if (s == null) return '<div style="width:28px;"></div>';
         const h = Math.round(clamp(s) / 100 * USABLE);
         return '<div style="display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;">'
-          + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isNew ? '12px' : '10px') + ';font-weight:' + (isNew ? '700' : '600') + ';line-height:1;margin-bottom:4px;color:' + (isNew ? App.scoreColor(s) : 'var(--t4)') + ';">' + s + '</span>'
-          + '<div class="acmp-bar" title="' + esc(name) + ' — ' + esc(fmtDate(a.date)) + ': ' + s + '" style="width:16px;height:' + h + 'px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';border-radius:3px 3px 0 0;"></div>'
+          + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isNew ? '15px' : '11px') + ';font-weight:' + (isNew ? '700' : '600') + ';line-height:1;margin-bottom:5px;color:' + (isNew ? App.scoreColor(s) : 'var(--t4)') + ';">' + s + '</span>'
+          + '<div class="acmp-bar" data-tip="' + esc(name) + ' · ' + esc(fmtDate(a.date)) + ' · ' + s + '" style="width:28px;height:' + h + 'px;background:var(--c4);opacity:' + opac(p).toFixed(2) + ';border-radius:3px 3px 0 0;"></div>'
           + '</div>';
       }).join('');
-      return '<div style="flex:0 0 ' + GROUP_W + 'px;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:100%;">' + bars + '</div>';
+      return '<div style="' + colStyle + 'display:flex;align-items:flex-end;justify-content:center;gap:10px;height:100%;">' + bars + '</div>';
     }).join('');
 
-    const labelsRow = secNames.map(name => '<div style="flex:0 0 ' + GROUP_W + 'px;font-size:10px;font-weight:600;color:var(--t3);text-align:center;line-height:1.25;">' + esc(name) + '</div>').join('');
+    const labelsRow = secNames.map(name => '<div style="' + colStyle + 'font-size:10px;font-weight:600;color:var(--t3);text-align:center;line-height:1.3;">' + esc(name) + '</div>').join('');
 
     const tgt = Math.round(clamp(target) / 100 * USABLE);
-    return '<div class="card" style="margin-bottom:16px;padding:18px 20px 16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px;">'
+    return '<div class="card" style="margin-bottom:16px;padding:18px 22px 16px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + esc(title) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">' + legend + '</div>'
       + '</div>'
@@ -164,9 +166,9 @@ const AuditUI = {
       +       '<div style="position:absolute;left:0;right:0;bottom:' + tgt + 'px;border-top:1px dashed var(--b1);z-index:0;">'
       +         '<span style="position:absolute;right:0;top:-7px;font-size:9px;color:var(--t3);background:var(--surface);padding:0 5px;letter-spacing:1px;text-transform:uppercase;">Target ' + target + '</span>'
       +       '</div>'
-      +       '<div style="position:relative;z-index:1;display:flex;align-items:flex-end;gap:20px;height:100%;">' + barsRow + '</div>'
+      +       '<div style="position:relative;z-index:1;display:flex;align-items:flex-end;gap:30px;height:100%;">' + barsRow + '</div>'
       +     '</div>'
-      +     '<div style="display:flex;gap:20px;margin-top:8px;">' + labelsRow + '</div>'
+      +     '<div style="display:flex;gap:30px;margin-top:10px;">' + labelsRow + '</div>'
       +   '</div>'
       + '</div></div>';
   },
@@ -370,3 +372,30 @@ const AuditUI = {
       + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>';
   }
 };
+
+// Styled hover readout for the audit comparison bars (AuditUI.scoreChart). One
+// shared position:fixed tooltip, delegated off document so it works for every
+// rendered chart with no per-screen wiring and is never clipped by the chart's
+// horizontal scroll container. Bars carry the text in data-tip.
+(function () {
+  if (typeof document === 'undefined' || window._acmpTipBound) return;
+  window._acmpTipBound = true;
+  let tip = null;
+  const show = bar => {
+    if (!tip) { tip = document.createElement('div'); tip.id = 'acmp-tip'; document.body.appendChild(tip); }
+    tip.textContent = bar.getAttribute('data-tip') || '';
+    const r = bar.getBoundingClientRect();
+    tip.style.left = (r.left + r.width / 2) + 'px';
+    tip.style.top  = r.top + 'px';
+    tip.style.display = 'block';
+  };
+  const hide = () => { if (tip) tip.style.display = 'none'; };
+  document.addEventListener('pointerover', e => {
+    const bar = e.target && e.target.closest && e.target.closest('.acmp-bar[data-tip]');
+    if (bar) show(bar);
+  });
+  document.addEventListener('pointerout', e => {
+    const bar = e.target && e.target.closest && e.target.closest('.acmp-bar[data-tip]');
+    if (bar) hide();
+  });
+})();
