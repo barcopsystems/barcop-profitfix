@@ -1146,6 +1146,33 @@ S.HubSettings = {
         hypothesis:'Added a daily pre-shift upsell briefing on every dinner shift.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(8) }
     ];
 
+    // ── Profit Initiative Tracker — cost experiments, each watching a cost
+    // percentage that fell across the recovery arc, so the 8-week before/after
+    // lift reads as a real win (a drop, in gold, since lower is better).
+    App.data.profit_initiatives = [
+      { id:uid(), name:'Re-Spec\'d Well Pours to 1.25oz', start_date:dateStr(52), type:'Pour Spec', metric:'pour_pct',
+        hypothesis:'Dropped every well pour from a free pour to a 1.25oz jigger and re-trained the bar.', status:'Active', created_at:daysAgoISO(52) },
+      { id:uid(), name:'Portion Control on Top Plates', start_date:dateStr(45), type:'Portion Control', metric:'food_pct',
+        hypothesis:'Put scales on the line and locked portions on the five highest-cost plates.', status:'Active', created_at:daysAgoISO(45) },
+      { id:uid(), name:'Switched Liquor Distributor', start_date:dateStr(38), type:'Vendor Change', metric:'pour_pct',
+        hypothesis:'Moved the well and rail to a new distributor at a better case price.', status:'Active', created_at:daysAgoISO(38) },
+      { id:uid(), name:'Cut Prep Over-Production', start_date:dateStr(70), type:'Operational Change', metric:'food_pct',
+        hypothesis:'Tightened prep pars so the kitchen stopped over-producing and dumping at close.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
+    ];
+
+    // ── Traffic Initiative Tracker — demand experiments, each watching an online
+    // metric that climbed across the arc, so the before/after lift is a real win.
+    App.data.traffic_initiatives = [
+      { id:uid(), name:'Ask Every Table for a Google Review', start_date:dateStr(49), type:'Review Push', metric:'new_reviews',
+        hypothesis:'Put a review QR on every check and trained servers to ask at payout.', status:'Active', created_at:daysAgoISO(49) },
+      { id:uid(), name:'Reply to Every Review Within a Day', start_date:dateStr(42), type:'Posting Routine', metric:'response_rate',
+        hypothesis:'Set a daily ten-minute block to answer every new review, good or bad.', status:'Active', created_at:daysAgoISO(42) },
+      { id:uid(), name:'Weekly Google Posts', start_date:dateStr(35), type:'Posting Routine', metric:'monthly_sessions',
+        hypothesis:'Posted a special or an event to the Google profile every Monday.', status:'Active', created_at:daysAgoISO(35) },
+      { id:uid(), name:'Monthly Regulars Email', start_date:dateStr(70), type:'Email Campaign', metric:'google_rating',
+        hypothesis:'Emailed regulars a what\'s-new note with a soft ask to leave an honest rating.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(7) }
+    ];
+
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote
