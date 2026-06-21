@@ -19,9 +19,7 @@ S.AuditTracker = {
     const desc = 'Get a new audit every 30 days. Run first audit on day 1.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('at', 'Profit Audit', desc, canRun, !!latest, daysLeft)
-      + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())
-      + (latest ? AuditUI.scoreChart(audits, 'Profit Score History') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
+      + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
       + '</div>';
     document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     this.container.querySelectorAll('.at-view-btn').forEach(btn =>
