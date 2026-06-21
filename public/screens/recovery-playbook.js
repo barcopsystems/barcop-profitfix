@@ -23,15 +23,18 @@ S.RecoveryPlaybook = {
   // so it just routes there and inherits the section sidebar, topbar, and shell.
   open(module) {
     this._module = module || 'profit';
-    App.openScreen('recovery-playbook');
+    App.openScreen(module === 'revenue' ? 'r-playbook' : module === 'traffic' ? 't-playbook' : 'recovery-playbook');
   },
 
   doc() { return this.CONTENT[this._module] || this.CONTENT.profit; },
-  docPath(file) { return 'assets/resources/' + encodeURIComponent(file); },
+  // Slash-safe so per-module resource subfolders resolve (e.g. revenue/Foo.pdf).
+  docPath(file) { return 'assets/resources/' + String(file).split('/').map(encodeURIComponent).join('/'); },
 
   // ── Module screen: standard .screen width + a sticky right-hand section rail ──
   render(content, actions) {
     this.container = content;
+    // The screen serves whichever Recovery section it is opened from.
+    this._module = (App._activeModule === 'revenue') ? 'revenue' : (App._activeModule === 'traffic') ? 'traffic' : 'profit';
     this._diag = {};   // diagnostic answers, session-only (fresh each visit)
     const d = this.doc();
     const rail = d.sections.map(sec =>
@@ -771,6 +774,371 @@ S.RecoveryPlaybook = {
             { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Take Inventory and schedule your first count. Read your prime cost in This Week. Pull your last month of voids and comps in the Void and Comp Log. Then open your Profit Fix System and do the first step, so Bar Cop logs the day and starts measuring what you win back.' },
             { t: 'p', text: 'The gap between what you are making and what you should be making is not a mystery. It is a measurement problem. Start measuring tonight.' },
             { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
+          ]
+        }
+      ]
+    },
+
+    revenue: {
+      label: 'Revenue',
+      intro: 'The strategic read behind your Revenue Fix System. The Fix screens tell you what to do this week. This is the why behind it: where the top line leaks, what each gap quietly costs, and the exact Bar Cop screen that captures, measures, and closes it. No spreadsheets, no formulas. Bar Cop does that math now.',
+      sections: [
+        {
+          id: 'worth', nav: 'What It Costs You', eyebrow: 'What you are leaving on the table',
+          title: 'The Revenue Walking Out the Door',
+          blocks: [
+            { t: 'lead', text: 'You track revenue obsessively. You know last Saturday to the dollar, against last week, last year, and your gut for the room. What almost never gets calculated is the gap between what you took in and what you were set up to take in. That gap lives in servers who take orders instead of sell, a menu priced on instinct, an event room nobody owns, and a schedule built from memory. None of it shows up as a line on the P&L. It just shows up as a revenue number that never quite gets where it should.' },
+            { t: 'p', text: 'A bar running without revenue systems leaves roughly 8 to 15 percent of its potential on the table. On 750,000 a year that is 60,000 to 110,000. From the building you already have, the guests already at your tables. It is recoverable, and pulling it back is the job Bar Cop does.' },
+            { t: 'box', tone: 'gold', label: 'The stakes', title: '8 to 15 percent of your revenue never gets captured', text: 'On a million-dollar bar that is 80,000 to 150,000 a year. These are illustrative ranges for a bar with no menu engineering, no pricing discipline, a floor selling on instinct, and a schedule built from habit. Your real number is whatever Bar Cop measures once you start.' },
+            { t: 'h', text: 'The Four Gaps Running at Once' },
+            { t: 'p', text: 'Sit down with a busy bar that is not growing and the same four gaps are running together. Each one alone leaks. All four together is why the room is full and the number still will not move.' },
+            { t: 'table',
+              head: ['The gap', 'What it looks like', 'Illustrative cost'],
+              rows: [
+                ['Menu mix', 'Items in the wrong positions, prices nobody has reviewed in two years, your best margin item buried.', 'A few points of margin on every cover.'],
+                ['Floor selling', 'Half the servers sell, half take orders, and nobody knows which is which.', 'A $3 to $8 check-average spread across the floor.'],
+                ['Events', 'An event room booking four a month when it should book twelve, priced like a favor.', 'The highest-margin revenue in the building, left on the table.'],
+                ['Schedule by habit', 'Built like last week, with nothing to do with the revenue it has to support.', '2 to 4 points of labor on slow shifts.']
+              ] },
+            { t: 'h', text: 'Check Average: The Fastest Lever' },
+            { t: 'p', text: 'Check average is the fastest revenue lever in the building. No new customers, no bigger room. The guests already at your tables spending 3 to 5 dollars more a visit. At 200 covers a day over 300 service days, a 3 dollar lift is 180,000 a year. Same guests, same room, a different conversation at the table.' },
+            { t: 'table',
+              head: ['Covers a day', '+$3 a cover', '+$4 a cover', '+$5 a cover'],
+              rows: [
+                ['100', '$90,000 / yr', '$120,000 / yr', '$150,000 / yr'],
+                ['150', '$135,000 / yr', '$180,000 / yr', '$225,000 / yr'],
+                ['200', '$180,000 / yr', '$240,000 / yr', '$300,000 / yr'],
+                ['300', '$270,000 / yr', '$360,000 / yr', '$450,000 / yr']
+              ],
+              note: 'Illustrative example over 300 service days. Find your cover count. This is from the same guests already in the room.' },
+            { t: 'h', text: 'What 90 Days Looks Like' },
+            { t: 'p', text: 'A worked example, not a promise. A full-service bar and kitchen at about 1.2 million. The owner figures her check average is around 30. Pull three weeks by server and it is 31.40, with three servers under 26 and two over 38. The menu has never been run for margin. Labor sits at 26 percent against a 21 target. The event room books four a month. Here is the arc the first 90 days tends to follow.' },
+            { t: 'table',
+              head: ['Metric', 'Where it stood', 'The gap'],
+              rows: [
+                ['Check average', 'Never measured', 'A $17 spread between the best and worst server, unseen'],
+                ['Menu', 'No process', '14 items in the wrong position or priced below margin'],
+                ['Labor', '26%', '5 points above target, schedule built from memory'],
+                ['Events', '4 a month', 'Inquiries answered in 38 hours, handled like favors']
+              ],
+              note: 'Day 1 is always the same. The gap is bigger than expected. That is not a problem with the bar. It is the first accurate picture it has had of itself.' },
+            { t: 'p', text: 'Week two: a pre-shift briefing starts before every service with a check-average target and two featured items. The first menu pass repositions three high-margin items and flags the below-floor prices. Week six: check average is climbing, one server is cut off a dead Thursday, the event room has a rate card and a two-hour response standard. Day 90: check average up 3.80, floor labor down to 22 percent, nine events booked in the month against four. Annual impact off the run rate, about 147,000 captured. Same room, same staff, no new customers. A different set of systems running every week.' },
+            { t: 'box', tone: 'steel', title: 'The revenue is already in your building', text: 'You do not need more customers. You need the ones you have to spend more, stay longer, and book the room. The only question is whether something captures it every shift. That is the whole job Bar Cop does.' }
+          ]
+        },
+        {
+          id: 'timeline', nav: 'The First 90 Days', eyebrow: 'What to expect and when',
+          title: 'Recovery Has a Timeline',
+          blocks: [
+            { t: 'p', text: 'The first 30 days are about baselines, not results. You track check average by server for the first time and find a spread you did not know was there. You run the menu for margin and see which items carry the others. You pull labor by department and find the floor a few points over. No revenue results yet. This is measurement.' },
+            { t: 'p', text: 'Days 30 to 60 are where the first numbers move. The briefing is running, check average starts climbing within three to four weeks, the schedule gets built from a forecast instead of memory, and the event room starts answering inquiries same day. Days 60 to 90 the systems compound: the server spread closes from coaching, the events pipeline starts producing, and the full impact shows up in the Monday numbers.' },
+            { t: 'table',
+              head: ['Phase', 'What is happening', 'What to expect'],
+              rows: [
+                ['Days 1-30', 'Baselines: check average by server, menu by margin, labor by department', 'No results yet. This is measurement, not correction.'],
+                ['Days 30-60', 'Briefing live, schedule built from forecast, events answered same day', 'Check average trending up within 3 to 4 weeks'],
+                ['Days 60-90', 'Server spread closing, events pipeline producing, pricing corrected', 'Full system impact showing in the weekly numbers'],
+                ['Day 90+', 'Every system running, monthly revenue review standard', 'Your real annual improvement is established and compounding']
+              ],
+              note: 'The most common place it breaks is days 20 to 45, when the briefing gets skipped on a busy night and the Monday review slides to Tuesday. Bar Cop tracks whether each system is still running and flags the moment one starts slipping, so it restarts before the habit dies.' }
+          ]
+        },
+        {
+          id: 'diagnostic', nav: 'Revenue Diagnostic', eyebrow: 'Revenue diagnostic',
+          title: 'How Much Revenue Are You Capturing?',
+          blocks: [
+            { t: 'lead', text: 'Ten questions. Yes or no, no partial credit. If it is somewhere between, that is a No. The system is either running this week or it is not.' },
+            { t: 'p', text: 'Most operators know their revenue number cold. Ask the average check per cover from last Tuesday and it gets quiet. Ask what floor labor ran as a percent of revenue last week and the subject changes. That gap is where this diagnostic lives. The monthly figure next to each No is an illustrative example of what that gap commonly costs, not your number.' },
+            { t: 'diag', items: [
+              { n: 1, cost: '$1,200', q: 'Do you know which menu items are your highest-margin contributors, and are those items positioned to sell on your current menu?',
+                yes: 'You have a menu engineering process, you review it at least quarterly, and your highest-margin items sit in the positions that sell.',
+                no: 'Your layout is based on tradition or what looked good to the designer. High-cost items may be getting promoted over high-margin ones and nobody has done the math to find out.' },
+              { n: 2, cost: '$900', q: 'Do you have a written pricing strategy, reviewed at least quarterly against your actual food and beverage costs?',
+                yes: 'You have pricing logic tied to real cost data and you review it on a schedule. Prices move by calculation, not by reaction to a bad month.',
+                no: 'Prices were set at opening or when costs got painful enough to force a change. Every month you wait, the gap between your price and your cost grows wider.' },
+              { n: 3, cost: '$1,400', q: 'Do you calculate labor cost as a percent of revenue by department and review it weekly, not just on the monthly P&L?',
+                yes: 'You have weekly labor by bar, kitchen, and floor against target every Monday. A department running over shows up in seven days, not thirty.',
+                no: 'You see a blended total on the monthly statement. By the time it shows up there, three to four weeks of over-schedule have already run and cannot be recovered.' },
+              { n: 4, cost: '$1,100', q: 'Do you track revenue per labor hour by shift and use that number when you build the schedule?',
+                yes: 'Your schedule is built against an RPLH target. You know which shifts produce and which ones cost more than they return.',
+                no: 'The schedule looks like last week because that is how schedules get built. No connection to the revenue it has to support. That gap runs every week.' },
+              { n: 5, cost: '$800', q: 'Do you track average check per cover by server and by shift and review it weekly?',
+                yes: 'You know which servers sell and which take orders, and you act on the difference every week.',
+                no: 'You see total sales by server. Your best and worst salespeople look identical in the data you are reviewing now.' },
+              { n: 6, cost: '$1,400', q: 'Do your servers follow a documented upsell sequence on every table, with a system that confirms they are doing it?',
+                yes: 'You have written upsell sequences, a briefing before every service, and a table audit that confirms execution.',
+                no: 'Upselling depends on the server mood and instinct. Some do it, most do not, and you have no way to measure the difference.' },
+              { n: 7, cost: '$2,000', q: 'Do you have a private dining or events offer with a written rate card, a minimum spend, and a named person who sells it?',
+                yes: 'You have a client-facing package, a rate card, a pipeline, and a follow-up process. The event room is a revenue center with an owner.',
+                no: 'Events get booked when someone asks and priced however feels right. Inquiries that could be 3,000 dollar bookings get handled like favors.' },
+              { n: 8, cost: '$1,500', q: 'Do you have a written follow-up process for every event inquiry, with a response-time standard and a tracked pipeline?',
+                yes: 'Every inquiry gets a fast response and goes in a tracker. You know your close rate and the dollar value of every open inquiry.',
+                no: 'Inquiries get answered when someone gets to them. No record of what came in, what was quoted, or what went cold. The typical response time runs well over a day.' },
+              { n: 9, cost: '$1,800', q: 'Do you have a catering or off-premise revenue stream with documented pricing, a repeatable process, and a named owner?',
+                yes: 'You have a catering menu, a pricing calculator, a delivery checklist, and one person accountable from first contact to final invoice.',
+                no: 'Catering happens when someone asks and you figure out the details each time. Pricing is a guess. Execution starts from scratch on every booking.' },
+              { n: 10, cost: '$1,000', q: 'Do you run a structured monthly revenue review covering check-average trend, the event pipeline, and server performance?',
+                yes: 'You review the components monthly with your team and set specific targets for the next 30 days.',
+                no: 'Revenue review means looking at the total and hoping it went up. Without reviewing the parts, you cannot know what is working and what is bleeding.' }
+            ] },
+            { t: 'diagscore' },
+            { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
+              'Your highest-selling item and your most profitable item are not the same item, and most operators cannot say which is which.',
+              'At least one server on your floor is taking orders and at least one is selling. Without check average by server you cannot tell them apart.',
+              'Your event space is doing a fraction of what it could, not for lack of demand, but because nobody owns the process end to end.',
+              'This week you built the schedule the same way you built it three years ago. Your revenue changed. The schedule did not catch up.',
+              'The bar that grows revenue is not the busiest on the block. It is the one that knows what it is worth and builds the systems to capture it.'
+            ] }
+          ]
+        },
+        {
+          id: 'what', nav: 'What Bar Cop Does', eyebrow: 'What Bar Cop does for you',
+          title: 'Every Gap: Captured, Measured, Closed',
+          blocks: [
+            { t: 'lead', text: 'The old way was a folder full of spreadsheets you had to keep alive by hand, abandoned by week three. Bar Cop runs the whole thing for you. You capture the work in your sections, Bar Cop diagnoses where the top line is leaking, and the Fix System walks you into the exact screen that closes it.' },
+            { t: 'p', text: 'Here is the map. Every gap, where you capture it, where Bar Cop shows it to you, and where you fix it. Tap any Fix button to jump straight there.' },
+            { t: 'cross', rows: [
+              { leak: 'Menu mix', capture: 'Menu Items recipes and costs', show: 'Menu Engineering + Dog Test Tracker', fixLabel: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
+              { leak: 'Pricing', capture: 'Menu Items costs by ingredient', show: 'Price Calculator + Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
+              { leak: 'Labor cost', capture: 'Build Schedule + Revenue Forecast', show: 'Labor Reports + Overtime Watch', fixLabel: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
+              { leak: 'Labor productivity', capture: 'Build Schedule hours against the week', show: 'This Week revenue per labor hour', fixLabel: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
+              { leak: 'Check average', capture: 'Server Check covers and sales', show: 'Server Check scorecard', fixLabel: 'Check Average system', screen: 'r-fix', focus: 'check-average' },
+              { leak: 'Server performance', capture: 'Server Check by server', show: 'Server Check scorecard', fixLabel: 'Server Performance system', screen: 'r-fix', focus: 'server-performance' }
+            ] },
+            { t: 'p', text: 'The paper a system still needs lives inside it too. The upsell standards and scripts, the pre-shift briefing, the table visit audit, the menu engineering review, and the quarterly pricing checklist all download right from the step that calls for them in your Revenue Fix System. Events and catering have their own section, and confirmed bookings feed your week and the Revenue Audit automatically.' },
+            { t: 'p', text: 'And you do not read the numbers alone. Bar Cop Outlook writes a plain-language narrative on every audit, and Bar Cop Insights reads your trend on the Revenue dashboard, so the story behind the numbers is already written for you.' }
+          ]
+        },
+        {
+          id: 'benchmarks', nav: 'Benchmarks', eyebrow: 'Benchmarks',
+          title: 'The Numbers to Run Against',
+          blocks: [
+            { t: 'p', text: 'These are your reference points. Bar Cop measures against them for you every week, but know them cold. Find your category, know your target, and know the line where a number turns into a problem.' },
+            { t: 'h', text: 'Menu and Pricing' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'Common cause'],
+              rows: [
+                ['Stars (contribution margin)', 'Above average', 'At average', 'Below average', 'Stars belong in prime placement and the briefing every shift'],
+                ['Plowhorses', 'Reprice to avg', 'Within 10%', '25%+ below avg', 'Reprice or rework the recipe to lift margin without losing volume'],
+                ['Menu price review', 'Quarterly', 'Semi-annual', 'Annual or less', 'Prices untouched since opening are almost always below the floor'],
+                ['Items above food-cost target', 'Under 10%', '10-20%', 'Above 20%', 'Every item above target is subsidized by the ones at target']
+              ] },
+            { t: 'h', text: 'Labor Cost and Productivity' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'High warning', 'Critical', 'Most common cause'],
+              rows: [
+                ['Bar labor % of bar revenue', '18-24%', '25-28%', '29%+', 'Over-scheduled for the volume'],
+                ['Kitchen labor % of food revenue', '28-34%', '35-38%', '39%+', 'Scheduling above the revenue, or a low-volume week'],
+                ['Floor labor % of total revenue', '16-22%', '23-26%', '27%+', 'Over-staffed floor or check average below threshold'],
+                ['Revenue per labor hour, bar', '$55-75', '$40-54', 'Under $40', 'Labor not producing proportional revenue'],
+                ['Revenue per labor hour, full service', '$40-60', '$30-39', 'Under $30', 'Schedule or check average needs work']
+              ] },
+            { t: 'h', text: 'Check Average and Upsell' },
+            { t: 'table',
+              head: ['Metric', 'Target', 'Warning', 'Critical', 'What to look at'],
+              rows: [
+                ['Check average growth, monthly', '0.5-1.5%', 'Flat', 'Declining', 'Server performance, menu mix, or briefing slipping'],
+                ['Server check-average spread', 'Under 15%', '15-25%', 'Above 25%', 'Wide spread means inconsistent selling, not personality'],
+                ['Upsell attempt rate', '80%+ of tables', '50-79%', 'Under 50%', 'Briefing not landing, or no table audit'],
+                ['Dessert close rate', '25-35%', '15-24%', 'Under 15%', 'Dessert offered, not suggested by name']
+              ] }
+          ]
+        },
+        {
+          id: 'connect', nav: 'How It Connects', eyebrow: 'How the systems connect',
+          title: 'Six Systems, One Revenue Engine',
+          blocks: [
+            { t: 'p', text: 'These are not independent fixes. Menu engineering without pricing gives you items in the right spot at the wrong price. Scheduling without RPLH gives you a schedule that feels right but is not tied to the revenue it has to support. Upselling without check-average tracking gives you activity with no measure of whether it works. Revenue stalls when it is treated as separate problems instead of one connected engine.' },
+            { t: 'p', text: 'The systems are sequenced on purpose. Menu engineering comes first because every pricing decision, every upsell, and every event menu builds on knowing which items make money and which ones you are subsidizing. Each system feeds the next.' },
+            { t: 'parts', items: [
+              { label: 'System 1', name: 'Menu Engineering', desc: 'Stars, plowhorses, puzzles, dogs. Know which items to push and which to cut. Start here.', focus: 'menu-engineering' },
+              { label: 'System 2', name: 'Pricing', desc: 'Price to your real costs, not the bar down the street. Review it every quarter.', focus: 'pricing' },
+              { label: 'System 3', name: 'Labor Cost and Scheduling', desc: 'Build the schedule from the revenue number, not from last week schedule.', focus: 'labor-scheduling' },
+              { label: 'System 4', name: 'Labor Productivity', desc: 'Revenue per labor hour tells you whether the schedule is actually working.', focus: 'rplh' },
+              { label: 'System 5', name: 'Check Average and Upsell', desc: 'Every table has more in it. This builds the system that captures it.', focus: 'check-average' },
+              { label: 'System 6', name: 'Server Performance', desc: 'Your floor is the revenue engine. Measure it by server, coach from the number.', focus: 'server-performance' }
+            ] },
+            { t: 'box', tone: 'gold', label: 'The logic in plain language', text: 'Menu engineering tells you which items to sell, pricing makes sure each one carries its margin, and the floor systems (check average and server performance) get them ordered. Labor cost and RPLH make sure the revenue you capture is not eaten by the hours you scheduled to capture it. Start with menu engineering. Every pricing, upsell, and labor decision downstream is better once you know which items make money.' },
+            { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' }
+          ]
+        },
+        {
+          id: 'r1', nav: 'System 1: Menu Engineering', eyebrow: 'System 1 - know what makes money',
+          title: 'Menu Engineering',
+          blocks: [
+            { t: 'lead', text: 'A bar in Atlanta, 72 seats, same menu for three years. Salmon was her third-highest seller. She was proud of it, put it in the feature box, trained servers to push it. We ran the numbers. Salmon contributed 7.20 a plate. Her ribeye, which she never pushed because it felt expensive to suggest, contributed 19.40. Same covers, same kitchen. She had been training her team to sell her worst-margin item and leaving 12 dollars on the table every time they succeeded.' },
+            { t: 'p', text: 'Food cost percent tells you whether an item is in line with its price. Contribution margin in dollars is what hits the bottom line. Most operators promote by volume, not by margin per plate, and that is exactly backwards. Promotion is not the same as margin. Filling your best menu positions with anything other than your best-margin items is opportunity walking out the door.' },
+            { t: 'p', text: 'Every item lands in one of four spots. Stars are high margin and high volume: feature them and put them in the briefing. Plowhorses are high volume, low margin: reprice toward the floor or rework the recipe. Puzzles are high margin, low volume: usually a visibility problem, so reposition and rewrite the description. Dogs are low and low: rework or cut. A box or a strong description moves selection 20 to 30 percent, which is revenue with no kitchen change.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You set every item up in Menu Items with its real cost. Menu Engineering plots the four quadrants for you off your live sales, ranked by contribution margin in dollars, not food cost percent. The Dog Test Tracker watches the items on a 90-day test so a cut is a decision, not a guess.' },
+            { t: 'go', label: 'Menu Engineering', screen: 'r-menu-engineering' },
+            { t: 'go', label: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Review the quadrants quarterly: which Stars are not in prime positions, which Plowhorses need a price or recipe fix.',
+              'Sort by contribution margin in dollars, not by food cost percent. The ranking will surprise you.',
+              'Put Dogs on a 90-day test in a better spot with a better description, then keep or cut.',
+              'Update item costs whenever a supplier price moves more than 5 percent. Stale costs put items in the wrong quadrant.',
+              'Give every Star and high-margin item a description that names the key ingredient and a pairing. A pairing in the description is an embedded upsell.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'revenue/Menu_Engineering_Audit.pdf', label: 'Menu Engineering Review Worksheet' }
+            ] }
+          ]
+        },
+        {
+          id: 'r2', nav: 'System 2: Pricing', eyebrow: 'System 2 - price to your cost, not theirs',
+          title: 'Pricing',
+          blocks: [
+            { t: 'lead', text: 'A bar owner in Denver, full-service, solid reviews, steady regulars. He had not changed a menu price in 26 months. His chicken entree was still 18 dollars while his protein cost was up 21 percent and his kitchen labor up 14. His food cost on that plate was now 44 percent. He had been serving it to 80 people a week and losing ground on every one, assuming the menu was fine because nobody complained.' },
+            { t: 'p', text: 'Most operators do not have a pricing strategy, they have a pricing history. Prices were set at opening, nudged when costs got painful, and otherwise left alone because raising feels risky. Reactive pricing always lags the cost curve. The fix is a quarterly review on a fixed calendar that catches the increase in April instead of finding it on the May statement.' },
+            { t: 'p', text: 'Do not price off the bar down the street. Their supplier discount, their lease, their prep cook are not yours. Their 16 dollar burger hits 28 percent food cost; yours at 16 might hit 34. Price to your own cost floor: ingredient cost divided by your target food-cost percent. And guest resistance is wildly overestimated. A surgical 1 to 2 dollar bump on a mid-menu item during a normal reprint almost never gets noticed. The 1.50 you are afraid to add is real money every year you do not.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Menu Items holds your real ingredient costs and shows the price floor for every item. The Price Calculator runs a proposed change and shows the break-even before you print. Menu Engineering hands you the plowhorse list that should go through pricing first.' },
+            { t: 'go', label: 'Price Calculator', screen: 'r-price-calc' },
+            { t: 'go', label: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Run the price floor on every item where ingredient costs moved since the last review. Flag anything below floor.',
+              'Run each plowhorse through the Price Calculator at a 1.50 to 3 dollar increase before you decide.',
+              'Review quarterly on a fixed calendar, and any time a supplier raises a high-volume item more than 8 percent.',
+              'Price spirits, wine, draft, and food on their own math. They are not the same category.',
+              'Close the review with a written list and a target print date. An intention to reprice the salmon is not a review.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'revenue/Quarterly_Pricing_Review.pdf', label: 'Quarterly Pricing Review Checklist' }
+            ] }
+          ]
+        },
+        {
+          id: 'r3', nav: 'System 3: Labor Cost', eyebrow: 'System 3 - schedule to the revenue',
+          title: 'Labor Cost and Scheduling',
+          blocks: [
+            { t: 'lead', text: 'A full-service concept in Chicago, 110 seats. A Tuesday in February: 22 servers on for a shift that did 4,200 in food and beverage. That is 191 dollars a server and floor labor at 58 percent of revenue. The manager who built it did what he always did on Tuesdays, the same way for two and a half years. Nobody had ever told him to check the revenue before he wrote the names.' },
+            { t: 'p', text: 'Labor is the most controllable major expense you have. Your lease does not flex with revenue; your labor should, and in most bars it does not because the schedule is built the same way every week. The fix is not cutting staff or wages, it is building the schedule from a revenue number instead of from memory. And a blended labor percent hides the problem: 32 percent total can be a tight bar carrying a kitchen and floor that are both five points over.' },
+            { t: 'p', text: 'Overtime is a scheduling failure, not a staffing solution. A few overtime earners at five premium hours a week runs well into five figures a year, paid as a premium on hours you were already going to have. And slow shifts are the quiet leak: Monday and Tuesday do half the weekend revenue at three-quarters of the headcount because the extra body feels safe.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Revenue Forecast sets the number for the week. You build to it in Build Schedule, which shows the labor budget in hours before you write a single name. Overtime Watch catches the premium before it runs, and Labor Reports split the percentage by department so nothing hides in the blend.' },
+            { t: 'go', label: 'Build Schedule', screen: 'lc-build-schedule' },
+            { t: 'go', label: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Pull the revenue forecast by day before you build, and build to the labor budget in hours, not from last week.',
+              'Flag any shift where the schedule runs more than 5 percent over its budget, and settle it before you post.',
+              'Every Monday, review actual labor by department against target. Flag anything more than 2 points over.',
+              'Decide whether a miss was a scheduling error or a revenue miss, and assign one action before the review closes.',
+              'Treat overtime as a schedule to fix, not a cost to accept. Redistribute the hours.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'revenue/Weekly_Labor_Review.pdf', label: 'Weekly Labor Review Form' }
+            ] }
+          ]
+        },
+        {
+          id: 'r4', nav: 'System 4: Labor Productivity', eyebrow: 'System 4 - the return on every hour',
+          title: 'Labor Productivity (RPLH)',
+          blocks: [
+            { t: 'lead', text: 'Two bars, same city, similar concept, both around 900,000 a year, both running 28 percent blended labor. Bar A pulls 68 dollars of revenue per labor hour on Saturday and 41 on Tuesday. Bar B pulls 42 on Saturday and 28 on Tuesday. Same labor percent. Bar A gets 60 percent more revenue out of every labor dollar, and the percentage hides it completely.' },
+            { t: 'p', text: 'Revenue per labor hour is what you get back for every hour you schedule: revenue divided by labor hours. Labor percent answers whether you spent the right share. RPLH answers whether that spend produced what it should. A Saturday at 38 against a 55 target is a 17 dollar gap an hour, and across a season of Saturdays that is real revenue the labor you already pay for is not capturing.' },
+            { t: 'p', text: 'Low RPLH has three causes and each needs a different fix: over-scheduling (rebuild from the forecast), check average too low (briefing and upsell), or a revenue miss against forecast (a one-off). Get the diagnosis right, because cutting the schedule to fix a check-average problem just makes service worse. Set your targets off your own baseline plus 10 to 15 percent, not a benchmark copied from a guide that has nothing to do with your concept.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'This Week shows your revenue per labor hour by shift against target, with the trend. You build to that target in Build Schedule, working backward from the revenue the shift is set up for instead of guessing a headcount.' },
+            { t: 'go', label: 'This Week', screen: 'r-this-week' },
+            { t: 'go', label: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Read RPLH by shift every Monday. Flag any shift more than 10 percent below target.',
+              'Check the four-week trend: is the shift moving toward target or away from it.',
+              'Decide whether a below-target shift is a scheduling problem or a check-average problem, then fix the right one.',
+              'Build the schedule from the revenue the shift is set up for, not from a headcount habit.',
+              'Set targets off your own baseline plus 10 to 15 percent, not a copied benchmark.'
+            ] }
+          ]
+        },
+        {
+          id: 'r5', nav: 'System 5: Check Average', eyebrow: 'System 5 - the fastest floor lever',
+          title: 'Check Average and Upsell',
+          blocks: [
+            { t: 'lead', text: 'A full-service bar in Portland, 85 seats. The owner figured her average check was around 30, maybe a little more. We pulled three weeks by server. Her highest was 41.20. Her lowest was 23.80. Same menu, same guests, same room. A 17.40 spread between her best and worst server she had never seen because she was only looking at total revenue, not at what each person on the floor was generating per cover.' },
+            { t: 'p', text: 'Check average is the revenue your servers generate per cover, and it is the number that tells you whether the floor is selling or taking orders. Two servers with the same section produce completely different revenue if one suggests an appetizer and a dessert and the other asks if there is anything else. A server who says we have a really good Old Fashioned tonight is making a suggestion; a server who asks if you want a drink is making an offer. Specific suggestions convert two to three times the rate of open offers.' },
+            { t: 'p', text: 'A 3 dollar lift across the floor needs no new customers and no bigger room, just a briefing before each shift and a number to hit. The pre-shift briefing is the highest-leverage five minutes in the building, and it is operational, not motivational: the featured items, the check-average target, the upsell sequence, one pairing. Track by server and flag anyone more than 15 percent below the team. The gap between a below-average server and the team, times their covers, times the year, is the coaching conversation.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Server Check tracks check average by server and shift, compares each to the team, and flags the gaps. The scorecard is your weekly read, and the upsell standards, the briefing form, and the table audit download right here for the floor.' },
+            { t: 'go', label: 'Server Check', screen: 'r-server-check' },
+            { t: 'go', label: 'Check Average system', screen: 'r-fix', focus: 'check-average' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Run a pre-shift briefing before every service: featured items, a check-average target, the upsell sequence, one pairing.',
+              'Review check average by server every Monday. Flag anyone more than 15 percent below the team.',
+              'Any server trending down two weeks in a row gets a coaching conversation this week.',
+              'Run two table audits a week, different shifts, unannounced. Predictable audits only buy you good behavior on audit day.',
+              'Set the next week briefing items from your Menu Engineering Stars.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' },
+              { file: 'revenue/PreShift_Upsell_Briefing.pdf', label: 'Pre-Shift Upsell Briefing' },
+              { file: 'revenue/Table_Visit_Audit.pdf', label: 'Table Visit Audit' }
+            ] }
+          ]
+        },
+        {
+          id: 'r6', nav: 'System 6: Server Performance', eyebrow: 'System 6 - manage the revenue engine',
+          title: 'Server Performance',
+          blocks: [
+            { t: 'lead', text: 'A GM at a 110-seat concept spent three years watching his best server and his second-best from across the room. Both were regulars favorites, both professional. He asked which one to promote to floor lead. I asked their individual check averages for the last 60 days. He had never pulled the number by server. We pulled it together: his best server averaged 29 a cover, his second-best 41. He had been about to promote the wrong person because he was managing by impression instead of by data.' },
+            { t: 'p', text: 'The floor generates 60 to 70 percent of revenue in most full-service concepts and gets the least rigor. You track product cost to the decimal and let the floor run on personality. Two reliable, well-liked servers a few dollars below the team average can quietly cost tens of thousands a year, not because they are bad, but because nobody told them the number.' },
+            { t: 'p', text: 'Coach from the number, not a judgment. Not your tables are not selling enough, which is an impression, but your check average over four weeks was 24.80 against a team average of 33.40, which is a fact. Most servers below average are not lazy; they are uncomfortable at one touch point, usually the dessert close, and nobody ever helped them get comfortable with it. A written standard signed at hire makes every later conversation fair and enforceable, and naming the top performer each week tells the whole floor the number is seen.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Server Check is the scorecard: check average by server, the team comparison, and the four-week trend, so coaching starts from a fact. The written standard and the table audit download right here.' },
+            { t: 'go', label: 'Server Check', screen: 'r-server-check' },
+            { t: 'go', label: 'Server Performance system', screen: 'r-fix', focus: 'server-performance' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Review check average by server every Monday and flag anyone below threshold.',
+              'Name the top performer for the prior week in the next briefing.',
+              'Schedule coaching for below-average servers this week, not next, and open with the number.',
+              'Distribute the written standard, collect a signed copy at hire, and keep it on file.',
+              'Check the four-week trend two weeks after coaching. Moving, acknowledge it. Not moving, a second conversation in writing.'
+            ] },
+            { t: 'docs', items: [
+              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' },
+              { file: 'revenue/Table_Visit_Audit.pdf', label: 'Table Visit Audit' }
+            ] }
+          ]
+        },
+        {
+          id: 'r7', nav: 'System 7: Keep It Running', eyebrow: 'System 7 - make it survive a busy Friday',
+          title: 'Putting It In Place and Keeping It Running',
+          blocks: [
+            { t: 'lead', text: 'A bar owner in Seattle reads every book about running a better restaurant. She highlights, she dog-ears, she starts about twice a year, gets through week one with real energy, and then a Saturday blows up and a manager calls out and the spreadsheet she opened Tuesday sits untouched until she finds it three months later. The information was never the problem. The absence of a sequenced plan with named owners, fixed deadlines, and one number to confirm it is working was the problem, every time. Motivation lasts about ten days. Process does not expire.' },
+            { t: 'p', text: 'Most efforts fail at the 45-day mark, not week one. A briefing gets skipped on a busy night, the Monday review slides to Tuesday, the audit sits in a drawer. Each feels like a one-time exception. None of them are. The order matters too: menu engineering before pricing, labor cost before RPLH, check average before the upsell standard, because each one produces the data the next one needs.' },
+            { t: 'h', text: 'The first four weeks' },
+            { t: 'table', nowrap1: true,
+              head: ['Week', 'Focus', 'What goes live'],
+              rows: [
+                ['Week 1', 'Establish baselines', 'Run the menu for margin, pull check average by server, set labor and RPLH targets. Change nothing. Know the numbers.'],
+                ['Week 2', 'Build the lists', 'Run the price floors, build next week from a forecast, log every server check average. Build the lists, do not reprice yet.'],
+                ['Week 3', 'Launch the floor systems', 'Sign the server standard, run the first briefing, start the first coaching conversation, run the first table audit.'],
+                ['Week 4', 'Full run', 'Every system at once: Monday labor and RPLH review, a briefing every shift, two audits, the menu matrix and check average updated.']
+              ],
+              note: 'Week 3 feels uncomfortable the first time you hand experienced servers a written standard. Do it anyway. Direct, professional, not apologetic. This is how the floor runs now.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You do not track this on paper. The moment you do the first real step, your Revenue Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month numbers. Your setup checklist lives in Getting Started.' },
+            { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' },
+            { t: 'docs', items: [
+              { file: 'revenue/30_90Day_Revenue_Growth_Roadmap.docx', label: '30 and 90-Day Revenue Growth Roadmap' }
+            ] }
+          ]
+        },
+        {
+          id: 'close', nav: 'Start Tonight', eyebrow: 'Start tonight',
+          title: 'The Revenue Is Already in Your Building',
+          blocks: [
+            { t: 'lead', text: 'A bar owner in Asheville, 78 seats, three months in. Check average up 3.80 from baseline at 110 covers a night. Nine private events in October against four the month before. Floor labor running 22 percent against a 29 percent habit-schedule baseline. She said she could not believe none of it was complicated. It was not. She just never had a system that made her look at it every week.' },
+            { t: 'p', text: 'What separates bars that capture their revenue from bars that leave it on the table is not location, concept, or talent. It is measurement and a system instead of a feeling. A briefing before every service. A schedule built from a revenue number. A rate card that goes out within two hours. None of it is complicated. All of it requires a system.' },
+            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Menu Items and set up your top sellers with real costs. Read your check average by server in Server Check. Build next week from your Revenue Forecast instead of last week schedule. Then open your Revenue Fix System and do the first step, so Bar Cop logs the day and starts measuring what you capture.' },
+            { t: 'p', text: 'The gap between what you are making and what you should be making is not a market problem. It is a systems problem. Start building the system tonight.' },
+            { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' }
           ]
         }
       ]
