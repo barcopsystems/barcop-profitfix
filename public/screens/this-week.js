@@ -13,7 +13,6 @@ S.ThisWeek = {
   draft: null,
   _weekEnd: null,
   _editId: null,
-  _showCatering: false,
   _msg: '',
   DRAFT_KEY: 'pf_draft',
   filterPreset: 'last-12',
@@ -100,9 +99,13 @@ S.ThisWeek = {
     const start = App.ymdLocal(startD);
     const posDept = {};
     ((App.laborData && App.laborData.lc_positions) || []).forEach(p => { posDept[p.id] = p.department; });
+    // Staff hours charged to an offsite event this week belong on the Events line,
+    // not bar/food, so skip them here to avoid double-counting that labor.
+    const evKeys = this.offsiteEventStaffKeys(periodEnd);
     let bar = 0, food = 0, any = false;
     actuals.forEach(a => {
       if (!a.date || a.date < start || a.date > periodEnd) return;
+      if (evKeys.has(a.staff_id + '|' + String(a.date).slice(0, 10))) return;
       any = true;
       if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
       else food += a.cost || 0;
@@ -126,26 +129,49 @@ S.ThisWeek = {
   // shared App.dateRangeLabel so the format matches every other week selector.
   weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },
 
-  // Catering revenue from the Events section for this week — but ONLY offsite
-  // catering jobs. An in-house event runs inside a normal shift, so its revenue
-  // already lands in bar/food revenue above; counting it here too would double it.
-  // Offsite jobs have no shift, so they are the separate catering line. Revenue +
-  // food/bar cost prefill; labor stays for the operator (offsite labor is manual).
+  // The Events line for this week, read straight from the Events section. Offsite
+  // jobs ONLY: an in-house event runs inside a normal shift, so its revenue is
+  // already in bar/food above and counting it here too would double it. Revenue,
+  // COGS, and labor all come from the booking, so the row is read-only, never
+  // hand-typed. Labor is the event staff you checked in Build Schedule, the same
+  // figure the Event P&L shows (and excluded from bar/food labor above).
   cateringFromBookings(periodEnd) {
     const blank = { revenue: '', cogs: '', labor: '' };
     if (!periodEnd) return blank;
-    const start = App.weekStartFor(periodEnd);
-    let rev = 0, cogs = 0;
-    (App.data.bookings || []).forEach(b => {
-      if (b.stage !== 'Completed' || !b.event_date) return;
-      const ed = String(b.event_date).slice(0, 10);
-      if (ed < start || ed > periodEnd) return;
-      const offsite = b.event_type === 'Catering (Offsite)' || /offsite/i.test(b.space || '');
-      if (!offsite) return;   // in-house event revenue is already in the shift's bar/food revenue
-      rev  += parseFloat(b.actual_revenue) || 0;
-      cogs += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0);
+    const EB = window.S && S.EventsBookings;
+    let rev = 0, cogs = 0, labor = 0;
+    this.offsiteBookings(periodEnd).forEach(b => {
+      rev   += parseFloat(b.actual_revenue) || 0;
+      cogs  += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0);
+      labor += EB ? (EB.bookingLabor(b) || 0) : 0;
     });
-    return rev > 0 ? { revenue: rev.toFixed(2), cogs: cogs.toFixed(2), labor: '' } : blank;
+    return (rev > 0 || cogs > 0 || labor > 0)
+      ? { revenue: rev ? rev.toFixed(2) : '', cogs: cogs ? cogs.toFixed(2) : '', labor: labor ? labor.toFixed(2) : '' }
+      : blank;
+  },
+
+  // Completed offsite bookings whose event date falls in the selected week.
+  offsiteBookings(periodEnd) {
+    if (!periodEnd) return [];
+    const start = App.weekStartFor(periodEnd);
+    return (App.data.bookings || []).filter(b => {
+      if (b.stage !== 'Completed' || !b.event_date) return false;
+      const ed = String(b.event_date).slice(0, 10);
+      if (ed < start || ed > periodEnd) return false;
+      return b.event_type === 'Catering (Offsite)' || /offsite/i.test(b.space || '');
+    });
+  },
+
+  // (staff_id|date) pairs charged to an offsite event this week, so bar/food labor
+  // can skip them (their cost lands on the Events line instead, never twice).
+  offsiteEventStaffKeys(periodEnd) {
+    const keys = new Set();
+    const EB = window.S && S.EventsBookings;
+    if (!EB || typeof EB.eventStaffShifts !== 'function') return keys;
+    this.offsiteBookings(periodEnd).forEach(b => {
+      EB.eventStaffShifts(b).forEach(sh => { if (sh.staff_id && sh._iso) keys.add(sh.staff_id + '|' + sh._iso); });
+    });
+    return keys;
   },
 
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
@@ -186,7 +212,6 @@ S.ThisWeek = {
   // Control pull (with the current-week localStorage draft restored if present).
   loadWeek(weekEnd) {
     this._weekEnd = weekEnd;
-    this._showCatering = false;
     const saved = this.savedWeek(weekEnd);
     if (saved) {
       this.draft = this.draftFromWeek(saved);
@@ -196,12 +221,9 @@ S.ThisWeek = {
       const dr = (weekEnd === this.currentWeekEnd()) ? this.readDraft(weekEnd) : null;
       this.draft = dr || this.freshDraft(weekEnd);
     }
-  },
-
-  cateringActive(d) {
-    if (this._showCatering) return true;
-    const c = d && d.catering;
-    return !!(c && (parseFloat(c.revenue) || parseFloat(c.cogs) || parseFloat(c.labor)));
+    // The Events line is always read-only and pulled live from the Events section,
+    // so it reflects current bookings on every load (saved weeks included).
+    this.draft.catering = this.cateringFromBookings(weekEnd);
   },
 
   // ── History filter range ──────────────────────────────────────────────────
@@ -230,7 +252,7 @@ S.ThisWeek = {
       { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
-      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Refresh from Control re-pulls the latest logged numbers and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'The Confirm Grid', p: ['Three rows: Bar, Food, and Events. Bar and Food are pre-filled from Control and editable, so you confirm or correct them against your POS. The Events row is read-only and pulls offsite catering and event revenue, cost, and labor straight from the Events section (the staff you checked to the event in Build Schedule), so it is never hand-typed. Cost percent and dollars over or under target compute live. Refresh This Week re-pulls the latest logged numbers and refills every editable cell; if you have edited one by hand it asks before overwriting.'] },
       { h: 'Other Revenue', p: ['Merch, vending, ticketed events, anything outside bar and food, goes in the Other / Ancillary Revenue box with its cost. It stays out of your prime cost but rolls into Books as its own income line.'] },
       { h: 'Operating Costs', p: ['Third-party platform fees, delivery commissions and the like, are an operating cost, not COGS or labor, so they sit in their own box and do not move the prime cost numbers above. Bar Cop captures the weekly figure here and Books reads it as an operating expense toward your true profit.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
@@ -273,7 +295,7 @@ S.ThisWeek = {
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
       + statePill
-      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Refresh from Control</button>'
+      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Refresh This Week</button>'
       + '</div></div>';
   },
 
@@ -281,21 +303,22 @@ S.ThisWeek = {
   cell(id, val) {
     return '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-' + id + '" value="' + esc(String(val || '')) + '" step="0.01" inputmode="decimal" style="width:100%;" oninput="S.ThisWeek.onInput()"/></div>';
   },
-  lineRow(label, p, data) {
+  // Read-only money cell — the Events line, pulled from bookings, never typed.
+  roCell(id, val) {
+    return '<div class="fw"><span class="pre" style="color:var(--t4);">$</span><input class="form-input pre" type="text" id="tw-' + id + '" value="' + esc(val ? Number(val).toFixed(2) : '0.00') + '" readonly tabindex="-1" style="width:100%;background:transparent;border-color:transparent;color:var(--t3);cursor:default;"/></div>';
+  },
+  lineRow(label, p, data, readonly) {
+    const c = (id, val) => readonly ? this.roCell(id, val) : this.cell(id, val);
     return '<tr class="tw-line">'
       + '<td><div class="val">' + label + '</div></td>'
-      + '<td>' + this.cell(p + 'r', data.revenue) + '</td>'
-      + '<td>' + this.cell(p + 'l', data.labor) + '</td>'
-      + '<td>' + this.cell(p + 'c', data.cogs) + '</td>'
+      + '<td>' + c(p + 'r', data.revenue) + '</td>'
+      + '<td>' + c(p + 'l', data.labor) + '</td>'
+      + '<td>' + c(p + 'c', data.cogs) + '</td>'
       + '<td id="tw-' + p + 'pct">-</td>'
       + '<td id="tw-' + p + 'vd" style="text-align:right;">-</td>'
       + '</tr>';
   },
   gridCard(d) {
-    const cateringOn = this.cateringActive(d);
-    const footerLeft = cateringOn
-      ? '<button type="button" id="tw-remove-catering" style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:0;">Remove catering</button>'
-      : '<button type="button" id="tw-add-catering" style="background:none;border:none;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;padding:0;">+ Add catering / events</button>';
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Confirm the Week</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
@@ -304,9 +327,8 @@ S.ThisWeek = {
       + '</tr></thead><tbody>'
       + this.lineRow('Bar', 'b', d.bar)
       + this.lineRow('Food', 'f', d.food)
-      + (cateringOn ? this.lineRow('Catering', 'c', d.catering || { revenue: '', cogs: '', labor: '' }) : '')
+      + this.lineRow('Events', 'c', d.catering || { revenue: '', cogs: '', labor: '' }, true)
       + '</tbody></table></div>'
-      + '<div style="margin-bottom:14px;">' + footerLeft + '</div>'
       + '<div class="f" style="margin:0;"><label>Notes</label>'
       + '<textarea id="tw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
@@ -417,8 +439,6 @@ S.ThisWeek = {
     document.getElementById('tw-save')?.addEventListener('click', () => this.saveWeek());
     document.getElementById('tw-start-over')?.addEventListener('click', () => this.startOver());
     document.getElementById('tw-pull')?.addEventListener('click', () => this.pullAll());
-    document.getElementById('tw-add-catering')?.addEventListener('click', () => { this.collect(); this._showCatering = true; this.saveDraft(); this.draw(); });
-    document.getElementById('tw-remove-catering')?.addEventListener('click', () => { this.collect(); this.draft.catering = { revenue: '', cogs: '', labor: '' }; this._showCatering = false; this.saveDraft(); this.draw(); });
     this.container.querySelectorAll('.tw-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeek(b.dataset.end)));
     this.container.querySelector('.tw-wk-prev')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, -7)));
     this.container.querySelector('.tw-wk-next')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, 7)));
@@ -472,8 +492,8 @@ S.ThisWeek = {
     const d = this.draft;
     d.bar.revenue = v('tw-br'); d.bar.cogs = v('tw-bc'); d.bar.labor = v('tw-bl');
     d.food.revenue = v('tw-fr'); d.food.cogs = v('tw-fc'); d.food.labor = v('tw-fl');
-    if (!d.catering) d.catering = { revenue: '', cogs: '', labor: '' };
-    if (this.cateringActive(d)) { d.catering.revenue = v('tw-cr'); d.catering.cogs = v('tw-cc'); d.catering.labor = v('tw-cl'); }
+    // Events line is read-only, pulled live from the Events section, never typed.
+    d.catering = this.cateringFromBookings(this._weekEnd);
     if (!d.other) d.other = { revenue: '', cogs: '' };
     d.other.revenue = v('tw-or'); d.other.cogs = v('tw-oc');
     d.platform_fees = v('tw-pf');
@@ -521,7 +541,7 @@ S.ThisWeek = {
       { p: 'b', target: t.bar_pour_cost_pct ?? 22 },
       { p: 'f', target: t.food_cost_pct ?? 32 }
     ];
-    if (this.cateringActive(d)) sections.push({ p: 'c', target: null });
+    sections.push({ p: 'c', target: null });   // Events line (read-only, from bookings)
 
     let totRev = 0, totCost = 0, overTarget = 0;
     sections.forEach(s => {
