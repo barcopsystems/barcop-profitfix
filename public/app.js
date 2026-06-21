@@ -606,7 +606,7 @@ const App = {
     const pill = document.createElement('div');
     pill.id = 'offline-pill';
     pill.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
-      + 'background:rgba(20,20,20,0.92);color:var(--gold);border:1px solid var(--gold);'
+      + 'background:var(--bg);color:var(--t2);border:1px solid var(--b-edge);'
       + 'border-radius:14px;padding:5px 14px;font-size:11px;font-weight:700;letter-spacing:1px;'
       + 'text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
     pill.textContent = 'Offline. Saves staying on this device.';
