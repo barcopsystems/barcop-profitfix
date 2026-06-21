@@ -335,7 +335,8 @@ S.TrafficAudit = {
 
     // From weekly traffic numbers (Bar Cop does not auto-collect this — it only
     // has what the operator logged in This Week).
-    const tw = (App.data.traffic_weeks || []).slice(-4);
+    const tw = (App.data.traffic_weeks || [])
+      .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-4);
     const has = (fn) => tw.some(w => w[fn] != null);
     const checks = [
       { label: 'Google Rating',   ok: has('google_rating') },
