@@ -228,9 +228,9 @@ S.ThisWeek = {
   showHowTo() {
     App.showHelpModal('How This Week Works', [
       { p: ['This is the weekly confirm. Bar Cop pulls the week in from your Control systems: revenue from Shift Control, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save. You almost never type a raw number, you confirm one.'] },
-      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one.'] },
+      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
-      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Load From Control re-runs the math and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'The Confirm Grid', p: ['One row per stream (Bar, Food, and Catering if you run events). Revenue, Labor, and COGS are the cells, pre-filled from Control and editable. Cost percent and dollars over or under target compute live as you tweak. Refresh from Control re-pulls the latest logged numbers and refills every auto cell; if you have edited a cell by hand it asks before overwriting.'] },
       { h: 'Other Revenue', p: ['Merch, vending, ticketed events, anything outside bar and food, goes in the Other / Ancillary Revenue box with its cost. It stays out of your prime cost but rolls into Books as its own income line.'] },
       { h: 'Operating Costs', p: ['Third-party platform fees, delivery commissions and the like, are an operating cost, not COGS or labor, so they sit in their own box and do not move the prime cost numbers above. Bar Cop captures the weekly figure here and Books reads it as an operating expense toward your true profit.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
@@ -253,6 +253,12 @@ S.ThisWeek = {
     const sel = this._weekEnd;
     const older = this.addDays(sel, -7);
     const fwdDisabled = sel >= now;   // never step past the in-progress current week
+    // Lifecycle marker so it reads as a week-in-progress, not a static form:
+    // "Building from your logs" until the week is saved (closed out), then "Saved."
+    const saved = !!this.savedWeek(sel);
+    const statePill = '<span style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;color:' + (saved ? 'var(--green)' : 'var(--t3)') + ';">'
+      + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (saved ? 'var(--green)' : 'var(--t4)') + ';"></span>'
+      + (saved ? 'Saved' : 'Building from your logs') + '</span>';
     const chip = (end, active) =>
       '<button class="tw-wk-chip btn btn-sm" data-end="' + end + '" style="'
         + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
@@ -265,8 +271,9 @@ S.ThisWeek = {
       + '<button class="btn btn-ghost btn-sm tw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
       + (sel !== now ? '<button class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>' : '')
       + '</div>'
-      + '<div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Load from Control</button>'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      + statePill
+      + '<button class="btn btn-ghost btn-sm" id="tw-pull">Refresh from Control</button>'
       + '</div></div>';
   },
 
