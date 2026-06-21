@@ -87,7 +87,7 @@ S.TrafficDashboard = {
       value: n(latest.monthly_sessions), color: latest.monthly_sessions >= (t.monthly_sessions || 2000) ? 'var(--green)' : 'var(--red)'
     });
     if (latest.ig_posts_month != null) rows.push({
-      label: 'Posts / Mo', sub: 'target ' + (t.social_posts_month || 12),
+      label: 'IG Posts / Mo', sub: 'target ' + (t.social_posts_month || 12),
       value: String(latest.ig_posts_month), color: latest.ig_posts_month >= (t.social_posts_month || 12) ? 'var(--green)' : 'var(--red)'
     });
     return rows;
