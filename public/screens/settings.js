@@ -2120,14 +2120,16 @@ S.HubSettings = {
         created_at:daysAgoISO(daysAgo) };
     };
     // The recent three counts drive the live weekly COGS + variance window and
-    // must stay exactly as-is. The older weekly counts (back ~12 weeks) oscillate
+    // must stay exactly as-is. Weekly counts begin in week 4 (~63 days back): the
+    // operator spent the first weeks setting up before counting on a schedule, so
+    // the early audit windows honestly show few counts. The older counts oscillate
     // around the well-stocked day-7 level so inventory reads flat across the
-    // quarter (beginning ~= ending), with a couple of busy-week draw-downs — the
-    // sawtooth a real bar shows. Deterministic multipliers keep it reproducible.
+    // quarter, with a couple of busy-week draw-downs — the sawtooth a real bar
+    // shows. Deterministic multipliers keep it reproducible.
     const icOlderCounters = ['Carlos P.', 'Maria G.', 'Jake T.'];
     const icOlderWeeks = [
       [21, 1.05], [28, 0.92], [35, 1.10], [42, 0.86], [49, 1.03],
-      [56, 0.95], [63, 1.09], [70, 0.90], [77, 1.04], [84, 0.98]
+      [56, 0.95], [63, 1.09]
     ];
     App.inventoryData.ic_counts = [
       mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
@@ -2532,15 +2534,25 @@ S.HubSettings = {
     ];
     const mkChkItems = (arr, doneN) => arr.map((text, idx) => ({ text:text, done:idx < doneN }));
     const scChecklists = [];
+    // Adoption ramp: the operator sets up in the first two weeks, so checklists
+    // start in week 2 (closing routine first), reach a routine by week 3, and
+    // settle at a disciplined-but-not-perfect run rate (~75% opening, ~67%
+    // closing). The recent 30-day window — what the live audit reads — lands on
+    // those rates, so the live score and the seeded day-90 audit agree, while the
+    // early audit windows honestly show sparse checklists. Deterministic skips.
     scDays.forEach((d, i) => {
       const mgr = d.manager;
-      const openDone  = (i % 9 === 0) ? scOpenItems.length  - 1 : scOpenItems.length;   // ~89% fully complete
-      const closeDone = (i % 7 === 0) ? scCloseItems.length - 1 : scCloseItems.length;  // ~86% fully complete
-      scChecklists.push({ id:uid(), type:'Opening', template_id:scOpenTplId, template_name:'Standard Open',
+      if (i < 12) return;                                  // weeks 1-1.5: onboarding, no checklists yet
+      const inRoutine = i >= 21;                           // fully in the routine by week 3
+      const openRun  = inRoutine ? (i % 4 !== 0) : (i % 3 === 0);   // ~75% in routine, sparse during ramp
+      const closeRun = inRoutine ? (i % 3 !== 0) : (i % 2 === 0);   // ~67% in routine, partial during ramp
+      const openDone  = (i % 9 === 0) ? scOpenItems.length  - 1 : scOpenItems.length;   // ~89% item completion
+      const closeDone = (i % 7 === 0) ? scCloseItems.length - 1 : scCloseItems.length;  // ~86% item completion
+      if (openRun) scChecklists.push({ id:uid(), type:'Opening', template_id:scOpenTplId, template_name:'Standard Open',
         date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scOpenItems, openDone),
         done_count:openDone, total_count:scOpenItems.length, notes:'',
         completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
-      scChecklists.push({ id:uid(), type:'Closing', template_id:scCloseTplId, template_name:'Standard Close',
+      if (closeRun) scChecklists.push({ id:uid(), type:'Closing', template_id:scCloseTplId, template_name:'Standard Close',
         date:d.date, completed_by:mgr, completed_by_id:'', items:mkChkItems(scCloseItems, closeDone),
         done_count:closeDone, total_count:scCloseItems.length, notes:'',
         completed_at:new Date().toISOString(), created_at:new Date().toISOString() });
@@ -2769,30 +2781,29 @@ S.HubSettings = {
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
-    // Each system STARTS when the operator first works it, which for The Anchor
-    // is the beginning of the logged history (week 1, ~77 days back). Recovery is
-    // then COMPUTED honestly by the engine: those first weeks are the baseline (a
-    // loose start), and the improving arc that follows shows up as real recovered
-    // dollars, exactly as a live user's would. No backdated "fix landed here"
-    // fantasy. Reviews stays untracked (absent from Recovery.METRICS by design,
-    // too indirect to dollarize) so the demo also shows how an untracked fix renders.
-    const fxStart = dateStr(77), fxStartISO = daysAgoISO(77);
+    // Fixes are logged across the 90 days as the operator worked each gap, not all
+    // at once: pour cost first (week 2), the rest of the cost leaks through month 1,
+    // and the slower digital gaps still being worked in the last month. The recovery
+    // engine then treats the first weeks as the baseline (a loose start) and the
+    // improving arc that follows shows up as real, maturing recovered dollars,
+    // exactly as a live user's would. No backdated "fix landed here" fantasy.
+    const fxAt = (n) => ({ date: dateStr(n), logged_at: daysAgoISO(n) });
     App.data.fix_log = (App.data.fix_log || [])
       .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
       .concat([
-      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',           date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',           date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',          date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',      date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'revenue', gap_id:'check-average',    gap_name:'Check Average and Upsell',  date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling', date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business',         date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email Marketing',          date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'delivery',      gap_name:'Delivery Platforms',      date:fxStart, logged_at:fxStartISO },
-      { id:uid(), module:'traffic', gap_id:'reviews',       gap_name:'Reviews',                 date:fxStart, logged_at:fxStartISO },
+      { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',           ...fxAt(78) },
+      { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',      ...fxAt(74) },
+      { id:uid(), module:'profit', gap_id:'food-cost',  gap_name:'Food Cost',           ...fxAt(70) },
+      { id:uid(), module:'profit', gap_id:'prime-cost', gap_name:'Prime Cost',          ...fxAt(56) },
+      { id:uid(), module:'revenue', gap_id:'check-average',    gap_name:'Check Average and Upsell',  ...fxAt(64) },
+      { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling', ...fxAt(50) },
+      { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  ...fxAt(18) },
+      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business',         ...fxAt(62) },
+      { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 ...fxAt(44) },
+      { id:uid(), module:'traffic', gap_id:'reviews',       gap_name:'Reviews',                 ...fxAt(30) },
+      { id:uid(), module:'traffic', gap_id:'delivery',      gap_name:'Delivery Platforms',      ...fxAt(26) },
+      { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            ...fxAt(22) },
+      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email Marketing',          ...fxAt(14) },
     ]);
 
     // ── Variance Investigations ──
