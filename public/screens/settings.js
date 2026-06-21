@@ -2669,50 +2669,50 @@ S.HubSettings = {
     });
     App.shiftData.sc_void_comps = scVoidComps;
 
-    // One Saturday cash drop per week. Each drop also seeds a mirrored
-    // sc_safe_log entry so the Cash Control safe balance is honest from
-    // load (Phase 2 Chunk A auto-mirror only fires for NEW drops; sample
-    // drops have to seed both stores by hand).
+    // A cash drop at every close on operating days (skip Monday, the slowest), so
+    // the drawer never holds too much cash — that is the discipline the Bar Cop
+    // Audit reads on revenue days. Each drop mirrors an sc_safe_log "in" entry, and
+    // a weekly bank deposit "out" clears most of it so the safe balance stays
+    // realistic from load (the Phase 2 auto-mirror only fires for NEW drops; sample
+    // drops seed both stores by hand).
     const scCashDrops = [];
     const scSafeLog = [];
     ANCHS.weeks.forEach(a => {
       const baseAgo = sunOff + ANCHS.endAgo(a);
-      const dropId = uid();
-      const safeId = uid();
-      const dropDate = dateStr(baseAgo + 1);
-      const dropAmount = 900 + Math.round(Math.random() * 500);
-      const performed = mgrs[a.wk % 3];
-      const witness   = mgrs[(a.wk + 1) % 3];
-      scCashDrops.push({
-        id:dropId, date:dropDate, shift_type:'Close', drop_time:'23:30',
-        drawer_id: scDrawers[0].id, drawer: scDrawers[0].name,
-        performed_by:performed, witness:witness,
-        amount:dropAmount, denominations:{}, notes:'',
-        safe_log_id: safeId,
-        created_at:new Date().toISOString()
-      });
+      let weekDrops = 0;
+      for (let di = 1; di < 7; di++) {           // Tue..Sun (skip Monday)
+        const dropId = uid();
+        const safeId = uid();
+        const dropDate = dateStr(baseAgo + 6 - di);
+        const dropAmount = 900 + Math.round(Math.random() * 500);
+        weekDrops += dropAmount;
+        const performed = mgrs[(a.wk + di) % 3];
+        const witness   = mgrs[(a.wk + di + 1) % 3];
+        const dr = scDrawers[di % scDrawers.length];
+        scCashDrops.push({
+          id:dropId, date:dropDate, shift_type:'Close', drop_time:'23:30',
+          drawer_id: dr.id, drawer: dr.name,
+          performed_by:performed, witness:witness,
+          amount:dropAmount, denominations:{}, notes:'',
+          safe_log_id: safeId,
+          created_at:new Date().toISOString()
+        });
+        scSafeLog.push({
+          id:safeId, date:dropDate, time:'23:30',
+          txn_type:'Cash Drop', direction:'in', amount:dropAmount,
+          reference:'Drawer: ' + dr.name + ' / Close',
+          performed_by:performed, witness:witness, notes:'',
+          source:'cash-drop', source_id:dropId,
+          created_at:new Date().toISOString()
+        });
+      }
+      // Weekly bank deposit clears ~90% of the week's drops out of the safe.
       scSafeLog.push({
-        id:safeId, date:dropDate, time:'23:30',
-        txn_type:'Cash Drop', direction:'in', amount:dropAmount,
-        reference:'Drawer: ' + scDrawers[0].name + ' / Close',
-        performed_by:performed, witness:witness, notes:'',
-        source:'cash-drop', source_id:dropId,
-        created_at:new Date().toISOString()
+        id:uid(), date:dateStr(baseAgo), time:'09:15',
+        txn_type:'Bank Deposit', direction:'out', amount:Math.round(weekDrops * 0.9),
+        reference:'Weekly deposit run', performed_by:mgrs[a.wk % 3], witness:'', notes:'',
+        source:'safe-log', created_at:new Date().toISOString()
       });
-    });
-    // Seed a couple of bank deposit out entries so Net In Window can swing
-    // negative on some windows — gives the operator a realistic demo.
-    scSafeLog.push({
-      id:uid(), date:dateStr(10), time:'09:30',
-      txn_type:'Bank Deposit', direction:'out', amount:6500,
-      reference:'Tuesday deposit run', performed_by:mgrs[0], witness:'', notes:'',
-      source:'safe-log', created_at:new Date().toISOString()
-    });
-    scSafeLog.push({
-      id:uid(), date:dateStr(38), time:'09:15',
-      txn_type:'Bank Deposit', direction:'out', amount:5200,
-      reference:'Tuesday deposit run', performed_by:mgrs[1], witness:'', notes:'',
-      source:'safe-log', created_at:new Date().toISOString()
     });
     App.shiftData.sc_cash_drops = scCashDrops;
     App.shiftData.sc_safe_log = scSafeLog;
