@@ -24,7 +24,9 @@ S.Dashboard = {
   // Leaking Now as text + Cost vs Target), a standard row (Profit Forecast +
   // Profit Audit), then Quick Actions. Layout via the shared DashUI.
   renderFull(container) {
-    const weeks   = (App.data && App.data.weeks) || [];
+    // weeks load newest-first from the event store, so sort a copy ascending by
+    // period_end before any positional slice/last-element read (event-store gotcha).
+    const weeks   = ((App.data && App.data.weeks) || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
     const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
     const leak = FixPanel.leakRowsText('profit');
     const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
@@ -42,6 +44,8 @@ S.Dashboard = {
             runText: 'Run Profit Audit',
             emptyText: 'Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.'
           })))
+      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
+      + InitiativeTracker.card('profit')
       + DashUI.quickActions([
           { go: 'this-week', label: 'Enter This Week' },
           { go: 'audit-tracker', label: 'Run Profit Audit' },
@@ -52,6 +56,7 @@ S.Dashboard = {
     FixPanel.wireFixAreas(container);
     document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
     DashUI.wireQuick(container);
+    InitiativeTracker.wire('profit', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
   },
 
   // Profit Forecast panel — profit projected forward twelve months, plus what
@@ -142,7 +147,7 @@ S.Dashboard = {
   showInsights() {
     if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
     const btn = document.getElementById('db-insights-btn');
-    const weeks = (App.data.weeks || []).slice(-8);
+    const weeks = (App.data.weeks || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
     // Once-a-week cache (shared with Revenue and Traffic): re-open the stored
