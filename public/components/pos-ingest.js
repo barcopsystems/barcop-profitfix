@@ -36,13 +36,23 @@ const PosIngest = {
       { key: 'server', label: 'Server',       required: false, match: ['server', 'employee', 'name', 'staff', 'bartender', 'cashier'] },
       { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note'] },
       { key: 'date',   label: 'Date',         required: false, match: ['date', 'business date', 'shift date'] }
+    ],
+    // A POS "sales by day" report: one row per day. Bar/food (revenue centers)
+    // optional but at least one is needed; covers optional. Writes one per-day
+    // record into sc_shifts (revenue/covers, no live-shift cruft).
+    sales: [
+      { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date'] },
+      { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales'] },
+      { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales'] },
+      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers', 'count'] }
     ]
   },
 
   TYPES: {
     hours: { label: 'Hours',         module: 'lc', kind: 'actual'    },
     tips:  { label: 'Tips',          module: 'lc', kind: 'tip'       },
-    voids: { label: 'Voids & Comps', module: 'sc', kind: 'void_comp' }
+    voids: { label: 'Voids & Comps', module: 'sc', kind: 'void_comp' },
+    sales: { label: 'Daily Sales',   module: 'sc', kind: 'shift'     }
   },
 
   normDate(raw) {
@@ -64,6 +74,7 @@ const PosIngest = {
     if (type === 'hours') return this.buildHours(rows);
     if (type === 'tips')  return this.buildTips(rows);
     if (type === 'voids') return this.buildVoids(rows);
+    if (type === 'sales') return this.buildSales(rows);
     return { toAdd: [], skipped: [], dupCount: 0 };
   },
 
@@ -155,12 +166,47 @@ const PosIngest = {
     return { toAdd, skipped, dupCount };
   },
 
+  buildSales(rows) {
+    const existingDates = new Set((((App.shiftData && App.shiftData.sc_shifts) || [])).map(s => s.date));
+    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')) || 0;
+    const toAdd = []; const skipped = []; let dupCount = 0; const seen = new Set();
+    (rows || []).forEach(r => {
+      const date = this.normDate(r.date);
+      if (!date) { skipped.push('(no date)'); return; }
+      const bar = num(r.bar), food = num(r.food);
+      if (bar + food <= 0) { skipped.push(date); return; }
+      if (seen.has(date)) return;          // one row per day; ignore a repeat date in the file
+      seen.add(date);
+      if (existingDates.has(date)) dupCount++;   // this day already has a record — it gets replaced
+      const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
+      toAdd.push({
+        id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
+        total_revenue: bar + food, shift_type: 'Full Day', status: 'Closed',
+        imported: true, created_at: new Date().toISOString()
+      });
+    });
+    return { toAdd, skipped, dupCount };
+  },
+
   // ── Persist ──────────────────────────────────────────────────────────────
   async commit(type, toAdd) {
+    if (type === 'sales') return this._commitSales(toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
     for (const rec of (toAdd || [])) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+    return ok;
+  },
+
+  // Sales upserts by DATE: a re-import of the same week replaces those days'
+  // figures (one record per day), so it never double-counts and supersedes any
+  // older record for the day.
+  async _commitSales(toAdd) {
+    const dates = new Set((toAdd || []).map(r => r.date));
+    const existing = (((App.shiftData && App.shiftData.sc_shifts) || [])).filter(s => dates.has(s.date));
+    let ok = true;
+    for (const e of existing) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
+    for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'shift', rec)) && ok; }
     return ok;
   }
 };
