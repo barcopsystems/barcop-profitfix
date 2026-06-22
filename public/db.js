@@ -260,7 +260,6 @@ const DB = {
     'sc-cash-history':'cash-mgmt',
     'sc-cash-control':'cash-mgmt','sc-shift-policies':'cash-mgmt','sc-drawers':'cash-mgmt',
     'sc-checklists':'checklists','sc-checklist-templates':'checklists',
-    'sc-86-list':'86-list',
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
     'sc-waste':'waste',
