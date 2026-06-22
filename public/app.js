@@ -1586,7 +1586,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'pos-import']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -1945,7 +1945,6 @@ const App = {
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
   _moduleOf(id) {
-    if (id === 'pos-import') return 'inventory';  // Control-wide import hub; lives under each Control sidebar, canonical home = Inventory
     if (/^ic-/.test(id)) return 'inventory';
     if (/^lc-/.test(id)) return 'labor';
     if (/^sc-/.test(id)) return 'shift';
@@ -4126,7 +4125,6 @@ const App = {
         'ic-report-stock':     ['Stock Report', 'Inventory Control'],
         'ic-report-movers':    ['Movement Report', 'Inventory Control'],
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
-        'pos-import':          ['Import POS Data', 'Control'],
       };
       const icScreens = {
         'ic-dashboard':      S.InventoryDashboard,
@@ -4150,7 +4148,6 @@ const App = {
         'ic-report-stock':    S.InventoryStockReport,
         'ic-report-movers':   S.InventoryMoversReport,
         'ic-help':            S.InventoryHelp,
-        'pos-import':         S.PosImport,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = icTitle;
@@ -4179,7 +4176,6 @@ const App = {
         'sc-shift-policies':     ['Shift Policies', 'Shift Control'],
         'sc-reports':            ['Reports', 'Shift Control'],
         'sc-help':               ['Help and FAQ', 'Shift Control'],
-        'pos-import':            ['Import POS Data', 'Control'],
       };
       const scScreens = {
         'sc-dashboard': S.ShiftDashboard,
@@ -4196,7 +4192,6 @@ const App = {
         'sc-shift-policies': S.ShiftPolicies,
         'sc-reports': S.ShiftReports,
         'sc-help': S.ShiftHelp,
-        'pos-import': S.PosImport,
       };
       const [scTitle, scSub] = scTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = scTitle;
@@ -4226,7 +4221,6 @@ const App = {
         'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
         'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
         'lc-help':               ['Help and FAQ', 'Labor Control'],
-        'pos-import':            ['Import POS Data', 'Control'],
       };
       const lcScreens = {
         'lc-dashboard': S.LaborDashboard,
@@ -4244,7 +4238,6 @@ const App = {
         'lc-callout-log': S.LaborCalloutLog,
         'lc-reports': S.LaborReports,
         'lc-help': S.LaborHelp,
-        'pos-import': S.PosImport,
       };
       const [lcTitle, lcSub] = lcTitles[id] || [id, ''];
       document.getElementById('topbar-title').textContent = lcTitle;
