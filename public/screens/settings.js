@@ -979,7 +979,7 @@ S.HubSettings = {
       return App.ymdLocal(d);
     };
     // Covers forecast derives from the revenue forecast at the Anchor's blended
-    // check average. Active Shift reads covers_per_day for its Cover Goal.
+    // check average. Build Schedule reads covers_per_day for its cover target.
     const AVG_CHECK = 38;
     const coversFor = (pd) => { const c = {}; fcDays.forEach(d => { c[d] = Math.round((pd[d] || 0) / AVG_CHECK); }); return c; };
     const totalCoversOf = (cpd) => fcDays.reduce((t, d) => t + (cpd[d] || 0), 0);
@@ -1025,8 +1025,7 @@ S.HubSettings = {
         method: 'manual', notes,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       });
-      // Current week feeds Active Shift's Cover Goal; the coming week feeds the
-      // schedule builder.
+      // Both weeks feed the schedule builder's cover target and the forecast.
       App.data.revenue_forecasts.push(mk(monAt(0), ''));
       App.data.revenue_forecasts.push(mk(monAt(1), ''));
     })();
