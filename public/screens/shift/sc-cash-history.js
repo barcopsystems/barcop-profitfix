@@ -149,12 +149,11 @@ S.ShiftCashHistory = {
     const rows = filtered.length
       ? filtered.slice(0, App.listLimit('sc', 'cash_drop')).map(d => '<tr>'
           + '<td><div class="val">' + this.fmtDate(d.date) + '</div></td>'
-          + '<td>' + esc(d.shift_type || '-') + '</td>'
           + '<td>' + esc(d.drawer || '-') + '</td>'
           + '<td>' + esc(d.performed_by || '-') + '</td>'
           + '<td class="val">' + App.fmtCurrency(d.amount || 0) + '</td></tr>').join('')
-      : this.noMatchRow(5);
-    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', rows)
+      : this.noMatchRow(4);
+    const table = this.dataCard('<th>Date</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', rows)
       + App.showOlderBar('sc', 'cash_drop', filtered, this.filterPreset !== 'all');
     return { stats, table };
   },
@@ -206,7 +205,7 @@ S.ShiftCashHistory = {
       + this.statItem('Net Over/Short', (net > 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
       + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : ''));
     let rows;
-    if (!filtered.length) rows = this.noMatchRow(8);
+    if (!filtered.length) rows = this.noMatchRow(7);
     else rows = filtered.slice(0, App.listLimit('sc', 'variance')).map(v => {
       const vr = v.variance || 0;
       const nc = v.status === 'Not Counted';
@@ -215,12 +214,12 @@ S.ShiftCashHistory = {
       const col = v.status === 'Short' ? 'var(--red)' : v.status === 'Over' ? 'var(--amber)' : nc ? 'var(--t3)' : 'var(--green)';
       const vc = nc ? '-' : (vr > 0 ? '+' : '') + App.fmtCurrency(vr);
       return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
-        + '<td>' + esc(v.shift_type || '-') + '</td><td>' + esc(v.drawer || '-') + '</td>'
+        + '<td>' + esc(v.drawer || '-') + '</td>'
         + '<td>' + esc(v.cashier || '-') + '</td><td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
         + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td><span style="color:' + col + ';">' + vc + '</span></td>'
         + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
     }).join('');
-    const table = this.dataCard('<th>Date</th><th>Shift</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
+    const table = this.dataCard('<th>Date</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)
       + App.showOlderBar('sc', 'variance', filtered, this.filterPreset !== 'all');
     return { stats, table };
   }
