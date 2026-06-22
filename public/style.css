@@ -629,6 +629,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .data-table-archived .tbl tbody td{background:transparent;padding:12px 16px;}
 .data-table-archived .tbl tbody tr:hover td{background:var(--hover);}
 .page-empty{font-size:14px;color:var(--t3);padding:48px 0;line-height:1.6;max-width:540px;}
+
+/* CSV import preview: flat darkest-bg table, no row hover (it is a read-only
+   confirm-your-columns snapshot, not an interactive list). */
+.tbl.csvm-preview thead th,
+.tbl.csvm-preview tbody td,
+.page .tbl.csvm-preview thead th,
+.page .tbl.csvm-preview tbody td{background:#070E15;}
+.tbl.csvm-preview tbody tr:hover td,
+.page .tbl.csvm-preview tbody tr:hover td{background:#070E15;}
 @media (max-width:768px){
   .page{padding:16px 14px 72px;}
   .page-head{flex-direction:column;gap:14px;}
