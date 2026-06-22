@@ -393,10 +393,6 @@ const Shift = {
         <span class="nav-label">Cash History</span>
       </div>
       <div class="nav-section">Operations</div>
-      <div class="nav-item" data-screen="sc-86-list" id="nav-sc-86-list">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 4l9 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">86 List</span>
-      </div>
       <div class="nav-item" data-screen="sc-walked-tabs" id="nav-sc-walked-tabs">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Walked Tabs</span>
