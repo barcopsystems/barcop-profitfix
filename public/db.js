@@ -256,6 +256,8 @@ const DB = {
     'lc-callout-log':'call-out-log',
     'lc-reports':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports','lc-payroll-export':'labor-reports',
     'lc-dashboard':'labor-dashboard','lc-help':'_always',
+    // Control-wide unified POS import hub (writes hours, tips, voids/comps)
+    'pos-import':'pos-import',
     // Shift Control
     'sc-shift-history':'log-shift',
     'sc-active-shift':'active-shift',
