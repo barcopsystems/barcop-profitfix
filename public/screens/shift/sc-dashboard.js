@@ -301,7 +301,64 @@ S.ShiftDashboard = {
       onComplete: rows => this.importCash(rows)
     });
   },
+  // The cash report names its own registers. Match them to the operator's
+  // registers (by name or a saved alias). Unknown names get resolved once: on a
+  // blank slate they auto-create; if registers already exist, a one-time map-or-add
+  // prompt links each to an existing register or adds it new (remembered as an
+  // alias), so we never make duplicate registers and never ask twice.
   async importCash(rows) {
+    this._pendingCashRows = rows;
+    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
+    const key = s => String(s || '').trim().toLowerCase();
+    const known = new Set();
+    drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
+    const unmatched = [...new Set((rows || []).map(r => String(r.drawer || '').trim()).filter(Boolean))]
+      .filter(n => !known.has(key(n)));
+
+    if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
+      unmatched.forEach(n => this._addRegister(n));
+      await App.saveShift();
+      return this._commitCash(rows);
+    }
+    if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
+    return this._commitCash(rows);
+  },
+  _addRegister(name) {
+    if (!App.shiftData) App.shiftData = {};
+    if (!Array.isArray(App.shiftData.sc_drawers)) App.shiftData.sc_drawers = [];
+    App.shiftData.sc_drawers.push({ id: App.uid(), name: name, default_opening_bank: null, notes: '', active: true, pos_aliases: [], created_at: new Date().toISOString() });
+  },
+  _showCashMap(unmatched) {
+    const res = document.getElementById('sc-ck-cash-res');
+    if (!res) return;
+    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
+    const opts = drawers.map(d => '<option value="' + esc(d.id) + '">' + esc(d.name) + '</option>').join('');
+    const rows = unmatched.map(n =>
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);min-width:130px;">' + esc(n) + '</span>'
+      + '<span style="color:var(--t3);font-size:12px;">&rarr;</span>'
+      + '<select class="sc-cm-sel" data-name="' + esc(n) + '" style="height:34px;min-width:200px;">'
+      +   '<option value="__add">Add as a new register</option>' + opts
+      + '</select></div>').join('');
+    res.innerHTML = '<div style="margin-top:14px;border:1px solid var(--b-edge);border-radius:var(--r);background:var(--bg);padding:14px 16px;">'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Your report has registers Bar Cop does not recognize. Match each to one of yours, or add it new. Bar Cop remembers your choice.</div>'
+      + rows
+      + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" id="sc-cm-go">Match and Import</button></div>'
+      + '</div>';
+    document.getElementById('sc-cm-go')?.addEventListener('click', () => this._applyCashMap());
+  },
+  async _applyCashMap() {
+    const keyOf = s => String(s || '').trim().toLowerCase();
+    [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
+      const name = sel.dataset.name;
+      if (sel.value === '__add') { this._addRegister(name); return; }
+      const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
+      if (d) { if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); }
+    });
+    await App.saveShift();
+    return this._commitCash(this._pendingCashRows);
+  },
+  async _commitCash(rows) {
     const { toAdd, dupCount } = PosIngest.build('cash', rows);
     const res = document.getElementById('sc-ck-cash-res');
     if (!toAdd.length) {
@@ -311,6 +368,7 @@ S.ShiftDashboard = {
     }
     const ok = await PosIngest.commit('cash', toAdd);
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    this._pendingCashRows = null;
     this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
     this._openStep = 'exc';
     this.render(this.container, this.actions);
