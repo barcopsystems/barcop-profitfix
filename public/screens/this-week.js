@@ -4,11 +4,11 @@
    Matches the Control entry-page standard (Build Schedule / Log Hours / Receive
    Delivery): a stat strip up top, a week-chip selector row (chips left, page
    actions right), the confirm grid, Save + Start Over below the card, then a
-   filter-chip row and a view/edit history table. Revenue is entered off the
-   operator's POS weekly sales summary (the POS is the system of record for
-   sales); COGS pulls from Inventory and labor from Labor Control. Stepping the
-   selector to a saved week loads it for edit; Save updates that record. Saves to
-   App.data.weeks. */
+   filter-chip row and a view/edit history table. Revenue rolls up from the
+   week's imported POS sales (the Shift cockpit's weekly "sales by day" import),
+   COGS from Inventory, labor from Labor Control; the operator confirms. Stepping
+   the selector to a saved week loads it for edit; Save updates that record. Saves
+   to App.data.weeks. */
 
 S.ThisWeek = {
   draft: null,
@@ -66,6 +66,27 @@ S.ThisWeek = {
       if (c != null) { cogs += used * c; any = true; }
     });
     return any ? cogs : null;
+  },
+
+  // ── Weekly sales feed: the per-day POS sales imported in Shift (sc_shifts) ──
+  // Revenue lands in sc_shifts via the weekly "sales by day" import on the Shift
+  // cockpit (the POS is the system of record for sales), and rolls up to the
+  // week here. The operator confirms it; nothing is captured live.
+  salesRevenue(periodEnd) {
+    const days = (App.shiftData && App.shiftData.sc_shifts) || [];
+    if (!days.length || !periodEnd) return null;
+    const startD = new Date(periodEnd + 'T00:00:00');
+    if (isNaN(startD.getTime())) return null;
+    startD.setDate(startD.getDate() - 6);
+    const start = App.ymdLocal(startD);
+    let bar = 0, food = 0, any = false;
+    days.forEach(s => {
+      if (!s.date || s.date < start || s.date > periodEnd) return;
+      bar += s.bar_revenue || 0;
+      food += s.floor_revenue || 0;
+      any = true;
+    });
+    return any ? { bar, food } : { bar: 0, food: 0 };
   },
 
   // ── Labor Control labor feed (7-day week ending periodEnd) ────────────────
@@ -160,13 +181,14 @@ S.ThisWeek = {
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ──
   freshDraft(periodEnd) {
     const bc = this.icCOGS(this.BAR_CATS, periodEnd), fc = this.icCOGS(this.KITCHEN_CATS, periodEnd);
+    const sr = this.salesRevenue(periodEnd);
     const lc = this.laborCost(periodEnd);
-    // Revenue is entered off the operator's POS weekly sales summary, so it starts
-    // blank. COGS pulls from Inventory counts, labor from logged hours.
+    // Revenue rolls up from the week's imported POS sales (Shift), COGS from
+    // Inventory counts, labor from logged hours. The operator confirms.
     return {
       period_end: periodEnd,
-      bar:  { revenue: '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
-      food: { revenue: '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
+      bar:  { revenue: sr && sr.bar ? sr.bar.toFixed(2) : '', labor: lc && lc.bar ? lc.bar.toFixed(2) : '', cogs: bc != null ? bc.toFixed(2) : '' },
+      food: { revenue: sr && sr.food ? sr.food.toFixed(2) : '', labor: lc && lc.food ? lc.food.toFixed(2) : '', cogs: fc != null ? fc.toFixed(2) : '' },
       catering: this.cateringFromBookings(periodEnd),
       other: { revenue: '', cogs: '' },
       platform_fees: '',
@@ -233,10 +255,10 @@ S.ThisWeek = {
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
-      { p: ['This is the weekly confirm. You enter the week\'s revenue off your POS sales summary, and Bar Cop fills in COGS from Inventory Control and labor from Labor Control. You read the money picture up top, confirm the grid, and save.'] },
+      { p: ['This is the weekly confirm. Bar Cop pulls the week in from Control: revenue from your weekly POS sales import in Shift, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },
-      { h: 'The Confirm Grid', p: ['Three rows: Bar, Food, and Events. Enter Bar and Food revenue off your POS sales summary; their COGS and labor pre-fill from Inventory and Labor Control, so you confirm those. The Events row is read-only and pulls offsite catering and event revenue, cost, and labor straight from the Events section (the staff you checked to the event in Build Schedule), so it is never hand-typed. Cost percent and dollars over or under target compute live. Refresh This Week re-pulls the latest logged COGS and labor and refills those cells; if you have edited one by hand it asks before overwriting.'] },
+      { h: 'The Confirm Grid', p: ['Three rows: Bar, Food, and Events. Bar and Food revenue fills from your weekly POS sales import; COGS and labor pre-fill from Inventory and Labor Control. You confirm or correct against your POS. The Events row is read-only and pulls offsite catering and event revenue, cost, and labor straight from the Events section (the staff you checked to the event in Build Schedule), so it is never hand-typed. Cost percent and dollars over or under target compute live. Refresh This Week re-pulls the latest imported sales, COGS, and labor and refills those cells; if you have edited one by hand it asks before overwriting.'] },
       { h: 'Other Revenue', p: ['Merch, vending, ticketed events, anything outside bar and food, goes in the Other / Ancillary Revenue box with its cost. It stays out of your prime cost but rolls into Books as its own income line.'] },
       { h: 'Operating Costs', p: ['Third-party platform fees, delivery commissions and the like, are an operating cost, not COGS or labor, so they sit in their own box and do not move the prime cost numbers above. Bar Cop captures the weekly figure here and Books reads it as an operating expense toward your true profit.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first. The Cost vs Target column shows the real dollars that week ran over or under your bar and food cost targets combined. Edit loads a week back into the grid; Delete removes it. The range chips filter the list and Export PDF saves it.'] }
@@ -495,15 +517,17 @@ S.ThisWeek = {
   async pullAll() {
     const pe = this._weekEnd;
     const bc = this.icCOGS(this.BAR_CATS, pe), fc = this.icCOGS(this.KITCHEN_CATS, pe);
+    const sr = this.salesRevenue(pe);
     const lc = this.laborCost(pe);
-    // Revenue is operator-entered off the POS summary, so Refresh pulls only the
-    // Control-owned figures: COGS from Inventory counts, labor from logged hours.
+    // Refresh re-pulls every Control-owned figure: revenue from the week's
+    // imported POS sales, COGS from Inventory counts, labor from logged hours.
     const incoming = {};
+    if (sr) { incoming['tw-br'] = sr.bar; incoming['tw-fr'] = sr.food; }
     if (lc) { incoming['tw-bl'] = lc.bar; incoming['tw-fl'] = lc.food; }
     if (bc != null) incoming['tw-bc'] = bc;
     if (fc != null) incoming['tw-fc'] = fc;
     if (!Object.keys(incoming).length) {
-      await App.confirm({ title: 'Nothing to pull yet', message: 'No counts or hours are logged in Control for this week yet. Log them in Inventory and Labor Control, or enter your numbers here by hand.', confirmText: 'OK', cancelText: '' });
+      await App.confirm({ title: 'Nothing to pull yet', message: 'No sales, counts, or hours are logged for this week yet. Import your sales in Shift, log counts in Inventory and hours in Labor, or enter the numbers here by hand.', confirmText: 'OK', cancelText: '' });
       return;
     }
     const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
