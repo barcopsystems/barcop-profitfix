@@ -9,8 +9,8 @@
 
 S.ShiftVoidComp = {
   editId: null,
-  entryMode: 'manual',     // landing card: 'manual' = batch builder, 'import' = drop a POS export
-  _modalMode: 'manual',    // active-shift log pop-up: same two modes
+  entryMode: 'import',     // landing card: import-first ('import' = drop a POS export, 'manual' = batch builder)
+  _modalMode: 'import',    // log pop-up: same two modes
   _draft: null,            // in-memory header draft (survives leave/return)
   _draftRows: null,        // in-memory line rows
   filterPreset: 'last-4',  // active range chip
@@ -511,7 +511,7 @@ S.ShiftVoidComp = {
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     return '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">'
-      + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+      + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>';
   },
 
   builderCard() {
