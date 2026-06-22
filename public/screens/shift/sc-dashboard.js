@@ -38,7 +38,10 @@ S.ShiftDashboard = {
     const d = new Date(this.weekEnd() + 'T00:00:00');
     if (isNaN(d.getTime())) return;
     d.setDate(d.getDate() + n);
-    this._weekEnd = App.ymdLocal(d);
+    const next = App.ymdLocal(d);
+    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    if (n > 0 && next > cur) return;   // never walk into the future
+    this._weekEnd = next;
     this._openStep = null; this._flash = null;
     this.render(this.container, this.actions);
   },
@@ -84,24 +87,44 @@ S.ShiftDashboard = {
     this.wire();
   },
 
+  // True when the shown week is the current week (or later) — the forward edge.
+  // The cockpit only walks backward from the current week, never into the future.
+  atCurrentWeek() {
+    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    return this.weekEnd() >= cur;
+  },
+  // The week selector pill: ‹ JUN 22 - JUN 28 NOW › — NOW shows on the current
+  // week, and the forward arrow is inert there (no future weeks to close out).
+  weekPill() {
+    const isCur = this.atCurrentWeek();
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:10px;letter-spacing:1px;margin-left:4px;">NOW</span>' : '';
+    const next = isCur
+      ? '<span style="padding:2px 7px;color:var(--t4);font-size:14px;line-height:1;cursor:default;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:2px 7px;">&rsaquo;</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:2px;border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:8px;padding:3px 5px;">'
+      + '<button class="btn btn-ghost btn-sm sc-wk-prev" aria-label="Previous week" style="margin:0;padding:2px 7px;">&lsaquo;</button>'
+      + '<span style="font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;padding:0 4px;">' + esc(range) + nowBadge + '</span>'
+      + next
+      + '</div>';
+  },
+
   banner(doneCount, total) {
-    const range = App.dateRangeLabel ? App.dateRangeLabel(this.weekStart(), this.weekEnd()) : (this.weekStart() + ' - ' + this.weekEnd());
     const allDone = doneCount === total;
     const pct = Math.round(doneCount / total * 100);
-    const right = allDone
-      ? '<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--green);font-weight:800;font-size:16px;">&#10003;</span><span style="font-size:13px;color:var(--green);font-weight:700;">You\'re current this week</span></div>'
-      : '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--t1);font-weight:800;font-size:16px;">' + doneCount + '</span> of ' + total + ' done this week</div>';
-    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:12px;padding:18px 22px;">'
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+    return '<div class="card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-      +   '<div style="display:flex;align-items:center;gap:10px;">'
-      +     '<button class="btn btn-ghost btn-sm sc-wk-prev" aria-label="Previous week" style="margin:0;">&lsaquo;</button>'
-      +     '<div><div style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
-      +       '<div style="font-size:18px;font-weight:800;color:var(--t1);">Week of ' + esc(range) + '</div></div>'
-      +     '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;">&rsaquo;</button>'
-      +   '</div>'
-      +   right
+      +   '<div class="card-title" style="margin:0;">Close Out Your Week</div>'
+      +   this.weekPill()
       + '</div>'
-      + '<div style="height:6px;background:var(--input);border-radius:4px;overflow:hidden;margin-top:14px;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +   '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +   '<div style="font-size:12px;">' + doneLine + '</div>'
+      + '</div>'
       + '</div>';
   },
 
@@ -131,7 +154,7 @@ S.ShiftDashboard = {
     const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' + (isOpen ? 'border:1.5px solid var(--gold);color:var(--gold);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + m.n + '</span>';
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
     // Active box uses the opaque selection tones directly (#151C1C bg / #504829
     // border) so the white title and gold number read true, not washed by a
     // translucent gold tint.
@@ -198,7 +221,7 @@ S.ShiftDashboard = {
     const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
     const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    return '<div style="display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--b2);">'
+    return '<div style="display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:10px;padding:18px 22px;">'
       + item('This Week Revenue', App.fmtCurrency(rev))
       + item('Voids', App.fmtCurrency(voidTot))
       + item('Cash Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
