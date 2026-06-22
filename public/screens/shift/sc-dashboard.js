@@ -51,14 +51,20 @@ S.ShiftDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
+  // A step is done if it carries an explicit operator stamp (true/false in the
+  // done map, so a step can be UNMARKED), otherwise it falls back to what the
+  // week's data shows (sales imported, a drawer reconciled).
   stepDone() {
     const dm = this.doneMap();
-    return {
+    const derive = {
       import: this.shifts().some(s => this.inWeek(s.date)),
-      cash:   !!dm.cash || this.variances().some(v => this.inWeek(v.date)),
-      exc:    !!dm.exc,
-      review: !!dm.review
+      cash:   this.variances().some(v => this.inWeek(v.date)),
+      exc:    false,
+      review: false
     };
+    const r = {};
+    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    return r;
   },
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -93,37 +99,40 @@ S.ShiftDashboard = {
     const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
     return this.weekEnd() >= cur;
   },
-  // The week selector pill: ‹ JUN 22 - JUN 28 NOW › — NOW shows on the current
-  // week, and the forward arrow is inert there (no future weeks to close out).
-  weekPill() {
+  // Week selector: ‹ [JUN 22 - JUN 28 NOW] › — one week at a time, only the date
+  // range carries the gold border (the arrows sit OUTSIDE it). NOW shows on the
+  // current week, where the forward arrow is inert (no future weeks to close out).
+  weekSelector() {
     const isCur = this.atCurrentWeek();
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
     const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
-    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:10px;letter-spacing:1px;margin-left:4px;">NOW</span>' : '';
-    const next = isCur
-      ? '<span style="padding:2px 7px;color:var(--t4);font-size:14px;line-height:1;cursor:default;">&rsaquo;</span>'
-      : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:2px 7px;">&rsaquo;</button>';
-    return '<div style="display:inline-flex;align-items:center;gap:2px;border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:8px;padding:3px 5px;">'
-      + '<button class="btn btn-ghost btn-sm sc-wk-prev" aria-label="Previous week" style="margin:0;padding:2px 7px;">&lsaquo;</button>'
-      + '<span style="font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;padding:0 4px;">' + esc(range) + nowBadge + '</span>'
-      + next
-      + '</div>';
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm sc-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">' + esc(range) + nowBadge + '</span>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
   },
 
+  // Standard titled card: an uppercase header band over the body (selector on the
+  // left above the progress bar).
   banner(doneCount, total) {
     const allDone = doneCount === total;
     const pct = Math.round(doneCount / total * 100);
     const doneLine = allDone
       ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
-    return '<div class="card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-      +   '<div class="card-title" style="margin:0;">Close Out Your Week</div>'
-      +   this.weekPill()
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
       + '</div>'
-      + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
-      +   '<div style="font-size:12px;">' + doneLine + '</div>'
+      + '<div style="padding:18px 22px;">'
+      +   this.weekSelector()
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
       + '</div>'
       + '</div>';
   },
@@ -167,11 +176,18 @@ S.ShiftDashboard = {
       +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, isDone) + '</div></div>'
       +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
       + '</div>';
-    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k) + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
     return html + '</div>';
   },
 
-  workspace(k) {
+  // A done step's button flips to "Mark not done" so any step can be unmarked.
+  markBtn(k, label) {
+    return this._isDone
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
+  },
+  workspace(k, isDone) {
+    this._isDone = isDone;
     if (k === 'import') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull a "sales by day" report from your POS for this week and drop it. Re-importing replaces the days already in.</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
@@ -181,7 +197,7 @@ S.ShiftDashboard = {
         + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Open Cash Control</button>'
-        + '<button class="btn btn-primary btn-sm" data-done="cash">Mark Done</button></div>';
+        + this.markBtn('cash', 'Mark Done') + '</div>';
     }
     if (k === 'exc') {
       const cnt = (arr) => arr.filter(r => this.inWeek(r.date)).length;
@@ -193,7 +209,7 @@ S.ShiftDashboard = {
         + '<button class="btn btn-ghost btn-sm" data-go="sc-void-comp">Voids / Comps</button>'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-waste">Waste / Spills</button>'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-walked-tabs">Walked Tabs</button>'
-        + '<button class="btn btn-primary btn-sm" data-done="exc">Mark Reviewed</button></div>';
+        + this.markBtn('exc', 'Mark Reviewed') + '</div>';
     }
     // review
     const wkVar = this.variances().filter(v => this.inWeek(v.date));
@@ -210,7 +226,7 @@ S.ShiftDashboard = {
       + line('Comps', App.fmtCurrency(compTot), false)
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
       + '<button class="btn btn-ghost btn-sm" data-go="theft-risk">Open Loss Prevention</button>'
-      + '<button class="btn btn-primary btn-sm" data-done="review">Mark Reviewed</button></div>';
+      + this.markBtn('review', 'Mark Reviewed') + '</div>';
   },
 
   statusStrip() {
@@ -221,9 +237,12 @@ S.ShiftDashboard = {
     const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
     const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    return '<div style="display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:10px;padding:18px 22px;">'
+    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 10px;"></div>';
+    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:10px;padding:18px 22px;">'
       + item('This Week Revenue', App.fmtCurrency(rev))
+      + div
       + item('Voids', App.fmtCurrency(voidTot))
+      + div
       + item('Cash Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
       + '</div>';
   },
@@ -303,6 +322,8 @@ S.ShiftDashboard = {
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
       if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
+      const un = ev.target.closest('[data-undone]');
+      if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.sc-wk-prev')) { this._stepWeek(-7); return; }
