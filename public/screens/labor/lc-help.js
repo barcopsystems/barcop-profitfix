@@ -65,7 +65,7 @@ S.LaborHelp = {
       { q: 'What flows from Labor Control to Profit Recovery?',
         a: 'Logged hours feed Profit This Week labor and the prime cost calculation, which combines labor and COGS as a percentage of revenue. Prime cost is the single most important number in a healthy operation, and Labor Control owns half of it. The other half comes from Inventory Control counts.' },
       { q: 'What flows from Labor Control to Shift Control?',
-        a: 'Two ways. Tip pool records are linked to the shift, so the Shift Close Wizard\'s tip reconciliation step can read and update them inline. And the staff roster is the source for the staff dropdowns across Shift Control: manager on duty, void and comp authorizer, performed-by on cash drops, completed-by on checklists.' },
+        a: 'The staff roster is the source for the staff dropdowns across Shift Control: the void and comp authorizer, performed-by on cash drops, and completed-by on checklists. Tip logs and tip pools also draw their crew from the roster.' },
       { q: 'What flows from Labor Control into Accounting?',
         a: 'The Books Month-End workbook reads Labor Control for the Labor Cost Analysis sheet (hours and wages by position and by staff) and for the Form 8027 Worksheet (per-employee tips, preferring the saved tip-pool split when a pool exists for the shift). Payroll Export builds the payroll file for direct handoff to your payroll provider. Set the labor data right here and every accounting deliverable lines up automatically.' }
     ]}
