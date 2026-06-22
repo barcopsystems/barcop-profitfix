@@ -26,7 +26,7 @@ S.HubGettingStarted = {
     { group:'foundation', id:'gs_profile', screen:'settings-profile',
       label:'Set your operation profile in Settings: bar name, location, and annual bar and food sales.' },
     { group:'foundation', id:'gs_service_periods', screen:'settings-profile',
-      label:'Set your service periods in Settings: the dayparts you run. These drive Open the Floor, schedules, and every shift-type field across Bar Cop.' },
+      label:'Set your service periods in Settings: the dayparts you run. These drive your schedules and every shift-type field across Bar Cop.' },
     { group:'foundation', id:'gs_targets', screen:'settings-targets',
       label:'Set your Profit, Revenue, and Traffic targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
 
@@ -57,8 +57,8 @@ S.HubGettingStarted = {
       label:'Log a week of actual hours in Log Hours.' },
     { group:'capture', id:'gs_sc_checklists', screen:'sc-checklist-templates',
       label:'Set your opening and closing checklist templates in Shift Control.' },
-    { group:'capture', id:'gs_sc_shift', screen:'sc-active-shift',
-      label:'Log your first shift. Shift revenue and covers feed Profit and Revenue Recovery.' },
+    { group:'capture', id:'gs_sc_shift', screen:'sc-dashboard',
+      label:'Import your first week of POS sales in the Shift cockpit. Revenue and covers feed Profit and Revenue Recovery.' },
     { group:'capture', id:'gs_sc_cash', screen:'sc-cash-control',
       label:'Record a cash drop and a drawer count so cash data starts flowing.' },
 

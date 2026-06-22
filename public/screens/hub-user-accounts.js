@@ -33,8 +33,6 @@ S.HubUserAccounts = {
     { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor Reports' },
     // Shift Control
     { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
-    { module: 'Shift Control',     key: 'log-shift',        label: 'Log Shifts' },
-    { module: 'Shift Control',     key: 'active-shift',     label: 'Run Active Shift' },
     { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
     { module: 'Shift Control',     key: 'checklists',       label: 'Opening / Closing Checklists' },
     { module: 'Shift Control',     key: '86-list',          label: '86 Items List' },

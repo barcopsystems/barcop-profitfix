@@ -26,7 +26,7 @@ S.HubSettingsHelp = {
     ]},
     { t: 'Business Profile', qa: [
       { q: 'What are service periods and why do they matter?',
-        a: 'They are the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. They are not cosmetic: they set every shift-type field across Bar Cop, including Open the Floor, the schedule, cash tolerances, and the Recovery daypart breakdowns. Turn on the ones you run, and add a custom one if your venue runs something different.' },
+        a: 'They are the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. They are not cosmetic: they set every shift-type field across Bar Cop, including the schedule, cash tolerances, and the Recovery daypart breakdowns. Turn on the ones you run, and add a custom one if your venue runs something different.' },
       { q: 'What are the Operation Links for?',
         a: 'Your public URLs for each digital platform, like your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data from them into the Traffic Audit. It is a one-time setup.' },
       { q: 'Why does it ask for annual Sales?',

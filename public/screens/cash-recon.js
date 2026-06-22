@@ -116,7 +116,7 @@ S.CashRecon = {
         lead: 'Your drawer counts and cash drops flow here from Shift Control. Once a few shifts are reconciled, this shows which cashier and which register keep coming up short. Set up a register and run a shift to start the picture.',
         steps: [
           { title: 'Set up a register', desc: 'Add your registers in Shift Control so drawers can be counted.', btn: 'Set Up Registers', screen: 'sc-drawers', done: false },
-          { title: 'Run and reconcile a shift', desc: 'Open the floor, drop cash, and reconcile drawers at close. Those land here.', btn: 'Open the Floor', screen: 'sc-active-shift', done: false }
+          { title: 'Reconcile your drawers', desc: 'Count drawers and log over/short in Cash Control. Those land here.', btn: 'Go to Cash Control', screen: 'sc-cash-control', done: false }
         ]
       });
       this.container.onclick = ev => { const go = ev.target.closest('.setup-go'); if (go && go.dataset.go) App.openScreen(go.dataset.go); };
