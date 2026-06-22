@@ -239,34 +239,31 @@ S.ShiftCashControl = {
       +   '<button class="btn btn-ghost btn-sm" id="cc-issue-bank">Issue a Bank</button>'
       +   '<button class="btn btn-ghost btn-sm" id="cc-safe-activity">Add Cash / Paid Out</button>'
       +   '<button class="btn btn-ghost btn-sm" id="cc-count-safe">Count the Safe</button>'
+      +   '<button class="btn btn-ghost btn-sm" id="cc-log-drop">Log a Drop</button>'
       + '</div></div></div>';
-
-    const winWord = this.filterPreset === 'all' ? 'all time' : 'this window';
 
     // ── 2. Registers ──
     const tile = d => {
       const st = this.drawerStats(d);
       const bank = (d.default_opening_bank != null && d.default_opening_bank !== '') ? App.fmtCurrency(d.default_opening_bank) : '-';
-      let closeLine;
+      let reconcileBlock;
       if (st.lastVar) {
         const vr = parseFloat(st.lastVar.variance) || 0;
         const status = st.lastVar.status || '';
         const col = this.statusColor(status);
         const sd = new Date((st.lastVar.date || '') + 'T00:00:00');
         const shortDate = isNaN(sd.getTime()) ? '' : sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
-          + '<span style="color:var(--t3);">' + esc(status) + (shortDate ? ' (' + shortDate + ')' : '') + '</span>';
+        reconcileBlock = '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Last reconcile: <span style="color:var(--t1);font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>' + (shortDate ? ' <span style="color:var(--t3);">(' + shortDate + ')</span>' : '') + '</div>'
+          + '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:2px;">' + esc(status) + '</div>';
       } else {
-        closeLine = '<span style="color:var(--t4);">No reconcile logged yet</span>';
+        reconcileBlock = '<div style="font-size:12px;color:var(--t4);margin-top:8px;">No reconcile logged yet</div>';
       }
       return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;background:var(--surface);">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
         +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(d.name) + '</div>'
         +   '<div style="font-size:11px;color:var(--t3);">Bank ' + bank + '</div></div>'
-        + '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Drops ' + winWord + ': <span style="color:var(--t1);font-weight:700;">' + App.fmtCurrency(st.dropTotal) + '</span> <span style="color:var(--t3);">(' + st.dropCount + ')</span></div>'
-        + '<div style="font-size:12px;margin-top:4px;">Last reconcile: ' + closeLine + '</div>'
+        + reconcileBlock
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
-        +   '<button class="btn btn-ghost btn-sm cc-drop" data-id="' + esc(d.id) + '">Log a Drop</button>'
         +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile by Hand</button>'
         + '</div></div>';
     };
@@ -345,6 +342,7 @@ S.ShiftCashControl = {
     document.getElementById('cc-issue-bank')?.addEventListener('click', () => this.openSafeMove('Bank Issued'));
     document.getElementById('cc-safe-activity')?.addEventListener('click', () => this.openSafeMove('Paid Out'));
     document.getElementById('cc-count-safe')?.addEventListener('click', () => this.openSafeCount());
+    document.getElementById('cc-log-drop')?.addEventListener('click', () => this.openDrop(null, ''));
     document.getElementById('cc-go-drawers')?.addEventListener('click', () => App.navigate('sc-drawers'));
 
     this.container.onclick = ev => {
@@ -360,11 +358,9 @@ S.ShiftCashControl = {
         this.draw();
         return;
       }
-      const drop = ev.target.closest('.cc-drop');
       const cdr  = ev.target.closest('.cc-count-drawer');
       const edit = ev.target.closest('.cc-edit');
       const row  = ev.target.closest('.cc-row');
-      if (drop) { this.openDrop(null, drop.dataset.id); return; }
       if (cdr)  { this.openCountDrawer(null, cdr.dataset.id); return; }
       if (edit) { ev.stopPropagation(); this.editRow(edit.dataset.cat, edit.dataset.id); return; }
       if (row)  { this.editRow(row.dataset.cat, row.dataset.id); }
@@ -396,20 +392,17 @@ S.ShiftCashControl = {
     this._dropOnDone = onDone || null;
     const active    = (App.activeShift && App.activeShift()) || null;
     const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
-    const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
     const byId      = editing ? (rec.performed_by_id || rec.performed_by) : (active ? active.manager_id || '' : '');
     const witId     = editing ? (rec.witness_id || rec.witness) : '';
-    const typeOpts  = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
 
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccd-type" style="height:44px;">' + typeOpts + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccd-time" value="' + esc(v(rec && rec.drop_time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccd-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>From Register <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="ccd-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'No specific register' }) + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccd-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccd-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
@@ -449,7 +442,6 @@ S.ShiftCashControl = {
     const rec = {
       id: editId || App.uid(),
       date,
-      shift_type:      document.getElementById('ccd-type')?.value || '',
       drop_time:       document.getElementById('ccd-time')?.value || '',
       drawer_id:       drawerId,
       drawer:          (App.drawerById(drawerId) || {}).name || '',
@@ -649,17 +641,14 @@ S.ShiftCashControl = {
     const editing = !!rec;
     const active    = (App.activeShift && App.activeShift()) || null;
     const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
-    const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
     const cashId    = editing ? (rec.cashier_id || rec.cashier) : '';
     const reasonOpts = '<option value="">Select reason...</option>'
       + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
-    const typeOpts = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
 
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
       + '</div>'
@@ -718,7 +707,6 @@ S.ShiftCashControl = {
     const rec = {
       id: editId || App.uid(),
       date,
-      shift_type:    document.getElementById('ccv-type')?.value || '',
       drawer_id:     drawerId,
       drawer:        (App.drawerById(drawerId) || {}).name || '',
       cashier_id:    cashId,
