@@ -151,8 +151,8 @@ S.RevenueServerCheck = {
       + '<div class="calc-val lg"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div>'
       + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
     return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
-      + item('Team Average', has ? App.fmtCurrency(sc.teamAvg) : '-', 'target ' + App.fmtCurrency(targetCA), has ? (sc.teamAvg >= targetCA ? 'var(--gold)' : 'var(--red)') : null)
-      + item('Top Performer', top ? App.fmtCurrency(top.checkAvg) : '-', top ? esc(top.name) : 'no data yet', top ? 'var(--gold)' : null)
+      + item('Team Average', has ? App.fmtCurrency(sc.teamAvg) : '-', 'target ' + App.fmtCurrency(targetCA), has ? (sc.teamAvg >= targetCA ? null : 'var(--red)') : null)
+      + item('Top Performer', top ? App.fmtCurrency(top.checkAvg) : '-', top ? esc(top.name) : 'no data yet', null)
       + item('Trending Down', has ? String(downCount) : '-', downCount > 0 ? 'off pace last 7 days' : 'none off pace', downCount > 0 ? 'var(--red)' : null)
       + item('Spread', has ? App.fmtCurrency(spread) : '-', 'top vs bottom', spread > 10 ? 'var(--red)' : null)
       + '</div></div>';
@@ -204,25 +204,20 @@ S.RevenueServerCheck = {
     if (!sc.rows.length) {
       return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above to build the scorecard.</div></div>';
     }
-    const arrow = trend => trend === 'up'
-      ? '<span style="color:var(--gold);font-size:14px;">&#9650;</span>'
-      : trend === 'down' ? '<span style="color:var(--red);font-size:14px;">&#9660;</span>'
-      : '<span style="color:var(--t4);font-size:14px;">&#9679;</span>';
     const rows = sc.rows.map((r, i) => {
       const vsT = r.checkAvg - targetCA;
       const vsTeam = r.checkAvg - sc.teamAvg;
       const isTop = i === 0;
       const isDown = r.trend === 'down';
-      const tag = isTop ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--gold);">TOP</span>'
+      const tag = isTop ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--t3);">TOP</span>'
         : (isDown ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--red);">DOWN</span>' : '');
       const coachBtn = r.staff_id
         ? '<button class="btn btn-ghost btn-sm rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:10px;padding:3px 8px;">+ Coaching Note</button>' : '';
       return '<tr>'
         + '<td style="font-weight:700;color:' + (isDown ? 'var(--red)' : 'var(--t1)') + ';">' + esc(r.name) + tag + '</td>'
-        + '<td>' + arrow(r.trend) + '</td>'
-        + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
-        + '<td style="color:' + (vsT >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsT >= 0 ? '+' : '') + App.fmtCurrency(vsT) + '</td>'
-        + '<td style="color:' + (vsTeam >= 0 ? 'var(--gold)' : 'var(--red)') + ';">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</td>'
+        + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--t1)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
+        + '<td style="color:' + (vsT >= 0 ? 'var(--t2)' : 'var(--red)') + ';">' + (vsT >= 0 ? '+' : '') + App.fmtCurrency(vsT) + '</td>'
+        + '<td style="color:var(--t2);">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</td>'
         + '<td>' + Math.round(r.covers) + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.sales) + '</td>'
         + '<td>' + (r.compsPct > 0 ? r.compsPct.toFixed(1) + '%' : '-') + '</td>'
@@ -233,7 +228,7 @@ S.RevenueServerCheck = {
     }).join('');
     return headingRow
       + '<div id="rsc-sc-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Server</th><th>Trend</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
+      + '<th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
   },
 
@@ -241,21 +236,23 @@ S.RevenueServerCheck = {
   logSection(log, targetCA) {
     return '<div class="sh" style="margin:24px 0 10px;">Server Shift</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Shift</th><th>Server</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
+      + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers</th><th>Sales</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
       + '</tr></thead><tbody id="rsc-log">' + this._buildRows(log, targetCA) + '</tbody></table></div></div>';
   },
 
   _buildRows(log, targetCA) {
-    if (!log.length) return '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--t4);">No shift checks in this range.</td></tr>';
+    if (!log.length) return '<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--t4);">No shift checks in this range.</td></tr>';
     return log.map(c => {
       const ca = c.covers > 0 ? c.sales / c.covers : 0;
       const diff = ca - targetCA;
-      const color = diff >= 0 ? 'var(--gold)' : diff >= -5 ? 'var(--amber)' : 'var(--red)';
+      const color = diff >= 0 ? 'var(--t2)' : diff >= -5 ? 'var(--amber)' : 'var(--red)';
       const status = diff >= 0 ? 'On Target' : diff >= -5 ? 'Watch' : 'Below Standard';
       return '<tr>'
         + '<td>' + (c.date || '').slice(0, 10) + '</td>'
         + '<td>' + esc(c.shift || '') + '</td>'
         + '<td>' + esc(c.server_name || '') + '</td>'
+        + '<td>' + Math.round(c.covers || 0) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(c.sales || 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(ca) + '</td>'
         + '<td style="color:' + color + ';">' + (diff >= 0 ? '+' : '') + App.fmtCurrency(diff) + '</td>'
         + '<td style="color:' + color + ';font-weight:600;">' + status + '</td>'
@@ -362,7 +359,7 @@ S.RevenueServerCheck = {
     const ca = sales / cov;
     const diff = ca - target;
     let status, color;
-    if (diff >= 0)       { status = 'On Target';      color = 'var(--gold)'; }
+    if (diff >= 0)       { status = 'On Target';      color = 'var(--t2)'; }
     else if (diff >= -5) { status = 'Watch';          color = 'var(--amber)'; }
     else                 { status = 'Below Standard'; color = 'var(--red)'; }
     caEl.textContent = App.fmtCurrency(ca); caEl.style.color = color;
