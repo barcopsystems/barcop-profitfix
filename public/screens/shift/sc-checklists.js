@@ -139,7 +139,7 @@ S.ShiftChecklists = {
     const toggle = '<div style="display:flex;gap:8px;margin-bottom:18px;">'
       + this.TYPES.map(t =>
         '<button type="button" class="cl-toggle" data-type="' + t + '" style="padding:9px 16px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
-        + (this.TYPE === t ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--gold);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+        + (this.TYPE === t ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
         + '">' + t + '</button>').join('')
       + '</div>';
 
@@ -151,7 +151,7 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<input type="checkbox" class="cl-chk"' + (it.done ? ' checked' : '') + ' tabindex="-1" style="flex-shrink:0;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;pointer-events:none;"/>'
+      + '<input type="checkbox" class="cl-chk"' + (it.done ? ' checked' : '') + ' tabindex="-1" style="flex-shrink:0;accent-color:var(--green);width:16px;height:16px;cursor:pointer;pointer-events:none;"/>'
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
       + '</div>').join('');
 
@@ -166,7 +166,7 @@ S.ShiftChecklists = {
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'
-      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
+      + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width 0.2s;"></div></div></div>'
       + '<div id="cl-items">' + itemRows + '</div>'
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '</div>'
@@ -295,7 +295,7 @@ S.ShiftChecklists = {
     if (!r) { this.renderMain(); return; }
     const itemRows = (r.items || []).map(it =>
       '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--b2);">'
-      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--gold)' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
+      + '<span style="font-size:13px;font-weight:800;color:' + (it.done ? 'var(--green)' : 'var(--t4)') + ';width:48px;">' + (it.done ? 'DONE' : '-') + '</span>'
       + '<span style="font-size:14px;color:var(--t1);">' + esc(it.text) + '</span></div>').join('');
     // Stats in their own card at top; the run title is a heading outside/above the
     // checklist card, with Export PDF aligned right on the same row.
