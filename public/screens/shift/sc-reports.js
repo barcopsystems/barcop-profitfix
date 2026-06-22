@@ -59,7 +59,7 @@ S.ShiftReports = {
   showHowTo() {
     App.showHelpModal('How Shift Reports Work', [
       { p: ['Reports roll up everything your shifts generated so you can spot the patterns: which shifts make money, where the cash is leaking, and what keeps going wrong on the floor. Everything here is read-only, pulled straight from the shifts, drawers, and logs you already recorded.'] },
-      { h: 'The Three Tabs', p: ['Shift covers revenue, covers, and check average broken out by shift type and by day of week. Cash covers your drops by drawer and your variances by cashier, plus net over/short and the safe balance. Operations covers voids and comps by server and reason, maintenance by priority, and checklist completion.'] },
+      { h: 'The Three Tabs', p: ['Shift covers revenue, covers, and check average broken out by day and by weekday. Cash covers your drops by drawer and your variances by cashier, plus net over/short and the safe balance. Operations covers voids and comps by server and reason, maintenance by priority, and checklist completion.'] },
       { h: 'Setting the Range', p: ['The chips pick the window: This Week, Last Week, This Month, Last 4 Weeks, or All. Custom opens a From and To date picker. The range carries across all three tabs and every number on the page updates to match.'] },
       { h: 'Reading the Numbers', p: ['The stats card up top is the headline for the tab. The breakdown tables below it show where those totals come from, so a cashier who runs short or a shift type that drags can stand right out.'] },
       { h: 'Export', p: ['Export PDF saves the tab you are looking at, with the current range, for a manager review or your records.'] }
@@ -170,18 +170,35 @@ S.ShiftReports = {
     const avgChk = totCov > 0 ? totRev / totCov : null;
     const avgRev = rows.length ? totRev / rows.length : 0;
     const stats = this.statsCard(
-      this.statItem('Shifts', rows.length)
+      this.statItem('Days', rows.length)
       + this.statItem('Total Revenue', App.fmtCurrency(totRev))
-      + this.statItem('Avg Revenue / Shift', App.fmtCurrency(avgRev))
+      + this.statItem('Avg Revenue / Day', App.fmtCurrency(avgRev))
       + this.statItem('Total Covers', totCov)
       + this.statItem('Avg Check', avgChk != null ? App.fmtCurrency(avgChk) : '-'));
 
     // First breakdown carries no heading — the chips row sits in its place.
     const below = rows.length
-      ? (this.shiftGroup(rows, s => s.shift_type || 'Unspecified')
+      ? (this.shiftByDay(rows)
          + this.section('By Day of Week', this.shiftGroup(rows, s => { const d = this.dowOf(s.date); return d >= 0 ? this.DOW[d] : 'Unknown'; }, this.DOW)))
-      : this.noRange('shifts');
+      : this.noRange('sales');
     return { stats, below };
+  },
+
+  // Per-day detail: one row per imported day, newest first.
+  shiftByDay(rows) {
+    if (!rows.length) return this.noRange('sales');
+    const sorted = rows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const trs = sorted.map(s => {
+      const rev = s.total_revenue || 0, cov = s.covers || 0;
+      const chk = cov > 0 ? rev / cov : null;
+      const d = new Date((s.date || '') + 'T00:00:00');
+      const label = isNaN(d.getTime()) ? esc(s.date || '-') : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      return '<tr><td><div class="val">' + label + '</div></td>'
+        + '<td class="val">' + App.fmtCurrency(rev) + '</td>'
+        + '<td>' + cov + '</td>'
+        + '<td>' + (chk != null ? App.fmtCurrency(chk) : '-') + '</td></tr>';
+    }).join('');
+    return this.bareTable(['Date', 'Revenue', 'Covers', 'Avg Check'], trs);
   },
 
   shiftGroup(rows, keyFn, order) {
@@ -206,7 +223,7 @@ S.ShiftReports = {
         + '<td>' + avgCov.toFixed(1) + '</td>'
         + '<td>' + (avgChk != null ? App.fmtCurrency(avgChk) : '-') + '</td></tr>';
     }).join('');
-    return this.bareTable([isDay ? 'Day' : 'Shift Type', 'Shifts', 'Total Revenue', 'Avg Revenue', 'Covers', 'Avg Covers', 'Avg Check'], trs);
+    return this.bareTable([isDay ? 'Day' : 'Shift Type', 'Days', 'Total Revenue', 'Avg Revenue', 'Covers', 'Avg Covers', 'Avg Check'], trs);
   },
 
   // ── Cash tab ────────────────────────────────────────────────────────────────
