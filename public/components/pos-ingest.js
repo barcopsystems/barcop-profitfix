@@ -45,6 +45,18 @@ const PosIngest = {
       { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales'] },
       { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales'] },
       { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers', 'count'] }
+    ],
+    // A POS cash / drawer report: per-day, optionally per-register. The POS blind
+    // close already computed over/short, so the cash-variance pattern recovery
+    // reads comes from this import, not a hand reconcile. Takes Over/Short
+    // directly, OR Expected + Counted. Writes sc_variances.
+    cash: [
+      { key: 'date',       label: 'Date',          required: true,  match: ['date', 'business date', 'day', 'service date', 'shift date'] },
+      { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal'] },
+      { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server', 'employee', 'name', 'staff', 'bartender'] },
+      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due'] },
+      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count'] },
+      { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-'] }
     ]
   },
 
@@ -52,7 +64,8 @@ const PosIngest = {
     hours: { label: 'Hours',         module: 'lc', kind: 'actual'    },
     tips:  { label: 'Tips',          module: 'lc', kind: 'tip'       },
     voids: { label: 'Voids & Comps', module: 'sc', kind: 'void_comp' },
-    sales: { label: 'Daily Sales',   module: 'sc', kind: 'shift'     }
+    sales: { label: 'Daily Sales',   module: 'sc', kind: 'shift'     },
+    cash:  { label: 'Cash Variances', module: 'sc', kind: 'variance' }
   },
 
   normDate(raw) {
@@ -75,6 +88,7 @@ const PosIngest = {
     if (type === 'tips')  return this.buildTips(rows);
     if (type === 'voids') return this.buildVoids(rows);
     if (type === 'sales') return this.buildSales(rows);
+    if (type === 'cash')  return this.buildCash(rows);
     return { toAdd: [], skipped: [], dupCount: 0 };
   },
 
@@ -182,6 +196,52 @@ const PosIngest = {
       toAdd.push({
         id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
         total_revenue: bar + food, shift_type: 'Full Day', status: 'Closed',
+        imported: true, created_at: new Date().toISOString()
+      });
+    });
+    return { toAdd, skipped, dupCount };
+  },
+
+  // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
+  // against the roster/registers by name so the by-cashier and by-register
+  // patterns still build from an import. Dedup on date + register + variance so a
+  // re-dropped cash report never double-logs. source:'import' tags it apart from
+  // a hand reconcile. Writes sc_variances.
+  buildCash(rows) {
+    const VL = (window.S && S.ShiftVarianceLog) || null;
+    const tol = VL ? VL.tolerance() : 10;
+    const drawerByName = {};
+    ((App.shiftData && App.shiftData.sc_drawers) || []).forEach(d => {
+      if (d && d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
+    });
+    const staffByName = this._staffByName();
+    const existing = (App.shiftData && App.shiftData.sc_variances) || [];
+    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    const toAdd = []; const skipped = []; let dupCount = 0;
+    (rows || []).forEach(r => {
+      const date = this.normDate(r.date);
+      if (!date) { skipped.push('(no date)'); return; }
+      const exp = num(r.expected), cnt = num(r.counted), os = num(r.over_short);
+      let expected_cash = null, counted_cash = null, variance;
+      if (!isNaN(exp) && !isNaN(cnt)) { expected_cash = exp; counted_cash = cnt; variance = Math.round((cnt - exp) * 100) / 100; }
+      else if (!isNaN(os)) { variance = Math.round(os * 100) / 100; }
+      else { skipped.push(date); return; }            // no over/short derivable
+      const dName = (r.drawer || '').trim();
+      const dRec = dName ? drawerByName[dName.toLowerCase()] : null;
+      const drawer = dRec ? dRec.name : dName;
+      const cName = (r.cashier || '').trim();
+      const staff = cName ? staffByName[cName.toLowerCase()] : null;
+      const cashier = staff ? staff.name : cName;
+      if (existing.some(x => x.date === date && (x.drawer || '') === drawer
+            && Math.abs((x.variance || 0) - variance) < 0.001)) { dupCount++; return; }
+      const status = (expected_cash != null && VL) ? VL.statusOf(variance, expected_cash, counted_cash)
+                   : (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over');
+      toAdd.push({
+        id: App.uid(), date, shift_type: '',
+        drawer_id: dRec ? dRec.id : '', drawer,
+        cashier_id: staff ? staff.id : '', cashier,
+        source: 'import', expected_cash, counted_cash, variance,
+        tolerance: tol, status, reason: '', notes: '',
         imported: true, created_at: new Date().toISOString()
       });
     });
