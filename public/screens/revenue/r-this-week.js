@@ -153,9 +153,9 @@ S.RevenueThisWeek = {
   showHowTo() {
     App.showHelpModal('How This Week Works', [
       { p: ['This is the weekly revenue confirm. Bar Cop pulls the week in from your Control systems: revenue and covers from Shift Control, hours and cost from Labor Control. You read the money picture up top, confirm the numbers, and save. You almost never type a raw number, you confirm one.'] },
-      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one.'] },
+      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, how the week tracked versus your forecast, check average against target, labor percent against target, and revenue per labor hour, all live as you confirm the numbers.'] },
-      { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Every cell is pre-filled from Control and editable. Load from Control re-runs the pull and refills the cells; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Every cell is pre-filled from Control and editable. Refresh This Week re-runs the pull and refills the cells; if you have edited a cell by hand it asks before overwriting.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first, with check average and labor percent colored against your targets. Edit loads a week back into the form to correct it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
@@ -177,6 +177,12 @@ S.RevenueThisWeek = {
     const sel = this._weekEnd;
     const older = this.addDays(sel, -7);
     const fwdDisabled = sel >= now;   // never step past the in-progress current week
+    // Lifecycle marker so it reads as a week-in-progress, not a static form:
+    // "Building from your logs" until the week is saved (closed out), then "Saved."
+    const saved = !!this.savedWeek(sel);
+    const statePill = '<span style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;color:' + (saved ? 'var(--green)' : 'var(--t3)') + ';">'
+      + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (saved ? 'var(--green)' : 'var(--t4)') + ';"></span>'
+      + (saved ? 'Saved' : 'Building from your logs') + '</span>';
     const chip = (end, active) =>
       '<button class="rw-wk-chip btn btn-sm" data-end="' + end + '" style="'
         + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
@@ -189,8 +195,9 @@ S.RevenueThisWeek = {
       + '<button class="btn btn-ghost btn-sm rw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
       + (sel !== now ? '<button class="btn btn-ghost btn-sm rw-wk-now" style="margin-left:4px;">This Week</button>' : '')
       + '</div>'
-      + '<div style="display:flex;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm" id="rw-pull">Load from Control</button>'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      + statePill
+      + '<button class="btn btn-ghost btn-sm" id="rw-pull">Refresh This Week</button>'
       + '</div></div>';
   },
 
@@ -346,7 +353,7 @@ S.RevenueThisWeek = {
     return Math.abs(cur - inc) > 0.5;
   },
 
-  // One "Load from Control" pulls revenue + covers from Shift Control and hours
+  // One "Refresh This Week" pulls revenue + covers from Shift Control and hours
   // + cost from Labor Control, with a single overwrite confirm if any typed cell
   // would change.
   async pullAll() {
