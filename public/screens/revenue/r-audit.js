@@ -17,9 +17,9 @@ S.RevenueAudit = {
     const latest = audits[0] || null;
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = daysSince >= 30;
-    const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'Generate a new audit every 30 days. Run first audit on day 1.';
+    const canRun = daysSince >= 7;
+    const daysLeft = canRun ? 0 : 7 - daysSince;
+    const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ra', 'Revenue Audit', desc, canRun, !!latest, daysLeft)
@@ -328,11 +328,11 @@ S.RevenueAudit = {
   renderIntake() {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
-    // Form viewable anytime; the 30-day window gates only Generate.
+    // Form viewable anytime; the weekly cadence gates only Generate.
     const _a = (App.data.revenue_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = _since >= 30;
-    const daysLeft = canRun ? 0 : 30 - _since;
+    const canRun = _since >= 7;
+    const daysLeft = canRun ? 0 : 7 - _since;
 
     const cd = this.buildControlData();
     const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
@@ -402,7 +402,7 @@ S.RevenueAudit = {
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
       { h: 'What Bar Cop already has', p: ['If you log weekly numbers, schedules, menu items, and servers in Bar Cop, those feed the audit automatically. A new operation reads from what you enter and upload here instead.'] },
       { h: 'The steps', p: ['1. Enter your annual sales (the dollar baseline).', '2. Upload any reports for a section Bar Cop cannot see yet (a POS sales summary covers Check Average, a server sales report covers Server Performance, and so on).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in over time.'] },
-      { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Outlook is a short written read of where you stand, and Export PDF saves the whole audit. Run one every 30 days; each is saved so you can watch the score trend on the audit landing.'] },
+      { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Outlook is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
     ]);
   },
