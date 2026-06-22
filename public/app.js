@@ -996,7 +996,6 @@ const App = {
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
     { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
     { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
-    { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
     { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
     { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
     { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
@@ -1584,7 +1583,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-shift-policies', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-shift-policies', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3571,9 +3570,8 @@ const App = {
   prepBatchById(id) {
     return this.prepBatches().find(b => b.id === id) || null;
   },
-  // Backward-compat alias for sc-86-list and any other consumer still
-  // referencing the old top-level batches array. Resolves to the new
-  // ic_prep_batches home.
+  // Backward-compat alias for any consumer still referencing the old
+  // top-level batches array. Resolves to the new ic_prep_batches home.
   batches() { return this.prepBatches(); },
 
   // Compute effective cost for a menu item. Priority order:
@@ -3664,7 +3662,7 @@ const App = {
       data: () => App.shiftData,
       kinds: {
         shift: 'sc_shifts', void_comp: 'sc_void_comps', cash_drop: 'sc_cash_drops',
-        variance: 'sc_variances', safe_log: 'sc_safe_log', eighty_six: 'sc_86_list',
+        variance: 'sc_variances', safe_log: 'sc_safe_log',
         maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
         waste: 'sc_waste', checklist: 'sc_checklists',
         safe_count: 'sc_safe_counts'
@@ -4163,7 +4161,6 @@ const App = {
         'sc-dashboard':          ['Dashboard', 'Shift Control'],
         'sc-cash-control':       ['Cash Control', 'Shift Control'],
         'sc-cash-history':       ['Cash History', 'Shift Control'],
-        'sc-86-list':            ['86 List', 'Shift Control'],
         'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
         'sc-waste':              ['Waste / Spill Log', 'Shift Control'],
         'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
@@ -4178,7 +4175,6 @@ const App = {
         'sc-dashboard': S.ShiftDashboard,
         'sc-cash-control': S.ShiftCashControl,
         'sc-cash-history': S.ShiftCashHistory,
-        'sc-86-list': S.Shift86List,
         'sc-void-comp': S.ShiftVoidComp,
         'sc-waste': S.ShiftWaste,
         'sc-maintenance': S.ShiftMaintenance,
