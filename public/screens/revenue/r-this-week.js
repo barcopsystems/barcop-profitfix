@@ -4,10 +4,11 @@
    Brought to the Control entry-page standard (Build Schedule / Log Hours /
    Profit This Week): a stat strip up top, a week-chip selector row (chips left,
    page actions right), the confirm form, Save + Start Over below the card, then
-   a filter-chip row and a view/edit history table. Revenue and covers pull from
-   Shift Control (sc_shifts); labor pulls from Labor Control (lc_actuals). The
-   operator confirms. Stepping the selector to a saved week loads it for edit;
-   Save updates that record. Saves to App.data.revenue_weeks. */
+   a filter-chip row and a view/edit history table. Revenue and covers are entered
+   off the operator's POS weekly sales summary (the POS is the system of record
+   for sales); labor pulls from Labor Control (lc_actuals). Stepping the selector
+   to a saved week loads it for edit; Save updates that record. Saves to
+   App.data.revenue_weeks. */
 
 S.RevenueThisWeek = {
   draft: null,
@@ -26,28 +27,6 @@ S.RevenueThisWeek = {
     { v: 'all', label: 'All' },
     { v: 'custom', label: 'Custom' }
   ],
-
-  // ── Shift Control revenue/covers feed (7-day week ending periodEnd) ─────────
-  hasShifts() {
-    return (((App.shiftData && App.shiftData.sc_shifts) || []).length) > 0;
-  },
-  shiftFeed(periodEnd) {
-    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    if (!shifts.length || !periodEnd) return null;
-    const startD = new Date(periodEnd + 'T00:00:00');
-    if (isNaN(startD.getTime())) return null;
-    startD.setDate(startD.getDate() - 6);
-    const start = App.ymdLocal(startD);
-    let bar = 0, floor = 0, covers = 0, any = false;
-    shifts.forEach(s => {
-      if (!s.date || s.date < start || s.date > periodEnd) return;
-      bar += s.bar_revenue || 0;
-      floor += s.floor_revenue || 0;
-      covers += s.covers || 0;
-      any = true;
-    });
-    return any ? { bar, floor, covers } : { bar: 0, floor: 0, covers: 0 };
-  },
 
   // ── Labor Control labor feed (7-day week ending periodEnd) ─────────────────
   hasLabor() {
@@ -93,12 +72,13 @@ S.RevenueThisWeek = {
 
   // ── Draft (localStorage; only the unsaved current-week confirm persists) ────
   freshDraft(periodEnd) {
-    const sf = this.shiftFeed(periodEnd);
     const lf = this.laborFeed(periodEnd);
+    // Revenue and covers are entered off the POS weekly sales summary, so they
+    // start blank. Labor hours and cost pull from logged hours.
     return {
-      bar_revenue: sf && sf.bar ? sf.bar.toFixed(2) : '',
-      floor_revenue: sf && sf.floor ? sf.floor.toFixed(2) : '',
-      covers: sf && sf.covers ? String(sf.covers) : '',
+      bar_revenue: '',
+      floor_revenue: '',
+      covers: '',
       labor_hours: lf && lf.hours ? lf.hours.toFixed(2) : '',
       labor_cost: lf && lf.cost ? lf.cost.toFixed(2) : '',
       notes: ''
@@ -152,10 +132,10 @@ S.RevenueThisWeek = {
 
   showHowTo() {
     App.showHelpModal('How This Week Works', [
-      { p: ['This is the weekly revenue confirm. Bar Cop pulls the week in from your Control systems: revenue and covers from Shift Control, hours and cost from Labor Control. You read the money picture up top, confirm the numbers, and save. You almost never type a raw number, you confirm one.'] },
+      { p: ['This is the weekly revenue confirm. You enter the week\'s revenue and covers off your POS sales summary, and Bar Cop fills in hours and cost from Labor Control. You read the money picture up top, confirm the numbers, and save.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, how the week tracked versus your forecast, check average against target, labor percent against target, and revenue per labor hour, all live as you confirm the numbers.'] },
-      { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Every cell is pre-filled from Control and editable. Refresh This Week re-runs the pull and refills the cells; if you have edited a cell by hand it asks before overwriting.'] },
+      { h: 'Confirm the Week', p: ['Bar revenue, floor revenue and covers give you the check average. Labor hours and cost give you labor percent and revenue per labor hour. Enter revenue and covers off your POS summary; labor hours and cost pre-fill from Labor Control. Refresh This Week re-runs the labor pull and refills those cells; if you have edited a cell by hand it asks before overwriting.'] },
       { h: 'Weekly History', p: ['Every week you save lands in the history list, newest first, with check average and labor percent colored against your targets. Edit loads a week back into the form to correct it. The range chips filter the list and Export PDF saves it.'] }
     ]);
   },
@@ -353,21 +333,16 @@ S.RevenueThisWeek = {
     return Math.abs(cur - inc) > 0.5;
   },
 
-  // One "Refresh This Week" pulls revenue + covers from Shift Control and hours
-  // + cost from Labor Control, with a single overwrite confirm if any typed cell
-  // would change.
+  // One "Refresh This Week" pulls hours + cost from Labor Control, with a single
+  // overwrite confirm if any typed cell would change. Revenue and covers are
+  // operator-entered off the POS summary, so Refresh leaves them alone.
   async pullAll() {
     const pe = this._weekEnd;
-    const sf = this.shiftFeed(pe);
     const lf = this.laborFeed(pe);
     const incoming = {};
-    if (sf && (sf.bar || sf.floor || sf.covers)) {
-      incoming['rw-brev'] = sf.bar; incoming['rw-frev'] = sf.floor;
-      if (sf.covers) incoming['rw-cov'] = sf.covers;
-    }
     if (lf && (lf.cost || lf.hours)) { incoming['rw-lhrs'] = lf.hours; incoming['rw-lcost'] = lf.cost; }
     if (!Object.keys(incoming).length) {
-      await App.confirm({ title: 'Nothing to pull yet', message: 'No shifts or hours are logged in Control for this week yet. Log them in Shift and Labor Control, or enter the numbers here by hand.', confirmText: 'OK', cancelText: '' });
+      await App.confirm({ title: 'Nothing to pull yet', message: 'No hours are logged in Labor Control for this week yet. Log them in Labor Control, or enter your numbers here by hand.', confirmText: 'OK', cancelText: '' });
       return;
     }
     const conflicted = Object.entries(incoming).some(([id, val]) => this._isOverride(id, val));
