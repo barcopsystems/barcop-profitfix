@@ -8,9 +8,8 @@
 
 S.HubUserAccounts = {
 
-  // Permission groups: 24 sections, organized by module, each with two
-  // checkboxes per member (Access + Allow Edit/Delete). Default staff
-  // baseline (pre-checked for new invites): Take Inventory + 86 List.
+  // Permission groups: organized by module, each with two checkboxes per
+  // member (Access + Allow Edit/Delete).
   // No pre-selected defaults. Admin explicitly checks every box for every
   // staff invite. Protects ownership from accidental over-permissioning.
   PERMISSION_GROUPS: [
@@ -35,7 +34,6 @@ S.HubUserAccounts = {
     { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
     { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
     { module: 'Shift Control',     key: 'checklists',       label: 'Opening / Closing Checklists' },
-    { module: 'Shift Control',     key: '86-list',          label: '86 Items List' },
     { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log' },
     { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log' },
     { module: 'Shift Control',     key: 'waste',            label: 'Waste / Spill Log' },
