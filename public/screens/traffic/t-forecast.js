@@ -42,7 +42,7 @@ S.TrafficForecast = {
     low = Math.round(low); high = Math.round(high);
     if (low <= 0 && high <= 0) return null;
     if (low === high) return this.money(low);
-    return this.money(low) + ' – ' + this.money(high);
+    return this.money(low) + ' - ' + this.money(high);
   },
 
   // ── Build the four outcome channels off the latest week + profile ───────────
