@@ -1168,6 +1168,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   /* Form rows stack vertically on narrow widths so fields get full width
      instead of squeezing into truncated columns. */
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+  /* Menu Items adaptive cells live under #mi-adaptive (display:contents), so the
+     rule above (direct children only) misses them; stack them full-width too. */
+  .form-row > #mi-adaptive > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
   /* Shrink-to-fit data rows stack on mobile instead of squeezing. */
   .data-row{flex-wrap:wrap;}
   .form-grid{grid-template-columns:1fr;}
