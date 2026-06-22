@@ -17,9 +17,9 @@ S.TrafficAudit = {
     const latest = audits[0] || null;
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = daysSince >= 30;
-    const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'Generate a new audit every 30 days. Run first audit on day 1.';
+    const canRun = daysSince >= 7;
+    const daysLeft = canRun ? 0 : 7 - daysSince;
+    const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     const SECTION_NAMES = ['Google Business', 'Website', 'Reviews', 'Search and SEO', 'Social Media', 'Delivery Platforms', 'Email Marketing'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ta', 'Traffic Audit', desc, canRun, !!latest, daysLeft)
@@ -325,11 +325,11 @@ S.TrafficAudit = {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     const urls = (App.data.traffic_settings && App.data.traffic_settings.urls) || {};
-    // Form viewable anytime; the 30-day window gates only Generate.
+    // Form viewable anytime; the weekly cadence gates only Generate.
     const _a = (App.data.traffic_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = _since >= 30;
-    const daysLeft = canRun ? 0 : 30 - _since;
+    const canRun = _since >= 7;
+    const daysLeft = canRun ? 0 : 7 - _since;
 
     // From weekly traffic numbers (Bar Cop does not auto-collect this — it only
     // has what the operator logged in This Week).
@@ -389,7 +389,7 @@ S.TrafficAudit = {
 
   showHowTo() {
     App.showHelpModal('How the Traffic Audit Works', [
-      { p: ['The Traffic Audit scores your digital presence across seven areas: Google Business, website, reviews, search, social, delivery, and email. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers. One audit every 30 days.'] },
+      { p: ['The Traffic Audit scores your digital presence across seven areas: Google Business, website, reviews, search, social, delivery, and email. It scores whatever you give it and shows N/A for anything it has no data on, so the more you provide, the more it covers. One audit a week, scoring your trailing four weeks.'] },
       { h: 'What Bar Cop Already Has', p: ['The chips on the form show which areas your weekly This Week numbers already cover, so you do not re-enter them. The greyed ones fill in as you log more or drop a screenshot.'] },
       { h: 'Reads Live From a Link', p: ['Your Website is the one link Bar Cop reads live: speed, mobile, SEO, and best practices, scored straight from the link. Save it once and it is ready every audit.'] },
       { h: 'Needs a Screenshot', p: ['Everything else needs a screenshot. Your Google and Yelp ratings, website analytics, Instagram, Facebook, delivery platforms, and email sit behind a login or carry data a link cannot reach. Drop one screenshot per area you want scored; one drop zone takes them all, and PDF or CSV exports work too.'] },
