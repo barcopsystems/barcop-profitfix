@@ -2546,6 +2546,15 @@ const App = {
     return gross - (parseFloat(t.tip_out_paid) || 0) + (parseFloat(t.tip_out_received) || 0);
   },
 
+  // The logical "shift" a tip entry or tip pool belongs to = its day + service
+  // period. A deterministic key both the Tip Log and the Tip Pool compute the
+  // same way, so Books / Year-End / Tip History / pay periods keep joining tips
+  // to their pool without depending on a live shift record. Replaces the old
+  // sc_shifts id as the tip anchor.
+  tipShiftKey(date, period) {
+    return (date || '') + '|' + (period || '');
+  },
+
   // Resolve a staff_id (or legacy name) to the staff record. Save handlers
   // call this to denormalize the picked staff into a name field for display
   // alongside the id for joins.
