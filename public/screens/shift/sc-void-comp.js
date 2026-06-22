@@ -665,51 +665,30 @@ S.ShiftVoidComp = {
       dropTitle: 'Drop your POS voids and comps export here',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
       actionsEl: elId === 'vc-csv' ? '#vc-imp-actions' : undefined,
-      fields: [
-        { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
-        { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
-        { key: 'item',   label: 'Item',         required: false, match: ['item', 'item name', 'product', 'menu item', 'description'] },
-        { key: 'server', label: 'Server',       required: false, match: ['server', 'employee', 'name', 'staff', 'bartender', 'cashier'] },
-        { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note'] },
-        { key: 'date',   label: 'Date',         required: false, match: ['date', 'business date', 'shift date'] }
-      ],
+      fields: PosIngest.FIELDS.voids,
       confirmLabel: 'Import',
       onComplete: rows => this.importRows(rows, resultId, after)
     });
   },
   async importRows(rows, resultId, after) {
-    const byName = {};
-    ((App.laborData && App.laborData.lc_staff) || []).forEach(s => { if (s && s.name) byName[String(s.name).trim().toLowerCase()] = s; });
-    const today = App.todayLocal();
-    const toAdd = []; let skipped = 0;
-    (rows || []).forEach(r => {
-      const amount = parseFloat(String(r.amount == null ? '' : r.amount).replace(/[^0-9.\-]/g, ''));
-      if (isNaN(amount) || amount < 0) { skipped++; return; }
-      const t = (r.type || '').trim().toLowerCase();
-      const type = (t.indexOf('comp') >= 0 || t === 'c') ? 'Comp' : 'Void';
-      const serverName = (r.server || '').trim();
-      const staff = serverName ? byName[serverName.toLowerCase()] : null;
-      toAdd.push({
-        id: App.uid(), date: this.normDate(r.date) || today, type, shift_type: '',
-        item: (r.item || '').trim(), amount,
-        product_id: '', product_name: '', menu_item_id: '', units: null,
-        staff_id: staff ? staff.id : '', server: staff ? staff.name : serverName,
-        authorized_by_id: '', authorized_by: '', check_number: '',
-        reason: (r.reason || '').trim(), notes: '', auth_threshold_override: false,
-        created_at: new Date().toISOString()
-      });
-    });
+    // Match / dedup / build / save live in the shared PosIngest (dedup added so a
+    // re-dropped voids/comps export never double-counts). UI message stays here.
+    const { toAdd, skipped, dupCount } = PosIngest.build('voids', rows);
     const setResult = html => { const r = resultId && document.getElementById(resultId); if (r) r.innerHTML = html; };
-    if (!toAdd.length) { setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. Every row was missing a valid amount.</div>'); return; }
-    const list = this.records();
-    let ok = true;
-    for (const rec of toAdd) { list.push(rec); ok = (await App.putRecord('sc', 'void_comp', rec)) && ok; }
+    if (!toAdd.length) {
+      setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+                    : 'No rows imported. Every row was missing a valid amount.') + '</div>');
+      return;
+    }
+    const ok = await PosIngest.commit('voids', toAdd);
     if (!ok) { setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
     if (typeof after === 'function') { after(); return; }   // popup: close + re-render the shift
     this.renderList();
     const r2 = document.getElementById('vc-imp-result');
     if (r2) r2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.'
-      + (skipped ? ' <span style="color:var(--t3);font-weight:400;">' + skipped + ' row' + (skipped === 1 ? '' : 's') + ' skipped (no amount).</span>' : '') + '</div>';
+      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no amount).</span>' : '')
+      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount + ' already logged, skipped.</span>' : '') + '</div>';
   },
   // Paper-at-bar workflow.
   printBlank() {
