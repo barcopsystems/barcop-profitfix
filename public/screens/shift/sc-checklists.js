@@ -72,7 +72,7 @@ S.ShiftChecklists = {
     const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'cl-range-chip');
     const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="cl-worksheet">Worksheet</button></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="cl-export">Export PDF</button></div>'
       + '</div>';
     const custom = this.filterPreset !== 'custom' ? '' :
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
@@ -151,13 +151,18 @@ S.ShiftChecklists = {
 
     const itemRows = items.map((it, idx) =>
       '<div class="cl-item" data-idx="' + idx + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<input type="checkbox" class="cl-chk"' + (it.done ? ' checked' : '') + ' tabindex="-1" style="flex-shrink:0;accent-color:var(--green);width:16px;height:16px;cursor:pointer;pointer-events:none;"/>'
+      + (it.done
+          ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:3px;background:var(--green);color:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;">&#10003;</span>'
+          : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:3px;border:1.5px solid var(--b1);"></span>')
       + '<span style="font-size:14px;color:' + (it.done ? 'var(--t3)' : 'var(--t1)') + ';' + (it.done ? 'text-decoration:line-through;' : '') + '">' + esc(it.text) + '</span>'
       + '</div>').join('');
 
     const runner = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-checklists', 'Checklists')
-      + '<div class="collapse-body">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      +   '<span>Checklists</span>'
+      +   '<button class="btn btn-ghost btn-sm no-print" id="cl-worksheet">Worksheet</button>'
+      + '</div>'
+      + '<div>'
       + toggle
       + '<div class="form-row" style="gap:16px;">'
       + tplField
@@ -171,7 +176,7 @@ S.ShiftChecklists = {
       + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="cl-notes" rows="2" placeholder="Optional">' + esc(this._run.notes) + '</textarea></div></div>'
       + '</div>'
       + '</div>'
-      + '<div data-collapse-group="sc-checklists" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
       + '<button class="btn btn-ghost" id="cl-startover">Start Over</button>'
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
