@@ -790,56 +790,26 @@ S.LaborTipLog = {
       dropTitle: 'Drop your POS tips export here',
       dropSub: 'Needs columns for staff name, date, and card or cash tips.',
       actionsEl: '#tl-imp-actions',
-      fields: [
-        { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'server', 'server name'] },
-        { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date'] },
-        { key: 'card_tips', label: 'Card Tips',  required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips'] },
-        { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips'] },
-        { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart'] }
-      ],
+      fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
       onComplete: rows => this.importTipRows(rows)
     });
   },
 
   async importTipRows(rows) {
-    const staffByName = {};
-    this.staff().forEach(s => { staffByName[(s.name || '').trim().toLowerCase()] = s; });
-    const toAdd = [];
-    const skipped = [];
-    (rows || []).forEach(r => {
-      const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const cash = parseFloat(r.cash_tips) || 0;
-      const card = parseFloat(r.card_tips) || 0;
-      if (!staff || (cash + card) <= 0) { skipped.push(r.name || '(blank)'); return; }
-      toAdd.push({
-        id:          App.uid(),
-        shift_id:    '',
-        manager_id:  '',
-        date:        this.normDate(r.date),
-        staff_id:    staff.id,
-        name:        staff.name,
-        position_id: staff.position_id || '',
-        shift_type:  (r.shift || '').trim(),
-        cash_tips:   cash,
-        card_tips:   card,
-        total_tips:  cash + card,
-        hours:       null,
-        notes:       '',
-        imported:    true,
-        created_at:  new Date().toISOString()
-      });
-    });
+    // Match / dedup / build / save live in the shared PosIngest (dedup added so a
+    // re-dropped tips export never double-counts). UI message stays here.
+    const { toAdd, skipped, dupCount } = PosIngest.build('tips', rows);
 
     const result = document.getElementById('tl-imp-result');
     const imported = toAdd.length;
     if (imported === 0) {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + 'No rows imported. No staff names matched the roster, or no tip amounts were found.</div>';
+        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+                    : 'No rows imported. No staff names matched the roster, or no tip amounts were found.') + '</div>';
       return;
     }
-    let ok = true;
-    for (const rec of toAdd) { ok = (await App.putRecord('lc', 'tip', rec)) && ok; }
+    const ok = await PosIngest.commit('tips', toAdd);
     if (!ok) {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
       return;
@@ -849,7 +819,9 @@ S.LaborTipLog = {
     if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
       + 'Imported ' + imported + ' tip entr' + (imported === 1 ? 'y' : 'ies') + '.'
       + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
-          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or no tip amount).</span>' : '') + '</div>';
+          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or no tip amount).</span>' : '')
+      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount
+          + ' already logged, skipped.</span>' : '') + '</div>';
   },
 
   // Effective date window from the active range chip (recomputed off "today" each
