@@ -43,21 +43,6 @@ S.InventoryDashboard = {
     if (isNaN(d.getTime())) return null;
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   },
-  repeat86() {
-    const items = (App.shiftData && App.shiftData.sc_86_list) || [];
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const counts = {};
-    items.forEach(i => {
-      const d = new Date((i.date_86 || '') + 'T00:00:00');
-      if (isNaN(d.getTime()) || d < cutoff) return;
-      const key = (i.item || '').trim().toLowerCase();
-      if (!key) return;
-      if (!counts[key]) counts[key] = { name: (i.item || '').trim(), count: 0 };
-      counts[key].count++;
-    });
-    return Object.values(counts).filter(x => x.count >= 2).sort((a, b) => b.count - a.count);
-  },
-
   _onHand(count) {
     const m = {};
     (count.items || []).forEach(it => { m[it.product_id] = (m[it.product_id] || 0) + (it.total || 0); });
@@ -219,7 +204,7 @@ S.InventoryDashboard = {
     const catCard      = this.shPanel('Where Your Cash Sits', emptyBody('Take a count to see how much cash is tied up in each category.'));
     const movementCard = this.shPanel('Movement', emptyBody('Take two counts to see what is moving fast, slow, and not at all.'));
     const sinceCard    = this.shPanel('Since Last Count', emptyBody('Trends appear once you have two counts.'));
-    const leakCard     = this.shPanel('Leaks &amp; Watch', emptyBody('Shrinkage, spot-check flags, and repeat 86s surface here as you log.'));
+    const leakCard     = this.shPanel('Leaks &amp; Watch', emptyBody('Shrinkage and spot-check flags surface here as you log.'));
 
     this.container.innerHTML = '<div class="screen">'
       + startStrip
@@ -301,7 +286,6 @@ S.InventoryDashboard = {
       if (isNaN(d.getTime()) || d < cutoff) return;
       spotFlags += (s.flagged_count || 0);
     });
-    const reps = this.repeat86();
 
     // Inventory value by category.
     const byCat = {};
@@ -404,10 +388,9 @@ S.InventoryDashboard = {
       '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
       + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
-    const anyLeak = shrink > 0 || spotFlags > 0 || reps.length > 0;
+    const anyLeak = shrink > 0 || spotFlags > 0;
     const leakBody = leakRow('Shrinkage written off (30d)', App.fmtCurrency(shrink), 'ic-adjustments', shrink > 0)
       + leakRow('Spot-check flags (30d)', String(spotFlags), 'ic-spot-check', spotFlags > 0)
-      + leakRow('Repeat 86s (30d)', String(reps.length), 'ic-par-suggestions', reps.length > 0)
       + (anyLeak ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">No leaks flagged in the last 30 days. Clean.</div>');
 
