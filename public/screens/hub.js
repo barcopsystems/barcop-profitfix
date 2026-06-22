@@ -352,6 +352,33 @@ S.Hub = {
     // Faint vertical divider between the stats (desktop only; hidden on mobile
     // where the stats stack — see .hub-stat-div in the hub style block).
     const statDiv = '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 10px;"></div>';
+
+    // What's Due — the ongoing weekly cadence, shown only once setup is complete
+    // (the permanent successor to the "Continue Setup" banner; never both). Honest:
+    // each item appears only when it is actually due, so a current operator sees the
+    // caught-up line, not a false nudge. The audit cadence is NOT repeated here, it
+    // already lives in the Audit Scores panel (days-left + Run button).
+    let whatsDueRight = '';
+    if (App.isSetupComplete && App.isSetupComplete()) {
+      const nd = new Date(App.nextSunday() + 'T00:00:00'); nd.setDate(nd.getDate() - 7);
+      const lastEnd = App.ymdLocal(nd);
+      const wkConfirmed = arr => (arr || []).some(w => ((w.period_end || '') + '').slice(0, 10) >= lastEnd);
+      const due = [];
+      if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'this-week',   mod: 'profit'  });
+      if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'r-this-week', mod: 'revenue' });
+      const dueRows = due.length
+        ? due.slice(0, 3).map(it =>
+            '<div onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
+            + '<span style="width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0;"></span>'
+            + '<span style="flex:1;min-width:0;">' + esc(it.text) + '</span>'
+            + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>').join('')
+        : '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t3);"><span style="color:var(--green);font-weight:800;">&#10003;</span> You are current this week</div>';
+      whatsDueRight = '<div style="flex:1 1 16px;min-width:0;"></div>' + statDiv
+        + '<div style="flex:0 0 230px;min-width:190px;">'
+        +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">What\'s Due</div>'
+        +   dueRows
+        + '</div>';
+    }
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
@@ -370,6 +397,7 @@ S.Hub = {
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
+      + whatsDueRight
       + '</div></div>';
 
     // Audit Scores panel — three stacked rows, one per module.
@@ -463,13 +491,15 @@ S.Hub = {
           + '</div>';
       }
 
-      return '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+      return '<div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">'
         +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
         +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
         + '</div>'
-        + scoreBlock
-        + summaryLine
+        + '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;">'
+        +   scoreBlock
+        +   summaryLine
+        + '</div>'
         + '</div>';
     };
     const auditPanel = `${shWrapOpen('Audit Scores', '14px')}
@@ -558,7 +588,7 @@ S.Hub = {
       const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
       const tgtDisp  = valFmt(target);
 
-      const card = (inner) => '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
+      const card = (inner) => '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
 
       const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
@@ -911,7 +941,7 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
-        .hub-app .hd-metric{background:var(--bg);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
+        .hub-app .hd-metric{background:var(--surface);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:var(--hover);}
