@@ -169,7 +169,7 @@ S.ShiftDashboard = {
     // translucent gold tint.
     const bg = isOpen ? '#151C1C' : (isDone ? 'var(--input)' : 'var(--surface)');
     const bord = isOpen ? '#504829' : 'var(--b-edge)';
-    let html = '<div style="border:1px solid ' + bord + ';border-radius:10px;background:' + bg + ';overflow:hidden;">'
+    let html = '<div style="border:1px solid ' + bord + ';border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="sc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
       +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
@@ -237,8 +237,8 @@ S.ShiftDashboard = {
     const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
     const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 10px;"></div>';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:10px;padding:18px 22px;">'
+    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
+    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
       + item('This Week Revenue', App.fmtCurrency(rev))
       + div
       + item('Voids', App.fmtCurrency(voidTot))
