@@ -159,7 +159,7 @@ const CSVMapper = {
     const previewRows = rows.slice(0, 3);
     if (previewRows.length) {
       html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">PREVIEW: FIRST ROWS FROM YOUR FILE</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
+        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl csvm-preview"><thead><tr>'
         + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
         + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
         + '</tbody></table></div></div>';
