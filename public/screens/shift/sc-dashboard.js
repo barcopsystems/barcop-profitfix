@@ -16,7 +16,7 @@ S.ShiftDashboard = {
   showHowTo() {
     App.showHelpModal('How the Shift Cockpit Works', [
       { p: ['This is your weekly close-out for Shift. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
-      { h: 'The Steps', p: ['1. Import this week\'s sales and voids: drop your weekly POS export (one row per day) and Bar Cop reads the whole week at once. 2. Reconcile cash: optional, since your POS handles the blind close; do it here only if you want to. 3. Log exceptions: waste, spills, and walked tabs, off your sheet. 4. Review loss flags: cash shorts, voids, and comps worth a look.'] },
+      { h: 'The Steps', p: ['1. Import this week\'s sales: drop your weekly POS sales-by-day report (one row per day) and Bar Cop reads the whole week at once. 2. Reconcile cash: drop your POS cash report, or reconcile each drawer by hand in Cash Control if your POS does not make one. 3. Log exceptions: waste, spills, and walked tabs, off your sheet. 4. Review loss flags: cash shorts, voids, and comps worth a look.'] },
       { h: 'Working A Step', p: ['Click a step to open it. The import runs right in the cockpit. The others either do the quick part here or send you to the full screen and come back. Mark a step done and the bar advances. The week selector at the top steps you to a prior week to close it out.'] },
       { h: 'The Bottom Strip', p: ['Once the week is in, the strip shows your revenue, voids, and cash over/short at a glance. Below it, the as-needed jobs (Spot Check, Maintenance, Checklists) are one tap away whenever you need them, not part of the weekly flow.'] }
     ]);
@@ -133,13 +133,14 @@ S.ShiftDashboard = {
       +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
       +     '<div style="font-size:12px;">' + doneLine + '</div>'
       +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Have ready: your weekly POS sales-by-day report, plus a cash report if your POS makes one.</div>')
       + '</div>'
       + '</div>';
   },
 
   _META: {
-    import: { n: 1, title: 'Import this week\'s sales &amp; voids', sub: 'Drop your weekly POS export, one row per day' },
-    cash:   { n: 2, title: 'Reconcile cash',                        sub: 'Optional. Your POS likely handles the close-out' },
+    import: { n: 1, title: 'Import this week\'s sales',             sub: 'Drop your weekly POS sales-by-day report' },
+    cash:   { n: 2, title: 'Reconcile cash',                        sub: 'POS cash report, or a hand count in Cash Control' },
     exc:    { n: 3, title: 'Log this week\'s exceptions',           sub: 'Waste, spills, walked tabs' },
     review: { n: 4, title: 'Review loss flags',                     sub: 'Cash shorts, voids, comps' }
   },
@@ -189,14 +190,14 @@ S.ShiftDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull a "sales by day" report from your POS for this week and drop it. Re-importing replaces the days already in.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in.</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
     }
     if (k === 'cash') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS counts the drawer and computes over/short at close. Drop its cash or drawer report to track the variance pattern, or just mark this done if you do not need it.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. If it does not, reconcile each drawer by hand in Cash Control. Mark done only if you do not track cash over/short.</div>'
         + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Open Cash Control</button>'
+        + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile in Cash Control</button>'
         + this.markBtn('cash', 'Mark Done') + '</div>';
     }
     if (k === 'exc') {
@@ -260,7 +261,7 @@ S.ShiftDashboard = {
     const el = document.getElementById('sc-ck-import');
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
-      dropTitle: 'Drop your weekly POS sales export here',
+      dropTitle: 'Drop your weekly POS sales-by-day report here',
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
