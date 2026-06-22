@@ -13,8 +13,7 @@ const RT_GOLD = '#DBAB46';
 const RT_RED  = '#C03828';
 const RT_GRID = '#16252E';
 const RT_STEEL = '#496477';
-const RT_TXT  = '#9FB0BC';
-const RT_DIM  = '#5E6E78';
+const RT_DIM  = 'rgba(255,255,255,0.38)';   // = --t3, muted axis labels
 
 S.RecoveryTimeline = {
   PHASES: [
@@ -57,7 +56,7 @@ S.RecoveryTimeline = {
       + this.PHASES.map((p, i) => {
         const on = p.key === phase;
         return '<div style="flex:1 1 150px;min-width:150px;background:' + (on ? 'var(--gold-tint)' : 'var(--surface)') + ';border:1px solid ' + (on ? 'var(--gold-tint-bord)' : 'var(--b-edge)') + ';border-radius:10px;padding:13px 15px;">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><span style="width:20px;height:20px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--input)') + ';color:' + (on ? '#0B0F14' : 'var(--t3)') + ';font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><span style="width:20px;height:20px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--input)') + ';color:' + (on ? 'var(--bg)' : 'var(--t3)') + ';font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
           + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + p.name + '</span></div>'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';margin-bottom:6px;">' + p.when + '</div>'
           + '<div style="font-size:11px;color:var(--t2);line-height:1.5;">' + p.desc + '</div></div>';
@@ -74,8 +73,8 @@ S.RecoveryTimeline = {
         : 'Your recovery number is live and tracked every week.';
       here = 'You are in the ' + this.PHASES.find(p => p.key === phase).name + ' phase, about ' + wks + ' week' + (wks === 1 ? '' : 's') + ' in. ' + next;
     }
-    const hereCard = '<div class="card form-card" style="margin-bottom:18px;border-color:var(--gold-tint-bord);background:var(--gold-tint);">'
-      + '<div class="card-title" style="color:var(--gold);">You Are Here</div>'
+    const hereCard = '<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div class="card-title">You Are Here</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + here + '</div></div>';
 
     // ── Recovery-number journey chart ──
