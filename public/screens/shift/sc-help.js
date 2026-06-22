@@ -17,7 +17,7 @@ S.ShiftHelp = {
 
   showHowTo() {
     App.showHelpModal('Shift Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, 86 list, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
+      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "drawer" or "comp" lands you on the right answer fast.'] },
       { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Cash Control or the Void and Comp Log, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
@@ -26,7 +26,7 @@ S.ShiftHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Shift Control do?',
-        a: 'Shift Control captures the operating week: your imported POS sales (revenue and covers), cash drops, the safe log, drawer variances, the 86 list, voids and comps, maintenance issues, walked tabs, and your opening and closing checklists. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Your imported sales are the single source for the weekly revenue number every Recovery system reads. Cash data feeds Profit Recovery Cash Reconciliation and the Profit Audit. Voids and comps feed Theft Risk. Repeat 86s feed Inventory Control par alerts. Run Shift Control well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
+        a: 'Shift Control captures the operating week: your imported POS sales (revenue and covers), cash drops, the safe log, drawer variances, voids and comps, maintenance issues, walked tabs, and your opening and closing checklists. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Your imported sales are the single source for the weekly revenue number every Recovery system reads. Cash data feeds Profit Recovery Cash Reconciliation and the Profit Audit. Voids and comps feed Theft Risk. Run Shift Control well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
       { q: 'Where do I start?',
         a: 'A little setup, then a weekly habit. To set up, build your opening and closing checklist templates on Checklist Templates and add your registers on Add Registers. Then each week, open the Shift dashboard and import this week\'s POS sales: one "sales by day" export, dropped once, lands the whole week. The Getting Started checklist on the Hub lists the Shift Control tasks in order.' },
       { q: 'How do I add or fix a past week?',
@@ -51,8 +51,6 @@ S.ShiftHelp = {
         a: 'Within tolerance is green. Short, meaning less cash than expected, is red. Over, meaning more cash than expected, is amber. A drawer that was never counted shows grey as Not Counted. The repeat-offender pattern feeds the Theft Risk Scorecard in Profit Recovery, so a bartender consistently short across shifts is a pattern Bar Cop surfaces without you tracking it on paper.' }
     ]},
     { t: 'Operations Logs', qa: [
-      { q: 'How does the 86 List work?',
-        a: 'When something runs out, 86 it: pick the menu item or the inventory product, and optionally add a reason (out of product, equipment down, no prep time). It shows as a card visible from any screen until someone marks it back in stock. During-shift use is mobile-first so a bartender on the floor can 86 a product in a few taps. The Worksheet button prints a blank grid the bar can mark up during service for the manager to enter after close. Repeat 86s on the same product across recent shifts flow into Inventory Control as par-level alerts.' },
       { q: 'What goes in the Void and Comp Log?',
         a: 'Every voided ticket and every comped item, logged by the dollar amount (a whole comped table is one line, not one per item). The item is optional, picked from the menu-and-inventory dropdown when you want the link or left off. The Reason carries the classification: customer-facing comps such as service recovery, goodwill, regular or VIP, and promo are loss and feed Theft Risk, while Staff Meal and Shift Drink are policy expense tracked as cost in Books and Year-End. Enter a whole shift at once in the batch builder, or edit a single row to add a check number or a note. The log feeds the Theft Risk Scorecard and the Profit Audit exception analysis.' },
       { q: 'What is the Comp Authorization Threshold?',
@@ -74,15 +72,13 @@ S.ShiftHelp = {
       { q: 'What is on the Cash tab?',
         a: 'Cash drops by drawer, variances by cashier, net over/short, and the safe balance over the date range. The variance summary tells you the total over/short for the period and which cashier pattern is off. This is the tab to print and walk through with the bookkeeper.' },
       { q: 'What is on the Operations tab?',
-        a: 'Voids and comps by server and by reason, the most-86\'d items, maintenance open and resolved, and checklist completion by type. Use it monthly. The most-86\'d list often surfaces an ordering pattern that no single shift would catch, like a vendor whose delivery never has enough of one product.' }
+        a: 'Voids and comps by server and by reason, maintenance open and resolved, and checklist completion by type. Use it monthly to spot the patterns a single shift would not catch, like a server who runs a high comp total or a checklist that keeps getting skipped.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Shift Control to Profit Recovery?',
         a: 'Four connections, all read-only on the Recovery side. Your imported sales feed Profit This Week revenue line (the weekly sum of the imported days). Cash drops and variances feed Cash Reconciliation as a diagnosis view. Cash variance feeds the Profit Audit cash section. Voids and comps feed the Theft Risk Scorecard and the Profit Audit exception analysis. POS revenue is imported, not calculated, and it enters once a week here via the sales import.' },
       { q: 'What flows from Shift Control to Revenue Recovery?',
         a: 'Two connections. Your imported sales feed Revenue This Week revenue line (the same weekly sum as Profit, broken out as bar and floor). Covers from the import feed Revenue This Week cover count and the check-average that drives Server Check and the Check Average screen.' },
-      { q: 'What flows from Shift Control to Inventory Control?',
-        a: 'One feed. Repeat 86s on the same product across recent shifts surface as par-level alerts in Inventory Control. A product 86\'d three times in two weeks is a stocking or par problem, and Bar Cop flags it on the Inventory side so the par gets reviewed before the next 86.' },
       { q: 'What flows from Shift Control to the Hub?',
         a: 'Maintenance entries marked Urgent and Open flow to the Hub Dashboard alerts so they stay visible across shift changes until resolved, and the Hub reads your logged shifts to show how the current week is tracking.' }
     ]}
