@@ -1,19 +1,18 @@
 'use strict';
 
 /* ── PosIngest — one place that turns POS/timeclock export rows into records ───
-   The three recurring POS imports (Hours, Tips, Voids/Comps) used to each carry
+   The three recurring POS imports (Hours, Tips, Voids/Comps) each used to carry
    their own parse -> match -> dedup -> save logic baked into the screen. That
-   logic now lives here, ONCE, with no DOM. Both the per-page import lanes
-   (Log Hours, Tip Log, Void/Comp) and the unified Import screen call these, so
-   the two can never drift.
+   logic now lives here, ONCE, with no DOM, so the three per-page import lanes
+   (Log Hours, Tip Log, Void/Comp) match, dedup, and save identically and can
+   never drift.
 
    Each type:
-     FIELDS[type]  - the column-mapping field config (shared with CSVMapper)
-     TYPES[type]   - { label, module, kind } for App.putRecord
+     FIELDS[type] - the column-mapping field config handed to CSVMapper.mount
+     TYPES[type]  - { label, module, kind } for App.putRecord
    build(type, rows) -> { toAdd, skipped, dupCount }   (pure; rows already mapped
-                          to {key:value} by CSVMapper or PosIngest.mapRows)
-   commit(type, toAdd) -> bool                          (persists via putRecord)
-   ingest(type, rows)  -> { imported, skipped, dupCount } (build + commit)        */
+                          to {key:value} by CSVMapper.onComplete)
+   commit(type, toAdd) -> bool                          (persists via putRecord)   */
 
 const PosIngest = {
   FIELDS: {
@@ -41,35 +40,9 @@ const PosIngest = {
   },
 
   TYPES: {
-    hours: { label: 'Hours',          module: 'lc', kind: 'actual'     },
-    tips:  { label: 'Tips',           module: 'lc', kind: 'tip'        },
-    voids: { label: 'Voids & Comps',  module: 'sc', kind: 'void_comp'  }
-  },
-
-  // A single dropped file can carry more than one kind. 'hours_tips' is the
-  // common payroll export with both hours and tip columns; it feeds both stores.
-  SUBTYPES: {
-    hours:      ['hours'],
-    tips:       ['tips'],
-    voids:      ['voids'],
-    hours_tips: ['hours', 'tips']
-  },
-
-  // UI label for a (possibly combined) detected type.
-  typeLabel(type) {
-    if (type === 'hours_tips') return 'Hours + Tips';
-    return (this.TYPES[type] && this.TYPES[type].label) || '';
-  },
-
-  // The column-mapping fields for a UI type. For the combined hours+tips file the
-  // two field sets are merged (shared keys like name/date/shift kept once).
-  fieldsFor(type) {
-    const subs = this.SUBTYPES[type] || [];
-    const out = []; const seen = {};
-    subs.forEach(t => (this.FIELDS[t] || []).forEach(f => {
-      if (!seen[f.key]) { seen[f.key] = 1; out.push(f); }
-    }));
-    return out;
+    hours: { label: 'Hours',         module: 'lc', kind: 'actual'    },
+    tips:  { label: 'Tips',          module: 'lc', kind: 'tip'       },
+    voids: { label: 'Voids & Comps', module: 'sc', kind: 'void_comp' }
   },
 
   normDate(raw) {
@@ -84,46 +57,6 @@ const PosIngest = {
       if (s && s.name) m[String(s.name).trim().toLowerCase()] = s;
     });
     return m;
-  },
-
-  // Map raw rows (array-of-arrays from a parsed file) to {key:value} objects
-  // using a {fieldKey: headerName} mapping. CSVMapper.onComplete already returns
-  // rows in this shape; the unified Import screen uses this to do its own mapping.
-  mapRows(headers, rows, map) {
-    const idx = {};
-    Object.keys(map || {}).forEach(k => { idx[k] = headers.indexOf(map[k]); });
-    return (rows || []).map(row => {
-      const o = {};
-      Object.keys(idx).forEach(k => { o[k] = idx[k] >= 0 ? (row[idx[k]] || '') : ''; });
-      return o;
-    });
-  },
-
-  // Auto-match a file's headers to a type's fields (delegates to CSVMapper so the
-  // matching rules stay in one place). Returns {fieldKey: headerName}.
-  autoMap(headers, type) {
-    if (typeof CSVMapper === 'undefined') return {};
-    return CSVMapper._autoMap(headers, this.fieldsFor(type));
-  },
-
-  // Decide what a file is from its headers alone. Returns one of
-  // 'hours' | 'tips' | 'voids' | 'hours_tips' | '' (unknown -> operator picks).
-  detect(headers) {
-    const hs = (headers || []).map(h => String(h).toLowerCase().trim());
-    const has = kws => hs.some(h => kws.some(k => h.indexOf(k) >= 0));
-    const nameCol   = has(['name', 'employee', 'staff', 'server']);
-    const hoursCol  = has(['hours', 'hrs', 'worked']);
-    const tipCol    = has(['tip', 'gratuity']);
-    const amountCol = has(['amount', 'total', 'value']);
-    const voidSig   = has(['void', 'comp']);
-    const hoursOK = nameCol && hoursCol;
-    const tipsOK  = nameCol && tipCol;
-    const voidsOK = voidSig && amountCol;
-    if (hoursOK && tipsOK) return 'hours_tips';
-    if (voidsOK) return 'voids';
-    if (hoursOK) return 'hours';
-    if (tipsOK) return 'tips';
-    return '';
   },
 
   // ── Pure builders (no save) ────────────────────────────────────────────────
@@ -229,13 +162,6 @@ const PosIngest = {
     let ok = true;
     for (const rec of (toAdd || [])) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
     return ok;
-  },
-
-  // build + commit convenience for the per-page import lanes.
-  async ingest(type, rows) {
-    const { toAdd, skipped, dupCount } = this.build(type, rows);
-    const ok = toAdd.length ? await this.commit(type, toAdd) : true;
-    return { ok, imported: ok ? toAdd.length : 0, skipped, dupCount };
   }
 };
 
