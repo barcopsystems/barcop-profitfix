@@ -5,9 +5,9 @@
    through Lead -> Quote Sent -> Booked -> Completed / Lost.
 
    Landing = stat strip + an inline New Booking form + the pipeline table.
-   Open a booking and it becomes an "Active Booking" workspace built in the
-   Active Shift design language: a live status header, a progress rail, stat
-   tiles, and a single stage-driven "work it" zone with one big forward action,
+   Open a booking and it becomes an "Active Booking" workspace: a live status
+   header, a progress rail, stat tiles, and a single stage-driven "work it" zone
+   with one big forward action,
    instead of card after card of identical buttons. Send Quote emails the
    customer (the vendor-order mailto pattern). Costs + the P&L are collected at
    the Completed stage, where they actually exist. */
@@ -32,7 +32,7 @@ S.EventsBookings = {
   rateCards() { if (!Array.isArray(App.data.event_rate_cards)) App.data.event_rate_cards = []; return App.data.event_rate_cards; },
   regulars()  { if (!Array.isArray(App.data.event_regulars)) App.data.event_regulars = []; return App.data.event_regulars; },
 
-  // ── shared visual atoms (the Active Shift language) ──────────────────────
+  // ── shared visual atoms (the stage-driven workspace language) ────────────
   subLabel(t) { return '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + t + '</div>'; },
   divider()   { return '<div style="border-top:1px solid var(--b2);margin:20px -20px;"></div>'; },
   statTile(label, val, sub, cls) {
@@ -803,7 +803,7 @@ S.EventsBookings = {
   showHowTo() {
     App.showHelpModal('How Event Booking Works', [
       { p: ['One record per party, worked from the first call to the paid invoice. Read the stat strip up top for what is open, stale, booked soon, and the deposits you are owed. Log a lead in the New Booking form on the page, or open any row to work it. Worksheet prints a blank inquiry pad to capture calls by the phone.'] },
-      { h: 'The Active Booking', p: ['Open a booking and the page follows its stage, like Active Shift follows a shift. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
+      { h: 'The Active Booking', p: ['Open a booking and the page follows its stage. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
       { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; it stays in the pipeline and you can reopen it.'] },
       { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the quoted total, then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the quote in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
       { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
