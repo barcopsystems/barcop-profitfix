@@ -69,7 +69,7 @@ S.ShiftDashboard = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
 
-    container.innerHTML = '<div class="screen" style="max-width:900px;">'
+    container.innerHTML = '<div class="screen">'
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -130,9 +130,12 @@ S.ShiftDashboard = {
     const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' + (isOpen ? 'background:var(--gold-tint-bord);color:var(--t1);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + m.n + '</span>';
-    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
-    const bord = isOpen ? 'var(--gold-tint-bord)' : 'var(--b-edge)';
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' + (isOpen ? 'border:1.5px solid var(--gold);color:var(--gold);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + m.n + '</span>';
+    // Active box uses the opaque selection tones directly (#151C1C bg / #504829
+    // border) so the white title and gold number read true, not washed by a
+    // translucent gold tint.
+    const bg = isOpen ? '#151C1C' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bord = isOpen ? '#504829' : 'var(--b-edge)';
     let html = '<div style="border:1px solid ' + bord + ';border-radius:10px;background:' + bg + ';overflow:hidden;">'
       + '<div class="sc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
@@ -203,7 +206,6 @@ S.ShiftDashboard = {
   outlierStrip() {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-spot-check">Spot Check</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="sc-maintenance">Maintenance</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="sc-checklists">Checklists</button>'
       + '</div>';
