@@ -445,7 +445,7 @@ S.TrafficAudit = {
       return;
     }
 
-    setStatus('Uploading files and generating audit...', 'var(--t2)');
+    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
       const res  = await fetch('/api/generate-traffic-audit', { method:'POST', body: form });
