@@ -412,12 +412,16 @@ S.RevenueMenuItems = {
     const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
     const catOpts = '<option value="">Select category...</option>'
       + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    // One flex-wrap row holds every field: name + category + inventory product +
+    // the adaptive price/cost/covers/pour cells (injected into mi-adaptive, which
+    // is display:contents so its cells flow in the same row). The recipe builder
+    // and notes carry flex:0 0 100% so they break to their own full-width lines.
     return '<div class="form-row">'
       + '<div class="f" style="width:210px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
       + '<div class="f" id="mi-linked-slot" style="width:210px;flex-shrink:0;display:none;"></div>'
-      + '</div>'
-      + '<div id="mi-adaptive"></div>';
+      + '<div id="mi-adaptive" style="display:contents;"></div>'
+      + '</div>';
   },
 
   // Close the edit modal and return to the calling page — the Menu Items landing
@@ -460,7 +464,7 @@ S.RevenueMenuItems = {
     if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }   // the inventory-product field rides the top row; reset it
     if (!host) return;
     if (!this.formType) {
-      host.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
+      host.innerHTML = '<div style="flex:0 0 100%;font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
       return;
     }
     if (this.formType === 'inventory') {
@@ -479,13 +483,11 @@ S.RevenueMenuItems = {
   },
 
   recipeFields(item) {
-    return '<div class="form-row">'
-      + '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+    return '<div class="f" style="width:150px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:150px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
-      + '</div>'
-      + '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
-      + '<div class="f" style="margin-top:16px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
+      + '<div id="ri-recipe-section" style="flex:0 0 100%;border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
+      + '<div class="f" style="flex:0 0 100%;margin-top:16px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
   },
 
   // The inventory-product picker — rendered into the top-row slot (right of
@@ -506,16 +508,14 @@ S.RevenueMenuItems = {
     const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
     const showPour = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
     const pourField = showPour
-      ? '<div class="f" style="width:130px;"><label>Pour Size <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : 'oz') + '"/><span class="suf">oz</span></div></div>'
+      ? '<div class="f" style="width:130px;"><label>Pour Size</label>'
+        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : '') + '"/><span class="suf">oz</span></div></div>'
       : '';
-    return '<div class="form-row">'
-      + '<div class="f" style="width:120px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:160px;"><label>Cost <span style="color:var(--t4);font-weight:400;">(from product)</span></label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
+    return '<div class="f" style="width:120px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:160px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
       + pourField
-      + '</div>'
-      + '<div class="f" style="margin-top:8px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
+      + '<div class="f" style="flex:0 0 100%;margin-top:8px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
   },
 
   wireInventoryFields() {
