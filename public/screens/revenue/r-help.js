@@ -40,8 +40,8 @@ S.RevenueHelp = {
         a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let This Week sum from there.' }
     ]},
     { t: 'Decisions', qa: [
-      { q: 'How often can I run an audit, and why 30 days?',
-        a: 'One Revenue Audit every 30 days from your last one. The pace gives you time to actually act on a report before scoring yourself again; a number you check daily is just noise. The countdown on the Revenue Audit screen shows the days remaining.' },
+      { q: 'How often can I run an audit?',
+        a: 'One Revenue Audit a week. It scores your trailing four weeks, so each run reflects a fresh week of confirmed numbers without whipsawing on one slow or busy day. The countdown on the Revenue Audit screen shows the days remaining.' },
       { q: 'What is a good RPLH, and how do I set my target?',
         a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and track it on This Week and the Revenue dashboard.' },
       { q: 'Why are cost savings and revenue growth never combined into one number?',
