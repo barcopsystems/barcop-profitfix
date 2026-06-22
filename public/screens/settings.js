@@ -2757,38 +2757,6 @@ S.HubSettings = {
     App.shiftData.sc_cash_drops = scCashDrops;
     App.shiftData.sc_safe_log = scSafeLog;
 
-    // Currently-out items (status '86') are recent; older ones are Back In Stock
-    // (status 'Back' + date_back). Ribeye, Hazy IPA, and the Espresso Martini
-    // repeat across the window so the repeat-86 -> Inventory par alert has signal.
-    App.shiftData.sc_86_list = [
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Out of product, delivery Thursday',
-        date_86:dateStr(2),  time_86:'19:40', reported_by:'Luis V.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Espresso machine down',
-        date_86:dateStr(1),  time_86:'18:10', reported_by:'Maria G.',  status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'House Chardonnay',    category:'Wine',       reason:'Ran the case, reorder placed',
-        date_86:dateStr(4),  time_86:'21:30', reported_by:'Jake T.',   status:'86',   date_back:'',          notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Burrata',             category:'Food',       reason:'Out until morning prep',
-        date_86:dateStr(9),  time_86:'12:30', reported_by:'Hector M.', status:'Back', date_back:dateStr(9),  notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg blew, tapping new in the morning',
-        date_86:dateStr(12), time_86:'22:15', reported_by:'Maria G.',  status:'Back', date_back:dateStr(11), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Short on the delivery again',
-        date_86:dateStr(16), time_86:'20:05', reported_by:'Sam P.',    status:'Back', date_back:dateStr(15), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Oysters',             category:'Food',       reason:'Daily count sold out',
-        date_86:dateStr(18), time_86:'21:00', reported_by:'Luis V.',   status:'Back', date_back:dateStr(18), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Branzino',            category:'Food',       reason:'Sold out at dinner',
-        date_86:dateStr(24), time_86:'20:30', reported_by:'Sam P.',    status:'Back', date_back:dateStr(24), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Hazy IPA',            category:'Draft Beer', reason:'Keg kicked mid-service',
-        date_86:dateStr(27), time_86:'21:45', reported_by:'Jake T.',   status:'Back', date_back:dateStr(26), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Ribeye (10 oz)',      category:'Food',       reason:'Weekend rush sold out',
-        date_86:dateStr(33), time_86:'20:50', reported_by:'Hector M.', status:'Back', date_back:dateStr(33), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Espresso Martini',    category:'Cocktails',  reason:'Out of espresso beans',
-        date_86:dateStr(31), time_86:'19:00', reported_by:'Ashley B.', status:'Back', date_back:dateStr(30), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'Barrel Old Fashioned',category:'Cocktails',  reason:'Barrel batch empty, re-batching',
-        date_86:dateStr(38), time_86:'18:40', reported_by:'Maria G.',  status:'Back', date_back:dateStr(37), notes:'', created_at:new Date().toISOString() },
-      { id:uid(), item:'House Margarita',     category:'Cocktails',  reason:'Out of fresh lime',
-        date_86:dateStr(45), time_86:'18:20', reported_by:'Jake T.',   status:'Back', date_back:dateStr(44), notes:'', created_at:new Date().toISOString() },
-    ];
-
     // A real mix of Open / In Progress / Resolved across the window. Resolved
     // rows carry a resolution date and the repair cost so the cost rollup is
     // honest. The open Walk-in Cooler ties to the same equipment as the temp
