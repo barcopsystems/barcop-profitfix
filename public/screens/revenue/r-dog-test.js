@@ -155,15 +155,25 @@ S.RevenueDogTest = {
 
   wire() {
     document.getElementById('dt-start')?.addEventListener('click', () => this.start());
-    // Picking an item auto-fills the baseline from item.weekly_covers if the
-    // operator hasn't typed a value yet.
+    // Picking an item auto-fills the baseline from item.weekly_covers. Changing
+    // to a different item updates that auto value; a baseline the operator typed
+    // by hand is left alone (marked manual by the input handler below).
     document.getElementById('dt-item')?.addEventListener('change', e => {
-      const item = (App.data.menu_items || []).find(m => m.id === e.target.value);
       const baseEl = document.getElementById('dt-base');
-      if (item && baseEl && !baseEl.value && item.weekly_covers != null) {
+      if (!baseEl) return;
+      // Only auto-fill when the field is empty or still holds a prior auto value.
+      if (baseEl.value && baseEl.dataset.auto !== '1') return;
+      const item = (App.data.menu_items || []).find(m => m.id === e.target.value);
+      if (item && item.weekly_covers != null) {
         baseEl.value = Math.round(item.weekly_covers);
+        baseEl.dataset.auto = '1';
+      } else {
+        baseEl.value = '';
+        delete baseEl.dataset.auto;
       }
     });
+    // Typing a baseline by hand marks it manual so switching items won't overwrite it.
+    document.getElementById('dt-base')?.addEventListener('input', e => { delete e.target.dataset.auto; });
     this.container.querySelectorAll('.dt-keep').forEach(b =>
       b.addEventListener('click', () => this.decide(b.dataset.id, 'Kept')));
     this.container.querySelectorAll('.dt-remove').forEach(b =>
