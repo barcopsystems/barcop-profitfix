@@ -210,9 +210,13 @@ const PosIngest = {
   buildCash(rows) {
     const VL = (window.S && S.ShiftVarianceLog) || null;
     const tol = VL ? VL.tolerance() : 10;
+    // Match by the register's name OR any saved POS alias (a report calls a
+    // register "Main Bar" that the operator named "Bar 1" — the alias links them).
     const drawerByName = {};
     ((App.shiftData && App.shiftData.sc_drawers) || []).forEach(d => {
-      if (d && d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
+      if (!d || d.active === false) return;
+      if (d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
+      (d.pos_aliases || []).forEach(a => { if (a) drawerByName[String(a).trim().toLowerCase()] = d; });
     });
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
