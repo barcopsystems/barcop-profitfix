@@ -700,55 +700,16 @@ S.LaborLogHours = {
       dropTitle: 'Drop your timeclock export here',
       dropSub: 'Needs columns for staff name, date, and hours worked.',
       actionsEl: '#lo-imp-actions',
-      fields: [
-        { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
-        { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
-        { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked'] },
-        { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type'] }
-      ],
+      fields: PosIngest.FIELDS.hours,
       confirmLabel: 'Import',
       onComplete: rows => this.importRows(rows)
     });
   },
 
   async importRows(rows) {
-    const staffByName = {};
-    this.staff().forEach(s => { staffByName[(s.name || '').trim().toLowerCase()] = s; });
-
-    const toAdd = [];
-    const skipped = [];
-    let dupCount = 0;
-    rows.forEach(r => {
-      const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const hours = parseFloat(r.hours);
-      if (!staff || isNaN(hours) || hours <= 0) {
-        skipped.push(r.name || '(blank)');
-        return;
-      }
-      const recDate = this.normDate(r.date);
-      // Skip an exact re-import (same staff + date + hours) so re-dropping a
-      // timeclock file doesn't silently double-count hours into gross pay.
-      if (this.actuals().some(x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
-        dupCount++;
-        return;
-      }
-      const sal = App.isSalaried(staff);
-      const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0));
-      toAdd.push({
-        id:          App.uid(),
-        date:        recDate,
-        staff_id:    staff.id,
-        name:        staff.name,
-        position_id: staff.position_id || '',
-        shift_type:  (r.shift || '').trim(),
-        hours,
-        wage,
-        cost:        sal ? 0 : hours * (wage || 0),
-        notes:       '',
-        imported:    true,
-        created_at:  new Date().toISOString()
-      });
-    });
+    // Match / dedup / build / save all live in the shared PosIngest so this lane
+    // and the unified Import screen never drift; the UI message stays here.
+    const { toAdd, skipped, dupCount } = PosIngest.build('hours', rows);
 
     const result = document.getElementById('lo-imp-result');
     const imported = toAdd.length;
@@ -758,10 +719,7 @@ S.LaborLogHours = {
                     : 'No rows imported. No staff names matched the roster, or hours were missing.') + '</div>';
       return;
     }
-    // Each row persists as its own lc_actuals event; putRecord reverts its own
-    // in-memory push on a hard failure, so no manual rollback is needed.
-    let ok = true;
-    for (const rec of toAdd) { ok = (await App.putRecord('lc', 'actual', rec)) && ok; }
+    const ok = await PosIngest.commit('hours', toAdd);
     if (!ok) {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + 'Save failed. Try the import again.</div>';
