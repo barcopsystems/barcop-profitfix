@@ -994,8 +994,6 @@ const App = {
     { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
     // Shift Control
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
-    { group:'log-shift',           label:'Shift History',            module:'shift',     screen:'sc-shift-history',     moduleName:'Shift Control' },
-    { group:'active-shift',        label:'Active Shift',             module:'shift',     screen:'sc-active-shift',      moduleName:'Shift Control' },
     { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
     { group:'checklists',          label:'Opening / Closing Checklists', module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
     { group:'86-list',             label:'86 Items List',            module:'shift',     screen:'sc-86-list',           moduleName:'Shift Control' },
@@ -1513,7 +1511,7 @@ const App = {
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
-      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, from Open the Floor to the schedule to the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] },
+      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] },
       { h: 'Operation links', p: ['Paste the public URL for each platform: your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data into the Traffic Audit.'] }
     ] },
     'settings-targets': { title: 'How Recovery Targets Work', sections: [
@@ -1586,7 +1584,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-active-shift', 'sc-shift-policies', 'sc-shift-history', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-shift-policies', 'sc-cash-control', 'sc-cash-history', 'sc-86-list', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -4163,7 +4161,6 @@ const App = {
       const scTitles = {
         'hub':                   ['Recovery Hub', ''],
         'sc-dashboard':          ['Dashboard', 'Shift Control'],
-        'sc-active-shift':       ['Active Shift', 'Shift Control'],        'sc-shift-history':      ['Shift History', 'Shift Control'],
         'sc-cash-control':       ['Cash Control', 'Shift Control'],
         'sc-cash-history':       ['Cash History', 'Shift Control'],
         'sc-86-list':            ['86 List', 'Shift Control'],
@@ -4179,7 +4176,6 @@ const App = {
       };
       const scScreens = {
         'sc-dashboard': S.ShiftDashboard,
-        'sc-active-shift': S.ShiftActiveShift,        'sc-shift-history': S.ShiftHistory,
         'sc-cash-control': S.ShiftCashControl,
         'sc-cash-history': S.ShiftCashHistory,
         'sc-86-list': S.Shift86List,
