@@ -28,7 +28,6 @@ S.ShiftReports = {
   variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
   safeLog()    { return ((App.shiftData && App.shiftData.sc_safe_log) || []); },
   voidComps()  { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
-  list86()     { return ((App.shiftData && App.shiftData.sc_86_list) || []); },
   maint()      { return ((App.shiftData && App.shiftData.sc_maintenance) || []); },
   checklists() { return ((App.shiftData && App.shiftData.sc_checklists) || []); },
 
@@ -60,15 +59,15 @@ S.ShiftReports = {
   showHowTo() {
     App.showHelpModal('How Shift Reports Work', [
       { p: ['Reports roll up everything your shifts generated so you can spot the patterns: which shifts make money, where the cash is leaking, and what keeps going wrong on the floor. Everything here is read-only, pulled straight from the shifts, drawers, and logs you already recorded.'] },
-      { h: 'The Three Tabs', p: ['Shift covers revenue, covers, and check average broken out by shift type and by day of week. Cash covers your drops by drawer and your variances by cashier, plus net over/short and the safe balance. Operations covers voids and comps by server and reason, your most-86\'d items, maintenance by priority, and checklist completion.'] },
+      { h: 'The Three Tabs', p: ['Shift covers revenue, covers, and check average broken out by shift type and by day of week. Cash covers your drops by drawer and your variances by cashier, plus net over/short and the safe balance. Operations covers voids and comps by server and reason, maintenance by priority, and checklist completion.'] },
       { h: 'Setting the Range', p: ['The chips pick the window: This Week, Last Week, This Month, Last 4 Weeks, or All. Custom opens a From and To date picker. The range carries across all three tabs and every number on the page updates to match.'] },
-      { h: 'Reading the Numbers', p: ['The stats card up top is the headline for the tab. The breakdown tables below it show where those totals come from, so a repeat 86, a cashier who runs short, or a shift type that drags can stand right out.'] },
+      { h: 'Reading the Numbers', p: ['The stats card up top is the headline for the tab. The breakdown tables below it show where those totals come from, so a cashier who runs short or a shift type that drags can stand right out.'] },
       { h: 'Export', p: ['Export PDF saves the tab you are looking at, with the current range, for a manager review or your records.'] }
     ]);
   },
 
   draw() {
-    if (!(this.shifts().length || this.drops().length || this.variances().length || this.voidComps().length || this.list86().length || this.maint().length || this.checklists().length)) {
+    if (!(this.shifts().length || this.drops().length || this.variances().length || this.voidComps().length || this.maint().length || this.checklists().length)) {
       App.setupCard(this.container, {
         title: 'Shift Reports',
         lead: 'Reports roll up your shifts, cash, and operations across any date range. Run a shift and log a little activity and these fill in.',
@@ -268,11 +267,10 @@ S.ShiftReports = {
 
   // ── Operations tab ──────────────────────────────────────────────────────────
   bodyOps() {
-    if (!(this.voidComps().length || this.list86().length || this.maint().length || this.checklists().length)) {
-      return { empty: this.emptyPanel('No operations data yet.', 'Log voids and comps, 86s, maintenance, and checklists in Shift Control and this report will summarize the operational exceptions.', 'sc-void-comp', 'Go to Void / Comp') };
+    if (!(this.voidComps().length || this.maint().length || this.checklists().length)) {
+      return { empty: this.emptyPanel('No operations data yet.', 'Log voids and comps, maintenance, and checklists in Shift Control and this report will summarize the operational exceptions.', 'sc-void-comp', 'Go to Void / Comp') };
     }
     const vc = this.voidComps().filter(r => this.inRange(r.date));
-    const items86 = this.list86().filter(r => this.inRange(r.date_86));
     const maint = this.maint().filter(r => this.inRange(r.date_reported));
     const checks = this.checklists().filter(r => this.inRange(r.date));
 
@@ -282,15 +280,13 @@ S.ShiftReports = {
     const stats = this.statsCard(
       this.statItem('Voids &amp; Comps', vc.length)
       + this.statItem('Void/Comp $', App.fmtCurrency(vcTotal), 'warn')
-      + this.statItem('86\'s Logged', items86.length)
       + this.statItem('Open Maint.', openMaint, openMaint ? 'warn' : '')
       + this.statItem('Checklist Rate', checkRate != null ? checkRate + '%' : '-'));
 
     // First breakdown carries no heading — the chips row sits in its place.
     let below = this.vcByServer(vc);
     if (vc.length) below += this.section('Voids &amp; Comps by Reason', this.vcByReason(vc));
-    below += this.section('Most-86\'d Items', this.most86(items86))
-      + this.section('Maintenance by Priority', this.maintByPriority(maint))
+    below += this.section('Maintenance by Priority', this.maintByPriority(maint))
       + this.section('Checklist Completion', this.checklistCard(checks));
     return { stats, below };
   },
@@ -327,21 +323,6 @@ S.ShiftReports = {
       '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + g[k].count + '</td>'
       + '<td class="val">' + App.fmtCurrency(g[k].amt) + '</td></tr>').join('');
     return this.bareTable(['Reason', 'Count', 'Amount'], rows);
-  },
-
-  most86(items) {
-    if (!items.length) return '<div style="font-size:13px;color:var(--t3);">No 86s logged in this range.</div>';
-    const g = {};
-    items.forEach(i => {
-      const key = (i.item || 'Unspecified').trim();
-      const lk = key.toLowerCase();
-      if (!g[lk]) g[lk] = { name: key, count: 0, category: i.category || '-' };
-      g[lk].count++;
-    });
-    const rows = Object.values(g).sort((a, b) => b.count - a.count).slice(0, 15).map(x =>
-      '<tr><td><div class="val">' + esc(x.name) + '</div></td><td>' + esc(x.category) + '</td>'
-      + '<td>' + x.count + (x.count > 1 ? ' <span style="color:var(--amber);font-weight:700;">Repeat</span>' : '') + '</td></tr>').join('');
-    return this.bareTable(['Item', 'Category', 'Times 86\'d'], rows);
   },
 
   maintByPriority(maint) {
