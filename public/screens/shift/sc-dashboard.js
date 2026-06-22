@@ -194,10 +194,10 @@ S.ShiftDashboard = {
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
     }
     if (k === 'cash') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. If it does not, reconcile each drawer by hand in Cash Control. Mark done only if you do not track cash over/short.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
         + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile in Cash Control</button>'
+        + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile by Hand</button>'
         + this.markBtn('cash', 'Mark Done') + '</div>';
     }
     if (k === 'exc') {
