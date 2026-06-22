@@ -542,9 +542,54 @@ S.HubSettings = {
       return MONTHS[e.getMonth()] + ' ' + e.getFullYear() + ', 4 weeks ending ' + MONTHS[e.getMonth()].slice(0,3) + ' ' + e.getDate();
     };
 
+    // ── Weekly audit series generator ────────────────────────────────────────
+    // Audits run weekly now. The four rich milestone audits (today, and 30/60/90
+    // days back) stay full detail; between each pair we generate terser weekly
+    // fill-ins by interpolating the milestone numbers, so the history reads weekly
+    // with honest score-and-gap figures and the latest week stays the richest. A
+    // fill-in carries section scores + the headline numbers + gaps (no prose),
+    // which the audit views render cleanly (empty fields are filtered).
+    let _ipSerial = 60;
+    const ipRaw = (lo, hi, t) => {
+      const raw = {};
+      Object.keys(lo).forEach(k => {
+        const a = lo[k], b = hi[k];
+        if (typeof a === 'number' && typeof b === 'number') {
+          const isFloat = /_PCT$|_AVG$|_RATING$|_RPLH$|_PER_COVER$|_SPREAD$|_VARIANCE$/.test(k);
+          const v = a + (b - a) * t;
+          raw[k] = isFloat ? +v.toFixed(1) : Math.round(v);
+        }
+      });
+      raw.BAR_NAME = lo.BAR_NAME || 'The Anchor Bar & Kitchen';
+      raw.DATA_TIER_LABEL = (t >= 0.5 ? hi : lo).DATA_TIER_LABEL || 'Tier 3 Analysis, Bar Cop Operating Data';
+      return raw;
+    };
+    const ANCH_DAYS = [0, 30, 60, 90];
+    const FILL_DAYS = [7, 14, 21, 37, 44, 51, 67, 74, 81];
+    const weeklySeries = (mod, richByDay) => {
+      const PFX = mod === 'profit' ? 'PFA' : mod === 'revenue' ? 'RFA' : 'TFA';
+      const all = ANCH_DAYS.map(d => richByDay[d]);
+      FILL_DAYS.forEach(D => {
+        const hiD = ANCH_DAYS.filter(d => d < D).sort((a, b) => b - a)[0];   // newer milestone (fewer days ago)
+        const loD = ANCH_DAYS.filter(d => d > D).sort((a, b) => a - b)[0];   // older milestone (more days ago)
+        const lo = richByDay[loD].raw, hi = richByDay[hiD].raw;
+        const t = (loD - D) / (loD - hiD);
+        const raw = ipRaw(lo, hi, t);
+        const id = PFX + '-2026-' + String(++_ipSerial).padStart(4, '0');
+        raw.AUDIT_ID = id; raw.AUDIT_PERIOD = periodLabel(D);
+        if (mod === 'traffic') {
+          const score = Math.round(lo.OVERALL_SCORE + (hi.OVERALL_SCORE - lo.OVERALL_SCORE) * t);
+          all.push(mkTrafficAudit(dateStr(D), daysAgoISO(D), id, periodLabel(D), score, raw.DATA_TIER_LABEL, raw));
+        } else {
+          all.push(mkAudit(mod, { date: dateStr(D), generated_at: daysAgoISO(D), raw }));
+        }
+      });
+      return all;
+    };
+
     // ── Profit Audits ──
-    App.data.audits = [
-      mkAudit('profit', { date: dateStr(90), generated_at: daysAgoISO(90), raw: {
+    App.data.audits = weeklySeries('profit', {
+      90: mkAudit('profit', { date: dateStr(90), generated_at: daysAgoISO(90), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 33,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: periodLabel(90), AUDIT_ID: 'PFA-2026-0029',
@@ -598,7 +643,7 @@ S.HubSettings = {
         S6_SIG4_GAP: 'Comp dollars are untracked and untrainable.',
         S6_SIG4_TOOL: 'Set a comp authorization threshold in Shift Policies.'
       }}),
-      mkAudit('profit', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
+      60: mkAudit('profit', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 44,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: periodLabel(60), AUDIT_ID: 'PFA-2026-0034',
@@ -648,7 +693,7 @@ S.HubSettings = {
         S6_SIG3_GAP: 'Legitimate loss cannot be separated from variance.',
         S6_SIG3_TOOL: 'Start logging breakage in Waste and Spills this week.'
       }}),
-      mkAudit('profit', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
+      30: mkAudit('profit', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 58,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: periodLabel(30), AUDIT_ID: 'PFA-2026-0040',
@@ -698,7 +743,7 @@ S.HubSettings = {
         S6_SIG3_GAP: 'On track. Keep the log current.',
         S6_SIG3_TOOL: 'Keep logging breakage in Waste and Spills.'
       }}),
-      mkAudit('profit', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
+      0: mkAudit('profit', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 70,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: periodLabel(0), AUDIT_ID: 'PFA-2026-0046',
@@ -744,11 +789,11 @@ S.HubSettings = {
         S6_SIG2_GAP: 'Small price increases quietly give back the margin you just recovered.',
         S6_SIG2_TOOL: 'Review the Price Changes tab in Vendor Tracker each month.'
       }})
-    ];
+    });
 
     // ── Revenue Audits ──
-    App.data.revenue_audits = [
-      mkAudit('revenue', { date: dateStr(90), generated_at: daysAgoISO(90), raw: {
+    App.data.revenue_audits = weeklySeries('revenue', {
+      90: mkAudit('revenue', { date: dateStr(90), generated_at: daysAgoISO(90), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 39,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: periodLabel(90), AUDIT_ID: 'RVA-2026-0012',
@@ -798,7 +843,7 @@ S.HubSettings = {
         S6_SIG4_GAP: 'Bottom-third servers get no daily coaching.',
         S6_SIG4_TOOL: 'Run a 5-minute pre-shift on every dinner shift, even when short-staffed.'
       }}),
-      mkAudit('revenue', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
+      60: mkAudit('revenue', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 48,
         DATA_TIER_LABEL: 'Tier 2 Analysis, Standard Data Submitted',
         AUDIT_PERIOD: periodLabel(60), AUDIT_ID: 'RVA-2026-0017',
@@ -844,7 +889,7 @@ S.HubSettings = {
         S6_SIG3_GAP: 'On track. Spread under $10 is the target.',
         S6_SIG3_TOOL: 'Keep the daily briefings going and add a monthly server-by-server review.'
       }}),
-      mkAudit('revenue', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
+      30: mkAudit('revenue', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 56,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: periodLabel(30), AUDIT_ID: 'RVA-2026-0022',
@@ -890,7 +935,7 @@ S.HubSettings = {
         S6_SIG3_GAP: 'On track. Spread under $10 is the target.',
         S6_SIG3_TOOL: 'Keep daily briefings and a monthly server review.'
       }}),
-      mkAudit('revenue', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
+      0: mkAudit('revenue', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 64,
         DATA_TIER_LABEL: 'Tier 3 Analysis, Full Data Submitted',
         AUDIT_PERIOD: periodLabel(0), AUDIT_ID: 'RVA-2026-0028',
@@ -936,7 +981,7 @@ S.HubSettings = {
         S6_SIG3_GAP: 'Growing further requires a second Saturday slot or off-site catering.',
         S6_SIG3_TOOL: 'Add a Friday and Saturday early-dining slot and price it.'
       }})
-    ];
+    });
 
     // ════════════════════════════════════════════════════════════════════
     //  REVENUE RECOVERY — the Anchor's revenue side, all traced to
@@ -1391,8 +1436,8 @@ S.HubSettings = {
         sections:sections, action_items:items, raw:raw, generated_at:generated_at };
     };
 
-    App.data.traffic_audits = [
-      mkTrafficAudit(dateStr(90), daysAgoISO(90), 'TFA-2026-0006',
+    App.data.traffic_audits = weeklySeries('traffic', {
+      90: mkTrafficAudit(dateStr(90), daysAgoISO(90), 'TFA-2026-0006',
         periodLabel(90), 35,
         'Tier 2 Analysis, Standard Data Submitted', {
         S1_SCORE:32, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Partial',
@@ -1457,7 +1502,7 @@ S.HubSettings = {
         S8_SIG4_GAP:'Sitting below the competitors who run offers.',
         S8_SIG4_TOOL:'Launch a first-order promo on DoorDash this week.'
       }),
-      mkTrafficAudit(dateStr(60), daysAgoISO(60), 'TFA-2026-0010',
+      60: mkTrafficAudit(dateStr(60), daysAgoISO(60), 'TFA-2026-0010',
         periodLabel(60), 42,
         'Tier 2 Analysis, Standard Data Submitted', {
         S1_SCORE:42, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
@@ -1517,7 +1562,7 @@ S.HubSettings = {
         S8_SIG3_GAP:'Orders leak to the delivery apps at a higher fee.',
         S8_SIG3_TOOL:'Add first-party online ordering to the site.'
       }),
-      mkTrafficAudit(dateStr(30), daysAgoISO(30), 'TFA-2026-0015',
+      30: mkTrafficAudit(dateStr(30), daysAgoISO(30), 'TFA-2026-0015',
         periodLabel(30), 50,
         'Tier 3 Analysis, Full Data Submitted', {
         S1_SCORE:52, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
@@ -1577,7 +1622,7 @@ S.HubSettings = {
         S8_SIG3_GAP:'Room to send weekly during event months.',
         S8_SIG3_TOOL:'Add a weekly email during event-heavy weeks.'
       }),
-      mkTrafficAudit(dateStr(0), daysAgoISO(0), 'TFA-2026-0020',
+      0: mkTrafficAudit(dateStr(0), daysAgoISO(0), 'TFA-2026-0020',
         periodLabel(0), 57,
         'Tier 3 Analysis, Full Data Submitted', {
         S1_SCORE:60, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
@@ -1638,7 +1683,7 @@ S.HubSettings = {
         S8_SIG3_GAP:'Confirm this is intentional given local order mix.',
         S8_SIG3_TOOL:'Review Grubhub local order share annually before deciding.'
       })
-    ];
+    });
 
     // ════════════════════════════════════════════════════════════════════
     //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
@@ -2450,66 +2495,11 @@ S.HubSettings = {
     ];
     const scDrawers = App.shiftData.sc_drawers;
 
-    // Each operating day runs multiple typed services that sum to the day's
-    // bar_rev / food_rev / covers, so the weekly revenue feed is unchanged but
-    // Shift Reports (by type) and the per-type cash tolerances demo realistically.
-    // Weekends open with Brunch, weekdays with Lunch, and Dinner anchors the day.
-    // ── Close-out seed helpers (cash recon / tip recon / handoff) ────────────
-    // The recap reads the close-wizard blocks; the seed predated them, so closed
-    // sample shifts had empty recaps. Cash is ~15% of revenue, dropped toward the
-    // bank through service; drawers end within tolerance except a deterministic
-    // handful with a real over/short to demo the catch. Registers vary by daypart.
-    const REG_BANKS = { 'Main Bar Register': 300, 'Service Bar Register': 200, 'Floor Register 1': 250, 'Floor Register 2': 250 };
-    const DAYPART_REGS = {
-      Brunch: ['Main Bar Register', 'Floor Register 1'],
-      Lunch: ['Main Bar Register', 'Floor Register 1'],
-      Dinner: ['Main Bar Register', 'Service Bar Register', 'Floor Register 1', 'Floor Register 2'],
-      'Late Night': ['Main Bar Register', 'Service Bar Register']
-    };
-    const CASH_MISS = [0, 0, 0, 4, 0, -3, 0, 0, -18, 0, 5, 0, 16, -2, 0];
-    const seedCashRecon = (shiftType, totalRev, idx) => {
-      const regs = DAYPART_REGS[shiftType] || ['Main Bar Register'];
-      const cashTotal = Math.round(totalRev * 0.15);
-      const miss = CASH_MISS[idx % CASH_MISS.length];
-      const drawers = regs.map((name, di) => {
-        const opening = REG_BANKS[name] || 200;
-        const sales_cash = Math.round(cashTotal / regs.length);
-        const drops_total = Math.max(0, Math.floor(sales_cash / 20) * 20);
-        const expected = opening + sales_cash - drops_total;
-        const counted_cash = expected + (di === 0 ? miss : 0);
-        const variance = counted_cash - expected;
-        const status = Math.abs(variance) <= 10 ? 'Within Tolerance' : (variance < 0 ? 'Short' : 'Over');
-        return { drawer_id: '', name, opening_bank: opening, drops_total, sales_cash, expected, counted_cash, variance, status };
-      });
-      const sum = k => drawers.reduce((t, d) => t + d[k], 0);
-      const expected = sum('expected'), counted_cash = sum('counted_cash');
-      return { drawers, opening_bank: sum('opening_bank'), drops_total: sum('drops_total'),
-        sales_cash: sum('sales_cash'), expected, counted_cash, variance: counted_cash - expected, skipped: false };
-    };
-    const TIP_MISS = [0, 0, 6, 0, -4, 0, 9, 0, -3, 0];
-    const seedTipRecon = (totalRev, idx) => {
-      const logged = Math.round(totalRev * 0.18);
-      const pos = logged + TIP_MISS[idx % TIP_MISS.length];
-      return { logged_total: logged, pos_reported: pos, variance: logged - pos };
-    };
-    const SEED_HANDOFFS = [
-      'Slow start, picked up after seven. Walk-in running a touch warm, flagged it to maintenance.',
-      'Busy all night. Down to the last case of the house red, get an order in before tomorrow.',
-      'Smooth shift. Comped a birthday round for a regular, approved.',
-      'Short a server, the team covered well. Bourbon delivery came up light, check the invoice.',
-      'Steady night. Floor 2 card reader glitched twice, give it a restart at open.',
-      ''
-    ];
-    const SEED_SHIFT_NOTES = [
-      'VIP four-top at nine, comped dessert.',
-      'Delivery short on limes, ran to the store.',
-      'Large party walk-in, watched the door the rest of the night.',
-      'Server sent home sick after first turn, covered the section.'
-    ];
-    const seedShiftNotes = (date, idx) => idx % 6 === 0
-      ? [{ id: uid(), at: date + 'T20:30:00', text: SEED_SHIFT_NOTES[idx % SEED_SHIFT_NOTES.length], manager_id: '' }]
-      : [];
-
+    // sc_shifts are per-day records fed by the weekly POS sales import (one row
+    // per calendar day). The seed builds the exact slim shape the cockpit's
+    // PosIngest 'sales' lane writes, off the 13-week spine, so revenue and covers
+    // reconcile. Cash, tips, and exceptions live in their own stores, not on the
+    // shift record (no live-shift cruft).
     const scShifts = [];
     const scDays   = [];   // one entry per operating day, drives the checklists
     ANCHS.weeks.forEach(a => {
@@ -2521,37 +2511,13 @@ S.HubSettings = {
         const dayFloor = last ? foodLeft : Math.round(a.food_rev * w);
         const dayCov   = last ? covLeft  : Math.round(a.covers   * w);
         barLeft -= dayBar; foodLeft -= dayFloor; covLeft -= dayCov;
-        const date    = dateStr(baseAgo + 6 - di);
-        const weekend = di >= 5;
-        const isLastWeek = a.wk === ANCHS.weeks.length;
-        // daypart: [type, revenue share, staff on floor]. Dinner is the anchor.
-        const parts = weekend
-          ? [['Brunch', 0.35, 7], ['Dinner', 0.45, 9], ['Late Night', 0.20, 5]]
-          : [['Lunch', 0.30, 5], ['Dinner', 0.50, 8], ['Late Night', 0.20, 4]];
-        let bLeft = dayBar, fLeft = dayFloor, cLeft = dayCov;
-        parts.forEach((p, pi) => {
-          const lastPart = pi === parts.length - 1;
-          const bar   = lastPart ? bLeft : Math.round(dayBar   * p[1]);
-          const floor = lastPart ? fLeft : Math.round(dayFloor * p[1]);
-          const cov   = lastPart ? cLeft : Math.round(dayCov   * p[1]);
-          bLeft -= bar; fLeft -= floor; cLeft -= cov;
-          // Phase 0: weather_tag gives the audits real context so a low-revenue
-          // Friday during a thunderstorm reads as bad luck, not bad ops. (Event
-          // P&L no longer reads a shift tag; it uses the checked event staff in
-          // Build Schedule. See ev-bookings eventStaffShifts.)
-          const weatherTag = (a.wk === ANCHS.weeks.length - 3 && di === 4 && p[0] === 'Dinner') ? 'thunderstorm' : '';
-          const sIdx = scShifts.length;
-          const cashRecon = seedCashRecon(p[0], bar + floor, sIdx);
-          scShifts.push({
-            id:uid(), date:date, shift_type:p[0],
-            manager:mgrs[(di + pi) % 3], bar_revenue:bar, floor_revenue:floor,
-            total_revenue:bar + floor, covers:cov, opening_bank:cashRecon.opening_bank,
-            staff_on_floor:p[2], status:'Closed', notes:'',
-            cash_recon:cashRecon, tip_recon:seedTipRecon(bar + floor, sIdx),
-            handoff_notes:SEED_HANDOFFS[sIdx % SEED_HANDOFFS.length], shift_notes:seedShiftNotes(date, sIdx),
-            weather_tag:weatherTag,
-            created_at:new Date().toISOString()
-          });
+        const date = dateStr(baseAgo + 6 - di);
+        scShifts.push({
+          id:uid(), date:date,
+          bar_revenue:dayBar, floor_revenue:dayFloor,
+          total_revenue:dayBar + dayFloor, covers:dayCov,
+          shift_type:'Full Day', status:'Closed', imported:true,
+          created_at:new Date().toISOString()
         });
         scDays.push({ date:date, manager:mgrs[di % 3] });
       });
@@ -3130,7 +3096,7 @@ S.HubSettings = {
         if (match) c.staff_id = match.id;
       }
       if (!c.shift_id && c.date) {
-        const matchShift = scShifts.find(s => s.date === c.date && (!c.shift || s.shift_type === c.shift));
+        const matchShift = scShifts.find(s => s.date === c.date);
         if (matchShift) c.shift_id = matchShift.id;
       }
     });
@@ -3297,8 +3263,7 @@ S.HubSettings = {
     const lcTips = [];
     [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
       const tipDate = dateStr(d);
-      const matchedShift = scShifts.find(s => s.date === tipDate && s.shift_type === 'Dinner') || scShifts.find(s => s.date === tipDate);
-      const shiftId = matchedShift ? matchedShift.id : '';
+      const shiftId = App.tipShiftKey(tipDate, 'Dinner');   // day + period key, same as the live Tip Log
       lcTipped.forEach(st => {
         const role = posNameOf(st.position_id);
         const base = role === 'Bartender' ? 135 : role === 'Server' ? 100 : 55;
@@ -3318,15 +3283,14 @@ S.HubSettings = {
     // tip log), and Tip History can group by shift.
     const mkPool = (d, amount) => {
       const poolDate = dateStr(d);
-      const matched = scShifts.find(s => s.date === poolDate);
       const parts = lcTipped.map(st => ({ staff_id:st.id, name:st.name,
         hours:posNameOf(st.position_id) === 'Server' ? 5 : 7 }));
       const totH = parts.reduce((s, p) => s + p.hours, 0);
       parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
       return { id:uid(),
-        shift_id:    matched ? matched.id : '',
+        shift_id:    App.tipShiftKey(poolDate, 'Dinner'),
         date:        poolDate,
-        shift_type:  matched ? (matched.shift_type || '') : 'Dinner',
+        shift_type:  'Dinner',
         method:      'hours',
         pool_amount: amount,
         total_hours: totH,
