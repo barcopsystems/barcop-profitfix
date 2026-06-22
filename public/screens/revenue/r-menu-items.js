@@ -506,16 +506,28 @@ S.RevenueMenuItems = {
     // Pour Size only matters for poured drinks (Beer/Wine). Packaged resale
     // items (NA beverages, Snacks) are sold whole, so the field is dropped.
     const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
-    const showPour = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
-    const pourField = showPour
-      ? '<div class="f" style="width:130px;"><label>Pour Size</label>'
+    // Pour Size only for products SOLD BY A POUR: draft beer (from a keg) and wine
+    // by the glass. Bottle beer, NA, and snacks sell whole, so no pour. The cell is
+    // rendered for the eligible categories but hidden until a poured product is
+    // picked (toggled in the product-change handler).
+    const pourEligible = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
+    const pourShow = this.pourVisibleFor(menuCat, linkedProd);
+    const pourField = pourEligible
+      ? '<div class="f" id="ri-pour-cell" style="width:90px;' + (pourShow ? '' : 'display:none;') + '"><label>Pour Size</label>'
         + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : '') + '"/><span class="suf">oz</span></div></div>'
       : '';
     return '<div class="f" style="width:120px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:160px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
+      + '<div class="f" style="width:110px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:150px;"><label>Avg Weekly Covers</label><input class="form-input" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/></div>'
       + pourField
       + '<div class="f" style="flex:0 0 100%;margin-top:8px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
+  },
+  // Pour Size applies only to products sold by a pour: draft beer and wine by the
+  // glass. Bottle beer sells whole, so it carries no pour size.
+  pourVisibleFor(menuCat, prod) {
+    if (menuCat === 'NA Beverages' || menuCat === 'Snacks') return false;
+    if (menuCat === 'Beer') return !!(prod && prod.category === 'Draft Beer');
+    return true;
   },
 
   wireInventoryFields() {
@@ -533,6 +545,14 @@ S.RevenueMenuItems = {
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
       this.linkedProductId = e.target.value || '';
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
+      // Pour Size shows only for poured products (draft beer, wine by the glass);
+      // hide and clear it for bottle beer and the like before recomputing cost.
+      const pourCell = document.getElementById('ri-pour-cell');
+      if (pourCell) {
+        const show = this.pourVisibleFor(document.getElementById('ri-cat')?.value || '', p);
+        pourCell.style.display = show ? '' : 'none';
+        if (!show) { const pi = document.getElementById('ri-pour'); if (pi) pi.value = ''; }
+      }
       recomputeCost();
       // Auto-fill the menu price from the linked product's saved menu price,
       // the same way cost auto-fills. Beer + Wine carry a menu price in
