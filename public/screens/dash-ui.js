@@ -54,7 +54,7 @@ const DashUI = {
     const score = latest.overall_score || 0;
     const col = App.scoreColor(score);
     const daysSince = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const daysLeft = Math.max(0, 30 - daysSince);
+    const daysLeft = Math.max(0, 7 - daysSince);
     const timing = daysLeft > 0 ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') : 'Ready to run a new audit';
     return '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'

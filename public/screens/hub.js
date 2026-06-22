@@ -405,11 +405,11 @@ S.Hub = {
     // big score / 100 with the score bar full-width below it, then the red
     // dollar statement (or green "On target") computed honestly from the
     // audit's action_items, then audit date + trend in small subtext. The
-    // action mirrors the 30-day rolling rule the audit screens enforce.
+    // action mirrors the weekly rolling rule the audit screens enforce.
     const auditDaysLeft = (a) => {
       if (!a || !a.date) return 0;
       const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
-      return Math.max(0, 30 - d);
+      return Math.max(0, 7 - d);
     };
     const auditRow = (name, audit, trend, screen, mod, isFirst) => {
       const score      = audit?.overall_score ?? null;

@@ -14,9 +14,9 @@ S.AuditTracker = {
     const latest = audits[0] || null;
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = daysSince >= 30;
-    const daysLeft = canRun ? 0 : 30 - daysSince;
-    const desc = 'Generate a new audit every 30 days. Run first audit on day 1.';
+    const canRun = daysSince >= 7;
+    const daysLeft = canRun ? 0 : 7 - daysSince;
+    const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('at', 'Profit Audit', desc, canRun, !!latest, daysLeft)
       + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
@@ -367,11 +367,11 @@ S.AuditTracker = {
     const d = this._intakeDraft || {};
     document.getElementById('topbar-sub').textContent = '';
     // The form is always viewable so the operator can review/update inputs. The
-    // 30-day window gates only the Generate action.
+    // weekly cadence gates only the Generate action.
     const _a = (App.data.audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
     const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = _since >= 30;
-    const daysLeft = canRun ? 0 : 30 - _since;
+    const canRun = _since >= 7;
+    const daysLeft = canRun ? 0 : 7 - _since;
 
     // Pills — every section the audit can pull from Control. Always listed:
     // greyed until that data exists, gold-tint when Bar Cop is using it.
@@ -448,7 +448,7 @@ S.AuditTracker = {
       { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
       { h: 'What Bar Cop already has', p: ['If you run the Inventory, Shift, and Labor Control systems, those numbers feed the audit automatically as verified ground truth. A brand-new operation has none yet, so this first audit reads from what you enter and upload.'] },
       { h: 'The steps', p: ['1. Enter your annual sales (the dollar baseline). A bar with no kitchen leaves Food blank.', '2. Upload any reports that cover a section Bar Cop cannot see yet (a P&L covers Bar, Food, and Prime in one file).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in as you log more.'] },
-      { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you straight into Profit Fix on that exact gap. Bar Cop Outlook is a short written read of where you stand, and Export PDF saves the whole audit. Run one every 30 days; each is saved so you can watch the score trend on the audit landing.'] },
+      { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you straight into Profit Fix on that exact gap. Bar Cop Outlook is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Every score and dollar figure is computed in code from your real numbers, the same every time. A section with no data is left out, never guessed.'] }
     ]);
   },

@@ -20,9 +20,9 @@ S.HubAuditHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Bar Cop Audit?',
-        a: 'It is your monthly read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Traffic tell you where money is leaking and how to fix it. The Bar Cop Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
+        a: 'It is your weekly read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Traffic tell you where money is leaking and how to fix it. The Bar Cop Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
       { q: 'How often do I run it?',
-        a: 'Once every 30 days, the same rhythm as the recovery audits. Between runs the page counts down to the next one. The 30-day cadence keeps the trend honest and gives each measure enough fresh data to mean something.' },
+        a: 'Once a week, the same rhythm as the recovery audits. Between runs the page counts down to the next one. It scores your trailing 30 days, so the window stays wide enough for each measure to mean something while you still get a fresh read every week.' },
       { q: 'Do I have to enter anything to run it?',
         a: 'No. The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows Not Enough Data instead of guessing.' }
     ]},
@@ -44,7 +44,7 @@ S.HubAuditHelp = {
       { q: 'Where do past audits go?',
         a: 'Every Bar Cop Audit is kept. The Audit History page in the sidebar lists them newest first, and View opens the full detail of any past one so you can see how a score moved and what was flagged at the time.' },
       { q: 'What does the score trend tell me?',
-        a: 'Whether the operation is tightening up or slipping. One audit is a snapshot; a line of them is the real story, which is why the 30-day rhythm matters. A steady climb means your procedures are sticking. A drop is an early warning before it shows up in the money.' }
+        a: 'Whether the operation is tightening up or slipping. One audit is a snapshot; a line of them is the real story, which is why the weekly rhythm matters. A steady climb means your procedures are sticking. A drop is an early warning before it shows up in the money.' }
     ]}
   ],
 

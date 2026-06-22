@@ -1,7 +1,7 @@
 'use strict';
 
-/* ── Bar Cop Audit — Hub-level executive monthly operational audit ───────────
-   The owner-operator's monthly read on the entire operation. Distinct from
+/* ── Bar Cop Audit — Hub-level executive weekly operational audit ───────────
+   The owner-operator's weekly read on the entire operation. Distinct from
    the three recovery audits (Profit, Revenue, Traffic) which answer
    "what's broken, where to fix" with financial outcomes. Bar Cop Audit
    answers a different question: "is the operation being run well, is there
@@ -17,9 +17,10 @@
      5. Recovery Action         — gaps surfaced vs fixes logged vs dollars pulled
      6. Operational Consistency — week-over-week variance in stable metrics
 
-   One audit every 30 days, hard-locked, same as the three recovery audits.
-   It scores as soon as there is anything real to show; each sub-score reads
-   N/A until the data behind it exists.
+   One audit a week, same as the three recovery audits. It scores the trailing
+   30 days, so the window stays wide enough to read discipline even as it runs
+   weekly. It scores as soon as there is anything real to show; each sub-score
+   reads N/A until the data behind it exists.
 
    Single-page audit detail built on the shared AuditUI so it matches the three
    recovery audits. Bar Cop Outlook + Export PDF sit in the Top Operational
@@ -29,7 +30,7 @@ S.HubBarCopAudit = {
   WINDOW_DAYS:           30,   // scoring window for most sub-scores
   CONSISTENCY_WEEKS:     8,    // weeks of history for Operational Consistency
   MIN_DATA_DAYS:         60,   // before this much history exists, empty state
-  AUDIT_INTERVAL_DAYS:   30,
+  AUDIT_INTERVAL_DAYS:   7,    // run weekly; the scoring window (WINDOW_DAYS) stays at 30 so discipline reads over a trailing month
   RETENTION_CAP:         12,   // keep last 12 audits (1 year), match recovery audits
   MIN_SUBS_FOR_OVERALL:  3,    // need this many of 6 sub-scores covered for an honest overall
 
@@ -192,7 +193,7 @@ S.HubBarCopAudit = {
       const arr = r.list || [];
       const latest = App.latestEvent(arr);
       const since = latest ? this._daysSince(latest.date) : null;
-      const onTime = since != null && since <= 35; // 30-day rule with 5-day grace
+      const onTime = since != null && since <= 12; // weekly rhythm with a few days grace
       components.push({ label: r.name + ' audit on time', ratio: onTime ? 1 : 0, na: arr.length === 0, extra: arr.length === 0 ? 'No audit run yet' : (onTime ? 'Current' : 'Overdue') });
     });
 
@@ -565,10 +566,10 @@ S.HubBarCopAudit = {
           severity: 'warn',
           screen:   r.screen
         });
-      } else if (since > 35) {
+      } else if (since > 14) {
         out.push({
           label:    r.name + ' audit overdue (' + since + ' days)',
-          detail:   'Last run on ' + this._fmtDate(latest.date) + '. The 30-day rhythm keeps the trend honest.',
+          detail:   'Last run on ' + this._fmtDate(latest.date) + '. The weekly rhythm keeps the trend honest.',
           severity: since > 60 ? 'critical' : 'warn',
           screen:   r.screen
         });
@@ -830,7 +831,7 @@ S.HubBarCopAudit = {
     const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    const desc = 'Generate a new audit every 30 days. Run first audit on day 30.';
+    const desc = 'Generate a new audit every week. Bar Cop runs the first one once you have enough logged data to score. It reads your trailing 30 days.';
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
