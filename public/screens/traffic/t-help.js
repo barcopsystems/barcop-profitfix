@@ -44,8 +44,8 @@ S.TrafficHelp = {
         a: 'In Settings. Traffic Targets holds your goals: Google rating, new reviews per month, response rate, monthly sessions, and posts per month, with Bar Cop benchmarks prefilled to adjust. Operation Links holds your website, Google, Yelp, social, delivery, reservation, and email URLs. Those links power the Live Links strip on the dashboard and let the Audit pull your public numbers.' }
     ]},
     { t: 'Decisions', qa: [
-      { q: 'When do I run my first audit, and why the 30-day pace?',
-        a: 'Day one, before you change anything, so you have a baseline score. After that, one audit every 30 days. The pace gives you time to work the prior report before you score yourself again; a number you check daily is just noise. The gap between two audits is the most useful number here, it shows what 30 days of work moved. The countdown on the Traffic Audit screen shows the days left.' },
+      { q: 'When do I run my first audit, and how often after that?',
+        a: 'Day one, before you change anything, so you have a baseline score. After that, one audit a week. It scores your trailing four weeks, so each run reflects a fresh week of work. The gap between two audits is the most useful number here, it shows what the latest week moved. The countdown on the Traffic Audit screen shows the days left.' },
       { q: 'What if I do not have every number each week?',
         a: 'Log what you have. Google rating and new reviews take two minutes from the Google Business dashboard. Sessions need analytics access, follower counts are on your profile in seconds. Enter what you can and leave the rest blank. Partial numbers entered every week beat a complete set entered once a quarter. Do not skip the week because the data is not all there.' },
       { q: 'Why does Bar Cop give ranges instead of a promise?',
