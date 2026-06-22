@@ -239,9 +239,10 @@ S.TheftRisk = {
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
       + '<textarea class="vi-resolution" rows="2" placeholder="The conclusion, even if inconclusive" style="' + inputStyle + 'width:100%;margin-top:5px;resize:vertical;">' + esc(inv.resolution || '') + '</textarea></div>'
       + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary vi-resolve-btn">Resolve and Close</button>'
-      + '<button class="btn btn-danger vi-remove-detail">Delete Investigation</button>'
+      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary vi-save-btn">Save &amp; Close</button>'
+      + '<button class="btn btn-ghost vi-resolve-btn">Resolve &amp; Close</button>'
+      + '<button class="btn btn-danger vi-remove-detail" style="margin-left:auto;">Delete Investigation</button>'
       + '</div>'
       + '</div>';
 
@@ -257,7 +258,17 @@ S.TheftRisk = {
       inv.resolution = e.target.value;
       App.putRecord('core', 'variance_investigation', inv);
     });
+    // Save & Close — flush the latest entries and return to the list with the
+    // investigation still Open. The page already auto-saves; this is the explicit
+    // "step away, come back later" exit users expect.
+    this.container.querySelector('.vi-save-btn')?.addEventListener('click', () => {
+      this.container.querySelectorAll('.vi-finding').forEach(i => { inv.steps[+i.dataset.step].finding = i.value; });
+      const ta = this.container.querySelector('.vi-resolution');
+      if (ta) inv.resolution = ta.value;
+      App.putRecord('core', 'variance_investigation', inv).then(() => App.goBack());
+    });
     this.container.querySelector('.vi-resolve-btn')?.addEventListener('click', () => {
+      this.container.querySelectorAll('.vi-finding').forEach(i => { inv.steps[+i.dataset.step].finding = i.value; });
       const ta = this.container.querySelector('.vi-resolution');
       if (ta) inv.resolution = ta.value;
       inv.status = 'resolved';
@@ -427,7 +438,7 @@ S.TheftRisk = {
     App.showHelpModal('How Loss Prevention Works', [
       { p: ['Loss Prevention is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
       { h: 'What Flagged', p: ['The five things worth a look: voids or comps rung without a manager, drawer counts coming up short, flagged spot checks, large comps filed over your threshold without authorization, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.'] },
-      { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings, then resolve and close. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
+      { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings. You do not have to finish in one sitting; every step and note saves as you go. Hit Save and Close to step away and pick it back up later, it stays open in the list. Hit Resolve and Close only when you have reached a conclusion. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
       { h: 'Theft and Loss Brief', p: ['Generates a one-page 90-day PDF summary of every loss signal and your investigations, for an owner, bookkeeper, or insurance review. The 90-day window is right for a review document; the live page above stays on the last 7 days.'] }
     ]);
   }
