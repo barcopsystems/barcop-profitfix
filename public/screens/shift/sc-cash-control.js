@@ -189,7 +189,7 @@ S.ShiftCashControl = {
     App.showHelpModal('How Cash Control Works', [
       { p: ['Cash Control is the one place you handle cash. Everything is logged and edited right here, top to bottom: the safe, your registers, then the full activity list.'] },
       { h: 'The Safe', p: ['The big number is what should be in your safe right now, built from every safe entry on file. Cash drops mirror into the safe automatically, so the balance stays honest with no double entry.', 'Make a Deposit, Issue a Bank, or log other safe activity (cash added, paid out) with the buttons here. Count the Safe lets you count what is physically in the safe and catch an over or short against what should be there. A safe count flags the gap, it does not change your running balance.', 'Both the Count the Safe and Log a Drop pop-ups give you a bill counter: punch in how many of each bill, ones through hundreds, drop your coins total on the Coins line, and the amount fills in for you. Skip it and type the amount straight in if you already counted by hand.'] },
-      { h: 'Registers', p: ['Each register shows its standard bank, the drops pulled in the date range you picked, and how its last reconcile came out. Log a Drop pulls cash from that register into the safe.', 'Reconcile sets the over or short for a register. Your POS counts the drawer at close and computes that for you, so the fastest way in is Import POS Report: drop your POS cash or drawer report and Bar Cop logs the over or short for every register at once. Reconcile by Hand is the fallback for an off-cycle count, a register with no POS export, or a recount. Either way it adds a dated reconcile and the tile shows the most recent one.'] },
+      { h: 'Registers', p: ['Each register shows its standard bank, the drops pulled in the date range you picked, and how its last reconcile came out. Log a Drop pulls cash from that register into the safe.', 'Your POS cash report imports on the Shift dashboard each week, and that fills the over or short for every register at once. Reconcile by Hand here is for an off-cycle count, a register with no POS export, or a recount: enter the expected POS cash and what you counted, and Bar Cop logs the variance. Either way it adds a dated reconcile and the tile shows the most recent one.'] },
       { h: 'Filter and Activity', p: ['The range chips above the activity list set the window. It drives the four totals (drops in, safe out, drawer net, flagged variances), the drops shown on each register, and the activity list below.', 'Every drop, deposit, bank move, drawer reconcile, and safe count lands in Cash Activity. Hit Edit on any row to change or delete it. Export PDF next to the chips prints the range you are viewing.'] },
       { h: 'History pages', p: ['Cash Drop History, Safe Log History, and Variance History in the sidebar hold the full filterable record of each type with their own Export. They are read-only. All logging and editing happens here on the board.'] }
     ]);
@@ -267,7 +267,7 @@ S.ShiftCashControl = {
         + '<div style="font-size:12px;margin-top:4px;">Last reconcile: ' + closeLine + '</div>'
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
         +   '<button class="btn btn-ghost btn-sm cc-drop" data-id="' + esc(d.id) + '">Log a Drop</button>'
-        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile</button>'
+        +   '<button class="btn btn-ghost btn-sm cc-count-drawer" data-id="' + esc(d.id) + '">Reconcile by Hand</button>'
         + '</div></div>';
     };
     const registersCard = '<div class="card form-card no-print" data-collapse-group="sc-cash-safe" style="margin-bottom:16px;"><div class="card-title">Registers</div>'
@@ -642,26 +642,11 @@ S.ShiftCashControl = {
     else { if (btn) { btn.disabled = false; btn.textContent = editId ? 'Update' : 'Save Count'; } fail('Save failed. Try again.'); }
   },
 
-  // Segmented Reconcile-by-Hand / Import-POS-Report toggle, same look as the Log
-  // Hours and Void/Comp lanes (gold-tint active).
-  reconcileToggleHtml(activeMode) {
-    const segBtn = (mode, label) => {
-      const on = activeMode === mode;
-      return '<button type="button" class="btn btn-sm ccv-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    };
-    return '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">'
-      + segBtn('manual', 'Reconcile by Hand') + segBtn('import', 'Import POS Report') + '</div>';
-  },
-
-  // ── Reconcile Drawer (new or edit) — reconcile a drawer count vs POS ────────
-  // New reconciles offer two lanes: import the POS cash/drawer report (the
-  // primary feed, since the POS blind close already computed over/short) or count
-  // by hand (the fallback). Editing an existing reconcile is hand-only.
+  // ── Reconcile Drawer (new or edit) — count a drawer vs POS by hand ──────────
+  // The POS cash-report import lives on the Shift dashboard (the weekly close-out),
+  // so this is always a hand count. One drop-zone for the report, not two.
   openCountDrawer(rec, drawerId) {
     const editing = !!rec;
-    this._recMode = 'manual';
     const active    = (App.activeShift && App.activeShift()) || null;
     const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
     const shiftType = editing ? rec.shift_type : (active ? active.shift_type || '' : '');
@@ -669,101 +654,51 @@ S.ShiftCashControl = {
     const reasonOpts = '<option value="">Select reason...</option>'
       + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
+    const typeOpts = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
 
-    const manualBody = () => {
-      const typeOpts = App.SHIFT_TYPES.map(t => '<option' + (shiftType === t ? ' selected' : '') + '>' + t + '</option>').join('');
-      return '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
-        + '</div>'
-        + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '" style="height:44px;"/></div></div>'
-        +   '<div class="f" style="flex:1;min-width:0;"><label>Reason</label><select id="ccv-reason" style="height:44px;">' + reasonOpts + '</select></div>'
-        + '</div>'
-        + '<div class="calc">'
-        +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
-        +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
-        +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
-        + '</div>'
-        + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
-        + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
-        +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div>';
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Shift Type</label><select id="ccv-type" style="height:44px;">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '" style="height:44px;"/></div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Reason</label><select id="ccv-reason" style="height:44px;">' + reasonOpts + '</select></div>'
+      + '</div>'
+      + '<div class="calc">'
+      +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
+      +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
+
+    App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
+    const calc = () => {
+      const exp = parseFloat(document.getElementById('ccv-expected')?.value);
+      const cnt = parseFloat(document.getElementById('ccv-counted')?.value);
+      const varEl = document.getElementById('ccv-c-variance');
+      const stEl = document.getElementById('ccv-c-status');
+      if (!varEl || !stEl) return;
+      if (isNaN(exp) || isNaN(cnt)) { varEl.textContent = '-'; varEl.className = 'calc-val'; stEl.textContent = '-'; stEl.className = 'calc-val'; return; }
+      const variance = Math.round((cnt - exp) * 100) / 100;
+      const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
+      const col = this.statusColor(status);
+      varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
+      stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
     };
-    const importBody = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS counted the drawer at close. Drop its report to log the over or short for every register.</div>'
-      + '<div id="ccv-csv"></div><div id="ccv-imp-result"></div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" id="ccv-cancel">Cancel</button></div>';
-
-    const mount = () => {
-      const body = (!editing && this._recMode === 'import') ? importBody : manualBody();
-      const html = '<div class="card form-card" style="margin:0;">'
-        + '<div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
-        + (editing ? '' : this.reconcileToggleHtml(this._recMode))
-        + body + '</div>';
-      const modal = App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
-      if (!modal) return;
-      modal.addEventListener('click', ev => {
-        const mb = ev.target.closest('.ccv-mode');
-        if (mb && mb.dataset.mode !== this._recMode) { this._recMode = mb.dataset.mode; mount(); }
-      });
-      document.getElementById('ccv-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
-
-      if (!editing && this._recMode === 'import') { this.mountCashImporter(); return; }
-
-      const calc = () => {
-        const exp = parseFloat(document.getElementById('ccv-expected')?.value);
-        const cnt = parseFloat(document.getElementById('ccv-counted')?.value);
-        const varEl = document.getElementById('ccv-c-variance');
-        const stEl = document.getElementById('ccv-c-status');
-        if (!varEl || !stEl) return;
-        if (isNaN(exp) || isNaN(cnt)) { varEl.textContent = '-'; varEl.className = 'calc-val'; stEl.textContent = '-'; stEl.className = 'calc-val'; return; }
-        const variance = Math.round((cnt - exp) * 100) / 100;
-        const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
-        const col = this.statusColor(status);
-        varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
-        stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
-      };
-      document.getElementById('ccv-expected')?.addEventListener('input', calc);
-      document.getElementById('ccv-counted')?.addEventListener('input', calc);
-      document.getElementById('ccv-save')?.addEventListener('click', () => this.saveCountDrawer(editing ? rec.id : null));
-      document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('drawer count', async () => {
-        await S.ShiftVarianceLog.removeVariance(rec.id); App.closeModal('cc-modal'); this.draw();
-      }));
-      calc();
-    };
-    mount();
-  },
-
-  // Drop a POS cash/drawer report -> sc_variances (over/short per register).
-  mountCashImporter() {
-    const el = document.getElementById('ccv-csv');
-    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your POS cash or drawer report here',
-      dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
-      fields: PosIngest.FIELDS.cash,
-      confirmLabel: 'Import',
-      onComplete: rows => this.importCashRows(rows)
-    });
-  },
-  async importCashRows(rows) {
-    const { toAdd, skipped, dupCount } = PosIngest.build('cash', rows);
-    const res = document.getElementById('ccv-imp-result');
-    const setRes = html => { if (res) res.innerHTML = html; };
-    if (!toAdd.length) {
-      setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-                    : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.') + '</div>');
-      return;
-    }
-    const ok = await PosIngest.commit('cash', toAdd);
-    if (!ok) { setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
-    this.draw();   // refresh the board behind the modal
-    setRes('<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + '.'
-      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped.</span>' : '')
-      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount + ' already logged, skipped.</span>' : '') + '</div>');
+    document.getElementById('ccv-expected')?.addEventListener('input', calc);
+    document.getElementById('ccv-counted')?.addEventListener('input', calc);
+    document.getElementById('ccv-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
+    document.getElementById('ccv-save')?.addEventListener('click', () => this.saveCountDrawer(editing ? rec.id : null));
+    document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('drawer count', async () => {
+      await S.ShiftVarianceLog.removeVariance(rec.id); App.closeModal('cc-modal'); this.draw();
+    }));
+    calc();
   },
 
   async saveCountDrawer(editId) {
