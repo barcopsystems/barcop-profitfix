@@ -41,48 +41,6 @@ const CSVMapper = {
     zone.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); over(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this._readFile(f, container, opts); });
   },
 
-  // Parse a CSV/XLSX file to { headers, rows } without mounting any UI. Lets a
-  // caller (the unified Import screen) read several files at once and drive its
-  // own mapping. Rejects on an empty file or unsupported type.
-  parseFile(file) {
-    return new Promise((resolve, reject) => {
-      const ext = file.name.split('.').pop().toLowerCase();
-      if (ext === 'csv') {
-        const r = new FileReader();
-        r.onload = e => { const p = this._parseCSV(e.target.result); p ? resolve(p) : reject(new Error('empty')); };
-        r.onerror = () => reject(new Error('read'));
-        r.readAsText(file);
-      } else if (ext === 'xlsx' || ext === 'xls') {
-        const r = new FileReader();
-        r.onload = e => {
-          const buf = e.target.result;
-          const run = () => {
-            try {
-              const wb = XLSX.read(buf, { type: 'array' });
-              const ws = wb.Sheets[wb.SheetNames[0]];
-              const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-              if (data.length < 2) { reject(new Error('empty')); return; }
-              const headers = data[0].map(h => String(h).trim());
-              const rows = data.slice(1).filter(rr => rr.some(c => c !== '')).map(rr => rr.map(c => String(c).trim()));
-              resolve({ headers, rows });
-            } catch (err) { reject(err); }
-          };
-          if (typeof XLSX === 'undefined') {
-            const s = document.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-            s.onload = run;
-            s.onerror = () => reject(new Error('xlsx'));
-            document.head.appendChild(s);
-          } else run();
-        };
-        r.onerror = () => reject(new Error('read'));
-        r.readAsArrayBuffer(file);
-      } else {
-        reject(new Error('type'));
-      }
-    });
-  },
-
   _area(c) { return c.querySelector('.csvm-area'); },
   // Resolve an optional external container for the action row (element, selector,
   // or function returning one). Lets a caller place Import/Cancel outside the card.
