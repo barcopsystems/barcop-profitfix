@@ -366,6 +366,9 @@ S.Hub = {
       const due = [];
       if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'this-week',   mod: 'profit'  });
       if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'r-this-week', mod: 'revenue' });
+      // Importing the week's POS data is the first step of the weekly routine, so
+      // surface it above the confirm nudges whenever the week is still open.
+      if (due.length) due.unshift({ text: 'Import this week\'s POS data', screen: 'pos-import', mod: 'inventory' });
       const dueRows = due.length
         ? due.slice(0, 3).map(it =>
             '<div onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
