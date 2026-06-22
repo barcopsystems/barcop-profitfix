@@ -294,7 +294,7 @@ S.ShiftDashboard = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS cash or drawer report here',
-      dropSub: 'Needs a Date column plus the Over/Short, or Expected and Counted cash. Register and cashier are matched if your report has them.',
+      dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
       onComplete: rows => this.importCash(rows)
