@@ -257,8 +257,6 @@ const DB = {
     'lc-reports':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports','lc-payroll-export':'labor-reports',
     'lc-dashboard':'labor-dashboard','lc-help':'_always',
     // Shift Control
-    'sc-shift-history':'log-shift',
-    'sc-active-shift':'active-shift',
     'sc-cash-history':'cash-mgmt',
     'sc-cash-control':'cash-mgmt','sc-shift-policies':'cash-mgmt','sc-drawers':'cash-mgmt',
     'sc-checklists':'checklists','sc-checklist-templates':'checklists',
