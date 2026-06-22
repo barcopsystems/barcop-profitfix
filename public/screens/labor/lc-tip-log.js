@@ -16,12 +16,14 @@ S.LaborTipLog = {
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
-  // Batch manual-entry state (preloaded from the picked shift).
-  _addShift: '',           // '' | shift id | '__manual'
-  _addDate: '',            // manual-mode date
-  _addShiftType: '',       // manual-mode shift type
+  // Batch manual-entry state (preloaded from the picked day's posted schedule).
+  _addWeekStart: '',       // Monday of the week shown in the day picker
+  _addDate: '',            // selected day (ymd)
+  _addShiftType: '',       // selected service period (the daypart / shift_type)
   _addRows: null,          // [{ staff_id, hours, cash, card, sales, received }]
   _savedNote: null,        // count to confirm after a save (shown once)
+  // Edit pop-up anchor state (one record at a time).
+  _eWeekStart: '', _eDate: '', _ePeriod: '',
 
   tips() {
     if (!App.laborData) App.laborData = {};
@@ -30,8 +32,6 @@ S.LaborTipLog = {
   },
   staff() { return ((App.laborData && App.laborData.lc_staff) || []); },
   staffById(id) { return this.staff().find(s => s.id === id); },
-  shifts() { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
-  shiftById(id) { return this.shifts().find(s => s.id === id); },
   actuals() { return ((App.laborData && App.laborData.lc_actuals) || []); },
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
   callouts() { return ((App.laborData && App.laborData.lc_callouts) || []); },
@@ -64,40 +64,48 @@ S.LaborTipLog = {
     return mins / 60;
   },
 
-  // Shift dropdown options. Open shifts first, then closed shifts from the last
-  // 14 days, then a Manual escape hatch for off-cycle entries.
-  shiftOptions(selectedId) {
-    const all = this.shifts().slice().sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-    const open = all.filter(s => s.status === 'Open');
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
-    const closed = all.filter(s => s.status !== 'Open' && new Date(s.date || s.created_at) >= cutoff);
-
-    const label = s => {
-      const d = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-      const parts = [d, s.shift_type || ''].filter(Boolean).join(' · ');
-      return parts || 'Shift';
-    };
-
-    let h = '<option value="">Select a shift...</option>';
-    if (open.length) {
-      h += '<optgroup label="Open Shifts">';
-      open.forEach(s => { h += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + esc(label(s)) + '</option>'; });
-      h += '</optgroup>';
-    }
-    if (closed.length) {
-      h += '<optgroup label="Recent Closed Shifts">';
-      closed.forEach(s => { h += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + esc(label(s)) + '</option>'; });
-      h += '</optgroup>';
-    }
-    h += '<optgroup label="Other"><option value="__manual"' + (selectedId === '__manual' ? ' selected' : '') + '>Manual entry (no specific shift)</option></optgroup>';
-    return h;
+  // ── Day + Service-Period anchor (replaces the old sc_shifts picker) ──────────
+  // A week stepper + day-of-week chips + service-period chips, shared by the Tip
+  // Log batch builder, the edit pop-up, and the Tip Pool. The real date printed on
+  // each chip kills the misclick a bare date field invited. prefix scopes the
+  // class names so two hosts never collide.
+  defaultPeriod() {
+    const p = App.servicePeriodByTime && App.servicePeriodByTime();
+    return (p && p.name) || (App.SHIFT_TYPES || [])[0] || '';
   },
-
-  // Active shift for the current session — defaults the form to it
-  activeShift() {
-    return this.shifts().filter(s => s.status === 'Open')
-      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0] || null;
+  addDaysYmd(ymd, n) {
+    const d = new Date((ymd || App.todayLocal()) + 'T00:00:00');
+    if (isNaN(d.getTime())) return ymd;
+    d.setDate(d.getDate() + n);
+    return App.ymdLocal(d);
+  },
+  anchorHtml(prefix, weekStart, selDate, selPeriod) {
+    const ws = weekStart || this.mondayOf(App.todayLocal());
+    const start = new Date(ws + 'T00:00:00');
+    const days = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(App.ymdLocal(d)); }
+    const mLabel = ymd => new Date(ymd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const chip = (cls, on, attr, label) => '<button type="button" class="btn btn-sm ' + cls + '" ' + attr + ' style="'
+      + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    const dayChips = days.map(ymd => {
+      const d = new Date(ymd + 'T00:00:00');
+      const wd = this.DAYS[(d.getDay() + 6) % 7];
+      return chip(prefix + '-day', ymd === selDate, 'data-ymd="' + ymd + '"', wd + ' ' + d.getDate());
+    }).join('');
+    const perChips = (App.SHIFT_TYPES || []).map(per =>
+      chip(prefix + '-period', per === selPeriod, 'data-period="' + esc(per) + '"', esc(per))).join('');
+    return '<div style="margin-bottom:14px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+      +   '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-prev" aria-label="Previous week" style="margin:0;">&lsaquo;</button>'
+      +   '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Week of ' + mLabel(days[0]) + ' &ndash; ' + mLabel(days[6]) + '</div>'
+      +   '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-next" aria-label="Next week" style="margin:0;">&rsaquo;</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + dayChips + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      +   '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:2px;">Service Period</span>' + perChips
+      + '</div>'
+    + '</div>';
   },
 
   fmtDate(str) {
@@ -119,12 +127,12 @@ S.LaborTipLog = {
     // "fresh" visit (no entered amounts) defaults to the open shift, preloads crew.
     const hasWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
     if (!hasWork) {
-      const a = this.activeShift();
-      this._addShift = a ? a.id : '';
-      this._addDate = App.todayLocal();
-      this._addShiftType = '';
+      const today = App.todayLocal();
+      this._addWeekStart = this.mondayOf(today);
+      this._addDate = today;
+      this._addShiftType = this._addShiftType || this.defaultPeriod();
       this._addRows = [];
-      if (a) this.preloadFromShift(a.id);
+      this.preloadFromDate(today, this._addShiftType);
     }
     this._savedNote = null;
     this.renderList();
@@ -132,8 +140,8 @@ S.LaborTipLog = {
 
   showHowTo() {
     App.showHelpModal('How the Tip Log Works', [
-      { p: ['The Tip Log records cash and card tips by shift and staff member. Pick the shift first and Bar Cop fills in the date, shift type, and the staff who worked it, so you mostly just type the tip amounts.'] },
-      { h: 'Logging Tips', p: ['Choose Enter Manually and pick the shift. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole shift at once. Use Add Staff for anyone the schedule missed, or pick Manual entry to set the date and shift type yourself.'] },
+      { p: ['The Tip Log records cash and card tips by day, service period, and staff member. Tap the day and the period and Bar Cop loads the staff who were scheduled, so you mostly just type the tip amounts. Most weeks you import this straight off your POS export instead.'] },
+      { h: 'Logging Tips', p: ['Choose Enter Manually, tap the day on the week strip, then the service period. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole period at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week.'] },
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool Log and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
@@ -141,37 +149,15 @@ S.LaborTipLog = {
     ]);
   },
 
-  // The shift to default the dropdown to: an existing record's shift, an existing
-  // manual entry, the active shift, or none.
-  initialShiftIdFor(x) {
-    if (x) {
-      if (x.shift_id) return x.shift_id;
-      if (x.date) return '__manual';
-      return '';
-    }
-    const a = this.activeShift();
-    return a ? a.id : '';
-  },
-
-  // Shared form fields used by the inline add form and the edit pop-up. p =
-  // element-id prefix ('tl-' inline, 'tle-' edit pop-up) so the modal's inputs
-  // never collide with the inline form sitting behind it. All entry cells on one
-  // row; the manual date/shift-type row and the shift summary are conditional,
-  // and Notes sits on its own row. Pass the record for edit, or null for new.
+  // Shared form fields for the edit pop-up. p = element-id prefix ('tle-'). The
+  // day/period anchor sits up top (seeded from this._e* state), then Staff, hours,
+  // amounts, the tip-out row, and Notes. Pass the record being edited.
   formBody(x, p) {
-    p = p || 'tl-';
+    p = p || 'tle-';
     const v = val => (val != null && val !== '') ? val : '';
-    const initialShiftId = this.initialShiftIdFor(x);
-    const isManual = initialShiftId === '__manual';
-    const initialShift = initialShiftId && initialShiftId !== '__manual' ? this.shiftById(initialShiftId) : null;
-    const defaultDate = x?.date || initialShift?.date || App.todayLocal();
-    const defaultShiftType = x?.shift_type || initialShift?.shift_type || '';
-    // Tip-out edit row (edit pop-up only, when the house uses tip-outs): built via
-    // tipoutRowHtml so it reshapes if the staff is changed to a different tip role.
-
-    return '<div class="form-row data-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1.5 1 180px;min-width:0;"><label>Shift</label>'
-          + '<select id="' + p + 'shift">' + this.shiftOptions(initialShiftId) + '</select></div>'
+    const pre = p.replace(/-$/, '');
+    return '<div id="' + p + 'anchor">' + this.anchorHtml(pre, this._eWeekStart, this._eDate, this._ePeriod) + '</div>'
+      + '<div class="form-row data-row" style="gap:12px;">'
         + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
           + '<select id="' + p + 'staff"></select></div>'
         + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Tippable Hours</label>'
@@ -184,28 +170,14 @@ S.LaborTipLog = {
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
       + '<div id="' + p + 'tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
-
-      // Manual mode reveals date + shift type (a shift pick derives them instead).
-      + '<div id="' + p + 'manual-row" class="form-row" style="gap:16px;' + (isManual ? '' : 'display:none;') + '">'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Date</label>'
-          + '<input type="date" id="' + p + 'date" value="' + esc(defaultDate) + '"/></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label>'
-          + '<select id="' + p + 'shift-type">' + (App.SHIFT_TYPES || []).map(t =>
-              '<option value="' + esc(t) + '"' + (defaultShiftType === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>'
-      + '</div>'
-
-      + '<div id="' + p + 'shift-summary" style="margin-bottom:14px;"></div>'
-
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
         + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div></div>';
   },
 
-  // Wire the form field interactions (inline add OR edit pop-up). Save/Cancel are
-  // wired by the caller. p = element-id prefix. x = the record (null for new).
+  // Wire the edit-form field interactions. Save/Cancel/anchor are wired by the
+  // caller. p = element-id prefix. x = the record being edited.
   wireForm(x, p) {
-    p = p || 'tl-';
-    const initialShiftId = this.initialShiftIdFor(x);
-    document.getElementById(p + 'shift')?.addEventListener('change', e => this.onShiftChange(e.target.value, x, p));
+    p = p || 'tle-';
     document.getElementById(p + 'staff')?.addEventListener('change', () => this.onStaffChange(x, p));
     document.getElementById(p + 'cash')?.addEventListener('input', () => this.calc(p));
     document.getElementById(p + 'card')?.addEventListener('input', () => this.calc(p));
@@ -218,8 +190,7 @@ S.LaborTipLog = {
     };
     document.getElementById(p + 'sales')?.addEventListener('input', updTipout);
     updTipout();
-    this.populateStaffList(initialShiftId, x, p);
-    this.renderShiftSummary(initialShiftId, p);
+    this.populateStaffList(x, p);
     this.calc(p);
   },
 
@@ -315,7 +286,7 @@ S.LaborTipLog = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged yet. Log your first entry above, or import a POS tips export. Pick the shift and the rest auto-fills.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged yet. Log your first entry above, or import a POS tips export. Tap the day and period and the crew auto-fills.</div>';
     } else {
       const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
       const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
@@ -369,10 +340,17 @@ S.LaborTipLog = {
       if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      // Day + period anchor (batch builder).
+      if (ev.target.closest('.tl-b-wk-prev')) { this._addWeekStart = this.addDaysYmd(this._addWeekStart, -7); this.renderList(); return; }
+      if (ev.target.closest('.tl-b-wk-next')) { this._addWeekStart = this.addDaysYmd(this._addWeekStart, 7); this.renderList(); return; }
+      const dayChip = ev.target.closest('.tl-b-day');
+      if (dayChip) { this._addDate = dayChip.dataset.ymd; this._addWeekStart = this.mondayOf(this._addDate); this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
+      const perChip = ev.target.closest('.tl-b-period');
+      if (perChip) { this.collectBatch(); this._addShiftType = perChip.dataset.period; this.renderList(); return; }
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
-      if (ev.target.closest('#tl-startover')) { this._addShift = ''; this._addRows = []; this._savedNote = null; this.renderList(); return; }
+      if (ev.target.closest('#tl-startover')) { this._addRows = []; this._savedNote = null; this.renderList(); return; }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
         const v = tlRange.dataset.v;
@@ -402,32 +380,21 @@ S.LaborTipLog = {
   },
 
   // ── Batch manual entry (preloaded from the shift) ────────────────────────────
-  // The manual lane is a multi-row builder: pick the shift up top and Bar Cop
+  // The manual lane is a multi-row builder: tap the day + period up top and Bar Cop
   // loads a row for every TIPPED employee who worked it (hours pre-filled), so the
   // manager types each person's cash/card off the tip sheet and saves the whole
   // shift at once. Mirrors the Void/Comp + Waste builders. The single-record form
   // (formBody) is still used for the edit pop-up.
   batchBody() {
-    const isManual = this._addShift === '__manual';
     const on = App.tipOutEnabled();
-    const header = '<div class="form-row" style="gap:16px;margin-bottom:14px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Shift</label>'
-        + '<select id="tl-b-shift">' + this.shiftOptions(this._addShift) + '</select></div>'
-      + (isManual
-          ? '<div class="f" style="width:160px;flex-shrink:0;"><label>Date</label>'
-            + '<input type="date" id="tl-b-date" value="' + esc(this._addDate || App.todayLocal()) + '"/></div>'
-            + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift Type</label>'
-            + '<select id="tl-b-shift-type">' + (App.SHIFT_TYPES || []).map(t =>
-                '<option value="' + esc(t) + '"' + (this._addShiftType === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>'
-          : '')
-      + '</div>';
+    const header = '<div id="tl-b-anchor">' + this.anchorHtml('tl-b', this._addWeekStart, this._addDate, this._addShiftType) + '</div>';
     const addBtn = '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
     const rows = this._addRows || [];
     if (!rows.length) {
       return header + '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
-        + (this._addShift && !isManual
-            ? 'No tipped staff on this shift still need tips entered. Add staff below.'
-            : 'Pick a shift above to load its tipped staff, or add staff by hand.') + '</div>' + addBtn;
+        + (this._addDate
+            ? 'No tipped staff scheduled for this day still need tips entered. Add staff below.'
+            : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
     const tbl = (head, body) => '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
@@ -551,22 +518,14 @@ S.LaborTipLog = {
       hasEarner: out.some(o => o.paid > 0) };
   },
 
-  // The effective date the batch logs against: the picked shift's date, or the
-  // manual date field.
+  // The effective date the batch logs against: the day picked in the anchor.
   batchDate() {
-    if (this._addShift === '__manual') return this._addDate || '';
-    const s = this.shiftById(this._addShift);
-    return s ? (s.date || '') : '';
+    return this._addDate || '';
   },
 
-  // Read the batch form (header + rows) back into state for re-renders and save.
+  // Read the batch rows back into state for re-renders and save (the day + period
+  // come from the anchor chips, not a form field).
   collectBatch() {
-    const shiftEl = document.getElementById('tl-b-shift');
-    if (shiftEl) this._addShift = shiftEl.value;
-    if (this._addShift === '__manual') {
-      this._addDate = document.getElementById('tl-b-date')?.value || this._addDate || App.todayLocal();
-      this._addShiftType = document.getElementById('tl-b-shift-type')?.value || this._addShiftType || '';
-    }
     const rowEls = [...document.querySelectorAll('#tl-b-rows .tl-line')];
     if (rowEls.length) {
       this._addRows = rowEls.map(el => ({
@@ -580,23 +539,16 @@ S.LaborTipLog = {
     }
   },
 
-  // Build participant rows for a picked shift from the POSTED SCHEDULE — who was
-  // scheduled to work that day (tipped only) — adjusted by the Call-Out Log: drop
-  // anyone who called out, add a tipped person who covered. Tippable hours come
-  // from logged actuals when they exist, otherwise the scheduled hours (an
-  // estimate you can override). Schedule, not logged hours, because tips are
-  // entered at close before hours are usually logged. Manual entry seeds a blank row.
-  preloadFromShift(shiftId) {
-    this._addShift = shiftId;
-    if (shiftId === '__manual') {
-      this._addDate = this._addDate || App.todayLocal();
-      this._addShiftType = this._addShiftType || ((App.SHIFT_TYPES || [])[0] || '');
-      if (!this._addRows || !this._addRows.length) this._addRows = [{ staff_id: '', hours: '', cash: '', card: '', sales: '', received: '' }];
-      return;
-    }
-    const s = shiftId ? this.shiftById(shiftId) : null;
-    if (!s) { this._addRows = []; return; }
-    const date = s.date || '';
+  // Build participant rows for a picked DAY from the POSTED SCHEDULE — who was
+  // scheduled that day (tipped only) — adjusted by the Call-Out Log: drop anyone
+  // who called out, add a tipped person who covered. Tippable hours come from
+  // logged actuals when they exist, otherwise the scheduled hours (an estimate you
+  // can override). Schedule, not logged hours, because tips are entered at close
+  // before hours are usually logged.
+  preloadFromDate(date, period) {
+    this._addDate = date || '';
+    if (period != null) this._addShiftType = period;
+    if (!date) { this._addRows = []; return; }
     // Scheduled tipped staff for that day -> scheduled hours (the hours fallback).
     const schedHrs = new Map();
     const sched = this.scheduleForDate(date);
@@ -609,17 +561,19 @@ S.LaborTipLog = {
         schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + this.schedHours(sh));
       });
     }
-    // Call-out adjustments for this date (loosely matched on shift type): a
-    // caller-out didn't work; a tipped cover did.
-    this.callouts().filter(c => c.date === date && (!c.shift_type || !s.shift_type || c.shift_type === s.shift_type)).forEach(c => {
+    // Call-out adjustments for this date (loosely matched on period): a caller-out
+    // didn't work; a tipped cover did.
+    const per = this._addShiftType || '';
+    this.callouts().filter(c => c.date === date && (!c.shift_type || !per || c.shift_type === per)).forEach(c => {
       if (c.staff_id) schedHrs.delete(c.staff_id);
       if (c.covered && c.covered_by_id) {
         const cov = this.staffById(c.covered_by_id);
         if (cov && App.isTipped(cov) && !schedHrs.has(c.covered_by_id)) schedHrs.set(c.covered_by_id, 0);
       }
     });
-    // Skip anyone already tip-logged for this shift, fill hours from actuals else schedule.
-    const already = new Set(this.tips().filter(t => t.date === date && (t.shift_id || '') === shiftId).map(t => t.staff_id));
+    // Skip anyone already tip-logged for this day + period, fill hours from actuals else schedule.
+    const key = App.tipShiftKey(date, per);
+    const already = new Set(this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key).map(t => t.staff_id));
     const rows = [];
     [...schedHrs.keys()].forEach(id => {
       if (already.has(id)) return;
@@ -679,13 +633,8 @@ S.LaborTipLog = {
   },
 
   wireBatch() {
-    document.getElementById('tl-b-shift')?.addEventListener('change', e => {
-      this.collectBatch();
-      this.preloadFromShift(e.target.value);
-      this.renderList();
-    });
-    document.getElementById('tl-b-date')?.addEventListener('change', e => { this._addDate = e.target.value || ''; });
-    document.getElementById('tl-b-shift-type')?.addEventListener('change', e => { this._addShiftType = e.target.value || ''; });
+    // The day + period anchor chips are handled by the screen-level click handler
+    // in renderList (they sit outside #tl-b-rows). Here we wire the rows + Add Staff.
     document.getElementById('tl-b-add')?.addEventListener('click', () => {
       this.collectBatch();
       this._addRows = this._addRows || [];
@@ -728,18 +677,11 @@ S.LaborTipLog = {
     this.collectBatch();
     const err = document.getElementById('tl-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!this._addShift) { fail('Pick a shift or choose Manual entry.'); return; }
-    const date = this.batchDate();
-    if (!date) { fail('Date is required for manual entry.'); return; }
-    let shiftType = '', shiftId = '', managerId = '';
-    if (this._addShift === '__manual') {
-      shiftType = this._addShiftType || '';
-      managerId = App.activeManagerId ? App.activeManagerId() : '';
-    } else {
-      const s = this.shiftById(this._addShift);
-      if (!s) { fail('Shift not found.'); return; }
-      shiftId = s.id; shiftType = s.shift_type || ''; managerId = s.manager_id || '';
-    }
+    const date = this._addDate || '';
+    if (!date) { fail('Pick a day.'); return; }
+    const shiftType = this._addShiftType || '';
+    const shiftId = App.tipShiftKey(date, shiftType);
+    const managerId = App.activeManagerId ? App.activeManagerId() : '';
 
     const tipOutOn = App.tipOutEnabled();
     const out = this.computeTipOut(this._addRows || []);
@@ -750,7 +692,7 @@ S.LaborTipLog = {
       if (!staff) return;
       const o = out[i];
       if ((o.cash + o.card) <= 0 && o.received <= 0) return;
-      if (this.tips().some(t => t.staff_id === staff.id && t.date === date && (t.shift_id || '') === shiftId)) { dupCount++; return; }
+      if (this.tips().some(t => t.staff_id === staff.id && App.tipShiftKey(t.date, t.shift_type) === shiftId)) { dupCount++; return; }
       const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
       const r2 = n => Math.round((n || 0) * 100) / 100;
       recs.push({
@@ -763,7 +705,7 @@ S.LaborTipLog = {
         hours: (h != null && !isNaN(h)) ? h : null, notes: '', created_at: new Date().toISOString()
       });
     });
-    if (!recs.length) { fail(dupCount ? 'Those entries are already logged for this shift.' : 'Enter cash or card tips for at least one person.'); return; }
+    if (!recs.length) { fail(dupCount ? 'Those entries are already logged for this day and period.' : 'Enter cash or card tips for at least one person.'); return; }
 
     const btn = document.getElementById('tl-save-all');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -863,12 +805,15 @@ S.LaborTipLog = {
     return row + custom;
   },
 
-  // ── Edit in a focused pop-up (same form, own tle- ids) ──────────────────────
+  // ── Edit in a focused pop-up (day/period anchor + own tle- ids) ─────────────
   openEditModal(id) {
     if (!App.canEdit('lc-tip-log')) return;
     const x = this.tips().find(t => t.id === id);
     if (!x) return;
     this.editId = id;
+    this._eDate = x.date || App.todayLocal();
+    this._ePeriod = x.shift_type || this.defaultPeriod();
+    this._eWeekStart = this.mondayOf(this._eDate);
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tips</div>'
       + this.formBody(x, 'tle-')
       + '<div class="card-actions">'
@@ -877,54 +822,40 @@ S.LaborTipLog = {
         + '<span id="tle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
+    const modal = App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
     this.wireForm(x, 'tle-');
     document.getElementById('tle-save')?.addEventListener('click', () => this.save('tle-'));
     document.getElementById('tle-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); });
     document.getElementById('tle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); this.confirmDel(id); });
+    // Anchor chips re-render just the anchor block (typed amounts are preserved);
+    // a day change also refreshes the "worked this day" staff list.
+    if (modal) modal.addEventListener('click', ev => {
+      const reanchor = () => { const a = document.getElementById('tle-anchor'); if (a) a.innerHTML = this.anchorHtml('tle', this._eWeekStart, this._eDate, this._ePeriod); };
+      if (ev.target.closest('.tle-wk-prev')) { this._eWeekStart = this.addDaysYmd(this._eWeekStart, -7); reanchor(); return; }
+      if (ev.target.closest('.tle-wk-next')) { this._eWeekStart = this.addDaysYmd(this._eWeekStart, 7); reanchor(); return; }
+      const dc = ev.target.closest('.tle-day');
+      if (dc) { this._eDate = dc.dataset.ymd; this._eWeekStart = this.mondayOf(this._eDate); reanchor(); this.populateStaffList(x, 'tle-'); return; }
+      const pc = ev.target.closest('.tle-period');
+      if (pc) { this._ePeriod = pc.dataset.period; reanchor(); return; }
+    });
   },
 
-  // When the shift dropdown changes — reveal/hide manual fields, refresh staff
-  // list + shift summary, auto-fill hours if staff already picked.
-  onShiftChange(shiftId, existingRec, p) {
-    p = p || 'tl-';
-    const manualRow = document.getElementById(p + 'manual-row');
-    if (shiftId === '__manual') {
-      if (manualRow) manualRow.style.display = '';
-    } else {
-      if (manualRow) manualRow.style.display = 'none';
-      const s = this.shiftById(shiftId);
-      if (s) {
-        const dateInp = document.getElementById(p + 'date');
-        if (dateInp) dateInp.value = s.date || dateInp.value;
-        const stInp = document.getElementById(p + 'shift-type');
-        if (stInp && s.shift_type) stInp.value = s.shift_type;
-      }
-    }
-    this.populateStaffList(shiftId, existingRec, p);
-    this.renderShiftSummary(shiftId, p);
-    this.onStaffChange(existingRec, p);
-  },
-
-  // Populate staff dropdown. When a shift is picked, default to that shift's
-  // logged staff first (an optgroup), then the rest of the roster.
-  populateStaffList(shiftId, existingRec, p) {
-    p = p || 'tl-';
+  // Populate the staff dropdown: who logged hours on the picked day first (an
+  // optgroup), then the rest of the roster.
+  populateStaffList(existingRec, p) {
+    p = p || 'tle-';
     const sel = document.getElementById(p + 'staff');
     if (!sel) return;
-    const shift = shiftId && shiftId !== '__manual' ? this.shiftById(shiftId) : null;
-    const shiftDate = shift?.date || document.getElementById(p + 'date')?.value || '';
-    const shiftStaffIds = new Set();
-    if (shift && shiftDate) {
-      this.actuals().filter(a => a.date === shiftDate).forEach(a => { if (a.staff_id) shiftStaffIds.add(a.staff_id); });
-    }
+    const date = this._eDate || '';
+    const workedIds = new Set();
+    if (date) this.actuals().filter(a => a.date === date).forEach(a => { if (a.staff_id) workedIds.add(a.staff_id); });
     const selectedId = existingRec?.staff_id || sel.value || '';
     const all = this.staff().filter(s => s.status !== 'Inactive' || s.id === selectedId);
-    const onShift = all.filter(s => shiftStaffIds.has(s.id));
-    const offShift = all.filter(s => !shiftStaffIds.has(s.id));
+    const onShift = all.filter(s => workedIds.has(s.id));
+    const offShift = all.filter(s => !workedIds.has(s.id));
     let h = '<option value="">Select staff...</option>';
     if (onShift.length) {
-      h += '<optgroup label="Worked This Shift">';
+      h += '<optgroup label="Worked This Day">';
       onShift.forEach(s => { h += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + esc(s.name) + '</option>'; });
       h += '</optgroup>';
     }
@@ -936,36 +867,19 @@ S.LaborTipLog = {
     sel.innerHTML = h;
   },
 
-  // When staff dropdown changes — auto-fill hours from lc_actuals for this
-  // staff member + shift date. Operator can still override.
+  // When the staff dropdown changes — auto-fill hours from lc_actuals for this
+  // staff member + the picked day. Operator can still override.
   onStaffChange(existingRec, p) {
-    p = p || 'tl-';
+    p = p || 'tle-';
     const staffId = document.getElementById(p + 'staff')?.value || '';
-    const date = document.getElementById(p + 'date')?.value || '';
-    // Reshape the tip-out row to the newly selected staff's role (edit modal only).
+    const date = this._eDate || '';
+    // Reshape the tip-out row to the newly selected staff's role.
     if (existingRec && App.tipOutEnabled()) this.refreshTipoutRow(p);
     const hoursInp = document.getElementById(p + 'hours');
     if (!hoursInp) return;
     if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
     const hrs = App.hoursFor(staffId, date);
     if (hrs != null && hrs > 0) hoursInp.value = hrs;
-  },
-
-  renderShiftSummary(shiftId, p) {
-    p = p || 'tl-';
-    const box = document.getElementById(p + 'shift-summary');
-    if (!box) return;
-    if (!shiftId || shiftId === '__manual') { box.innerHTML = ''; return; }
-    const s = this.shiftById(shiftId);
-    if (!s) { box.innerHTML = ''; return; }
-    const dateLabel = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '-';
-    const managerName = s.manager_id ? ((this.staffById(s.manager_id) || {}).name || '') : '';
-    box.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:10px 14px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:4px;line-height:1.6;">'
-      + '<div style="font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:1px;font-size:9px;margin-bottom:4px;">Shift</div>'
-      + esc(dateLabel) + (s.shift_type ? ' &middot; ' + esc(s.shift_type) : '')
-      + (managerName ? ' &middot; ' + esc(managerName) : '')
-      + (s.status === 'Open' ? ' <span style="color:var(--gold);font-weight:700;">(open)</span>' : '')
-      + '</div>';
   },
 
   calc(p) {
@@ -981,23 +895,11 @@ S.LaborTipLog = {
     const isEdit = p === 'tle-';
     const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const shiftPick = document.getElementById(p + 'shift')?.value || '';
-    if (!shiftPick) { fail('Pick a shift or choose Manual entry.'); return; }
-
-    let date, shiftType, shiftId = '', managerId = '';
-    if (shiftPick === '__manual') {
-      date      = document.getElementById(p + 'date')?.value;
-      shiftType = document.getElementById(p + 'shift-type')?.value || '';
-      if (!date) { fail('Date is required for manual entry.'); return; }
-      managerId = App.activeManagerId ? App.activeManagerId() : '';
-    } else {
-      const s = this.shiftById(shiftPick);
-      if (!s) { fail('Shift not found.'); return; }
-      shiftId   = s.id;
-      date      = s.date || App.todayLocal();
-      shiftType = s.shift_type || '';
-      managerId = s.manager_id || '';
-    }
+    const date = this._eDate || '';
+    if (!date) { fail('Pick a day.'); return; }
+    const shiftType = this._ePeriod || '';
+    const shiftId = App.tipShiftKey(date, shiftType);
+    const managerId = App.activeManagerId ? App.activeManagerId() : '';
 
     const staff = this.staffById(document.getElementById(p + 'staff')?.value);
     if (!staff) { fail('Choose a staff member.'); return; }
