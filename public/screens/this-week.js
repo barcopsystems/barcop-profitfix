@@ -287,7 +287,7 @@ S.ThisWeek = {
                   : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + this.weekRangeLabel(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
       + chip(older, false) + chip(sel, true)
       + '<button class="btn btn-ghost btn-sm tw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
