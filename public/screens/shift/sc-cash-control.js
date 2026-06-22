@@ -253,7 +253,7 @@ S.ShiftCashControl = {
         const col = this.statusColor(status);
         const sd = new Date((st.lastVar.date || '') + 'T00:00:00');
         const shortDate = isNaN(sd.getTime()) ? '' : sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        reconcileBlock = '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Last reconcile: <span style="color:var(--t1);font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>' + (shortDate ? ' <span style="color:var(--t3);">(' + shortDate + ')</span>' : '') + '</div>'
+        reconcileBlock = '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Last reconcile: <span style="color:var(--t1);font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>' + (shortDate ? '<span style="color:var(--t3);margin-left:6px;">(' + shortDate + ')</span>' : '') + '</div>'
           + '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:2px;">' + esc(status) + '</div>';
       } else {
         reconcileBlock = '<div style="font-size:12px;color:var(--t4);margin-top:8px;">No reconcile logged yet</div>';
