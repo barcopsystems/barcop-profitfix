@@ -235,6 +235,7 @@ S.ShiftDashboard = {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
       return;
     }
+    if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
