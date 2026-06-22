@@ -77,7 +77,7 @@ FIX.profit = [
           detail: 'Use Spot Check for a fast pre and post shift count on your high-risk products, on different shifts at varied times.' },
         { kind: 'result', target: 'theft-risk', targetLabel: 'Loss Prevention',
           title: 'Review the loss signals weekly',
-          detail: 'Each week, open Loss Prevention: unauthorized voids and comps, drawer shorts, flagged spot checks, and confirmed theft, with what flagged today and over the last 7 days and a dollar amount on each. The worst flags also push to the Hub and to Open the Floor so they find you.' },
+          detail: 'Each week, open Loss Prevention: unauthorized voids and comps, drawer shorts, flagged spot checks, and confirmed theft, with what flagged today and over the last 7 days and a dollar amount on each. The worst flags also push to the Hub so they find you.' },
         { kind: 'reference', target: 'Employee_Corrective_Action_Template.docx', targetLabel: 'Employee Corrective Action Template',
           title: 'Escalate a documented pattern',
           detail: 'One incident is a data point; two on the same employee within 30 days is a pattern. Document each one in writing as you see it, and use the Corrective Action Template once the pattern is clear.' }
