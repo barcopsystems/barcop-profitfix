@@ -80,6 +80,7 @@ S.ShiftDashboard = {
       + '</div>';
 
     if (this._openStep === 'import') this.mountImport();
+    if (this._openStep === 'cash') this.mountCashImport();
     this.wire();
   },
 
@@ -153,8 +154,9 @@ S.ShiftDashboard = {
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
     }
     if (k === 'cash') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS counts the drawer and computes over/short at close, so you do not have to do it here. Reconcile in Bar Cop only if you want the variance pattern tracked, or just mark this done.</div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS counts the drawer and computes over/short at close. Drop its cash or drawer report to track the variance pattern, or just mark this done if you do not need it.</div>'
+        + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Open Cash Control</button>'
         + '<button class="btn btn-primary btn-sm" data-done="cash">Mark Done</button></div>';
     }
@@ -238,6 +240,36 @@ S.ShiftDashboard = {
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '') + '.';
     this._openStep = 'cash';
+    this.render(this.container, this.actions);
+  },
+
+  // ── Inline cash-report import (step 2) ───────────────────────────────────────
+  // The POS blind close already computed over/short; drop that report and the
+  // variance pattern lands without a hand reconcile. Manual reconcile lives on
+  // Cash Control as the fallback.
+  mountCashImport() {
+    const el = document.getElementById('sc-ck-cash');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS cash or drawer report here',
+      dropSub: 'Needs a Date column plus the Over/Short, or Expected and Counted cash. Register and cashier are matched if your report has them.',
+      fields: PosIngest.FIELDS.cash,
+      confirmLabel: 'Import',
+      onComplete: rows => this.importCash(rows)
+    });
+  },
+  async importCash(rows) {
+    const { toAdd, dupCount } = PosIngest.build('cash', rows);
+    const res = document.getElementById('sc-ck-cash-res');
+    if (!toAdd.length) {
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (dupCount ? 'No new rows imported. ' + dupCount + ' already logged.' : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.') + '</div>';
+      return;
+    }
+    const ok = await PosIngest.commit('cash', toAdd);
+    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
+    this._openStep = 'exc';
     this.render(this.container, this.actions);
   },
 
