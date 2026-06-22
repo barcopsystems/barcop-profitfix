@@ -252,14 +252,14 @@ S.ShiftCashControl = {
         const vr = parseFloat(st.lastVar.variance) || 0;
         const status = st.lastVar.status || '';
         const col = this.statusColor(status);
-        const srcMap = { 'shift-close': 'from shift close', 'manual': 'manual count' };
-        const srcTag = srcMap[st.lastVar.source] ? ' &middot; ' + srcMap[st.lastVar.source] : '';
+        const sd = new Date((st.lastVar.date || '') + 'T00:00:00');
+        const shortDate = isNaN(sd.getTime()) ? '' : sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         closeLine = '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> '
-          + '<span style="color:var(--t3);">' + esc(status) + srcTag + ' (' + this.fmtDate(st.lastVar.date) + ')</span>';
+          + '<span style="color:var(--t3);">' + esc(status) + (shortDate ? ' (' + shortDate + ')' : '') + '</span>';
       } else {
         closeLine = '<span style="color:var(--t4);">No reconcile logged yet</span>';
       }
-      return '<div style="border:1px solid var(--b1);border-radius:6px;padding:14px 16px;background:var(--surface);">'
+      return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;background:var(--surface);">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
         +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(d.name) + '</div>'
         +   '<div style="font-size:11px;color:var(--t3);">Bank ' + bank + '</div></div>'
@@ -303,7 +303,9 @@ S.ShiftCashControl = {
     // ── 4. Cash Activity (bare list under the range chips) ──
     let activityBody;
     if (stream.length === 0) {
-      activityBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No cash activity in this range. Log a drop, deposit, or safe count above to get started.</div>';
+      activityBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:16px;">No cash activity in this range. Log a drop, deposit, or safe count above to get started.</td></tr></tbody></table></div></div>';
     } else {
       const rows = stream.map(s => {
         let amountCell, statusCell;
@@ -690,7 +692,7 @@ S.ShiftCashControl = {
         + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
         +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div>';
     };
-    const importBody = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS already counted the drawer at close. Drop its cash or drawer report and Bar Cop logs the over or short for every register at once.</div>'
+    const importBody = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Your POS counted the drawer at close. Drop its report to log the over or short for every register.</div>'
       + '<div id="ccv-csv"></div><div id="ccv-imp-result"></div>'
       + '<div class="card-actions"><button class="btn btn-ghost" id="ccv-cancel">Cancel</button></div>';
 
@@ -740,7 +742,7 @@ S.ShiftCashControl = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS cash or drawer report here',
-      dropSub: 'Needs a Date column plus the Over/Short, or Expected and Counted cash. Register and cashier are matched to yours if the report has them.',
+      dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
       onComplete: rows => this.importCashRows(rows)
