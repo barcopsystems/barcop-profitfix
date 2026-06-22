@@ -383,15 +383,6 @@ const Shift = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
-      <div class="nav-section">Shifts</div>
-      <div class="nav-item" data-screen="sc-active-shift" id="nav-sc-active-shift">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 5.5l4.5 3-4.5 3z" fill="currentColor"/></svg>
-        <span class="nav-label">Active Shift</span>
-      </div>
-      <div class="nav-item" data-screen="sc-shift-history" id="nav-sc-shift-history">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
-        <span class="nav-label">Shift History</span>
-      </div>
       <div class="nav-section">Cash</div>
       <div class="nav-item" data-screen="sc-cash-control" id="nav-sc-cash-control">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4h12v9h-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h0.7M11.3 8.5H12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
