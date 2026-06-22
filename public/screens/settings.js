@@ -2565,28 +2565,32 @@ S.HubSettings = {
     });
     App.shiftData.sc_checklists = scChecklists;
 
-    // Drawer reconciliations — a drawer is counted at every close, so one variance
-    // record per operating day (that is how Bar Cop reads "drawer counted"). Most
-    // land within tolerance; the loose early weeks run wider over/short and tighten
-    // after the fixes. Cash counting is day-one discipline, so no adoption ramp.
+    // Drawer reconciliations — EVERY register is counted at the close of EVERY
+    // operating day (the over/short the weekly POS cash report carries), so one
+    // record per register per day sharing the same date, not one rotating register.
+    // Most land within tolerance; the loose early weeks run wider over/short and
+    // tighten after the fixes. Cash counting is day-one discipline, no adoption ramp.
     const scVariances = [];
+    const activeRegs = scDrawers.filter(d => d.active !== false);
     ANCHS.weeks.forEach(a => {
       const baseAgo = sunOff + ANCHS.endAgo(a);
       const improving = !a.loose;
       for (let di = 0; di < 7; di++) {
-        const exp = 600 + Math.round(Math.random() * 350);
-        const variance = improving
-          ? Math.round((Math.random() - 0.55) * 12)
-          : Math.round((Math.random() - 0.75) * 30);
-        scVariances.push({
-          id:uid(), date:dateStr(baseAgo + 6 - di), shift_type:'Close',
-          drawer_id: scDrawers[di % scDrawers.length].id,
-          drawer:    scDrawers[di % scDrawers.length].name,
-          cashier:mgrs[(a.wk + di) % 3],
-          source:'shift-close',
-          expected_cash:exp, counted_cash:exp + variance, variance:variance,
-          tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
-          reason:'', notes:'', created_at:new Date().toISOString()
+        const date = dateStr(baseAgo + 6 - di);
+        activeRegs.forEach((dr, ri) => {
+          const exp = 600 + Math.round(Math.random() * 350);
+          const variance = improving
+            ? Math.round((Math.random() - 0.55) * 12)
+            : Math.round((Math.random() - 0.75) * 30);
+          scVariances.push({
+            id:uid(), date:date,
+            drawer_id: dr.id, drawer: dr.name,
+            cashier:mgrs[(a.wk + di + ri) % 3],
+            source:'import',
+            expected_cash:exp, counted_cash:exp + variance, variance:variance,
+            tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
+            reason:'', notes:'', created_at:new Date().toISOString()
+          });
         });
       }
     });
@@ -2696,7 +2700,7 @@ S.HubSettings = {
         const witness   = mgrs[(a.wk + di + 1) % 3];
         const dr = scDrawers[di % scDrawers.length];
         scCashDrops.push({
-          id:dropId, date:dropDate, shift_type:'Close', drop_time:'23:30',
+          id:dropId, date:dropDate, drop_time:'23:30',
           drawer_id: dr.id, drawer: dr.name,
           performed_by:performed, witness:witness,
           amount:dropAmount, denominations:{}, notes:'',
@@ -2706,7 +2710,7 @@ S.HubSettings = {
         scSafeLog.push({
           id:safeId, date:dropDate, time:'23:30',
           txn_type:'Cash Drop', direction:'in', amount:dropAmount,
-          reference:'Drawer: ' + dr.name + ' / Close',
+          reference:'Drawer: ' + dr.name,
           performed_by:performed, witness:witness, notes:'',
           source:'cash-drop', source_id:dropId,
           created_at:new Date().toISOString()
