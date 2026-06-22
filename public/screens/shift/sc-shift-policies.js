@@ -30,7 +30,7 @@ S.ShiftPolicies = {
   showHowTo() {
     App.showHelpModal('How Shift Policies Work', [
       { p: ['Two thresholds that tell Bar Cop when to flag a shift: how far a drawer can be off, and how big a comp can get before a manager has to sign off. Set them once and they drive the warnings across Shift Control.'] },
-      { h: 'Cash Variance Tolerance', p: ['Cash tolerance is the most a drawer can be off before Bar Cop flags it. A count under the tolerance stays green; over it, the shift flags on the Variance Log, Cash Reconciliation, and the Shift Handoff Report.'] },
+      { h: 'Cash Variance Tolerance', p: ['Cash tolerance is the most a drawer can be off before Bar Cop flags it. A count under the tolerance stays green; over it, the drawer flags on the Variance Log and in Cash Reconciliation.'] },
       { h: 'Default vs Per Shift-Type', p: ['The Default Tolerance is your baseline; it applies to any shift type without its own number. Some shifts carry more cash risk than others (a busy late night is tougher to count tight than a slow brunch), so set a different tolerance for a shift type and it overrides the default for that type. Leave a type blank to inherit the default.'] },
       { h: 'One-Off Overrides', p: ['Start a Shift can still override the tolerance for one specific shift, without touching these settings.'] },
       { h: 'Comp Authorization', p: ['Comps above your threshold on the Void and Comp Log require a manager in the Authorized By field. Saving a comp over the threshold without a manager pops a soft warning the operator can override, and every override flags in Theft Risk under the Unauthorized Large Comps signal.'] },

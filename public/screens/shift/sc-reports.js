@@ -73,7 +73,7 @@ S.ShiftReports = {
         title: 'Shift Reports',
         lead: 'Reports roll up your shifts, cash, and operations across any date range. Run a shift and log a little activity and these fill in.',
         steps: [
-          { title: 'Open the floor', desc: 'Run a shift in Active Shift to feed the Shift and Cash reports. Voids, 86s, and checklists feed the Operations report.', btn: 'Go to Active Shift', screen: 'sc-active-shift', done: false }
+          { title: 'Import your week', desc: 'Import your weekly sales in the Shift dashboard to feed the Shift and Cash reports. Voids, waste, and checklists feed the Operations report.', btn: 'Go to Shift Dashboard', screen: 'sc-dashboard', done: false }
         ]
       });
       return;
@@ -163,7 +163,7 @@ S.ShiftReports = {
   // ── Shift tab ───────────────────────────────────────────────────────────────
   bodyShift() {
     const all = this.shifts();
-    if (!all.length) return { empty: this.emptyPanel('No shifts logged yet.', 'Log a shift in Active Shift and this report will summarize revenue, covers, and check average by shift type and day of week.', 'sc-active-shift', 'Go to Active Shift') };
+    if (!all.length) return { empty: this.emptyPanel('No sales imported yet.', 'Import your weekly sales in the Shift dashboard and this report will summarize revenue, covers, and check average by day.', 'sc-dashboard', 'Go to Shift Dashboard') };
     const rows = all.filter(s => this.inRange(s.date));
 
     const totRev = rows.reduce((t, s) => t + (s.total_revenue || 0), 0);

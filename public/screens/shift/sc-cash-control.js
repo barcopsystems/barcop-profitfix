@@ -209,10 +209,9 @@ S.ShiftCashControl = {
     if (!this.drawers().length && !hasAny) {
       App.setupCard(this.container, {
         title: 'Cash Control',
-        lead: 'Track the safe, your registers, and every cash move in one place. Set up your registers, then open the floor to start logging drops and closes.',
+        lead: 'Track the safe, your registers, and every cash move in one place. Set up your registers, then log drops and drawer counts here as the night runs.',
         steps: [
-          { title: 'Add your registers', desc: 'Every register you run cash through. Each one gets its own tile here.', btn: 'Set Up Registers', screen: 'sc-drawers' },
-          { title: 'Open the floor', desc: 'Start a shift to set opening banks and log drops as the night runs.', btn: 'Go to Active Shift', screen: 'sc-active-shift' }
+          { title: 'Add your registers', desc: 'Every register you run cash through. Each one gets its own tile here, with its opening bank.', btn: 'Set Up Registers', screen: 'sc-drawers' }
         ]
       });
       return;
@@ -389,7 +388,7 @@ S.ShiftCashControl = {
 
   // ── Log a Drop (new or edit) ────────────────────────────────────────────────
   // onDone (optional): called after a successful save instead of redrawing the
-  // board, so Active Shift can open this pop-up in place and refresh itself.
+  // board, so a caller can open this pop-up in place and refresh itself.
   openDrop(rec, drawerId, onDone) {
     const editing = !!rec;
     this._dropOnDone = onDone || null;

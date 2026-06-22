@@ -6,10 +6,10 @@
    box that filters questions across every topic. Per-screen step-by-step
    directions live in each screen's nav "i" panel (showHowTo), so this FAQ stays
    on orientation, the why, cross-system connections, and troubleshooting, not the
-   how-to. Content tracks the current Shift Control: Active Shift (live + past
-   shifts), Cash Control and Cash History, the unified Checklists screen, the
-   tabbed Reports, the combined Shift Policies setup page, and how Shift Control
-   feeds Profit, Revenue, Inventory, and the Hub. */
+   how-to. Content tracks the current Shift Control: the weekly cockpit (the POS
+   sales import), Cash Control and Cash History, the operations logs, the unified
+   Checklists screen, the tabbed Reports, the combined Shift Policies setup page,
+   and how Shift Control feeds Profit, Revenue, Inventory, and the Hub. */
 
 S.ShiftHelp = {
   tab: 0,
@@ -17,30 +17,26 @@ S.ShiftHelp = {
 
   showHowTo() {
     App.showHelpModal('Shift Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Shift Control: opening and closing the floor, cash control and reconciliation, the operations logs (voids, comps, walked tabs, 86 list, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
+      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, 86 list, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "drawer" or "comp" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Active Shift or Cash Control, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Cash Control or the Void and Comp Log, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Shift Control do?',
-        a: 'Shift Control is where the night happens. Active shift management, shift revenue, covers, cash drops, the safe log, drawer variances, the 86 list, voids and comps, maintenance issues, walked tabs, and your opening and closing checklists. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Shift revenue from here is the single source for the weekly revenue number every Recovery system reads. Cash data feeds Profit Recovery Cash Reconciliation and the Profit Audit. Voids and comps feed Theft Risk. Repeat 86s feed Inventory Control par alerts. Run Shift Control well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
+        a: 'Shift Control captures the operating week: your imported POS sales (revenue and covers), cash drops, the safe log, drawer variances, the 86 list, voids and comps, maintenance issues, walked tabs, and your opening and closing checklists. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Your imported sales are the single source for the weekly revenue number every Recovery system reads. Cash data feeds Profit Recovery Cash Reconciliation and the Profit Audit. Voids and comps feed Theft Risk. Repeat 86s feed Inventory Control par alerts. Run Shift Control well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
       { q: 'Where do I start?',
-        a: 'Two paths in. If you are setting up for the first time, build your opening and closing checklist templates on Checklist Templates so they are ready when the first shift starts. If you are mid-week and want to capture data from this point forward, open Active Shift at the start of your next shift, tap the daypart, the manager on duty, and the registers in play, set each opening bank, and open the floor. The Getting Started checklist on the Hub lists the Shift Control tasks in order.' },
-      { q: 'How do I log a shift that already happened?',
-        a: 'Open Active Shift. Below the open-the-floor card is Recent Shifts, where you can log a past shift or edit one that needs fixing. It writes the same shift record as a live shift, so a shift entered after the fact feeds every downstream number exactly the same way. Until a shift is logged, the weekly revenue total sums only the shifts that exist, so the number reads low.' }
+        a: 'A little setup, then a weekly habit. To set up, build your opening and closing checklist templates on Checklist Templates and add your registers on Add Registers. Then each week, open the Shift dashboard and import this week\'s POS sales: one "sales by day" export, dropped once, lands the whole week. The Getting Started checklist on the Hub lists the Shift Control tasks in order.' },
+      { q: 'How do I add or fix a past week?',
+        a: 'Import it. On the Shift dashboard, step the week selector back to the week you want and drop that week\'s POS sales export. Re-importing a week replaces those days, so correcting a week is just re-importing it. Until a week is imported, the weekly revenue total only sums the days that exist, so the number reads low.' }
     ]},
-    { t: 'Shifts and Revenue', qa: [
-      { q: 'What are Shift Notes?',
-        a: 'A timestamped notebook for things the closer or the next manager should know, captured as the shift runs instead of trying to remember at close. Delivery short on bourbon, VIP at 9pm, server went home sick, weather slowing us down. Each note records the time you added it, and the notes flow into the Shift Handoff so the next manager opens the night knowing what happened on the prior one.' },
-      { q: 'What does the Shift Close Wizard do?',
-        a: 'Five steps in order: Revenue and Covers (bar, floor, and total covers), Cash Reconciliation (opening bank plus POS cash sales minus drops against the counted cash, which auto-creates a variance entry if it lands outside tolerance), Exception Review (open 86s, large voids and comps, open maintenance, closing checklist completion), Tip Reconciliation (pick Tip Out, Tip Pool, or Skip and enter the tips inline, which log straight to Labor on close), and Handoff Notes for the opener. Saving runs all the writes at once.' },
-      { q: 'Why does shift revenue matter so much?',
-        a: 'It is the single source of weekly revenue for Bar Cop. Profit Recovery and Revenue Recovery both read the weekly sum of your logged shift revenue. You enter it once here and never re-type it. Covers feed the check-average calculation in Revenue Recovery and the Server Check screen. Get every shift logged and the weekly numbers downstream stay honest without manual override.' },
-      { q: 'What does Shift History show?',
-        a: 'Every saved shift, newest first, read-only. Click any shift for the full detail page: profile (manager, registers, opening banks, staff on floor), revenue (bar, floor, covers, check average), cash reconciliation (opening bank, POS cash, drops, expected, counted, variance, status), tip reconciliation, the exception-review acknowledgments, every timestamped shift note from during service, and the closing handoff notes. Save Handoff PDF on the recap prints a clean one-page handoff for the opener. Use it to spot the shift that ran outside the norm.' }
+    { t: 'Sales and Revenue', qa: [
+      { q: 'How do I get my sales into Bar Cop?',
+        a: 'On the Shift dashboard, the first step is Import this week\'s sales. Pull a "sales by day" report from your POS for the week and drop it: one file, one row per day. Bar Cop reads the whole week at once and lands each day\'s bar revenue, food revenue, and covers. Re-importing a week replaces those days so it never double-counts. No daily entry and no live shift to run; the POS is the system of record for sales and Bar Cop ingests it once a week.' },
+      { q: 'Why does the sales import matter so much?',
+        a: 'It is the single source of weekly revenue for Bar Cop. Profit This Week and Revenue This Week both fill their revenue and covers straight from the imported days, so you confirm the week instead of typing it. Covers feed the check-average in Revenue Recovery and the Server Check screen. Import every week and the numbers downstream stay honest without manual override.' }
     ]},
     { t: 'Cash Control', qa: [
       { q: 'Where do I enter cash activity?',
@@ -50,7 +46,7 @@ S.ShiftHelp = {
       { q: 'How does the Safe Log work?',
         a: 'A running ledger of cash moving in and out of the safe: drops in, banks issued and returned, deposits prepared, paid-outs. Every entry carries a running balance, so at any moment you know what the safe should hold. Count the safe against that balance at least daily. A safe that does not balance against the log is a problem the log surfaces immediately.' },
       { q: 'What is a variance, and where does it come from?',
-        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created automatically when you reconcile a drawer in Active Shift (with the shift register and manager pre-filled), or entered by hand if needed. The tolerance lives under Setup, Shift Policies (default $10, with optional overrides per daypart and per shift). Anything outside tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
+        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created when you reconcile a drawer in Cash Control, or entered by hand if needed. The tolerance lives under Setup, Shift Policies (default $10, with optional overrides per daypart and per shift). Anything outside tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
       { q: 'What do the variance colors mean?',
         a: 'Within tolerance is green. Short, meaning less cash than expected, is red. Over, meaning more cash than expected, is amber. A drawer that was never counted shows grey as Not Counted. The repeat-offender pattern feeds the Theft Risk Scorecard in Profit Recovery, so a bartender consistently short across shifts is a pattern Bar Cop surfaces without you tracking it on paper.' }
     ]},
@@ -74,7 +70,7 @@ S.ShiftHelp = {
     ]},
     { t: 'Reports', qa: [
       { q: 'What is on the Shift tab?',
-        a: 'Revenue and covers broken down by shift type and by day of week over the date range you pick. Spot the patterns: which daypart produces the highest average check, which day underperforms, which shifts run hottest on covers. Same data the Revenue Audit uses, sliced for the operational decision.' },
+        a: 'Revenue and covers broken down by day over the date range you pick. Spot the patterns: which day produces the highest average check, which day underperforms, which day runs hottest on covers. Same data the Revenue Audit uses, sliced for the operational decision.' },
       { q: 'What is on the Cash tab?',
         a: 'Cash drops by drawer, variances by cashier, net over/short, and the safe balance over the date range. The variance summary tells you the total over/short for the period and which cashier pattern is off. This is the tab to print and walk through with the bookkeeper.' },
       { q: 'What is on the Operations tab?',
@@ -82,9 +78,9 @@ S.ShiftHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Shift Control to Profit Recovery?',
-        a: 'Four connections, all read-only on the Recovery side. Shift revenue feeds Profit This Week revenue line (the weekly sum of logged shifts). Cash drops and variances feed Cash Reconciliation as a diagnosis view. Cash variance feeds the Profit Audit cash section. Voids and comps feed the Theft Risk Scorecard and the Profit Audit exception analysis. The one number Bar Cop imports rather than calculates is POS revenue, and it enters once per shift here.' },
+        a: 'Four connections, all read-only on the Recovery side. Your imported sales feed Profit This Week revenue line (the weekly sum of the imported days). Cash drops and variances feed Cash Reconciliation as a diagnosis view. Cash variance feeds the Profit Audit cash section. Voids and comps feed the Theft Risk Scorecard and the Profit Audit exception analysis. POS revenue is imported, not calculated, and it enters once a week here via the sales import.' },
       { q: 'What flows from Shift Control to Revenue Recovery?',
-        a: 'Two connections. Shift revenue feeds Revenue This Week revenue line (the same weekly sum as Profit, broken out as bar and floor). Covers from each shift feed Revenue This Week cover count and the check-average that drives Server Check and the Check Average screen.' },
+        a: 'Two connections. Your imported sales feed Revenue This Week revenue line (the same weekly sum as Profit, broken out as bar and floor). Covers from the import feed Revenue This Week cover count and the check-average that drives Server Check and the Check Average screen.' },
       { q: 'What flows from Shift Control to Inventory Control?',
         a: 'One feed. Repeat 86s on the same product across recent shifts surface as par-level alerts in Inventory Control. A product 86\'d three times in two weeks is a stocking or par problem, and Bar Cop flags it on the Inventory side so the par gets reviewed before the next 86.' },
       { q: 'What flows from Shift Control to the Hub?',
