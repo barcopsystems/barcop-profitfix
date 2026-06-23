@@ -168,7 +168,7 @@ S.ShiftDashboard = {
     const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#1E2B34;color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
     // Active box uses a solid lifted bg (#0D181E) with the standard card border,
     // so the white title and gold number read true, not washed by a translucent
     // gold tint.
