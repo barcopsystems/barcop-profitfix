@@ -2,13 +2,13 @@
 
 /* ── Shift Control — Help and FAQ ─────────────────────────────────────────────
    The in-app knowledge layer for Shift Control. One topic at a time on the same
-   underline tab switcher used by Cash History and Reports, plus a live search
+   underline tab switcher used by Cash History, plus a live search
    box that filters questions across every topic. Per-screen step-by-step
    directions live in each screen's nav "i" panel (showHowTo), so this FAQ stays
    on orientation, the why, cross-system connections, and troubleshooting, not the
    how-to. Content tracks the current Shift Control: the weekly cockpit (the POS
    sales import), Cash Control and Cash History, the operations logs, the unified
-   Checklists screen, the tabbed Reports, the registers reference,
+   Checklists screen, the registers reference,
    and how Shift Control feeds Profit, Revenue, Inventory, and the Hub. */
 
 S.ShiftHelp = {
@@ -17,7 +17,7 @@ S.ShiftHelp = {
 
   showHowTo() {
     App.showHelpModal('Shift Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, maintenance), checklists, the reports, and how Shift feeds the rest of Bar Cop.'] },
+      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, maintenance), checklists, and how Shift feeds the rest of Bar Cop.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "drawer" or "comp" lands you on the right answer fast.'] },
       { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Cash Control or the Void and Comp Log, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
@@ -62,17 +62,9 @@ S.ShiftHelp = {
     ]},
     { t: 'Checklists', qa: [
       { q: 'How do the checklists work?',
-        a: 'One Checklists screen runs both routines. Toggle Opening or Closing up top (it starts on the one that fits the time of day), and the items come from a template you built or a built-in default. Tap items to check them off, then Save to record who completed it, the date, and the completion percentage. Completed runs land in the filterable history below, where View shows the per-item detail and Export PDF saves the record. Completion feeds the Reports Operations tab so you can see which shifts ran the open and close properly and which skipped steps.' },
+        a: 'One Checklists screen runs both routines. Toggle Opening or Closing up top (it starts on the one that fits the time of day), and the items come from a template you built or a built-in default. Tap items to check them off, then Save to record who completed it, the date, and the completion percentage. Completed runs land in the filterable history below, where View shows the per-item detail and Export PDF saves the record, so you can see which shifts ran the open and close properly and which skipped steps.' },
       { q: 'Why use checklists in Bar Cop instead of paper?',
-        a: 'Three reasons. The digital list shows the same items in the same order to every manager, so quality does not drift by who is working. The completion data feeds the Reports Operations tab, so checklist quality becomes measurable instead of a maybe-it-happened. And a blank Worksheet still prints for the clipboard when you want to run it on paper and enter it after.' }
-    ]},
-    { t: 'Reports', qa: [
-      { q: 'What is on the Shift tab?',
-        a: 'Revenue and covers broken down by day over the date range you pick. Spot the patterns: which day produces the highest average check, which day underperforms, which day runs hottest on covers. Same data the Revenue Audit uses, sliced for the operational decision.' },
-      { q: 'What is on the Cash tab?',
-        a: 'Cash drops by drawer, variances by cashier, net over/short, and the safe balance over the date range. The variance summary tells you the total over/short for the period and which cashier pattern is off. This is the tab to print and walk through with the bookkeeper.' },
-      { q: 'What is on the Operations tab?',
-        a: 'Voids and comps by server and by reason, maintenance open and resolved, and checklist completion by type. Use it monthly to spot the patterns a single shift would not catch, like a server who runs a high comp total or a checklist that keeps getting skipped.' }
+        a: 'Three reasons. The digital list shows the same items in the same order to every manager, so quality does not drift by who is working. The completion percentage is recorded on every run, so checklist quality becomes measurable instead of a maybe-it-happened. And a blank Worksheet still prints for the clipboard when you want to run it on paper and enter it after.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Shift Control to Profit Recovery?',
