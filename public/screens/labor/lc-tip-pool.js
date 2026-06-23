@@ -38,17 +38,19 @@ S.LaborTipPool = {
     // Keep an in-progress (or being-edited) pool through leaving the screen and
     // coming back, plus the in-screen re-renders — only Save or Start Over resets
     // it. A clean entry (nothing entered) starts fresh on today's date.
-    const hasWork = this._editId || (this.pool !== '' && this.pool != null)
-      || (this.rows || []).some(r => r && (r.staff_id || (r.hours !== '' && r.hours != null)));
+    // Match the Tip Log: a fresh visit (no pool amount entered, not editing) lands
+    // on today with that day's crew already preloaded. A bare preloaded crew does
+    // not count as "work," so it re-lands ready each time until an amount is entered.
+    const hasWork = this._editId || (this.pool !== '' && this.pool != null);
     if (!hasWork) {
       const today = App.todayLocal();
       this._weekStart = S.LaborTipLog.mondayOf(today);
       this.date = today;
       this.period = '';   // pools log per day now (no service-period split)
       this.pool = '';
-      this.rows = [];
       this.method = 'hours';
       this._editId = null;
+      this.rows = this.crewForDate(today);
     }
     this.renderMain();
   },
@@ -224,25 +226,27 @@ S.LaborTipPool = {
     }
   },
 
-  // Pick a day -> preload the participants from the posted SCHEDULE (call-out
-  // adjusted, hours from logged-actuals-else-scheduled), the same crew the Tip Log
-  // loads via preloadFromDate. The pool amount stays operator-entered, since the
-  // schedule has no tip totals. Tip Log state is saved/restored so the call has no
-  // side effect on a half-finished Tip Log entry.
+  // Preload the crew for a day from the posted SCHEDULE (call-out adjusted, hours
+  // from logged-actuals-else-scheduled), the same crew the Tip Log loads via
+  // preloadFromDate. The Tip Log's own in-progress state is saved/restored so this
+  // has no side effect on a half-finished Tip Log entry.
+  crewForDate(date) {
+    const TL = S.LaborTipLog;
+    if (!date || !TL || !TL.preloadFromDate) return [];
+    const savedDate = TL._addDate, savedRows = TL._addRows, savedPeriod = TL._addShiftType;
+    TL.preloadFromDate(date, '');
+    const crew = (TL._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
+    TL._addDate = savedDate; TL._addRows = savedRows; TL._addShiftType = savedPeriod;
+    return crew;
+  },
+  // Pick a day -> preload the participants. The pool amount stays operator-entered,
+  // since the schedule has no tip totals.
   loadFromDate(date, period) {
     this.collect();
     this.date = date || this.date || App.todayLocal();
     if (period != null) this.period = period;
     this._weekStart = S.LaborTipLog.mondayOf(this.date);
-    let crew = [];
-    const TL = S.LaborTipLog;
-    if (this.date && TL && TL.preloadFromDate) {
-      const savedDate = TL._addDate, savedRows = TL._addRows, savedPeriod = TL._addShiftType;
-      TL.preloadFromDate(this.date, this.period);
-      crew = (TL._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
-      TL._addDate = savedDate; TL._addRows = savedRows; TL._addShiftType = savedPeriod;
-    }
-    this.rows = crew;
+    this.rows = this.crewForDate(this.date);
     this.renderMain();
   },
 
