@@ -1,10 +1,11 @@
 'use strict';
 
 /* ── Labor Control — Tip Log (writes lc_tips) ─────────────────────────────────
-   Records tips by SHIFT and staff member — cash and card, totalled.
-   shift_id is the anchor. Picking a shift pre-fills date, shift_type, and the
-   active manager. Staff dropdown filters to that shift's logged staff (with full
-   roster fallback). Hours pull from lc_actuals when staff + shift are both set.
+   Records tips by DAY + service period and staff member — cash and card, totalled.
+   The anchor is a week-stepper with day-of-week and service-period chips; shift_id
+   is a synthetic join key, App.tipShiftKey(date, period). Staff preload from the
+   posted schedule for the tapped day (with full roster fallback). Hours pull from
+   lc_actuals when staff + day are both set.
 
    Landing = one Log Tips card with an Enter Manually / Import File toggle, then
    the stats, filter, and tip list. Editing a row opens it in a focused pop-up. */
