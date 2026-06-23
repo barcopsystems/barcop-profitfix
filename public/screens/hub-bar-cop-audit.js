@@ -213,20 +213,19 @@ S.HubBarCopAudit = {
     return this._rollup(components);
   },
 
-  // 2. Cash Integrity. Variance trend + drawer + drop + auth compliance.
+  // 2. Cash Integrity. Variance trend + drawer counts + cash drops. (Comp/void
+  // authorization is a POS-native control, not Bar Cop's to score; the per-server
+  // sales-pattern read lives in Sales Integrity.)
   _scoreCashIntegrity() {
     const variances = (App.shiftData?.sc_variances)    || [];
     const drops     = (App.shiftData?.sc_cash_drops)   || [];
-    const voidComps = (App.shiftData?.sc_void_comps)   || [];
     const shifts    = (App.shiftData?.sc_shifts)       || [];
-    const threshold = (App.shiftData?.settings?.comp_auth_threshold) || 25;
 
     const wkVar     = variances.filter(v => this._withinWindow(v.date, this.WINDOW_DAYS));
     const wkShifts  = shifts.filter(s => this._withinWindow(s.date, this.WINDOW_DAYS));
     // A counted drawer is recorded as a variance record; sc_drawers is the
     // register reference table (no date), so completion reads off the variances.
     const wkDrawers = wkVar;
-    const wkVoids   = voidComps.filter(v => this._withinWindow(v.date, this.WINDOW_DAYS));
 
     // Variance trend: total absolute variance / total revenue handled.
     // Operator-honest: lower is better, capped at 1% as ceiling = 100 score.
@@ -241,11 +240,6 @@ S.HubBarCopAudit = {
     const operatingDays = new Set(wkShifts.map(s => s.date)).size;
     const drawerRatio = operatingDays > 0 ? Math.min(1, wkDrawers.length / operatingDays) : null;
 
-    // Authorization compliance on large voids/comps (over threshold).
-    const overThresh = wkVoids.filter(v => (parseFloat(v.amount) || 0) >= threshold);
-    const authorized = overThresh.filter(v => v.authorized_by);
-    const authRatio  = overThresh.length === 0 ? 1 : authorized.length / overThresh.length;
-
     // Cash drops activity: a drop on each operating day that took real money.
     const cashDays = new Set(wkShifts.filter(s => (parseFloat(s.total_revenue) || 0) > 500).map(s => s.date)).size;
     const wkDrops  = drops.filter(d => this._withinWindow(d.date, this.WINDOW_DAYS));
@@ -254,7 +248,6 @@ S.HubBarCopAudit = {
     const components = [
       { label: 'Cash variance trend (lower is better)', ratio: varRatio,    na: totalRev === 0,         extra: totalRev > 0 ? varPct.toFixed(2) + '% of revenue handled' : 'No revenue logged in window' },
       { label: 'Drawer counts per operating day',       ratio: drawerRatio, na: operatingDays === 0,    extra: wkDrawers.length + ' counts on ' + operatingDays + ' operating days' },
-      { label: 'Large void/comp authorization',         ratio: authRatio,   na: wkVoids.length === 0,   extra: wkVoids.length === 0 ? 'No voids/comps logged' : (authorized.length + ' of ' + overThresh.length + ' over $' + threshold + ' authorized') },
       { label: 'Cash drops on revenue days',            ratio: dropRatio,   na: cashDays === 0,         extra: wkDrops.length + ' drops on ' + cashDays + ' days over $500' }
     ];
     return this._rollup(components);
