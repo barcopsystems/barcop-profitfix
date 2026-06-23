@@ -2910,7 +2910,7 @@ S.HubSettings = {
     // An approved vacation, a pending request (surfaces on the cockpit), one more.
     const lcId = nm => (lcStaff.find(s => s.name === nm) || {}).id || '';
     App.laborData.lc_time_off = [
-      { id:uid(), staff_id:lcId('Maria G.'),   name:'Maria G.',   start_date:dateStr(-12), end_date:dateStr(-9), type:'Vacation',     status:'Approved',  notes:'Out of town.',  created_at:new Date().toISOString() },
+      { id:uid(), staff_id:lcId('Maria G.'),   name:'Maria G.',   start_date:dateStr(-9), end_date:dateStr(-12), type:'Vacation',     status:'Approved',  notes:'Out of town.',  created_at:new Date().toISOString() },
       { id:uid(), staff_id:lcId('Jake T.'),    name:'Jake T.',    start_date:dateStr(-10), end_date:dateStr(-10), type:'Requested Off', status:'Requested', notes:'Family event.', created_at:new Date().toISOString() },
       { id:uid(), staff_id:lcId('Marcus T.'),  name:'Marcus T.',  start_date:dateStr(-11), end_date:dateStr(-11), type:'Personal',     status:'Approved',  notes:'',              created_at:new Date().toISOString() }
     ];
