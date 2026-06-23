@@ -2846,12 +2846,16 @@ S.HubSettings = {
     App.laborData = App.laborData || {};
     const ANCHL = window.ANCHOR;
 
+    // Tipped roles: earners (Server, Bartender) tip out a percent of their sales;
+    // support (Barback, Busser) pay 0 and only receive. tip_out_pct drives the Tip
+    // Log's earner/receives split + the tip-out reconciliation.
     const lcPositions = [
-      { name:'Bartender', department:'Bar',            default_wage:ANCHL.wages.bar,     tipped:true  },
-      { name:'Barback',   department:'Bar',            default_wage:12,                  tipped:true  },
+      { name:'Bartender', department:'Bar',            default_wage:ANCHL.wages.bar,     tipped:true,  tip_out_pct:2 },
+      { name:'Barback',   department:'Bar',            default_wage:12,                  tipped:true,  tip_out_pct:0 },
       { name:'Line Cook', department:'Kitchen',        default_wage:ANCHL.wages.kitchen, tipped:false },
       { name:'Prep Cook', department:'Kitchen',        default_wage:13.5,                tipped:false },
-      { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true  },
+      { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true,  tip_out_pct:3 },
+      { name:'Busser',    department:'Front of House', default_wage:11,                  tipped:true,  tip_out_pct:0 },
       { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
       { name:'Manager',   department:'Management',     default_wage:28,                  tipped:false },
       { name:'Assistant Manager', department:'Management', default_wage:24,               tipped:false },
@@ -2893,6 +2897,8 @@ S.HubSettings = {
       mkStaff('Brianna K.', 'Server',    14,   175),
       mkStaff('Priya N.',   'Server',    14,   110),
       mkStaff('Owen L.',    'Host',      12.5, 80),
+      mkStaff('Tara W.',    'Busser',    11,   90),
+      mkStaff('Diego S.',   'Busser',    11,   55),
       mkSalaried('Carlos P.', 'Manager',           68000, 520),
       mkSalaried('Renee K.',  'Assistant Manager', 52000, 300),
     ];
@@ -3154,7 +3160,7 @@ S.HubSettings = {
     };
     const lcBar     = lcByPos('Bartender', 'Barback');
     const lcKitchen = lcByPos('Line Cook', 'Prep Cook');
-    const lcFloor   = lcByPos('Server', 'Host');
+    const lcFloor   = lcByPos('Server', 'Host', 'Busser');
 
     // Per week, split each department's labor dollars across its staff, then
     // log five daily hour entries per person. cost sums back to ANCHOR labor.
@@ -3182,7 +3188,7 @@ S.HubSettings = {
       const baseAgo = sunOff + ANCHS.endAgo(a);
       lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.23, 0.21, 0.20, 0.19, 0.17], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
     });
     App.laborData.lc_actuals   = lcActuals;
 
@@ -3209,6 +3215,10 @@ S.HubSettings = {
         { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'22:00', hours:6 },   // dinner
         { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // weekend brunch
         { days:['Fri','Sat','Sun'],             start:'17:00', end:'23:00', hours:6 },   // dinner into late
+      ],
+      'Busser':    [
+        { days:['Thu','Fri','Sat','Sun'],       start:'17:00', end:'23:00', hours:6 },   // dinner / late floor support
+        { days:['Sat','Sun'],                   start:'10:00', end:'15:00', hours:5 },   // weekend brunch support
       ],
       'Host':      [
         { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // brunch host
@@ -3305,20 +3315,42 @@ S.HubSettings = {
     // Every tip carries a synthetic shift_id = App.tipShiftKey(date, service period),
     // not an sc_shifts link. Books Form 8027 per-employee allocations and the Server
     // Scorecard tips % both group through that same key.
-    const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
+    // Tip-out percentages MUST match the position config above (Server 3%,
+    // Bartender 2%; Barback + Busser pay 0 and only receive). Earners log sales +
+    // tip_out_paid; the collected pool splits across the support crew by hours so
+    // Collected == Distributed (the last support row absorbs the rounding remainder).
+    const TIPOUT_PCT = { 'Server': 3, 'Bartender': 2 };
+    const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server','Busser'].includes(posNameOf(st.position_id)));
+    const isEarnerRole = r => r === 'Server' || r === 'Bartender';
     const lcTips = [];
     [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
       const tipDate = dateStr(d);
-      const shiftId = App.tipShiftKey(tipDate, 'Dinner');   // day + period key, same as the live Tip Log
-      lcTipped.forEach(st => {
+      const shiftId = App.tipShiftKey(tipDate, '');   // per-day key (the Tip Log logs per day now)
+      const built = lcTipped.map(st => {
         const role = posNameOf(st.position_id);
-        const base = role === 'Bartender' ? 135 : role === 'Server' ? 100 : 55;
-        const cash = Math.round(base * (0.30 + Math.random() * 0.22));
-        const card = Math.round(base * (0.92 + Math.random() * 0.40));
-        lcTips.push({ id:uid(), date:tipDate, shift_id:shiftId, staff_id:st.id, name:st.name,
-          position_id:st.position_id, shift_type:'Dinner',
-          cash_tips:cash, card_tips:card, total_tips:cash + card,
-          hours:role === 'Server' ? 5 : 7, notes:'', created_at:daysAgoISO(d) });
+        const earner = isEarnerRole(role);
+        const base = role === 'Bartender' ? 135 : 100;
+        const cash = earner ? Math.round(base * (0.30 + Math.random() * 0.22)) : 0;
+        const card = earner ? Math.round(base * (0.92 + Math.random() * 0.40)) : 0;
+        const sales = earner ? Math.round((role === 'Bartender' ? 1450 : 1150) + Math.random() * 450) : 0;
+        const paid = earner ? Math.round(sales * (TIPOUT_PCT[role] || 0) / 100 * 100) / 100 : 0;
+        return { st, role, earner, cash, card, sales, paid, received:0, hours: role === 'Server' ? 5 : 7 };
+      });
+      const collected = +built.reduce((s, r) => s + r.paid, 0).toFixed(2);
+      const sup = built.filter(r => !r.earner);
+      const totSupH = sup.reduce((s, r) => s + r.hours, 0) || 1;
+      let handed = 0;
+      sup.forEach((r, i) => {
+        r.received = (i === sup.length - 1) ? +(collected - handed).toFixed(2)
+                                            : Math.round(collected * (r.hours / totSupH) * 100) / 100;
+        handed += r.received;
+      });
+      built.forEach(r => {
+        lcTips.push({ id:uid(), date:tipDate, shift_id:shiftId, staff_id:r.st.id, name:r.st.name,
+          position_id:r.st.position_id, shift_type:'',
+          cash_tips:r.cash, card_tips:r.card, total_tips:r.cash + r.card,
+          sales:r.sales, tip_out_paid:r.paid, tip_out_received:r.received,
+          hours:r.hours, notes:'', created_at:daysAgoISO(d) });
       });
     });
     App.laborData.lc_tips = lcTips;
