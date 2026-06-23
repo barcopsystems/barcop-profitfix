@@ -258,7 +258,7 @@ const DB = {
     'lc-dashboard':'labor-dashboard','lc-help':'_always',
     // Shift Control
     'sc-cash-history':'cash-mgmt',
-    'sc-cash-control':'cash-mgmt','sc-shift-policies':'cash-mgmt','sc-drawers':'cash-mgmt',
+    'sc-cash-control':'cash-mgmt','sc-drawers':'cash-mgmt',
     'sc-checklists':'checklists','sc-checklist-templates':'checklists',
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
@@ -638,13 +638,6 @@ const DB = {
   async writeLaborData(data)     { return await this._writeControl('lc_data', 'pf_lc_data', data); },
   async readShiftData() {
     const d = await this._readControl('sc_data', 'pf_sc_data');
-    // The comp authorization threshold defaults to $25 so the control is active
-    // (and reads "In place" in Profit Fix) out of the box, matching the Shift
-    // Policies copy. An explicit 0 means the operator turned it off, so keep it.
-    if (d && typeof d === 'object') {
-      d.settings = d.settings || {};
-      if (d.settings.comp_auth_threshold == null) d.settings.comp_auth_threshold = 25;
-    }
     return d;
   },
   async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
@@ -879,8 +872,8 @@ const DB = {
           bar_pour_cost_pct: 22, food_cost_pct: 32,
           labor_cost_pct: 30, prime_cost_pct: 60
         },
-        // Cash tolerance moved to App.shiftData.settings — Shift Control owns
-        // it now. See sc-shift-policies.js + App.cashToleranceForShift().
+        // Cash variance tolerance is per-register now (sc_drawers.cash_tolerance,
+        // set on the Add Register form). See App.drawerTolerance().
         onboarding_complete: false
       },
       bar_products: [], kitchen_products: [],
