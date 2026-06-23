@@ -187,7 +187,7 @@ S.LaborDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'hours') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Enter hours by hand in Log Hours.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Log hours from your posted schedule in Log Hours.</div>'
         + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button></div>';
     }
