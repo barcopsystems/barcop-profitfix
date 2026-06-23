@@ -231,7 +231,8 @@ S.LaborPayPeriods = {
       closedCard = '<div class="sh" style="margin:24px 0 10px;">Closed Periods</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Closed</th><th></th>'
-        + '</tr></thead><tbody>' + closedWeeks.map(closedRow).join('') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + closedWeeks.slice(0, App.listLimit('lc', 'pay_period')).map(closedRow).join('') + '</tbody></table></div></div>'
+        + App.showOlderBar('lc', 'pay_period', closedWeeks, false);
     }
 
     this.container.innerHTML = '<div class="screen">' + topCard + openCard + closedCard + '</div>';
@@ -239,6 +240,7 @@ S.LaborPayPeriods = {
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { const ws = b.dataset.ws; this.detailWeekStart = ws; App.pushView(() => this.renderDetail(ws)); }));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
   },
 
   // ── Detail view ─────────────────────────────────────────────────────
