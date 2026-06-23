@@ -45,8 +45,8 @@ S.TheftRisk = {
 
   // Recent flag events as a flat list, so the Hub alert and the Open-the-Floor
   // warning read the same definition of a dated "flag" (one source). severe =
-  // confirmed theft (the one that should not hide). Comp-volume is a windowed
-  // pattern, not a dated event, so it surfaces on the page, not in this stream.
+  // confirmed theft (the one that should not hide). Per-server sales-pattern
+  // theft lives in its own Sales Integrity screen, not in this stream.
   recentFlags(fromStr) {
     const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
     const out = [];
