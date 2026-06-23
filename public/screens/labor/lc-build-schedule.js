@@ -121,7 +121,7 @@ S.LaborBuildSchedule = {
     const chip = ws => {
       const on = ws === sel, isCur = ws === cur;
       return '<button type="button" class="bs-week-chip btn btn-sm" data-ws="' + ws + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + App.dateRangeLabel(ws, App.periodEndFor(ws))
         + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
@@ -474,7 +474,7 @@ S.LaborBuildSchedule = {
     const chips = this.DAYS.map(dy => {
       const on = dy === day;
       return '<button type="button" class="btn btn-sm bs-day-chip" data-day="' + esc(dy) + '" style="flex:1 1 0;min-width:0;padding:7px 2px;'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(dy) + '</button>';
     }).join('');
 

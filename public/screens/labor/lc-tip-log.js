@@ -86,7 +86,7 @@ S.LaborTipLog = {
     for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(App.ymdLocal(d)); }
     const mLabel = ymd => new Date(ymd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const chip = (cls, on, attr, label) => '<button type="button" class="btn btn-sm ' + cls + '" ' + attr + ' style="'
-      + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+      + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
             : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     const dayChips = days.map(ymd => {
       const d = new Date(ymd + 'T00:00:00');
@@ -253,7 +253,7 @@ S.LaborTipLog = {
     const segBtn = (mode, label) => {
       const on = this.entryMode === mode;
       return '<button type="button" class="btn btn-sm tl-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     // Primary action lives BELOW the card (bottom-left), collapse-group tagged so

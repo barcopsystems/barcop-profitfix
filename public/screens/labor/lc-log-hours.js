@@ -206,7 +206,7 @@ S.LaborLogHours = {
     const segBtn = (mode, label) => {
       const on = this.entryMode === mode;
       return '<button type="button" class="btn btn-sm lo-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     // Primary action lives BELOW the card (bottom-left), collapse-group tagged so
@@ -549,7 +549,7 @@ S.LaborLogHours = {
     const chip = w => {
       const on = w === ws, isCur = w === cur;
       return '<button type="button" class="lo-fill-week-chip btn btn-sm" data-ws="' + w + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + App.dateRangeLabel(w, App.periodEndFor(w))
         + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
