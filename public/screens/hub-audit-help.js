@@ -28,7 +28,7 @@ S.HubAuditHelp = {
     ]},
     { t: 'The Score', qa: [
       { q: 'What are the six sub-scores?',
-        a: 'Operational Discipline (are daily and weekly procedures getting done), Cash Integrity (variance trend, drawer counts, large void and comp authorization), Inventory Execution (count cadence and discrepancy resolution), Labor Hygiene (schedule adherence, callouts, overtime, certifications), Recovery Action (are you acting on the gaps your audits surfaced), and Operational Consistency (how steady your weekly numbers are). Each is built only from real records.' },
+        a: 'Operational Discipline (are daily and weekly procedures getting done), Cash Integrity (variance trend, drawer counts, cash drops), Inventory Execution (count cadence and discrepancy resolution), Labor Hygiene (schedule adherence, callouts, overtime, certifications), Recovery Action (are you acting on the gaps your audits surfaced), and Operational Consistency (how steady your weekly numbers are). Each is built only from real records.' },
       { q: 'Why does a sub-score say Not Enough Data?',
         a: 'Because that area does not have enough logged behind it to score honestly yet. One signal is not enough to claim a confident number, so the sub-score stays Not Enough Data and drops out of the overall until the data fills in. It is the honest answer, not a failing grade. Keep logging and it fills in.' },
       { q: 'How is the overall score figured?',
