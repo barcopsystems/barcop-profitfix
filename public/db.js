@@ -269,7 +269,7 @@ const DB = {
     // Profit Recovery (root + profit module screens)
     'dashboard':'profit-recovery','this-week':'profit-recovery',
     'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
-    'cash-recon':'profit-recovery','theft-risk':'profit-recovery',
+    'cash-recon':'profit-recovery','theft-risk':'profit-recovery','sales-integrity':'profit-recovery',
     'recipe-cost-analysis':'profit-recovery','vendor-tracker':'profit-recovery',
     'vendor-watch':'profit-recovery','vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
     'profit-forecast':'profit-recovery','help':'_always',
@@ -886,6 +886,7 @@ const DB = {
       theft_scores: [], last_theft_score_date: null,
       vendor_discrepancies: [],
       variance_investigations: [],
+      sales_reviews: [],
       audits: [],
       getting_started_profit: {},
       // Revenue Recovery data
