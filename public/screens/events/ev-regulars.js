@@ -105,7 +105,7 @@ S.EventsRegulars = {
     else if (this.filter === 'vip') list = all.filter(r => r.vip);
     list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-    const rows = list.slice(0, App.LIST_PAGE || 50).map(r => {
+    const rows = list.slice(0, App.listLimit('core', 'event_regulars')).map(r => {
       const q = this.isQuiet(r);
       return '<tr class="rg-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
         + '<td><div class="val" style="font-weight:600;">' + esc(r.name || '-') + (r.vip ? ' <span style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;">VIP</span>' : '') + '</div>'
@@ -120,7 +120,8 @@ S.EventsRegulars = {
 
     const listSection = all.length === 0
       ? '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
-      : headRow + '<div id="rg-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      : headRow + '<div id="rg-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + App.showOlderBar('core', 'event_regulars', list, !!this.filter);
 
     this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';
     this.wire();
@@ -133,6 +134,7 @@ S.EventsRegulars = {
     document.getElementById('rg-export')?.addEventListener('click', () => { const el = document.getElementById('rg-list'); if (el) App.exportPDF({ title: 'Regulars', root: el }); });
     this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
     document.getElementById('rg-add')?.addEventListener('click', () => this.add());
     document.getElementById('rg-clear')?.addEventListener('click', () => this.renderList());
     this.container.querySelectorAll('.rg-row, .rg-edit').forEach(el => el.addEventListener('click', ev => { if (ev.target.closest('.rg-del')) return; this.showEdit(el.dataset.id); }));
