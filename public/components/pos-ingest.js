@@ -173,7 +173,7 @@ const PosIngest = {
         product_id: '', product_name: '', menu_item_id: '', units: null,
         staff_id: staff ? staff.id : '', server,
         authorized_by_id: '', authorized_by: '', check_number: '',
-        reason: (r.reason || '').trim(), notes: '', auth_threshold_override: false,
+        reason: (r.reason || '').trim(), notes: '',
         created_at: new Date().toISOString()
       });
     });
@@ -209,7 +209,6 @@ const PosIngest = {
   // a hand reconcile. Writes sc_variances.
   buildCash(rows) {
     const VL = (window.S && S.ShiftVarianceLog) || null;
-    const tol = VL ? VL.tolerance() : 10;
     // Match by the register's name OR any saved POS alias (a report calls a
     // register "Main Bar" that the operator named "Bar 1" — the alias links them).
     const drawerByName = {};
@@ -238,7 +237,10 @@ const PosIngest = {
       const cashier = staff ? staff.name : cName;
       if (existing.some(x => x.date === date && (x.drawer || '') === drawer
             && Math.abs((x.variance || 0) - variance) < 0.001)) { dupCount++; return; }
-      const status = (expected_cash != null && VL) ? VL.statusOf(variance, expected_cash, counted_cash)
+      // Tolerance is the matched register's own (App.drawerTolerance); $10 when
+      // the register is unrecognized or unmapped.
+      const tol = (window.App && App.drawerTolerance) ? App.drawerTolerance(dRec || null) : 10;
+      const status = (expected_cash != null && VL) ? VL.statusOf(variance, expected_cash, counted_cash, dRec ? dRec.id : null)
                    : (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over');
       toAdd.push({
         id: App.uid(), date, shift_type: '',
