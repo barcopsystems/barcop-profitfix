@@ -1,392 +1,221 @@
 'use strict';
-
-/* ── Shift Control — Weekly Cockpit (landing screen) ──────────────────────────
-   Not a stack of status cards. A guided weekly close-out: a progress banner, a
-   step flow you work top to bottom (the current step expands as a live
-   workspace, done steps collapse to a check), and a compact status strip + the
-   as-needed outliers at the bottom. The keystone step (Import this week's sales
-   & voids) runs INLINE here via PosIngest. This is the prototype for the
-   weekly-cockpit pattern that rolls to the other section dashboards. */
-
-S.ShiftDashboard = {
-  _weekEnd: null,    // Sunday of the selected week
-  _openStep: null,   // which step is expanded ('' = all collapsed; null = auto-open first undone)
-  _flash: null,      // one-shot confirmation line under the banner
-
+S.Dashboard = {
   showHowTo() {
-    App.showHelpModal('How the Shift Cockpit Works', [
-      { p: ['This is your weekly close-out for Shift. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
-      { h: 'The Steps', p: ['1. Import this week\'s sales: drop your weekly POS sales-by-day report (one row per day) and Bar Cop reads the whole week at once. 2. Reconcile cash: drop your POS cash report, or reconcile each drawer by hand in Cash Control if your POS does not make one. 3. Log exceptions: waste, spills, and walked tabs, off your sheet. 4. Review loss flags: cash shorts, voids, and comps worth a look.'] },
-      { h: 'Working A Step', p: ['Click a step to open it. The import runs right in the cockpit. The others either do the quick part here or send you to the full screen and come back. Mark a step done and the bar advances. The week selector at the top steps you to a prior week to close it out.'] },
-      { h: 'The Bottom Strip', p: ['Once the week is in, the strip shows your revenue, voids, and cash over/short at a glance. Below it, the as-needed jobs (Spot Check, Maintenance, Checklists) are one tap away whenever you need them, not part of the weekly flow.'] }
+    App.showHelpModal('How the Profit Dashboard Works', [
+      { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and your costs against target just under it, your profit forecast and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
+      { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
+      { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Tap any row to open its fix process. Labor is part of prime cost but is worked in Revenue Recovery, so it lives on that dashboard, not here.'] },
+      { h: 'Cost vs Target', p: ['Your bar pour cost, food cost, and prime cost from your latest confirmed week, each against its own target. Green is at or under target, red is over. Tap Bar Cop Insights for a written read on where the numbers are heading.'] },
+      { h: 'Profit Forecast and Profit Audit', p: ['Profit Forecast projects your profit forward at your recent pace, plus what hitting your cost targets is worth. The panel here reads twelve months; open the full screen to switch the horizon between a month, a quarter, six months, or a year. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
+      { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
     ]);
   },
 
-  // ── Data ──────────────────────────────────────────────────────────────────
-  shifts()     { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
-  variances()  { return ((App.shiftData && App.shiftData.sc_variances) || []); },
-  voidComps()  { return ((App.shiftData && App.shiftData.sc_void_comps) || []); },
-  walkedTabs() { return ((App.shiftData && App.shiftData.sc_walked_tabs) || []); },
-  waste()      { return ((App.shiftData && App.shiftData.sc_waste) || []); },
-  maint()      { return ((App.shiftData && App.shiftData.sc_maintenance) || []); },
-
-  // ── Week math ───────────────────────────────────────────────────────────────
-  weekEnd()   { return this._weekEnd || (App.nextSunday ? App.nextSunday() : App.todayLocal()); },
-  weekStart() { return App.weekStartFor(this.weekEnd()); },
-  inWeek(d)   { const s = this.weekStart(), e = this.weekEnd(); d = String(d || '').slice(0, 10); return !!d && d >= s && d <= e; },
-  _stepWeek(n) {
-    const d = new Date(this.weekEnd() + 'T00:00:00');
-    if (isNaN(d.getTime())) return;
-    d.setDate(d.getDate() + n);
-    const next = App.ymdLocal(d);
-    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
-    if (n > 0 && next > cur) return;   // never walk into the future
-    this._weekEnd = next;
-    this._openStep = null; this._flash = null;
-    this.render(this.container, this.actions);
-  },
-
-  // ── Per-week step-done stamps (operator-controlled, local to the device) ────
-  _doneKey() { return 'sc_cockpit_done_' + this.weekEnd(); },
-  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
-  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
-
-  // A step is done if it carries an explicit operator stamp (true/false in the
-  // done map, so a step can be UNMARKED), otherwise it falls back to what the
-  // week's data shows (sales imported, a drawer reconciled).
-  stepDone() {
-    const dm = this.doneMap();
-    const derive = {
-      import: this.shifts().some(s => this.inWeek(s.date)),
-      cash:   this.variances().some(v => this.inWeek(v.date)),
-      exc:    false,
-      review: false
-    };
-    const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
-    return r;
-  },
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-  ORDER: ['import', 'cash', 'exc', 'review'],
   render(container, actions) {
-    this.container = container; this.actions = actions;
     if (actions) actions.innerHTML = '';
-    if (!this._weekEnd) this._weekEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
-    const done = this.stepDone();
-    const doneCount = this.ORDER.filter(k => done[k]).length;
-    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
-    const flash = this._flash; this._flash = null;
+    this.container = container;
+    const weeks  = (App.data && App.data.weeks)  || [];
+    const audits = (App.data && App.data.audits) || [];
+    if (weeks.length === 0 && audits.length === 0) this.renderDayOne(container);
+    else this.renderFull(container);
+  },
+
+  // Populated dashboard: Recovery Scoreboard hero, a diagnosis row (Where You're
+  // Leaking Now as text + Cost vs Target), a standard row (Profit Forecast +
+  // Profit Audit), then Quick Actions. Layout via the shared DashUI.
+  renderFull(container) {
+    // weeks load newest-first from the event store, so sort a copy ascending by
+    // period_end before any positional slice/last-element read (event-store gotcha).
+    const weeks   = ((App.data && App.data.weeks) || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
+    const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
+    const leak = FixPanel.leakRowsText('profit');
+    const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>';
+    container.innerHTML = '<div class="screen">'
+      + FixPanel._scoreboardCard('profit', insightsBtn)
+      + DashUI.row(
+          DashUI.shPanel('Where You\'re Leaking Now', leakBody),
+          DashUI.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets)))
+      + DashUI.row(
+          DashUI.shPanel('Profit Forecast', this.forecastPanel()),
+          DashUI.shPanel('Profit Audit', DashUI.auditPanel({
+            audits: App.data.audits,
+            screen: 'audit-tracker',
+            runText: 'Run Profit Audit',
+            emptyText: 'Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.'
+          })))
+      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
+      + InitiativeTracker.card('profit')
+      + DashUI.quickActions([
+          { go: 'this-week', label: 'Enter This Week' },
+          { go: 'audit-tracker', label: 'Run Profit Audit' },
+          { go: 'profit-forecast', label: 'Profit Forecast' },
+          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
+        ])
+      + '</div>';
+    FixPanel.wireFixAreas(container);
+    document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
+    DashUI.wireQuick(container);
+    InitiativeTracker.wire('profit', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
+  },
+
+  // Profit Forecast panel — profit projected forward twelve months, plus what
+  // hitting your cost targets is worth. Reuses the Profit Forecast engine so the
+  // dashboard and the full screen never disagree. Forward-looking complement to
+  // the backward Scoreboard and the Audit score beside it.
+  forecastPanel() {
+    const PF = S.ProfitForecast;
+    const placeholder = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a few weeks in This Week and Bar Cop projects your profit forward, at your recent pace and at your cost targets.</div>'
+      + '<button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button>';
+    if (!PF) return placeholder;
+    const rr = PF.runRates();
+    if (rr.nW < PF.MIN_WEEKS) return placeholder;
+    const targetP = (PF.targets().prime_cost_pct ?? 60) / 100;
+    const sales     = rr.avgWeeklyRev * 52;
+    const opexTot   = (rr.avgWeeklyOpex + rr.avgWeeklyPF) * 52;
+    const profitCur = sales - sales * rr.primePctCurrent - opexTot;
+    const profitTgt = sales - sales * targetP - opexTot;
+    const swing     = Math.max(0, profitTgt - profitCur);
+    const label = rr.opexLogged ? 'Projected Operating Profit, next 12 months' : 'Profit Before Operating Costs, next 12 months';
+    const money = n => App.fmtCurrency(n, 0);
+    return '<div style="font-size:11px;color:var(--t3);margin-bottom:5px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:40px;font-weight:700;line-height:1;color:' + (profitCur < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + money(profitCur) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;">at your recent pace</div>'
+      + (swing > 0
+          ? '<div style="font-size:13px;font-weight:600;color:var(--gold);margin-top:12px;">+' + money(swing) + ' if you hit your cost targets</div>'
+          : '<div style="font-size:13px;font-weight:600;color:var(--green);margin-top:12px;">You are at or above your cost targets</div>')
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button></div>';
+  },
+
+  // Day one (no weeks, no audits): guided steps + placeholders, like Control.
+  renderDayOne(container) {
+    const hasAudit = ((App.data && App.data.audits) || []).length > 0;
+    const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
+    const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
+    const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
+    const ph = DashUI.ph;
 
     container.innerHTML = '<div class="screen">'
-      + this.banner(doneCount, this.ORDER.length)
-      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
-      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
-      +   this.ORDER.map(k => this.stepRow(k, done)).join('')
-      + '</div>'
-      + this.statusStrip()
-      + this.outlierStrip()
+      + DashUI.dayOneStrip(
+          'Four steps and this dashboard fills in with your recovered dollars, where you are leaking, and your costs against target.',
+          [
+            { done: hasAudit, num: 1, label: 'Run your first Profit Audit', go: 'audit-tracker' },
+            { done: hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
+            { done: hasShift, num: 3, label: 'Set up Shift Control', go: 'sc-dashboard', cross: true },
+            { done: hasLabor, num: 4, label: 'Set up Labor Control', go: 'lc-dashboard', cross: true }
+          ])
+      + '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Recovery Scoreboard</div>'
+        + ph('Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
+      + DashUI.row(
+          DashUI.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
+          DashUI.shPanel('Cost vs Target', ph('Your bar pour, food, and prime cost against target show here once you confirm a week.')))
+      + DashUI.row(
+          DashUI.shPanel('Profit Forecast', ph('Your profit projected forward shows here once you have a few weeks confirmed in This Week.')),
+          DashUI.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
+      + DashUI.quickActions([
+          { go: 'this-week', label: 'Enter This Week' },
+          { go: 'audit-tracker', label: 'Run Profit Audit' },
+          { go: 'profit-forecast', label: 'Profit Forecast' },
+          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
+        ])
       + '</div>';
-
-    if (this._openStep === 'import') this.mountImport();
-    if (this._openStep === 'cash') this.mountCashImport();
-    this.wire();
+    DashUI.wireQuick(container);
   },
 
-  // True when the shown week is the current week (or later) — the forward edge.
-  // The cockpit only walks backward from the current week, never into the future.
-  atCurrentWeek() {
-    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
-    return this.weekEnd() >= cur;
-  },
-  // Week selector: ‹ [JUN 22 - JUN 28 NOW] › — one week at a time, only the date
-  // range carries the gold border (the arrows sit OUTSIDE it). NOW shows on the
-  // current week, where the forward arrow is inert (no future weeks to close out).
-  weekSelector() {
-    const isCur = this.atCurrentWeek();
-    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
-    const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
-    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
-    const prevBtn = '<button class="btn btn-ghost btn-sm sc-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
-    const nextBtn = isCur
-      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
-      : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
-    const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">' + esc(range) + nowBadge + '</span>';
-    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
-  },
-
-  // Standard titled card: an uppercase header band over the body (selector on the
-  // left above the progress bar).
-  banner(doneCount, total) {
-    const allDone = doneCount === total;
-    const pct = Math.round(doneCount / total * 100);
-    const doneLine = allDone
-      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
-    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
-      + '</div>'
-      + '<div style="padding:18px 22px;">'
-      +   this.weekSelector()
-      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
-      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
-      +     '<div style="font-size:12px;">' + doneLine + '</div>'
-      +   '</div>'
-      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Have ready: your weekly POS sales-by-day report, plus a cash report if your POS makes one.</div>')
-      + '</div>'
-      + '</div>';
-  },
-
-  _META: {
-    import: { n: 1, title: 'Import this week\'s sales',             sub: 'Drop your weekly POS sales-by-day report' },
-    cash:   { n: 2, title: 'Reconcile cash',                        sub: 'POS cash report, or a hand count in Cash Control' },
-    exc:    { n: 3, title: 'Log this week\'s exceptions',           sub: 'Waste, spills, walked tabs' },
-    review: { n: 4, title: 'Review loss flags',                     sub: 'Cash shorts, voids, comps' }
-  },
-  stepStatus(k, isDone) {
-    if (k === 'import') {
-      const n = this.shifts().filter(s => this.inWeek(s.date)).length;
-      return isDone ? (n + ' day' + (n === 1 ? '' : 's') + ' imported') : this._META.import.sub;
+  // Cost vs Target — your latest confirmed week's bar pour cost, food cost, and
+  // prime cost, each as a plain percentage colored by over/under its own target
+  // (red over, green at or under). No chart; the written read lives behind the
+  // Insights button. Returns the metricsPanel card body (shPanel wraps it).
+  costPanel(weeks, targets) {
+    const metrics = [
+      { label: 'Bar Pour Cost', vals: weeks.map(w => (w && w.bar)  ? (w.bar.cost_pct  != null ? w.bar.cost_pct  : null) : null), tgt: targets.bar_pour_cost_pct || 22 },
+      { label: 'Food Cost',     vals: weeks.map(w => (w && w.food) ? (w.food.cost_pct != null ? w.food.cost_pct : null) : null), tgt: targets.food_cost_pct || 32 },
+      { label: 'Prime Cost',    vals: weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null),                   tgt: targets.prime_cost_pct || 60 }
+    ];
+    if (!metrics.some(m => m.vals.some(v => v != null))) {
+      return DashUI.metricsPanel([], 'Confirm a week to see your costs');
     }
-    if (k === 'cash') return isDone ? 'Reconciled' : this._META.cash.sub;
-    if (k === 'exc') {
-      const v = this.voidComps().filter(r => this.inWeek(r.date)).length;
-      const w = this.waste().filter(r => this.inWeek(r.date)).length;
-      const t = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
-      const tot = v + w + t;
-      return tot ? (tot + ' logged this week') : (isDone ? 'Nothing to log' : this._META.exc.sub);
-    }
-    if (k === 'review') return isDone ? 'Reviewed' : this._META.review.sub;
-    return '';
-  },
-  stepRow(k, done) {
-    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
-    const circle = isDone
-      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
-    // Active box uses the opaque selection tones directly (#15191B bg / #504829
-    // border) so the white title and gold number read true, not washed by a
-    // translucent gold tint.
-    const bg = isOpen ? '#15191B' : (isDone ? 'var(--input)' : 'var(--surface)');
-    const bord = isOpen ? '#504829' : 'var(--b-edge)';
-    let html = '<div style="border:1px solid ' + bord + ';border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
-      + '<div class="sc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
-      +   circle
-      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
-      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, isDone) + '</div></div>'
-      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
-      + '</div>';
-    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
-    return html + '</div>';
-  },
-
-  // A done step's button flips to "Mark not done" so any step can be unmarked.
-  markBtn(k, label) {
-    return this._isDone
-      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
-      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
-  },
-  workspace(k, isDone) {
-    this._isDone = isDone;
-    if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in.</div>'
-        + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
-    }
-    if (k === 'cash') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
-        + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile by Hand</button>'
-        + this.markBtn('cash', 'Mark Done') + '</div>';
-    }
-    if (k === 'exc') {
-      const cnt = (arr) => arr.filter(r => this.inWeek(r.date)).length;
-      const v = cnt(this.voidComps()), w = cnt(this.waste()), t = cnt(this.walkedTabs());
-      const tally = '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;">This week so far: '
-        + '<strong style="color:var(--t1);">' + v + '</strong> voids/comps, <strong style="color:var(--t1);">' + w + '</strong> waste, <strong style="color:var(--t1);">' + t + '</strong> walked tabs.</div>';
-      return tally
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-void-comp">Voids / Comps</button>'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-waste">Waste / Spills</button>'
-        + '<button class="btn btn-ghost btn-sm" data-go="sc-walked-tabs">Walked Tabs</button>'
-        + this.markBtn('exc', 'Mark Reviewed') + '</div>';
-    }
-    // review
-    const wkVar = this.variances().filter(v => this.inWeek(v.date));
-    const shorts = wkVar.filter(v => v.status === 'Short').length;
-    const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
-    const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
-    const voidTot = wkVC.filter(r => r.type === 'Void').reduce((s, r) => s + (r.amount || 0), 0);
-    const compTot = wkVC.filter(r => r.type === 'Comp').reduce((s, r) => s + (r.amount || 0), 0);
-    const line = (label, val, warn) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;">'
-      + '<span style="color:var(--t2);">' + label + '</span><span style="font-weight:700;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + '</span></div>';
-    return line('Cash shorts this week', String(shorts), shorts > 0)
-      + line('Drawers out of tolerance', String(oot), oot > 0)
-      + line('Voids', App.fmtCurrency(voidTot), false)
-      + line('Comps', App.fmtCurrency(compTot), false)
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-      + '<button class="btn btn-ghost btn-sm" data-go="theft-risk">Open Loss Prevention</button>'
-      + this.markBtn('review', 'Mark Reviewed') + '</div>';
-  },
-
-  statusStrip() {
-    const wkS = this.shifts().filter(s => this.inWeek(s.date));
-    const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
-    const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
-    const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
-    const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('This Week Revenue', App.fmtCurrency(rev))
-      + div
-      + item('Voids', App.fmtCurrency(voidTot))
-      + div
-      + item('Cash Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
-      + '</div>';
-  },
-
-  outlierStrip() {
-    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
-      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
-      + '<button class="btn btn-ghost btn-sm" data-go="sc-maintenance">Maintenance</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="sc-checklists">Checklists</button>'
-      + '</div>';
-  },
-
-  // ── Inline sales import (step 1) ─────────────────────────────────────────────
-  mountImport() {
-    const el = document.getElementById('sc-ck-import');
-    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your weekly POS sales-by-day report here',
-      dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
-      fields: PosIngest.FIELDS.sales,
-      confirmLabel: 'Import',
-      onComplete: rows => this.importSales(rows)
+    const rows = metrics.map(m => {
+      let li = m.vals.length - 1; while (li >= 0 && m.vals[li] == null) li--;
+      const lastV = li >= 0 ? m.vals[li] : null;
+      const col = (lastV != null && lastV > m.tgt) ? 'var(--red)' : (lastV != null ? 'var(--green)' : 'var(--t3)');
+      return { label: m.label, sub: 'target ' + m.tgt + '%', value: lastV != null ? lastV.toFixed(1) + '%' : 'n/a', color: col };
     });
-  },
-  async importSales(rows) {
-    const { toAdd, dupCount } = PosIngest.build('sales', rows);
-    const res = document.getElementById('sc-ck-import-res');
-    if (!toAdd.length) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No days imported. Check that the file has a Date column and sales values.</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('sales', toAdd);
-    if (!ok) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
-      return;
-    }
-    if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
-    this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '') + '.';
-    this._openStep = 'cash';
-    this.render(this.container, this.actions);
+    return DashUI.metricsPanel(rows, 'Confirm a week to see your costs');
   },
 
-  // ── Inline cash-report import (step 2) ───────────────────────────────────────
-  // The POS blind close already computed over/short; drop that report and the
-  // variance pattern lands without a hand reconcile. Manual reconcile lives on
-  // Cash Control as the fallback.
-  mountCashImport() {
-    const el = document.getElementById('sc-ck-cash');
-    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your POS cash or drawer report here',
-      dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
-      fields: PosIngest.FIELDS.cash,
-      confirmLabel: 'Import',
-      onComplete: rows => this.importCash(rows)
-    });
-  },
-  // The cash report names its own registers. Match them to the operator's
-  // registers (by name or a saved alias). Unknown names get resolved once: on a
-  // blank slate they auto-create; if registers already exist, a one-time map-or-add
-  // prompt links each to an existing register or adds it new (remembered as an
-  // alias), so we never make duplicate registers and never ask twice.
-  async importCash(rows) {
-    this._pendingCashRows = rows;
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
-    const key = s => String(s || '').trim().toLowerCase();
-    const known = new Set();
-    drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
-    const unmatched = [...new Set((rows || []).map(r => String(r.drawer || '').trim()).filter(Boolean))]
-      .filter(n => !known.has(key(n)));
+  showInsights() {
+    if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
+    const btn = document.getElementById('db-insights-btn');
+    const weeks = (App.data.weeks || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
+    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
-    if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
-      unmatched.forEach(n => this._addRegister(n));
-      await App.saveShift();
-      return this._commitCash(rows);
-    }
-    if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
-    return this._commitCash(rows);
-  },
-  _addRegister(name) {
-    if (!App.shiftData) App.shiftData = {};
-    if (!Array.isArray(App.shiftData.sc_drawers)) App.shiftData.sc_drawers = [];
-    App.shiftData.sc_drawers.push({ id: App.uid(), name: name, default_opening_bank: null, notes: '', active: true, pos_aliases: [], created_at: new Date().toISOString() });
-  },
-  _showCashMap(unmatched) {
-    const res = document.getElementById('sc-ck-cash-res');
-    if (!res) return;
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
-    const opts = drawers.map(d => '<option value="' + esc(d.id) + '">' + esc(d.name) + '</option>').join('');
-    const rows = unmatched.map(n =>
-      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;">'
-      + '<span style="font-size:13px;font-weight:700;color:var(--t1);min-width:130px;">' + esc(n) + '</span>'
-      + '<span style="color:var(--t3);font-size:12px;">&rarr;</span>'
-      + '<select class="sc-cm-sel" data-name="' + esc(n) + '" style="height:34px;min-width:200px;">'
-      +   '<option value="__add">Add as a new register</option>' + opts
-      + '</select></div>').join('');
-    res.innerHTML = '<div style="margin-top:14px;border:1px solid var(--b-edge);border-radius:var(--r);background:var(--bg);padding:14px 16px;">'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Your report has registers Bar Cop does not recognize. Match each to one of yours, or add it new. Bar Cop remembers your choice.</div>'
-      + rows
-      + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" id="sc-cm-go">Match and Import</button></div>'
-      + '</div>';
-    document.getElementById('sc-cm-go')?.addEventListener('click', () => this._applyCashMap());
-  },
-  async _applyCashMap() {
-    const keyOf = s => String(s || '').trim().toLowerCase();
-    [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
-      const name = sel.dataset.name;
-      if (sel.value === '__add') { this._addRegister(name); return; }
-      const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
-      if (d) { if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); }
-    });
-    await App.saveShift();
-    return this._commitCash(this._pendingCashRows);
-  },
-  async _commitCash(rows) {
-    const { toAdd, dupCount } = PosIngest.build('cash', rows);
-    const res = document.getElementById('sc-ck-cash-res');
-    if (!toAdd.length) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' already logged.' : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.') + '</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('cash', toAdd);
-    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
-    this._pendingCashRows = null;
-    this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
-    this._openStep = 'exc';
-    this.render(this.container, this.actions);
-  },
+    // Once-a-week cache (shared with Revenue and Traffic): re-open the stored
+    // read for free, regenerate only when it is a week old. No manual refresh.
+    const rec = DashUI._insRec('profit');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
 
-  // ── Wiring ───────────────────────────────────────────────────────────────────
-  wire() {
-    this.container.onclick = ev => {
-      const head = ev.target.closest('.sc-step-head');
-      if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
-      const dn = ev.target.closest('[data-done]');
-      if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
-      const un = ev.target.closest('[data-undone]');
-      if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
-      const go = ev.target.closest('[data-go]');
-      if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
-      if (ev.target.closest('.sc-wk-prev')) { this._stepWeek(-7); return; }
-      if (ev.target.closest('.sc-wk-next')) { this._stepWeek(7); return; }
+    const t = App.data.settings.targets || {};
+    const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
+    const r1 = n => (Math.round(n * 10) / 10).toFixed(1);
+    const direction = v => {
+      if (v.length < 3) return 'not enough weeks to call a trend';
+      const d = v[v.length - 1] - v[0];
+      return d > 0.5 ? 'rising, getting worse' : d < -0.5 ? 'falling, improving' : 'holding steady';
     };
+    const metricFact = (name, raw, tgt) => {
+      const v = raw.filter(x => x != null);
+      if (!v.length) return name + ': no weeks logged yet.';
+      const cur = v[v.length - 1], avg = v.reduce((s, x) => s + x, 0) / v.length;
+      const lo = Math.min(...v), hi = Math.max(...v), over = cur - tgt;
+      const overTxt = over > 0.05 ? r1(over) + ' points OVER target' : over < -0.05 ? r1(-over) + ' points under target' : 'right on target';
+      return name + ': current week ' + r1(cur) + '%, target ' + tgt + '%, ' + overTxt + '. '
+        + 'Last ' + v.length + ' weeks ran ' + r1(lo) + '% to ' + r1(hi) + '%, averaging ' + r1(avg) + '%, '
+        + v.filter(x => x > tgt).length + ' of ' + v.length + ' weeks over target. Direction: ' + direction(v) + '.';
+    };
+    const bP = weeks.map(w => w.bar?.cost_pct);
+    const fP = weeks.map(w => w.food?.cost_pct);
+    const pP = weeks.map(w => w.prime_cost_pct);
+    const bR = weeks.map(w => w.bar?.revenue).filter(v => v != null);
+    const aR = bR.length ? bR.reduce((s, x) => s + x, 0) / bR.length : 0;
+    const curB = bP.filter(v => v != null).slice(-1)[0];
+    const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
+    const facts = [
+      metricFact('Bar pour cost', bP, bT),
+      metricFact('Food cost', fP, fT),
+      metricFact('Prime cost', pP, pT),
+      'Bar revenue is averaging about $' + Math.round(aR) + ' a week.',
+      barOver > 0
+        ? 'At this bar pour cost, the overage is costing about $' + barOver + ' a week.'
+        : 'Bar pour cost is at or under target, so there is no pour overage to chase right now.'
+    ];
+    const prompt = 'You are a 30-year bar and restaurant operator writing a brief, blunt read for a fellow owner. The facts below are already computed from this operator\'s own weekly numbers.\n\n'
+      + 'STRICT RULES, follow exactly:\n'
+      + '- Use only the facts below. Do not invent numbers, streaks, or week counts.\n'
+      + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it. If current bar pour cost is 22.8%, do not say it is above 23% or stuck high.\n'
+      + '- Respect the stated direction. If a metric is falling and improving, do not call it stuck or rising. If it is on or under target, say so plainly.\n'
+      + '- State over or under target exactly as given.\n'
+      + '- No emdashes, no dashes used as punctuation, no bullet points, no headers, no AI phrasing. Plain operator sentences.\n\n'
+      + 'FACTS:\n' + facts.join('\n')
+      + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
+
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
+
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { DashUI.insightsModal('Bar Cop Insights', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        const text = data.content?.[0]?.text;
+        if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('profit', html));
+        restore();
+      })
+      .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
   }
 };
