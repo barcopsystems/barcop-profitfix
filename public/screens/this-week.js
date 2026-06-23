@@ -385,7 +385,7 @@ S.ThisWeek = {
       : '';
 
     const rows = all.length
-      ? all.map(w => {
+      ? all.slice(0, App.listLimit('core', 'week')).map(w => {
           // Cost vs Target $: real dollars this week ran over (or under) the bar
           // and food cost targets combined. Computable from data every saved week
           // carries.
@@ -416,7 +416,8 @@ S.ThisWeek = {
       + customRow
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Bar %</th><th>Food Rev</th><th>Food %</th><th>Prime %</th><th>Cost vs Tgt $</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('core', 'week', all, this.filterPreset !== 'all');
   },
 
   draw() {
@@ -460,6 +461,7 @@ S.ThisWeek = {
     document.getElementById('tw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
     this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
     this.container.querySelectorAll('.tw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
   },
 
   gotoWeek(weekEnd) {
