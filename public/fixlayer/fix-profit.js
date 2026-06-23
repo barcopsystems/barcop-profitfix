@@ -63,9 +63,9 @@ FIX.profit = [
         { kind: 'action', target: 'sc-void-comp', targetLabel: 'Void and Comp Log',
           title: 'Log voids, comps, and no-sales by employee with category',
           detail: 'In Shift Control, log every void and comp against the employee who rang it, and pick the honest Reason. Customer-facing reasons (service recovery, goodwill, regular or VIP, promo) count as loss in Loss Prevention; Staff Meal and Shift Drink go to the books as a cost line.' },
-        { kind: 'action', target: 'sc-shift-policies', targetLabel: 'Shift Policies',
-          title: 'Set a Comp Auth Threshold and enforce it',
-          detail: 'In Shift Control under Setup, open Shift Policies and set the Comp Auth Threshold a manager must sign off above (defaults to $25). A comp saved over it without a manager pops a soft warning; an override flags in Loss Prevention as a large comp cleared without authorization. That catches the bartender comping a $40 round on their own.' },
+        { kind: 'action', target: 'theft-risk', targetLabel: 'Loss Prevention',
+          title: 'Watch comp volume by server',
+          detail: 'Set a clear comp policy on the floor: who can comp, how much without a manager, and a reason on every one. Then let Loss Prevention do the catching. It ranks comp dollars by server and flags anyone running well above the rest of the floor, the bartender giving away rounds. Pull that server aside before it becomes a habit.' },
         { kind: 'action', target: 'sc-cash-control', targetLabel: 'Cash Control',
           title: 'Reconcile every cash drawer',
           detail: 'In Cash Control, count each drawer against expected POS cash at end of shift and log the over or short. Watch consistent overs as closely as consistent shorts.' },
@@ -77,7 +77,7 @@ FIX.profit = [
           detail: 'Use Spot Check for a fast pre and post shift count on your high-risk products, on different shifts at varied times.' },
         { kind: 'result', target: 'theft-risk', targetLabel: 'Loss Prevention',
           title: 'Review the loss signals weekly',
-          detail: 'Each week, open Loss Prevention: unauthorized voids and comps, drawer shorts, flagged spot checks, and confirmed theft, with what flagged today and over the last 7 days and a dollar amount on each. The worst flags also push to the Hub so they find you.' },
+          detail: 'Each week, open Loss Prevention: drawer shorts, flagged spot checks, servers comping above the rest of the floor, and confirmed theft, with what flagged today and over the last 7 days and a dollar amount on each. The worst flags also push to the Hub so they find you.' },
         { kind: 'reference', target: 'Employee_Corrective_Action_Template.docx', targetLabel: 'Employee Corrective Action Template',
           title: 'Escalate a documented pattern',
           detail: 'One incident is a data point; two on the same employee within 30 days is a pattern. Document each one in writing as you see it, and use the Corrective Action Template once the pattern is clear.' }
@@ -87,7 +87,7 @@ FIX.profit = [
     commonMistakes: [
       'Comps logged under the wrong reason. Staff Meal and Shift Drink are policy expense; everything else is loss.',
       'Ringing voids and comps without naming the employee. The same server\'s pattern never collects in one place.',
-      'Overriding the comp threshold and never opening the flag it raised. The override lands in Loss Prevention whether anyone reads it or not.',
+      'Reading comps as a lump sum instead of by server. One bartender giving away rounds hides in the total until Loss Prevention ranks comp dollars per server.',
       'Watching only for drawer shorts. A drawer that runs consistently over is as much a signal as one that runs short.'
     ]
   },
