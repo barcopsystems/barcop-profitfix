@@ -1460,10 +1460,10 @@ S.Hub = {
     });
 
     // 6. Loss Prevention flags (last 7 days), in two honest tiers so red stays
-    // reserved for the real thing. Severe (confirmed theft / over-threshold comp
-    // without auth) is Critical and reads as theft to act on; softer signals
-    // (unauthorized voids, drawer shorts, flagged spot checks) are Watch, worded
-    // as items to review rather than theft.
+    // reserved for the real thing. Severe (confirmed theft) is Critical and reads
+    // as theft to act on; softer signals (drawer shorts, flagged spot checks) are
+    // Watch, worded as items to review rather than theft. Comp-volume-by-server is
+    // a windowed pattern, surfaced on the Loss Prevention page, not in this stream.
     if (window.S && S.TheftRisk && S.TheftRisk.recentFlags) {
       const wk7 = new Date(); wk7.setDate(wk7.getDate() - 6);
       const flags = S.TheftRisk.recentFlags(iso(wk7));
