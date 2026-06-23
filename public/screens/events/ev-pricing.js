@@ -50,7 +50,7 @@ S.EventsPricing = {
         + '<button class="btn btn-ghost" id="rp-calc">Catering Calculator</button>'
       + '</div>';
 
-    const rows = rc.map(r =>
+    const rows = rc.slice(0, App.listLimit('core', 'event_rate_cards')).map(r =>
       '<tr><td style="font-weight:600;">' + esc(r.package_name || '') + '</td>'
       + '<td>' + esc(r.event_type || '-') + '</td>'
       + '<td>' + (r.min_covers || ' ') + ' - ' + (r.max_covers || ' ') + '</td>'
@@ -67,7 +67,8 @@ S.EventsPricing = {
 
     const listCard = '<div id="rp-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Package</th><th>Type</th><th>Covers</th><th>F&amp;B Min</th><th>Room Fee</th><th>Per Head</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('core', 'event_rate_cards', rc, false);
 
     this.container.innerHTML = '<div class="screen">' + rateForm + headingRow + listCard + '</div>';
     this.wire();
@@ -78,6 +79,7 @@ S.EventsPricing = {
     document.getElementById('rp-clear')?.addEventListener('click', () => this.draw());
     document.getElementById('rp-calc')?.addEventListener('click', () => this.cateringCalcModal());
     document.getElementById('rp-export')?.addEventListener('click', () => { const el = document.getElementById('rp-list'); if (el) App.exportPDF({ title: 'Rate Card', root: el }); });
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     this.container.querySelectorAll('.rp-del').forEach(b => b.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;
       App.data.event_rate_cards = this.rateCards().filter(r => r.id !== b.dataset.id);
