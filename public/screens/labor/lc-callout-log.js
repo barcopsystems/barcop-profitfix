@@ -105,7 +105,7 @@ S.LaborCalloutLog = {
   showHowTo() {
     App.showHelpModal('How the Call-Out Log Works', [
       { p: ['The Call-Out Log tracks attendance exceptions, no-shows, sick calls, late arrivals, and early-outs, so reliability patterns surface instead of living in your head.'] },
-      { h: 'Logging A Call-Out', p: ['Fill the row at the top: date, staff member, what happened, the shift, and whether it got covered and by whom. Reason and notes are optional but worth a line if it might matter later.'] },
+      { h: 'Logging A Call-Out', p: ['Fill the row at the top: date, staff member, what happened, the shift, and whether it got covered and by whom. Reason is optional but worth a line if it might matter later.'] },
       { h: 'Schedule Connection', p: ['Pick the staff member and the date and Bar Cop reads the posted schedule for that week. If they were on the floor that day it reads "Scheduled [day] [time]. Needs cover." in amber, so you can see at a glance what shift just opened up. If they were not on the schedule that day it says so. When you then name who is covering, Bar Cop checks the same schedule and warns "[name] is also scheduled that day" so you do not patch one hole by double-booking somebody already working.'] },
       { h: 'Repeat Flags', p: ['When someone has more than one call-out in the last 60 days, the list flags the count in red next to their name, so a pattern is easy to spot before it becomes a problem.'] },
       { h: 'Coverage', p: ['Set Shift Covered? to Covered or Not Covered, and pick the coverer from the Covered By list, which is your roster. That builds a record of who picks up the slack and who left you short, useful at review time and the spot where the double-booked warning fires.'] }
@@ -114,7 +114,7 @@ S.LaborCalloutLog = {
 
   // Form cells shared by the inline log form and the edit pop-up. p = element-id
   // prefix ('co-' inline, 'coe-' pop-up) so the modal's inputs never collide with
-  // the inline form behind it. Six data cells on one row; Reason and Notes below.
+  // the inline form behind it. Six data cells on one row; Reason below.
   formCells(c, p) {
     p = p || 'co-';
     const staffOpts = '<option value="">Select staff...</option>'
@@ -139,11 +139,9 @@ S.LaborCalloutLog = {
       + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Covered By</label>'
         + '<select id="' + p + 'coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div id="' + p + 'sched-note" style="font-size:11px;line-height:1.5;margin:-2px 0 12px;min-height:14px;"></div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Reason</label>'
-        + '<input type="text" id="' + p + 'reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
-        + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(c?.notes || '') + '</textarea></div></div>';
+      + '<div id="' + p + 'sched-note" style="font-size:11px;line-height:1.5;margin:-6px 0 0;min-height:0;"></div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Reason</label>'
+        + '<input type="text" id="' + p + 'reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>';
   },
 
   renderList() {
@@ -275,8 +273,7 @@ S.LaborCalloutLog = {
       covered:       document.getElementById(p + 'covered')?.value === 'yes',
       covered_by_id: coveredById,
       covered_by:    (App.staffById(coveredById) || {}).name || '',
-      reason:        document.getElementById(p + 'reason')?.value.trim() || '',
-      notes:         document.getElementById(p + 'notes')?.value.trim() || ''
+      reason:        document.getElementById(p + 'reason')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
