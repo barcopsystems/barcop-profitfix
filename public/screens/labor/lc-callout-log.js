@@ -139,7 +139,7 @@ S.LaborCalloutLog = {
       + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Covered By</label>'
         + '<select id="' + p + 'coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div id="' + p + 'sched-note" style="font-size:11px;line-height:1.5;margin:-6px 0 0;min-height:0;"></div>'
+      + '<div id="' + p + 'sched-note" class="co-sched-line" style="font-size:11px;line-height:1.5;"></div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Reason</label>'
         + '<input type="text" id="' + p + 'reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>';
   },
