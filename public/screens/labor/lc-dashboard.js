@@ -1,29 +1,35 @@
 'use strict';
 
-/* ── Labor Control — Dashboard (landing screen) ───────────────────────────────
-   Last-7-day labor cost and hours, overtime risk for the current week, roster
-   size, plus alerts and recent activity. Same layout and card standard as the
-   Shift dashboard: KPI tiles, a full-width banded hero, two equal-height rows of
-   heading-outside panels, a data-card for the recent list, then Quick Actions,
-   with a day-one Get Started state until hours are logged. */
+/* ── Labor Control — Weekly Cockpit (landing screen) ──────────────────────────
+   Not a stack of status cards. A guided weekly close-out, same pattern as the
+   Shift cockpit: a "CLOSE OUT YOUR WEEK" banner with a week-stepper, a progress
+   bar, and the week's steps top to bottom. The current step opens inline as a
+   workspace (the hours/tips imports run right here); deeper work (Build Schedule,
+   Overtime Watch) launches out. A status strip and "As needed" outliers sit at
+   the bottom. Per-week step-done stamps live in localStorage. */
 
 S.LaborDashboard = {
+  _weekStart: null,   // Monday of the selected week
+  _openStep: null,
+  _flash: null,
+
   showHowTo() {
-    App.showHelpModal('How the Labor Dashboard Works', [
-      { p: ['This is the Labor landing screen. It reads the last seven days of logged hours, the current schedule, and your roster so you can see where labor stands without opening four different screens. Every number comes from hours you actually logged and the schedule you built. Until you log hours, the screen shows this same layout in placeholder form with a Get Started strip.'] },
-      { h: 'The Four Tiles Up Top', p: ['Labor Cost, Last 7 Days is what your team cost to run, with salaried managers folded in at their weekly rate. Labor Hours, Last 7 Days is the hours behind that cost. Overtime Risk counts the staff projected to cross the ' + App.OT_THRESHOLD + '-hour line this week, from hours already worked plus what is still scheduled. Active Staff is who is working versus the full roster. A bartender already at 34 hours by Thursday with two shifts left is exactly what Overtime Risk is there to catch before it costs you time and a half.'] },
-      { h: 'This Week', p: ['The wide band compares what you scheduled against what you have actually logged so far this week, in hours and dollars, against your labor target. Use it any day Monday through Sunday to see whether the week is tracking to plan or drifting over, while you still have time to cut or move a shift.'] },
-      { h: 'The Four Panels', p: ['Labor Cost by Department splits the spend across Bar, Kitchen, Front of House, and Management, so you can see which side ran hot. Hours This Week projects each person toward the overtime line. Recent Hours is the latest logged shifts, newest first. Labor Watch is the leaks panel: overtime risk, uncovered call-outs, and certifications expiring inside 30 days. A bartender whose TABC lapses next week is a shift you cannot legally cover, and this is where it shows up first. Tap any line to jump to the fix.'] },
-      { h: 'Quick Actions And Day One', p: ['The buttons jump to the jobs you run most: Build Schedule, Log Hours, Staff Roster, and Labor Reports. Before you have logged any hours, the dashboard shows this same layout with a Get Started strip that walks you through positions, the roster, the schedule, and the first hours log. Once hours land, the panels fill with real numbers.'] }
+    App.showHelpModal('How the Labor Cockpit Works', [
+      { p: ['This is your weekly close-out for Labor. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
+      { h: 'The Steps', p: ['1. Import this week\'s hours: drop your timeclock export and Bar Cop matches the hours to your roster. 2. Log this week\'s tips: drop a tips export, or enter them in Tip Log. 3. Build next week\'s schedule: set next week\'s shifts and labor budget in Build Schedule. 4. Review labor flags: overtime risk, uncovered call-outs, and expiring certifications worth a look.'] },
+      { h: 'Working A Step', p: ['Click a step to open it. The hours and tips imports run right in the cockpit. Build Schedule and Overtime Watch open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector at the top steps you back to a prior week to close it out.'] },
+      { h: 'The Bottom Strip', p: ['Once hours are in, the strip shows the week\'s labor cost, hours, and overtime risk at a glance. Below it, the as-needed jobs (Staff Roster, Call-Out Log, Payroll Export, Labor Reports) are one tap away whenever you need them, not part of the weekly flow.'] }
     ]);
   },
 
-  actuals()   { return ((App.laborData && App.laborData.lc_actuals) || []); },
-  schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },
-  staff()     { return ((App.laborData && App.laborData.lc_staff) || []); },
-  positions() { return ((App.laborData && App.laborData.lc_positions) || []); },
-  callouts()  { return ((App.laborData && App.laborData.lc_callouts) || []); },
-  certs()     { return ((App.laborData && App.laborData.lc_certs) || []); },
+  // ── Data ─────────────────────────────────────────────────────────────────────
+  actuals()   { return ((App.laborData && App.laborData.lc_actuals)   || []); },
+  tips()      { return ((App.laborData && App.laborData.lc_tips)       || []); },
+  schedules() { return ((App.laborData && App.laborData.lc_schedules)  || []); },
+  staff()     { return ((App.laborData && App.laborData.lc_staff)      || []); },
+  positions() { return ((App.laborData && App.laborData.lc_positions)  || []); },
+  callouts()  { return ((App.laborData && App.laborData.lc_callouts)   || []); },
+  certs()     { return ((App.laborData && App.laborData.lc_certs)      || []); },
   posDept(id) { const p = this.positions().find(x => x.id === id); return p ? (p.department || 'Other') : 'Unassigned'; },
 
   fmtDate(str) {
@@ -31,270 +37,310 @@ S.LaborDashboard = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
-  weekAgo() {
-    // Inclusive 7-day window: today and the 6 prior days (today - 6), so the
-    // "Last 7 Days" tiles cover 7 days, not 8, and salary accrues one week.
-    const d = new Date(); d.setDate(d.getDate() - 6);
-    return App.ymdLocal(d);
-  },
   mondayOf(d) {
     const date = new Date(d);
     const day = date.getDay();
     date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
     return App.ymdLocal(date);
   },
-  addDays(dateStr, n) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return App.ymdLocal(d);
+  addDays(dateStr, n) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+
+  // ── Week (Monday-based, matching lc_schedules.week_start) ────────────────────
+  todayMonday()   { return this.mondayOf(new Date()); },
+  weekStart()     { return this._weekStart || this.todayMonday(); },
+  weekEnd()       { return this.addDays(this.weekStart(), 6); },
+  nextWeekStart() { return this.addDays(this.weekStart(), 7); },
+  inWeek(d)       { const s = this.weekStart(), e = this.weekEnd(); d = String(d || '').slice(0, 10); return !!d && d >= s && d <= e; },
+  atCurrentWeek() { return this.weekStart() >= this.todayMonday(); },
+  _stepWeek(n) {
+    const next = this.addDays(this.weekStart(), n);
+    if (n > 0 && next > this.todayMonday()) return;   // never into the future
+    this._weekStart = next;
+    this._openStep = null;
+    this.render(this.container, this.actions);
   },
 
-  // ── Shared bits (match the Shift dashboard card standard) ────────────────────
-  metricCard(label, valHtml, target, cls) {
-    return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-      + '<div class="metric-val ' + (cls || '') + '">' + valHtml + '</div>'
-      + '<div class="metric-target">' + target + '</div><div class="metric-trend"> </div></div>';
-  },
-  // Full-width hero: a .form-card with a banded title (optional right action).
-  panelCard(title, bodyHtml, titleRight) {
-    return '<div class="card form-card" style="height:100%;">'
-      + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
-      + '<span>' + title + '</span>' + (titleRight || '') + '</div>'
-      + bodyHtml + '</div>';
-  },
-  // Grid panel: title OUTSIDE the card as a .sh heading so side-by-side panels
-  // line up on top; the card flexes to fill its row column for equal height.
-  shPanel(title, bodyHtml) {
-    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
-      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
-  },
-  actionBtn(id, label) {
-    return '<button class="btn btn-primary ld-act" data-go="' + id + '" style="flex:1;min-width:150px;">' + label + '</button>';
-  },
-  quickActions() {
-    return '<div style="margin-top:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
-      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
-      + this.actionBtn('lc-build-schedule', 'Build Schedule')
-      + this.actionBtn('lc-log-hours', 'Log Hours')
-      + this.actionBtn('lc-staff-roster', 'Staff Roster')
-      + this.actionBtn('lc-reports', 'Labor Reports')
-      + '</div></div>';
-  },
-  // Two equal-height columns: each column is a flex-column so the card inside
-  // (flex:1) grows to match its row-mate even with the .sh heading outside.
-  row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
-      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
-  },
+  // ── Per-week step-done stamps (operator-controlled, local to the device) ─────
+  _doneKey() { return 'lc_cockpit_done_' + this.weekStart(); },
+  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
+  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  render(container, actions) {
-    this.container = container;
-    this.actions = actions;
-    if (actions) actions.innerHTML = '';
-    if (this.actuals().length === 0) this.renderDayOne();
-    else this.renderFull();
-    this.container.onclick = ev => {
-      const act = ev.target.closest('.ld-act');
-      if (act && act.dataset.go) {
-        // A watch row that points at a single person carries data-staff; open
-        // that person's page directly instead of the roster list.
-        if (act.dataset.staff) App._staffFocus = { staff_id: act.dataset.staff };
-        App.navigate(act.dataset.go);
-      }
+  ORDER: ['hours', 'tips', 'schedule', 'review'],
+  // A step is done if it carries an explicit operator stamp, else it falls back to
+  // what the week's data shows (hours logged, tips logged, next week scheduled).
+  stepDone() {
+    const dm = this.doneMap();
+    const derive = {
+      hours:    this.actuals().some(a => this.inWeek(a.date)),
+      tips:     this.tips().some(t => this.inWeek(t.date)),
+      schedule: this.schedules().some(s => s.week_start === this.nextWeekStart()),
+      review:   false
     };
+    const r = {};
+    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    return r;
   },
 
-  // ── Day-one: the real layout in placeholder form + Get Started ────────────────
-  renderDayOne() {
-    const hasPos = this.positions().length > 0;
-    const totalStaff = this.staff().length;
-    const activeStaff = this.staff().filter(s => s.status !== 'Inactive').length;
-    const hasStaff = totalStaff > 0;
-    const hasSchedule = this.schedules().length > 0;
+  // ── Render ───────────────────────────────────────────────────────────────────
+  render(container, actions) {
+    this.container = container; this.actions = actions;
+    if (actions) actions.innerHTML = '';
+    const done = this.stepDone();
+    const doneCount = this.ORDER.filter(k => done[k]).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
+    const flash = this._flash; this._flash = null;
 
-    const step = (done, num, label, screen) =>
-      '<div class="ld-act" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
-      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
+    container.innerHTML = '<div class="screen">'
+      + this.banner(doneCount, this.ORDER.length)
+      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
+      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
+      +   this.ORDER.map(k => this.stepRow(k, done)).join('')
+      + '</div>'
+      + this.statusStrip()
+      + this.outlierStrip()
+      + '</div>';
 
-    const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this dashboard fills in with your labor cost, overtime risk, and coverage alerts.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasPos,      1, 'Add positions',      'lc-positions')
-      + step(hasStaff,    2, 'Add your staff',     'lc-staff-roster')
-      + step(hasSchedule, 3, 'Build the schedule', 'lc-build-schedule')
-      + step(false,       4, 'Log hours',          'lc-log-hours')
-      + '</div></div>';
+    if (this._openStep === 'hours') this.mountHoursImport();
+    if (this._openStep === 'tips') this.mountTipsImport();
+    this.wire();
+  },
 
-    const cards =
-        this.metricCard('Labor Cost, Last 7 Days', '$0', 'After you log hours')
-      + this.metricCard('Labor Hours, Last 7 Days', '&mdash;', 'After you log hours')
-      + this.metricCard('Overtime Risk', '&mdash;', 'After you build a schedule')
-      + this.metricCard('Active Staff', String(activeStaff), totalStaff + ' on the roster');
+  // ── Week selector: ‹ [JUN 16 - JUN 22 NOW] › ─────────────────────────────────
+  weekSelector() {
+    const isCur = this.atCurrentWeek();
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm lc-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm lc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = isCur
+      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>'
+      : '<span style="' + pillBase + 'border:1px solid var(--b1);background:transparent;color:var(--t2);">' + esc(range) + '</span>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
+  },
 
-    const hero = this.panelCard('This Week',
-      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No schedule built for this week yet. Build one to set a labor budget and project overtime, then log hours as the week runs.</div>'
-      + '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button></div>');
-
-    const emptyBody = msg => '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
-    const deptCard  = this.shPanel('Labor Cost by Department', emptyBody('Once you log hours, your labor cost splits by department here.'));
-    const hoursCard = this.shPanel('Hours This Week', emptyBody('Logged and scheduled hours project here against the ' + App.OT_THRESHOLD + '-hour overtime threshold.'));
-    const recent    = this.shPanel('Recent Hours', emptyBody('The hours you log land here, newest first.'));
-    const watchCard = this.shPanel('Labor Watch', emptyBody('Overtime risk, uncovered call-outs, and expiring certifications surface here once you build a schedule and log hours.'));
-
-    this.container.innerHTML = '<div class="screen">'
-      + startStrip
-      + '<div class="metric-grid">' + cards + '</div>'
-      + '<div style="margin-bottom:16px;">' + hero + '</div>'
-      + this.row(deptCard, hoursCard)
-      + this.row(recent, watchCard)
-      + this.quickActions()
+  banner(doneCount, total) {
+    const allDone = doneCount === total;
+    const pct = Math.round(doneCount / total * 100);
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
+      + '</div>'
+      + '<div style="padding:18px 22px;">'
+      +   this.weekSelector()
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Have ready: your weekly timeclock export, plus a tips export if your POS makes one.</div>')
+      + '</div>'
       + '</div>';
   },
 
-  // ── Populated dashboard ──────────────────────────────────────────────────────
-  renderFull() {
-    const cutoff = this.weekAgo();
-    const today = App.todayLocal();
-    const wkActuals = this.actuals().filter(a => (a.date || '') >= cutoff);
-    const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const salWeek = App.salariedCost(cutoff, today).total;
-    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWeek;
-    const activeStaff = this.staff().filter(s => s.status !== 'Inactive').length;
+  _META: {
+    hours:    { n: 1, title: 'Import this week\'s hours',   sub: 'Drop your weekly timeclock export' },
+    tips:     { n: 2, title: 'Log this week\'s tips',       sub: 'Drop a tips export, or enter in Tip Log' },
+    schedule: { n: 3, title: 'Build next week\'s schedule', sub: 'Set next week\'s shifts and budget' },
+    review:   { n: 4, title: 'Review labor flags',          sub: 'Overtime, call-outs, expiring certs' }
+  },
+  stepStatus(k, isDone) {
+    if (k === 'hours') {
+      const hrs = this.actuals().filter(a => this.inWeek(a.date)).reduce((t, a) => t + (a.hours || 0), 0);
+      return isDone ? (hrs.toFixed(1) + ' hrs logged') : this._META.hours.sub;
+    }
+    if (k === 'tips') {
+      const n = this.tips().filter(t => this.inWeek(t.date)).length;
+      return n ? (n + ' tip entr' + (n === 1 ? 'y' : 'ies') + ' logged') : (isDone ? 'Nothing to log' : this._META.tips.sub);
+    }
+    if (k === 'schedule') return isDone ? 'Next week scheduled' : this._META.schedule.sub;
+    if (k === 'review') return isDone ? 'Reviewed' : this._META.review.sub;
+    return '';
+  },
+  stepRow(k, done) {
+    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+    const circle = isDone
+      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
+      + '<div class="lc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
+      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, isDone) + '</div></div>'
+      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
+      + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
+    return html + '</div>';
+  },
 
-    // Current-week window + per-staff overtime projection (greater of logged and
-    // scheduled hours, the same basis as Overtime Watch).
-    const wkStart = this.mondayOf(new Date()), wkEnd = this.addDays(wkStart, 6);
+  markBtn(k, label) {
+    return this._isDone
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
+  },
+  workspace(k, isDone) {
+    this._isDone = isDone;
+    if (k === 'hours') {
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Enter hours by hand in Log Hours.</div>'
+        + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
+        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button></div>';
+    }
+    if (k === 'tips') {
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Log. Mark this done once it is handled, or if there are no tips to log.</div>'
+        + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-res"></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+        + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Log</button>'
+        + this.markBtn('tips', 'Mark Done') + '</div>';
+    }
+    if (k === 'schedule') {
+      const built = this.schedules().some(s => s.week_start === this.nextWeekStart());
+      const nwLabel = this.fmtDate(this.nextWeekStart()) + ' - ' + this.fmtDate(this.addDays(this.nextWeekStart(), 6));
+      const status = built
+        ? '<span style="color:var(--green);font-weight:700;">&#10003; Built</span>'
+        : '<span style="color:var(--t3);">Not built yet</span>';
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Set next week\'s shifts and labor budget while this week is fresh. Build Schedule projects the cost against your forecast and flags overtime before it is logged.</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;">Next week (' + nwLabel + '): ' + status + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Build Schedule</button>'
+        + this.markBtn('schedule', 'Mark Done') + '</div>';
+    }
+    // review
+    const p = this.weekProjection();
+    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
+    const today = App.todayLocal();
+    const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
+    const uncovered = this.callouts().filter(c => this.inWeek(c.date) && !c.covered).length;
+    const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
+    const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
+    const line = (label, val, warn) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;">'
+      + '<span style="color:var(--t2);">' + label + '</span><span style="font-weight:700;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + '</span></div>';
+    return line('Staff projected over ' + App.OT_THRESHOLD + ' hrs', String(p.over), p.over > 0)
+      + line('Approaching overtime', String(p.approaching), p.approaching > 0)
+      + line('Projected OT premium', App.fmtCurrency(p.otPremium), p.otPremium > 0)
+      + line('Uncovered call-outs this week', String(uncovered), uncovered > 0)
+      + line('Certifications expired / expiring', expired + ' / ' + expiring, (expired + expiring) > 0)
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-overtime-watch">Open Overtime Watch</button>'
+      + this.markBtn('review', 'Mark Reviewed') + '</div>';
+  },
+
+  // Per-staff overtime projection for the selected week (greater of logged and
+  // scheduled hours, the same basis Overtime Watch uses).
+  weekProjection() {
+    const wkStart = this.weekStart(), wkEnd = this.weekEnd();
     const curWeek = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
     const sched = this.schedules().find(s => s.week_start === wkStart) || null;
     const proj = {};
     const ensure = (id, name) => { if (!proj[id]) proj[id] = { id, name: name || '-', actual: 0, scheduled: 0 }; return proj[id]; };
     curWeek.forEach(a => { if (App.isSalaried(a.staff_id)) return; ensure(a.staff_id || a.name, a.name).actual += (a.hours || 0); });
     if (sched) (sched.shifts || []).forEach(sh => { if (App.isSalaried(sh.staff_id)) return; ensure(sh.staff_id || sh.name, sh.name).scheduled += (sh.hours || 0); });
-    const projRows = Object.values(proj).map(e => {
-      const wage = App.wageForStaffOn ? (App.wageForStaffOn(e.id, wkStart) || 0) : 0;
+    let over = 0, approaching = 0, otPremium = 0;
+    Object.values(proj).forEach(e => {
       const projected = Math.max(e.actual, e.scheduled);
+      const wage = App.wageForStaffOn ? (App.wageForStaffOn(e.id, wkStart) || 0) : 0;
       const otHours = Math.max(0, projected - App.OT_THRESHOLD);
-      return { ...e, projected, otHours, otCost: otHours * wage * 0.5,
-        status: projected > App.OT_THRESHOLD ? 'over' : projected >= App.OT_APPROACHING ? 'approaching' : 'ok' };
-    }).sort((a, b) => b.projected - a.projected);
-    const over = projRows.filter(r => r.status === 'over').length;
-    const approaching = projRows.filter(r => r.status === 'approaching').length;
-    const otPremium = projRows.reduce((t, r) => t + r.otCost, 0);
+      otPremium += otHours * wage * 0.5;
+      if (projected > App.OT_THRESHOLD) over++;
+      else if (projected >= App.OT_APPROACHING) approaching++;
+    });
+    return { over, approaching, otPremium };
+  },
 
-    // ── KPI tiles ──
-    const cards =
-        this.metricCard('Labor Cost, Last 7 Days', App.fmtCurrency(wkCost),
-             wkActuals.length + ' hours entr' + (wkActuals.length === 1 ? 'y' : 'ies'))
-      + this.metricCard('Labor Hours, Last 7 Days', wkHours.toFixed(1),
-             wkHours > 0 ? App.fmtCurrency(wkHours > 0 ? wkCost / wkHours : 0) + ' avg wage' : 'No hours logged')
-      + this.metricCard('Overtime Risk', String(over + approaching),
-             over + ' over &middot; ' + approaching + ' approaching', (over + approaching) ? 'over-target' : 'on-target')
-      + this.metricCard('Active Staff', String(activeStaff), this.staff().length + ' on the roster');
-
-    // ── This Week hero (full width) ──
-    let weekCard;
-    if (!sched) {
-      weekCard = this.panelCard('This Week',
-        '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No schedule built for this week yet. Build one to set a labor budget and project overtime.</div>',
-        '<button class="btn btn-primary btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">Build Schedule</button>');
-    } else {
-      const loggedHours = curWeek.reduce((t, a) => t + (a.hours || 0), 0);
-      const loggedCost = curWeek.reduce((t, a) => t + (a.cost || 0), 0) + App.salariedCost(wkStart, today).total;
-      const fc = sched.revenue_forecast || 0;
-      const planPct = fc > 0 ? (sched.total_cost || 0) / fc * 100 : null;
-      weekCard = this.panelCard('This Week',
-        '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Scheduled</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--t1);line-height:1;">' + App.fmtCurrency(sched.total_cost || 0) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (sched.total_hours || 0).toFixed(1) + ' hrs'
-        + (planPct != null ? ' &middot; ' + App.fmtPct(planPct) + ' of forecast' : '') + '</div></div>'
-        + '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Logged So Far</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);line-height:1;">' + App.fmtCurrency(loggedCost) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + loggedHours.toFixed(1) + ' hrs logged</div></div>'
-        + '</div>',
-        '<button class="btn btn-ghost btn-sm ld-act" data-go="lc-build-schedule" style="margin:0;">View Schedule</button>');
-    }
-
-    // ── Labor Cost by Department (last 7 days) — bar chart ──
-    const deptCost = {};
-    wkActuals.forEach(a => { if (App.isSalaried(a.staff_id)) return; const d = this.posDept(a.position_id); deptCost[d] = (deptCost[d] || 0) + (a.cost || 0); });
-    if (salWeek > 0) deptCost['Salaried'] = (deptCost['Salaried'] || 0) + salWeek;
-    const deptRows = Object.entries(deptCost).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
-    const deptMax = deptRows.length ? deptRows[0][1] : 1;
-    const deptCard = this.shPanel('Labor Cost by Department',
-      (deptRows.length
-        ? deptRows.map(([d, c]) => {
-            const pct = Math.max(2, Math.round(c / deptMax * 100));
-            return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
-              + '<span style="color:var(--t2);">' + esc(d) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(c) + '</span></div>'
-              + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
-          }).join('')
-        : '<div style="font-size:12px;color:var(--t3);">No labor cost in the last 7 days.</div>'));
-
-    // ── Hours This Week (per-staff projection) ──
-    const hLine = (r) => {
-      const col = r.status === 'over' ? 'var(--red)' : r.status === 'approaching' ? 'var(--amber)' : 'var(--t3)';
-      const word = r.status === 'over' ? 'Over' : r.status === 'approaching' ? 'Approaching' : 'OK';
-      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">'
-        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(r.name) + '</div>'
-        + '<div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;">' + r.projected.toFixed(1) + ' hrs</div>'
-        + '<span style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap;width:84px;text-align:right;">' + word + '</span></div>';
-    };
-    const hoursCard = this.shPanel('Hours This Week',
-      (projRows.length
-        ? projRows.slice(0, 6).map(hLine).join('')
-          + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Projected is the greater of logged and scheduled hours. Threshold ' + App.OT_THRESHOLD + ' hrs/week.</div>'
-        : '<div style="font-size:12px;color:var(--t3);">No hourly staff logged or scheduled this week.</div>'));
-
-    // ── Recent Hours (data-card table + .sh heading) ──
-    const recent = [...this.actuals()]
-      .sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime())
-      .slice(0, 6);
-    const recentRows = recent.map(a => '<tr><td><div class="val">' + this.fmtDate(a.date) + '</div></td>'
-      + '<td>' + esc(a.name || '-') + '</td>'
-      + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-      + '<td class="val">' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0)) + '</td></tr>').join('');
-    const recentBlock = '<div class="sh" style="margin:0 0 10px;">Recent Hours</div>'
-      + '<div class="card card-bleed data-card" style="flex:1;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Staff</th><th>Hours</th><th>Cost</th>'
-      + '</tr></thead><tbody>' + recentRows + '</tbody></table></div></div>';
-
-    // ── Labor Watch (leaks-style, tappable) ──
-    const uncovered = this.callouts().filter(c => (c.date || '') >= cutoff && !c.covered).length;
-    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
-    const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
-    const expiredCerts = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today);
-    const expiringCerts = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30);
-    const expired = expiredCerts.length;
-    const expiring = expiringCerts.length;
-    // When a cert row covers exactly one person, deep-link straight to them.
-    const oneStaff = certs => { const ids = new Set(certs.map(c => c.staff_id)); return ids.size === 1 ? [...ids][0] : ''; };
-    const expiredStaff = oneStaff(expiredCerts);
-    const expiringStaff = oneStaff(expiringCerts);
-    const watchRow = (label, val, screen, warn, staffId) =>
-      '<div class="ld-act" data-go="' + screen + '"' + (staffId ? ' data-staff="' + esc(staffId) + '"' : '') + ' style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
-      + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
-    const anyWatch = otPremium > 0 || uncovered > 0 || expired > 0 || expiring > 0;
-    const watchCard = this.shPanel('Labor Watch',
-      watchRow('Projected OT premium (this week)', App.fmtCurrency(otPremium), 'lc-overtime-watch', otPremium > 0)
-      + watchRow('Uncovered call-outs (7d)', String(uncovered), 'lc-callout-log', uncovered > 0)
-      + watchRow('Certifications expired (active staff)', String(expired), 'lc-staff-roster', expired > 0, expiredStaff)
-      + watchRow('Certifications expiring (30d)', String(expiring), 'lc-staff-roster', expiring > 0, expiringStaff)
-      + (anyWatch ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
-                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">All clear. No labor issues flagged.</div>'));
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="metric-grid">' + cards + '</div>'
-      + '<div style="margin-bottom:16px;">' + weekCard + '</div>'
-      + this.row(deptCard, hoursCard)
-      + this.row(recentBlock, watchCard)
-      + this.quickActions()
+  statusStrip() {
+    const wkStart = this.weekStart(), wkEnd = this.weekEnd();
+    const today = App.todayLocal();
+    const endCap = wkEnd < today ? wkEnd : today;
+    const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
+    const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
+    const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
+    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+    const p = this.weekProjection();
+    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
+    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
+      + item('Labor Cost This Week', App.fmtCurrency(wkCost))
+      + div
+      + item('Labor Hours', wkHours.toFixed(1))
+      + div
+      + item('Overtime Risk', String(p.over + p.approaching), (p.over + p.approaching) ? 'warn' : '')
       + '</div>';
+  },
+
+  outlierStrip() {
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-staff-roster">Staff Roster</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-callout-log">Call-Out Log</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-payroll-export">Payroll Export</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-reports">Labor Reports</button>'
+      + '</div>';
+  },
+
+  // ── Inline hours import (step 1) ─────────────────────────────────────────────
+  mountHoursImport() {
+    const el = document.getElementById('lc-ck-hours');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your weekly timeclock export here',
+      dropSub: 'Needs Staff, Date, and Hours. Shift matched if present. One row per shift.',
+      fields: PosIngest.FIELDS.hours,
+      confirmLabel: 'Import',
+      onComplete: rows => this.importLane('hours', rows, 'lc-ck-hours-res', 'tips')
+    });
+  },
+  // ── Inline tips import (step 2) ──────────────────────────────────────────────
+  mountTipsImport() {
+    const el = document.getElementById('lc-ck-tips');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS tips export here',
+      dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
+      fields: PosIngest.FIELDS.tips,
+      confirmLabel: 'Import',
+      onComplete: rows => this.importLane('tips', rows, 'lc-ck-tips-res', 'schedule')
+    });
+  },
+  // Shared import path: match/dedup/build/save live in PosIngest so the cockpit
+  // and the per-page lanes never drift. label = 'hours' | 'tips'.
+  async importLane(type, rows, resultId, nextStep) {
+    const { toAdd, skipped, dupCount } = PosIngest.build(type, rows);
+    const noun = type === 'hours' ? 'hour' : 'tip';
+    const setRes = html => { const r = document.getElementById(resultId); if (r) r.innerHTML = html; };
+    if (!toAdd.length) {
+      setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (dupCount ? 'No new rows imported. ' + dupCount + ' already logged.'
+                    : 'No rows imported. Check the file has Staff, Date, and ' + (type === 'hours' ? 'Hours.' : 'tip amounts, and the names match your roster.')) + '</div>');
+      return;
+    }
+    const ok = await PosIngest.commit(type, toAdd);
+    if (!ok) { setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
+    this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
+      + (skipped.length ? ' (' + skipped.length + ' skipped, no roster match)' : '')
+      + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
+    this._openStep = nextStep;
+    this.render(this.container, this.actions);
+  },
+
+  // ── Wiring ───────────────────────────────────────────────────────────────────
+  wire() {
+    this.container.onclick = ev => {
+      const head = ev.target.closest('.lc-step-head');
+      if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
+      const dn = ev.target.closest('[data-done]');
+      if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
+      const un = ev.target.closest('[data-undone]');
+      if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      const go = ev.target.closest('[data-go]');
+      if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
+      if (ev.target.closest('.lc-wk-prev')) { this._stepWeek(-7); return; }
+      if (ev.target.closest('.lc-wk-next')) { this._stepWeek(7); return; }
+    };
   }
 };
