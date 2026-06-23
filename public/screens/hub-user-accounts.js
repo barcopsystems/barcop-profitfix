@@ -37,7 +37,6 @@ S.HubUserAccounts = {
     { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log' },
     { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log' },
     { module: 'Shift Control',     key: 'waste',            label: 'Waste / Spill Log' },
-    { module: 'Shift Control',     key: 'shift-reports',    label: 'Shift Reports' },
     // Recovery
     { module: 'Recovery',          key: 'profit-recovery',  label: 'Profit Recovery (all)' },
     { module: 'Recovery',          key: 'revenue-recovery', label: 'Revenue Recovery (all)' },
