@@ -264,7 +264,6 @@ const DB = {
     'sc-maintenance':'maintenance',
     'sc-waste':'waste',
     'sc-walked-tabs':'cash-mgmt',
-    'sc-reports':'shift-reports',
     'sc-dashboard':'shift-dashboard','sc-help':'_always',
     // Profit Recovery (root + profit module screens)
     'dashboard':'profit-recovery','this-week':'profit-recovery',
