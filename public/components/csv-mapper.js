@@ -39,6 +39,10 @@ const CSVMapper = {
     ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(true); }));
     ['dragleave', 'dragend'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(false); }));
     zone.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); over(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) this._readFile(f, container, opts); });
+    // Lifecycle hook: 'drop' = dropzone showing, 'map' = column-mapping showing.
+    // Lets a caller hide its own sibling buttons while the mapper is open so they
+    // do not stack under the Import/Cancel row. Fires again on Cancel (re-mount).
+    if (typeof opts.onState === 'function') opts.onState('drop');
   },
 
   _area(c) { return c.querySelector('.csvm-area'); },
@@ -199,6 +203,7 @@ const CSVMapper = {
       });
       opts.onComplete(mapped);
     });
+    if (typeof opts.onState === 'function') opts.onState('map');
   }
 };
 
