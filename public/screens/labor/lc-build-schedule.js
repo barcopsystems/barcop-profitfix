@@ -623,7 +623,7 @@ S.LaborBuildSchedule = {
     let eventField = '';
     if (evs.length === 1) {
       eventField = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">'
-        + '<input type="checkbox" id="bs-m-event" data-eid="' + esc(evs[0].id) + '"' + (sh.event === evs[0].id ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> Working ' + esc(this.bookingName(evs[0])) + '</label>';
+        + '<input type="checkbox" class="bc-check" id="bs-m-event" data-eid="' + esc(evs[0].id) + '"' + (sh.event === evs[0].id ? ' checked' : '') + '/> Working ' + esc(this.bookingName(evs[0])) + '</label>';
     } else if (evs.length > 1) {
       eventField = '<div class="f" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);"><label>Working an Event?</label><select id="bs-m-event-sel"><option value="">No</option>'
         + evs.map(e => '<option value="' + esc(e.id) + '"' + (sh.event === e.id ? ' selected' : '') + '>' + esc(this.bookingName(e)) + '</option>').join('') + '</select></div>';
