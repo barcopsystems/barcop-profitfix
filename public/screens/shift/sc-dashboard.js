@@ -197,12 +197,12 @@ S.ShiftDashboard = {
     if (k === 'import') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in. Mark this done once the week is fully in.</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + this.markBtn('import', 'Mark Done') + '</div>';
+        + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
         + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+        + '<div id="sc-ck-cash-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile by Hand</button>'
         + this.markBtn('cash', 'Mark Done') + '</div>';
     }
@@ -262,6 +262,10 @@ S.ShiftDashboard = {
       + '</div>';
   },
 
+  // Hide a step's own buttons while the column-mapper is open so they do not
+  // stack under the mapper's Import/Cancel row; show them again on cancel.
+  _toggleBtns(id, st) { const b = document.getElementById(id); if (b) b.style.display = (st === 'map') ? 'none' : 'flex'; },
+
   // ── Inline sales import (step 1) ─────────────────────────────────────────────
   mountImport() {
     const el = document.getElementById('sc-ck-import');
@@ -271,6 +275,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
+      onState: st => this._toggleBtns('sc-ck-import-btns', st),
       onComplete: rows => this.importSales(rows)
     });
   },
@@ -305,6 +310,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
+      onState: st => this._toggleBtns('sc-ck-cash-btns', st),
       onComplete: rows => this.importCash(rows)
     });
   },
