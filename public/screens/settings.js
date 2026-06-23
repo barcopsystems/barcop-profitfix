@@ -3366,9 +3366,9 @@ S.HubSettings = {
       const totH = parts.reduce((s, p) => s + p.hours, 0);
       parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
       return { id:uid(),
-        shift_id:    App.tipShiftKey(poolDate, 'Dinner'),
+        shift_id:    App.tipShiftKey(poolDate, ''),
         date:        poolDate,
-        shift_type:  'Dinner',
+        shift_type:  '',
         method:      'hours',
         pool_amount: amount,
         total_hours: totH,
