@@ -100,9 +100,10 @@ S.ShiftDashboard = {
     return this.weekEnd() >= cur;
   },
   // Week selector: ‹ [JUN 22 - JUN 28 NOW] › — one week at a time (arrows sit
-  // OUTSIDE the pill). The current week is the lifted #0D181E pill with the
-  // standard card border and a gold NOW; step back to a past week and the pill
-  // drops to a plain ghost-button style. Forward is inert on the current week.
+  // OUTSIDE the pill). The current week is the active-selector pill
+  // (--sel-active-bg) with the standard card border and a gold NOW; step back to
+  // a past week and the pill drops to a plain ghost style. Forward is inert on
+  // the current week.
   weekSelector() {
     const isCur = this.atCurrentWeek();
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
@@ -114,7 +115,7 @@ S.ShiftDashboard = {
       : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
     const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
     const pill = isCur
-      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:#1E2B34;color:var(--t1);">' + esc(range) + nowBadge + '</span>'
+      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>'
       : '<span style="' + pillBase + 'border:1px solid var(--b1);background:transparent;color:var(--t2);">' + esc(range) + '</span>';
     return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
   },
@@ -168,11 +169,11 @@ S.ShiftDashboard = {
     const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#1E2B34;color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
-    // Active box uses a solid lifted bg (#0D181E) with the standard card border,
-    // so the white title and gold number read true, not washed by a translucent
-    // gold tint.
-    const bg = isOpen ? '#0D181E' : (isDone ? 'var(--input)' : 'var(--surface)');
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
+    // Active box uses the panel-fill token (--gold-tint) with the standard card
+    // border, so the white title and gold number read true, not washed by a
+    // translucent tint.
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
     const bord = 'var(--b-edge)';
     let html = '<div style="border:1px solid ' + bord + ';border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="sc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'

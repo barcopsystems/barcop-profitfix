@@ -493,7 +493,7 @@ S.ShiftVoidComp = {
     const segBtn = (mode, label) => {
       const on = activeMode === mode;
       return '<button type="button" class="btn btn-sm ' + cls + '" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     return '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">'
