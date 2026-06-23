@@ -270,7 +270,7 @@ S.VendorTracker = {
 
     const filterRow = this.rangeFilterRow('vt-w-export');
 
-    const rows = changes.map(c => '<tr>'
+    const rows = changes.slice(0, App.listLimit('core', 'vendor_price_changes')).map(c => '<tr>'
       + '<td>' + this.fmtDate(c.date) + '</td>'
       + '<td>' + esc(c.vendor || '-') + '</td>'
       + '<td class="val">' + esc(c.name || '-') + '</td>'
@@ -282,7 +282,8 @@ S.VendorTracker = {
       + '</tr>').join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No price changes in this range. Pick a wider range above.</td></tr>';
 
     const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Product</th><th>Previous Cost</th><th>New Cost</th><th>Change %</th><th>Annual Impact</th></tr></thead>';
-    return stats + filterRow + this.dataCard(thead, rows);
+    return stats + filterRow + this.dataCard(thead, rows)
+      + App.showOlderBar('core', 'vendor_price_changes', changes, this.range !== 'all');
   },
 
   wireWatch() {
@@ -290,6 +291,7 @@ S.VendorTracker = {
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-w-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Price Changes', root: this.container }));
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
   },
 
   // ════════════════════════════════════════════════════════════════════
