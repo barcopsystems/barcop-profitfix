@@ -65,7 +65,7 @@ S.Help = {
     ]},
     { t: 'Loss, Cash, and Vendors', qa: [
       { q: 'What does Loss Prevention show?',
-        a: 'A live read of the last seven days of loss signals: voids and comps without authorization, drawer shorts, flagged spot checks, large comps over your threshold without a manager, and any confirmed theft. There is no score here. It is a working list of what flagged and what each item costs, so you act on the pattern instead of a number. Severe flags also push to the Hub so they find you.' },
+        a: 'A live read of the last seven days of loss signals: drawer shorts, flagged spot checks, a server comping far above the rest of the floor, and any confirmed theft. There is no score here. It is a working list of what flagged and what each item costs, so you act on the pattern instead of a number. Severe flags also push to the Hub so they find you.' },
       { q: 'What is a Variance Investigation?',
         a: 'When a product shows unexplained variance, you open an investigation and work the steps in order. Because it is tied to a real product, Bar Cop shows the live usage from your last two counts and the recent spot checks for that product right on the steps, so you compare against the POS instead of retyping numbers. A flagged spot check or variance line opens one pre-filled.' },
       { q: 'What is Over and Short?',
