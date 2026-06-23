@@ -334,10 +334,6 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M5.5 5h5a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Tip Log</span>
       </div>
-      <div class="nav-item" data-screen="lc-tip-pool" id="nav-lc-tip-pool">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="3" y="2.5" width="11" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 5.5h6M5.5 8.5h6M5.5 11.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Tip Pool Log</span>
-      </div>
       <div class="nav-item" data-screen="lc-tip-history" id="nav-lc-tip-history">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Tip History</span>
