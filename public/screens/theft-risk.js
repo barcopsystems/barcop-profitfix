@@ -4,9 +4,10 @@
    The job is to CATCH theft on the shift it happens and investigate it, which
    is what recovers money. No 0-100 score. The page shows what flagged TODAY and
    over the LAST 7 DAYS from the data you already log — drawer shorts, flagged
-   spot checks, a server comping far above the rest of the floor, and confirmed
-   theft from the Adjustment Log — then lets you open and work a Variance
-   Investigation. The Theft & Loss Brief is the periodic 90-day review.
+   spot checks, and confirmed theft from the Adjustment Log — then lets you open
+   and work a Variance Investigation. Per-server sales-pattern theft (no-sales,
+   voids, comps, cash mix) lives in its own Sales Integrity screen. The Theft &
+   Loss Brief is the periodic 90-day review.
 
    (Coming next: flags push to the Hub critical alerts + an Open-the-Floor
    warning for the next manager, so this never becomes a page nobody opens.) */
@@ -33,40 +34,14 @@ S.TheftRisk = {
     const shorts = this.variances().filter(v => v.status === 'Short' && inRange(v.date));
     const spots = [];
     this.spotChecks().forEach(c => { if (inRange(c.date)) (c.items || []).forEach(it => { if (it.flagged) spots.push(it); }); });
-    const overComp = this._overCompingServers(fromStr);
     const theft = this.adjustments().filter(a => a.reason === 'Theft' && inRange((a.date_time || '').slice(0, 10)));
     return {
       shorts:    { count: shorts.length,    amount: Math.abs(shorts.reduce((s, v) => s + Math.min(0, v.variance || 0), 0)) },
       spots:     { count: spots.length,     amount: spots.reduce((s, it) => s + Math.max(0, it.variance_dollar || 0), 0) },
-      overComp:  { count: overComp.length,  amount: overComp.reduce((s, x) => s + x.amount, 0) },
       theft:     { count: theft.length,     amount: theft.reduce((s, a) => s + Math.abs(a.value || 0), 0) }
     };
   },
-  _totalFlags(d) { return d.shorts.count + d.spots.count + d.overComp.count + d.theft.count; },
-
-  // Comp volume by server: a server whose comp dollars run well above the rest
-  // of the floor over the window. The honest comp-theft read (a bartender giving
-  // away rounds) from data already on the log, not whether a manager name was
-  // typed. Needs at least 3 servers comping to have a team to compare against;
-  // flags anyone over 2x the team average who is also above a $50 floor.
-  _overCompingServers(fromStr) {
-    const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
-    const byServer = {};
-    this.voidComps().forEach(r => {
-      if (r.type !== 'Comp' || !inRange(r.date)) return;
-      const name = (r.server || '').trim();
-      if (!name) return;
-      byServer[name] = (byServer[name] || 0) + (parseFloat(r.amount) || 0);
-    });
-    const names = Object.keys(byServer);
-    if (names.length < 3) return [];
-    const total = names.reduce((s, n) => s + byServer[n], 0);
-    const avg = total / names.length;
-    if (avg <= 0) return [];
-    return names.filter(n => byServer[n] > avg * 2 && byServer[n] >= 50)
-      .map(n => ({ server: n, amount: byServer[n] }))
-      .sort((a, b) => b.amount - a.amount);
-  },
+  _totalFlags(d) { return d.shorts.count + d.spots.count + d.theft.count; },
 
   // Recent flag events as a flat list, so the Hub alert and the Open-the-Floor
   // warning read the same definition of a dated "flag" (one source). severe =
@@ -130,7 +105,6 @@ S.TheftRisk = {
       + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th></tr></thead><tbody>'
       + fRow('Cash drawer shorts', td.shorts.count, wkd.shorts.count, wkd.shorts.amount)
       + fRow('Flagged spot checks', td.spots.count, wkd.spots.count, wkd.spots.amount)
-      + fRow('Servers over-comping the floor', td.overComp.count, wkd.overComp.count, wkd.overComp.amount)
       + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
       + '</tbody></table></div></div>';
 
@@ -228,12 +202,15 @@ S.TheftRisk = {
     const inv = this._inv(id);
     if (!inv) { App.navigate('theft-risk'); return; }
     const doneN = inv.steps.filter(s => s.done).length;
-    const liveData = this.investigationLiveData(inv.product_id);
+    // A Sales Integrity flag opens a server-focused investigation carrying its own
+    // step text (steps_def) and no product, so skip the product-pour live data.
+    const stepDefs = inv.steps_def || this.VARIANCE_STEPS;
+    const liveData = inv.product_id ? this.investigationLiveData(inv.product_id) : { step2: '', step3: '' };
     const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
 
     let steps = '';
     inv.steps.forEach((s, idx) => {
-      const st = this.VARIANCE_STEPS[idx];
+      const st = stepDefs[idx] || { title: '', detail: '' };
       let extra = '';
       if (idx === 1 && liveData.step2) extra = liveData.step2;
       if (idx === 2 && liveData.step3) extra = liveData.step3;
@@ -427,7 +404,6 @@ S.TheftRisk = {
     b.table(['Signal', 'Events', 'Amount'], [
       ['Cash drawer shorts', String(d.shorts.count), fmt$(d.shorts.amount)],
       ['Flagged spot checks', String(d.spots.count), fmt$(d.spots.amount)],
-      ['Servers over-comping the floor', String(d.overComp.count), fmt$(d.overComp.amount)],
       ['Confirmed theft (adjustment log)', String(d.theft.count), fmt$(d.theft.amount)]
     ], { columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } } });
 
@@ -456,7 +432,7 @@ S.TheftRisk = {
   showHowTo() {
     App.showHelpModal('How Loss Prevention Works', [
       { p: ['Loss Prevention is a live leak detector, not a score. Its job is to catch theft on the shift it happens and walk you through investigating it, because that is what actually recovers money. Everything here reads from the data you already log.'] },
-      { h: 'What Flagged', p: ['The four things worth a look: drawer counts coming up short, flagged spot checks, a server comping far more than the rest of the floor, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.', 'The over-comping signal ranks comp dollars by server over the window and flags anyone running well above the team. It needs a few servers comping to have a floor to compare against, so it shows the pattern over the week, not off a single ticket.'] },
+      { h: 'What Flagged', p: ['The three things worth a look: drawer counts coming up short, flagged spot checks, and confirmed theft from the Adjustment Log. You see Today and the Last 7 Days for each. A red number under Today means it happened on this shift, deal with it now, not in three months.', 'Per-server sales-pattern theft (no-sales, voids, comps, cash mix) is a deeper read off your POS sales report, so it lives on its own Sales Integrity screen in Profit Recovery rather than here.'] },
       { h: 'Variance Investigations', p: ['When a product does not add up, open an investigation and work the six steps. Open one to drill in: it pulls live count and spot-check data into the steps, you check them off and record findings. You do not have to finish in one sitting; every step and note saves as you go. Hit Save and Close to step away and pick it back up later, it stays open in the list. Hit Resolve and Close only when you have reached a conclusion. A flagged spot check in Inventory Control opens one here for you, and re-flagging the same product reuses the open one. Print the Worksheet to work it on paper at the bar.'] },
       { h: 'Theft and Loss Brief', p: ['Generates a one-page 90-day PDF summary of every loss signal and your investigations, for an owner, bookkeeper, or insurance review. The 90-day window is right for a review document; the live page above stays on the last 7 days.'] }
     ]);
