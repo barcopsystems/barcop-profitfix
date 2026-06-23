@@ -50,7 +50,6 @@ S.ShiftDrawers = {
       + '<div class="f" style="width:170px;min-width:0;"><label>Cash Tolerance</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'tol" min="0" step="0.5" value="' + (d && d.cash_tolerance != null && d.cash_tolerance !== '' ? d.cash_tolerance : 10) + '"/></div></div>'
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin:-4px 0 2px;">How far this register can be off before a reconcile flags it. Default $10.</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
   },
