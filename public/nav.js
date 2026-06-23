@@ -28,6 +28,10 @@ const ProfitNav = {
         <span class="nav-label">Profit Forecast</span>
       </div>
       <div class="nav-section">Leaks</div>
+      <div class="nav-item" data-screen="sales-integrity" id="nav-sales-integrity">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Sales Integrity</span>
+      </div>
       <div class="nav-item" data-screen="vendor-tracker" id="nav-vendor-tracker">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.2V3.2A.7.7 0 0 1 3.2 2.5H8.2L14.2 8.5 8.5 14.2 2.5 8.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" stroke="currentColor" stroke-width="1.2"/></svg>
         <span class="nav-label">Vendor Tracker</span>
