@@ -276,7 +276,11 @@ S.LaborTipHistory = {
       + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
       + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
-    const html = '<div class="card form-card" id="th-pview-card" style="margin:0;"><div class="card-title">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+    const html = '<div class="card form-card" id="th-pview-card" style="margin:0;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">'
+        + '<div class="card-title" style="margin:0;">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+        + '<button class="btn btn-ghost btn-sm no-print" id="th-pview-export">Export PDF</button>'
+      + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
@@ -284,9 +288,8 @@ S.LaborTipHistory = {
       + '</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" id="th-pview-export">Export PDF</button>'
-      + '<button class="btn btn-ghost" id="th-pview-close" style="margin-left:auto;">Close</button></div></div>';
-    App.openModal(html, { id: 'th-pview-modal', maxWidth: 520 });
+      + '<div class="card-actions no-print"><button class="btn btn-ghost" id="th-pview-close">Close</button></div></div>';
+    App.openModal(html, { id: 'th-pview-modal', maxWidth: 520, noClose: true });
     document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: document.getElementById('th-pview-card') }));
     document.getElementById('th-pview-close')?.addEventListener('click', () => App.closeModal('th-pview-modal'));
   }
