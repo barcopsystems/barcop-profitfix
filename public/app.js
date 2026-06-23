@@ -991,6 +991,7 @@ const App = {
     { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
     { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
     { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
+    { group:'time-off',            label:'Time Off',                 module:'labor',     screen:'lc-time-off',          moduleName:'Labor Control' },
     { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
     // Shift Control
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
@@ -1582,7 +1583,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3676,7 +3677,8 @@ const App = {
       data: () => App.laborData,
       kinds: {
         actual: 'lc_actuals', schedule: 'lc_schedules', tip: 'lc_tips',
-        tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods'
+        tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods',
+        time_off: 'lc_time_off'
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
@@ -4212,6 +4214,7 @@ const App = {
         'lc-reports':            ['Labor Reports', 'Labor Control'],
         'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
         'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
+        'lc-time-off':           ['Time Off', 'Labor Control'],
         'lc-help':               ['Help and FAQ', 'Labor Control'],
       };
       const lcScreens = {
@@ -4228,6 +4231,7 @@ const App = {
         'lc-tip-history': S.LaborTipHistory,
         'lc-overtime-watch': S.LaborOvertimeWatch,
         'lc-callout-log': S.LaborCalloutLog,
+        'lc-time-off': S.LaborTimeOff,
         'lc-reports': S.LaborReports,
         'lc-help': S.LaborHelp,
       };
@@ -4495,6 +4499,27 @@ const App = {
       ? staffOrId
       : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
     return !!(s && s.pay_type === 'Salary');
+  },
+  // Is a staff member off on a date? Returns a reason string (the time-off type,
+  // or "Regular day off") or null. Reads approved one-off Time Off (lc_time_off)
+  // and the per-staff recurring days off (roster off_days = short weekday names).
+  // Build Schedule uses this to warn before someone is scheduled on a day off.
+  staffOffOn(staffId, dateStr) {
+    if (!staffId || !dateStr) return null;
+    const ds = String(dateStr).slice(0, 10);
+    const to = ((this.laborData && this.laborData.lc_time_off) || []).find(t =>
+      t && t.staff_id === staffId && t.status === 'Approved'
+      && t.start_date && t.end_date && ds >= t.start_date && ds <= t.end_date);
+    if (to) return to.type || 'Time off';
+    const st = ((this.laborData && this.laborData.lc_staff) || []).find(s => s.id === staffId);
+    if (st && Array.isArray(st.off_days) && st.off_days.length) {
+      const d = new Date(ds + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+        if (st.off_days.indexOf(wd) >= 0) return 'Regular day off';
+      }
+    }
+    return null;
   },
   // Fixed salaried labor cost accrued over [startDate, endDate] inclusive. Salary
   // accrues evenly every day; a full 7-day week equals annual_salary / 52. Only
