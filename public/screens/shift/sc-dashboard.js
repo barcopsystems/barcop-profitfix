@@ -57,7 +57,7 @@ S.ShiftDashboard = {
   stepDone() {
     const dm = this.doneMap();
     const derive = {
-      import: this.shifts().some(s => this.inWeek(s.date)),
+      import: false,   // operator-marked (or set by a cockpit import); a few imported days should not auto-complete the week
       cash:   this.variances().some(v => this.inWeek(v.date)),
       exc:    false,
       review: false
@@ -152,7 +152,7 @@ S.ShiftDashboard = {
   stepStatus(k, isDone) {
     if (k === 'import') {
       const n = this.shifts().filter(s => this.inWeek(s.date)).length;
-      return isDone ? (n + ' day' + (n === 1 ? '' : 's') + ' imported') : this._META.import.sub;
+      return n ? (n + ' day' + (n === 1 ? '' : 's') + ' imported') : this._META.import.sub;
     }
     if (k === 'cash') return isDone ? 'Reconciled' : this._META.cash.sub;
     if (k === 'exc') {
@@ -195,8 +195,9 @@ S.ShiftDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in.</div>'
-        + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>';
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in. Mark this done once the week is fully in.</div>'
+        + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
@@ -286,6 +287,7 @@ S.ShiftDashboard = {
       return;
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
+    this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
     this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
