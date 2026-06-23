@@ -5,8 +5,8 @@
    keep running. So Bar Cop does not ask the operator to tick boxes and take their
    word for it. For every step that maps to real work, it reads the actual Control
    data and shows whether the work is happening:
-     • Setup steps  — verified by state (comp threshold set, recipe cards built,
-       product costs entered). In place, or not.
+     • Setup steps  — verified by state (recipe cards built, product costs
+       entered). In place, or not.
      • Watched steps — verified by the records flowing in (counts, drawer
        reconciliations, voids and comps, deliveries, spot checks, waste). On
        track, slipping, behind, or not started. You cannot fake a logged drawer.
@@ -32,7 +32,7 @@ S.ProfitFix = {
   // step stays On track; up to 2x is Slipping; beyond is Behind.
   TRACK: {
     'pour-cost':      { 0: { kind: 'setup', key: 'yields' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'variancereport', maxDays: 12, every: 'every week' }, 5: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 4, every: 'every shift' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 3, every: 'every shift' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' }, 6: { kind: 'recur', signal: 'view:theft-risk', maxDays: 9, every: 'every week' } },
+    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 4, every: 'every shift' }, 2: { kind: 'recur', signal: 'salesreview', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 3, every: 'every shift' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' }, 6: { kind: 'recur', signal: 'view:theft-risk', maxDays: 9, every: 'every week' } },
     'food-cost':      { 0: { kind: 'setup', key: 'recipes' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'waste', maxDays: 4, every: 'every shift' }, 7: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 8: { kind: 'state', key: 'reprice' } },
     'vendor-control': { 0: { kind: 'recur', signal: 'order', maxDays: 14, every: 'every order you place' }, 1: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 4: { kind: 'state', key: 'chase' }, 5: { kind: 'recur', signal: 'view:vendor-tracker:watch', maxDays: 35, every: 'once a month' }, 6: { kind: 'recur', signal: 'view:vendor-tracker:scorecard', maxDays: 95, every: 'once a quarter' } },
     'prime-cost':     { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 1: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 4: { kind: 'recur', signal: 'view:weekly-pnl', maxDays: 9, every: 'every week' }, 5: { kind: 'recur', signal: 'view:books', maxDays: 35, every: 'once a month' } }
@@ -55,6 +55,7 @@ S.ProfitFix = {
     variancereport: () => (App.inventoryData && App.inventoryData.ic_variance_runs) || [],
     order:     () => (App.inventoryData && App.inventoryData.ic_orders)       || [],
     waste:     () => (App.shiftData     && App.shiftData.sc_waste)            || [],
+    salesreview: () => (App.data        && App.data.sales_reviews)            || [],
     week:      () => (App.data          && App.data.weeks)                    || []
   },
   lastActivity(signal) {
