@@ -277,8 +277,8 @@ S.LaborTipHistory = {
       + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
     const html = '<div class="card form-card" id="th-pview-card" style="margin:0;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">'
-        + '<div class="card-title" style="margin:0;">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Tip Pool &middot; ' + this.fmtDate(p.date) + '</span>'
         + '<button class="btn btn-ghost btn-sm no-print" id="th-pview-export">Export PDF</button>'
       + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
