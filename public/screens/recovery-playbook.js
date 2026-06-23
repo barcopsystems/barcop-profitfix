@@ -574,7 +574,7 @@ S.RecoveryPlaybook = {
               rows: [
                 ['Total void rate (all staff)', 'Under 1.5%', 'Above 2.5%', 'Above 4%', 'Pull by employee. Look for clustering by shift or time of night.'],
                 ['Individual bartender void rate', 'Under 1%', 'Above 2%', 'Above 4%', 'Investigate the shift pattern. Compare to their sales volume.'],
-                ['Total comp rate (all staff)', '1-2%', 'Above 3%', 'Above 5%', 'Check authorization. No comp without a manager signature.'],
+                ['Total comp rate (all staff)', '1-2%', 'Above 3%', 'Above 5%', 'Pull comp dollars by server in Sales Integrity. One server far above the floor is the tell.'],
                 ['Cash drawer variance per shift', 'Under $5', '$10-$20', '$25+ recurring', 'Log the direction. Recurring same direction means investigate.'],
                 ['Pour cost variance by SKU', 'Under 3%', '3-5%', 'Above 5%', 'Pull opening and closing counts for that SKU. Check shift records.'],
                 ['Prime cost week over week', 'Under 1 pt', '2-3 pts up', '4+ pts up', 'Separate COGS from labor. Three weeks trending up is structural.']
@@ -636,15 +636,16 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Run the math on one bartender voiding six 18 dollar transactions a shift, three shifts a week: about 16,000 a year, from one person, on one method, invisible without a report that breaks voids out by employee. The no-ring scheme is simpler and harder to catch: cash in, drink out, nothing rung, drawer comes up over, the overage gets pulled before the count. The comp game is legal on its face, which is what makes it expensive: the bar pays for a relationship the bartender is using to build their own following.' },
             { t: 'p', text: 'The shift audit is not mainly a detection tool, it is a behavior tool. Audit every Tuesday at 3pm and you have trained the staff to behave on Tuesdays at 3pm. Audit twice a week at times nobody can predict and you have a real deterrent: everybody knows it happens, nobody knows when, and that uncertainty changes behavior on every shift.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'The Void and Comp Log shows every void, comp, and no-sale by employee as a rate against their sales, so a bartender running triple the staff is visible by Wednesday. Cash Control reconciles every drawer against expected, and tracks overages as hard as shortages. Spot checks and Receive Delivery close the product and short-count holes. Loss Prevention scores the risk and is where an unexplained pour-cost variance lands.' },
+            { t: 'p', text: 'You log every void, comp, and no-sale in the Void and Comp Log. Then Sales Integrity reads your POS server sales report and benchmarks every server against the floor, so a bartender running triple the no-sales or voids of the staff is an outlier by Wednesday, not eight months later. Cash Control reconciles every drawer against expected and tracks overages as hard as shortages. Spot checks and Receive Delivery close the product and short-count holes. Loss Prevention is where a flagged server or an unexplained pour-cost variance opens an investigation.' },
             { t: 'go', label: 'Void and Comp Log', screen: 'sc-void-comp' },
+            { t: 'go', label: 'Sales Integrity', screen: 'sales-integrity' },
             { t: 'go', label: 'Loss Prevention', screen: 'theft-risk' },
             { t: 'go', label: 'Theft and Loss system', screen: 'profit-fix', focus: 'theft-loss' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [
               'Every day: reconcile every drawer in Cash Control before it leaves the floor, and log every void, comp, and no-sale by employee.',
               'Every day: confirm the delivery inspection was done on anything received.',
-              'Every week: review voids and comps by employee in Loss Prevention. Flag anyone over 3 percent of their sales.',
+              'Every week: run a Sales Integrity review on your POS server sales report. It flags any server whose no-sales, voids, cash mix, or comps run well above the floor.',
               'Every week: review drawer history. Flag anyone with recurring same-direction variance.',
               'Every week: run a shift audit at least twice, different shifts, different times. Document what you saw in writing.',
               'Escalate: one incident, document and watch. Two in 30 days on the same person, written corrective action. Confirmed cash theft, document fully and talk to your attorney before the conversation.'
