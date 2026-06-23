@@ -76,7 +76,7 @@ S.EventsRegulars = {
       + '</div></div>';
 
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
-      + (this.entryMode === mode ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+      + (this.entryMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
     let body, belowButtons = '';
     if (this.entryMode === 'import') {
