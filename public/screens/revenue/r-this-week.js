@@ -188,7 +188,7 @@ S.RevenueThisWeek = {
       + (saved ? 'Saved' : 'Building from your logs') + '</span>';
     const chip = (end, active) =>
       '<button class="rw-wk-chip btn btn-sm" data-end="' + end + '" style="'
-        + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (active ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
                   : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + this.weekRangeLabel(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
