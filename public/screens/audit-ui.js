@@ -265,7 +265,7 @@ const AuditUI = {
   // the data exists, greyed otherwise. checks = [{label, ok}].
   intakePills(checks) {
     return checks.map(c => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 11px;border-radius:20px;margin:0 6px 7px 0;'
-      + (c.ok ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+      + (c.ok ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">'
       + (c.ok ? '<span style="color:var(--green);font-weight:800;">&#10003;</span>' : '')
       + esc(c.label) + '</span>').join('');

@@ -134,8 +134,8 @@ S.FlowMap = {
 
     const nodeEls = NODES.map(n => {
       const p = pos[n.id], isSel = sel === n.id, dim = sel && !connected.has(n.id);
-      const fill = isSel ? '#151C1C' : '#070E15';
-      const stroke = isSel ? '#504829' : '#16252E';
+      const fill = isSel ? '#1E2B34' : '#070E15';
+      const stroke = '#16252E';
       return '<g class="fm-node" data-node="' + n.id + '" style="cursor:pointer;opacity:' + (dim ? '0.28' : '1') + ';">'
         + '<rect x="' + p.x + '" y="' + p.y.toFixed(1) + '" width="' + NW + '" height="' + NH + '" rx="8" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1"/>'
         + '<text x="' + (p.x + NW / 2) + '" y="' + (p.y + NH / 2 + 4).toFixed(1) + '" text-anchor="middle" fill="#E8EDF0" font-family="Barlow,system-ui,sans-serif" font-size="12.5" font-weight="600">'
