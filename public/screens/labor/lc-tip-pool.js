@@ -44,7 +44,7 @@ S.LaborTipPool = {
       const today = App.todayLocal();
       this._weekStart = S.LaborTipLog.mondayOf(today);
       this.date = today;
-      this.period = this.period || S.LaborTipLog.defaultPeriod();
+      this.period = '';   // pools log per day now (no service-period split)
       this.pool = '';
       this.rows = [];
       this.method = 'hours';
@@ -55,8 +55,8 @@ S.LaborTipPool = {
 
   showHowTo() {
     App.showHelpModal('How the Tip Pool Log Works', [
-      { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Pick the day and service period, enter the pool amount, and Bar Cop works out each person\'s share live.'] },
-      { h: 'Pick The Day', p: ['Tap the day and the service period up top and Bar Cop pre-loads the crew straight from the posted schedule, call-out adjusted, with hours from their logged actuals or their scheduled hours. That is the same crew the Tip Log loads, so the two match. Add or remove a person and adjust hours, and the shares recompute. Enter the pool amount yourself, since the pool is the total tips you are splitting.'] },
+      { p: ['The Tip Pool Log splits a pool of tips across the staff who share it, either by hours worked or in an equal split. Pick the day, enter the pool amount, and Bar Cop works out each person\'s share live.'] },
+      { h: 'Pick The Day', p: ['Tap the day up top and Bar Cop pre-loads the crew straight from the posted schedule, call-out adjusted, with hours from their logged actuals or their scheduled hours. That is the same crew the Tip Log loads, so the two match. Add or remove a person and adjust hours, and the shares recompute. Enter the pool amount yourself, since the pool is the total tips you are splitting.'] },
       { h: 'Two Methods', p: ['By Hours Worked splits the pool in proportion to each person\'s hours. Equal Split divides it evenly across participants. Watch the Unallocated figure: it should land at zero when the whole pool is distributed.'] },
       { h: 'Saving And Starting Over', p: ['Save Tip Pool stores the split as a record and feeds the tip-credit check on Pay Periods. Start Over empties the form back to a fresh pool without saving.'] },
       { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit loads it back into the calculator to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] }
@@ -107,7 +107,7 @@ S.LaborTipPool = {
     const card = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-pool', this._editId ? 'Editing Tip Pool' : 'Tip Pool')
       + '<div class="collapse-body">'
-      + '<div id="tp-anchor">' + S.LaborTipLog.anchorHtml('tp', this._weekStart, this.date, this.period) + '</div>'
+      + '<div id="tp-anchor">' + S.LaborTipLog.tlAnchor('tp', this._weekStart, this.date) + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
@@ -169,18 +169,17 @@ S.LaborTipPool = {
       this.renderMain();
     });
     document.getElementById('tp-save')?.addEventListener('click', () => this.save());
-    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.method = 'hours'; this.date = App.todayLocal(); this.period = S.LaborTipLog.defaultPeriod(); this._weekStart = S.LaborTipLog.mondayOf(this.date); this.renderMain(); });
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this._editId = null; this.rows = []; this.pool = ''; this.method = 'hours'; this.date = App.todayLocal(); this.period = ''; this._weekStart = S.LaborTipLog.mondayOf(this.date); this.renderMain(); });
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
-      // Day + period anchor (picking a day preloads the crew from the schedule).
+      // Day anchor (picking a day preloads the crew from the schedule). No future.
       if (ev.target.closest('.tp-wk-prev')) { this.collect(); this._weekStart = S.LaborTipLog.addDaysYmd(this._weekStart, -7); this.renderMain(); return; }
-      if (ev.target.closest('.tp-wk-next')) { this.collect(); this._weekStart = S.LaborTipLog.addDaysYmd(this._weekStart, 7); this.renderMain(); return; }
+      if (ev.target.closest('.tp-wk-next')) { const nw = S.LaborTipLog.addDaysYmd(this._weekStart, 7); if (nw > S.LaborTipLog.mondayOf(App.todayLocal())) return; this.collect(); this._weekStart = nw; this.renderMain(); return; }
+      if (ev.target.closest('.tp-wk-now')) { this.collect(); this._weekStart = S.LaborTipLog.mondayOf(App.todayLocal()); this.renderMain(); return; }
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadFromDate(dayChip.dataset.ymd, this.period); return; }
-      const perChip = ev.target.closest('.tp-period');
-      if (perChip) { this.collect(); this.period = perChip.dataset.period; this.renderMain(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.tp-hrow');
       const hview = ev.target.closest('.tp-hview');
@@ -307,10 +306,10 @@ S.LaborTipPool = {
       return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share };
     });
 
-    // Anchor the pool to its day + service period via the shared key, so Form 8027
-    // + Tip History group pool splits together with the matching Tip Log entries.
+    // Anchor the pool to its day via the shared per-day key, so Form 8027 + Tip
+    // History group pool splits together with the matching Tip Log entries.
     const existing = this._editId ? this.pools().find(x => x.id === this._editId) : null;
-    const period = this.period || (existing ? (existing.shift_type || '') : '');
+    const period = '';   // pools log per day now (no service-period split)
     const rec = {
       id:          this._editId || App.uid(),
       shift_id:    App.tipShiftKey(this.date, period),
@@ -347,7 +346,7 @@ S.LaborTipPool = {
     if (!p) { this.renderMain(); return; }
     this._editId = id;
     this.date = p.date || App.todayLocal();
-    this.period = p.shift_type || S.LaborTipLog.defaultPeriod();
+    this.period = p.shift_type || '';   // preserved (no period selector); pools are per-day now
     this._weekStart = S.LaborTipLog.mondayOf(this.date);
     this.pool = (p.pool_amount != null) ? String(p.pool_amount) : '';
     this.method = p.method || 'hours';
