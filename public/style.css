@@ -14,8 +14,9 @@
   --gold:      #DBAB46;
   --gold-h:    #C29638;
   --gold-bg:   rgba(219,171,70,0.10);
-  --gold-tint: #151C1C;                    /* selection fill — OPAQUE so it reads identically on any background (was rgba(219,171,70,0.06), which composited differently over --bg vs --surface). This is the value it landed on over the lighter card surface. */
-  --gold-tint-bord: #504829;               /* selection border — OPAQUE for the same reason (was rgba(219,171,70,0.3)). */
+  --gold-tint: #0D181E;                    /* selection / panel fill (heads-up boxes, banners, playbook + profit-fix active boxes). Opaque so it reads identically on any background. */
+  --gold-tint-bord: var(--b-edge);         /* selection border = the standard card border. */
+  --sel-active-bg: #1E2B34;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
   --red:       #C03828;
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
