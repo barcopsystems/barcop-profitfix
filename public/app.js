@@ -3035,12 +3035,13 @@ const App = {
       '<button type="button" class="btn btn-ghost btn-sm ' + (cls || 'date-preset') + '" data-preset="' + p[0] + '">' + p[1] + '</button>').join('');
   },
   // Single-select filter chips. options = [{ v, label }] with v:'' as the "All"
-  // chip. Active chip = gold-tint (the selection look). Caller wires the class.
+  // chip. Active chip = --sel-active-bg (the active selector look); inactive is
+  // ghost. Caller wires the class.
   filterChips(active, options, cls) {
     return options.map(o => {
       const on = (o.v || '') === (active || '');
       return '<button type="button" class="btn btn-sm ' + (cls || 'fc-chip') + '" data-v="' + esc(o.v || '') + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(o.label) + '</button>';
     }).join('');
   },
