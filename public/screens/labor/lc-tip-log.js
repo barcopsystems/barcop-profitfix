@@ -25,7 +25,7 @@ S.LaborTipLog = {
   _addRows: null,          // [{ staff_id, hours, cash, card, sales, received }]
   _savedNote: null,        // count to confirm after a save (shown once)
   // Edit pop-up anchor state (one record at a time).
-  _eWeekStart: '', _eDate: '', _ePeriod: '',
+  _eDate: '', _ePeriod: '',
   // Tip Pool mode state (shares the anchor above; own crew rows + amount + method).
   _poolRows: null,         // [{ staff_id, name, hours }]
   _poolAmount: '',         // pool dollar amount (operator-entered)
@@ -236,24 +236,29 @@ S.LaborTipLog = {
     ]);
   },
 
-  // Shared form fields for the edit pop-up. p = element-id prefix ('tle-'). The
-  // day/period anchor sits up top (seeded from this._e* state), then Staff, hours,
-  // amounts, the tip-out row, and Notes. Pass the record being edited.
+  // Shared form fields for the edit pop-up. p = element-id prefix ('tle-'). Clean
+  // two-up layout for the narrow modal: Date + Staff, then the tips, then the
+  // tip-out row and Notes. A plain Date field (like the other edit pop-ups) replaces
+  // the week+day chip picker, which was overkill for correcting one record.
   formBody(x, p) {
     p = p || 'tle-';
     const v = val => (val != null && val !== '') ? val : '';
-    const pre = p.replace(/-$/, '');
-    return '<div id="' + p + 'anchor">' + this.tlAnchor(pre, this._eWeekStart, this._eDate) + '</div>'
-      + '<div class="form-row data-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
+    return '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
+          + '<input type="date" id="' + p + 'date" value="' + esc(this._eDate || App.todayLocal()) + '"/></div>'
+        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Staff</label>'
           + '<select id="' + p + 'staff"></select></div>'
-        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Tippable Hours</label>'
-          + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(x?.hours) + '" placeholder="Auto"/></div>'
-        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Cash Tips</label>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Cash Tips</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cash" min="0" step="0.01" value="' + v(x?.cash_tips) + '"/></div></div>'
-        + '<div class="f" style="flex:0.9 1 110px;min-width:0;"><label>Card Tips</label>'
+        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Card Tips</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'card" min="0" step="0.01" value="' + v(x?.card_tips) + '"/></div></div>'
-        + '<div class="f" style="flex:0.8 1 100px;min-width:0;"><label>Total</label>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Tippable Hours</label>'
+          + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(x?.hours) + '" placeholder="Auto"/></div>'
+        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Total</label>'
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
       + '<div id="' + p + 'tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
@@ -265,6 +270,7 @@ S.LaborTipLog = {
   // caller. p = element-id prefix. x = the record being edited.
   wireForm(x, p) {
     p = p || 'tle-';
+    document.getElementById(p + 'date')?.addEventListener('change', e => { this._eDate = e.target.value || this._eDate; this.populateStaffList(x, p); });
     document.getElementById(p + 'staff')?.addEventListener('change', () => this.onStaffChange(x, p));
     document.getElementById(p + 'cash')?.addEventListener('input', () => this.calc(p));
     document.getElementById(p + 'card')?.addEventListener('input', () => this.calc(p));
@@ -843,7 +849,6 @@ S.LaborTipLog = {
     this.editId = id;
     this._eDate = x.date || App.todayLocal();
     this._ePeriod = x.shift_type || '';   // preserved (no period selector); tips are per-day now
-    this._eWeekStart = this.mondayOf(this._eDate);
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tips</div>'
       + this.formBody(x, 'tle-')
       + '<div class="card-actions">'
@@ -852,21 +857,11 @@ S.LaborTipLog = {
         + '<span id="tle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
-    const modal = App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
+    App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
     this.wireForm(x, 'tle-');
     document.getElementById('tle-save')?.addEventListener('click', () => this.save('tle-'));
     document.getElementById('tle-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); });
     document.getElementById('tle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); this.confirmDel(id); });
-    // Anchor chips re-render just the anchor block (typed amounts are preserved);
-    // a day change also refreshes the "worked this day" staff list.
-    if (modal) modal.addEventListener('click', ev => {
-      const reanchor = () => { const a = document.getElementById('tle-anchor'); if (a) a.innerHTML = this.tlAnchor('tle', this._eWeekStart, this._eDate); };
-      if (ev.target.closest('.tle-wk-prev')) { this._eWeekStart = this.addDaysYmd(this._eWeekStart, -7); reanchor(); return; }
-      if (ev.target.closest('.tle-wk-next')) { const nw = this.addDaysYmd(this._eWeekStart, 7); if (nw > this.mondayOf(App.todayLocal())) return; this._eWeekStart = nw; reanchor(); return; }
-      if (ev.target.closest('.tle-wk-now')) { this._eWeekStart = this.mondayOf(App.todayLocal()); reanchor(); return; }
-      const dc = ev.target.closest('.tle-day');
-      if (dc) { this._eDate = dc.dataset.ymd; this._eWeekStart = this.mondayOf(this._eDate); reanchor(); this.populateStaffList(x, 'tle-'); return; }
-    });
   },
 
   // Populate the staff dropdown: who logged hours on the picked day first (an
@@ -924,8 +919,9 @@ S.LaborTipLog = {
     const isEdit = p === 'tle-';
     const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = this._eDate || '';
+    const date = document.getElementById(p + 'date')?.value || this._eDate || '';
     if (!date) { fail('Pick a day.'); return; }
+    this._eDate = date;
     const shiftType = this._ePeriod || '';
     const shiftId = App.tipShiftKey(date, shiftType);
     const managerId = App.activeManagerId ? App.activeManagerId() : '';
