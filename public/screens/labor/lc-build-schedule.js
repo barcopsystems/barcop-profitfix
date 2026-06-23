@@ -371,7 +371,7 @@ S.LaborBuildSchedule = {
               + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div>'
               + '</div>';
           });
-          const offTag = (offReason && !items.length) ? '<div title="' + esc(offReason) + '" style="font-size:8px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);text-align:center;opacity:.65;">Off</div>' : '';
+          const offTag = (offReason && !items.length) ? '<div title="' + esc(offReason) + '" style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);text-align:center;opacity:.85;">Off</div>' : '';
           cellInner += offTag + '<div class="bs-add-cell" style="text-align:center;color:var(--t4);font-size:14px;cursor:pointer;line-height:1.2;padding:' + (items.length ? '0' : (offTag ? '2px' : '8px')) + ' 0;">+</div>';
           row += '<td class="bs-cell" data-staff="' + esc(s.id) + '" data-day="' + day + '" style="padding:4px;border-top:1px solid var(--b2);vertical-align:top;border-left:1px solid var(--b2);">' + cellInner + '</td>';
         });
@@ -630,7 +630,7 @@ S.LaborBuildSchedule = {
     }
     const offReason = this.offReasonFor(staffId, day);
     const offBanner = offReason
-      ? '<div style="border:1px solid var(--red);background:var(--red-bg);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--red);font-weight:600;">' + esc(staff.name || 'This person') + ' is off this day (' + esc(offReason) + '). Scheduling a shift here will flag it.</div>'
+      ? '<div style="border:1px solid var(--red);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--red);font-weight:600;">' + esc(offReason) + '. Scheduling a shift here will flag it.</div>'
       : '';
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
       + offBanner
