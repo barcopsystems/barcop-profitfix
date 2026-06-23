@@ -248,7 +248,7 @@ const DB = {
     'ic-dashboard':'inventory-dashboard','ic-help':'_always',
     // Labor Control
     'lc-log-hours':'log-hours',
-    'lc-tip-log':'log-tips','lc-tip-history':'log-tips','lc-tip-pool':'log-tips',
+    'lc-tip-log':'log-tips','lc-tip-history':'log-tips',
     'lc-schedule-history':'view-schedule',
     'lc-build-schedule':'manage-schedule',
     'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
