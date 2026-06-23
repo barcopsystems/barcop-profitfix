@@ -288,11 +288,11 @@ S.SalesIntegrity = {
   draw() {
     this._viewing = null;
     const latest = this.latestReview();
-    const importCard = '<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Sales Integrity Review</div>'
-      + '<div style="padding:18px 22px;">'
+    const importCard = '<div class="card form-card">'
+      + '<div class="card-title">Shift Sales Integrity Review</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
-      + '</div></div>';
+      + '</div>'
+      + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
 
     let body;
     if (!latest) {
@@ -313,6 +313,7 @@ S.SalesIntegrity = {
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS per-server sales report here',
       dropSub: 'Needs a Server column. No-sales, voids, cash and card split, comps, checks, refunds, and hours are each read if your export has them.',
+      actionsEl: '#si-imp-actions',
       fields: this.FIELDS,
       confirmLabel: 'Analyze',
       onComplete: rows => this.runImport(rows)
@@ -362,7 +363,7 @@ S.SalesIntegrity = {
       + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">These are patterns to investigate, not proof. A flag means a server\'s numbers are an outlier worth a closer look. Product theft (overpouring, free pours, bottle loss) does not show in a sales report; pour cost, inventory variance, and spot checks catch that. Bar Cop is a software tool, not an investigator; confirm before acting on anyone.</div>'
       + '</div>';
 
-    return head + statStrip + cards + cleanLine + skipLine + note;
+    return statStrip + head + cards + cleanLine + skipLine + note;
   },
 
   serverCard(x) {
@@ -372,7 +373,7 @@ S.SalesIntegrity = {
     (x.flags || []).forEach(f => { (byCat[f.cat] = byCat[f.cat] || []).push(f); });
     const cats = this.CATS.filter(c => byCat[c.key] && byCat[c.key].length).map(c => {
       const rows = byCat[c.key].map(f => '<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
-        + '<span style="color:var(--t2);">' + esc(f.label) + (f.soft ? ' <span style="color:var(--t4);">(soft)</span>' : '') + '<span style="color:var(--t3);"> — ' + esc(f.detail) + '</span></span>'
+        + '<span style="color:var(--t2);">' + esc(f.label) + (f.soft ? ' <span style="color:var(--t4);">(soft)</span>' : '') + '<span style="color:var(--t3);">: ' + esc(f.detail) + '</span></span>'
         + '<span style="color:' + (f.exposure > 0 ? 'var(--red)' : 'var(--t4)') + ';white-space:nowrap;font-weight:600;">' + (f.exposure > 0 ? App.fmtCurrency(f.exposure) : '') + '</span></div>').join('');
       return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
     }).join('');
@@ -430,12 +431,11 @@ S.SalesIntegrity = {
     if (!r) return;
     this._viewing = r;
     App.pushView(() => {
-      this.container.innerHTML = '<div class="screen">' + this.renderReport(r)
-        + '<div class="no-print" style="margin:16px 0 24px;"><button class="btn btn-ghost" id="si-back">Back to Latest</button></div></div>';
+      this.container.innerHTML = '<div class="screen">' + this.renderReport(r) + '</div>';
       document.getElementById('si-export')?.addEventListener('click', () => this.printReview(r));
-      document.getElementById('si-back')?.addEventListener('click', () => { this._viewing = null; App.goBack(); });
-      // .si-investigate is handled by the delegated container.onclick from wire(),
-      // so no per-button listener here (it would double-fire and open two cases).
+      // Back is the floating nav from pushView. .si-investigate is handled by the
+      // delegated container.onclick from wire() (no per-button listener, or it
+      // would double-fire and open two cases).
     });
   },
 
