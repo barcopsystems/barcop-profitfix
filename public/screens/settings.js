@@ -347,6 +347,10 @@ S.HubSettings = {
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
 
+    // Drop the cockpit's per-week "done" stamps (localStorage) so a fresh sample
+    // does not inherit phantom step checks from a prior session.
+    try { Object.keys(localStorage).filter(k => k.indexOf('sc_cockpit_done_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+
     const uid = () => App.uid();
     const today = new Date();
     const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
@@ -3639,6 +3643,9 @@ S.HubSettings = {
     await App.saveShift();
     await DB.clearEvents('sc_events');   // drop the shift event rows too
     await DB.clearEvents('core_events'); // drop the recovery event rows too
+    // The cockpit's per-week "done" stamps live in localStorage (per device), so
+    // clear them too or past weeks keep phantom checks after a wipe.
+    try { Object.keys(localStorage).filter(k => k.indexOf('sc_cockpit_done_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
