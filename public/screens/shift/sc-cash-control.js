@@ -303,7 +303,7 @@ S.ShiftCashControl = {
         + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th>Status</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:16px;">No cash activity in this range. Log a drop, deposit, or safe count above to get started.</td></tr></tbody></table></div></div>';
     } else {
-      const rows = stream.map(s => {
+      const rows = stream.slice(0, App.listLimit('sc', 'cash_activity')).map(s => {
         let amountCell, statusCell;
         if (s.category === 'variance' || s.category === 'safe_count') {
           const sign = s.variance > 0 ? '+' : s.variance < 0 ? '-' : '';
@@ -331,7 +331,8 @@ S.ShiftCashControl = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
     this.container.innerHTML = '<div class="screen">' + safeCard + registersCard + statsCard
-      + this.filterRow() + activityBody + '</div>';
+      + this.filterRow() + activityBody
+      + App.showOlderBar('sc', 'cash_activity', stream, this.filterPreset !== 'all') + '</div>';
     App.applyCollapsed(this.container);
 
     document.getElementById('cc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Control', root: this.container }));
@@ -347,6 +348,7 @@ S.ShiftCashControl = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.draw()); return; }
       const chip = ev.target.closest('.cc-range-chip');
       if (chip) {
         const v = chip.dataset.v;
