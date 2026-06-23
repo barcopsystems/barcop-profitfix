@@ -253,7 +253,7 @@ S.EventsBookings = {
       const list = (this.filterStage ? all.filter(b => b.stage === this.filterStage) : all)
         .slice().sort((a, b) => (b.date_received || b.event_date || '').localeCompare(a.date_received || a.event_date || ''));
 
-      const rows = list.slice(0, App.LIST_PAGE || 50).map(b => {
+      const rows = list.slice(0, App.listLimit('core', 'booking')).map(b => {
         const dUntil = this.daysUntil(b.event_date);
         const isStale = this.isOpen(b.stage) && (this.daysSince(b.date_received) >= 3);
         const money = b.stage === 'Completed' ? App.fmtCurrency(this.bookingRevenue(b))
@@ -279,7 +279,8 @@ S.EventsBookings = {
       listSection = headRow
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Event</th><th>Type</th><th>Event Date</th><th>Party</th><th>Quote / Revenue</th><th>Deposit</th><th>Stage</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + App.showOlderBar('core', 'booking', list, !!this.filterStage);
     }
 
     this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';
@@ -296,6 +297,7 @@ S.EventsBookings = {
     this.container.querySelectorAll('.eb-stage-chip').forEach(b =>
       b.addEventListener('click', () => { this.filterStage = b.dataset.v; this.renderList(); }));
     document.getElementById('eb-worksheet')?.addEventListener('click', () => this.worksheet());
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
     this.container.querySelectorAll('.eb-row, .eb-view').forEach(el =>
       el.addEventListener('click', ev => {
         if (ev.target.closest('.eb-del')) return;
