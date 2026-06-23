@@ -232,7 +232,7 @@ S.LaborTipLog = {
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on the Labor cockpit. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
-      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit opens it in a pop-up to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] },
+      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode, where Edit reopens it in a pop-up to fix a number (Update writes back to the same record, no duplicate) and Delete removes one you logged in error. To review a pool\'s per-person split, open the Tip Pools tab in Tip History.'] },
       { h: 'Where Tips Go', p: ['Tips and pool splits feed the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum, and the Form 8027 worksheet in Books. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['On Log Tips, the Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
     ]);
@@ -1120,14 +1120,10 @@ S.LaborTipLog = {
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderPool()); return; }
-      const hrow = ev.target.closest('.tp-hrow');
-      const hview = ev.target.closest('.tp-hview');
       const hedit = ev.target.closest('.tp-hedit');
       const hdel = ev.target.closest('.tp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDelPool(hdel.dataset.id); }
       else if (hedit) { ev.stopPropagation(); this.openPoolEditModal(hedit.dataset.id); }
-      else if (hview) { ev.stopPropagation(); this.renderPoolDetail(hview.dataset.id); }
-      else if (hrow) this.renderPoolDetail(hrow.dataset.id);
     };
     App.applyCollapsed(this.container);
     this.recalcPool();
@@ -1384,13 +1380,12 @@ S.LaborTipLog = {
     const list = [...this.pools()].sort((a, b) =>
       new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
     if (list.length === 0) return '';
-    const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr class="tp-hrow" data-id="' + p.id + '" style="cursor:pointer;">'
+    const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr data-id="' + p.id + '">'
       + '<td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
       + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
       + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</td>'
       + '<td>' + ((p.participants || []).length) + '</td>'
       + '<td><div class="row-actions">'
-      + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
       + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
@@ -1401,30 +1396,6 @@ S.LaborTipLog = {
       + App.showOlderBar('lc', 'tip_pool', list, false);
   },
 
-  renderPoolDetail(id) {
-    const p = this.pools().find(x => x.id === id);
-    if (!p) { this.renderPool(); return; }
-    this.actions.innerHTML = '';
-    const rows = (p.participants || []).map(pt => '<tr>'
-      + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
-      + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
-      + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val lg">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val lg">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + (p.total_hours || 0) + '</div></div>'
-      + '</div></div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="tp-back">Back</button><button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button></div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Staff</th><th>Hours</th><th>Tip Share</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
-    this.container.onclick = null;
-    document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: this.container }));
-    document.getElementById('tp-back')?.addEventListener('click', () => this.renderPool());
-  },
 
   async confirmDelPool(id) {
     if (!(await App.confirmDelete())) return;
