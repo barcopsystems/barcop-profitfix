@@ -33,7 +33,7 @@ const CSVMapper = {
     if (extEl) extEl.innerHTML = '';
     const zone = container.querySelector('.csvm-drop');
     const input = container.querySelector('.csvm-file');
-    const over = on => { zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'var(--gold-bg)' : 'var(--input)'; };
+    const over = on => { zone.style.borderColor = on ? 'rgba(255,255,255,.30)' : 'var(--b1)'; zone.style.background = on ? 'rgba(255,255,255,.04)' : 'var(--input)'; };
     zone.addEventListener('click', () => input.click());
     input.addEventListener('change', e => { const f = e.target.files[0]; if (f) this._readFile(f, container, opts); input.value = ''; });
     ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(true); }));
