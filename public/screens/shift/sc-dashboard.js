@@ -114,7 +114,7 @@ S.ShiftDashboard = {
       : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
     const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
     const pill = isCur
-      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:#0D181E;color:var(--t1);">' + esc(range) + nowBadge + '</span>'
+      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:#1E2B34;color:var(--t1);">' + esc(range) + nowBadge + '</span>'
       : '<span style="' + pillBase + 'border:1px solid var(--b1);background:transparent;color:var(--t2);">' + esc(range) + '</span>';
     return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
   },
