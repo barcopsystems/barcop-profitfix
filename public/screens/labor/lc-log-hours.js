@@ -10,7 +10,7 @@
 
 S.LaborLogHours = {
   editId: null,
-  entryMode: 'manual',     // 'manual' = type a row, 'schedule' = pull the posted week, 'import' = drop a timeclock file
+  entryMode: 'schedule',   // 'schedule' = pull the posted week (default), 'manual' = type a row. The timeclock import lives on the Labor cockpit, not here.
   _modeOnce: null,         // one-shot mode override from a deep-link, consumed on the next render
   _fillWeek: '',           // Monday of the week being pulled from the schedule
   _fillModel: null,        // in-memory Fill-from-Schedule rows (week pulled into the modal)
@@ -206,12 +206,7 @@ S.LaborLogHours = {
     // it hides with the card. The card body is just the entry surface per mode.
     let modeBody, actionRow;
     const rowOpen = '<div data-collapse-group="lc-log-hours" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">';
-    if (this.entryMode === 'import') {
-      modeBody = '<div id="lo-csv"></div><div id="lo-imp-result"></div>';
-      // Empty until a file is dropped; CSVMapper then renders its own spaced
-      // Import / Cancel row here (below the card), so no empty gap beforehand.
-      actionRow = '<div id="lo-imp-actions" data-collapse-group="lc-log-hours" style="margin-bottom:24px;"></div>';
-    } else if (this.entryMode === 'schedule') {
+    if (this.entryMode === 'schedule') {
       // The week-list workspace moved into a focused pop-up so the landing stays
       // short (stats + log right below). The card body is a compact launcher.
       modeBody = this.scheduleLauncherBody();
@@ -226,7 +221,7 @@ S.LaborLogHours = {
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-log-hours', 'Log Hours')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('schedule', 'Fill from Schedule') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('schedule', 'Fill from Schedule') + segBtn('manual', 'Enter Manually') + '</div>'
       + modeBody
       + '</div></div>';
 
@@ -239,8 +234,8 @@ S.LaborLogHours = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged yet. Log your first entry above, or import a '
-        + 'timeclock export. Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged yet. Fill them from your posted schedule or enter them by hand above. '
+        + 'Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div>';
     } else {
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
@@ -311,8 +306,7 @@ S.LaborLogHours = {
       else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
       else if (row && App.canEdit('lc-log-hours')) this.openEditModal(row.dataset.id);
     };
-    if (this.entryMode === 'import') this.mountImporter();
-    else if (this.entryMode === 'schedule') {
+    if (this.entryMode === 'schedule') {
       document.getElementById('lo-fill-prev')?.addEventListener('click', () => this.shiftFillWeek(-7));
       document.getElementById('lo-fill-next')?.addEventListener('click', () => this.shiftFillWeek(7));
       this.container.querySelectorAll('.lo-fill-week-chip').forEach(b => b.addEventListener('click', () => {
@@ -552,7 +546,7 @@ S.LaborLogHours = {
       return picker + '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Every scheduled shift this week is already logged. Pick another week to fill.</div>';
     }
     const loggedNote = logged ? ' <span style="color:var(--t3);">(' + logged + ' already logged)</span>' : '';
-    const readout = '<div style="font-size:13px;color:var(--t2);margin:2px 0 14px;">'
+    const readout = '<div style="font-size:13px;color:var(--t2);margin:14px 0 20px;">'
       + '<span style="color:var(--t1);font-weight:600;">' + toReview + ' shift' + (toReview === 1 ? '' : 's') + '</span> ready to log from the schedule, hours pre-filled.' + loggedNote + '</div>';
     return picker + readout + '<button class="btn btn-primary" id="lo-fill-open">Review &amp; Log Week</button>';
   },
@@ -570,7 +564,7 @@ S.LaborLogHours = {
       ? ' <span style="color:var(--t3);">' + loggedCount + ' already logged ' + (loggedCount === 1 ? 'shift is' : 'shifts are') + ' not shown.</span>' : '';
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Log Hours &middot; ' + esc(App.dateRangeLabel(ws, App.periodEndFor(ws))) + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:12px;">Everyone scheduled is checked with hours pre-filled. Uncheck anyone who did not work, fix any hours, then log the week.' + loggedLine + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:12px;">Uncheck anyone who did not work, fix any hours, then log.' + loggedLine + '</div>'
       + '<div id="lo-fmodal-list" style="max-height:52vh;overflow-y:auto;margin:0 -2px;padding:0 2px;">' + this.fillModalListHtml(active) + '</div>'
       + '<div class="card-actions" style="margin-top:16px;">'
       + '<button class="btn btn-primary" id="lo-fmodal-log"' + (n ? '' : ' disabled') + '>Log ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') + '</button>'
@@ -605,7 +599,7 @@ S.LaborLogHours = {
         const note = r.calloutNote
           ? '<div style="color:var(--amber);font-size:10px;font-weight:600;">' + esc(r.calloutNote) + '</div>' : '';
         return '<tr class="lo-fmodal-row" data-mi="' + r.i + '">'
-          + '<td style="width:34px;text-align:center;"><input type="checkbox" class="lo-fmodal-cb"' + (r.checked ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
+          + '<td style="width:34px;text-align:center;"><input type="checkbox" class="lo-fmodal-cb"' + (r.checked ? ' checked' : '') + ' style="accent-color:var(--green);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
           + '<td><div class="val">' + esc(r.name) + '</div>' + note + '</td>'
           + '<td>' + time + '</td>'
           + '<td><input type="number" class="lo-fmodal-hours form-input" min="0" step="0.25" value="' + esc(r.hours) + '" style="width:80px;"/></td>'
@@ -677,8 +671,7 @@ S.LaborLogHours = {
       { p: ['This is where actual hours worked get recorded. Logged hours feed your weekly labor cost, prime cost, and revenue per labor hour across Profit and Revenue Recovery, so what you enter here drives the numbers everywhere else.'] },
       { h: 'Logging An Entry', p: ['Pick Enter Manually, then fill the row: date, staff member, shift, and hours worked, and Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
       { h: 'Filling From The Schedule', p: ['Pick Fill from Schedule to pull a posted week in instead of typing each row. Use the week chips and arrows to choose the week, then Review and Log Week opens it. Everyone scheduled comes in checked with their hours pre-filled, and anyone with a no-show or sick call-out logged for that day is unchecked for you. Uncheck anyone else who did not work, fix any hours, then log the whole week at once. Shifts already logged are kept out of the list so nothing double-counts.'] },
-      { h: 'Importing From A Timeclock', p: ['Switch to Import File and drop a timeclock or POS export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name, Date, and Hours are required; Shift is optional. Your headers do not need to match exactly: Staff Name reads employee / name / staff, Date reads date / work date / shift date, Hours reads hours / total hours / hrs / worked.'] },
-      { h: 'Matching To Your Roster', p: ['Each imported row is matched to a staff member by name and costs out at the wage in effect on the date worked. A row that does not match anyone on the roster, or is missing hours, is skipped and reported so you can fix it.'] },
+      { h: 'Importing A Timeclock Export', p: ['Got a timeclock or POS export? Drop it on the Labor cockpit, where Bar Cop matches each row to your roster by name and costs it at the wage in effect on the date worked. Anything that does not match, or is missing hours, is reported so you can fix it. The imported hours land in the list here to review and edit.'] },
       { h: 'Closed Pay Periods', p: ['Once a pay period is closed in Pay Periods, its entries lock so the payroll handoff stays clean. Reopen the period there if you need to correct a locked entry.'] }
     ]);
   },
@@ -710,52 +703,6 @@ S.LaborLogHours = {
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     document.body.appendChild(node);
     Promise.resolve(App.exportPDF({ title: 'Logged Hours', root: node })).finally(() => node.remove());
-  },
-
-  // ── CSV import (drag-drop + column mapping, mounted in the Import card) ───────
-  mountImporter() {
-    const el = document.getElementById('lo-csv');
-    if (!el || typeof CSVMapper === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your timeclock export here',
-      dropSub: 'Needs columns for staff name, date, and hours worked.',
-      actionsEl: '#lo-imp-actions',
-      fields: PosIngest.FIELDS.hours,
-      confirmLabel: 'Import',
-      onComplete: rows => this.importRows(rows)
-    });
-  },
-
-  async importRows(rows) {
-    // Match / dedup / build / save all live in the shared PosIngest so this lane
-    // and the unified Import screen never drift; the UI message stays here.
-    const { toAdd, skipped, dupCount } = PosIngest.build('hours', rows);
-
-    const result = document.getElementById('lo-imp-result');
-    const imported = toAdd.length;
-    if (imported === 0) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-                    : 'No rows imported. No staff names matched the roster, or hours were missing.') + '</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('hours', toAdd);
-    if (!ok) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + 'Save failed. Try the import again.</div>';
-      return;
-    }
-    App.markSetupDone('gs_lc_hours');
-    // Re-render the landing so the imported hours show in the list below, then
-    // drop the summary into the freshly-rendered import result slot.
-    this.renderList();
-    const res2 = document.getElementById('lo-imp-result');
-    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
-      + 'Imported ' + imported + ' hours entr' + (imported === 1 ? 'y' : 'ies') + '.'
-      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
-          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or missing hours).</span>' : '')
-      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount
-          + ' already logged, skipped.</span>' : '') + '</div>';
   },
 
   async confirmDel(id) {
