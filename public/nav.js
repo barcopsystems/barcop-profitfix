@@ -321,6 +321,10 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.4M8.5 12v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Call-Out Log</span>
       </div>
+      <div class="nav-item" data-screen="lc-time-off" id="nav-lc-time-off">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 11.5l4-2.5M6.5 9l4 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Time Off</span>
+      </div>
       <div class="nav-item" data-screen="lc-log-hours" id="nav-lc-log-hours">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Log Hours</span>
