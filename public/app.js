@@ -1583,7 +1583,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-shift-policies', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-checklists', 'sc-checklist-templates', 'sc-reports', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-positions', 'lc-staff-roster', 'lc-wage-settings', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -2564,22 +2564,16 @@ const App = {
     return list.find(s => s.id === id) || list.find(s => s.name === id) || null;
   },
 
-  // Resolve cash variance tolerance for a given shift record. Looks up in
-  // priority order: per-shift override → per-shift-type default → overall
-  // default → legacy 10. Every cash-related screen calls this so changes to
-  // the lookup logic land in one place.
-  cashToleranceForShift(shift) {
-    if (shift && shift.cash_tolerance != null && shift.cash_tolerance !== '') {
-      const n = parseFloat(shift.cash_tolerance);
-      if (!isNaN(n)) return n;
-    }
-    const ss = (this.shiftData && this.shiftData.settings) || {};
-    if (shift && shift.shift_type && ss.tolerances_by_type && ss.tolerances_by_type[shift.shift_type] != null) {
-      const n = parseFloat(ss.tolerances_by_type[shift.shift_type]);
-      if (!isNaN(n)) return n;
-    }
-    if (ss.cash_tolerance != null) {
-      const n = parseFloat(ss.cash_tolerance);
+  // Cash variance tolerance for a register: how far its drawer can be off before
+  // a reconcile flags. Set per-register on the Add Register form (cash_tolerance);
+  // default $10 so it is never blank. Pass a register id (or record). Every cash
+  // screen + the POS cash import resolve tolerance through here so the rule lives
+  // in one place. The safe count uses a fixed $10, not a register tolerance.
+  drawerTolerance(drawerOrId) {
+    const d = (drawerOrId && typeof drawerOrId === 'object') ? drawerOrId
+            : (drawerOrId ? this.drawerById(drawerOrId) : null);
+    if (d && d.cash_tolerance != null && d.cash_tolerance !== '') {
+      const n = parseFloat(d.cash_tolerance);
       if (!isNaN(n)) return n;
     }
     return 10;
@@ -4176,7 +4170,6 @@ const App = {
         'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
         'sc-checklists':         ['Checklists', 'Shift Control'],        'sc-checklist-templates':['Checklist Templates', 'Shift Control'],
         'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
-        'sc-shift-policies':     ['Shift Policies', 'Shift Control'],
         'sc-reports':            ['Reports', 'Shift Control'],
         'sc-help':               ['Help and FAQ', 'Shift Control'],
       };
@@ -4190,7 +4183,6 @@ const App = {
         'sc-walked-tabs': S.ShiftWalkedTabs,
         'sc-checklists': S.ShiftChecklists,        'sc-checklist-templates': S.ShiftChecklistTemplates,
         'sc-drawers': S.ShiftDrawers,
-        'sc-shift-policies': S.ShiftPolicies,
         'sc-reports': S.ShiftReports,
         'sc-help': S.ShiftHelp,
       };
