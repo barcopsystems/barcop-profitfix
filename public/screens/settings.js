@@ -2804,25 +2804,33 @@ S.HubSettings = {
         resolution:'' },
     ];
 
-    // Sales Integrity — a seeded Saturday server-sales report run through the live
-    // engine so the demo lands on a real review. One planted bad actor (Brianna K.,
-    // the same server the comp pattern concentrates on): heavy no-sales, a high
-    // void rate, a cash mix far above the floor, and refunds. The rest track the
-    // floor and come back clean. True by construction (same analyze() the upload
-    // uses), so re-running it yields the same flags.
+    // Sales Integrity — four weekend server-sales reports run through the live
+    // engine so the demo lands on a real review with a history below it. The
+    // planted bad actor is Brianna K. (the same server the comp pattern
+    // concentrates on); her numbers escalate over the last two weekends, caught
+    // building: two clean weekends, then a cash-mix Watch, then a High (heavy
+    // no-sales, a high void rate, refunds). The rest track the floor. True by
+    // construction (same analyze() the upload uses), so re-running yields the
+    // same flags.
     if (window.S && S.SalesIntegrity) {
-      const siDate = dateStr(2);
-      const siRows = [
-        { server:'Jessica M.', date:siDate, net_sales:2050, checks:41, cash_sales:380, card_sales:1670, voids:25, void_count:2, comps:24, no_sales:1, refunds:0,  hours:8   },
-        { server:'Marcus T.',  date:siDate, net_sales:1820, checks:36, cash_sales:365, card_sales:1455, voids:20, void_count:2, comps:18, no_sales:0, refunds:0,  hours:7.5 },
-        { server:'Priya N.',   date:siDate, net_sales:1680, checks:34, cash_sales:300, card_sales:1380, voids:24, void_count:2, comps:22, no_sales:2, refunds:0,  hours:7.5 },
-        { server:'Devin R.',   date:siDate, net_sales:1540, checks:31, cash_sales:340, card_sales:1200, voids:17, void_count:1, comps:16, no_sales:1, refunds:0,  hours:7   },
-        { server:'Carlos P.',  date:siDate, net_sales:1960, checks:39, cash_sales:410, card_sales:1550, voids:26, void_count:3, comps:20, no_sales:1, refunds:0,  hours:8   },
-        { server:'Brianna K.', date:siDate, net_sales:1500, checks:30, cash_sales:705, card_sales:795,  voids:90, void_count:7, comps:25, no_sales:9, refunds:40, hours:8   }
+      const siRows = (date, bad) => [
+        { server:'Jessica M.', date, net_sales:2050, checks:41, cash_sales:380, card_sales:1670, voids:25, void_count:2, comps:24, no_sales:1, refunds:0, hours:8   },
+        { server:'Marcus T.',  date, net_sales:1820, checks:36, cash_sales:365, card_sales:1455, voids:20, void_count:2, comps:18, no_sales:0, refunds:0, hours:7.5 },
+        { server:'Priya N.',   date, net_sales:1680, checks:34, cash_sales:300, card_sales:1380, voids:24, void_count:2, comps:22, no_sales:2, refunds:0, hours:7.5 },
+        { server:'Devin R.',   date, net_sales:1540, checks:31, cash_sales:340, card_sales:1200, voids:17, void_count:1, comps:16, no_sales:1, refunds:0, hours:7   },
+        { server:'Carlos P.',  date, net_sales:1960, checks:39, cash_sales:410, card_sales:1550, voids:26, void_count:3, comps:20, no_sales:1, refunds:0, hours:8   },
+        Object.assign({ server:'Brianna K.', date, checks:30, comps:20, hours:8 }, bad)
       ];
-      App.data.sales_reviews = [
-        S.SalesIntegrity.analyze(siRows, { id:uid(), date:siDate, created_at:new Date().toISOString(), source:'sample' })
+      const siShifts = [
+        { ago:2,  bad:{ net_sales:1500, cash_sales:705, card_sales:795,  voids:90, void_count:7, no_sales:9, refunds:40 } }, // High
+        { ago:9,  bad:{ net_sales:1620, cash_sales:680, card_sales:940,  voids:24, void_count:2, no_sales:2, refunds:0  } }, // Watch (cash mix)
+        { ago:16, bad:{ net_sales:1700, cash_sales:360, card_sales:1340, voids:22, void_count:2, no_sales:1, refunds:0  } }, // clean
+        { ago:23, bad:{ net_sales:1580, cash_sales:330, card_sales:1250, voids:20, void_count:2, no_sales:1, refunds:0  } }  // clean
       ];
+      App.data.sales_reviews = siShifts.map(s => {
+        const d = dateStr(s.ago);
+        return S.SalesIntegrity.analyze(siRows(d, s.bad), { id:uid(), date:d, created_at:new Date(d + 'T20:00:00').toISOString(), source:'sample' });
+      });
     } else {
       App.data.sales_reviews = [];
     }
@@ -3484,11 +3492,11 @@ S.HubSettings = {
       };
     };
     App.data.bar_cop_audits = [
-      // ── Day 30 (61 days ago) — overall 48. The first Bar Cop audit, on only a
+      // ── Day 30 (61 days ago) — overall 49. The first Bar Cop audit, on only a
       //    few weeks of logged data. Recovery Action and Operational Consistency
       //    read N/A until a longer trend exists; they fill in by day 60.
       bcaRec(61, 'BCA-2026-0009',
-        [50, 44, 44, 52, null, null],
+        [50, 48, 44, 52, null, null],
         [
           [ d('Opening checklist completion', '7 opening checklists logged', 23),
             d('Closing checklist completion', '5 closing checklists logged', 17),
@@ -3501,7 +3509,6 @@ S.HubSettings = {
             d('Maintenance backlog cleared', '4 open over 14 days', 20) ],
           [ d('Cash variance trend (lower is better)', '0.62% of revenue handled', 38),
             d('Drawer counts per operating day', '8 counts on 14 operating days', 57),
-            d('Large void/comp authorization', '4 of 12 over $25 authorized', 33),
             d('Cash drops on revenue days', '7 drops on 14 days over $500', 50) ],
           [ d('Inventory counts on schedule', '2 of 4 expected weekly counts', 50),
             d('Spot checks completed', '1 of 4 expected weekly', 25),
@@ -3548,7 +3555,6 @@ S.HubSettings = {
             d('Maintenance backlog cleared', '2 open over 14 days', 60) ],
           [ d('Cash variance trend (lower is better)', '0.50% of revenue handled', 50),
             d('Drawer counts per operating day', '14 counts on 22 operating days', 64),
-            d('Large void/comp authorization', '8 of 16 over $25 authorized', 50),
             d('Cash drops on revenue days', '11 drops on 20 days over $500', 55) ],
           [ d('Inventory counts on schedule', '3 of 4 expected weekly counts', 75),
             d('Spot checks completed', '2 of 4 expected weekly', 50),
