@@ -505,10 +505,10 @@ S.LaborLogHours = {
   fillWeekSelector(ws) {
     const cur = this.mondayOf(App.todayLocal());
     const isCur = ws >= cur;
-    const nowBadge = isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '';
-    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;';
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
     const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
-      + App.dateRangeLabel(ws, App.periodEndFor(ws)) + nowBadge + '</span>';
+      + App.dateRangeLabel(ws, App.periodEndFor(ws)).toUpperCase() + nowBadge + '</span>';
     const nextBtn = isCur
       ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
       : '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
