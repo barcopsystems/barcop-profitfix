@@ -606,7 +606,7 @@ S.HubSettings = {
         S2_MONTHLY_GAP: 2900,
         S2_NARRATIVE: 'Voids and comps reached 4.6% of sales, more than four times the 1% benchmark. 71% of voids were rung with no manager approval at all.',
         S2_FINDING: 'Two bartenders account for roughly 80% of unapproved voids. With no drawer reconciliation and no cash policy on file, there is no control gate anywhere in the cash path.',
-        S2_TOOL: 'Log every void in Void and Comps and require manager authorization in Shift Policies.',
+        S2_TOOL: 'Log every void in Void and Comps against the server who rang it, and watch comp volume by server in Loss Prevention.',
         S3_SCORE: 30, S3_FOOD_COST_PCT: 40.5, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 27600,
         S3_FOOD_VAR_PCT: 7.1, S3_FOOD_VAR_AMT: 1960, S3_RECIPE_COVERAGE: '0 of 24 plates costed',
         S3_INV_FREQ: 'Never', S3_WASTE_LOG: 'No', S3_MONTHLY_GAP: 2346, S3_ANNUAL_GAP: 28152,
@@ -633,7 +633,7 @@ S.HubSettings = {
         S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Void concentration',
         S6_SIG2_EVIDENCE: '71% of voids were rung without a manager code; two bartenders account for 80% of them.',
         S6_SIG2_GAP: 'Pattern is consistent with comped-drink theft, not training error.',
-        S6_SIG2_TOOL: 'Log voids in Void and Comps and review the unapproved ones in Loss Prevention.',
+        S6_SIG2_TOOL: 'Log every void in Void and Comps against the server who rang it, so the concentration on two bartenders shows in the log.',
         S6_SIG3_SCORE: 'MEDIUM', S6_SIG3_LABEL: 'No closing inventory counts',
         S6_SIG3_EVIDENCE: 'No end-of-night liquor counts were recorded in the audit period.',
         S6_SIG3_GAP: 'Variance cannot be isolated to a shift or a person.',
@@ -641,7 +641,7 @@ S.HubSettings = {
         S6_SIG4_SCORE: 'MEDIUM', S6_SIG4_LABEL: 'Unrestricted comp authority',
         S6_SIG4_EVIDENCE: 'Every server can comp without a limit or a reason code.',
         S6_SIG4_GAP: 'Comp dollars are untracked and untrainable.',
-        S6_SIG4_TOOL: 'Set a comp authorization threshold in Shift Policies.'
+        S6_SIG4_TOOL: 'Log comps by server in Void and Comps; Loss Prevention flags a server comping far above the rest of the floor.'
       }}),
       60: mkAudit('profit', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 44,
@@ -660,7 +660,7 @@ S.HubSettings = {
         S2_MONTHLY_GAP: 1600,
         S2_NARRATIVE: 'Void and comp rate fell to 3.4% after a manager-PIN requirement went in. Unapproved voids dropped from 71% to 45%.',
         S2_FINDING: 'Drawer reconciliation has started at close and a cash policy is drafted. There is still no spillage log, so breakage and theft still look the same.',
-        S2_TOOL: 'Finalize the cash policy in Shift Policies and start a spillage log at close.',
+        S2_TOOL: 'Finalize your written cash handling policy and start a spillage log at close.',
         S3_SCORE: 41, S3_FOOD_COST_PCT: 38.0, S3_TARGET_PCT: 32, S3_FOOD_REV_MONTHLY: 29000,
         S3_FOOD_VAR_PCT: 5.6, S3_FOOD_VAR_AMT: 1624, S3_RECIPE_COVERAGE: '12 of 24 plates costed',
         S3_INV_FREQ: 'Monthly', S3_WASTE_LOG: 'Started', S3_MONTHLY_GAP: 1740, S3_ANNUAL_GAP: 20880,
@@ -829,7 +829,7 @@ S.HubSettings = {
         S6_SIG1_SCORE: 'HIGH', S6_SIG1_LABEL: 'Server comp concentration',
         S6_SIG1_EVIDENCE: 'One server accounts for 54% of comped checks over the audit period.',
         S6_SIG1_GAP: 'Pattern is consistent with discount abuse, not service recovery.',
-        S6_SIG1_TOOL: 'Review comps by server in Loss Prevention and set a comp authorization threshold in Shift Policies.',
+        S6_SIG1_TOOL: 'Review comps by server in Loss Prevention; it flags a server comping far above the rest of the floor.',
         S6_SIG2_SCORE: 'HIGH', S6_SIG2_LABEL: 'Saturday floor overstaffed',
         S6_SIG2_EVIDENCE: 'Saturday floor RPLH ran $48 against a $75 target while weeknight RPLH hit $72.',
         S6_SIG2_GAP: 'About $720 per Saturday in excess labor.',
@@ -2470,28 +2470,20 @@ S.HubSettings = {
     const dayW  = [0.10, 0.10, 0.12, 0.14, 0.20, 0.22, 0.12]; // Mon..Sun
     const mgrs  = ['Maria G.', 'Jake T.', 'Carlos P.'];
 
-    // ── Cash settings + Drawers (Phase 0.5) ────────────────────────────────
+    // ── Registers (Phase 0.5) ──────────────────────────────────────────────
     if (!App.shiftData.settings) App.shiftData.settings = {};
-    App.shiftData.settings.cash_tolerance = 10;
-    App.shiftData.settings.tolerances_by_type = {
-      'Brunch':     10,
-      'Lunch':      10,
-      'Dinner':     15,
-      'Late Night': 20,
-      'Full Day':   15
-    };
-    // Comp over this dollar amount should carry a manager in Authorized By.
-    App.shiftData.settings.comp_auth_threshold = 25;
 
     // Drawers reference table. Seeded with realistic registers so the
     // dropdowns on Cash Drop and Variance Log render with options out of
     // the box. Default opening bank pre-fills the Start a Shift bank field
-    // when the matching drawer is the one tonight runs on.
+    // when the matching drawer is the one tonight runs on. cash_tolerance is
+    // per-register (how far it can be off before a reconcile flags); the busy
+    // main bar runs wider than a slow service well.
     App.shiftData.sc_drawers = [
-      { id: App.uid(), name: 'Main Bar Register',     location: 'Main Bar',       default_opening_bank: 300, notes: '', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Service Bar Register',  location: 'Back Bar',       default_opening_bank: 200, notes: 'Server-only well', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Floor Register 1',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() },
-      { id: App.uid(), name: 'Floor Register 2',      location: 'Front of House', default_opening_bank: 250, notes: '', active: true, created_at: new Date().toISOString() }
+      { id: App.uid(), name: 'Main Bar Register',     location: 'Main Bar',       default_opening_bank: 300, cash_tolerance: 15, notes: '', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Service Bar Register',  location: 'Back Bar',       default_opening_bank: 200, cash_tolerance: 10, notes: 'Server-only well', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Floor Register 1',      location: 'Front of House', default_opening_bank: 250, cash_tolerance: 10, notes: '', active: true, created_at: new Date().toISOString() },
+      { id: App.uid(), name: 'Floor Register 2',      location: 'Front of House', default_opening_bank: 250, cash_tolerance: 10, notes: '', active: true, created_at: new Date().toISOString() }
     ];
     const scDrawers = App.shiftData.sc_drawers;
 
@@ -2582,13 +2574,14 @@ S.HubSettings = {
           const variance = improving
             ? Math.round((Math.random() - 0.55) * 12)
             : Math.round((Math.random() - 0.75) * 30);
+          const tol = (dr.cash_tolerance != null) ? dr.cash_tolerance : 10;
           scVariances.push({
             id:uid(), date:date,
             drawer_id: dr.id, drawer: dr.name,
             cashier:mgrs[(a.wk + di + ri) % 3],
             source:'import',
             expected_cash:exp, counted_cash:exp + variance, variance:variance,
-            tolerance:10, status:Math.abs(variance) <= 10 ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
+            tolerance:tol, status:Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
             reason:'', notes:'', created_at:new Date().toISOString()
           });
         });
@@ -2638,7 +2631,6 @@ S.HubSettings = {
       { kind:'menu',    name:'Anchor Burger',                reason:'Customer Goodwill', amount:18 },
       { kind:'custom',  name:'Staff meal, Cobb Salad',       reason:'Staff Meal',        amount:13 }
     ];
-    const VC_THRESHOLD = 25;
     const scVoidComps = [];
     let vcVi = 0, vcCi = 0;
     ANCHS.weeks.forEach(a => {
@@ -2655,7 +2647,7 @@ S.HubSettings = {
           product_id:'', product_name:'', units:null, amount:s.amount,
           server:vcServers[(a.wk + j) % vcServers.length], staff_id:'',
           authorized_by:improving ? mgrs[(a.wk + j) % 3] : (j === 0 ? '' : mgrs[j % 3]),
-          check_number:'', reason:s.reason, notes:'', auth_threshold_override:false,
+          check_number:'', reason:s.reason, notes:'',
           created_at:new Date().toISOString()
         });
       }
@@ -2672,7 +2664,6 @@ S.HubSettings = {
           amount:s.amount, server:server, staff_id:'',
           authorized_by:noAuth ? '' : mgrs[(a.wk + j) % 3],
           check_number:'', reason:s.reason, notes:'',
-          auth_threshold_override:(noAuth && s.amount > VC_THRESHOLD),
           created_at:new Date().toISOString()
         });
       }
