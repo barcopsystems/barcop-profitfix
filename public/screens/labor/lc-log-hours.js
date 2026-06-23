@@ -208,9 +208,12 @@ S.LaborLogHours = {
     const rowOpen = '<div data-collapse-group="lc-log-hours" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">';
     if (this.entryMode === 'schedule') {
       // The week-list workspace moved into a focused pop-up so the landing stays
-      // short (stats + log right below). The card body is a compact launcher.
+      // short (stats + log right below). The card body is the launcher; the
+      // Review & Log Week button sits BELOW the card like every other mode's action.
       modeBody = this.scheduleLauncherBody();
-      actionRow = '';
+      actionRow = this.fillReviewCount() > 0
+        ? rowOpen + '<button class="btn btn-primary" id="lo-fill-open">Review &amp; Log Week</button></div>'
+        : '';
     } else {
       modeBody = this.logFormCells(null);
       actionRow = rowOpen
@@ -546,9 +549,17 @@ S.LaborLogHours = {
       return picker + '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Every scheduled shift this week is already logged. Pick another week to fill.</div>';
     }
     const loggedNote = logged ? ' <span style="color:var(--t3);">(' + logged + ' already logged)</span>' : '';
-    const readout = '<div style="font-size:13px;color:var(--t2);margin:14px 0 20px;">'
+    const readout = '<div style="font-size:13px;color:var(--t2);margin:14px 0 2px;">'
       + '<span style="color:var(--t1);font-weight:600;">' + toReview + ' shift' + (toReview === 1 ? '' : 's') + '</span> ready to log from the schedule, hours pre-filled.' + loggedNote + '</div>';
-    return picker + readout + '<button class="btn btn-primary" id="lo-fill-open">Review &amp; Log Week</button>';
+    return picker + readout;
+  },
+
+  // Shifts still to log for the active fill week (0 = no schedule or all logged).
+  // Drives whether the below-card Review & Log Week button shows.
+  fillReviewCount() {
+    const m = this._fillModel;
+    if (!m || !m.rows.length) return 0;
+    return m.rows.filter(r => !r.already).length;
   },
 
   // The focused week pop-up: every still-to-log scheduled shift as one list grouped
