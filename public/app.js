@@ -990,8 +990,8 @@ const App = {
     { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
     { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
     { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
+    { group:'time-off',            label:'Time Off Log',             module:'labor',     screen:'lc-time-off',          moduleName:'Labor Control' },
     { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
-    { group:'time-off',            label:'Time Off',                 module:'labor',     screen:'lc-time-off',          moduleName:'Labor Control' },
     { group:'labor-reports',       label:'Labor Reports',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
     // Shift Control
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
@@ -4214,7 +4214,7 @@ const App = {
         'lc-reports':            ['Labor Reports', 'Labor Control'],
         'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
         'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
-        'lc-time-off':           ['Time Off', 'Labor Control'],
+        'lc-time-off':           ['Time Off Log', 'Labor Control'],
         'lc-help':               ['Help and FAQ', 'Labor Control'],
       };
       const lcScreens = {
