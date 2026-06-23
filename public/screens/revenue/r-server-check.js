@@ -234,10 +234,12 @@ S.RevenueServerCheck = {
 
   // ── Shift log (data-card) ────────────────────────────────────────────────────
   logSection(log, targetCA) {
+    const shown = log.slice(0, App.listLimit('core', 'revenue_server_check'));
     return '<div class="sh" style="margin:24px 0 10px;">Server Shift</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers</th><th>Sales</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
-      + '</tr></thead><tbody id="rsc-log">' + this._buildRows(log, targetCA) + '</tbody></table></div></div>';
+      + '</tr></thead><tbody id="rsc-log">' + this._buildRows(shown, targetCA) + '</tbody></table></div></div>'
+      + App.showOlderBar('core', 'revenue_server_check', log, this._window !== 'all');
   },
 
   _buildRows(log, targetCA) {
@@ -273,8 +275,7 @@ S.RevenueServerCheck = {
     const scorecard = this.computeScorecard(win);
     const log = (App.data.revenue_server_checks || [])
       .filter(c => (c.date || '') >= cutoffStr)
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      .slice(0, 50);
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip(scorecard, targetCA)
@@ -310,6 +311,7 @@ S.RevenueServerCheck = {
   wire() {
     const c = this.container;
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
+    c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
     document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Server Performance', root: document.getElementById('rsc-sc-export') || c }));
 
