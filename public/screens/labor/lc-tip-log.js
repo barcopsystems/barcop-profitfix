@@ -31,6 +31,8 @@ S.LaborTipLog = {
   _poolAmount: '',         // pool dollar amount (operator-entered)
   _poolMethod: 'hours',    // 'hours' | 'equal'
   _poolEditId: null,       // id of a saved pool being edited (null = building a new one)
+  // Tip-pool EDIT pop-up state ('tpe-' ids; separate from the on-page builder).
+  _peEditId: null, _peDate: '', _peAmount: '', _peMethod: 'hours', _peRows: null,
 
   pools() {
     if (!App.laborData) App.laborData = {};
@@ -230,7 +232,7 @@ S.LaborTipLog = {
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on the Labor cockpit. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
-      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit loads it back into the calculator to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] },
+      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit opens it in a pop-up to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] },
       { h: 'Where Tips Go', p: ['Tips and pool splits feed the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum, and the Form 8027 worksheet in Books. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['On Log Tips, the Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
     ]);
@@ -261,7 +263,7 @@ S.LaborTipLog = {
         + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Total</label>'
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
-      + '<div id="' + p + 'tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
+      + '<div id="' + p + 'tipout-wrap" class="tl-tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
         + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div></div>';
   },
@@ -1123,7 +1125,7 @@ S.LaborTipLog = {
       const hedit = ev.target.closest('.tp-hedit');
       const hdel = ev.target.closest('.tp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDelPool(hdel.dataset.id); }
-      else if (hedit) { ev.stopPropagation(); this.editPool(hedit.dataset.id); }
+      else if (hedit) { ev.stopPropagation(); this.openPoolEditModal(hedit.dataset.id); }
       else if (hview) { ev.stopPropagation(); this.renderPoolDetail(hview.dataset.id); }
       else if (hrow) this.renderPoolDetail(hrow.dataset.id);
     };
@@ -1167,15 +1169,18 @@ S.LaborTipLog = {
     this.renderPool();
   },
 
-  computeShares() {
-    const pool = parseFloat(this._poolAmount) || 0;
-    const rows = this._poolRows || [];
+  // Shares for a set of rows. Defaults to the on-page builder's state; the edit
+  // pop-up passes its own rows/amount/method.
+  computeShares(rows, amount, method) {
+    rows = rows || this._poolRows || [];
+    const pool = parseFloat(amount != null ? amount : this._poolAmount) || 0;
+    method = method || this._poolMethod;
     let totalHours = 0;
     rows.forEach(r => { totalHours += parseFloat(r.hours) || 0; });
     const valid = rows.filter(r => r.staff_id);
     return rows.map(r => {
       let share = 0;
-      if (this._poolMethod === 'equal') { share = valid.length ? pool / valid.length : 0; }
+      if (method === 'equal') { share = valid.length ? pool / valid.length : 0; }
       else { const h = parseFloat(r.hours) || 0; share = totalHours > 0 ? pool * (h / totalHours) : 0; }
       return { staff_id: r.staff_id, hours: parseFloat(r.hours) || 0, share: r.staff_id ? share : 0 };
     });
@@ -1247,21 +1252,132 @@ S.LaborTipLog = {
     }
   },
 
-  // Load a saved pool back into the calculator to correct it; Update writes back to
-  // the SAME record (no duplicate).
-  editPool(id) {
+  // Edit a saved pool in a focused pop-up (matches the Log Tips edit), own 'tpe-'
+  // ids so the modal's rows never collide with the on-page builder behind it.
+  openPoolEditModal(id) {
+    if (!App.canEdit('lc-tip-log')) return;
     const p = this.pools().find(x => x.id === id);
-    if (!p) { this.renderPool(); return; }
-    this._poolEditId = id;
-    this._addDate = p.date || App.todayLocal();
-    this._addWeekStart = this.mondayOf(this._addDate);
-    this._poolAmount = (p.pool_amount != null) ? String(p.pool_amount) : '';
-    this._poolMethod = p.method || 'hours';
-    this._poolRows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
-    try { localStorage.removeItem(App._collapseKey('lc-tip-log')); } catch (e) {}  // make sure the form is open
-    this.renderPool();
-    const sc = this.container && this.container.closest('.content');
-    if (sc) sc.scrollTop = 0;
+    if (!p) return;
+    this._peEditId = id;
+    this._peDate = p.date || App.todayLocal();
+    this._peAmount = (p.pool_amount != null) ? String(p.pool_amount) : '';
+    this._peMethod = p.method || 'hours';
+    this._peRows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
+    this.renderPoolEditModal();
+  },
+  renderPoolEditModal() {
+    const equal = this._peMethod === 'equal';
+    const rows = this._peRows || [];
+    const rowHtml = rows.map((r, i) => this.poolEditRowHtml(r, i, equal)).join('');
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tip Pool</div>'
+      + '<div class="form-row" style="gap:16px;">'
+        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
+          + '<input type="date" id="tpe-date" value="' + esc(this._peDate || App.todayLocal()) + '"/></div>'
+        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Pool Amount</label>'
+          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tpe-pool" min="0" step="0.01" value="' + esc(this._peAmount) + '"/></div></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Method</label>'
+        + '<select id="tpe-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
+        + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div></div>'
+      + '<div style="max-height:38vh;overflow-y:auto;margin:0 -2px;padding:0 2px;">'
+        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th>Staff</th><th style="width:84px;">Hours</th><th style="width:104px;">Tip Share</th><th style="width:78px;"></th>'
+        + '</tr></thead><tbody id="tpe-rows">' + rowHtml + '</tbody></table></div></div>'
+      + '<button class="btn btn-ghost btn-sm" id="tpe-add">+ Add Participant</button>'
+      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+        + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tpe-c-alloc">$0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tpe-c-rem">$0</div></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="tpe-save">Update</button>'
+        + '<button class="btn btn-ghost" id="tpe-cancel">Cancel</button>'
+        + '<span id="tpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '<button class="btn btn-danger" id="tpe-del" style="margin-left:auto;">Delete</button>'
+      + '</div></div>';
+    App.openModal(html, { id: 'tp-edit-modal', maxWidth: 560, noClose: true });
+    const rowsEl = document.getElementById('tpe-rows');
+    if (rowsEl) {
+      rowsEl.addEventListener('input', () => { this.collectPoolEdit(); this.recalcPoolEdit(); });
+      rowsEl.addEventListener('change', ev => {
+        this.collectPoolEdit();
+        if (ev.target.classList && ev.target.classList.contains('tpe-staff')) {
+          const row = ev.target.closest('.tpe-row');
+          const idx = row ? parseInt(row.dataset.idx, 10) : -1;
+          const hoursInp = row && row.querySelector('.tpe-hours');
+          if (idx >= 0 && hoursInp && !hoursInp.value && this._peDate) {
+            const hrs = App.hoursFor(ev.target.value, this._peDate);
+            if (hrs != null && hrs > 0) { hoursInp.value = hrs; if (this._peRows[idx]) this._peRows[idx].hours = hrs; }
+          }
+        }
+        this.recalcPoolEdit();
+      });
+      rowsEl.addEventListener('click', ev => {
+        if (ev.target.closest('.tpe-remove')) { this.collectPoolEdit(); this._peRows.splice(parseInt(ev.target.closest('.tpe-row').dataset.idx, 10), 1); this.renderPoolEditModal(); }
+      });
+    }
+    document.getElementById('tpe-add')?.addEventListener('click', () => { this.collectPoolEdit(); this._peRows = this._peRows || []; this._peRows.push({ staff_id: '', hours: '' }); this.renderPoolEditModal(); });
+    document.getElementById('tpe-method')?.addEventListener('change', e => { this.collectPoolEdit(); this._peMethod = e.target.value; this.renderPoolEditModal(); });
+    document.getElementById('tpe-pool')?.addEventListener('input', () => { this._peAmount = document.getElementById('tpe-pool')?.value || ''; this.recalcPoolEdit(); });
+    document.getElementById('tpe-date')?.addEventListener('change', e => { this._peDate = e.target.value || this._peDate; });
+    document.getElementById('tpe-save')?.addEventListener('click', () => this.savePoolEdit());
+    document.getElementById('tpe-cancel')?.addEventListener('click', () => { this._peEditId = null; App.closeModal('tp-edit-modal'); });
+    document.getElementById('tpe-del')?.addEventListener('click', () => { const id = this._peEditId; this._peEditId = null; App.closeModal('tp-edit-modal'); this.confirmDelPool(id); });
+    this.recalcPoolEdit();
+  },
+  poolEditRowHtml(r, i, equal) {
+    r = r || {};
+    return '<tr class="tpe-row" data-idx="' + i + '">'
+      + '<td><select class="form-input tpe-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td><input class="form-input tpe-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
+      + '<td><div class="tpe-share" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm tpe-remove" type="button">Remove</button></td>'
+      + '</tr>';
+  },
+  collectPoolEdit() {
+    this._peAmount = document.getElementById('tpe-pool')?.value || '';
+    const rows = [...document.querySelectorAll('.tpe-row')];
+    if (rows.length) {
+      this._peRows = rows.map(r => ({ staff_id: r.querySelector('.tpe-staff')?.value || '', hours: r.querySelector('.tpe-hours')?.value || '' }));
+    }
+  },
+  recalcPoolEdit() {
+    const shares = this.computeShares(this._peRows, this._peAmount, this._peMethod);
+    const rowEls = [...document.querySelectorAll('.tpe-row')];
+    let alloc = 0;
+    rowEls.forEach((el, i) => { const s = shares[i]; if (!s) return; const shareEl = el.querySelector('.tpe-share'); if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share, 2) : '-'; alloc += s.share; });
+    const pool = parseFloat(this._peAmount) || 0;
+    const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    set('tpe-c-alloc', App.fmtCurrency(alloc, 2));
+    const rem = pool - alloc;
+    set('tpe-c-rem', App.fmtCurrency(rem, 2), Math.abs(rem) > 0.01 ? 'warn' : 'good');
+  },
+  async savePoolEdit() {
+    this.collectPoolEdit();
+    const err = document.getElementById('tpe-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const date = document.getElementById('tpe-date')?.value || this._peDate || '';
+    if (!date) { fail('Date is required.'); return; }
+    const pool = parseFloat(this._peAmount);
+    if (isNaN(pool) || pool <= 0) { fail('Enter the pool amount.'); return; }
+    const shares = this.computeShares(this._peRows, this._peAmount, this._peMethod).filter(s => s.staff_id);
+    if (shares.length === 0) { fail('Add at least one participant.'); return; }
+    if (this._peMethod === 'hours' && shares.every(s => s.hours <= 0)) { fail('Enter hours for the hours-based split.'); return; }
+    let totalHours = 0;
+    const participants = shares.map(s => { totalHours += s.hours; const staff = this.staffById(s.staff_id); return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share }; });
+    const existing = this.pools().find(x => x.id === this._peEditId);
+    const rec = {
+      id: this._peEditId, shift_id: App.tipShiftKey(date, ''), date, shift_type: '',
+      method: this._peMethod, pool_amount: pool, total_hours: totalHours, participants,
+      created_at: (existing && existing.created_at) ? existing.created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const btn = document.getElementById('tpe-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const idx = this.pools().findIndex(x => x.id === this._peEditId);
+    if (idx >= 0) this.pools()[idx] = rec; else this.pools().push(rec);
+    const ok = await App.putRecord('lc', 'tip_pool', rec);
+    if (ok) { this._peEditId = null; App.closeModal('tp-edit-modal'); this.renderPool(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   poolHistoryCard() {
