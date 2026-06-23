@@ -11,12 +11,14 @@
    the stats, filter, and tip list. Editing a row opens it in a focused pop-up. */
 
 S.LaborTipLog = {
+  _mode: 'log',            // 'log' = per-person tip log, 'pool' = tip pool split (toggle at top)
   editId: null,
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
   // Batch manual-entry state (preloaded from the picked day's posted schedule).
+  // The week + day anchor (_addWeekStart / _addDate) is SHARED by both modes.
   _addWeekStart: '',       // Monday of the week shown in the day picker
   _addDate: '',            // selected day (ymd)
   _addShiftType: '',       // selected service period (the daypart / shift_type)
@@ -24,7 +26,17 @@ S.LaborTipLog = {
   _savedNote: null,        // count to confirm after a save (shown once)
   // Edit pop-up anchor state (one record at a time).
   _eWeekStart: '', _eDate: '', _ePeriod: '',
+  // Tip Pool mode state (shares the anchor above; own crew rows + amount + method).
+  _poolRows: null,         // [{ staff_id, name, hours }]
+  _poolAmount: '',         // pool dollar amount (operator-entered)
+  _poolMethod: 'hours',    // 'hours' | 'equal'
+  _poolEditId: null,       // id of a saved pool being edited (null = building a new one)
 
+  pools() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_tip_pools)) App.laborData.lc_tip_pools = [];
+    return App.laborData.lc_tip_pools;
+  },
   tips() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_tips)) App.laborData.lc_tips = [];
@@ -160,28 +172,67 @@ S.LaborTipLog = {
     this.actions = actions;
     // Keep any unsaved in-progress entry so leaving the screen and coming back (or
     // clicking a filter) never wipes it — only Save or Start Over resets it. A
-    // "fresh" visit (no entered amounts) defaults to the open shift, preloads crew.
-    const hasWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
-    if (!hasWork) {
-      const today = App.todayLocal();
-      this._addWeekStart = this.mondayOf(today);
-      this._addDate = today;
-      this._addShiftType = '';   // tips log per DAY now (no service-period split)
-      this._addRows = [];
-      this.preloadFromDate(today, this._addShiftType);
+    // "fresh" visit (no entered amounts/pool) lands on today with that day's crew
+    // already loaded, for whichever mode is active.
+    const today = App.todayLocal();
+    if (this._mode === 'pool') {
+      const poolWork = this._poolEditId || (this._poolAmount !== '' && this._poolAmount != null);
+      if (!poolWork) {
+        this._addWeekStart = this.mondayOf(today);
+        this._addDate = today;
+        this._poolAmount = ''; this._poolMethod = 'hours'; this._poolEditId = null;
+        this._poolRows = this.crewForDate(today);
+      }
+    } else {
+      const logWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
+      if (!logWork) {
+        this._addWeekStart = this.mondayOf(today);
+        this._addDate = today;
+        this._addShiftType = '';   // tips log per DAY now (no service-period split)
+        this._addRows = [];
+        this.preloadFromDate(today, this._addShiftType);
+      }
     }
     this._savedNote = null;
     this.renderList();
   },
 
+  // Segmented toggle that picks the mode (sits at the top of the card, above the
+  // shared week + day anchor). Switching keeps the selected day and preloads the
+  // new mode's crew if it has nothing in progress.
+  modeToggle() {
+    const seg = (mode, label) => {
+      const on = this._mode === mode;
+      return '<button type="button" class="btn btn-sm tl-modesel" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    return '<div class="seg-toggle">' + seg('log', 'Log Tips') + seg('pool', 'Tip Pool') + '</div>';
+  },
+  switchMode(mode) {
+    if (mode === this._mode) return;
+    this._mode = mode;
+    const date = this._addDate || App.todayLocal();
+    if (mode === 'pool') {
+      const poolWork = this._poolEditId || (this._poolAmount !== '' && this._poolAmount != null);
+      if (!poolWork) { this._poolAmount = ''; this._poolMethod = 'hours'; this._poolEditId = null; this._poolRows = this.crewForDate(date); }
+    } else {
+      const logWork = (this._addRows || []).some(r => r && (r.cash || r.card || r.sales || r.received));
+      if (!logWork) { this._addShiftType = ''; this._addRows = []; this.preloadFromDate(date, ''); }
+    }
+    this.renderList();
+  },
+
   showHowTo() {
-    App.showHelpModal('How the Tip Log Works', [
-      { p: ['The Tip Log records cash and card tips by day and staff member. Tap the day and Bar Cop loads the staff who were scheduled, so you mostly just type the tip amounts. Most weeks you import this off your POS export on the Labor cockpit instead.'] },
-      { h: 'Logging Tips', p: ['Tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole day at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week.'] },
+    App.showHelpModal('How Tips Work', [
+      { p: ['This screen handles a day\'s tips two ways: the toggle up top picks Log Tips to record each person\'s actual cash and card tips, or Tip Pool to split a shared pool across the crew. Both share the same week and day picker, so pick the day once and switch as you need.'] },
+      { h: 'Logging Tips', p: ['On Log Tips, tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole day at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week. Most weeks you import this off your POS export on the Labor cockpit instead.'] },
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on the Labor cockpit. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
-      { h: 'Where Tips Go', p: ['Tips feed the Tip Pool Log and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
-      { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
+      { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
+      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. View opens a pool to see each person\'s share, with an Export PDF button to print or hand off that split. Edit loads it back into the calculator to fix a number, where Update writes back to the same record instead of making a duplicate. Delete removes a pool you logged in error.'] },
+      { h: 'Where Tips Go', p: ['Tips and pool splits feed the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum, and the Form 8027 worksheet in Books. Logging accurately here keeps those honest.'] },
+      { h: 'Worksheet', p: ['On Log Tips, the Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
     ]);
   },
 
@@ -276,7 +327,7 @@ S.LaborTipLog = {
     if (this.staff().length === 0) {
       App.setupCard(this.container, {
         title: 'Log Your First Tips',
-        lead: 'Tips are logged against your roster, by shift and staff member. Add your staff and you can start logging.',
+        lead: 'Tips are logged against your roster, by day and staff member. Add your staff and you can start logging.',
         steps: [
           { title: 'Add your staff', desc: 'Tips are logged against a staff member, so build your roster first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
         ]
@@ -284,8 +335,11 @@ S.LaborTipLog = {
       return;
     }
 
+    if (this._mode === 'pool') { this.renderPool(); return; }
+
     // The manual batch builder is the whole card now: the tips import lives on the
-    // Labor cockpit (one import door), so there is no Manual/Import toggle here.
+    // Labor cockpit (one import door), so there is no Manual/Import toggle here. The
+    // Log Tips / Tip Pool toggle sits at the top of the card, above the anchor.
     // Primary action lives BELOW the card (bottom-left), collapse-group tagged so
     // it hides with the card.
     const modeBody = this.batchBody();
@@ -297,8 +351,9 @@ S.LaborTipLog = {
       + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
       + '</div>';
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-log', 'Log Tips')
+      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
       + '<div class="collapse-body">'
+      + this.modeToggle()
       + modeBody
       + '</div></div>';
 
@@ -357,6 +412,8 @@ S.LaborTipLog = {
     this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
+      const modeSel = ev.target.closest('.tl-modesel');
+      if (modeSel) { this.switchMode(modeSel.dataset.mode); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       // Day anchor (batch builder) — week pill + day chips, no future.
@@ -958,5 +1015,308 @@ S.LaborTipLog = {
       ],
       rows: 14
     });
+  },
+
+  // ══ Tip Pool mode ════════════════════════════════════════════════════════════
+  // The pool splits one amount across the day's crew by hours or equally. It shares
+  // the week + day anchor with Log Tips (the toggle picks the mode); its own state
+  // is _poolRows / _poolAmount / _poolMethod / _poolEditId, and it writes lc_tip_pools.
+
+  // Preload the crew for a day from the posted schedule (call-out adjusted, hours
+  // from logged-actuals-else-scheduled) via preloadFromDate, restoring the Log Tips
+  // in-progress rows so a pool preload never clobbers a half-finished log entry.
+  crewForDate(date) {
+    if (!date) return [];
+    const savedRows = this._addRows, savedDate = this._addDate, savedShift = this._addShiftType;
+    this.preloadFromDate(date, '');
+    const crew = (this._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
+    this._addRows = savedRows; this._addDate = savedDate; this._addShiftType = savedShift;
+    return crew;
+  },
+
+  renderPool() {
+    const equal = this._poolMethod === 'equal';
+    const rows = this._poolRows || [];
+    const rowHtml = rows.map((r, i) => this.poolRowHtml(r, i, equal)).join('');
+    const rowsBlock = rows.length
+      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
+        + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
+        + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
+        + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
+      : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Pick a day above to load the crew, or add one below.</div>';
+    const calcAndHeads = rows.length
+      ? '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+        + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val" id="tp-c-hours">0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tp-c-alloc">$0</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
+        + '</div>'
+        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
+          + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+          + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
+        + '</div>'
+      : '';
+    const card = '<div class="card form-card">'
+      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
+      + '<div class="collapse-body">'
+      + this.modeToggle()
+      + '<div id="tp-anchor">' + this.tlAnchor('tp', this._addWeekStart, this._addDate) + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
+      + 'value="' + esc(this._poolAmount) + '"/></div></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Method</label>'
+      + '<select id="tp-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
+      + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
+      + '</div>'
+      + rowsBlock
+      + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
+      + calcAndHeads
+      + '</div></div>';
+    const actionsRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="tp-save">' + (this._poolEditId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
+      + '<button class="btn btn-ghost" id="tp-clear">Start Over</button>'
+      + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+
+    this.container.innerHTML = '<div class="screen">' + card + actionsRow + this.poolHistoryCard() + '</div>';
+
+    const rowsEl = document.getElementById('tp-rows');
+    if (rowsEl) {
+      rowsEl.addEventListener('input', () => { this.collectPool(); this.recalcPool(); });
+      rowsEl.addEventListener('change', ev => {
+        this.collectPool();
+        if (ev.target.classList && ev.target.classList.contains('tp-staff')) {
+          const row = ev.target.closest('.tp-row');
+          const idx = row ? parseInt(row.dataset.idx, 10) : -1;
+          const hoursInp = row && row.querySelector('.tp-hours');
+          if (idx >= 0 && hoursInp && !hoursInp.value && this._addDate) {
+            const hrs = App.hoursFor(ev.target.value, this._addDate);
+            if (hrs != null && hrs > 0) { hoursInp.value = hrs; if (this._poolRows[idx]) this._poolRows[idx].hours = hrs; }
+          }
+        }
+        this.recalcPool();
+      });
+      rowsEl.addEventListener('click', ev => {
+        if (ev.target.closest('.tp-remove')) {
+          this.collectPool();
+          this._poolRows.splice(parseInt(ev.target.closest('.tp-row').dataset.idx, 10), 1);
+          this.renderPool();
+        }
+      });
+    }
+    document.getElementById('tp-add')?.addEventListener('click', () => { this.collectPool(); this._poolRows = this._poolRows || []; this._poolRows.push({ staff_id: '', hours: '' }); this.renderPool(); });
+    document.getElementById('tp-method')?.addEventListener('change', e => { this.collectPool(); this._poolMethod = e.target.value; this.renderPool(); });
+    document.getElementById('tp-save')?.addEventListener('click', () => this.savePool());
+    document.getElementById('tp-clear')?.addEventListener('click', () => { this._poolEditId = null; this._poolAmount = ''; this._poolMethod = 'hours'; this._addDate = App.todayLocal(); this._addWeekStart = this.mondayOf(this._addDate); this._poolRows = this.crewForDate(this._addDate); this.renderPool(); });
+    document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
+    this.container.onclick = ev => {
+      const modeSel = ev.target.closest('.tl-modesel');
+      if (modeSel) { this.switchMode(modeSel.dataset.mode); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('.tp-wk-prev')) { this.collectPool(); this._addWeekStart = this.addDaysYmd(this._addWeekStart, -7); this.renderPool(); return; }
+      if (ev.target.closest('.tp-wk-next')) { const nw = this.addDaysYmd(this._addWeekStart, 7); if (nw > this.mondayOf(App.todayLocal())) return; this.collectPool(); this._addWeekStart = nw; this.renderPool(); return; }
+      if (ev.target.closest('.tp-wk-now')) { this.collectPool(); this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderPool(); return; }
+      const dayChip = ev.target.closest('.tp-day');
+      if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
+      if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderPool()); return; }
+      const hrow = ev.target.closest('.tp-hrow');
+      const hview = ev.target.closest('.tp-hview');
+      const hedit = ev.target.closest('.tp-hedit');
+      const hdel = ev.target.closest('.tp-hdel');
+      if (hdel) { ev.stopPropagation(); this.confirmDelPool(hdel.dataset.id); }
+      else if (hedit) { ev.stopPropagation(); this.editPool(hedit.dataset.id); }
+      else if (hview) { ev.stopPropagation(); this.renderPoolDetail(hview.dataset.id); }
+      else if (hrow) this.renderPoolDetail(hrow.dataset.id);
+    };
+    App.applyCollapsed(this.container);
+    this.recalcPool();
+  },
+
+  poolRowHtml(r, i, equal) {
+    r = r || {};
+    return '<tr class="tp-row" data-idx="' + i + '">'
+      + '<td><select class="form-input tp-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
+      + '<td><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td></td>'
+      + '<td><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
+      + '</tr>';
+  },
+
+  onPoolInput() {
+    this._poolAmount = document.getElementById('tp-pool')?.value || '';
+    this.recalcPool();
+  },
+
+  collectPool() {
+    this._poolAmount = document.getElementById('tp-pool')?.value || '';
+    const rows = [...document.querySelectorAll('.tp-row')];
+    if (rows.length) {
+      this._poolRows = rows.map(r => ({
+        staff_id: r.querySelector('.tp-staff')?.value || '',
+        hours: r.querySelector('.tp-hours')?.value || ''
+      }));
+    }
+  },
+
+  // Pick a day -> preload the participants. The pool amount stays operator-entered.
+  loadPoolDay(date) {
+    this.collectPool();
+    this._addDate = date || this._addDate || App.todayLocal();
+    this._addWeekStart = this.mondayOf(this._addDate);
+    this._poolRows = this.crewForDate(this._addDate);
+    this.renderPool();
+  },
+
+  computeShares() {
+    const pool = parseFloat(this._poolAmount) || 0;
+    const rows = this._poolRows || [];
+    let totalHours = 0;
+    rows.forEach(r => { totalHours += parseFloat(r.hours) || 0; });
+    const valid = rows.filter(r => r.staff_id);
+    return rows.map(r => {
+      let share = 0;
+      if (this._poolMethod === 'equal') { share = valid.length ? pool / valid.length : 0; }
+      else { const h = parseFloat(r.hours) || 0; share = totalHours > 0 ? pool * (h / totalHours) : 0; }
+      return { staff_id: r.staff_id, hours: parseFloat(r.hours) || 0, share: r.staff_id ? share : 0 };
+    });
+  },
+
+  recalcPool() {
+    const shares = this.computeShares();
+    const rowEls = [...document.querySelectorAll('.tp-row')];
+    let alloc = 0, totalHours = 0, count = 0;
+    rowEls.forEach((el, i) => {
+      const s = shares[i]; if (!s) return;
+      const shareEl = el.querySelector('.tp-share');
+      if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share, 2) : '-';
+      alloc += s.share; totalHours += s.hours; if (s.staff_id) count++;
+    });
+    const pool = parseFloat(this._poolAmount) || 0;
+    const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    set('tp-c-count', count);
+    set('tp-c-hours', totalHours.toFixed(2).replace(/\.00$/, ''));
+    set('tp-c-alloc', App.fmtCurrency(alloc, 2));
+    const rem = pool - alloc;
+    set('tp-c-rem', App.fmtCurrency(rem, 2), Math.abs(rem) > 0.01 ? 'warn' : 'good');
+  },
+
+  async savePool() {
+    this.collectPool();
+    const err = document.getElementById('tp-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (!this._addDate) { fail('Date is required.'); return; }
+    const pool = parseFloat(this._poolAmount);
+    if (isNaN(pool) || pool <= 0) { fail('Enter the pool amount.'); return; }
+    const shares = this.computeShares().filter(s => s.staff_id);
+    if (shares.length === 0) { fail('Add at least one participant.'); return; }
+    if (this._poolMethod === 'hours' && shares.every(s => s.hours <= 0)) { fail('Enter hours for the hours-based split.'); return; }
+
+    let totalHours = 0;
+    const participants = shares.map(s => { totalHours += s.hours; const staff = this.staffById(s.staff_id); return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share }; });
+
+    // Anchor the pool to its day via the shared per-day key, so Form 8027 + Tip
+    // History group pool splits together with the matching Tip Log entries.
+    const existing = this._poolEditId ? this.pools().find(x => x.id === this._poolEditId) : null;
+    const rec = {
+      id:          this._poolEditId || App.uid(),
+      shift_id:    App.tipShiftKey(this._addDate, ''),
+      date:        this._addDate,
+      shift_type:  '',
+      method:      this._poolMethod,
+      pool_amount: pool,
+      total_hours: totalHours,
+      participants,
+      created_at:  (existing && existing.created_at) ? existing.created_at : new Date().toISOString()
+    };
+    if (this._poolEditId) rec.updated_at = new Date().toISOString();
+
+    const btn = document.getElementById('tp-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const idx = this._poolEditId ? this.pools().findIndex(x => x.id === this._poolEditId) : -1;
+    if (idx >= 0) this.pools()[idx] = rec; else this.pools().push(rec);
+    const ok = await App.putRecord('lc', 'tip_pool', rec);
+    if (ok) {
+      // Reset to a fresh, ready pool for today (matches the Log Tips post-save feel).
+      this._poolEditId = null; this._poolAmount = ''; this._poolMethod = 'hours';
+      this._addDate = App.todayLocal(); this._addWeekStart = this.mondayOf(this._addDate);
+      this._poolRows = this.crewForDate(this._addDate);
+      this.renderPool();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = this._poolEditId ? 'Update Tip Pool' : 'Save Tip Pool'; }
+      fail('Save failed. Try again.');
+    }
+  },
+
+  // Load a saved pool back into the calculator to correct it; Update writes back to
+  // the SAME record (no duplicate).
+  editPool(id) {
+    const p = this.pools().find(x => x.id === id);
+    if (!p) { this.renderPool(); return; }
+    this._poolEditId = id;
+    this._addDate = p.date || App.todayLocal();
+    this._addWeekStart = this.mondayOf(this._addDate);
+    this._poolAmount = (p.pool_amount != null) ? String(p.pool_amount) : '';
+    this._poolMethod = p.method || 'hours';
+    this._poolRows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
+    try { localStorage.removeItem(App._collapseKey('lc-tip-log')); } catch (e) {}  // make sure the form is open
+    this.renderPool();
+    const sc = this.container && this.container.closest('.content');
+    if (sc) sc.scrollTop = 0;
+  },
+
+  poolHistoryCard() {
+    const list = [...this.pools()].sort((a, b) =>
+      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    if (list.length === 0) return '';
+    const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr class="tp-hrow" data-id="' + p.id + '" style="cursor:pointer;">'
+      + '<td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
+      + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
+      + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</td>'
+      + '<td>' + ((p.participants || []).length) + '</td>'
+      + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm tp-hview" data-id="' + p.id + '">View</button>'
+      + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
+      + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
+      + '</div></td></tr>').join('');
+    return '<div class="sh" style="margin:24px 0 10px;">Saved Tip Pools</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('lc', 'tip_pool', list, false);
+  },
+
+  renderPoolDetail(id) {
+    const p = this.pools().find(x => x.id === id);
+    if (!p) { this.renderPool(); return; }
+    this.actions.innerHTML = '';
+    const rows = (p.participants || []).map(pt => '<tr>'
+      + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
+      + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
+      + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
+    this.container.innerHTML = '<div class="screen">'
+      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val lg">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val lg">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val lg">' + (p.total_hours || 0) + '</div></div>'
+      + '</div></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="tp-back">Back</button><button class="btn btn-ghost btn-sm" id="tp-export">Export PDF</button></div></div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Staff</th><th>Hours</th><th>Tip Share</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+    this.container.onclick = null;
+    document.getElementById('tp-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: this.container }));
+    document.getElementById('tp-back')?.addEventListener('click', () => this.renderPool());
+  },
+
+  async confirmDelPool(id) {
+    if (!(await App.confirmDelete())) return;
+    await App.removeRecord('lc', 'tip_pool', id);
+    this.renderPool();
   }
 };
