@@ -257,7 +257,7 @@ S.ShiftCashControl = {
       } else {
         reconcileBlock = '<div style="font-size:12px;color:var(--t4);margin-top:8px;">No reconcile logged yet</div>';
       }
-      return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;background:var(--surface);">'
+      return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;background:var(--gold-tint);">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
         +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(d.name) + '</div>'
         +   '<div style="font-size:11px;color:var(--t3);">Bank ' + bank + '</div></div>'
