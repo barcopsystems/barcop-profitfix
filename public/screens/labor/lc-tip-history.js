@@ -1,11 +1,11 @@
 'use strict';
 
-/* ── Labor Control — Tip History (reads lc_tips) ──────────────────────────────
-   Historical tip analysis over a date range, three connected-tab views: by
-   staff, by shift, and by week. Read-only. A plain .ch-tabs switcher over a
-   stats card, then a single row of time-range chips (Export on the right) sitting
-   directly above the data card. The range is global to the report, so it persists
-   across tab switches; time is the only filter (the Log Hours chip model). */
+/* ── Labor Control — Tip History (reads lc_tips + lc_tip_pools) ───────────────
+   Read-only history over a date range, three connected-tab views: tips By Staff,
+   tips By Week, and the saved Tip Pools (with a per-person split View). A plain
+   .ch-tabs switcher over a stats card, then a single row of time-range chips
+   (Export on the right) directly above the data card. The range is global to the
+   report, so it persists across tab switches; time is the only filter. */
 
 S.LaborTipHistory = {
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
@@ -13,7 +13,7 @@ S.LaborTipHistory = {
   filterFrom: '',          // custom range only
   filterTo: '',            // custom range only
   tab: 'staff',
-  TABS: [['staff', 'By Staff'], ['shift', 'By Shift'], ['week', 'By Week']],
+  TABS: [['staff', 'By Staff'], ['week', 'By Week'], ['pools', 'Tip Pools']],
   // Single-select time range chips (the only filter), daily cadence. Mirrors Log Hours.
   RANGE_CHIPS: [
     { v: 'this-week', label: 'This Week' }, { v: 'last-week', label: 'Last Week' },
@@ -23,8 +23,6 @@ S.LaborTipHistory = {
 
   tips() { return ((App.laborData && App.laborData.lc_tips) || []); },
   pools() { return ((App.laborData && App.laborData.lc_tip_pools) || []); },
-  shifts() { return ((App.shiftData && App.shiftData.sc_shifts) || []); },
-  shiftById(id) { return this.shifts().find(s => s.id === id); },
   // Effective date window from the active range chip (preset recomputed off "today"
   // each render so This Week stays live); Custom reads the From/To pickers.
   effectiveRange() {
@@ -59,8 +57,8 @@ S.LaborTipHistory = {
 
   showHowTo() {
     App.showHelpModal('How Tip History Works', [
-      { p: ['Tip History summarizes the tips you have logged over a date range, three ways: by staff, by shift, and by week. Pick a range with the chips above the table, then switch tabs to see each view.'] },
-      { h: 'The Three Views', p: ['By Staff totals each person\'s cash and card; if you use tip-outs, it also shows their tip-out adjustment and net take-home. By Shift groups tips under the shift they were logged against and shows whether a pool split was saved for it. By Week rolls the range up week by week so you can watch the trend.'] },
+      { p: ['Tip History summarizes what you logged over a date range: tips By Staff, tips By Week, and your saved Tip Pools. Pick a range with the chips above the table, then switch tabs to see each view.'] },
+      { h: 'The Three Views', p: ['By Staff totals each person\'s cash and card; with tip-outs on it also shows their tip-out adjustment and net take-home. By Week rolls the range up week by week with the same cash, card, and net breakdown so you can watch the trend. Tip Pools lists every pool you saved in the range, and View opens its per-person split.'] },
       { h: 'Export', p: ['Export PDF saves whichever tab you are on, so you can hand someone just the view they need, like one server\'s totals for the month.'] }
     ]);
   },
@@ -88,38 +86,50 @@ S.LaborTipHistory = {
   renderReport() {
     this.actions.innerHTML = '';
 
-    if (this.tips().length === 0) {
+    if (this.tips().length === 0 && this.pools().length === 0) {
       App.setupCard(this.container, {
         title: 'Tip History',
-        lead: 'Tip History summarizes the tips you log, by staff, by shift, and by week over any date range.',
+        lead: 'Tip History summarizes the tips you log, by staff and by week, plus the tip pools you save, over any date range.',
         steps: [
-          { title: 'Log your first tips', desc: 'Tips you log in the Tip Log show up here. Log some to get started.', btn: 'Go to Tip Log', screen: 'lc-tip-log', done: false }
+          { title: 'Log your first tips', desc: 'Tips and pools you record in the Tip Log show up here. Log some to get started.', btn: 'Go to Tip Log', screen: 'lc-tip-log', done: false }
         ]
       });
       return;
     }
 
     const rows = this.tips().filter(t => this.inRange(t));
-    const cash = rows.reduce((t, x) => t + (x.cash_tips || 0), 0);
-    const card = rows.reduce((t, x) => t + (x.card_tips || 0), 0);
-    const total = cash + card;
+    const poolRows = this.pools().filter(p => this.inRange(p));
 
-    const statsCard = this.statsCard(
-      this.statItem('Entries', rows.length)
-      + this.statItem('Total Tips', App.fmtCurrency(total))
-      + this.statItem('Cash', App.fmtCurrency(cash))
-      + this.statItem('Card', App.fmtCurrency(card))
-      + this.statItem('Avg / Entry', App.fmtCurrency(rows.length ? total / rows.length : 0)));
+    let statsCard;
+    if (this.tab === 'pools') {
+      const poolTotal = poolRows.reduce((s, p) => s + (p.pool_amount || 0), 0);
+      statsCard = this.statsCard(
+        this.statItem('Pools', poolRows.length)
+        + this.statItem('Total Pooled', App.fmtCurrency(poolTotal))
+        + this.statItem('Avg Pool', App.fmtCurrency(poolRows.length ? poolTotal / poolRows.length : 0)));
+    } else {
+      const cash = rows.reduce((t, x) => t + (x.cash_tips || 0), 0);
+      const card = rows.reduce((t, x) => t + (x.card_tips || 0), 0);
+      const total = cash + card;
+      statsCard = this.statsCard(
+        this.statItem('Entries', rows.length)
+        + this.statItem('Total Tips', App.fmtCurrency(total))
+        + this.statItem('Cash', App.fmtCurrency(cash))
+        + this.statItem('Card', App.fmtCurrency(card))
+        + this.statItem('Avg / Entry', App.fmtCurrency(rows.length ? total / rows.length : 0)));
+    }
 
     this.container.innerHTML = '<div class="screen">'
       + this.tabBar()
       + statsCard
       + this.filterRow()
-      + this.tabBody(rows)
+      + this.tabBody(rows, poolRows)
       + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#th-export')) { App.exportPDF({ title: 'Tip History', root: this.container }); return; }
+      const pview = ev.target.closest('.th-pview');
+      if (pview) { this.openPoolView(pview.dataset.id); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       const chip = ev.target.closest('.th-range-chip');
@@ -155,8 +165,8 @@ S.LaborTipHistory = {
     return row + custom;
   },
 
-  tabBody(rows) {
-    if (this.tab === 'shift') return this.byShift(rows);
+  tabBody(rows, poolRows) {
+    if (this.tab === 'pools') return this.byPools(poolRows);
     if (this.tab === 'week') return this.byWeek(rows);
     return this.byStaff(rows);
   },
@@ -203,57 +213,81 @@ S.LaborTipHistory = {
     return this.dataCard('<th>Staff</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Avg / Entry</th>', trs);
   },
 
-  // Tip entries with a shift_id group under the matching shift. POOL column
-  // shows whether a pool split was saved for that shift.
-  byShift(rows) {
-    const linked = rows.filter(t => t.shift_id);
-    if (!linked.length) {
-      return this.dataCard('<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>',
-        this.noRow(6, 'No shift-linked tips in this range. Tips logged against a specific shift show up here.'));
-    }
-    const g = {};
-    linked.forEach(t => {
-      const k = t.shift_id;
-      if (!g[k]) {
-        const s = this.shiftById(k);
-        g[k] = { shift_id: k, date: t.date, shift_type: t.shift_type || (s ? s.shift_type : '') || '', count: 0, cash: 0, card: 0, pool_amount: null };
-      }
-      g[k].count++;
-      g[k].cash += (t.cash_tips || 0);
-      g[k].card += (t.card_tips || 0);
-    });
-    this.pools().forEach(p => { if (g[p.shift_id]) g[p.shift_id].pool_amount = p.pool_amount; });
-    const trs = Object.keys(g)
-      .sort((a, b) => (g[b].date || '').localeCompare(g[a].date || ''))
-      .map(k => {
-        const x = g[k];
-        const total = x.cash + x.card;
-        const poolCell = x.pool_amount != null
-          ? '<span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--t2);">POOL ' + App.fmtCurrency(x.pool_amount) + '</span>'
-          : '<span style="font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;">No pool saved</span>';
-        return '<tr><td><div class="val">' + (x.date ? new Date(x.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-') + '</div>'
-          + (x.shift_type ? '<div style="font-size:10px;color:var(--t3);">' + esc(x.shift_type) + '</div>' : '') + '</td>'
-          + '<td>' + x.count + '</td>'
-          + '<td>' + App.fmtCurrency(x.cash) + '</td>'
-          + '<td>' + App.fmtCurrency(x.card) + '</td>'
-          + '<td class="val">' + App.fmtCurrency(total) + '</td>'
-          + '<td>' + poolCell + '</td></tr>';
-      }).join('');
-    return this.dataCard('<th>Shift</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Pool</th>', trs);
-  },
-
+  // Weekly roll-up with the same cash / card / net breakdown as By Staff, so the
+  // view carries real detail (not just one total column).
   byWeek(rows) {
+    const hasTipOut = rows.some(t => (t.tip_out_paid || 0) > 0 || (t.tip_out_received || 0) > 0);
     const g = {};
     rows.forEach(t => {
       const wk = this.mondayOf(t.date);
-      if (!g[wk]) g[wk] = { count: 0, total: 0 };
+      if (!g[wk]) g[wk] = { count: 0, cash: 0, card: 0, tipout: 0, net: 0 };
       g[wk].count++;
-      g[wk].total += (t.total_tips || 0);
+      g[wk].cash += (t.cash_tips || 0);
+      g[wk].card += (t.card_tips || 0);
+      g[wk].tipout += (parseFloat(t.tip_out_received) || 0) - (parseFloat(t.tip_out_paid) || 0);
+      g[wk].net += App.netTips(t);
     });
-    const trs = Object.keys(g).sort((a, b) => b.localeCompare(a)).map(wk =>
-      '<tr><td><div class="val">Week of ' + this.fmtDate(wk) + '</div></td>'
-      + '<td>' + g[wk].count + '</td>'
-      + '<td class="val">' + App.fmtCurrency(g[wk].total) + '</td></tr>').join('') || this.noRow(3);
-    return this.dataCard('<th>Week</th><th>Entries</th><th>Total Tips</th>', trs);
+    const keys = Object.keys(g).sort((a, b) => b.localeCompare(a));
+    if (hasTipOut) {
+      const trs = keys.map(wk => {
+        const s = g[wk];
+        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (s.tipout > 0 ? '+' : '') + App.fmtCurrency(s.tipout, 2);
+        return '<tr><td><div class="val">Week of ' + this.fmtDate(wk) + '</div></td>'
+          + '<td>' + s.count + '</td>'
+          + '<td>' + App.fmtCurrency(s.cash) + '</td>'
+          + '<td>' + App.fmtCurrency(s.card) + '</td>'
+          + '<td>' + toCell + '</td>'
+          + '<td class="val">' + App.fmtCurrency(s.net) + '</td></tr>';
+      }).join('') || this.noRow(6);
+      return this.dataCard('<th>Week</th><th>Entries</th><th>Cash</th><th>Card</th><th>Tip-Out</th><th>Net Tips</th>', trs);
+    }
+    const trs = keys.map(wk => {
+      const s = g[wk], tot = s.cash + s.card;
+      return '<tr><td><div class="val">Week of ' + this.fmtDate(wk) + '</div></td>'
+        + '<td>' + s.count + '</td>'
+        + '<td>' + App.fmtCurrency(s.cash) + '</td>'
+        + '<td>' + App.fmtCurrency(s.card) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(tot) + '</td>'
+        + '<td>' + App.fmtCurrency(s.count ? tot / s.count : 0) + '</td></tr>';
+    }).join('') || this.noRow(6);
+    return this.dataCard('<th>Week</th><th>Entries</th><th>Cash</th><th>Card</th><th>Total</th><th>Avg / Entry</th>', trs);
+  },
+
+  // Every saved tip pool in the range; View opens its per-person split.
+  byPools(poolRows) {
+    if (!poolRows.length) {
+      return this.dataCard('<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>',
+        this.noRow(5, 'No tip pools saved in this range. Pools you save in Tip Pool mode show up here.'));
+    }
+    const trs = [...poolRows].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(p =>
+      '<tr><td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
+      + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
+      + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0) + '</td>'
+      + '<td>' + ((p.participants || []).length) + '</td>'
+      + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm th-pview" data-id="' + esc(p.id) + '">View</button></div></td></tr>').join('');
+    return this.dataCard('<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>', trs);
+  },
+
+  // Read-only per-person split for a saved pool, in a pop-up (matches the edit pop-up).
+  openPoolView(id) {
+    const p = this.pools().find(x => x.id === id);
+    if (!p) return;
+    const rows = (p.participants || []).map(pt => '<tr>'
+      + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
+      + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
+      + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
+    const html = '<div class="card form-card" id="th-pview-card" style="margin:0;"><div class="card-title">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
+      + '<div class="calc" style="margin-bottom:14px;">'
+        + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + (p.total_hours || 0) + '</div></div>'
+      + '</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<div class="card-actions"><button class="btn btn-ghost" id="th-pview-export">Export PDF</button>'
+      + '<button class="btn btn-ghost" id="th-pview-close" style="margin-left:auto;">Close</button></div></div>';
+    App.openModal(html, { id: 'th-pview-modal', maxWidth: 520 });
+    document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: document.getElementById('th-pview-card') }));
+    document.getElementById('th-pview-close')?.addEventListener('click', () => App.closeModal('th-pview-modal'));
   }
 };
