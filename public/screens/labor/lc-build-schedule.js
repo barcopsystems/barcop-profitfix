@@ -315,7 +315,7 @@ S.LaborBuildSchedule = {
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
-        + '<div class="calc-item"><div class="calc-label">Labor Budget (' + App.fmtPct(target) + ')</div><div class="calc-val lg">' + App.fmtCurrency(budget)
+        + '<div class="calc-item"><div class="calc-label">Labor Budget</div><div class="calc-val lg">' + App.fmtCurrency(budget)
         + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Target Hours</div><div class="calc-val lg">' + (targetHrs > 0 ? targetHrs.toFixed(1) + ' hrs' : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
@@ -709,7 +709,7 @@ S.LaborBuildSchedule = {
       + '</div></div>';
     App.openModal(html, { id: 'bs-lt-modal', maxWidth: 460, noClose: true });
     document.getElementById('bs-lt-cancel')?.addEventListener('click', () => App.closeModal('bs-lt-modal'));
-    document.getElementById('bs-lt-settings')?.addEventListener('click', () => { App.closeModal('bs-lt-modal'); if (window.S && S.HubSettings) S.HubSettings.open(); });
+    document.getElementById('bs-lt-settings')?.addEventListener('click', () => { App.closeModal('bs-lt-modal'); if (window.S && S.HubSettings) S.HubSettings.open('recovery-targets'); });
     document.getElementById('bs-lt-save')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('bs-lt-val')?.value);
       const err = document.getElementById('bs-lt-err');
