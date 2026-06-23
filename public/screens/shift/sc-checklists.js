@@ -139,7 +139,7 @@ S.ShiftChecklists = {
     const toggle = '<div style="display:flex;gap:8px;margin-bottom:18px;">'
       + this.TYPES.map(t =>
         '<button type="button" class="cl-toggle" data-type="' + t + '" style="padding:9px 16px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
-        + (this.TYPE === t ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
+        + (this.TYPE === t ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);')
         + '">' + t + '</button>').join('')
       + '</div>';
 
