@@ -599,7 +599,7 @@ S.LaborLogHours = {
         const note = r.calloutNote
           ? '<div style="color:var(--amber);font-size:10px;font-weight:600;">' + esc(r.calloutNote) + '</div>' : '';
         return '<tr class="lo-fmodal-row" data-mi="' + r.i + '">'
-          + '<td style="width:34px;text-align:center;"><input type="checkbox" class="lo-fmodal-cb"' + (r.checked ? ' checked' : '') + ' style="accent-color:var(--green);width:16px;height:16px;cursor:pointer;margin:0;"/></td>'
+          + '<td style="width:34px;text-align:center;"><input type="checkbox" class="lo-fmodal-cb bc-check"' + (r.checked ? ' checked' : '') + '/></td>'
           + '<td><div class="val">' + esc(r.name) + '</div>' + note + '</td>'
           + '<td>' + time + '</td>'
           + '<td><input type="number" class="lo-fmodal-hours form-input" min="0" step="0.25" value="' + esc(r.hours) + '" style="width:80px;"/></td>'
