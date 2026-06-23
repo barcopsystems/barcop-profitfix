@@ -134,7 +134,7 @@ S.TheftRisk = {
     this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
       App.removeRecord('core', 'variance_investigation', b.dataset.inv).then(() => this.renderMain());
     }));
-    this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.renderMain()));
+    this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderMain())));
   },
 
   // ── Variance Investigations — compact list (drill into one) ───────────────
@@ -166,7 +166,7 @@ S.TheftRisk = {
       + '</div></div>';
 
     if (open.length) {
-      const rows = open.map(inv => {
+      const rows = open.slice(0, App.listLimit('core', 'variance_investigation')).map(inv => {
         const doneN = inv.steps.filter(s => s.done).length;
         return '<tr>'
           + '<td><div class="val">' + esc(inv.sku) + '</div></td>'
@@ -177,7 +177,8 @@ S.TheftRisk = {
       }).join('');
       h += '<div class="sh" style="margin:18px 0 10px;">Open</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Opened</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '<th>Product</th><th>Opened</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + App.showOlderBar('core', 'variance_investigation', open, false);
     }
 
     if (resolved.length) {
