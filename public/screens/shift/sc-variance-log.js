@@ -17,13 +17,13 @@ S.ShiftVarianceLog = {
     if (!Array.isArray(App.shiftData.sc_variances)) App.shiftData.sc_variances = [];
     return App.shiftData.sc_variances;
   },
-  tolerance() {
-    const t = App.cashToleranceForShift(null);
+  tolerance(drawerOrId) {
+    const t = App.drawerTolerance(drawerOrId);
     return (t != null && !isNaN(t)) ? Number(t) : 10;
   },
-  statusOf(variance, expected, counted) {
+  statusOf(variance, expected, counted, drawerOrId) {
     if ((expected === 0 || expected == null) && (counted === 0 || counted == null)) return 'Not Counted';
-    const tol = this.tolerance();
+    const tol = this.tolerance(drawerOrId);
     if (Math.abs(variance) <= tol) return 'Within Tolerance';
     return variance > 0 ? 'Over' : 'Short';
   },

@@ -31,6 +31,7 @@ S.ShiftDrawers = {
     App.showHelpModal('How Registers Work', [
       { p: ['Every register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Drop and the Variance Log pull from this list, so every cash event lands on the same register name instead of "Bar 1" one night and "Front Bar" the next.'] },
       { h: 'Adding a Register', p: ['Give it a clear name and set a default opening bank if it normally opens with the same starting cash. That default pre-fills the opening bank when you start a shift on the register, so you are not retyping it every day.'] },
+      { h: 'Cash Tolerance', p: ['Each register carries its own cash tolerance: how far its drawer can be off at a reconcile before Bar Cop flags it Over or Short. A busy main bar is harder to count tight than a slow service well, so set the number that fits the register. The default is $10. The reconcile on Cash Control and the weekly POS cash import both read the matched register\'s tolerance.'] },
       { h: 'Archiving', p: ['Retire a register you no longer use with Archive. It drops out of the dropdowns but stays on past records, so your history stays intact. Restore it any time to bring it back.'] }
     ]);
   },
@@ -46,7 +47,10 @@ S.ShiftDrawers = {
       + '<input type="text" id="' + p + 'name" value="' + esc(d?.name || '') + '" placeholder="Main Bar Register"/></div>'
       + '<div class="f" style="width:210px;min-width:0;"><label>Default Opening Bank</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'bank" min="0" step="0.01" value="' + v(d?.default_opening_bank) + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:170px;min-width:0;"><label>Cash Tolerance</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'tol" min="0" step="0.5" value="' + (d && d.cash_tolerance != null && d.cash_tolerance !== '' ? d.cash_tolerance : 10) + '"/></div></div>'
       + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin:-4px 0 2px;">How far this register can be off before a reconcile flags it. Default $10.</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
   },
@@ -75,6 +79,7 @@ S.ShiftDrawers = {
       const row = d => '<tr>'
         + '<td><div class="val">' + esc(d.name) + '</div></td>'
         + '<td>' + (d.default_opening_bank != null && d.default_opening_bank !== '' ? App.fmtCurrency(d.default_opening_bank) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>&plusmn;' + App.fmtCurrency(App.drawerTolerance(d)) + '</td>'
         + '<td>' + esc(d.notes || '-') + '</td>'
         + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm dr-edit" data-id="' + d.id + '">Edit</button>'
@@ -83,7 +88,7 @@ S.ShiftDrawers = {
 
       listHtml = '<div class="card card-bleed data-card" style="margin-top:24px;">'
         + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Register Name</th><th>Default Opening Bank</th><th>Notes</th><th></th>'
+        + '<th>Register Name</th><th>Default Opening Bank</th><th>Cash Tolerance</th><th>Notes</th><th></th>'
         + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
 
       if (archived.length) {
@@ -92,6 +97,7 @@ S.ShiftDrawers = {
           + archived.map(d => '<tr style="opacity:0.55;">'
               + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
               + '<td>' + (d.default_opening_bank != null && d.default_opening_bank !== '' ? App.fmtCurrency(d.default_opening_bank) : '-') + '</td>'
+              + '<td>&plusmn;' + App.fmtCurrency(App.drawerTolerance(d)) + '</td>'
               + '<td>' + esc(d.notes || '-') + '</td>'
               + '<td><div class="row-actions">'
                 + '<button class="btn btn-ghost btn-sm dr-restore" data-id="' + d.id + '">Restore</button>'
@@ -163,6 +169,7 @@ S.ShiftDrawers = {
     if (!d) { fail('Register not found.'); return; }
     d.name                 = name;
     d.default_opening_bank = numOr('dre-bank', null);
+    d.cash_tolerance       = numOr('dre-tol', 10);
     d.notes                = document.getElementById('dre-notes')?.value.trim() || '';
     const btn = document.getElementById('dre-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -186,6 +193,7 @@ S.ShiftDrawers = {
       if (d) {
         d.name                  = name;
         d.default_opening_bank  = numOr('dr-bank', null);
+        d.cash_tolerance        = numOr('dr-tol', 10);
         d.notes                 = document.getElementById('dr-notes')?.value.trim() || '';
       }
     } else {
@@ -193,6 +201,7 @@ S.ShiftDrawers = {
         id:                    App.uid(),
         name,
         default_opening_bank:  numOr('dr-bank', null),
+        cash_tolerance:        numOr('dr-tol', 10),
         notes:                 document.getElementById('dr-notes')?.value.trim() || '',
         active:                true,
         created_at:            new Date().toISOString()

@@ -110,7 +110,7 @@ S.ShiftVoidComp = {
 
   showHowTo() {
     App.showHelpModal('How the Void and Comp Log Works', [
-      { p: ['Voids and comps are your exception transactions. Logging every one feeds Theft Risk and the Profit Audit, so the bartender comping a round without a manager shows up as a pattern instead of disappearing.'] },
+      { p: ['Voids and comps are your exception transactions. Logging every one feeds Loss Prevention and the Profit Audit, so a server who comps far more than the rest of the floor shows up as a pattern instead of disappearing.'] },
       { h: 'One record, the dollar amount', p: ['A void or comp is logged by the amount, not item by item. Comp a whole table\'s meal and you log one line for the total. The amount is what matters. The item is optional.'] },
       { h: 'Enter the whole shift at once', p: ['Set the date and shift up top, then add a line for each void or comp off your sheet or POS list. Authorized By up top applies to your comps. Add Line for another, and Save All writes them in one shot, no running to Bar Cop every time one happens. Need a check number, a custom item, or a note on one? Save it, then Edit that row.'] },
       { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
@@ -430,23 +430,10 @@ S.ShiftVoidComp = {
     }
 
     const type = document.getElementById(p + 'type')?.value || 'Void';
+    // Authorized By is an optional record of who cleared a comp. It is not
+    // enforced and does not drive any theft signal (comp authorization is a
+    // POS-native control); the honest comp-theft read is comp volume by server.
     const authBy = document.getElementById(p + 'auth')?.value || '';
-
-    // Comp authorization threshold check.
-    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
-    const thresholdActive = !isNaN(threshold) && threshold > 0;
-    let authThresholdOverride = false;
-    if (type === 'Comp' && thresholdActive && amount > threshold && !authBy) {
-      const ok = await App.confirm({
-        title: 'Comp over your $' + threshold + ' threshold',
-        message: 'No manager is set in Authorized By. Continue without manager authorization? The comp will be flagged in Theft Risk as an unauthorized large comp.',
-        confirmText: 'Continue Without Auth',
-        cancelText: 'Cancel'
-      });
-      if (!ok) return null;
-      authThresholdOverride = true;
-    }
-
     const serverId = document.getElementById(p + 'server')?.value || '';
     return {
       date,
@@ -464,8 +451,7 @@ S.ShiftVoidComp = {
       authorized_by:    (App.staffById(authBy) || {}).name || '',
       check_number:  document.getElementById(p + 'check')?.value.trim() || '',
       reason:        document.getElementById(p + 'reason')?.value || '',
-      notes:         document.getElementById(p + 'notes')?.value.trim() || '',
-      auth_threshold_override: authThresholdOverride
+      notes:         document.getElementById(p + 'notes')?.value.trim() || ''
     };
   },
 
@@ -586,8 +572,6 @@ S.ShiftVoidComp = {
     const authBy = document.getElementById('vcb-auth')?.value || '';
     const authName = (App.staffById(authBy) || {}).name || '';
     const batchNotes = document.getElementById('vcb-notes')?.value.trim() || '';
-    const threshold = parseFloat((App.shiftData?.settings || {}).comp_auth_threshold);
-    const thresholdActive = !isNaN(threshold) && threshold > 0;
 
     const recs = [];
     const rowsWrap = document.getElementById('vcb-rows');
@@ -609,13 +593,12 @@ S.ShiftVoidComp = {
         if (pr) { item = pr.name; productId = pr.id; productName = pr.name; const u = parseFloat(line.querySelector('.vcl-units')?.value); units = isNaN(u) ? null : u; }
       }
       const isComp = type === 'Comp';
-      const override = isComp && thresholdActive && amount > threshold && !authBy;
       recs.push({
         id: App.uid(), date, type, shift_type: shift, item, amount,
         product_id: productId, product_name: productName, menu_item_id: menuItemId, units,
         staff_id: serverId, server: (App.staffById(serverId) || {}).name || '',
         authorized_by_id: isComp ? authBy : '', authorized_by: isComp ? authName : '',
-        check_number: '', reason, notes: batchNotes, auth_threshold_override: override,
+        check_number: '', reason, notes: batchNotes,
         created_at: new Date().toISOString()
       });
     }

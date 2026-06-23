@@ -8,7 +8,7 @@
    on orientation, the why, cross-system connections, and troubleshooting, not the
    how-to. Content tracks the current Shift Control: the weekly cockpit (the POS
    sales import), Cash Control and Cash History, the operations logs, the unified
-   Checklists screen, the tabbed Reports, the combined Shift Policies setup page,
+   Checklists screen, the tabbed Reports, the registers reference,
    and how Shift Control feeds Profit, Revenue, Inventory, and the Hub. */
 
 S.ShiftHelp = {
@@ -46,15 +46,15 @@ S.ShiftHelp = {
       { q: 'How does the Safe Log work?',
         a: 'A running ledger of cash moving in and out of the safe: drops in, banks issued and returned, deposits prepared, paid-outs. Every entry carries a running balance, so at any moment you know what the safe should hold. Count the safe against that balance at least daily. A safe that does not balance against the log is a problem the log surfaces immediately.' },
       { q: 'What is a variance, and where does it come from?',
-        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created when you reconcile a drawer in Cash Control, or entered by hand if needed. The tolerance lives under Setup, Shift Policies (default $10, with optional overrides per daypart and per shift). Anything outside tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
+        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created when you reconcile a drawer in Cash Control, or entered by hand if needed. The tolerance is set per register on Add Registers (default $10), so a busy main bar can run a wider tolerance than a slow service well. Anything outside that register\'s tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Profit Recovery Cash Reconciliation and the Profit Audit both read this.' },
       { q: 'What do the variance colors mean?',
         a: 'Within tolerance is green. Short, meaning less cash than expected, is red. Over, meaning more cash than expected, is amber. A drawer that was never counted shows grey as Not Counted. The repeat-offender pattern feeds the Theft Risk Scorecard in Profit Recovery, so a bartender consistently short across shifts is a pattern Bar Cop surfaces without you tracking it on paper.' }
     ]},
     { t: 'Operations Logs', qa: [
       { q: 'What goes in the Void and Comp Log?',
         a: 'Every voided ticket and every comped item, logged by the dollar amount (a whole comped table is one line, not one per item). The item is optional, picked from the menu-and-inventory dropdown when you want the link or left off. The Reason carries the classification: customer-facing comps such as service recovery, goodwill, regular or VIP, and promo are loss and feed Theft Risk, while Staff Meal and Shift Drink are policy expense tracked as cost in Books and Year-End. Enter a whole shift at once in the batch builder, or edit a single row to add a check number or a note. The log feeds the Theft Risk Scorecard and the Profit Audit exception analysis.' },
-      { q: 'What is the Comp Authorization Threshold?',
-        a: 'Under Setup, Shift Policies, the Comp Auth Threshold sets the dollar amount above which a comp should have a manager in Authorized By (default $25). Saving a comp over the threshold with no manager pops a soft warning you can override, and every override is flagged in Theft Risk under unauthorized large comps. Set the threshold to 0 to turn the warning off.' },
+      { q: 'How does Bar Cop catch comp abuse?',
+        a: 'By comp volume per server, not by whether a manager name was typed (that is a POS-native control). Log every comp against the server who rang it with an honest Reason, and Loss Prevention ranks comp dollars by server and flags anyone running well above the rest of the floor, the bartender giving away rounds. Authorized By stays on the form as an optional record of who cleared a comp, but it does not drive the flag.' },
       { q: 'What is the Maintenance Log for?',
         a: 'Broken equipment, facility issues, and operational problems that need attention. Each entry has a priority (Urgent, High, Normal, Low) and a status (Open, In Progress, Resolved). Assigned To suggests staff from your roster but takes free text for an outside vendor like an HVAC tech or a plumber. Urgent open items show up as alerts on the Hub Dashboard so a problem from Saturday night carries to Sunday manager until it gets resolved.' },
       { q: 'What is the Walked Tabs log?',

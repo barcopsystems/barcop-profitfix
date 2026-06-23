@@ -26,10 +26,9 @@ S.ShiftCashControl = {
   safeCounts() { return ((App.shiftData && App.shiftData.sc_safe_counts)  || []); },
   drawers()    { return ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false); },
 
-  tolerance() {
-    const t = App.cashToleranceForShift(null);
-    return (t != null && !isNaN(t)) ? Number(t) : 10;
-  },
+  // The safe count uses a fixed $10 tolerance; drawer reconciles use the matched
+  // register's own tolerance (App.drawerTolerance), set on the Add Register form.
+  safeTolerance() { return 10; },
 
   // One cash-status color scheme used everywhere a count/variance status shows:
   // green = within tolerance (clean), red = short, amber = over, grey = not counted.
@@ -125,7 +124,7 @@ S.ShiftCashControl = {
     this.variances().forEach(v => {
       if (!this.inWindow(v.date)) return;
       const variance = parseFloat(v.variance) || 0;
-      const tol = (v.tolerance != null && !isNaN(v.tolerance)) ? Number(v.tolerance) : this.tolerance();
+      const tol = (v.tolerance != null && !isNaN(v.tolerance)) ? Number(v.tolerance) : App.drawerTolerance(v.drawer_id);
       out.push({
         date: v.date, time: '',
         sortKey: (v.date || '') + '|' + (v.created_at || ''),
@@ -155,7 +154,7 @@ S.ShiftCashControl = {
         amount: Math.abs(variance),
         direction: 'none',
         variance,
-        status: c.status || (Math.abs(variance) <= this.tolerance() ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over'),
+        status: c.status || (Math.abs(variance) <= this.safeTolerance() ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over'),
         editCat: 'safe_count',
         editId: c.id
       });
@@ -550,7 +549,7 @@ S.ShiftCashControl = {
   openSafeCount(rec) {
     const editing = !!rec;
     const expected = editing ? (parseFloat(rec.expected) || 0) : this.currentSafeBalance();
-    const tol = this.tolerance();
+    const tol = this.safeTolerance();
     this._safeExpected = expected;
     const v = x => (x != null && x !== '') ? x : '';
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
@@ -609,7 +608,7 @@ S.ShiftCashControl = {
     const existing = editId ? this.safeCounts().find(x => x.id === editId) : null;
     const expected = (this._safeExpected != null) ? this._safeExpected : this.currentSafeBalance();
     const variance = Math.round((counted - expected) * 100) / 100;
-    const tol = this.tolerance();
+    const tol = this.safeTolerance();
     const status = Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
     const byId  = document.getElementById('ccc-by')?.value || '';
     const witId = document.getElementById('ccc-witness')?.value || '';
@@ -660,7 +659,7 @@ S.ShiftCashControl = {
       + '<div class="calc">'
       +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim">&plusmn;' + App.fmtCurrency(this.tolerance()) + '</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim" id="ccv-c-tol">&plusmn;' + App.fmtCurrency(App.drawerTolerance(dId)) + '</div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
@@ -668,6 +667,9 @@ S.ShiftCashControl = {
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
     const calc = () => {
+      const drawerId = document.getElementById('ccv-drawer')?.value || '';
+      const tolEl = document.getElementById('ccv-c-tol');
+      if (tolEl) tolEl.textContent = '±' + App.fmtCurrency(App.drawerTolerance(drawerId));
       const exp = parseFloat(document.getElementById('ccv-expected')?.value);
       const cnt = parseFloat(document.getElementById('ccv-counted')?.value);
       const varEl = document.getElementById('ccv-c-variance');
@@ -675,11 +677,12 @@ S.ShiftCashControl = {
       if (!varEl || !stEl) return;
       if (isNaN(exp) || isNaN(cnt)) { varEl.textContent = '-'; varEl.className = 'calc-val'; stEl.textContent = '-'; stEl.className = 'calc-val'; return; }
       const variance = Math.round((cnt - exp) * 100) / 100;
-      const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt);
+      const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt, drawerId);
       const col = this.statusColor(status);
       varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
       stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
     };
+    document.getElementById('ccv-drawer')?.addEventListener('change', calc);
     document.getElementById('ccv-expected')?.addEventListener('input', calc);
     document.getElementById('ccv-counted')?.addEventListener('input', calc);
     document.getElementById('ccv-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
@@ -715,8 +718,8 @@ S.ShiftCashControl = {
       expected_cash: exp,
       counted_cash:  cnt,
       variance,
-      tolerance:     S.ShiftVarianceLog.tolerance(),
-      status:        S.ShiftVarianceLog.statusOf(variance, exp, cnt),
+      tolerance:     S.ShiftVarianceLog.tolerance(drawerId),
+      status:        S.ShiftVarianceLog.statusOf(variance, exp, cnt, drawerId),
       reason:        document.getElementById('ccv-reason')?.value || '',
       notes:         document.getElementById('ccv-notes')?.value.trim() || '',
       created_at:    existing ? existing.created_at : new Date().toISOString()
