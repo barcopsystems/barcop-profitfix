@@ -2804,6 +2804,29 @@ S.HubSettings = {
         resolution:'' },
     ];
 
+    // Sales Integrity — a seeded Saturday server-sales report run through the live
+    // engine so the demo lands on a real review. One planted bad actor (Brianna K.,
+    // the same server the comp pattern concentrates on): heavy no-sales, a high
+    // void rate, a cash mix far above the floor, and refunds. The rest track the
+    // floor and come back clean. True by construction (same analyze() the upload
+    // uses), so re-running it yields the same flags.
+    if (window.S && S.SalesIntegrity) {
+      const siDate = dateStr(2);
+      const siRows = [
+        { server:'Jessica M.', date:siDate, net_sales:2050, checks:41, cash_sales:380, card_sales:1670, voids:25, void_count:2, comps:24, no_sales:1, refunds:0,  hours:8   },
+        { server:'Marcus T.',  date:siDate, net_sales:1820, checks:36, cash_sales:365, card_sales:1455, voids:20, void_count:2, comps:18, no_sales:0, refunds:0,  hours:7.5 },
+        { server:'Priya N.',   date:siDate, net_sales:1680, checks:34, cash_sales:300, card_sales:1380, voids:24, void_count:2, comps:22, no_sales:2, refunds:0,  hours:7.5 },
+        { server:'Devin R.',   date:siDate, net_sales:1540, checks:31, cash_sales:340, card_sales:1200, voids:17, void_count:1, comps:16, no_sales:1, refunds:0,  hours:7   },
+        { server:'Carlos P.',  date:siDate, net_sales:1960, checks:39, cash_sales:410, card_sales:1550, voids:26, void_count:3, comps:20, no_sales:1, refunds:0,  hours:8   },
+        { server:'Brianna K.', date:siDate, net_sales:1500, checks:30, cash_sales:705, card_sales:795,  voids:90, void_count:7, comps:25, no_sales:9, refunds:40, hours:8   }
+      ];
+      App.data.sales_reviews = [
+        S.SalesIntegrity.analyze(siRows, { id:uid(), date:siDate, created_at:new Date().toISOString(), source:'sample' })
+      ];
+    } else {
+      App.data.sales_reviews = [];
+    }
+
     // ════════════════════════════════════════════════════════════════════
     //  LABOR CONTROL — derived from the Anchor profile. Each week's logged
     //  hours by department reconcile to ANCHOR bar_labor and food_labor.
