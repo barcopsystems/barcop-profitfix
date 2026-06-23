@@ -62,10 +62,10 @@ FIX.profit = [
           detail: 'Download the Theft and Loss Prevention Policy, set the cash, comp, and product rules, and have every staff member sign it at hire.' },
         { kind: 'action', target: 'sc-void-comp', targetLabel: 'Void and Comp Log',
           title: 'Log voids, comps, and no-sales by employee with category',
-          detail: 'In Shift Control, log every void and comp against the employee who rang it, and pick the honest Reason. Customer-facing reasons (service recovery, goodwill, regular or VIP, promo) count as loss in Loss Prevention; Staff Meal and Shift Drink go to the books as a cost line.' },
+          detail: 'In the Void and Comp Log, log every void, comp, and no-sale against the server who rang it, with an honest Reason. The give-aways read as loss; Staff Meal and Shift Drink post as a cost line.' },
         { kind: 'action', target: 'sales-integrity', targetLabel: 'Sales Integrity',
           title: 'Run a Sales Integrity review on your server sales',
-          detail: 'Each week, drop your POS per-server sales report into Sales Integrity. It benchmarks every server against the floor and flags the ones whose numbers do not add up: no-sale drawer opens, void abuse, an off cash mix, a low average check, heavy comps. The bartender selling cash drinks off book or giving away rounds shows up as an outlier instead of hiding in the totals. Work any flag from there.' },
+          detail: 'Drop your POS server sales report into Sales Integrity each week. Work any server it flags for running off the floor on no-sales, voids, cash mix, or check average.' },
         { kind: 'action', target: 'sc-cash-control', targetLabel: 'Cash Control',
           title: 'Reconcile every cash drawer',
           detail: 'In Cash Control, count each drawer against expected POS cash at end of shift and log the over or short. Watch consistent overs as closely as consistent shorts.' },
@@ -77,7 +77,7 @@ FIX.profit = [
           detail: 'Use Spot Check for a fast pre and post shift count on your high-risk products, on different shifts at varied times.' },
         { kind: 'result', target: 'theft-risk', targetLabel: 'Loss Prevention',
           title: 'Review the loss signals weekly',
-          detail: 'Each week, open Loss Prevention: drawer shorts, flagged spot checks, and confirmed theft, with what flagged today and over the last 7 days and a dollar amount on each. The worst flags also push to the Hub so they find you.' },
+          detail: 'Once a week, open Loss Prevention and work what flagged: drawer shorts, spot checks, confirmed theft. The worst push to the Hub so they find you.' },
         { kind: 'reference', target: 'Employee_Corrective_Action_Template.docx', targetLabel: 'Employee Corrective Action Template',
           title: 'Escalate a documented pattern',
           detail: 'One incident is a data point; two on the same employee within 30 days is a pattern. Document each one in writing as you see it, and use the Corrective Action Template once the pattern is clear.' }
@@ -87,7 +87,7 @@ FIX.profit = [
     commonMistakes: [
       'Comps logged under the wrong reason. Staff Meal and Shift Drink are policy expense; everything else is loss.',
       'Ringing voids and comps without naming the employee. The same server\'s pattern never collects in one place.',
-      'Reading server sales as a lump sum instead of by server. One bartender selling cash drinks off book or giving away rounds hides in the totals until Sales Integrity ranks each server against the floor.',
+      'Reading sales as one number instead of by server. The bartender running off book hides in the total until Sales Integrity ranks each one against the floor.',
       'Watching only for drawer shorts. A drawer that runs consistently over is as much a signal as one that runs short.'
     ]
   },
