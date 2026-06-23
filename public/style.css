@@ -354,6 +354,9 @@ input,select,textarea{color-scheme:dark;}
 /* All form rows: flex, wrap allowed, consistent gap */
 .form-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
 .form-row:last-of-type{margin-bottom:0;}
+/* Call-Out Log schedule note: collapses to the normal row gap when empty; when a
+   note shows it tucks under the row and adds breathing room before Reason. */
+.co-sched-line:not(:empty){margin:-8px 0 14px;}
 /* Data rows keep all cells on one line (shrink-to-fit) on desktop; on mobile
    they stack full-width via the media query below. */
 .data-row{flex-wrap:nowrap;}
