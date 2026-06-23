@@ -71,7 +71,7 @@ S.LaborDashboard = {
   stepDone() {
     const dm = this.doneMap();
     const derive = {
-      hours:    this.actuals().some(a => this.inWeek(a.date)),
+      hours:    false,   // operator-marked (or set by a cockpit import); logging one staff's hours should not auto-complete the week
       tips:     this.tips().some(t => this.inWeek(t.date)),
       schedule: this.schedules().some(s => s.week_start === this.nextWeekStart()),
       review:   false
@@ -152,7 +152,7 @@ S.LaborDashboard = {
   stepStatus(k, isDone) {
     if (k === 'hours') {
       const hrs = this.actuals().filter(a => this.inWeek(a.date)).reduce((t, a) => t + (a.hours || 0), 0);
-      return isDone ? (hrs.toFixed(1) + ' hrs logged') : this._META.hours.sub;
+      return hrs > 0 ? (hrs.toFixed(1) + ' hrs logged') : this._META.hours.sub;
     }
     if (k === 'tips') {
       const n = this.tips().filter(t => this.inWeek(t.date)).length;
@@ -187,9 +187,9 @@ S.LaborDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'hours') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Log hours from your posted schedule in Log Hours.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Log hours from your posted schedule in Log Hours. Mark this done once the week is fully in.</div>'
         + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button></div>';
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
     if (k === 'tips') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Log. Mark this done once it is handled, or if there are no tips to log.</div>'
@@ -321,6 +321,7 @@ S.LaborDashboard = {
     }
     const ok = await PosIngest.commit(type, toAdd);
     if (!ok) { setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
+    this.setDone(type, true);   // a cockpit import is a deliberate "the week is in" action
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (skipped.length ? ' (' + skipped.length + ' skipped, no roster match)' : '')
       + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
