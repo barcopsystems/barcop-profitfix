@@ -12,7 +12,6 @@
 
 S.LaborTipLog = {
   editId: null,
-  entryMode: 'manual',     // 'manual' = batch-enter rows, 'import' = drop a POS tips file
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
@@ -109,6 +108,42 @@ S.LaborTipLog = {
     + '</div>';
   },
 
+  // Day-only anchor for the Tip Log (tips log per day now, no service-period split):
+  // ONE week range pill matching the app's other selectors (gold NOW, no future)
+  // over a row of day chips, with breathing room between the two. prefix scopes the
+  // class names so the batch builder ('tl-b') and the edit pop-up ('tle') never
+  // collide. Tip Pool keeps the period-aware anchorHtml above.
+  tlAnchor(prefix, weekStart, selDate) {
+    const cur = this.mondayOf(App.todayLocal());
+    const ws = weekStart || cur;
+    const isCur = ws >= cur;
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
+      + App.dateRangeLabel(ws, App.periodEndFor(ws)).toUpperCase() + nowBadge + '</span>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const weekRow = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill + nextBtn
+      + (isCur ? '' : '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-now" style="margin-left:4px;">This Week</button>')
+      + '</div>';
+    const start = new Date(ws + 'T00:00:00');
+    let dayChips = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const ymd = App.ymdLocal(d);
+      const wd = this.DAYS[(d.getDay() + 6) % 7];
+      const on = ymd === selDate;
+      dayChips += '<button type="button" class="btn btn-sm ' + prefix + '-day" data-ymd="' + ymd + '" style="'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--b-edge);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + wd + ' ' + d.getDate() + '</button>';
+    }
+    return '<div style="margin-bottom:16px;">' + weekRow
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;">' + dayChips + '</div></div>';
+  },
+
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -131,7 +166,7 @@ S.LaborTipLog = {
       const today = App.todayLocal();
       this._addWeekStart = this.mondayOf(today);
       this._addDate = today;
-      this._addShiftType = this._addShiftType || this.defaultPeriod();
+      this._addShiftType = '';   // tips log per DAY now (no service-period split)
       this._addRows = [];
       this.preloadFromDate(today, this._addShiftType);
     }
@@ -141,10 +176,10 @@ S.LaborTipLog = {
 
   showHowTo() {
     App.showHelpModal('How the Tip Log Works', [
-      { p: ['The Tip Log records cash and card tips by day, service period, and staff member. Tap the day and the period and Bar Cop loads the staff who were scheduled, so you mostly just type the tip amounts. Most weeks you import this straight off your POS export instead.'] },
-      { h: 'Logging Tips', p: ['Choose Enter Manually, tap the day on the week strip, then the service period. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole period at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week.'] },
+      { p: ['The Tip Log records cash and card tips by day and staff member. Tap the day and Bar Cop loads the staff who were scheduled, so you mostly just type the tip amounts. Most weeks you import this off your POS export on the Labor cockpit instead.'] },
+      { h: 'Logging Tips', p: ['Tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole day at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week.'] },
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
-      { h: 'Importing From A POS Export', p: ['Switch to Import File and drop a tips export, CSV or Excel. Map the columns once and Bar Cop remembers it. Staff Name and Date are required; Card Tips and Cash Tips are each optional but a row needs at least one. Headers do not need to match exactly: Staff Name reads employee / server / name / staff, Card Tips reads card / credit / cc tips, Cash Tips reads cash / declared tips. Rows match your roster by name; a row with no match or no tip amount is skipped and reported. Imported tips come in as date entries not linked to a shift, which you can adjust by opening any entry.'] },
+      { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on the Labor cockpit. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Where Tips Go', p: ['Tips feed the Tip Pool Log and the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum. Logging accurately here keeps those honest.'] },
       { h: 'Worksheet', p: ['The Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
     ]);
@@ -157,7 +192,7 @@ S.LaborTipLog = {
     p = p || 'tle-';
     const v = val => (val != null && val !== '') ? val : '';
     const pre = p.replace(/-$/, '');
-    return '<div id="' + p + 'anchor">' + this.anchorHtml(pre, this._eWeekStart, this._eDate, this._ePeriod) + '</div>'
+    return '<div id="' + p + 'anchor">' + this.tlAnchor(pre, this._eWeekStart, this._eDate) + '</div>'
       + '<div class="form-row data-row" style="gap:12px;">'
         + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
           + '<select id="' + p + 'staff"></select></div>'
@@ -249,35 +284,21 @@ S.LaborTipLog = {
       return;
     }
 
-    // One card, two ways in: type a row by hand, or drop a POS tips export. A
-    // segmented toggle swaps the body. Same pattern as Log Hours.
-    const segBtn = (mode, label) => {
-      const on = this.entryMode === mode;
-      return '<button type="button" class="btn btn-sm tl-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    };
+    // The manual batch builder is the whole card now: the tips import lives on the
+    // Labor cockpit (one import door), so there is no Manual/Import toggle here.
     // Primary action lives BELOW the card (bottom-left), collapse-group tagged so
-    // it hides with the card. Import mode's Import/Cancel render into the same
-    // out-of-card slot via the CSVMapper actionsEl. Mirrors Log Hours.
-    let modeBody, actionRow;
-    if (this.entryMode === 'import') {
-      modeBody = '<div id="tl-imp-csv"></div><div id="tl-imp-result"></div>';
-      actionRow = '<div id="tl-imp-actions" data-collapse-group="lc-tip-log" style="margin-bottom:24px;"></div>';
-    } else {
-      modeBody = this.batchBody();
-      const note = this._savedNote; this._savedNote = null;   // show once, after a save
-      actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-        + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>'
-        + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
-        + '</div>';
-    }
+    // it hides with the card.
+    const modeBody = this.batchBody();
+    const note = this._savedNote; this._savedNote = null;   // show once, after a save
+    const actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
+      + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>'
+      + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
+      + '</div>';
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Log Tips')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>';
 
@@ -287,7 +308,7 @@ S.LaborTipLog = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged yet. Log your first entry above, or import a POS tips export. Tap the day and period and the crew auto-fills.</div>';
+      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged yet. Tap a day above and the crew auto-fills, or import a POS tips export on the Labor cockpit.</div>';
     } else {
       const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
       const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
@@ -313,7 +334,6 @@ S.LaborTipLog = {
           return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(x.date) + '</div></td>'
           + '<td>' + esc(x.name || '-') + '</td>'
-          + '<td>' + esc(x.shift_type || '-') + '</td>'
           + '<td>' + App.fmtCurrency(x.cash_tips || 0) + '</td>'
           + '<td>' + App.fmtCurrency(x.card_tips || 0) + '</td>'
           + '<td' + (hasTipOut ? '' : ' class="val"') + '>' + App.fmtCurrency(x.total_tips || 0) + '</td>'
@@ -324,7 +344,7 @@ S.LaborTipLog = {
           + '</div></td></tr>';
         }).join('');
         listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th>Date</th><th>Staff</th><th>Shift</th><th>Cash</th><th>Card</th><th>' + (hasTipOut ? 'Gross' : 'Total') + '</th>'
+          + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>' + (hasTipOut ? 'Gross' : 'Total') + '</th>'
           + (hasTipOut ? '<th>Tip-Out</th><th>Net</th>' : '')
           + '<th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
@@ -337,17 +357,14 @@ S.LaborTipLog = {
     this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      const modeBtn = ev.target.closest('.tl-mode');
-      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
-      // Day + period anchor (batch builder).
+      // Day anchor (batch builder) — week pill + day chips, no future.
       if (ev.target.closest('.tl-b-wk-prev')) { this._addWeekStart = this.addDaysYmd(this._addWeekStart, -7); this.renderList(); return; }
-      if (ev.target.closest('.tl-b-wk-next')) { this._addWeekStart = this.addDaysYmd(this._addWeekStart, 7); this.renderList(); return; }
+      if (ev.target.closest('.tl-b-wk-next')) { const nw = this.addDaysYmd(this._addWeekStart, 7); if (nw > this.mondayOf(App.todayLocal())) return; this._addWeekStart = nw; this.renderList(); return; }
+      if (ev.target.closest('.tl-b-wk-now')) { this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderList(); return; }
       const dayChip = ev.target.closest('.tl-b-day');
       if (dayChip) { this._addDate = dayChip.dataset.ymd; this._addWeekStart = this.mondayOf(this._addDate); this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
-      const perChip = ev.target.closest('.tl-b-period');
-      if (perChip) { this.collectBatch(); this._addShiftType = perChip.dataset.period; this.renderList(); return; }
       if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
@@ -371,24 +388,20 @@ S.LaborTipLog = {
       if (row && App.canEdit('lc-tip-log')) this.openEditModal(row.dataset.id);
     };
 
-    if (this.entryMode === 'import') {
-      this.mountTipImporter();
-    } else {
-      this.wireBatch();
-    }
+    this.wireBatch();
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderList(); });
     document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
   },
 
-  // ── Batch manual entry (preloaded from the shift) ────────────────────────────
-  // The manual lane is a multi-row builder: tap the day + period up top and Bar Cop
-  // loads a row for every TIPPED employee who worked it (hours pre-filled), so the
-  // manager types each person's cash/card off the tip sheet and saves the whole
-  // shift at once. Mirrors the Void/Comp + Waste builders. The single-record form
-  // (formBody) is still used for the edit pop-up.
+  // ── Batch manual entry (preloaded from the day) ──────────────────────────────
+  // The builder is a multi-row table: tap the day up top and Bar Cop loads a row for
+  // every TIPPED employee who worked it (hours pre-filled), so the manager types
+  // each person's cash/card off the tip sheet and saves the whole day at once.
+  // Mirrors the Void/Comp + Waste builders. The single-record form (formBody) is
+  // still used for the edit pop-up.
   batchBody() {
     const on = App.tipOutEnabled();
-    const header = '<div id="tl-b-anchor">' + this.anchorHtml('tl-b', this._addWeekStart, this._addDate, this._addShiftType) + '</div>';
+    const header = '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div>';
     const addBtn = '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
     const rows = this._addRows || [];
     if (!rows.length) {
@@ -726,47 +739,6 @@ S.LaborTipLog = {
     }
   },
 
-  mountTipImporter() {
-    const el = document.getElementById('tl-imp-csv');
-    if (!el || typeof CSVMapper === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your POS tips export here',
-      dropSub: 'Needs columns for staff name, date, and card or cash tips.',
-      actionsEl: '#tl-imp-actions',
-      fields: PosIngest.FIELDS.tips,
-      confirmLabel: 'Import',
-      onComplete: rows => this.importTipRows(rows)
-    });
-  },
-
-  async importTipRows(rows) {
-    // Match / dedup / build / save live in the shared PosIngest (dedup added so a
-    // re-dropped tips export never double-counts). UI message stays here.
-    const { toAdd, skipped, dupCount } = PosIngest.build('tips', rows);
-
-    const result = document.getElementById('tl-imp-result');
-    const imported = toAdd.length;
-    if (imported === 0) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-                    : 'No rows imported. No staff names matched the roster, or no tip amounts were found.') + '</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('tips', toAdd);
-    if (!ok) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
-      return;
-    }
-    this.renderList();
-    const res2 = document.getElementById('tl-imp-result');
-    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
-      + 'Imported ' + imported + ' tip entr' + (imported === 1 ? 'y' : 'ies') + '.'
-      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length
-          + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no roster match or no tip amount).</span>' : '')
-      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount
-          + ' already logged, skipped.</span>' : '') + '</div>';
-  },
-
   // Effective date window from the active range chip (recomputed off "today" each
   // render so This Week stays live); Custom reads the From/To pickers; All clears it.
   effectiveRange() {
@@ -813,7 +785,7 @@ S.LaborTipLog = {
     if (!x) return;
     this.editId = id;
     this._eDate = x.date || App.todayLocal();
-    this._ePeriod = x.shift_type || this.defaultPeriod();
+    this._ePeriod = x.shift_type || '';   // preserved (no period selector); tips are per-day now
     this._eWeekStart = this.mondayOf(this._eDate);
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tips</div>'
       + this.formBody(x, 'tle-')
@@ -831,13 +803,12 @@ S.LaborTipLog = {
     // Anchor chips re-render just the anchor block (typed amounts are preserved);
     // a day change also refreshes the "worked this day" staff list.
     if (modal) modal.addEventListener('click', ev => {
-      const reanchor = () => { const a = document.getElementById('tle-anchor'); if (a) a.innerHTML = this.anchorHtml('tle', this._eWeekStart, this._eDate, this._ePeriod); };
+      const reanchor = () => { const a = document.getElementById('tle-anchor'); if (a) a.innerHTML = this.tlAnchor('tle', this._eWeekStart, this._eDate); };
       if (ev.target.closest('.tle-wk-prev')) { this._eWeekStart = this.addDaysYmd(this._eWeekStart, -7); reanchor(); return; }
-      if (ev.target.closest('.tle-wk-next')) { this._eWeekStart = this.addDaysYmd(this._eWeekStart, 7); reanchor(); return; }
+      if (ev.target.closest('.tle-wk-next')) { const nw = this.addDaysYmd(this._eWeekStart, 7); if (nw > this.mondayOf(App.todayLocal())) return; this._eWeekStart = nw; reanchor(); return; }
+      if (ev.target.closest('.tle-wk-now')) { this._eWeekStart = this.mondayOf(App.todayLocal()); reanchor(); return; }
       const dc = ev.target.closest('.tle-day');
       if (dc) { this._eDate = dc.dataset.ymd; this._eWeekStart = this.mondayOf(this._eDate); reanchor(); this.populateStaffList(x, 'tle-'); return; }
-      const pc = ev.target.closest('.tle-period');
-      if (pc) { this._ePeriod = pc.dataset.period; reanchor(); return; }
     });
   },
 
