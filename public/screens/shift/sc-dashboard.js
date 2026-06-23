@@ -99,9 +99,10 @@ S.ShiftDashboard = {
     const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
     return this.weekEnd() >= cur;
   },
-  // Week selector: ‹ [JUN 22 - JUN 28 NOW] › — one week at a time, only the date
-  // range carries the gold border (the arrows sit OUTSIDE it). NOW shows on the
-  // current week, where the forward arrow is inert (no future weeks to close out).
+  // Week selector: ‹ [JUN 22 - JUN 28 NOW] › — one week at a time (arrows sit
+  // OUTSIDE the pill). The current week is the lifted #0D181E pill with the
+  // standard card border and a gold NOW; step back to a past week and the pill
+  // drops to a plain ghost-button style. Forward is inert on the current week.
   weekSelector() {
     const isCur = this.atCurrentWeek();
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
@@ -111,7 +112,10 @@ S.ShiftDashboard = {
     const nextBtn = isCur
       ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
       : '<button class="btn btn-ghost btn-sm sc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
-    const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--gold-tint-bord);background:#15191B;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">' + esc(range) + nowBadge + '</span>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = isCur
+      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:#0D181E;color:var(--t1);">' + esc(range) + nowBadge + '</span>'
+      : '<span style="' + pillBase + 'border:1px solid var(--b1);background:transparent;color:var(--t2);">' + esc(range) + '</span>';
     return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
   },
 
