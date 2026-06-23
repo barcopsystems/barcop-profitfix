@@ -189,12 +189,12 @@ S.LaborDashboard = {
     if (k === 'hours') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Log hours from your posted schedule in Log Hours. Mark this done once the week is fully in.</div>'
         + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
+        + '<div id="lc-ck-hours-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
     if (k === 'tips') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Log. Mark this done once it is handled, or if there are no tips to log.</div>'
         + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-res"></div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+        + '<div id="lc-ck-tips-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Log</button>'
         + this.markBtn('tips', 'Mark Done') + '</div>';
     }
@@ -283,6 +283,10 @@ S.LaborDashboard = {
       + '</div>';
   },
 
+  // Hide a step's own buttons while the column-mapper is open so they do not
+  // stack under the mapper's Import/Cancel row; show them again on cancel.
+  _toggleBtns(id, st) { const b = document.getElementById(id); if (b) b.style.display = (st === 'map') ? 'none' : 'flex'; },
+
   // ── Inline hours import (step 1) ─────────────────────────────────────────────
   mountHoursImport() {
     const el = document.getElementById('lc-ck-hours');
@@ -292,6 +296,7 @@ S.LaborDashboard = {
       dropSub: 'Needs Staff, Date, and Hours. Shift matched if present. One row per shift.',
       fields: PosIngest.FIELDS.hours,
       confirmLabel: 'Import',
+      onState: st => this._toggleBtns('lc-ck-hours-btns', st),
       onComplete: rows => this.importLane('hours', rows, 'lc-ck-hours-res', 'tips')
     });
   },
@@ -304,6 +309,7 @@ S.LaborDashboard = {
       dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
       fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
+      onState: st => this._toggleBtns('lc-ck-tips-btns', st),
       onComplete: rows => this.importLane('tips', rows, 'lc-ck-tips-res', 'schedule')
     });
   },
