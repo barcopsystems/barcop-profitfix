@@ -333,7 +333,7 @@ input,select,textarea{color-scheme:dark;}
 
 /* ══ BUTTONS ══ */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;padding:8px 18px;line-height:1;white-space:nowrap;transition:background 0.12s,color 0.12s,border-color 0.12s;}
-.btn-primary{background:var(--gold);color:#fff;}
+.btn-primary{background:var(--gold);color:var(--bg);}
 .btn-primary:hover{background:var(--gold-h);}
 .btn-ghost{background:transparent;border:1px solid var(--b1);color:var(--t2);}
 .btn-ghost:hover{border-color:rgba(255,255,255,0.28);color:var(--w);}
