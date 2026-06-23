@@ -291,7 +291,6 @@ S.SalesIntegrity = {
     const importCard = '<div class="card form-card" style="margin-bottom:18px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Sales Integrity Review</div>'
       + '<div style="padding:18px 22px;">'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Drop a per-server sales report from your POS. Bar Cop benchmarks every server against the floor and flags the patterns that read as register or cash theft, with the dollar exposure. It does not catch product theft (overpouring, free pours, bottle loss); pour cost, inventory variance, and spot checks cover that.</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div></div>';
 
@@ -358,8 +357,9 @@ S.SalesIntegrity = {
     const skipLine = (review.skipped && review.skipped.length)
       ? '<div style="font-size:12px;color:var(--t4);margin:4px 2px 0;">Not enough data to score: ' + review.skipped.map(esc).join(', ') + '.</div>' : '';
 
-    const note = '<div style="background:var(--bg);border:1px solid var(--b2);border-radius:6px;padding:12px 16px;margin:16px 0 6px;font-size:11px;color:var(--t3);line-height:1.6;">'
-      + 'These are patterns to investigate, not proof. A flag means a server\'s numbers are an outlier worth a closer look. Product theft (overpouring, free pours, bottle loss) does not show in a sales report; pour cost, inventory variance, and spot checks catch that. Bar Cop is a software tool, not an investigator; confirm before acting on anyone.'
+    const note = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:18px 0 6px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">These are patterns to investigate, not proof. A flag means a server\'s numbers are an outlier worth a closer look. Product theft (overpouring, free pours, bottle loss) does not show in a sales report; pour cost, inventory variance, and spot checks catch that. Bar Cop is a software tool, not an investigator; confirm before acting on anyone.</div>'
       + '</div>';
 
     return head + statStrip + cards + cleanLine + skipLine + note;
@@ -377,7 +377,7 @@ S.SalesIntegrity = {
       return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
     }).join('');
 
-    return '<div class="card" style="padding:16px 18px;margin-bottom:12px;border-left:3px solid ' + sevColor + ';">'
+    return '<div class="card" style="padding:16px 18px;margin-bottom:12px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:12px;">'
