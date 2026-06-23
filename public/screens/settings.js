@@ -3285,10 +3285,9 @@ S.HubSettings = {
     })();
 
     // ── Tips — recent shifts for every tipped staff member ──
-    // Phase 0: every tip carries shift_id linked to the sc_shifts record on
-    // the same date. Shift Close (Phase 2-3) reconciles tips against this link;
-    // Books Form 8027 pulls per-employee allocations through it; Server
-    // Scorecard (Phase 4) shows tips % per server through it.
+    // Every tip carries a synthetic shift_id = App.tipShiftKey(date, service period),
+    // not an sc_shifts link. Books Form 8027 per-employee allocations and the Server
+    // Scorecard tips % both group through that same key.
     const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server'].includes(posNameOf(st.position_id)));
     const lcTips = [];
     [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
