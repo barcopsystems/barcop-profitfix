@@ -621,7 +621,7 @@ S.InventoryVarianceReport = {
       const p = periods[idx];
       const on = idx === selIdx, isNewest = idx === len - 1;
       return '<button type="button" class="vrq-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + esc(p.label)
         + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
@@ -842,7 +842,7 @@ S.InventoryVarianceReport = {
       const r = asc[idx];
       const on = idx === selIdx, isNewest = idx === len - 1;
       return '<button type="button" class="vr-run-chip btn btn-sm" data-v="' + esc(r.id) + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
         + this.fmtDate(r.start_date) + ' - ' +this.fmtDate(r.end_date)
         + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
