@@ -157,7 +157,7 @@ S.TrafficThisWeek = {
     const older = this.addDays(sel, -7);
     const label = pe => App.dateRangeLabel(this.addDays(pe, -6), pe);
     const chip = (pe, active) => '<button type="button" class="tw-wk-chip btn btn-sm" data-pe="' + pe + '" style="'
-      + (active ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+      + (active ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
                 : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
       + label(pe) + (pe === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
@@ -280,7 +280,7 @@ S.TrafficThisWeek = {
     const seg = (mode, label) => {
       const on = this._scanMode === mode;
       return '<button type="button" class="btn btn-sm tw-mode-btn" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     return '<div style="display:inline-flex;gap:6px;margin-bottom:16px;">'
