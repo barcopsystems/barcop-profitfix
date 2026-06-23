@@ -1269,19 +1269,19 @@ S.LaborTipLog = {
     const equal = this._peMethod === 'equal';
     const rows = this._peRows || [];
     const rowHtml = rows.map((r, i) => this.poolEditRowHtml(r, i, equal)).join('');
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tip Pool</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Tip Pool</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Date</label>'
           + '<input type="date" id="tpe-date" value="' + esc(this._peDate || App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Pool Amount</label>'
+        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Pool Amount</label>'
           + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tpe-pool" min="0" step="0.01" value="' + esc(this._peAmount) + '"/></div></div>'
+        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Method</label>'
+          + '<select id="tpe-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
+          + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Method</label>'
-        + '<select id="tpe-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
-        + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div></div>'
-      + '<div style="max-height:38vh;overflow-y:auto;margin:0 -2px;padding:0 2px;">'
+      + '<div style="max-height:38vh;overflow-y:auto;padding-right:8px;">'
         + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
-        + '<th>Staff</th><th style="width:84px;">Hours</th><th style="width:104px;">Tip Share</th><th style="width:78px;"></th>'
+        + '<th>Staff</th><th style="width:80px;">Hours</th><th style="width:100px;">Tip Share</th><th style="width:96px;"></th>'
         + '</tr></thead><tbody id="tpe-rows">' + rowHtml + '</tbody></table></div></div>'
       + '<button class="btn btn-ghost btn-sm" id="tpe-add">+ Add Participant</button>'
       + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
@@ -1330,7 +1330,7 @@ S.LaborTipLog = {
       + '<td><select class="form-input tpe-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td><input class="form-input tpe-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
       + '<td><div class="tpe-share" style="font-weight:600;color:var(--t1);">-</div></td>'
-      + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm tpe-remove" type="button">Remove</button></td>'
+      + '<td style="text-align:right;padding-right:12px;"><button class="btn btn-ghost btn-sm tpe-remove" type="button">Remove</button></td>'
       + '</tr>';
   },
   collectPoolEdit() {
