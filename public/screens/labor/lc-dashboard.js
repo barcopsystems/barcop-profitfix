@@ -25,6 +25,7 @@ S.LaborDashboard = {
   // ── Data ─────────────────────────────────────────────────────────────────────
   actuals()   { return ((App.laborData && App.laborData.lc_actuals)   || []); },
   tips()      { return ((App.laborData && App.laborData.lc_tips)       || []); },
+  timeOff()   { return ((App.laborData && App.laborData.lc_time_off)   || []); },
   schedules() { return ((App.laborData && App.laborData.lc_schedules)  || []); },
   staff()     { return ((App.laborData && App.laborData.lc_staff)      || []); },
   positions() { return ((App.laborData && App.laborData.lc_positions)  || []); },
@@ -220,13 +221,16 @@ S.LaborDashboard = {
     const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
     const line = (label, val, warn) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;">'
       + '<span style="color:var(--t2);">' + label + '</span><span style="font-weight:700;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + '</span></div>';
+    const toPending = this.timeOff().filter(t => t.status === 'Requested').length;
     return line('Staff projected over ' + App.OT_THRESHOLD + ' hrs', String(p.over), p.over > 0)
       + line('Approaching overtime', String(p.approaching), p.approaching > 0)
       + line('Projected OT premium', App.fmtCurrency(p.otPremium), p.otPremium > 0)
       + line('Uncovered call-outs this week', String(uncovered), uncovered > 0)
+      + line('Time-off requests to review', String(toPending), toPending > 0)
       + line('Certifications expired / expiring', expired + ' / ' + expiring, (expired + expiring) > 0)
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-overtime-watch">Open Overtime Watch</button>'
+      + (toPending > 0 ? '<button class="btn btn-ghost btn-sm" data-go="lc-time-off">Review Time Off</button>' : '')
       + this.markBtn('review', 'Mark Reviewed') + '</div>';
   },
 
@@ -278,6 +282,7 @@ S.LaborDashboard = {
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-staff-roster">Staff Roster</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-callout-log">Call-Out Log</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-time-off">Time Off</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-payroll-export">Payroll Export</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-reports">Labor Reports</button>'
       + '</div>';

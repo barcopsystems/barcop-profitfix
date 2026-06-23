@@ -265,16 +265,22 @@ S.LaborBuildSchedule = {
   computeTotals() {
     const byDay = {};
     this.DAYS.forEach(d => byDay[d] = { hours: 0, count: 0 });
-    let hours = 0, cost = 0, conflicts = 0;
+    let hours = 0, cost = 0, conflicts = 0, offConflicts = 0;
     this.draft.shifts.forEach((sh, i) => {
       if (!sh.staff_id || !sh.start || !sh.end) return;
       const c = this.shiftCalc(sh);
       hours += c.hours; cost += c.cost;
       if (byDay[sh.day]) { byDay[sh.day].hours += c.hours; byDay[sh.day].count += 1; }
       if (this.isConflict(sh, i)) conflicts++;
+      if (this.offReasonFor(sh.staff_id, sh.day)) offConflicts++;
     });
     cost += this.salariedWeekCost(this.draft.week_start);
-    return { hours, cost, byDay, conflicts };
+    return { hours, cost, byDay, conflicts, offConflicts };
+  },
+  // Why a staff member is off on a day column of the current draft week (a time-off
+  // entry or a recurring day off), or null. Wraps App.staffOffOn with the column→date.
+  offReasonFor(staffId, day) {
+    return App.staffOffOn(staffId, this.dayIso(this.draft.week_start, this.DAYS.indexOf(day)));
   },
 
   shiftsFor(staffId, day) {
@@ -348,21 +354,25 @@ S.LaborBuildSchedule = {
           + '<td style="padding:6px 8px;border-top:1px solid var(--b2);white-space:nowrap;">'
           + '<div style="font-size:13px;color:var(--t1);font-weight:600;">' + esc(s.name || '-') + '</div>'
           + '<div style="font-size:10px;color:var(--t4);">' + esc(wageLabel) + '</div></td>';
-        days.forEach(day => {
+        days.forEach((day, di) => {
+          const offReason = App.staffOffOn(s.id, this.dayIso(d.week_start, di));
           const items = this.shiftsFor(s.id, day);
           let cellInner = '';
           items.forEach(({ sh, i }) => {
             const c = this.shiftCalc(sh);
             const conflict = this.isConflict(sh, i);
-            const border = conflict ? 'var(--red)' : 'var(--gold-tint-bord)';
-            const blockBg = conflict ? 'var(--surface)' : 'var(--gold-tint)';
-            cellInner += '<div class="bs-block" data-idx="' + i + '" title="Click to edit"'
+            const flagged = conflict || !!offReason;
+            const border = flagged ? 'var(--red)' : 'var(--gold-tint-bord)';
+            const blockBg = flagged ? 'var(--surface)' : 'var(--gold-tint)';
+            const flagNote = conflict ? ' · overlap' : (offReason ? ' · off' : '');
+            cellInner += '<div class="bs-block" data-idx="' + i + '" title="' + (offReason ? esc(offReason) : 'Click to edit') + '"'
               + ' style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:3px 5px;margin-bottom:3px;background:' + blockBg + ';">'
               + '<div style="font-size:11px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
-              + '<div style="font-size:9px;color:var(--t3);">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + (conflict ? ' · overlap' : '') + '</div>'
+              + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div>'
               + '</div>';
           });
-          cellInner += '<div class="bs-add-cell" style="text-align:center;color:var(--t4);font-size:14px;cursor:pointer;line-height:1.2;padding:' + (items.length ? '0' : '8px') + ' 0;">+</div>';
+          const offTag = (offReason && !items.length) ? '<div title="' + esc(offReason) + '" style="font-size:8px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);text-align:center;opacity:.65;">Off</div>' : '';
+          cellInner += offTag + '<div class="bs-add-cell" style="text-align:center;color:var(--t4);font-size:14px;cursor:pointer;line-height:1.2;padding:' + (items.length ? '0' : (offTag ? '2px' : '8px')) + ' 0;">+</div>';
           row += '<td class="bs-cell" data-staff="' + esc(s.id) + '" data-day="' + day + '" style="padding:4px;border-top:1px solid var(--b2);vertical-align:top;border-left:1px solid var(--b2);">' + cellInner + '</td>';
         });
         row += '</tr>';
@@ -399,7 +409,8 @@ S.LaborBuildSchedule = {
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
       + '<tbody>' + body + footer + '</tbody></table></div></div></div>'
       + this.dayViewHTML(d, T)
-      + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '');
+      + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '')
+      + (T.offConflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:6px;">' + T.offConflicts + ' shift' + (T.offConflicts === 1 ? '' : 's') + ' on a day someone is off (requested time off or a regular day off). The red blocks are the conflicts.</div>' : '');
 
     // Totals strip
     const totalsCard = '<div class="card" style="margin-top:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -487,18 +498,22 @@ S.LaborBuildSchedule = {
       rows += '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);padding:14px 0 4px;">' + esc(dep) + '</div>';
       groups[dep].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
         const sal = App.isSalaried(s);
+        const offReason = this.offReasonFor(s.id, day);
         let blocks = '';
         this.shiftsFor(s.id, day).forEach(({ sh, i }) => {
           const c = this.shiftCalc(sh);
           const conflict = this.isConflict(sh, i);
-          const border = conflict ? 'var(--red)' : 'var(--gold-tint-bord)';
-          const blockBg = conflict ? 'var(--surface)' : 'var(--gold-tint)';
+          const flagged = conflict || !!offReason;
+          const border = flagged ? 'var(--red)' : 'var(--gold-tint-bord)';
+          const blockBg = flagged ? 'var(--surface)' : 'var(--gold-tint)';
+          const flagNote = conflict ? ' · overlap' : (offReason ? ' · off' : '');
           blocks += '<div class="bs-mblock" data-staff="' + esc(s.id) + '" data-day="' + esc(day) + '" data-idx="' + i + '" style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:5px 8px;background:' + blockBg + ';">'
             + '<div style="font-size:12px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
-            + '<div style="font-size:9px;color:var(--t3);">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + (conflict ? ' · overlap' : '') + '</div></div>';
+            + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div></div>';
         });
+        const offBadge = offReason ? ' <span title="' + esc(offReason) + '" style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);">Off</span>' : '';
         rows += '<div style="display:flex;align-items:flex-start;gap:12px;border-top:1px solid var(--b2);padding:9px 0;">'
-          + '<div style="flex:1;min-width:0;"><div style="font-size:13px;color:var(--t1);font-weight:600;">' + esc(s.name || '-') + '</div>'
+          + '<div style="flex:1;min-width:0;"><div style="font-size:13px;color:var(--t1);font-weight:600;">' + esc(s.name || '-') + offBadge + '</div>'
           + '<div style="font-size:10px;color:var(--t4);">' + esc(sal ? 'Salary' : (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '')) + '</div></div>'
           + '<div style="display:flex;flex-direction:column;gap:4px;flex:0 0 132px;max-width:132px;">' + blocks
           + '<button type="button" class="btn btn-ghost btn-sm bs-madd" data-staff="' + esc(s.id) + '" data-day="' + esc(day) + '">+ Add</button></div>'
@@ -613,7 +628,12 @@ S.LaborBuildSchedule = {
       eventField = '<div class="f" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);"><label>Working an Event?</label><select id="bs-m-event-sel"><option value="">No</option>'
         + evs.map(e => '<option value="' + esc(e.id) + '"' + (sh.event === e.id ? ' selected' : '') + '>' + esc(this.bookingName(e)) + '</option>').join('') + '</select></div>';
     }
+    const offReason = this.offReasonFor(staffId, day);
+    const offBanner = offReason
+      ? '<div style="border:1px solid var(--red);background:var(--red-bg);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--red);font-weight:600;">' + esc(staff.name || 'This person') + ' is off this day (' + esc(offReason) + '). Scheduling a shift here will flag it.</div>'
+      : '';
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
+      + offBanner
       + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">'
       + this._timeSelectFields('bs-m-start', sh.start, 'Start')
       + this._timeSelectFields('bs-m-end', sh.end, 'End')
@@ -778,6 +798,7 @@ S.LaborBuildSchedule = {
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Picking the Week', p: ['Build Schedule opens on the current week. Use the week chips and the arrows above the grid to move between weeks, or This Week to snap back. A week you have already posted opens ready to edit; an empty week is ready to build. Worksheet prints a blank staff-by-day grid to pencil in before you enter it here.'] },
       { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
+      { h: 'Days Off', p: ['A cell reads Off when that person requested the day off (logged on Time Off and approved) or has it as a regular day off (set on their Staff Roster profile). Drop a shift on an Off day and the block turns red; you also get a warning before the schedule posts, so you never accidentally schedule someone you already gave the day off. You can still override and post it.'] },
       { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast), shows the Target Hours that forecast can support at your RPLH target, and shows live what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
       { h: 'Templates', p: ['To start from a typical week, Load one of your Saved Templates listed at the bottom of this page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched. On an empty week that follows a posted one, a Start from last week button drops your most recent posted schedule onto the grid so you pencil in the changes instead of rebuilding a typical week shift by shift.'] },
@@ -871,6 +892,18 @@ S.LaborBuildSchedule = {
     });
     totalCost += this.salariedWeekCost(d.week_start);
     const forecast = this.forecastTotal(d.week_start);
+
+    // Day-off guard: warn before posting anyone onto a day they requested off or
+    // never work, so it is a deliberate override, not an accident.
+    const offCount = validShifts.filter(sh => this.offReasonFor(sh.staff_id, sh.day)).length;
+    if (offCount > 0) {
+      const okOff = await App.confirm({
+        title: 'Scheduling someone on a day off?',
+        message: offCount + ' shift' + (offCount === 1 ? ' is' : 's are') + ' placed on a day someone requested off or does not work. Post the schedule anyway?',
+        confirmText: 'Post Anyway', cancelText: 'Keep Editing'
+      });
+      if (!okOff) return;
+    }
 
     // Over-budget guard: if a forecast is set and the schedule blows past the
     // labor budget, make posting a deliberate call instead of a surprise the

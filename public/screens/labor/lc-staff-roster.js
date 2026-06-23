@@ -136,7 +136,16 @@ S.LaborStaffRoster = {
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
       + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly. Management is always a supervisor.</span></label></div>'
-      + '</div>';
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;"><div style="flex:1 1 100%;min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off <span style="color:var(--t4);font-weight:400;letter-spacing:0;text-transform:none;">standing weekdays this person never works; Build Schedule blocks them</span></div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dn => {
+          const on = !!(s && Array.isArray(s.off_days) && s.off_days.indexOf(dn) >= 0);
+          return '<label class="sr-off-chip" style="display:inline-flex;align-items:center;gap:7px;border:1px solid ' + (on ? 'var(--gold-tint-bord)' : 'var(--b1)') + ';background:' + (on ? 'var(--sel-active-bg)' : 'transparent') + ';border-radius:6px;padding:7px 11px;font-size:12px;color:var(--t1);cursor:pointer;">'
+            + '<input type="checkbox" class="sr-off-day" data-day="' + dn + '"' + (on ? ' checked' : '') + ' style="width:14px;height:14px;accent-color:var(--gold);margin:0;cursor:pointer;"/>' + dn + '</label>';
+        }).join('')
+      + '</div></div></div>';
   },
 
   // Wire the Pay Type + pay field for whichever profile form is mounted.
@@ -164,6 +173,11 @@ S.LaborStaffRoster = {
         if (p && p.default_wage != null) payEl.value = p.default_wage;
       }
     });
+    // Regular-days-off chips: highlight the label live as it is toggled.
+    document.querySelectorAll('.sr-off-day').forEach(cb => cb.addEventListener('change', () => {
+      const lab = cb.closest('.sr-off-chip');
+      if (lab) { lab.style.background = cb.checked ? 'var(--sel-active-bg)' : 'transparent'; lab.style.borderColor = cb.checked ? 'var(--gold-tint-bord)' : 'var(--b1)'; }
+    }));
   },
 
   renderList() {
@@ -315,6 +329,7 @@ S.LaborStaffRoster = {
       { p: ['The roster is your team: every staff member, their position, wage, and status. It is the source for scheduling, hours, tips, and the Revenue Recovery server list, so getting it right here means it is right everywhere.'] },
       { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default hourly wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it.'] },
       { h: 'Fixing A Wage Change', p: ['Open a person and a Wage History table shows every raise and cut with the date it took effect. If a change landed on the wrong day, those shifts cost out at the wrong rate, so Edit the change to correct its effective date, or Delete one entered in error. To change the current wage, edit the profile up top; that records a fresh change here on its own.'] },
+      { h: 'Regular Days Off', p: ['Tap the weekday chips to mark a standing day someone never works, like a server who is always off Sundays. Build Schedule blocks every one of those weekdays automatically, so you do not have to remember it each week. For a one-time request (a vacation week, a day off), use Time Off instead.'] },
       { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.'] },
       { h: 'Hourly or Salaried', p: ['Set Pay Type to Salary for an exempt manager or any fixed-salary role, then enter the annual salary. Bar Cop spreads that salary evenly across the year (salary divided by 52 each week) as a fixed labor cost, and salaried staff never show overtime. You can still log their hours so they count toward coverage and revenue per labor hour, but those hours never add an hourly cost. If a salaried employee is overtime eligible (non-exempt), set them to Hourly instead. How you classify staff under wage and hour law is your call. Bar Cop is a tool, not legal or payroll advice.'] },
       { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
@@ -759,6 +774,7 @@ S.LaborStaffRoster = {
       wage_history:  wageHistory,
       status:        document.getElementById('sr-status')?.value || 'Active',
       shift_lead:    !!document.getElementById('sr-lead')?.checked,
+      off_days:      [...document.querySelectorAll('.sr-off-day')].filter(c => c.checked).map(c => c.dataset.day),
       phone:         document.getElementById('sr-phone')?.value.trim() || '',
       email:         document.getElementById('sr-email')?.value.trim() || '',
       notes:         document.getElementById('sr-notes')?.value.trim() || ''
