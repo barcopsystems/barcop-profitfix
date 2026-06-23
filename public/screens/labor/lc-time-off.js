@@ -129,8 +129,7 @@ S.LaborTimeOff = {
           + (App.canEdit('lc-time-off') ? '<button class="btn btn-danger btn-sm to-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="sh" style="margin-top:24px;">Time Off</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Staff</th><th>Dates</th><th>Type</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         + App.showOlderBar('lc', 'time_off', ordered, false);

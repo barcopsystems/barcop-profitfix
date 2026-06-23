@@ -117,10 +117,9 @@ S.LaborDashboard = {
       ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
       : '<button class="btn btn-ghost btn-sm lc-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
     const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
-    const pill = isCur
-      ? '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>'
-      : '<span style="' + pillBase + 'border:1px solid var(--b1);background:transparent;color:var(--t2);">' + esc(range) + '</span>';
-    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + '</div>';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm lc-wk-now" style="margin-left:4px;">This Week</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
   },
 
   banner(doneCount, total) {
@@ -353,6 +352,7 @@ S.LaborDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.lc-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.lc-wk-next')) { this._stepWeek(7); return; }
+      if (ev.target.closest('.lc-wk-now'))  { this._weekStart = null; this._openStep = null; this.render(this.container, this.actions); return; }
     };
   }
 };

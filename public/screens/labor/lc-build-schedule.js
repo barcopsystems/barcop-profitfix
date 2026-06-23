@@ -110,29 +110,23 @@ S.LaborBuildSchedule = {
     d.setDate(d.getDate() + n * 7);
     return this.mondayOf(App.ymdLocal(d));
   },
-  // The Monday-based week selector that replaces the calendar: a window of week
-  // chips (each labeled by its Monday date, the live current week tagged NOW, the
-  // selected week gold-tint) flanked by step arrows, plus a snap back to the
-  // current week. Every option is already a Monday, so there is no calendar to
-  // open and no wrong day to pick.
+  // The Monday-based week selector that replaces the calendar: ONE week range pill
+  // (the active-selector style, gold NOW on the current week) flanked by step
+  // arrows, plus a snap back to This Week once you step away. Forward IS allowed
+  // here so you can build future weeks. Every step lands on a Monday, so there is
+  // no calendar to open and no wrong day to pick.
   weekSelector() {
     const sel = this.draft.week_start || this.mondayOf(App.todayLocal());
     const cur = this.mondayOf(App.todayLocal());
-    const chip = ws => {
-      const on = ws === sel, isCur = ws === cur;
-      return '<button type="button" class="bs-week-chip btn btn-sm" data-ws="' + ws + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + App.dateRangeLabel(ws, App.periodEndFor(ws))
-        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let chips = '';
-    for (let i = -1; i <= 0; i++) chips += chip(this.addWeeks(sel, i));
-    return '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + chips
-      + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
+    const isCur = sel === cur;
+    const nowBadge = isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
+      + App.dateRangeLabel(sel, App.periodEndFor(sel)) + nowBadge + '</span>';
+    return '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-prev" title="Previous week" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill
+      + '<button class="btn btn-ghost btn-sm" id="bs-week-next" title="Next week" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>'
       + (sel !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="bs-week-now" style="margin-left:4px;">This Week</button>' : '')
       + '</div>';
   },
@@ -536,12 +530,6 @@ S.LaborBuildSchedule = {
   _wire() {
     document.getElementById('bs-week-prev')?.addEventListener('click', () => this.shiftWeek(-7));
     document.getElementById('bs-week-next')?.addEventListener('click', () => this.shiftWeek(7));
-    this.container.querySelectorAll('.bs-week-chip').forEach(b => b.addEventListener('click', async () => {
-      const target = b.dataset.ws;
-      if (!target || target === (this.draft.week_start || '')) return;
-      if (!(await this.confirmLeaveUnsaved())) return;
-      this.loadWeek(target); this.draw();
-    }));
     document.getElementById('bs-week-now')?.addEventListener('click', async () => {
       const target = this.mondayOf(App.todayLocal());
       if (target === (this.draft.week_start || '')) return;

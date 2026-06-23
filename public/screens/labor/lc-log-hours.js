@@ -78,12 +78,16 @@ S.LaborLogHours = {
     return this.actuals().some(a => a.staff_id === staffId && a.date === date);
   },
   // Step the Fill-from-Schedule week by the arrow buttons (always lands on a Monday).
+  // Forward is clamped at the current week: you can't log a week not yet worked.
   shiftFillWeek(n) {
-    const base = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
+    const cur = this.mondayOf(App.todayLocal());
+    const base = this._fillWeek || cur;
     const d = new Date(base + 'T00:00:00');
     if (isNaN(d.getTime())) return;
     d.setDate(d.getDate() + n);
-    this._fillWeek = this.mondayOf(App.ymdLocal(d));
+    const next = this.mondayOf(App.ymdLocal(d));
+    if (next > cur) return;   // never into the future
+    this._fillWeek = next;
     this.renderList();
   },
 
@@ -312,11 +316,6 @@ S.LaborLogHours = {
     if (this.entryMode === 'schedule') {
       document.getElementById('lo-fill-prev')?.addEventListener('click', () => this.shiftFillWeek(-7));
       document.getElementById('lo-fill-next')?.addEventListener('click', () => this.shiftFillWeek(7));
-      this.container.querySelectorAll('.lo-fill-week-chip').forEach(b => b.addEventListener('click', () => {
-        const ws = b.dataset.ws;
-        if (!ws || ws === this._fillWeek) return;
-        this._fillWeek = ws; this.renderList();
-      }));
       document.getElementById('lo-fill-now')?.addEventListener('click', () => {
         const ws = this.mondayOf(App.todayLocal());
         if (ws === this._fillWeek) return;
@@ -499,34 +498,25 @@ S.LaborLogHours = {
     rows.forEach((r, idx) => { r.i = idx; });
     this._fillModel = { ws, rows };
   },
-  // Monday-based week selector for Fill from Schedule (mirrors Build Schedule):
-  // a window of week chips by Monday date (live week tagged NOW, selected
-  // gold-tint) + step arrows + a snap to the current week. No calendar to hunt a
-  // Monday in.
+  // Week selector for Fill from Schedule: ONE week range pill (active-selector
+  // style, gold NOW on the current week) flanked by step arrows, plus a snap back
+  // to This Week. Forward is INERT on the current week: you can't log hours for a
+  // week that hasn't been worked yet.
   fillWeekSelector(ws) {
     const cur = this.mondayOf(App.todayLocal());
-    const step = (base, n) => {
-      const d = new Date((base || cur) + 'T00:00:00');
-      if (isNaN(d.getTime())) return base;
-      d.setDate(d.getDate() + n * 7);
-      return this.mondayOf(App.ymdLocal(d));
-    };
-    const chip = w => {
-      const on = w === ws, isCur = w === cur;
-      return '<button type="button" class="lo-fill-week-chip btn btn-sm" data-ws="' + w + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + App.dateRangeLabel(w, App.periodEndFor(w))
-        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let chips = '';
-    for (let i = -1; i <= 0; i++) chips += chip(step(ws, i));
-    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + chips
-      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
-      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-now" style="margin-left:4px;">This Week</button>' : '')
+    const isCur = ws >= cur;
+    const nowBadge = isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
+      + App.dateRangeLabel(ws, App.periodEndFor(ws)) + nowBadge + '</span>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill
+      + nextBtn
+      + (isCur ? '' : '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-now" style="margin-left:4px;">This Week</button>')
       + '</div>';
   },
 
@@ -534,7 +524,9 @@ S.LaborLogHours = {
   // mode: the week selector, a one-line ready-to-log readout, and the button that
   // opens the week pop-up. Keeps the landing short.
   scheduleLauncherBody() {
-    const ws = this._fillWeek || this.latestScheduleWeek() || this.mondayOf(App.todayLocal());
+    const cur = this.mondayOf(App.todayLocal());
+    let ws = this._fillWeek || this.latestScheduleWeek() || cur;
+    if (ws > cur) ws = cur;   // never land past the current week — nothing's been worked yet
     this._fillWeek = ws;
     const picker = this.fillWeekSelector(ws);
     this.ensureFillModel(ws);

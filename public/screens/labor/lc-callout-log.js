@@ -193,8 +193,7 @@ S.LaborCalloutLog = {
           + (App.canEdit('lc-callout-log') ? '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="sh" style="margin-top:24px;">Call-Out Log</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         + App.showOlderBar('lc', 'callout', list, false);
