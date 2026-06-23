@@ -165,10 +165,10 @@ S.ShiftDashboard = {
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
       : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
-    // Active box uses the opaque selection tones directly (#151C1C bg / #504829
+    // Active box uses the opaque selection tones directly (#15191B bg / #504829
     // border) so the white title and gold number read true, not washed by a
     // translucent gold tint.
-    const bg = isOpen ? '#151C1C' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bg = isOpen ? '#15191B' : (isDone ? 'var(--input)' : 'var(--surface)');
     const bord = isOpen ? '#504829' : 'var(--b-edge)';
     let html = '<div style="border:1px solid ' + bord + ';border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="sc-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
