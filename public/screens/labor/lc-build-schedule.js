@@ -402,7 +402,7 @@ S.LaborBuildSchedule = {
       + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '');
 
     // Totals strip
-    const totalsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+    const totalsCard = '<div class="card" style="margin-top:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Labor Hours</div><div class="calc-val lg">' + T.hours.toFixed(1) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Labor %</div><div class="calc-val lg ' + (pct != null ? (pct > target ? 'warn' : 'good') : '') + '">' + (pct != null ? App.fmtPct(pct) : '-') + '</div></div>'
