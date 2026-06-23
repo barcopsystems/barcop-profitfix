@@ -2871,13 +2871,13 @@ S.HubSettings = {
     const mkStaff = (name, posName, wage, hiredDaysAgo) => ({
       id:uid(), name:name, position_id:lcPos(posName), pay_type:'Hourly', wage:wage, annual_salary:null,
       status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
-      wage_history:[], created_at:new Date().toISOString()
+      wage_history:[], off_days:[], created_at:new Date().toISOString()
     });
     // Salaried (exempt): fixed annual salary, no hourly wage and no overtime.
     const mkSalaried = (name, posName, annual, hiredDaysAgo) => ({
       id:uid(), name:name, position_id:lcPos(posName), pay_type:'Salary', wage:null, annual_salary:annual,
       status:'Active', hire_date:dateStr(hiredDaysAgo), phone:'', email:'',
-      wage_history:[], created_at:new Date().toISOString()
+      wage_history:[], off_days:[], created_at:new Date().toISOString()
     });
     const lcStaff = [
       mkStaff('Maria G.',   'Bartender', 16,   320),
@@ -2897,6 +2897,23 @@ S.HubSettings = {
       mkSalaried('Renee K.',  'Assistant Manager', 52000, 300),
     ];
     App.laborData.lc_staff = lcStaff;
+    // Recurring days off for a few staff (feeds Build Schedule's day-off block).
+    // Recurring days off, set on days each person is not already scheduled in the
+    // seed (so the loaded current-week schedule shows no false day-off conflicts).
+    const setOff = (nm, days) => { const st = lcStaff.find(s => s.name === nm); if (st) st.off_days = days; };
+    setOff('Priya N.', ['Mon', 'Tue']);
+    setOff('Owen L.',  ['Tue']);
+    setOff('Ashley B.', ['Wed']);
+
+    // Time off, all in NEXT week (no schedule posted there yet) so the demo shows
+    // no conflicts on load; the warning fires when the operator builds next week.
+    // An approved vacation, a pending request (surfaces on the cockpit), one more.
+    const lcId = nm => (lcStaff.find(s => s.name === nm) || {}).id || '';
+    App.laborData.lc_time_off = [
+      { id:uid(), staff_id:lcId('Maria G.'),   name:'Maria G.',   start_date:dateStr(-12), end_date:dateStr(-9), type:'Vacation',     status:'Approved',  notes:'Out of town.',  created_at:new Date().toISOString() },
+      { id:uid(), staff_id:lcId('Jake T.'),    name:'Jake T.',    start_date:dateStr(-10), end_date:dateStr(-10), type:'Requested Off', status:'Requested', notes:'Family event.', created_at:new Date().toISOString() },
+      { id:uid(), staff_id:lcId('Marcus T.'),  name:'Marcus T.',  start_date:dateStr(-11), end_date:dateStr(-11), type:'Personal',     status:'Approved',  notes:'',              created_at:new Date().toISOString() }
+    ];
 
     // ════════════════════════════════════════════════════════════════════
     //  INVENTORY OPERATIONS LOGS — Empties, Transfers, Order History, and the

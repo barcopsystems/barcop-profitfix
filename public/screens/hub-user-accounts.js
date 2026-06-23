@@ -29,6 +29,7 @@ S.HubUserAccounts = {
     { module: 'Labor Control',     key: 'manage-schedule',  label: 'Manage Schedule' },
     { module: 'Labor Control',     key: 'manage-staff',     label: 'Manage Staff & Positions' },
     { module: 'Labor Control',     key: 'call-out-log',     label: 'Call-Out Log' },
+    { module: 'Labor Control',     key: 'time-off',         label: 'Time Off' },
     { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor Reports' },
     // Shift Control
     { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
