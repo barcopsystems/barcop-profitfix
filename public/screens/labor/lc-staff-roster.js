@@ -134,16 +134,17 @@ S.LaborStaffRoster = {
       + '<div style="flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
-      + '<input type="checkbox" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>'
+      + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
       + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly. Management is always a supervisor.</span></label></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:12px;margin-bottom:0;"><div style="flex:1 1 100%;min-width:0;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off <span style="color:var(--t4);font-weight:400;letter-spacing:0;text-transform:none;">standing weekdays this person never works; Build Schedule blocks them</span></div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
       + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dn => {
           const on = !!(s && Array.isArray(s.off_days) && s.off_days.indexOf(dn) >= 0);
-          return '<label class="sr-off-chip" style="display:inline-flex;align-items:center;gap:7px;border:1px solid ' + (on ? 'var(--gold-tint-bord)' : 'var(--b1)') + ';background:' + (on ? 'var(--sel-active-bg)' : 'transparent') + ';border-radius:6px;padding:7px 11px;font-size:12px;color:var(--t1);cursor:pointer;">'
-            + '<input type="checkbox" class="sr-off-day" data-day="' + dn + '"' + (on ? ' checked' : '') + ' style="width:14px;height:14px;accent-color:var(--gold);margin:0;cursor:pointer;"/>' + dn + '</label>';
+          return '<button type="button" class="sr-off-chip btn btn-sm" data-day="' + dn + '" data-on="' + (on ? '1' : '0') + '" style="'
+            + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + dn + '</button>';
         }).join('')
       + '</div></div></div>';
   },
@@ -173,10 +174,14 @@ S.LaborStaffRoster = {
         if (p && p.default_wage != null) payEl.value = p.default_wage;
       }
     });
-    // Regular-days-off chips: highlight the label live as it is toggled.
-    document.querySelectorAll('.sr-off-day').forEach(cb => cb.addEventListener('change', () => {
-      const lab = cb.closest('.sr-off-chip');
-      if (lab) { lab.style.background = cb.checked ? 'var(--sel-active-bg)' : 'transparent'; lab.style.borderColor = cb.checked ? 'var(--gold-tint-bord)' : 'var(--b1)'; }
+    // Regular-days-off chips: plain selectable chip (no checkbox), gold-tint when on.
+    document.querySelectorAll('.sr-off-chip').forEach(chip => chip.addEventListener('click', () => {
+      const on = chip.dataset.on === '1';
+      chip.dataset.on = on ? '0' : '1';
+      chip.style.background = on ? 'transparent' : 'var(--sel-active-bg)';
+      chip.style.borderColor = on ? 'var(--b1)' : 'var(--gold-tint-bord)';
+      chip.style.color = on ? 'var(--t2)' : 'var(--t1)';
+      chip.style.fontWeight = on ? '' : '700';
     }));
   },
 
@@ -531,7 +536,9 @@ S.LaborStaffRoster = {
       + '<div class="sh" style="margin:0;">Certifications &amp; Licenses</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div></div>';
     if (list.length === 0) {
-      return heading + '<div style="font-size:12px;color:var(--t3);padding:4px 2px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</div>';
+      return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div></div>';
     }
     const rows = list.map(c => {
       const status = this.certStatus(c);
@@ -639,7 +646,7 @@ S.LaborStaffRoster = {
       + '<div class="sh" style="margin:0;">Coaching Log</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div></div>';
     if (list.length === 0) {
-      return heading + '<div style="font-size:12px;color:var(--t3);padding:4px 2px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div>';
+      return heading + '<div class="card" style="padding:14px 20px;"><div style="font-size:13px;color:var(--t3);line-height:1.5;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div></div>';
     }
     const rows = list.map((n, i) => {
       const catColor = n.category === 'Praise' ? 'var(--green)'
@@ -774,7 +781,7 @@ S.LaborStaffRoster = {
       wage_history:  wageHistory,
       status:        document.getElementById('sr-status')?.value || 'Active',
       shift_lead:    !!document.getElementById('sr-lead')?.checked,
-      off_days:      [...document.querySelectorAll('.sr-off-day')].filter(c => c.checked).map(c => c.dataset.day),
+      off_days:      [...document.querySelectorAll('.sr-off-chip')].filter(c => c.dataset.on === '1').map(c => c.dataset.day),
       phone:         document.getElementById('sr-phone')?.value.trim() || '',
       email:         document.getElementById('sr-email')?.value.trim() || '',
       notes:         document.getElementById('sr-notes')?.value.trim() || ''
