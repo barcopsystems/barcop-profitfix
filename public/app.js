@@ -4205,6 +4205,7 @@ const App = {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
         'c-dashboard':   ['Dashboard', 'Cash Recovery'],
+        'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
         'c-fix':         ['Cash Fix', 'Fix Process and Guidance'],
         'c-trapped':     ['Trapped Cash', 'Cash Recovery'],
         'c-purchasing':  ['Purchasing', 'Cash Recovery'],
@@ -4213,6 +4214,7 @@ const App = {
       };
       const cashScreens = {
         'c-dashboard':   S.CashDashboard,
+        'c-playbook':    S.RecoveryPlaybook,
         'c-fix':         S.CashFix,
         'c-trapped':     S.CashTrapped,
         'c-purchasing':  S.CashPurchasing,
