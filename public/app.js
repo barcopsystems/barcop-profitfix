@@ -4418,7 +4418,9 @@ const App = {
     // still force whole dollars with fmtCurrency(n, 0) for projections/estimates
     // where cents would imply false precision.
     const d = decimals !== undefined ? decimals : 2;
-    return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+    let v = Number(n);
+    if (Number(v.toFixed(d)) === 0) v = 0;   // normalize -0 / tiny negatives so it never prints "$-0.00"
+    return '$' + v.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
   },
 
   // Phase 7: explode a menu item into per-product ounces consumed.
