@@ -137,7 +137,17 @@ const CSVMapper = {
     }
     const { headers, rows } = parsed;
     const sig = this._sig(headers);
-    const map = this._savedMaps()[sig] || this._autoMap(headers, opts.fields);
+    // Honor any remembered EXPLICIT column picks first, then auto-detect whatever is
+    // still unmapped. A remembered skip (or an older saved map missing a field) never
+    // suppresses a column the file clearly has — auto-detect still fills it.
+    const saved = this._savedMaps()[sig] || {};
+    const map = {}, taken = {};
+    opts.fields.forEach(f => { if (saved[f.key] && headers.includes(saved[f.key])) { map[f.key] = saved[f.key]; taken[saved[f.key]] = true; } });
+    const remaining = opts.fields.filter(f => !map[f.key]);
+    if (remaining.length) {
+      const auto = this._autoMap(headers.filter(h => !taken[h]), remaining);
+      Object.keys(auto).forEach(k => { map[k] = auto[k]; });
+    }
     this._renderMapper(headers, rows, map, sig, container, opts);
   },
 
