@@ -86,6 +86,36 @@ window.CashEngine = {
     return { weeksOnHand, value, excess, targetWeeks, weeklyCogs, hasData: true };
   },
 
+  // Per-category cash picture: value on hand, weekly usage cost, weeks on hand,
+  // and the cash tied up beyond a target supply. Drives the Purchasing view.
+  categoryBreakdown(targetWeeks) {
+    targetWeeks = targetWeeks || 3;
+    const base = this.usageBase();
+    const perp = App._perpetualInventory();
+    const cats = {};
+    const bump = c => (cats[c] = cats[c] || { cat: c, value: 0, weeklyCogs: 0 });
+    Object.keys(perp).forEach(pid => {
+      const p = this.productById(pid); if (!p) return;
+      bump(p.category || 'Other').value += (perp[pid].value || 0);
+    });
+    if (base) {
+      const asc = this.countsAsc();
+      const latest = asc[asc.length - 1], prev = asc[asc.length - 2];
+      const span = (new Date(latest.date + 'T00:00:00').getTime() - new Date(prev.date + 'T00:00:00').getTime()) / 86400000;
+      const weeks = span > 0 ? span / 7 : null;
+      Object.keys(base).forEach(pid => {
+        const b = base[pid], p = this.productById(pid); if (!p) return;
+        const cost = (b.unitCost != null ? Math.max(0, b.rawUsed) * b.unitCost : 0);
+        bump(p.category || 'Other').weeklyCogs += (weeks ? cost / weeks : 0);
+      });
+    }
+    return Object.values(cats).map(c => {
+      const woh = c.weeklyCogs > 0 ? c.value / c.weeklyCogs : null;
+      const excess = (woh != null && woh > targetWeeks) ? (woh - targetWeeks) * c.weeklyCogs : 0;
+      return { cat: c.cat, value: c.value, weeklyCogs: c.weeklyCogs, weeksOnHand: woh, excess };
+    }).filter(c => c.value > 0).sort((a, b) => b.excess - a.excess || b.value - a.value);
+  },
+
   // Bills + dated buys due in a window [startYmd, endYmd], inclusive.
   billsDue(startYmd, endYmd) {
     let total = 0; const list = [];
