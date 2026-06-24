@@ -231,7 +231,11 @@ S.InventoryDeliveryHistory = {
         + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
-        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">File Discrepancy</button></td>'
+        + '<td class="no-print" style="text-align:right;">'
+        + (it.discrepancy_filed
+            ? '<span style="font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;">Discrepancy Filed</span>'
+            : '<button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">File Discrepancy</button>')
+        + '</td>'
         + '</tr>';
     }).join('');
 
@@ -313,10 +317,10 @@ S.InventoryDeliveryHistory = {
     ['dhd-units', 'dhd-agreed', 'dhd-invoiced'].forEach(id => document.getElementById(id)?.addEventListener('input', recompute));
     document.getElementById('dhd-overcharge')?.addEventListener('input', e => { e.target._touched = true; });
     document.getElementById('dhd-cancel')?.addEventListener('click', () => App.closeModal('dh-disc-modal'));
-    document.getElementById('dhd-file')?.addEventListener('click', () => this.saveLineDiscrepancy(d));
+    document.getElementById('dhd-file')?.addEventListener('click', () => this.saveLineDiscrepancy(d, it));
   },
 
-  async saveLineDiscrepancy(d) {
+  async saveLineDiscrepancy(d, it) {
     const errEl = document.getElementById('dhd-err');
     const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
     const date = document.getElementById('dhd-date')?.value;
@@ -342,8 +346,11 @@ S.InventoryDeliveryHistory = {
     };
     const ok = await App.putRecord('core', 'vendor_discrepancy', rec);
     if (!ok) { fail('Could not save the discrepancy. Try again.'); return; }
-    // Reflect it on the delivery record so Delivery History shows the flag.
-    if (!d.has_discrepancy) { d.has_discrepancy = true; await App.putRecord('ic', 'delivery', d); }
+    // Mark the line as filed so the detail view shows "Discrepancy Filed" instead
+    // of re-offering the button, and flag the delivery so the list shows the flag.
+    if (it) it.discrepancy_filed = true;
+    d.has_discrepancy = true;
+    await App.putRecord('ic', 'delivery', d);
     App.closeModal('dh-disc-modal');
     this.renderDetail(d.id);
   }
