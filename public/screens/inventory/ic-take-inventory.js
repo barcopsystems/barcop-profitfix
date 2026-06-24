@@ -310,7 +310,18 @@ S.InventoryTakeInventory = {
     return result;
   },
 
-  renderCounting() {
+  // The per-card counted / not-counted state pill (green check when counted).
+  pstateHtml(pid, counted) {
+    return counted
+      ? '<span class="ti-pstate" data-pid="' + pid + '" style="display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--green);"><span style="width:15px;height:15px;border-radius:50%;background:var(--green);color:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:9px;">&#10003;</span>COUNTED</span>'
+      : '<span class="ti-pstate" data-pid="' + pid + '" style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--t3);">NOT COUNTED</span>';
+  },
+  setCardCounted(pid, counted) {
+    const el = this.container.querySelector('.ti-pstate[data-pid="' + pid + '"]');
+    if (el) el.outerHTML = this.pstateHtml(pid, counted);
+  },
+
+  renderCounting(keepScroll) {
     const groups = this.groups();
     if (groups.length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="empty">'
@@ -330,7 +341,9 @@ S.InventoryTakeInventory = {
     const isLast = this.locStep === groups.length - 1;
 
     const cards = grp.products.map(p => {
-      const c = this.draft.counts[p.id + '@@' + grp.location] || { value: 0, fulls: 0, notes: '' };
+      const _ckey = p.id + '@@' + grp.location;
+      const isCounted = this.draft.counts[_ckey] != null;
+      const c = this.draft.counts[_ckey] || { value: 0, fulls: 0, notes: '' };
       // Bottle beer with case_size set uses a case + loose-bottle input
       // pair. Bottles either are full or empty (no partial level applies),
       // so the slider does not fit. Everything else uses the partial slider.
@@ -370,12 +383,16 @@ S.InventoryTakeInventory = {
       // are far less scrolling. Notes auto-expand when one already exists.
       const hasNote = !!(c.notes && c.notes.trim());
       return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" style="margin-bottom:10px;padding:12px 14px;">'
-        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
         + '<div style="min-width:0;"><span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
         + '<span style="font-size:11px;color:var(--t3);margin-left:8px;">' + esc(p.category || 'Uncategorized') + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</span></div>'
-        + '<button type="button" class="ti-note-toggle" data-pid="' + p.id + '" style="flex-shrink:0;background:none;border:none;color:' + (hasNote ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;cursor:pointer;white-space:nowrap;">' + (hasNote ? 'Note' : '+ Note') + '</button>'
+        + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+        + this.pstateHtml(p.id, isCounted)
+        + '<button type="button" class="ti-note-toggle" data-pid="' + p.id + '" style="background:none;border:none;color:' + (hasNote ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;cursor:pointer;white-space:nowrap;">' + (hasNote ? 'Note' : '+ Note') + '</button>'
+        + '</div>'
         + '</div>'
         + countInput
+        + '<div style="display:flex;justify-content:center;margin-top:8px;"><button type="button" class="ti-oos btn btn-ghost btn-sm" data-pid="' + p.id + '">Out of Stock</button></div>'
         + '<div class="ti-note-wrap" data-pid="' + p.id + '" style="margin-top:10px;' + (hasNote ? '' : 'display:none;') + '">'
         + '<input type="text" class="ti-note" data-pid="' + p.id + '" value="' + esc(c.notes || '') + '" placeholder="Optional note"/></div>'
         + '</div>';
@@ -385,13 +402,13 @@ S.InventoryTakeInventory = {
       + '<div style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--b2);">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
-      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--gold);">' + done + ' of ' + total + '</span></span></div>'
+      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--green);">' + done + ' of ' + total + '</span></span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
         + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Start Over</button>'
       + '</div></div>'
       + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;">'
-      + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--gold);transition:width 0.2s;"></div></div></div>'
+      + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--green);transition:width 0.2s;"></div></div></div>'
       + cards
       + '<div class="card-actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
@@ -418,6 +435,7 @@ S.InventoryTakeInventory = {
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
+        this.setCardCounted(p.id, true);
       });
     });
     // Case + loose inputs for bottle beer products with case_size set.
@@ -437,6 +455,7 @@ S.InventoryTakeInventory = {
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
+        this.setCardCounted(pid, true);
       });
     });
     // Food / dry-goods plain number input.
@@ -449,6 +468,7 @@ S.InventoryTakeInventory = {
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
+        this.setCardCounted(pid, true);
       });
     });
     this.container.querySelectorAll('.ti-note').forEach(inp => {
@@ -471,6 +491,27 @@ S.InventoryTakeInventory = {
         if (!showing) { const inp = wrap.querySelector('.ti-note'); if (inp) inp.focus(); }
       });
     });
+    // "Out of Stock" records a confirmed 0 (counts the product as empty) and resets
+    // its input. Re-renders this location, preserving scroll so the page does not jump.
+    this.container.querySelectorAll('.ti-oos').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pid = btn.dataset.pid;
+        const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
+        const isCaseBeer = !!(card && card.dataset.caseBeer === '1');
+        const key = pid + '@@' + grp.location;
+        const prev = this.draft.counts[key] || {};
+        this.draft.counts[key] = isCaseBeer
+          ? { cases: 0, loose: 0, notes: prev.notes || '' }
+          : { value: 0, fulls: 0, notes: prev.notes || '' };
+        this.draft._locStep = this.locStep;
+        this.saveDraft();
+        const sc = this.container.closest('.content') || document.querySelector('.content');
+        const y = sc ? sc.scrollTop : 0;
+        this.renderCounting(true);
+        const sc2 = this.container.closest('.content') || document.querySelector('.content');
+        if (sc2) sc2.scrollTop = y;
+      });
+    });
 
     this.container.onclick = null;
     document.getElementById('ti-prev')?.addEventListener('click', () => { this.locStep--; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
@@ -481,7 +522,7 @@ S.InventoryTakeInventory = {
     // Top-right duplicates of the session actions, same handlers as the bottom.
     document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); this.draft = null; this.renderSetup(); this.scrollTop(); });
     document.getElementById('ti-discard-top')?.addEventListener('click', () => this.confirmDiscardDraft());
-    this.scrollTop();
+    if (!keepScroll) this.scrollTop();
   },
 
   updateProgress() {
@@ -501,7 +542,9 @@ S.InventoryTakeInventory = {
   rows() {
     const out = [];
     this.groups().forEach(g => g.products.forEach(p => {
-      const c = this.draft.counts[p.id + '@@' + g.location] || { value: 0, fulls: 0, notes: '' };
+      const _key = p.id + '@@' + g.location;
+      const counted = this.draft.counts[_key] != null;
+      const c = this.draft.counts[_key] || { value: 0, fulls: 0, notes: '' };
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       let total, value;
       if (isCaseBeer) {
@@ -513,7 +556,7 @@ S.InventoryTakeInventory = {
         total = (c.fulls || 0) + (c.value || 0);
         value = p.unit_cost != null ? total * p.unit_cost : null;
       }
-      out.push({ p, c, total, value, isCaseBeer, location: g.location });
+      out.push({ p, c, total, value, isCaseBeer, location: g.location, counted });
     }));
     return out;
   },
@@ -531,7 +574,7 @@ S.InventoryTakeInventory = {
     const warnBanner = uncounted > 0
       ? '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 13px;margin-bottom:16px;">'
         + '<span style="color:var(--amber);font-weight:800;font-size:14px;line-height:1.3;flex-shrink:0;">!</span>'
-        + '<div style="font-size:12px;color:var(--t1);line-height:1.5;"><strong>' + uncounted + ' of ' + rows.length + ' products were not counted.</strong> They will be submitted as 0. If a shelf was full, go Back to Counting and enter it. The uncounted products are tagged below.</div>'
+        + '<div style="font-size:12px;color:var(--t1);line-height:1.5;"><strong>' + uncounted + ' of ' + rows.length + ' products were not counted.</strong> They keep their last count and will not change. If one is actually empty, go Back to Counting and tap Out of Stock. The uncounted products are tagged below.</div>'
         + '</div>'
       : '';
 
@@ -598,7 +641,8 @@ S.InventoryTakeInventory = {
           total:               r.total,           // on-hand in cases (cases + loose/case_size)
           unit_cost:           r.p.unit_cost != null ? r.p.unit_cost : null,
           value:               r.value,
-          notes:               r.c.notes || ''
+          notes:               r.c.notes || '',
+          counted:             r.counted
         };
       }
       return {
@@ -611,7 +655,8 @@ S.InventoryTakeInventory = {
         total:      r.total,
         unit_cost:  r.p.unit_cost != null ? r.p.unit_cost : null,
         value:      r.value,
-        notes:      r.c.notes || ''
+        notes:      r.c.notes || '',
+        counted:    r.counted
       };
     });
     const record = {
