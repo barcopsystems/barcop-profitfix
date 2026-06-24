@@ -3511,6 +3511,70 @@ S.HubSettings = {
       buildClosedPeriod(mondayISO(70), 62),
     ];
 
+    // ── Variance Report demo data (engine-true off the seeded counts) ─────────
+    // Reads each period's theoretical category sales / per-product pours straight
+    // from the counts, then posts "actual" POS sales a realistic notch under it
+    // (normal over-pour, spill, shrink). Feeds the Quick Variance Check (manual
+    // category actuals, last 4 periods) and two saved deep-dive runs (the POS
+    // upload path), so both variance entry points open with believable numbers.
+    (() => {
+      const VR = S.InventoryVarianceReport;
+      if (!VR || !VR.categoryTheoretical) return;
+      const savedEnd = VR.endCountId, savedRows = VR.posRows, savedMap = VR.manualMap;
+      const asc = [...(App.inventoryData.ic_counts || [])].sort((a, b) =>
+        new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+      const ends = asc.slice(1);   // each count that closes a period
+      // Theoretical is the ceiling; actual rings a realistic notch lower, with a
+      // small period-to-period wobble so the trend never reads mechanically flat.
+      const lossFor = (cat, i) => {
+        const base = { 'Liquor': 0.035, 'Wine': 0.026, 'Bottle Beer': 0.012, 'Draft Beer': 0.072 }[cat];
+        return Math.max(0.004, (base != null ? base : 0.03) + ((i % 3) - 1) * 0.006);
+      };
+
+      // 1) Quick Variance Check — category actuals for the last 4 periods.
+      App.inventoryData.variance_category_sales = App.inventoryData.variance_category_sales || {};
+      ends.slice(-4).forEach((endC, i) => {
+        VR.endCountId = endC.id;
+        const theoMap = VR.categoryTheoretical();
+        const store = {};
+        Object.keys(theoMap).forEach(cat => {
+          if (!theoMap[cat] || !theoMap[cat].theo) return;
+          store[cat] = +(theoMap[cat].theo * (1 - lossFor(cat, i))).toFixed(2);
+        });
+        if (Object.keys(store).length) App.inventoryData.variance_category_sales[endC.id] = store;
+      });
+
+      // 2) Deep-dive saved runs — last two periods, POS rows built from the
+      //    period's poured usage so Sales / Usage Variance reconcile.
+      App.inventoryData.ic_variance_runs = App.inventoryData.ic_variance_runs || [];
+      ends.slice(-2).forEach((endC, k) => {
+        const startC = asc[asc.indexOf(endC) - 1];
+        if (!startC) return;
+        const periodIdx = ends.length - 2 + k;
+        VR.endCountId = endC.id;
+        const usage = VR.usageMap();
+        const posRows = [];
+        Object.keys(usage).forEach(pid => {
+          const u = usage[pid], p = u.product || {};
+          if (u.poursMade == null || u.poursMade <= 0 || !p.menu_price) return;
+          const qty = Math.round(u.poursMade * (1 - lossFor(p.category, periodIdx)));
+          if (qty > 0) posRows.push({ name: p.name, qty, sales: +(qty * p.menu_price).toFixed(2) });
+        });
+        if (!posRows.length) return;
+        VR.posRows = posRows; VR.manualMap = {};
+        const totalVar = VR.salesRows().reduce((s, r) =>
+          s + ((!r.mixedSizes && r.salesVar != null) ? r.salesVar : 0), 0);
+        App.inventoryData.ic_variance_runs.push({
+          id: uid(), date: endC.date, start_date: startC.date, end_date: endC.date,
+          start_count_id: startC.id, end_count_id: endC.id, pos_rows: posRows,
+          total_sales_variance: +totalVar.toFixed(2), item_count: posRows.length,
+          run_at: endC.created_at || daysAgoISO(0)
+        });
+      });
+
+      VR.endCountId = savedEnd; VR.posRows = savedRows; VR.manualMap = savedMap;
+    })();
+
     // ── Save everything — App.data plus all three Control stores ──
     await App.save();
     await App.saveInventory();           // config only (products, locations, vendors, batches, par/variance settings)
