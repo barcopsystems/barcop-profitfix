@@ -145,7 +145,10 @@ S.LaborOvertimeWatch = {
 
     let projBody;
     if (rows.length === 0) {
-      projBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</div>'
+      projBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
+        + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</td></tr></tbody></table></div></div>'
         + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     } else {
       const trs = rows.map(r => {

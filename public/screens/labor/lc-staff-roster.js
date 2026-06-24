@@ -14,7 +14,7 @@ S.LaborStaffRoster = {
   detailId: null,
   certEditId: null,
   noteEditId: null,
-  entryMode: 'manual',     // landing card: type a profile vs import a staff file
+  entryMode: 'import',     // landing card: import a staff file (default) vs type a profile
   _draft: null,            // in-memory Add-Staff draft (survives leave/return)
 
   CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
@@ -228,7 +228,7 @@ S.LaborStaffRoster = {
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
@@ -240,7 +240,9 @@ S.LaborStaffRoster = {
 
     let below;
     if (list.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No staff yet. Add your first team member above, or import a staff list. The roster feeds scheduling, hours, tips, and the Revenue Recovery server list.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div></div>';
     } else {
       const rows = list.map(s => {
         const pos = this.positionById(s.position_id);
@@ -265,7 +267,8 @@ S.LaborStaffRoster = {
           + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="sh" style="margin-top:24px;">Staff Roster</div>'
+      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;margin:24px 0 10px;">'
+        + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -278,6 +281,7 @@ S.LaborStaffRoster = {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#sr-startover')) { this._draft = null; this.renderList(); return; }
+      if (ev.target.closest('#sr-export'))    { App.exportPDF({ title: 'Staff Roster', root: this.container }); return; }
       if (ev.target.closest('#sr-save'))     { this.saveProfile(null); return; }
       const edit = ev.target.closest('.sr-edit');
       const del = ev.target.closest('.sr-del');

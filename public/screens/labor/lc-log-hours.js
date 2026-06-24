@@ -241,8 +241,9 @@ S.LaborLogHours = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged yet. Fill them from your posted schedule or enter them by hand above. '
-        + 'Logged hours feed your weekly labor cost in Profit and Revenue Recovery.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged yet. Fill them from your posted schedule or enter them by hand above.</td></tr></tbody></table></div></div>';
     } else {
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
@@ -252,7 +253,9 @@ S.LaborLogHours = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('lc', 'actual')).map(a => {
           const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
@@ -590,7 +593,7 @@ S.LaborLogHours = {
     const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const ws = this._fillWeek;
     const present = [...new Set(rows.map(r => r.dayIdx))].sort((a, b) => a - b);
-    if (!present.length) return '<div style="font-size:12px;color:var(--t3);padding:8px 2px;">Nothing left to log for this week.</div>';
+    if (!present.length) return '<div class="card" style="padding:14px 20px;"><div style="font-size:12px;color:var(--t3);">Nothing left to log for this week. Every scheduled shift is already logged.</div></div>';
     return present.map(di => {
       const date = this.weekDayYmd(ws, di);
       const d = new Date((date || '') + 'T00:00:00');

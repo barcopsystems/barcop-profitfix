@@ -408,7 +408,9 @@ S.LaborReports = {
     let staffBody;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
-      staffBody = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this week.</div>';
+      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:34%;">Staff</th><th style="width:16%;">Days</th><th style="width:16%;">Hours</th><th style="width:18%;">Cost</th><th style="width:16%;"></th>'
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No hours logged for this week.</td></tr></tbody></table></div></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {

@@ -199,7 +199,9 @@ S.LaborPayPeriods = {
     };
     let openCard = '<div class="sh" style="margin:24px 0 10px;">Open Periods</div>';
     if (openWeeks.length === 0) {
-      openCard += '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No open periods. Every week in range is closed and locked.</div>';
+      openCard += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No open periods. Every week in range is closed and locked.</td></tr></tbody></table></div></div>';
     } else {
       openCard += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'

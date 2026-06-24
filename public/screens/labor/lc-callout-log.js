@@ -175,7 +175,9 @@ S.LaborCalloutLog = {
 
     let below;
     if (list.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No call-outs logged yet. Use the form above to log no-shows, sick calls, and late arrivals. Repeat call-outs from one person get flagged so patterns are easy to spot.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No call-outs logged yet. Use the form above to log no-shows, sick calls, and late arrivals.</td></tr></tbody></table></div></div>';
     } else {
       const rows = list.slice(0, App.listLimit('lc', 'callout')).map(c => {
         const reps = this.repeatCount(c.staff_id);

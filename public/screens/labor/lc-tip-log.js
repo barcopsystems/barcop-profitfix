@@ -371,7 +371,9 @@ S.LaborTipLog = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged yet. Tap a day above and the crew auto-fills, or import a POS tips export on the Labor cockpit.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged yet. Tap a day above and the crew auto-fills, or import a POS tips export on the Labor cockpit.</td></tr></tbody></table></div></div>';
     } else {
       const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
       const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
@@ -384,7 +386,9 @@ S.LaborTipLog = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No tips logged in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const hasTipOut = filtered.some(x => (x.tip_out_paid || 0) > 0 || (x.tip_out_received || 0) > 0);
         const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x => {
@@ -1042,7 +1046,7 @@ S.LaborTipLog = {
         + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
         + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
-      : '<div id="tp-rows" style="font-size:12px;color:var(--t3);margin-bottom:8px;">No participants yet. Pick a day above to load the crew, or add one below.</div>';
+      : '<div class="card" style="padding:14px 20px;margin-bottom:12px;"><div id="tp-rows" style="font-size:12px;color:var(--t3);">No participants yet. Pick a day above to load the crew, or add one below.</div></div>';
     const calcAndHeads = rows.length
       ? '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
         + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
