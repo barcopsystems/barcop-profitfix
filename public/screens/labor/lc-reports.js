@@ -265,7 +265,7 @@ S.LaborReports = {
     let actualsCard;
     if (dayActuals.length === 0) {
       actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
-        + '<th style="width:34%;">Staff</th><th style="width:16%;">Shift</th><th style="width:14%;">Hours</th><th style="width:16%;">Wage</th><th style="width:14%;">Cost</th><th style="width:6%;"></th>'
+        + '<th style="width:28%;">Staff</th><th style="width:15%;">Shift</th><th style="width:14%;">Hours</th><th style="width:15%;">Wage</th><th style="width:14%;">Cost</th><th style="width:14%;"></th>'
         + '</tr></thead><tbody>' + this.noRow(6, 'No hours logged for this day. Log them in Log Hours.') + '</tbody></table></div></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
@@ -285,7 +285,7 @@ S.LaborReports = {
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
       actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
-        + '<th style="width:34%;">Staff</th><th style="width:16%;">Shift</th><th style="width:14%;">Hours</th><th style="width:16%;">Wage</th><th style="width:14%;">Cost</th><th style="width:6%;"></th>'
+        + '<th style="width:28%;">Staff</th><th style="width:15%;">Shift</th><th style="width:14%;">Hours</th><th style="width:15%;">Wage</th><th style="width:14%;">Cost</th><th style="width:14%;"></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -314,8 +314,8 @@ S.LaborReports = {
         : '';
       schedCard = '<div class="sh" style="margin:24px 0 10px;">Scheduled This Day</div>'
         + nudge
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Start</th><th>End</th><th>Hours</th><th>Cost</th><th>Status</th>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:28%;">Staff</th><th style="width:15%;">Start</th><th style="width:14%;">End</th><th style="width:15%;">Hours</th><th style="width:14%;">Cost</th><th style="width:14%;">Status</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
