@@ -360,7 +360,9 @@ input,select,textarea{color-scheme:dark;}
 /* Bar Cop checkbox: green fill + DARK check when checked (native accent-color
    forces a white check, so we render our own). Reusable on any interactive box. */
 .bc-check{appearance:none;-webkit-appearance:none;width:16px;height:16px;flex:none;border:1px solid var(--b1);border-radius:3px;background:var(--input);cursor:pointer;position:relative;margin:0;vertical-align:middle;}
-.bc-check:checked{background:var(--green);border-color:var(--green);}
+/* !important beats the global `.app input:not([type=file])` rule (specificity
+   0,2,1) so a checked box turns green even in an inline form inside .app. */
+.bc-check:checked{background:var(--green)!important;border-color:var(--green)!important;}
 .bc-check:checked::after{content:'\2713';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--bg);font-size:11px;font-weight:700;line-height:1;}
 /* Edit Tips pop-up: the tip-out row's inner form-row is :last-of-type (margin 0),
    so add the gap below it (only when shown) before Notes. */
