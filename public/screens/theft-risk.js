@@ -286,9 +286,10 @@ S.TheftRisk = {
   openInvestigationModal(productId, productName, opts) {
     opts = opts || {};
     this._vim = { productId, sku: productName || '', subtitle: opts.subtitle || '', onClose: opts.onClose || null };
-    const existing = (App.data.variance_investigations || []).find(i => i.product_id === productId && i.status !== 'resolved');
+    const list = (App.data.variance_investigations || []).filter(i => i.product_id === productId);
+    const inv = list.find(i => i.status !== 'resolved') || list.find(i => i.status === 'resolved') || null;
     App.openModal('<div class="card form-card" id="vim-card" style="margin:0;"></div>', { id: 'vi-modal', maxWidth: 620, noClose: true });
-    this._renderVimBody(existing ? existing.id : null);
+    this._renderVimBody(inv ? inv.id : null);
   },
   _vimClose() {
     App.closeModal('vi-modal');
@@ -326,6 +327,7 @@ S.TheftRisk = {
 
     // WORKING: the canonical record, interactive (step checks update in place).
     const inv = this._inv(invId); if (!inv) { this._vimClose(); return; }
+    const isResolved = inv.status === 'resolved';
     const doneN0 = inv.steps.filter(s => s.done).length;
     const stepDefs = inv.steps_def || this.VARIANCE_STEPS;
     const live = inv.product_id ? this.investigationLiveData(inv.product_id) : { step2: '', step3: '' };
@@ -348,13 +350,15 @@ S.TheftRisk = {
     card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Investigation</span>'
       + '<span id="vim-view" style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:none;color:var(--gold);cursor:pointer;white-space:nowrap;">View in Loss Prevention &rsaquo;</span></div>'
       + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(inv.sku) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Opened ' + esc(inv.opened_date) + ' &middot; <span id="vim-progress" style="font-weight:700;color:' + (doneN0 === 6 ? 'var(--green)' : 'var(--t3)') + ';">' + doneN0 + ' / 6 steps</span></div>' + sub
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Opened ' + esc(inv.opened_date) + (isResolved ? ' &middot; <span style="color:var(--green);font-weight:700;">Resolved ' + esc(inv.resolved_date || '') + '</span>' : '') + ' &middot; <span id="vim-progress" style="font-weight:700;color:' + (doneN0 === 6 ? 'var(--green)' : 'var(--t3)') + ';">' + doneN0 + ' / 6 steps</span></div>' + sub
       + '<div style="max-height:42vh;overflow-y:auto;margin-top:12px;padding-right:10px;">' + steps
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
       + '<textarea class="vim-resolution" rows="2" placeholder="The conclusion, even if inconclusive" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(inv.resolution || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="vim-save">Save &amp; Close</button>'
-      + '<button class="btn btn-ghost" id="vim-resolve">Resolve &amp; Close</button>'
+      + (isResolved
+          ? '<button class="btn btn-primary" id="vim-reopen">Reopen</button>'
+          : '<button class="btn btn-primary" id="vim-save">Save &amp; Close</button>'
+            + '<button class="btn btn-ghost" id="vim-resolve">Resolve &amp; Close</button>')
       + '<button class="btn btn-danger" id="vim-del" style="margin-left:auto;">Delete</button></div>';
 
     const flush = () => {
@@ -371,10 +375,11 @@ S.TheftRisk = {
     }));
     card.querySelectorAll('.vim-finding').forEach(i => i.addEventListener('change', () => { inv.steps[+i.dataset.step].finding = i.value; App.putRecord('core', 'variance_investigation', inv); }));
     card.querySelector('.vim-resolution')?.addEventListener('change', e => { inv.resolution = e.target.value; App.putRecord('core', 'variance_investigation', inv); });
-    card.querySelector('#vim-save').addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
-    card.querySelector('#vim-resolve').addEventListener('click', () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
-    card.querySelector('#vim-view').addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => { this._vimClose(); App.showApp('profit'); App.navigate('theft-risk'); }); });
-    card.querySelector('#vim-del').addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'variance_investigation', inv.id); this._vimClose(); });
+    card.querySelector('#vim-save')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
+    card.querySelector('#vim-resolve')?.addEventListener('click', () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
+    card.querySelector('#vim-reopen')?.addEventListener('click', () => { inv.status = 'open'; delete inv.resolved_date; App.putRecord('core', 'variance_investigation', inv).then(() => this._renderVimBody(invId)); });
+    card.querySelector('#vim-view')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => { this._vimClose(); App.showApp('profit'); App.navigate('theft-risk'); }); });
+    card.querySelector('#vim-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'variance_investigation', inv.id); this._vimClose(); });
   },
 
   /* The Fix System's variance process as a trackable workflow. Step 5 is a
