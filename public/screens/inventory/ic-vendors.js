@@ -13,7 +13,7 @@
 S.InventoryVendors = {
   editId: null,
   _pendingDelId: null,
-  entryMode: 'manual',     // 'manual' = type a vendor, 'import' = drop a vendor list file
+  entryMode: 'import',     // default to import (Import File first); 'manual' = type a vendor
   TERMS: ['', 'COD', 'Net 7', 'Net 15', 'Net 30', 'Net 60'],
 
   vendors() {
@@ -170,7 +170,7 @@ S.InventoryVendors = {
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
@@ -389,9 +389,8 @@ S.InventoryVendors = {
   },
 
   renderProductsCard(prods) {
-    const heading = '<div class="sh" style="margin-top:24px;">Products from this Vendor</div>';
     if (prods.length === 0) {
-      return heading + '<div style="font-size:12px;color:var(--t3);">No products are linked to this vendor yet. '
+      return '<div style="font-size:12px;color:var(--t3);margin-top:24px;">No products are linked to this vendor yet. '
         + 'Set the Primary Vendor field on a product in the Products screen.</div>';
     }
     const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
@@ -413,10 +412,10 @@ S.InventoryVendors = {
       const catProds = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
         + '<colgroup><col style="width:240px;"/><col/><col/><col/></colgroup>'
-        + '<thead><tr><th>' + esc(c) + ' Products</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
+        + '<thead><tr><th>' + esc(c) + '</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
         + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div></div>';
     }).join('');
-    return heading + tables;
+    return '<div style="margin-top:24px;">' + tables + '</div>';
   },
 
   renderPriceHistoryCard(prods) {
