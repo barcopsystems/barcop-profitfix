@@ -150,7 +150,7 @@ S.InventoryDashboard = {
     const derive = {
       count:      st.hasCountThisWeek,
       deliveries: false,
-      orders:     st.reorderCount === 0,
+      orders:     st.reorderCount === 0 && st.hasReorderBasis,
       review:     false
     };
     const r = {};
@@ -187,10 +187,11 @@ S.InventoryDashboard = {
 
     // Reorder plan (same basis as Order Sheet: below par → fill to par).
     const byVendor = {};
-    let reorderTotal = 0, reorderCount = 0;
+    let reorderTotal = 0, reorderCount = 0, parChecked = 0;
     Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid); if (!p) return;
       const par = parseFloat(p.par_level); if (isNaN(par) || par <= 0) return;
+      parChecked++;
       const oh = onHand[pid]; if (oh >= par) return;
       const qty = Math.max(1, Math.ceil(par - oh));
       const cost = qty * (App.unitCost(p) || 0);
@@ -244,7 +245,7 @@ S.InventoryDashboard = {
     return {
       asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek,
       base, periodCost, weeksOnHand, sigNow, prevRaw,
-      vendors, reorderTotal, reorderCount, parOff,
+      vendors, reorderTotal, reorderCount, parOff, hasReorderBasis: parChecked > 0,
       fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek, menuOver
     };
   },
@@ -330,9 +331,8 @@ S.InventoryDashboard = {
       return n ? (n + ' deliver' + (n === 1 ? 'y' : 'ies') + ' logged this week') : (isDone ? 'None this week' : this._META.deliveries.sub);
     }
     if (k === 'orders') {
-      return st.reorderCount
-        ? App.fmtCurrency(st.reorderTotal) + ' to reorder, ' + st.vendors.length + ' vendor' + (st.vendors.length === 1 ? '' : 's')
-        : 'Everything at par';
+      if (st.reorderCount) return App.fmtCurrency(st.reorderTotal) + ' to reorder, ' + st.vendors.length + ' vendor' + (st.vendors.length === 1 ? '' : 's');
+      return st.hasReorderBasis ? 'Everything at par' : this._META.orders.sub;
     }
     if (k === 'review') {
       const flags = (st.shrink > 0 ? 1 : 0) + (st.spotFlags > 0 ? 1 : 0) + (st.deadAll > 0 ? 1 : 0) + (st.menuOver > 0 ? 1 : 0);
@@ -383,7 +383,10 @@ S.InventoryDashboard = {
     }
     if (k === 'orders') {
       if (st.reorderCount === 0) {
-        return '<div style="font-size:13px;color:var(--t2);padding:2px 0;">Everything is at or above par. Nothing to reorder right now.</div>'
+        const msg = st.hasReorderBasis
+          ? 'Everything is at or above par. Nothing to reorder right now.'
+          : 'No reorder plan yet. Take a count and set pars, and anything below par shows up here to order by vendor.';
+        return '<div style="font-size:13px;color:var(--t2);padding:2px 0;">' + msg + '</div>'
           + (st.parOff ? this.parNudge(st.parOff) : '')
           + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>' + this.markBtn('orders', 'Mark Done'));
       }
