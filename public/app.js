@@ -3634,6 +3634,41 @@ const App = {
     return parseFloat(item.cost) || 0;
   },
 
+  // ── Menu cost vs target + cost-creep attribution ───────────────────────────
+  // Per-item cost target: the item's own override, else the default for its kind
+  // (food plate vs cocktail).
+  menuTargetPct(item) {
+    if (item && item.target_cost_pct != null && item.target_cost_pct !== '') return parseFloat(item.target_cost_pct);
+    const food = !!(item && item.recipe && item.recipe.mode === 'food');
+    return food ? this.MENU_TARGET_COST_PCT.plate : this.MENU_TARGET_COST_PCT.cocktail;
+  },
+  // Live cost percentage of a menu item against its menu price, plus its target.
+  menuItemPct(item) {
+    const cost = this.menuItemCost(item) || 0;
+    const price = parseFloat(item && item.price) || 0;
+    const pct = price > 0 ? cost / price * 100 : null;
+    const target = this.menuTargetPct(item);
+    return { cost, price, pct, target, over: (pct != null && target != null && pct > target + 0.05) };
+  },
+  // Menu items that reference any of the given inventory product ids — either a
+  // linked product or a recipe ingredient sourced from a product. idSet = a Set.
+  menuItemsUsingProducts(idSet) {
+    if (!idSet || !idSet.size) return [];
+    return this.menuItems().filter(it => {
+      if (it.linked_product_id && idSet.has(it.linked_product_id)) return true;
+      const ings = (it.recipe && Array.isArray(it.recipe.ingredients)) ? it.recipe.ingredients : [];
+      return ings.some(ing => {
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        return src === 'product' && id && idSet.has(id);
+      });
+    });
+  },
+  // Every menu item currently over its cost target (drives the cockpit count).
+  menuItemsOverTarget() {
+    return this.menuItems().map(it => this.menuItemPct(it)).filter(m => m.over);
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
