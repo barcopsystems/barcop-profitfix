@@ -172,6 +172,15 @@ const Cash = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
+      <div class="nav-section">Free Up Cash</div>
+      <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span class="nav-label">Trapped Cash</span>
+      </div>
+      <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Purchasing</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="c-help" id="nav-c-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
