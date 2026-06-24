@@ -79,6 +79,7 @@ S.ShiftDashboard = {
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
+      + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -91,6 +92,14 @@ S.ShiftDashboard = {
     if (this._openStep === 'import') this.mountImport();
     if (this._openStep === 'cash') this.mountCashImport();
     this.wire();
+  },
+
+  // ── Get Started: setup steps above the cockpit until both are done ───────────
+  getStartedBox() {
+    return App.controlGetStarted('Shift', [
+      { num: 1, label: 'Set up your registers', screen: 'sc-cash-control',        done: ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false).length > 0 },
+      { num: 2, label: 'Build your checklists',  screen: 'sc-checklist-templates', done: ((App.shiftData && App.shiftData.sc_checklist_templates) || []).length > 0 }
+    ]);
   },
 
   // True when the shown week is the current week (or later) — the forward edge.
