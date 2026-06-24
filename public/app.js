@@ -3669,6 +3669,43 @@ const App = {
     return this.menuItems().map(it => this.menuItemPct(it)).filter(m => m.over);
   },
 
+  // ── Perpetual on-hand (the CURRENT picture, not just the latest count) ───────
+  // The reorder math + inventory value read current on-hand, which is NOT the
+  // single latest count: a count can cover one location and skip products, so
+  // each product's on-hand is the sum across its locations of the most-recent
+  // value where that product@location was actually COUNTED. An item flagged
+  // `counted:false` (operator skipped it) never overwrites a prior value, so a
+  // count submitted with everything not counted changes nothing. Older counts
+  // predate the flag, so their items are treated as counted. { pid: {onHand,value} }.
+  _perpetualInventory() {
+    const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])]
+      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());   // newest first
+    const seen = {};      // "pid@@loc" already resolved to its newest counted value
+    const byProd = {};
+    counts.forEach(cnt => {
+      (cnt.items || []).forEach(it => {
+        if (it.counted === false) return;
+        const key = it.product_id + '@@' + (it.location || 'Unassigned');
+        if (seen[key]) return;
+        seen[key] = true;
+        const rec = byProd[it.product_id] || (byProd[it.product_id] = { onHand: 0, value: 0 });
+        rec.onHand += (it.total || 0);
+        rec.value  += (it.value || 0);
+      });
+    });
+    return byProd;
+  },
+  currentOnHand() {
+    const m = this._perpetualInventory();
+    const out = {};
+    Object.keys(m).forEach(pid => { out[pid] = m[pid].onHand; });
+    return out;
+  },
+  currentInventoryValue() {
+    const m = this._perpetualInventory();
+    return Object.keys(m).reduce((s, pid) => s + (m[pid].value || 0), 0);
+  },
+
   // True when every Getting Started step is checked off. The Hub sidebar uses
   // this to hide the Getting Started nav item once setup is fully complete,
   // so it does not clutter the sidebar for operators who have already worked
