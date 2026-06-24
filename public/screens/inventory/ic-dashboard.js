@@ -142,7 +142,7 @@ S.InventoryDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['count', 'deliveries', 'orders', 'review'],
+  ORDER: ['count', 'orders', 'deliveries', 'review'],
   // A step is done if it carries an operator stamp, else it falls back to what
   // the week's data shows: a count taken this week, or nothing left to reorder.
   stepDone(st) {
@@ -312,8 +312,8 @@ S.InventoryDashboard = {
 
   _META: {
     count:      { n: 1, title: 'Take this week\'s count', sub: 'Count your inventory' },
-    deliveries: { n: 2, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
-    orders:     { n: 3, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
+    orders:     { n: 2, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
+    deliveries: { n: 3, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
     review:     { n: 4, title: 'Review the flags',        sub: 'Shrinkage, spot checks, dead stock' }
   },
   stepStatus(k, isDone) {
