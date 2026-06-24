@@ -211,8 +211,8 @@ S.InventoryTakeInventory = {
     const ck = tile.querySelector('.ti-loc-ck');
     if (ck) {
       ck.style.color = on ? 'var(--bg)' : 'transparent';
-      ck.style.background = on ? 'var(--gold)' : 'transparent';
-      ck.style.borderColor = on ? 'var(--gold)' : 'var(--t3)';
+      ck.style.background = on ? 'var(--green)' : 'transparent';
+      ck.style.borderColor = on ? 'var(--green)' : 'var(--t3)';
     }
   },
 
@@ -646,8 +646,8 @@ S.InventoryTakeInventory = {
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
-      + '<circle cx="20" cy="20" r="17" stroke="var(--gold)" stroke-width="1.8"/>'
-      + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      + '<circle cx="20" cy="20" r="17" stroke="var(--green)" stroke-width="1.8"/>'
+      + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Count Submitted</div>'
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.type) + ' count &middot; ' + record.item_count
       + ' products &middot; ' + App.fmtCurrency(record.total_value) + ' total value</div>'
