@@ -366,9 +366,16 @@ S.VendorTracker = {
   requestCredit(id) {
     const r = this.discRecords().find(x => x.id === id);
     if (!r) return;
+    window.location.href = this._creditMailtoHref(r);
+    r.status = 'Credit Requested';
+    r.credit_requested_at = new Date().toISOString();
+    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
+  },
+
+  // Credit-request email draft (shared by the Discrepancies tab + the modal).
+  _creditMailtoHref(r) {
     const v = this.vendors().find(x => x.name === r.vendor) || null;
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop User';
-
     const lines = [];
     lines.push('Hi' + (v?.rep ? ' ' + v.rep : '') + ',', '', 'I am writing to request a credit on a delivery discrepancy.', '');
     if (v?.account_number) lines.push('Account: ' + v.account_number);
@@ -382,14 +389,9 @@ S.VendorTracker = {
     lines.push('Credit amount requested: $' + parseFloat(r.overcharge || 0).toFixed(2));
     if (r.notes) lines.push('', 'Notes: ' + r.notes);
     lines.push('', 'Please confirm the credit and let me know when it will be applied.', '', 'Thanks,', barName);
-
     const subj = 'Credit request: ' + (r.vendor || 'vendor') + ' discrepancy from ' + (r.date || '');
-    window.location.href = 'mailto:' + encodeURIComponent(v?.email || '')
+    return 'mailto:' + encodeURIComponent(v?.email || '')
       + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(lines.join('\n'));
-
-    r.status = 'Credit Requested';
-    r.credit_requested_at = new Date().toISOString();
-    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
   },
 
   // ── Mark Resolved (popup asking what was actually recovered) ──────────
@@ -431,6 +433,152 @@ S.VendorTracker = {
     });
     if (!ok) return;
     App.removeRecord('core', 'vendor_discrepancy', id).then(() => this.draw());
+  },
+
+  // ── Shared discrepancy modal (Receive Delivery + Delivery History) ─────────
+  // File a claim and chase it to credit/resolution in place, against the SAME
+  // vendor_discrepancies record the Discrepancies tab reads — no page leave.
+  // opts: { discrepancyId, prefill, onClose, onFiled }. [[two-doors-same-data]]
+  openDiscrepancyModal(opts) {
+    opts = opts || {};
+    this._vd = { prefill: opts.prefill || {}, onClose: opts.onClose || null, onFiled: opts.onFiled || null };
+    App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 640, noClose: true });
+    this._renderVdBody(opts.discrepancyId || null);
+  },
+  _vdClose() {
+    App.closeModal('vd-modal');
+    const cb = this._vd && this._vd.onClose; this._vd = null;
+    if (typeof cb === 'function') cb();
+  },
+  _vdRow(label, val) {
+    return '<div><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + val + '</div></div>';
+  },
+  _renderVdBody(discId) {
+    const card = document.getElementById('vdm-card'); if (!card) return;
+    const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
+
+    // FILE phase: the claim form, pre-filled from the line.
+    if (!discId) {
+      const pf = (this._vd && this._vd.prefill) || {};
+      const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === (pf.type || 'Price Overcharge') ? ' selected' : '') + '>' + t + '</option>').join('');
+      card.innerHTML = '<div class="card-title">File Discrepancy</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Files a credit claim you can chase to resolution right here. Adjust if needed.</div>'
+        + '<div class="form-row" style="gap:12px;">'
+          + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="vdm-date" value="' + esc(pf.date || App.todayLocal()) + '"/></div>'
+          + '<div class="f" style="flex:1;min-width:160px;"><label>Vendor</label><input type="text" id="vdm-vendor" value="' + esc(pf.vendor || '') + '"' + (pf.vendor ? ' readonly' : '') + '/></div>'
+          + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="vdm-ref" value="' + esc(pf.reference || '') + '"/></div>'
+        + '</div>'
+        + '<div class="form-row" style="gap:12px;">'
+          + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label><input type="text" id="vdm-product" value="' + esc(pf.sku || '') + '"/></div>'
+          + '<div class="f" style="width:180px;"><label>Type</label><select id="vdm-type">' + typeOpts + '</select></div>'
+        + '</div>'
+        + '<div class="form-row" style="gap:12px;">'
+          + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input type="number" id="vdm-units" step="1" value="' + (pf.units != null ? esc(String(pf.units)) : '') + '"/></div>'
+          + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-agreed" step="0.01" value="' + (pf.agreed_price != null ? parseFloat(pf.agreed_price).toFixed(2) : '') + '"/></div></div>'
+          + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-invoiced" step="0.01" value="' + (pf.invoiced_price != null ? parseFloat(pf.invoiced_price).toFixed(2) : '') + '"/></div></div>'
+          + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-over" step="0.01" value="' + (pf.overcharge != null ? parseFloat(pf.overcharge).toFixed(2) : '0.00') + '"/></div></div>'
+        + '</div>'
+        + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><input type="text" id="vdm-notes" value="' + esc(pf.notes || '') + '" placeholder="What was wrong, and who you contacted"/></div></div>'
+        + '<div id="vdm-err" style="color:var(--red);font-size:12px;margin-bottom:6px;display:none;"></div>'
+        + '<div class="card-actions"><button class="btn btn-primary" id="vdm-file">File Discrepancy</button>'
+        + '<button class="btn btn-ghost" id="vdm-cancel">Cancel</button></div>';
+      card.querySelector('#vdm-cancel').addEventListener('click', () => this._vdClose());
+      card.querySelector('#vdm-file').addEventListener('click', () => this._vdFile());
+      return;
+    }
+
+    // WORK phase: the saved claim — chase it to credit and resolution.
+    const r = this.discRecords().find(x => x.id === discId);
+    if (!r) { this._vdClose(); return; }
+    const st = r.status || 'Open';
+    const iSt = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
+
+    let statusBlock = '', primary = '';
+    if (st === 'Open') {
+      statusBlock = '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Open claim. Request the credit from your rep within 24 hours; they age out fast. Requesting drafts the email and flips this to Credit Requested.</div>';
+      primary = '<button class="btn btn-primary" id="vdm-credit">Request Credit</button>';
+    } else if (st === 'Credit Requested') {
+      statusBlock = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Credit requested ' + esc((r.credit_requested_at || '').slice(0, 10)) + '. When the vendor credits you, record what you actually got back.</div>'
+        + '<div class="f" style="width:200px;margin-bottom:0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-recovered" step="0.01" value="' + (parseFloat(r.overcharge) || 0).toFixed(2) + '"/></div></div>';
+      primary = '<button class="btn btn-primary" id="vdm-resolve">Mark Resolved</button>';
+    } else {
+      const rec = r.recovered_amount != null ? r.recovered_amount : r.overcharge;
+      statusBlock = '<div style="font-size:12px;color:var(--green);font-weight:700;">Resolved ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; Recovered ' + App.fmtCurrency(parseFloat(rec) || 0) + '</div>';
+      primary = '<button class="btn btn-primary" id="vdm-reopen">Reopen</button>';
+    }
+
+    card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Vendor Discrepancy</span>'
+      + '<span id="vdm-view" style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:none;color:var(--gold);cursor:pointer;white-space:nowrap;">View in Vendor Tracker &rsaquo;</span></div>'
+      + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(r.sku || '(unrecorded)') + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + esc(r.vendor || '-') + ' &middot; ' + esc(r.type || 'Other') + ' &middot; ' + this.discStatusText(st) + '</div>'
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0;background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:12px 16px;">'
+        + this._vdRow('Units', r.units != null ? esc(String(r.units)) : '-')
+        + this._vdRow('Agreed', r.agreed_price != null ? App.fmtCurrency(r.agreed_price) : '-')
+        + this._vdRow('Invoiced', r.invoiced_price != null ? App.fmtCurrency(r.invoiced_price) : '-')
+        + this._vdRow('Overcharge', App.fmtCurrency(r.overcharge || 0))
+      + '</div>'
+      + statusBlock
+      + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Notes</label>'
+      + '<textarea id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(r.notes || '') + '</textarea></div>'
+      + '<div class="card-actions">' + primary
+      + '<button class="btn btn-ghost" id="vdm-close">Close</button>'
+      + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
+
+    const flushNotes = () => { const ta = card.querySelector('#vdm-notes-w'); if (ta) r.notes = ta.value; };
+    card.querySelector('#vdm-notes-w')?.addEventListener('change', () => { flushNotes(); App.putRecord('core', 'vendor_discrepancy', r); });
+    card.querySelector('#vdm-credit')?.addEventListener('click', () => {
+      flushNotes();
+      window.location.href = this._creditMailtoHref(r);
+      r.status = 'Credit Requested'; r.credit_requested_at = new Date().toISOString();
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+    });
+    card.querySelector('#vdm-resolve')?.addEventListener('click', () => {
+      flushNotes();
+      const amt = parseFloat(card.querySelector('#vdm-recovered')?.value);
+      if (isNaN(amt) || amt < 0) return;
+      r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = amt;
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+    });
+    card.querySelector('#vdm-reopen')?.addEventListener('click', () => {
+      r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount;
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+    });
+    card.querySelector('#vdm-view')?.addEventListener('click', () => {
+      flushNotes();
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => { this._vdClose(); this.tab = 'discrepancies'; App.showApp('profit'); App.navigate('vendor-tracker'); });
+    });
+    card.querySelector('#vdm-close')?.addEventListener('click', () => { flushNotes(); App.putRecord('core', 'vendor_discrepancy', r).then(() => this._vdClose()); });
+    card.querySelector('#vdm-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'vendor_discrepancy', r.id); this._vdClose(); });
+  },
+  _vdFile() {
+    const card = document.getElementById('vdm-card'); if (!card) return;
+    const errEl = card.querySelector('#vdm-err');
+    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } };
+    const date = card.querySelector('#vdm-date')?.value;
+    const vendor = (card.querySelector('#vdm-vendor')?.value || '').trim();
+    if (!date) { fail('Date is required.'); return; }
+    if (!vendor) { fail('Vendor is required.'); return; }
+    const pf = (this._vd && this._vd.prefill) || {};
+    const rec = {
+      id: App.uid(), date, vendor,
+      reference: (card.querySelector('#vdm-ref')?.value || '').trim(),
+      type: card.querySelector('#vdm-type')?.value || 'Other',
+      sku: (card.querySelector('#vdm-product')?.value || '').trim(),
+      units: parseFloat(card.querySelector('#vdm-units')?.value) || 0,
+      agreed_price: parseFloat(card.querySelector('#vdm-agreed')?.value) || 0,
+      invoiced_price: parseFloat(card.querySelector('#vdm-invoiced')?.value) || 0,
+      overcharge: parseFloat(card.querySelector('#vdm-over')?.value) || 0,
+      notes: (card.querySelector('#vdm-notes')?.value || '').trim(),
+      status: 'Open',
+      source: pf.source || 'inventory',
+      delivery_id: pf.delivery_id || null,
+      created_at: new Date().toISOString()
+    };
+    App.putRecord('core', 'vendor_discrepancy', rec).then(() => {
+      if (this._vd && typeof this._vd.onFiled === 'function') this._vd.onFiled(rec);
+      this._renderVdBody(rec.id);
+    });
   },
 
   // ── Help ──────────────────────────────────────────────────────────────
