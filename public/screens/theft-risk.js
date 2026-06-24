@@ -357,6 +357,7 @@ S.TheftRisk = {
       + '<div class="card-actions">'
       + (isResolved
           ? '<button class="btn btn-primary" id="vim-reopen">Reopen</button>'
+            + '<button class="btn btn-ghost" id="vim-close">Close</button>'
           : '<button class="btn btn-primary" id="vim-save">Save &amp; Close</button>'
             + '<button class="btn btn-ghost" id="vim-resolve">Resolve &amp; Close</button>')
       + '<button class="btn btn-danger" id="vim-del" style="margin-left:auto;">Delete</button></div>';
@@ -378,6 +379,7 @@ S.TheftRisk = {
     card.querySelector('#vim-save')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
     card.querySelector('#vim-resolve')?.addEventListener('click', () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
     card.querySelector('#vim-reopen')?.addEventListener('click', () => { inv.status = 'open'; delete inv.resolved_date; App.putRecord('core', 'variance_investigation', inv).then(() => this._renderVimBody(invId)); });
+    card.querySelector('#vim-close')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
     card.querySelector('#vim-view')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => { this._vimClose(); App.showApp('profit'); App.navigate('theft-risk'); }); });
     card.querySelector('#vim-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'variance_investigation', inv.id); this._vimClose(); });
   },
