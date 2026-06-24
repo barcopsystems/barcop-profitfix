@@ -285,7 +285,7 @@ const DB = {
     't-presence':'traffic-recovery','t-forecast':'traffic-recovery',
     't-help':'_always',
     // Cash Recovery
-    'c-dashboard':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-help':'_always',
+    'c-dashboard':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-forecast':'cash-recovery','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'

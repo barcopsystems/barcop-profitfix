@@ -181,6 +181,11 @@ const Cash = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Purchasing</span>
       </div>
+      <div class="nav-section">Cash Flow</div>
+      <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash Forecast</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="c-help" id="nav-c-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>

@@ -4207,12 +4207,14 @@ const App = {
         'c-dashboard':   ['Dashboard', 'Cash Recovery'],
         'c-trapped':     ['Trapped Cash', 'Cash Recovery'],
         'c-purchasing':  ['Purchasing', 'Cash Recovery'],
+        'c-forecast':    ['Cash Forecast', 'Cash Recovery'],
         'c-help':        ['Help and FAQ', ''],
       };
       const cashScreens = {
         'c-dashboard':   S.CashDashboard,
         'c-trapped':     S.CashTrapped,
         'c-purchasing':  S.CashPurchasing,
+        'c-forecast':    S.CashForecast,
         'c-help':        S.CashHelp,
       };
       const [title, sub] = cashTitles[id] || [id, ''];

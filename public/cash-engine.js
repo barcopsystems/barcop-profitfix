@@ -162,6 +162,84 @@ window.CashEngine = {
     return m ? parseInt(m[1], 10) : 0;
   },
 
+  // ── Cash Forecast: net cash 2-4 weeks out, in (projected sales) versus out
+  //    (overhead bills + labor + recurring purchases). Catches a week where
+  //    heavy cash goes out before the sales come in. ───────────────────────────
+  _mondayOf(d) { const date = new Date(d); const day = date.getDay(); date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day)); return App.ymdLocal(date); },
+  _addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  _hoursOf(start, end) {
+    const ps = String(start).split(':'), pe = String(end).split(':');
+    if (ps.length < 2 || pe.length < 2) return 0;
+    let mins = (parseInt(pe[0], 10) * 60 + parseInt(pe[1], 10)) - (parseInt(ps[0], 10) * 60 + parseInt(ps[1], 10));
+    if (isNaN(mins)) return 0;
+    if (mins <= 0) mins += 1440;
+    return mins / 60;
+  },
+
+  // Projected sales for a week: a saved revenue forecast if there is one, else
+  // Bar Cop's weighted same-weekday baseline off your shift sales.
+  revenueForWeek(ws) {
+    if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total) return f.total; }
+    if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
+    return 0;
+  },
+
+  // Labor cost for an upcoming week: the built schedule if one exists, otherwise
+  // a trailing four-week average of what you actually paid.
+  laborForWeek(ws) {
+    const sched = ((App.laborData && App.laborData.lc_schedules) || []).find(s => s && s.week_start === ws);
+    if (sched && Array.isArray(sched.shifts) && sched.shifts.length) {
+      const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      let cost = 0;
+      sched.shifts.forEach(sh => {
+        if (!sh.staff_id || !sh.start || !sh.end) return;
+        const di = DAYS.indexOf(sh.day);
+        const date = di >= 0 ? this._addDays(ws, di) : ws;
+        const wage = App.wageForStaffOn ? App.wageForStaffOn(sh.staff_id, date) : 0;
+        cost += this._hoursOf(sh.start, sh.end) * wage;
+      });
+      cost += App.salariedCost ? App.salariedCost(ws, this._addDays(ws, 6)).total : 0;
+      return { cost, source: 'scheduled' };
+    }
+    return { cost: this._trailingWeeklyLabor(ws), source: 'estimated' };
+  },
+  _trailingWeeklyLabor(beforeYmd) {
+    const actuals = (App.laborData && App.laborData.lc_actuals) || [];
+    const end = new Date(beforeYmd + 'T00:00:00').getTime();
+    const start = end - 28 * 86400000;
+    let cost = 0, any = false;
+    actuals.forEach(a => {
+      const t = new Date((a.date || '') + 'T00:00:00').getTime();
+      if (isNaN(t) || t >= end || t < start) return;
+      cost += (a.cost || 0); any = true;
+    });
+    const hourlyWeekly = any ? cost / 4 : 0;
+    const wkEnd = App.ymdLocal(new Date(end - 86400000));
+    const wkStart = App.ymdLocal(new Date(end - 7 * 86400000));
+    const salaried = App.salariedCost ? App.salariedCost(wkStart, wkEnd).total : 0;
+    return hourlyWeekly + salaried;
+  },
+  // Recurring weekly inventory spend, estimated as your weekly cost of goods
+  // (in steady state you buy what you use). Overhead bills are counted separately.
+  recurringPurchases() { const o = this.overOrder(3); return o.weeklyCogs || 0; },
+
+  forecast(numWeeks, startMonday) {
+    numWeeks = numWeeks || 4;
+    const start = startMonday || this._mondayOf(new Date());
+    const purch = this.recurringPurchases();
+    const rows = [];
+    for (let i = 0; i < numWeeks; i++) {
+      const ws = this._addDays(start, i * 7);
+      const we = this._addDays(ws, 6);
+      const inflow = this.revenueForWeek(ws);
+      const bills = this.billsDue(ws, we).total;
+      const lab = this.laborForWeek(ws);
+      const out = bills + lab.cost + purch;
+      rows.push({ ws, we, inflow, bills, labor: lab.cost, laborSource: lab.source, purch, out, net: inflow - out });
+    }
+    return rows;
+  },
+
   // ── Realized cash freed (backward). Wired to the recovery engine once the
   //    Cash Fix rail lands; until a cash fix is logged it reads "building". ──
   freed() {
