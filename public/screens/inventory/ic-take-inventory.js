@@ -87,6 +87,40 @@ S.InventoryTakeInventory = {
     else this.renderCounting();
   },
 
+  // Print a blank count sheet: every active product grouped by location in the
+  // same shelf order as the count, with columns to pencil in Full + Open before
+  // entering the counts in Bar Cop.
+  printBlank() {
+    const order = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+      .filter(l => !l.archived).map(l => l.name);
+    const byLoc = {};
+    this.products().forEach(p => {
+      let plocs = App.productLocations(p);
+      if (!plocs || !plocs.length) plocs = [p.primary_location || 'Unassigned'];
+      plocs.forEach(loc => { (byLoc[loc] = byLoc[loc] || []).push(p); });
+    });
+    const seq = (loc, p) => (p.location_sequences && p.location_sequences[loc] != null) ? p.location_sequences[loc] : Number.MAX_SAFE_INTEGER;
+    const locNames = [...order.filter(l => byLoc[l]), ...Object.keys(byLoc).filter(l => !order.includes(l)).sort()];
+    const rows = [];
+    locNames.forEach(loc => {
+      byLoc[loc].slice()
+        .sort((a, b) => { const d = seq(loc, a) - seq(loc, b); return d !== 0 ? d : (a.name || '').localeCompare(b.name || ''); })
+        .forEach(p => rows.push([loc, p.name, '', '']));
+    });
+    if (!rows.length) return;
+    App.printBlankSheet({
+      title: 'Inventory Count Sheet',
+      subtitle: 'Count each location shelf by shelf. Write the number of full units, then the open or partial amount, and enter the counts in Bar Cop after.',
+      columns: [
+        { label: 'Location', width: '22%' },
+        { label: 'Product',  width: '44%' },
+        { label: 'Full',     width: '17%' },
+        { label: 'Open',     width: '17%' }
+      ],
+      bodyRows: rows
+    });
+  },
+
   // ── Setup ─────────────────────────────────────────────────────────────────
   renderSetup() {
     const prods = this.products();
@@ -141,6 +175,7 @@ S.InventoryTakeInventory = {
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
+      + (locs.length ? '<button class="btn btn-ghost btn-sm no-print" id="ti-print-blank">Print Blank Sheet</button>' : '')
       + '</div>'
       + body
       + '</div>'
@@ -150,6 +185,7 @@ S.InventoryTakeInventory = {
     this.container.onclick = ev => {
       const tile = ev.target.closest('.ti-loc-tile');
       if (tile) { this.toggleLocTile(tile); return; }
+      if (ev.target.closest('#ti-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#ti-go-locs')) { App.navigate('ic-locations'); return; }
       if (ev.target.closest('#ti-discard')) { this.confirmDiscardDraft(); return; }
       if (ev.target.closest('#ti-start'))   { this.startCount(); return; }
