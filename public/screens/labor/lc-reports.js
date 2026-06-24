@@ -61,23 +61,19 @@ S.LaborReports = {
   // gold-tint) + step arrows + a snap to the current week. No native calendar.
   weekSelector(ws) {
     const cur = this.mondayOf(new Date());
-    const chip = w => {
-      const on = w === ws, isCur = w === cur;
-      return '<button type="button" class="ws-week-chip btn btn-sm" data-ws="' + w + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + App.dateRangeLabel(w, App.periodEndFor(w))
-        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let chips = '';
-    for (let i = -1; i <= 0; i++) chips += chip(this.addDays(ws, i * 7));
+    const isCur = ws >= cur;
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
+      + App.dateRangeLabel(ws, App.periodEndFor(ws)).toUpperCase() + nowBadge + '</span>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button type="button" class="btn btn-ghost btn-sm" id="ws-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ws-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + chips
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ws-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
-      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="ws-now" style="margin-left:4px;">This Week</button>' : '')
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ws-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill + nextBtn
+      + (isCur ? '' : '<button type="button" class="btn btn-ghost btn-sm" id="ws-now" style="margin-left:4px;">This Week</button>')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
       + '<button class="btn btn-ghost btn-sm" id="ws-export">Export PDF</button></div>'
@@ -131,7 +127,7 @@ S.LaborReports = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
       + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
   noRow(cols, msg) {
@@ -192,9 +188,8 @@ S.LaborReports = {
       // Week lens
       if (ev.target.closest('#ws-export')) { App.exportPDF({ title: 'Labor Report - Week', root: this.container }); return; }
       if (ev.target.closest('#ws-prev')) { this.weekStart = this.addDays(this.weekStart, -7); this.renderReport(); return; }
-      if (ev.target.closest('#ws-next')) { this.weekStart = this.addDays(this.weekStart, 7); this.renderReport(); return; }
+      if (ev.target.closest('#ws-next')) { const nw = this.addDays(this.weekStart, 7); if (nw > this.mondayOf(new Date())) return; this.weekStart = nw; this.renderReport(); return; }
       if (ev.target.closest('#ws-now')) { this.weekStart = this.mondayOf(new Date()); this.renderReport(); return; }
-      const wsChip = ev.target.closest('.ws-week-chip'); if (wsChip) { this.weekStart = wsChip.dataset.ws; this.renderReport(); return; }
       if (ev.target.closest('#ws-log-missing')) { this.logMissing(this.weekStart, true); return; }
       const wsEdit = ev.target.closest('.ws-edit'); if (wsEdit) { this.openWeekEdit(wsEdit.dataset.key); return; }
       // Range lens
@@ -269,7 +264,9 @@ S.LaborReports = {
 
     let actualsCard;
     if (dayActuals.length === 0) {
-      actualsCard = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No hours logged for this day. Log them in Log Hours.</div>';
+      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:34%;">Staff</th><th style="width:16%;">Shift</th><th style="width:14%;">Hours</th><th style="width:16%;">Wage</th><th style="width:14%;">Cost</th><th style="width:6%;"></th>'
+        + '</tr></thead><tbody>' + this.noRow(6, 'No hours logged for this day. Log them in Log Hours.') + '</tbody></table></div></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
@@ -287,8 +284,8 @@ S.LaborReports = {
           + '<td class="val">' + costCell + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
+      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:34%;">Staff</th><th style="width:16%;">Shift</th><th style="width:14%;">Hours</th><th style="width:16%;">Wage</th><th style="width:14%;">Cost</th><th style="width:6%;"></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -427,8 +424,8 @@ S.LaborReports = {
           + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Staff</th><th>Days</th><th>Hours</th><th>Cost</th><th></th>'
+      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<th style="width:34%;">Staff</th><th style="width:16%;">Days</th><th style="width:16%;">Hours</th><th style="width:18%;">Cost</th><th style="width:16%;"></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     }
 
@@ -442,11 +439,11 @@ S.LaborReports = {
       dayRows.push('<tr><td><div class="val">' + this.fmtDay(dStr) + '</div></td>'
         + '<td>' + dayAct.length + '</td>'
         + '<td>' + h.toFixed(1) + '</td>'
-        + '<td class="val">' + App.fmtCurrency(c) + '</td></tr>');
+        + '<td class="val">' + App.fmtCurrency(c) + '</td><td></td></tr>');
     }
     const dayCard = '<div class="sh" style="margin:24px 0 10px;">By Day</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Day</th><th>Headcount</th><th>Hours</th><th>Hourly Cost</th>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:34%;">Day</th><th style="width:16%;">Headcount</th><th style="width:16%;">Hours</th><th style="width:18%;">Hourly Cost</th><th style="width:16%;"></th>'
       + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
 
     // Scheduled-but-not-logged nudge
@@ -623,7 +620,7 @@ S.LaborReports = {
         + '<td class="val">' + App.fmtCurrency(cost(k)) + '</td>'
         + '<td>' + (totCost > 0 ? App.fmtPct(cost(k) / totCost * 100) : '-') + '</td></tr>';
     }).join('') || this.noRow(5);
-    return this.dataCard('<th>Staff</th><th>Hours</th><th>Avg Wage</th><th>Labor Cost</th><th>% of Labor</th>', trs);
+    return this.dataCard('<th style="width:30%;">Staff</th><th style="width:15%;">Hours</th><th style="width:18%;">Avg Wage</th><th style="width:19%;">Labor Cost</th><th style="width:18%;">% of Labor</th>', trs);
   },
 
   byDept(rows, totCost, salWeeks, otByDept) {
@@ -650,8 +647,9 @@ S.LaborReports = {
     const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'
+      + '<td>' + App.fmtCurrency(g[k].hours > 0 ? g[k].cost / g[k].hours : 0) + '</td>'
       + '<td class="val">' + App.fmtCurrency(g[k].cost) + '</td>'
-      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('') || this.noRow(4);
-    return this.dataCard('<th>Department</th><th>Hours</th><th>Labor Cost</th><th>% of Labor</th>', trs);
+      + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('') || this.noRow(5);
+    return this.dataCard('<th style="width:30%;">Department</th><th style="width:15%;">Hours</th><th style="width:18%;">Avg Wage</th><th style="width:19%;">Labor Cost</th><th style="width:18%;">% of Labor</th>', trs);
   }
 };
