@@ -102,7 +102,7 @@ S.InventoryReceiveDelivery = {
       + '<td><div class="row-actions">'
         + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;"></span>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>'
-        + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;align-self:center;">Logged in Vendor Discrepancies</span>'
+        + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;align-self:center;">Discrepancy Filed in <span class="rd-vt-link" style="text-decoration:underline;cursor:pointer;">Vendor Tracker</span></span>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
       + '</div></td>'
       + '</tr>';
@@ -202,6 +202,7 @@ S.InventoryReceiveDelivery = {
     lines.addEventListener('input', onInput);
     lines.addEventListener('change', onInput);
     lines.addEventListener('click', ev => {
+      if (ev.target.closest('.rd-vt-link')) { App.openScreen('vendor-tracker'); return; }
       if (ev.target.closest('.rd-remove')) { this.removeLine(ev.target.closest('.rd-line')); return; }
       const flagBtn = ev.target.closest('.rd-flag-btn');
       if (flagBtn) this.openDiscrepancyModal(flagBtn.closest('.rd-line'));
