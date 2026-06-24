@@ -163,8 +163,10 @@ S.InventoryDashboard = {
     const asc = this.countsAsc();
     const latest = asc.length ? asc[asc.length - 1] : null;
     const prev = asc.length >= 2 ? asc[asc.length - 2] : null;
-    const onHand = latest ? this._onHand(latest) : {};
-    const inventoryValue = latest ? (parseFloat(latest.total_value) || 0) : 0;
+    const perp = App._perpetualInventory();
+    const onHand = {};
+    let inventoryValue = 0;
+    Object.keys(perp).forEach(pid => { onHand[pid] = perp[pid].onHand; inventoryValue += (perp[pid].value || 0); });
     const lastAge = latest ? this.daysSince(latest.date) : null;
     const hasCountThisWeek = asc.some(c => this.inWeek(c.date));
 
@@ -230,9 +232,9 @@ S.InventoryDashboard = {
       spotFlags += (s.flagged_count || 0);
     });
 
-    // Inventory value by category.
+    // Inventory value by category, from the perpetual on-hand (not just the latest count).
     const byCat = {};
-    (latest ? latest.items || [] : []).forEach(it => { const c = it.category || 'Other'; byCat[c] = (byCat[c] || 0) + (parseFloat(it.value) || 0); });
+    Object.keys(perp).forEach(pid => { const p = this.productById(pid); const c = (p && p.category) || 'Other'; byCat[c] = (byCat[c] || 0) + (perp[pid].value || 0); });
     const catRows = Object.entries(byCat).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
     const catMax = catRows.length ? catRows[0][1] : 1;
 
