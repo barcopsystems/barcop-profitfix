@@ -100,7 +100,7 @@ S.InventoryStockReport = {
   showHowTo() {
     App.showHelpModal('How the Stock Report Works', [
       { p: ['The Stock Report is a snapshot of what you are holding and what it is worth, taken from one of your counts. It answers one question: where is my cash sitting right now.'] },
-      { h: 'Pick A Count', p: ['Use the count scroller up top, or the arrows, to choose which count to read. The whole page reflects that snapshot. Default is your latest.'] },
+      { h: 'Pick A Count', p: ['Use the arrows up top to step through your counts, or the Latest button to jump to your most recent. The whole page reflects that snapshot.'] },
       { h: 'Where Your Cash Sits', p: ['By Category and By Location show how your stock value splits up, so you see how much is tied up in liquor versus food, or in the walk-in versus the back bar. vs Last Count shows whether your stock value is creeping up, which usually means over-ordering.'] },
       { h: 'Highest, Lowest, And Dead', p: ['Highest and Lowest Value rank the products holding the most and least cash on hand. Dead Stock is the one to watch: product you are holding value in that did not move at all this period. That is dead cash and spoilage risk, your cue to stop re-ordering it or cut it.'] }
     ]);

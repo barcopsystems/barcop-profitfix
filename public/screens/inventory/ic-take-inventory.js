@@ -68,7 +68,7 @@ S.InventoryTakeInventory = {
   showHowTo() {
     App.showHelpModal('How the Inventory Count Works', [
       { p: ['An inventory count is a snapshot of everything you have on hand right now, priced out so Bar Cop can tell you what you used, what to reorder, and where you are leaking. Count the same way every time and the numbers stay honest.'] },
-      { h: 'What You Are Counting', p: ['Bar Cop walks you through your products one location at a time. Go shelf by shelf and enter what is physically there. Anything you do not touch is recorded as zero, so only skip a product if it is truly empty.'] },
+      { h: 'What You Are Counting', p: ['Bar Cop walks you through your products one location at a time. Go shelf by shelf and enter what is physically there. Anything you do not touch is tagged Not Counted and keeps its last count, so a partial count never wipes your numbers. If a product is truly empty, tap Out of Stock to record a real zero.'] },
       { h: 'Pick Your Locations', p: ['Most operators count one location at a time and come back for the rest later. Pick a single location for a quick section count, or pick several to run a full inventory in one session. You count and finalize each location\'s products together.'] },
       { h: 'How To Enter Each Product', p: [
         'Liquor, wine, and bottled mixers use the fill slider. Set the number of full bottles, then drag the slider to the level of the open bottle. Draft beer uses the same slider shaped like a keg.',

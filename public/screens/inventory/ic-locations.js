@@ -99,7 +99,7 @@ S.InventoryLocations = {
     App.showHelpModal('How Locations Work', [
       { p: ['Locations are the places you keep product: your bars, coolers, and storerooms. Set them up here, then assign which products live in each one. Take Inventory walks you through one location at a time, counting the products you put there in the order you arrange them.'] },
       { h: 'Start With The Suggested Spots', p: ['Brand new with no locations yet? Hit add the suggested defaults to drop in a Front Bar, Back Bar, Walk-In Cooler, Dry Storage, and Office Storage in one tap. Rename or delete any that do not fit, then assign products. It saves you typing out the obvious spots before you can count anything.'] },
-      { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. To build a bar or cooler fast, hit Select all in a category, or Copy from another location to pull its whole product list in one move. Your checks carry across the tabs and the running count shows how many you have picked. Save and you drop right into arranging it.'] },
+      { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. To build a bar or cooler fast, hit Select all in a category. Your checks carry across the tabs and the running count shows how many you have picked. Save and you drop right into arranging it.'] },
       { h: 'Mark Your Service Bars', p: ['Check Location with Register (for spot check) on any spot that has a register and pours for guests, like your Front Bar or a patio well. That flag is what makes a location show up as a bar station when you run a Spot Check on a single shift. A stockroom or cooler stays unchecked. You can set it on a new location or toggle it later from the location\'s edit screen.'] },
       { h: 'Arrange For Counting', p: ['Open a location to add or pull products and drag them into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room. Reorder the locations themselves on the main list to set which one you count first.'] },
       { h: 'The Numbers Up Top', p: ['The strip across the top reads Locations, Products Placed, and Need a Location at a glance. Locations is how many active spots you run. Products Placed is how many products sit in at least one of them. Need a Location turns amber when products are sitting nowhere and would count as zero, so chase that number down to nothing before you run a count.'] },
@@ -153,7 +153,7 @@ S.InventoryLocations = {
     return p.container_size_oz != null ? p.container_size_oz + ' oz' : '-';
   },
 
-  // Per-context handles so the bulk helpers (select-all / clear / copy-from) work
+  // Per-context handles so the bulk helpers (select-all / clear) work
   // identically on the add form, the edit add-box, and the triage modal.
   _bulkCtx(ctx) {
     const activeProds = this.products().filter(p => p.active !== false);
@@ -195,12 +195,6 @@ S.InventoryLocations = {
   },
   selectAllCtx(ctx) { const c = this._bulkCtx(ctx); c.inCat().forEach(p => c.set.add(p.id)); c.rerender(); c.count(); },
   clearSelCtx(ctx)  { const c = this._bulkCtx(ctx); c.set.clear(); c.rerender(); c.count(); },
-  copyFromCtx(ctx, locName) {
-    if (!locName) return;
-    const c = this._bulkCtx(ctx);
-    this.products().forEach(p => { if (App.productLocations(p).includes(locName) && c.eligible.has(p.id)) c.set.add(p.id); });
-    c.rerender(); c.count();
-  },
 
   // ── Landing: stats + triage + add form + locations list ────────────────────
   renderList() {
@@ -407,9 +401,6 @@ S.InventoryLocations = {
     // Checkbox toggles accumulate into the running set so checks survive tab swaps.
     this.container.onchange = ev => {
       if (ev.target.id === 'il-new-servicebar') { this._newServiceBar = ev.target.checked; return; }
-      if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
-        const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
-      }
       if (ev.target.classList && ev.target.classList.contains('il-cb')) {
         this._toggleNew(ev.target.value, ev.target.checked);
       }
@@ -596,9 +587,6 @@ S.InventoryLocations = {
       const rm = ev.target.closest('.il-remove'); if (rm) { this.removeProduct(l.name, rm.dataset.id); return; }
     };
     this.container.onchange = ev => {
-      if (ev.target.classList && ev.target.classList.contains('il-copyfrom')) {
-        const v = ev.target.value; if (v) this.copyFromCtx(ev.target.dataset.ctx, v); ev.target.value = ''; return;
-      }
       if (ev.target.classList && ev.target.classList.contains('il-edit-cb')) {
         this._toggleEdit(ev.target.value, ev.target.checked);
       }
