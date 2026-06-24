@@ -126,8 +126,12 @@ S.InventoryReceiveDelivery = {
       + this.vendors().map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
     const today = App.todayLocal();
 
-    const detailsCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    // One flowing form card: delivery details up top (Worksheet across from the
+    // heading), then the line-item builder, the totals box, Notes at the bottom,
+    // and the save actions.
+    const formCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button">Worksheet</button>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
@@ -144,11 +148,7 @@ S.InventoryReceiveDelivery = {
           + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
         + '</div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="rd-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '</div>';
-
-    const linesCard = '<div class="card form-card"><div class="card-title">Line Items</div>'
+      + '<div class="sh" style="margin-top:6px;">Line Items</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
       + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:280px;">Product</th>'
@@ -165,15 +165,16 @@ S.InventoryReceiveDelivery = {
       + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val lg" id="rd-shorts">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val lg" id="rd-total">$0.00</div></div>'
       + '</div></div>'
-      + '</div>'
+      + '<div class="form-row" style="gap:16px;margin-top:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
+      + '<textarea id="rd-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
       + '<div style="margin-top:16px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
       + '<button class="btn btn-ghost" id="rd-startover">Start Over</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button" style="margin-left:auto;">Worksheet</button>'
+      + '</div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + detailsCard + linesCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + '</div>';
 
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
@@ -529,10 +530,10 @@ S.InventoryReceiveDelivery = {
         + '<div class="f" style="width:180px;"><label>Type</label><select id="rd-disc-type">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="width:100px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
-        + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
+        + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
+        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
         + '<div class="f" style="width:100%;"><label>Notes</label><input type="text" id="rd-disc-notes" placeholder="What was wrong, and who you contacted"/></div>'
@@ -860,8 +861,8 @@ S.InventoryReceiveDelivery = {
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
-      + '<circle cx="20" cy="20" r="17" stroke="var(--gold)" stroke-width="1.8"/>'
-      + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      + '<circle cx="20" cy="20" r="17" stroke="var(--green)" stroke-width="1.8"/>'
+      + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Delivery Recorded</div>'
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.vendor) + ' &middot; ' + record.item_count
       + ' line item' + (record.item_count === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total) + '</div>'
@@ -893,7 +894,7 @@ S.InventoryReceiveDelivery = {
         const delta = Math.abs(u.newPrice - u.prevPrice);
         const pct = u.prevPrice > 0 ? Math.round(delta / u.prevPrice * 100) : 0;
         const chk = (cls, label, checked) => '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;">'
-          + '<input type="checkbox" class="' + cls + '" data-idx="' + i + '"' + (checked ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>' + label + '</label>';
+          + '<input type="checkbox" class="bc-check ' + cls + '" data-idx="' + i + '"' + (checked ? ' checked' : '') + '/>' + label + '</label>';
         return '<div style="padding:12px 0;border-bottom:1px solid var(--b2);">'
           + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
             + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(u.product.name) + '</div>'
