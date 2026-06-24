@@ -124,8 +124,8 @@ S.CashDashboard = {
         + '</div></div>';
     }
     const freedLine = f.building
-      ? '<span style="color:var(--t3);">Cash Freed builds here once you log your first fix.</span>'
-      : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> freed across ' + f.measured + ' fix' + (f.measured === 1 ? '' : 'es') + '</span>';
+      ? '<span style="color:var(--t3);">Cash Freed builds here as you count, the drop in trapped cash from your first weeks.</span>'
+      : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> in cash freed so far, trapped cash down from your first weeks.</span>';
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Cash Scoreboard</div>'
       + heroBody
