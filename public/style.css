@@ -354,6 +354,11 @@ input,select,textarea{color-scheme:dark;}
 /* All form rows: flex, wrap allowed, consistent gap */
 .form-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
 .form-row:last-of-type{margin-bottom:0;}
+/* Product form row 2: fixed-width fields grow to fill, so the row's right edge lines
+   up with the full-width row 1 above it. */
+.ip-row2>.f{flex-grow:1;}
+/* Per-card "Upload X List" button: brighten the text on hover (beats the inline color). */
+.ip-card-imp:hover{color:var(--w)!important;border-color:rgba(255,255,255,0.28)!important;}
 /* Call-Out Log schedule note: collapses to the normal row gap when empty; when a
    note shows it tucks under the row and adds breathing room before Reason. */
 .co-sched-line:not(:empty){margin:-8px 0 14px;}
