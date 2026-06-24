@@ -112,7 +112,9 @@ S.InventoryEmpties = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No empties logged yet. Use the form above to log the first one.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No empties logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
     } else {
       const { from, to } = this.effectiveRange();
       const filtered = all.filter(e => {
@@ -134,7 +136,9 @@ S.InventoryEmpties = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No empties in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Product</th><th>Quantity</th><th>Disposition</th><th>Deposit Value</th><th>By</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No empties in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
           const deposit = (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);

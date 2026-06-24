@@ -474,7 +474,9 @@ S.InventorySpotCheck = {
     if (all.length === 0) {
       this.container.innerHTML = '<div class="screen">' + statsCard
         + '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
-        + '<div style="font-size:12px;color:var(--t3);">No spot checks saved yet.</div></div>';
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Bar</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No spot checks saved yet.</td></tr></tbody></table></div></div></div>';
       this.wireHistory();
       return;
     }

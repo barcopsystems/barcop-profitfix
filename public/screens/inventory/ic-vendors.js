@@ -2,7 +2,7 @@
 
 /* ── Inventory Control — Vendors (ic_vendors) ─────────────────────────────────
    Distributor / supplier contacts and terms. Products in ic_products reference
-   a vendor by name. Vendor pricing auto-feeds Profit Recovery Vendor Watch.
+   a vendor by name. Vendor pricing auto-feeds the Vendor Tracker in Profit Recovery.
    Stored in App.inventoryData (ic_data table).
 
    Landing-form pattern: the add form (all vendor fields on one row + notes, one
@@ -52,7 +52,7 @@ S.InventoryVendors = {
       { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, and account number all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
       { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything. If a name is a typo or a vendor you do not actually order from, tap Delete to clear it off those products and drop it from the list.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
-      { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds Profit Recovery Vendor Watch and the Vendor Scorecard, so a vendor quietly raising prices shows up before it eats your margin.'] }
+      { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds the Vendor Tracker in Profit Recovery, so a vendor quietly raising prices shows up before it eats your margin.'] }
     ]);
   },
 
@@ -81,8 +81,8 @@ S.InventoryVendors = {
 
     let listSection;
     if (vendors.length === 0) {
-      listSection = '<div style="margin-top:18px;font-size:12px;color:var(--t3);">No vendors yet. Add one above. '
-        + 'Products link to a vendor, and vendor pricing feeds Profit Recovery Vendor Watch.</div>';
+      listSection = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No vendors yet. Add one above. '
+        + 'Products link to a vendor, and vendor pricing feeds the Vendor Tracker in Profit Recovery.</div></div>';
     } else {
       const rows = vendors.map(v => {
         const n = this.vendorProducts(v.name).length;

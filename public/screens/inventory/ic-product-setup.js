@@ -525,7 +525,7 @@ S.InventoryProducts = {
         + '<span class="ip-active-state" data-active="' + (isActive ? 'true' : 'false') + '" style="'
           + 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px;'
           + 'background:' + (isActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)') + ';'
-          + 'color:' + (isActive ? '#7dc77d' : '#c77d7d') + ';">'
+          + 'color:' + (isActive ? 'var(--green)' : 'var(--red)') + ';">'
           + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>'
           + (isActive ? 'ACTIVE' : 'HIDDEN')
         + '</span>'
@@ -645,11 +645,11 @@ S.InventoryProducts = {
     if (spec.showCalcStrip) {
       const slot1Label = spec.calc1Label || (spec.showCaseSize ? 'Btls / Case' : 'Pours / Container');
       const slot2Label = spec.calc2Label || (spec.showCaseSize ? 'Cost / Btl' : 'Cost / Pour');
-      calcStrip = '<div class="calc" style="margin-top:18px;">'
+      calcStrip = '<div class="card" style="margin-top:18px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + esc(slot2Label) + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pour Cost %</div><div class="calc-val" id="ip-pct">-</div></div>'
-      + '</div>';
+      + '</div></div>';
     }
 
     // ── Notes ─────────────────────────────────────────────────────────────
@@ -802,7 +802,7 @@ S.InventoryProducts = {
       const nowActive = !(el.dataset.active === 'true');
       el.dataset.active = nowActive ? 'true' : 'false';
       el.style.background = nowActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)';
-      el.style.color = nowActive ? '#7dc77d' : '#c77d7d';
+      el.style.color = nowActive ? 'var(--green)' : 'var(--red)';
       el.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>' + (nowActive ? 'ACTIVE' : 'HIDDEN');
       document.getElementById('ip-toggle-active').textContent = nowActive ? 'Hide from operations' : 'Make active';
     });
@@ -951,7 +951,7 @@ S.InventoryProducts = {
     const pct = (size > 0 && price > 0 && costPerOz > 0) ? (costPerOz * size) / price * 100 : null;
     const target = App.data?.settings?.targets?.bar_pour_cost_pct || 22;
     span.textContent = pct != null ? App.fmtPct(pct) : '-';
-    span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : '#7dc77d');
+    span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : 'var(--green)');
   },
   recalcAllServing() {
     document.querySelectorAll('.vss-row').forEach(r => this.recalcServingRow(r));

@@ -240,8 +240,8 @@ S.InventoryLocations = {
 
     let listSection;
     if (!locs.length) {
-      listSection = '<div style="margin-top:18px;font-size:12px;color:var(--t3);">No locations yet. Add one above, or '
-        + '<button class="btn btn-ghost btn-sm" id="il-add-defaults">add the suggested defaults</button>.</div>';
+      listSection = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No locations yet. Add one above, or '
+        + '<button class="btn btn-ghost btn-sm" id="il-add-defaults">add the suggested defaults</button>.</div></div>';
     } else {
       const rows = active.map(l => {
         const n = this.productCount(l.name);

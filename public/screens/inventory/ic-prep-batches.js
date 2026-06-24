@@ -228,7 +228,10 @@ S.PrepBatches = {
 
     let listSection;
     if (!batches.length) {
-      listSection = '<div style="margin-top:18px;font-size:12px;color:var(--t3);">No prep batches yet. Build one above and it shows here.</div>';
+      listSection = '<div class="sh" style="margin-top:24px;">Prep Batches</div>'
+        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No prep batches yet. Build one above and it shows here.</td></tr></tbody></table></div></div>';
     } else {
       const rows = batches.map(b =>
         '<tr>'

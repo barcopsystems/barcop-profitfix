@@ -135,7 +135,9 @@ S.InventoryAdjustments = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No adjustments logged yet. Use the form above to log the first one.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
     } else {
       const { from, to } = this.effectiveRange();
       const filtered = all.filter(r => {
@@ -160,7 +162,9 @@ S.InventoryAdjustments = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No adjustments in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
           // Direction reads off the signed, colored Value (red loss / green
