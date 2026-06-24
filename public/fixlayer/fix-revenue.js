@@ -104,9 +104,9 @@ FIX.revenue = [
         { kind: 'action', target: 'lc-overtime-watch', targetLabel: 'Overtime Watch',
           title: 'Clear projected overtime before you post',
           detail: 'In Overtime Watch, find anyone heading into overtime on the schedule you just built. Move the concentrated hours to under-scheduled staff before the schedule goes out.' },
-        { kind: 'result', target: 'lc-reports', targetLabel: 'Labor Reports',
+        { kind: 'result', target: 'lc-reports', targetLabel: 'Labor History',
           title: 'Read labor cost on total labor',
-          detail: 'After the week, open the Week view in Labor Reports and read labor cost percent by department against target. It runs on total labor, wages plus payroll taxes and benefits, 10 to 15% above wages alone.' },
+          detail: 'After the week, open the Week view in Labor History and read labor cost percent by department against target. It runs on total labor, wages plus payroll taxes and benefits, 10 to 15% above wages alone.' },
         { kind: 'reference', target: 'Weekly_Labor_Review.pdf', targetLabel: 'Weekly Labor Review Form',
           title: 'Run the Monday labor review',
           detail: 'Download the Weekly Labor Review Form and work it every Monday before you build the new schedule. Flag any department more than 2 points over target, decide whether it was a scheduling error or a revenue miss, and assign one action before you close the review. Fix a scheduling error in next week\'s schedule; fix a revenue miss in the pre-shift briefing.' }
