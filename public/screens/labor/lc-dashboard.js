@@ -187,7 +187,7 @@ S.LaborDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'hours') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping the same file will not double-count. No export? Log hours from your posted schedule in Log Hours. Mark this done once the week is fully in.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export. Bar Cop matches it to your roster and rates.</div>'
         + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
         + '<div id="lc-ck-hours-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
@@ -280,10 +280,7 @@ S.LaborDashboard = {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-staff-roster">Staff Roster</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="lc-callout-log">Call-Out Log</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="lc-time-off">Time Off</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-payroll-export">Payroll Export</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="lc-reports">Labor History</button>'
       + '</div>';
   },
 
