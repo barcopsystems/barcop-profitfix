@@ -92,6 +92,7 @@ S.LaborDashboard = {
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
+      + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -104,6 +105,16 @@ S.LaborDashboard = {
     if (this._openStep === 'hours') this.mountHoursImport();
     if (this._openStep === 'tips') this.mountTipsImport();
     this.wire();
+  },
+
+  // ── Get Started: setup steps above the cockpit until all four are done ───────
+  getStartedBox() {
+    return App.controlGetStarted('Labor', [
+      { num: 1, label: 'Add positions',             screen: 'lc-positions',      done: this.positions().length > 0 },
+      { num: 2, label: 'Add your staff',            screen: 'lc-staff-roster',   done: this.staff().length > 0 },
+      { num: 3, label: 'Build your first schedule', screen: 'lc-build-schedule', done: this.schedules().length > 0 },
+      { num: 4, label: 'Log your first hours',      screen: 'lc-log-hours',      done: this.actuals().length > 0 }
+    ]);
   },
 
   // ── Week selector: ‹ [JUN 16 - JUN 22 NOW] › ─────────────────────────────────
