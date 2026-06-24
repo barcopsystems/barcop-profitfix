@@ -290,7 +290,7 @@ S.InventoryCountHistory = {
         const ms = byCat[c].slice().sort((x, y) => (x.name || '').localeCompare(y.name || ''));
         return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
           + '<colgroup><col style="width:260px;"/><col/><col/><col/></colgroup>'
-          + '<thead><tr><th>' + esc(c) + ' Products</th><th>' + dateB + '</th><th>' + dateA + '</th><th>Change</th></tr></thead>'
+          + '<thead><tr><th>' + esc(c) + '</th><th>' + dateB + '</th><th>' + dateA + '</th><th>Change</th></tr></thead>'
           + '<tbody>' + ms.map(cmpRowHtml).join('') + '</tbody></table></div></div>';
       }).join('');
       bodyNote = '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
@@ -312,7 +312,7 @@ S.InventoryCountHistory = {
         const catItems = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:620px;">'
           + '<colgroup><col style="width:240px;"/><col/><col/><col/><col/><col/></colgroup>'
-          + '<thead><tr><th>' + esc(c) + ' Products</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th></tr></thead>'
+          + '<thead><tr><th>' + esc(c) + '</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th></tr></thead>'
           + '<tbody>' + catItems.map(rowHtml).join('') + '</tbody></table></div></div>';
       }).join('');
     }
