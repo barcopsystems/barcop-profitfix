@@ -237,12 +237,13 @@ S.InventoryDashboard = {
     const catMax = catRows.length ? catRows[0][1] : 1;
 
     const deliveriesThisWeek = this.deliveries().filter(d => this.inWeek(d.date)).length;
+    const menuOver = App.menuItemsOverTarget().length;
 
     return {
       asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek,
       base, periodCost, weeksOnHand, sigNow, prevRaw,
       vendors, reorderTotal, reorderCount, parOff,
-      fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek
+      fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek, menuOver
     };
   },
 
@@ -332,7 +333,7 @@ S.InventoryDashboard = {
         : 'Everything at par';
     }
     if (k === 'review') {
-      const flags = (st.shrink > 0 ? 1 : 0) + (st.spotFlags > 0 ? 1 : 0) + (st.deadAll > 0 ? 1 : 0);
+      const flags = (st.shrink > 0 ? 1 : 0) + (st.spotFlags > 0 ? 1 : 0) + (st.deadAll > 0 ? 1 : 0) + (st.menuOver > 0 ? 1 : 0);
       return isDone ? 'Reviewed' : (flags ? flags + ' flag' + (flags === 1 ? '' : 's') + ' to review' : 'Nothing flagged');
     }
     return '';
@@ -400,14 +401,15 @@ S.InventoryDashboard = {
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>' + this.markBtn('orders', 'Mark Done'));
     }
     // review
-    const line = (label, val, screen, warn) =>
-      '<div data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+    const line = (label, val, screen, warn, open) =>
+      '<div ' + (open ? 'data-open="' + screen + '"' : 'data-go="' + screen + '"') + ' style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
       + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
-    const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0;
+    const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0 || st.menuOver > 0;
     return line('Shrinkage written off (30d)', App.fmtCurrency(st.shrink), 'ic-adjustments', st.shrink > 0)
       + line('Spot-check flags (30d)', String(st.spotFlags), 'ic-spot-check', st.spotFlags > 0)
       + line('Dead stock items', String(st.deadAll), 'ic-report-movers', st.deadAll > 0)
+      + line('Menu items over cost target', String(st.menuOver), 'recipe-cost-analysis', st.menuOver > 0, true)
       + (anyFlag ? '' : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">Nothing flagged in the last 30 days. Clean.</div>')
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Open Variance</button>' + this.markBtn('review', 'Mark Reviewed'));
   },
@@ -550,6 +552,8 @@ S.InventoryDashboard = {
       if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      const op = ev.target.closest('[data-open]');
+      if (op && op.dataset.open) { App.openScreen(op.dataset.open); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.navigate(go.dataset.go); return; }
       if (ev.target.closest('.ic-wk-prev')) { this._stepWeek(-7); return; }
