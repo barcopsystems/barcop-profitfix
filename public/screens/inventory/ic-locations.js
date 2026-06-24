@@ -105,7 +105,7 @@ S.InventoryLocations = {
       { h: 'The Numbers Up Top', p: ['The strip across the top reads Locations, Products Placed, and Need a Location at a glance. Locations is how many active spots you run. Products Placed is how many products sit in at least one of them. Need a Location turns amber when products are sitting nowhere and would count as zero, so chase that number down to nothing before you run a count.'] },
       { h: 'Products That Need A Location', p: ['A product not yet placed anywhere is flagged at the top of this screen as Need a Location, because it will not be counted until it has one. Tap Assign Products, pick where they live, and check them off. This is the quick way to place a batch you just imported.'] },
       { h: 'A Product Can Live In Several Places', p: ['Stock the same product in more than one location and it shows up at each during a count. The first location you put it in becomes its home for ordering, which is the Primary Location the Add Product form fills in.'] },
-      { h: 'Delete And Restore', p: ['Delete on a location pulls it out of counts and the order flow but keeps it, so a closed-down well or a seasonal patio bar is never gone for good. Deleted spots drop into a Deleted list at the bottom; hit Restore to bring one back with its products intact. Products that lived only there go back to Need a Location until you place them somewhere active.'] }
+      { h: 'Archive And Restore', p: ['Archive on a location pulls it out of counts and the order flow but keeps it, so a closed-down well or a seasonal patio bar is never gone for good. Archived spots drop into an Archived list at the bottom; hit Restore to bring one back with its products intact, or Delete Permanently to remove it for good. Products that lived only there go back to Need a Location until you place them somewhere active.'] }
     ]);
   },
 
@@ -242,7 +242,7 @@ S.InventoryLocations = {
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
-          + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '" style="color:var(--red);">Delete</button>'
+          + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '">Archive</button>'
           + '</div></td></tr>';
       }).join('');
 
@@ -253,7 +253,7 @@ S.InventoryLocations = {
             + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
         : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>';
       const archivedSection = archived.length
-        ? '<div class="sh" style="margin:24px 0 10px;">Deleted</div>'
+        ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
           + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
             + '</tr></thead><tbody>'
@@ -395,7 +395,7 @@ S.InventoryLocations = {
       if (save)       this.saveNewLocation();
       else if (open)  this.openEdit(open.dataset.id);
       else if (edit)  this.openEdit(edit.dataset.id);
-      else if (arch)  this.confirmDelete(arch.dataset.id);
+      else if (arch)  this.setArchived(arch.dataset.id, true);
       else if (un)    this.setArchived(un.dataset.id, false);
       else if (dperm) this.deletePermanently(dperm.dataset.id);
       else if (addD)  this.addDefaults();
@@ -778,14 +778,7 @@ S.InventoryLocations = {
     }
   },
 
-  // ── Delete / archive / defaults ────────────────────────────────────────────
-  async confirmDelete(id) {
-    const l = this.locations().find(x => x.id === id);
-    if (!l) return;
-    if (!(await App.confirmDelete())) return;
-    this.setArchived(id, true);
-  },
-
+  // ── Archive / restore / permanent delete / defaults ─────────────────────────
   async setArchived(id, val) {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
