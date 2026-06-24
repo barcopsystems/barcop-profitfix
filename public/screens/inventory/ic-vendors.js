@@ -390,8 +390,9 @@ S.InventoryVendors = {
 
   renderProductsCard(prods) {
     if (prods.length === 0) {
-      return '<div style="font-size:12px;color:var(--t3);margin-top:24px;">No products are linked to this vendor yet. '
-        + 'Set the Primary Vendor field on a product in the Products screen.</div>';
+      return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Product</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
+        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div></div>';
     }
     const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
@@ -451,8 +452,9 @@ S.InventoryVendors = {
 
     const heading = '<div class="sh" style="margin-top:24px;">Recent Price Changes</div>';
     if (recent.length === 0) {
-      return heading + '<div style="font-size:12px;color:var(--t3);">No price changes recorded yet for this vendor. '
-        + 'Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</div>';
+      return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No price changes recorded yet for this vendor. Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</td></tr></tbody></table></div></div>';
     }
     return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
