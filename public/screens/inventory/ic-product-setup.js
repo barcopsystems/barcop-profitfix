@@ -453,7 +453,7 @@ S.InventoryProducts = {
       const selBox  = ev.target.closest('.ip-sel');
 
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
-      if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat, stage: 'drop' }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
+      if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
@@ -469,17 +469,17 @@ S.InventoryProducts = {
     // while an upload is active for a category.
     if (this._import) {
       document.getElementById('ip-imp-cancel')?.addEventListener('click', () => { this._import = null; this.renderLanding(); });
-      if (this._import.stage === 'mapper') {
-        document.getElementById('ip-imp-run')?.addEventListener('click', () => this.runImport());
-      } else {
-        const zone = this.container.querySelector('.ip-drop');
-        const input = document.getElementById('ip-imp-input');
-        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'rgba(255,255,255,.30)' : 'var(--b1)'; zone.style.background = on ? 'rgba(255,255,255,.04)' : 'var(--input)'; };
-        zone?.addEventListener('click', () => input && input.click());
-        ['dragenter', 'dragover'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
-        ['dragleave', 'dragend'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
-        zone?.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); hi(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { this._formCategory = this._import.cat; this.readImportFile(f); } });
-        input?.addEventListener('change', ev => { const f = ev.target.files[0]; if (f) { this._formCategory = this._import.cat; this.readImportFile(f); } });
+      const cat = this._import.cat;
+      const el = document.getElementById('ip-csv');
+      if (el && typeof CSVMapper !== 'undefined') {
+        CSVMapper.mount(el, {
+          actionsEl: '#ip-csv-actions',
+          dropTitle: 'Drop your ' + cat + ' product file here',
+          dropSub: 'Needs a product name column; cost, size, price and par are optional.',
+          confirmLabel: 'Import',
+          fields: this.importFieldsForCategory(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
+          onComplete: rows => { this._formCategory = cat; this.runImport(rows); }
+        });
       }
     }
   },
@@ -1278,68 +1278,6 @@ S.InventoryProducts = {
   // columns (Case Size for Bottle Beer, Keg Size for Draft, Unit Type for
   // Food and Misc) and we never compute cost_per_pour with the wrong divisor.
 
-  readImportFile(file) {
-    const preview = document.getElementById('ip-imp-preview');
-    if (preview) preview.innerHTML = '<div style="color:var(--t3);font-size:12px;margin-top:12px;">Reading file...</div>';
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'csv') {
-      const reader = new FileReader();
-      reader.onload = e => this.parseCSV(e.target.result);
-      reader.readAsText(file);
-    } else if (ext === 'xlsx' || ext === 'xls') {
-      const reader = new FileReader();
-      reader.onload = e => this.parseXLSX(e.target.result);
-      reader.readAsArrayBuffer(file);
-    } else {
-      this.showImportError('Unsupported file type. Use CSV or Excel.');
-    }
-  },
-
-  parseCSV(text) {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) { this.showImportError('File appears empty or has only one row.'); return; }
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-    const rows = lines.slice(1).filter(l => l.trim()).map(line => {
-      const vals = [];
-      let inQ = false, cur = '';
-      for (const ch of line) {
-        if (ch === '"') inQ = !inQ;
-        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
-        else cur += ch;
-      }
-      vals.push(cur.trim());
-      return vals;
-    });
-    this._importHeaders = headers; this._importRows = rows; if (this._import) this._import.stage = 'mapper'; this.renderLanding();
-  },
-
-  parseXLSX(buffer) {
-    const run = () => {
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      if (data.length < 2) { this.showImportError('File appears empty.'); return; }
-      const headers = data[0].map(h => String(h).trim());
-      const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
-      this._importHeaders = headers; this._importRows = rows; if (this._import) this._import.stage = 'mapper'; this.renderLanding();
-    };
-    if (typeof XLSX === 'undefined') {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      script.onload = run;
-      script.onerror = () => this.showImportError('Could not load the Excel reader. Save the file as CSV and try again.');
-      document.head.appendChild(script);
-    } else {
-      run();
-    }
-  },
-
-  showImportError(msg) {
-    const preview = document.getElementById('ip-imp-preview');
-    if (preview) preview.innerHTML = '<div style="color:var(--red);font-size:12px;margin-top:12px;">' + esc(msg) + '</div>';
-    else if (typeof alert === 'function') alert(msg);
-  },
-
   // Category-specific column maps. Each category gets only the fields that
   // actually live on its form so the operator is not picking columns for
   // fields that will be ignored.
@@ -1395,107 +1333,51 @@ S.InventoryProducts = {
     return COMMON.concat(tail);
   },
 
-  autoMap(headers, fields) {
-    const map = {};
-    headers.forEach(h => {
-      const hl = h.toLowerCase().trim();
-      fields.forEach(f => {
-        if (!map[f.key] && f.aliases.some(k => hl === k || hl.includes(k))) map[f.key] = h;
-      });
-    });
-    return map;
-  },
-
   // In-place import panel rendered in the landing's lower area. Two stages:
   // 'drop' (drag-drop / browse zone) then 'mapper' (column matching) — same
   // spot, no page change. Wired in wireLanding().
+  // The upload uses the shared CSVMapper (drop -> Map Your Columns -> preview ->
+  // Import), mounted in wireLanding, so it matches every other import in the app.
   importPanelHTML() {
     const cat = this._import.cat;
     const spec = this.FORM_SPEC[cat] || {};
-    const header = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
-      + '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">Upload ' + esc(spec.title || cat) + ' Product List</div>'
-      + '</div>';
-    if (this._import.stage === 'mapper') {
-      const rows = this._importRows || [];
-      return '<div class="card">' + header + this.columnMapperBodyHTML() + '</div>'
-        + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="ip-imp-run">Import ' + rows.length + ' ' + esc(spec.title) + (rows.length === 1 ? '' : 's') + '</button>'
-        + '<button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
-    }
-    return '<div class="card">' + header
-      + '<div class="ip-drop" style="border:1px dashed var(--b1);border-radius:8px;padding:46px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;background:var(--input);">'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Drop your ' + esc(cat) + ' product file here</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;">Needs a product name column; cost, size, price and par are optional.</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:12px;">or <span style="color:var(--gold);text-decoration:underline;">browse to choose</span> &middot; CSV or Excel</div>'
+    return '<div class="card form-card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Upload ' + esc(spec.title || cat) + ' Product List</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-cancel">Cancel</button>'
       + '</div>'
-      + '<input type="file" id="ip-imp-input" accept=".csv,.xlsx,.xls" style="display:none;"/>'
+      + '<div id="ip-csv"></div>'
       + '</div>'
-      + '<div style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
+      + '<div id="ip-csv-actions" class="no-print" style="margin:16px 0 24px;"></div>';
   },
 
-  columnMapperBodyHTML() {
-    const cat = this._import.cat;
-    const headers = this._importHeaders || [], rows = this._importRows || [];
-    const fields = this.importFieldsForCategory(cat);
-    const autoMap = this.autoMap(headers, fields);
-    const optsFor = sel => '<option value="">(skip)</option>'
-      + headers.map(h => '<option value="' + esc(h) + '"' + (h === sel ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
-    let html = '<div style="font-size:12px;color:var(--t2);margin-bottom:16px;">'
-      + 'Found <strong style="color:var(--w);">' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + '</strong> in your file. '
-      + 'Match each field to its column; anything left on (skip) imports blank and can be filled in later.</div>'
-      + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
-    fields.forEach(f => {
-      html += '<div class="f" style="width:240px;flex-shrink:0;">'
-        + '<label>' + esc(f.label) + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
-        + '<select id="ipm-' + f.key + '">' + optsFor(autoMap[f.key] || '') + '</select></div>';
-    });
-    html += '</div>';
-    // First rows preview so the operator can confirm they mapped the right columns.
-    const previewRows = rows.slice(0, 3);
-    if (previewRows.length) {
-      html += '<div style="margin-top:18px;"><div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:1px;margin-bottom:6px;">PREVIEW: FIRST ROWS FROM YOUR FILE</div>'
-        + '<div class="tbl-wrap" style="overflow-x:auto;"><table class="tbl"><thead><tr>'
-        + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
-        + previewRows.map(r => '<tr>' + headers.map((h, i) => '<td>' + esc(r[i] != null ? r[i] : '') + '</td>').join('') + '</tr>').join('')
-        + '</tbody></table></div></div>';
-    }
-    html += '<div id="ip-imp-msg" style="font-size:12px;margin-top:12px;"></div>';
-    return html;
-  },
-
-  async runImport() {
-    const rows = this._importRows || [];
-    const headers = this._importHeaders || [];
+  // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
+  // a product per row with the same category-specific cost math the form uses.
+  async runImport(rows) {
+    rows = rows || [];
     const cat = this._formCategory || 'Liquor';
     const spec = this.FORM_SPEC[cat];
-    const fields = this.importFieldsForCategory(cat);
-    const getCol = key => document.getElementById('ipm-' + key)?.value || '';
-    const nameCol = getCol('name');
-    const msg = document.getElementById('ip-imp-msg');
-    if (!nameCol) {
-      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Product Name column is required.'; }
-      return;
-    }
-    const cell = (row, col) => { const i = headers.indexOf(col); return i >= 0 ? String(row[i] || '').trim() : ''; };
-    const numOf = str => { if (!str) return null; const n = parseFloat(String(str).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
+    const val = (row, k) => String(row[k] != null ? row[k] : '').trim();
+    const numOf = str => { if (str == null || str === '') return null; const n = parseFloat(String(str).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
     // Snap an imported Misc Type to a known tag (case-insensitive); an unknown
     // value is kept as typed and simply behaves as a recipe ingredient.
     const normMiscType = v => { const s = (v || '').trim().toLowerCase(); return (App.MISC_TYPES || []).find(t => t.toLowerCase() === s) || (v || '').trim(); };
+    const note = (txt, color) => { const a = document.getElementById('ip-csv-actions'); if (a) a.insertAdjacentHTML('beforeend', '<span style="color:' + (color || 'var(--red)') + ';font-size:12px;margin-left:10px;">' + esc(txt) + '</span>'); };
 
     const imported = [];
     rows.forEach(row => {
-      const name = cell(row, nameCol);
+      const name = val(row, 'name');
       if (!name) return;
-      const oz   = numOf(cell(row, getCol('container_size_oz')));
-      const pour = spec.showPour ? numOf(cell(row, getCol('pour_size_oz'))) : null;
-      const cost = numOf(cell(row, getCol('unit_cost')));
+      const oz   = numOf(val(row, 'container_size_oz'));
+      const pour = spec.showPour ? numOf(val(row, 'pour_size_oz')) : null;
+      const cost = numOf(val(row, 'unit_cost'));
       // Menu price + servings come in for resale Food/Misc as well as pourables.
-      const price = (spec.showMenuPrice || spec.showUnitType) ? numOf(cell(row, getCol('menu_price'))) : null;
+      const price = (spec.showMenuPrice || spec.showUnitType) ? numOf(val(row, 'menu_price')) : null;
       const soldOnMenu = spec.showUnitType && price != null && price > 0;
-      const servingsPerUnit = soldOnMenu ? (parseInt(cell(row, getCol('servings_per_unit'))) || 1) : null;
+      const servingsPerUnit = soldOnMenu ? (parseInt(val(row, 'servings_per_unit')) || 1) : null;
       const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
-      const caseSize = spec.showCaseSize ? (parseInt(cell(row, getCol('case_size'))) || null) : null;
-      const unitType = spec.showUnitType ? (cell(row, getCol('unit_type')).toLowerCase() || spec.defaultUnitType) : null;
+      const caseSize = spec.showCaseSize ? (parseInt(val(row, 'case_size')) || null) : null;
+      const unitType = spec.showUnitType ? (val(row, 'unit_type').toLowerCase() || spec.defaultUnitType) : null;
       const pours = oz && pour ? oz / pour : null;
       // Per-bottle cost (divides by case_size for Bottle Beer when set).
       const perBottle = (cat === 'Bottle Beer' && caseSize && caseSize > 0)
@@ -1506,11 +1388,11 @@ S.InventoryProducts = {
       imported.push({
         id:                  App.uid(),
         name,
-        brand:               cell(row, getCol('brand')),
+        brand:               val(row, 'brand'),
         category:            cat,
-        sub_category:        cat === 'Misc' ? '' : cell(row, getCol('sub_category')),
-        misc_type:           cat === 'Misc' ? normMiscType(cell(row, getCol('misc_type'))) : '',
-        vendor:              cell(row, getCol('vendor')),
+        sub_category:        cat === 'Misc' ? '' : val(row, 'sub_category'),
+        misc_type:           cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '',
+        vendor:              val(row, 'vendor'),
         container_size_oz:   oz,
         case_size:           caseSize,
         pour_size_oz:        pour,
@@ -1520,8 +1402,8 @@ S.InventoryProducts = {
         sold_on_menu:        soldOnMenu,
         servings_per_unit:   servingsPerUnit,
         cost_per_serving:    costPerServing,
-        par_level:           numOf(cell(row, getCol('par_level'))),
-        reorder_point:       numOf(cell(row, getCol('reorder_point'))),
+        par_level:           numOf(val(row, 'par_level')),
+        reorder_point:       numOf(val(row, 'reorder_point')),
         primary_location:    '',
         active:              true,
         notes:               '',
@@ -1533,26 +1415,19 @@ S.InventoryProducts = {
       });
     });
 
-    if (!imported.length) {
-      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'No rows with a product name were found.'; }
-      return;
-    }
+    if (!imported.length) { note('No rows with a product name were found.'); return; }
 
     this.products().push(...imported);
-    const btn = document.getElementById('ip-imp-run');
-    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
-
     const ok = await App.saveInventory();
     if (ok) {
+      App.markSetupDone('gs_ic_products');
       this.activeCat = cat;
       this.editId = null;
       this._formCategory = null;
       this._import = null;
       this.renderLanding();
-    } else if (msg) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Import ' + imported.length + ' Products'; }
-      msg.style.color = 'var(--red)';
-      msg.textContent = 'Save failed. Try again.';
+    } else {
+      note('Save failed. Try again.');
     }
   }
 };
