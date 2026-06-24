@@ -102,7 +102,7 @@ S.InventoryReceiveDelivery = {
       + '<td><div class="row-actions">'
         + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;"></span>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>'
-        + '<span class="rd-flag-logged" style="display:none;font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;align-self:center;">Discrepancy Filed in <span class="rd-vt-link" style="text-decoration:underline;cursor:pointer;">Vendor Tracker</span></span>'
+        + '<button type="button" class="btn btn-ghost btn-sm rd-disc-status" style="display:none;white-space:nowrap;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">Filed</button>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
       + '</div></td>'
       + '</tr>';
@@ -202,10 +202,11 @@ S.InventoryReceiveDelivery = {
     lines.addEventListener('input', onInput);
     lines.addEventListener('change', onInput);
     lines.addEventListener('click', ev => {
-      if (ev.target.closest('.rd-vt-link')) { App.openScreen('vendor-tracker'); return; }
       if (ev.target.closest('.rd-remove')) { this.removeLine(ev.target.closest('.rd-line')); return; }
+      const statusBtn = ev.target.closest('.rd-disc-status');
+      if (statusBtn) { this.openLineDiscrepancy(statusBtn.closest('.rd-line')); return; }
       const flagBtn = ev.target.closest('.rd-flag-btn');
-      if (flagBtn) this.openDiscrepancyModal(flagBtn.closest('.rd-line'));
+      if (flagBtn) { this.openLineDiscrepancy(flagBtn.closest('.rd-line')); return; }
     });
 
     document.getElementById('rd-add')?.addEventListener('click', () => {
@@ -307,17 +308,30 @@ S.InventoryReceiveDelivery = {
     } else {
       line.dataset.shortCount = '';
     }
-    // Once a discrepancy is filed, the logged badge replaces the reason text and
-    // the Flag button, so only show the reason while the line is still unfiled.
-    const alreadyLogged = line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged';
-    const loggedBadge = line.querySelector('.rd-flag-logged');
+    // Once a discrepancy is filed, the status button (Filed / Resolved) replaces
+    // the reason text and the Flag button; show the reason only while still unfiled.
+    const discId = line.dataset.discrepancyId;
+    const alreadyLogged = !!discId;
+    const statusBtn = line.querySelector('.rd-disc-status');
     if (flag) {
       if (!alreadyLogged && messages.length > 0) { flag.style.display = ''; flag.textContent = messages.join(' '); }
       else { flag.style.display = 'none'; flag.textContent = ''; }
     }
     line.classList.toggle('rd-flagged', messages.length > 0);
     if (flagBtn) flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
-    if (loggedBadge) loggedBadge.style.display = alreadyLogged ? '' : 'none';
+    if (statusBtn) {
+      if (alreadyLogged) {
+        const rec = (App.data.vendor_discrepancies || []).find(x => x.id === discId);
+        const resolved = rec && rec.status === 'Resolved';
+        statusBtn.style.display = '';
+        statusBtn.textContent = resolved ? 'Resolved' : 'Filed';
+        statusBtn.style.color = resolved ? 'var(--green)' : '';
+        statusBtn.style.background = resolved ? 'transparent' : 'var(--gold-tint)';
+        statusBtn.style.borderColor = resolved ? 'var(--b1)' : 'var(--gold-tint-bord)';
+      } else {
+        statusBtn.style.display = 'none';
+      }
+    }
   },
 
   recalcTotal() {
@@ -465,132 +479,49 @@ S.InventoryReceiveDelivery = {
     this.recalcTotal();
   },
 
-  // ── Discrepancy modal — opens from a flagged line ────────────────────────
-  // Pre-fills date, vendor, product, agreed price, invoiced price, and
-  // calculated overcharge. Operator adds notes and saves. Discrepancy record
-  // lands in App.data.vendor_discrepancies and surfaces on the Profit
-  // Recovery Vendor Discrepancies screen. Operator stays on Receive Delivery
-  // throughout — modal closes back to the same screen on save or cancel.
-  // Vendor dropdown options for the discrepancy modal. Selected vendor
-  // pre-fills from the parent Receive Delivery form. Preserves any legacy
-  // vendor name that no longer matches a saved record.
-  _vendorOptionsForModal(selected) {
-    const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
-      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    let h = '<option value="">Select vendor...</option>';
-    vendors.forEach(v => {
-      h += '<option value="' + esc(v.name) + '"' + (selected === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>';
+  // ── Discrepancy: open the shared Vendor Tracker modal from a flagged line ──
+  // File the claim and chase it to credit/resolution in place (no page leave),
+  // against the same vendor_discrepancies record Vendor Tracker reads. The line
+  // stores the record id so it reads Filed / Resolved. [[two-doors-same-data]]
+  openLineDiscrepancy(line) {
+    if (!line) return;
+    const did = line.dataset.discrepancyId;
+    const existing = (did && (App.data.vendor_discrepancies || []).some(x => x.id === did)) ? did : null;
+    S.VendorTracker.openDiscrepancyModal({
+      discrepancyId: existing,
+      prefill: this.discPrefillForLine(line),
+      onFiled: rec => { line.dataset.discrepancyId = rec.id; this.recalcLine(line); this._capture(); },
+      onClose: () => this.recalcLine(line)
     });
-    if (selected && !vendors.some(v => v.name === selected)) {
-      h += '<option value="' + esc(selected) + '" selected>' + esc(selected) + ' (unsaved)</option>';
-    }
-    return h;
   },
 
-  openDiscrepancyModal(line) {
-    if (!line) return;
-    const vendor = document.getElementById('rd-vendor')?.value || '';
-    const date   = document.getElementById('rd-date')?.value || App.todayLocal();
+  // Pre-fill for the shared discrepancy modal, computed from the in-progress line.
+  discPrefillForLine(line) {
+    const vendor  = document.getElementById('rd-vendor')?.value || '';
+    const date    = document.getElementById('rd-date')?.value || App.todayLocal();
     const invoice = document.getElementById('rd-invoice')?.value.trim() || '';
-
-    const productId = line.querySelector('.rd-prod')?.value || '';
-    const product = this.productById(productId);
+    const product = this.productById(line.querySelector('.rd-prod')?.value || '');
     const productName = product?.name || '(unrecorded)';
-
     const qty = parseFloat(line.querySelector('.rd-qty')?.value) || 0;
     const invoicedPrice = parseFloat(line.querySelector('.rd-price')?.value);
     const agreedPrice = product?.unit_cost != null ? product.unit_cost : null;
     const orderedQtyRaw = line.dataset.orderedQty;
     const orderedQty = (orderedQtyRaw === '' || orderedQtyRaw == null) ? null : parseFloat(orderedQtyRaw);
-
     const hasPriceChange = (agreedPrice != null && !isNaN(invoicedPrice) && Math.abs(invoicedPrice - agreedPrice) > 0.001);
     const hasShortCount  = (orderedQty != null && !isNaN(orderedQty) && orderedQty > 0 && qty < orderedQty);
-
-    // Pick the most likely type based on what's wrong.
-    let suggestedType = 'Other';
-    if (hasShortCount && hasPriceChange) suggestedType = 'Other';
-    else if (hasShortCount) suggestedType = 'Short Count';
-    else if (hasPriceChange) suggestedType = 'Price Overcharge';
-
-    // Calculate overcharge dollars based on the issue type.
+    let type = 'Other';
+    if (hasShortCount && !hasPriceChange) type = 'Short Count';
+    else if (hasPriceChange) type = 'Price Overcharge';
     let overcharge = 0;
     if (hasShortCount && agreedPrice != null) overcharge += (orderedQty - qty) * agreedPrice;
     if (hasPriceChange && qty > 0) overcharge += (invoicedPrice - agreedPrice) * qty;
     if (overcharge < 0) overcharge = 0;
-
-    const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
-    const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
-
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">File Discrepancy</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Files a credit claim to Vendor Discrepancies for follow-up. Adjust if needed.</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="rd-disc-date" value="' + esc(date) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Vendor</label><select id="rd-disc-vendor">' + this._vendorOptionsForModal(vendor) + '</select></div>'
-        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="rd-disc-ref" value="' + esc(invoice) + '"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1;min-width:220px;"><label>Product</label><input type="text" id="rd-disc-product" value="' + esc(productName) + '"/></div>'
-        + '<div class="f" style="width:180px;"><label>Type</label><select id="rd-disc-type">' + typeOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input type="number" id="rd-disc-units" step="1" value="' + (hasShortCount ? (orderedQty - qty) : qty) + '"/></div>'
-        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-invoiced" step="0.01" value="' + (!isNaN(invoicedPrice) ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="rd-disc-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="width:100%;"><label>Notes</label><input type="text" id="rd-disc-notes" placeholder="What was wrong, and who you contacted"/></div>'
-      + '</div>'
-      + '<div id="rd-disc-err" style="color:var(--red);font-size:12px;margin-bottom:6px;display:none;"></div>'
-      + '<div class="card-actions">'
-        + '<button type="button" id="rd-disc-file" class="btn btn-primary">File Discrepancy</button>'
-        + '<button type="button" id="rd-disc-cancel" class="btn btn-ghost">Cancel</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'rd-disc-modal', maxWidth: 640, noClose: true });
-    const close = () => App.closeModal('rd-disc-modal');
-    document.getElementById('rd-disc-cancel')?.addEventListener('click', close);
-    document.getElementById('rd-disc-file')?.addEventListener('click', () => this.saveDiscrepancy(line, close));
-  },
-
-  async saveDiscrepancy(line, closeFn) {
-    const errEl = document.getElementById('rd-disc-err');
-    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
-    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-
-    const date = document.getElementById('rd-disc-date')?.value;
-    const vendor = document.getElementById('rd-disc-vendor')?.value.trim();
-    if (!date) { fail('Date is required.'); return; }
-    if (!vendor) { fail('Vendor is required.'); return; }
-
-    const rec = {
-      id:             App.uid(),
-      date,
-      vendor,
-      reference:      document.getElementById('rd-disc-ref')?.value.trim() || '',
-      type:           document.getElementById('rd-disc-type')?.value || 'Other',
-      sku:            document.getElementById('rd-disc-product')?.value.trim() || '',
-      units:          parseFloat(document.getElementById('rd-disc-units')?.value) || 0,
-      agreed_price:   parseFloat(document.getElementById('rd-disc-agreed')?.value) || 0,
-      invoiced_price: parseFloat(document.getElementById('rd-disc-invoiced')?.value) || 0,
-      overcharge:     parseFloat(document.getElementById('rd-disc-overcharge')?.value) || 0,
-      notes:          document.getElementById('rd-disc-notes')?.value.trim() || '',
-      status:         'Open',
-      source:         'receive-delivery',
-      created_at:     new Date().toISOString()
+    return {
+      date, vendor, reference: invoice, sku: productName, type,
+      units: hasShortCount ? (orderedQty - qty) : qty,
+      agreed_price: agreedPrice, invoiced_price: isNaN(invoicedPrice) ? null : invoicedPrice,
+      overcharge, source: 'receive-delivery'
     };
-
-    const ok = await App.putRecord('core', 'vendor_discrepancy', rec);
-    if (!ok) {
-      fail('Could not save the discrepancy. Try again.');
-      return;
-    }
-
-    // Mark the line as logged; recalcLine swaps the reason text + Flag button for
-    // the "Logged in Vendor Discrepancies" badge.
-    line.dataset.discrepancyId = '1';
-    this.recalcLine(line);
-
-    if (closeFn) closeFn();
   },
 
   // Blank Delivery Inspection Sheet to print and fill at the dock; the manager
@@ -634,7 +565,7 @@ S.InventoryReceiveDelivery = {
       const prevPrice = p.unit_cost != null ? p.unit_cost : null;
       const unitPrice = isNaN(price) ? prevPrice : price;
       const changed = prevPrice != null && unitPrice != null && Math.abs(unitPrice - prevPrice) > 0.001;
-      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice, prevPrice, qty, alreadyFlagged: (line.dataset.discrepancyId === '1' || line.dataset.discrepancyId === 'logged') }); }
+      if (changed) { priceChanges++; productUpdates.push({ product: p, newPrice: unitPrice, prevPrice, qty, alreadyFlagged: !!line.dataset.discrepancyId }); }
       // Short count: ordered_qty came from the matched order (data attribute);
       // a delivered qty under the ordered qty flags this line for the
       // Vendor Discrepancy auto-fill in Phase 4.
