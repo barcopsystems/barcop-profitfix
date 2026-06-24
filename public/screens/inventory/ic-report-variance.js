@@ -319,25 +319,9 @@ S.InventoryVarianceReport = {
     }
   },
 
-  // Open (or create) a variance investigation for a flagged product and jump to
-  // it in Profit Recovery > Theft Risk, where it is worked and resolved. Mirrors
-  // the Spot Check flag so the investigation trail is one shared place.
-  openInvestigation(productId, productName) {
-    if (!productId) return;
-    App.data.variance_investigations = App.data.variance_investigations || [];
-    const existing = App.data.variance_investigations.find(i => i.product_id === productId && i.status !== 'resolved');
-    if (!existing) {
-      const steps = (S.TheftRisk && S.TheftRisk.VARIANCE_STEPS)
-        ? S.TheftRisk.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })) : [];
-      App.putRecord('core', 'variance_investigation', {
-        id: App.uid(), product_id: productId, sku: productName || '',
-        opened_date: App.todayLocal(), created_at: new Date().toISOString(),
-        status: 'open', steps, resolution: ''
-      });
-    }
-    App.showApp('profit');
-    App.navigate('theft-risk');
-  },
+  // A flagged product opens the shared investigation modal (worked in place,
+  // against the same record Loss Prevention reads) — no page leave. The modal
+  // lives on S.TheftRisk so the Variance Report and Spot Check stay identical.
 
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
@@ -856,9 +840,9 @@ S.InventoryVarianceReport = {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
     }));
-    this.container.querySelectorAll('.vr-flag').forEach(b => b.addEventListener('click', ev => {
+    this.container.querySelectorAll('.vr-review').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
-      this.openInvestigation(b.dataset.pid, b.dataset.name);
+      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { onClose: () => this.draw() });
     }));
   },
 
@@ -928,9 +912,14 @@ S.InventoryVarianceReport = {
   // product in Profit Recovery. OK stays plain green text.
   badge(key, pct, unitVar, pid, name) {
     const s = this.status(key, pct, unitVar);
-    if (s.label === 'Flag' && pid) {
-      return '<button type="button" class="vr-flag btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
-        + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>';
+    if (pid) {
+      const investigating = (App.data.variance_investigations || []).some(i => i.product_id === pid && i.status !== 'resolved');
+      if (investigating || s.label === 'Flag') {
+        return '<button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
+          + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">' + (investigating ? 'Reviewing' : 'Review') + '</button>';
+      }
+    } else if (s.label === 'Flag') {
+      return '<span style="font-weight:700;color:' + s.color + ';">Review</span>';
     }
     return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
