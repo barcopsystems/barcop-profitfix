@@ -369,12 +369,13 @@ S.InventoryProducts = {
         + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
       // Shared fixed colgroup so every group card lines its columns up in straight
       // lines down the page (and the mobile full-width stack hook kicks in).
-      const colgroup = '<colgroup><col style="width:40px;"/><col style="width:190px;"/><col/><col/><col/><col/><col/><col/><col style="width:150px;"/></colgroup>';
+      // Content-proportioned widths so each column hugs its data and the gaps read evenly.
+      const colgroup = '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
       const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
         const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
         return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
-          + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:900px;">' + colgroup + '<thead><tr>'
+          + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:1000px;">' + colgroup + '<thead><tr>'
           + '<th></th><th>' + hdr + '</th>' + headerCols
           + '</tr></thead><tbody>' + groupRows + '</tbody></table></div></div>';
       }).join('');
@@ -406,7 +407,7 @@ S.InventoryProducts = {
       : '<span style="color:var(--t4);">-</span>';
     const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
     return '<tr style="' + dim + '">'
-      + '<td style="width:40px;text-align:center;"><input type="checkbox" class="ip-sel" data-id="' + p.id + '"' + checked + ' style="appearance:auto;accent-color:var(--gold);width:16px;height:16px;cursor:pointer;margin:0;vertical-align:middle;"/></td>'
+      + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
       + '<td><div class="val">' + esc(p.name)
       + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
@@ -473,7 +474,7 @@ S.InventoryProducts = {
       } else {
         const zone = this.container.querySelector('.ip-drop');
         const input = document.getElementById('ip-imp-input');
-        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'var(--gold)' : 'var(--b1)'; zone.style.background = on ? 'rgba(219,171,70,0.08)' : 'var(--input)'; };
+        const hi = on => { if (!zone) return; zone.style.borderColor = on ? 'rgba(255,255,255,.30)' : 'var(--b1)'; zone.style.background = on ? 'rgba(255,255,255,.04)' : 'var(--input)'; };
         zone?.addEventListener('click', () => input && input.click());
         ['dragenter', 'dragover'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(true); }));
         ['dragleave', 'dragend'].forEach(evt => zone?.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); hi(false); }));
@@ -584,7 +585,7 @@ S.InventoryProducts = {
       // Liquor / Wine / Draft Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
-      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
@@ -604,7 +605,7 @@ S.InventoryProducts = {
       // Bottle Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
-      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
@@ -624,7 +625,7 @@ S.InventoryProducts = {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
-      row2 = '<div class="form-row" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
         + '<div class="f" id="ip-uw" style="width:140px;flex-shrink:0;' + (isCustomUnit ? '' : 'display:none;') + '"><label>Custom Unit</label>'
@@ -1161,7 +1162,7 @@ S.InventoryProducts = {
     const fieldsHTML = this.bulkFieldDefs(cat, spec).map(def =>
       '<div class="f">'
       + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">'
-        + '<input type="checkbox" class="be-apply" data-key="' + def.key + '" style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/>'
+        + '<input type="checkbox" class="bc-check be-apply" data-key="' + def.key + '"/>'
         + '<span>' + esc(def.label) + '</span>'
       + '</label>'
       + this.bulkInputHTML(def, spec, cat)
