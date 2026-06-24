@@ -251,7 +251,9 @@ S.InventoryLocations = {
         ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
             + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
-        : '<div style="font-size:12px;color:var(--t3);">No active locations.</div>';
+        : '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+            + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
+            + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No active locations. Restore one from Archived below, or add a new one above.</td></tr></tbody></table></div></div>';
       const archivedSection = archived.length
         ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
           + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
@@ -330,7 +332,9 @@ S.InventoryLocations = {
     cbClass = cbClass || 'il-cb';
     rowClass = rowClass || 'il-prow';
     if (!prods.length) {
-      return '<div style="font-size:12px;color:var(--t4);padding:10px 2px;">No matching products yet. Add products on the Products screen first, then assign them here.</div>';
+      return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th></th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No matching products yet. Add products on the Products screen first, then assign them here.</td></tr></tbody></table></div></div>';
     }
     const rowHtml = p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
       + '<td><input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/></td>'
@@ -530,7 +534,9 @@ S.InventoryLocations = {
                 + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
                 + '</tr>').join('')
             + '</tbody></table></div></div>'
-        : '<div style="font-size:12px;color:var(--t3);margin-bottom:4px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</div>';
+        : '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div></div>';
       middle = arrangeHeading + arrangeCard;
     }
 
