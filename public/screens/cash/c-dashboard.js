@@ -256,7 +256,7 @@ S.CashDashboard = {
       const b = st.billsWeek;
       if (b.total <= 0 && st.reorder.total <= 0) {
         return explain('Nothing scheduled out this week that Bar Cop can see. As bills and orders land, this is where you catch a day where cash goes out faster than it comes in.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
       }
       const rows = b.list.slice(0, 4).map(x => itemLine(x.vendor, App.fmtCurrency(x.amount, 0))).join('');
       const reorderLine = st.reorder.total > 0
@@ -264,7 +264,7 @@ S.CashDashboard = {
         : '';
       return explain('Going out this week: <strong style="color:var(--t1);">' + App.fmtCurrency(st.outThisWeek, 0) + '</strong> (' + App.fmtCurrency(b.total, 0) + ' in bills and buys). Line it up against the cash coming in so a heavy day does not catch you short.')
         + rows + reorderLine
-        + btnRow('<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
     }
 
     // terms
