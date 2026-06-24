@@ -67,36 +67,26 @@ S.InventoryStockReport = {
     return i;
   },
 
-  // Count selector as a two-count scroller (like the Usage/Variance reports):
-  // the selected count plus its older neighbor, step arrows, newest tagged NOW,
-  // and a Latest snap. Keeps a long count history compact.
+  // Single-pill count selector, exactly like the Inventory cockpit week selector:
+  // the selected count in one pill (newest tagged NOW), step arrows outside that
+  // grey at each end, and a Latest snap once you've stepped back.
   countStepper() {
     const asc = this.countsAsc();
     const len = asc.length;
     const selIdx = this.selectedIdx(asc);
-    const chip = idx => {
-      const c = asc[idx];
-      const on = idx === selIdx, isNewest = idx === len - 1;
-      return '<button type="button" class="sr-count-chip btn btn-sm" data-v="' + esc(c.id) + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.fmtDate(c.date)
-        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let winStart = selIdx - 1;
-    if (winStart < 0) winStart = 0;
-    if (winStart > len - 2) winStart = Math.max(0, len - 2);
-    let chips = '';
-    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
-    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
-    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
-    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="sr-count-prev" title="Older count" aria-label="Older count"' + prevDis + '>&lsaquo;</button>'
-      + chips
-      + '<button class="btn btn-ghost btn-sm" id="sr-count-next" title="Newer count" aria-label="Newer count"' + nextDis + '>&rsaquo;</button>'
-      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="sr-count-latest" style="margin-left:4px;">Latest</button>' : '')
-      + '</div>';
+    const isNewest = selIdx >= len - 1, atOldest = selIdx <= 0;
+    const label = this.fmtDate(asc[selIdx].date).toUpperCase();
+    const nowBadge = isNewest ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = atOldest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&lsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="sr-count-prev" aria-label="Older count" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isNewest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="sr-count-next" aria-label="Newer count" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(label) + nowBadge + '</span>';
+    const latestBtn = isNewest ? '' : '<button class="btn btn-ghost btn-sm" id="sr-count-latest" style="margin-left:4px;">Latest</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + latestBtn + '</div>';
   },
   stepCount(delta) {
     const asc = this.countsAsc();
@@ -191,8 +181,6 @@ S.InventoryStockReport = {
       if (ev.target.closest('#sr-count-prev')) { this.stepCount(-1); return; }
       if (ev.target.closest('#sr-count-next')) { this.stepCount(1); return; }
       if (ev.target.closest('#sr-count-latest')) { this.countId = null; this.draw(); return; }
-      const cchip = ev.target.closest('.sr-count-chip');
-      if (cchip) { this.countId = cchip.dataset.v; this.draw(); return; }
     };
   },
 
