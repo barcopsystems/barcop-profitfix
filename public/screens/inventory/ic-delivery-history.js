@@ -233,7 +233,7 @@ S.InventoryDeliveryHistory = {
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
         + '<td class="no-print" style="text-align:right;">'
         + (it.discrepancy_filed
-            ? '<span style="font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;">Discrepancy Filed</span>'
+            ? '<span style="font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;">Discrepancy Filed in <span class="dh-vt-link" style="text-decoration:underline;cursor:pointer;">Vendor Tracker</span></span>'
             : '<button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">File Discrepancy</button>')
         + '</td>'
         + '</tr>';
@@ -257,6 +257,7 @@ S.InventoryDeliveryHistory = {
       + '</div>';
 
     this.container.onclick = ev => {
+      if (ev.target.closest('.dh-vt-link')) { App.openScreen('vendor-tracker'); return; }
       const fl = ev.target.closest('.dh-flag');
       if (fl) { const it = items[parseInt(fl.dataset.idx, 10)]; if (it) this.openLineDiscrepancy(d, it); }
     };
@@ -293,10 +294,10 @@ S.InventoryDeliveryHistory = {
         + '<div class="f" style="width:180px;"><label>Type</label><select class="form-input" id="dhd-type">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="width:100px;"><label>Units</label><input class="form-input" type="number" id="dhd-units" step="1" value="' + qty + '"/></div>'
-        + '<div class="f" style="width:130px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="width:130px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-invoiced" step="0.01" value="' + (invoicedPrice != null ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="width:150px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
+        + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input class="form-input" type="number" id="dhd-units" step="1" value="' + qty + '"/></div>'
+        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-invoiced" step="0.01" value="' + (invoicedPrice != null ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
+        + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
       + '</div>'
       + '<div class="f" style="margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="dhd-notes" placeholder="What was wrong, and who you contacted"/></div>'
       + '<div class="card-actions">'
