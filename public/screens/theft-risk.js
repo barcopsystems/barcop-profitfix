@@ -287,7 +287,7 @@ S.TheftRisk = {
     opts = opts || {};
     this._vim = { productId, sku: productName || '', subtitle: opts.subtitle || '', onClose: opts.onClose || null };
     const existing = (App.data.variance_investigations || []).find(i => i.product_id === productId && i.status !== 'resolved');
-    App.openModal('<div class="card" id="vim-card" style="margin:0;"></div>', { id: 'vi-modal', maxWidth: 620, noClose: true });
+    App.openModal('<div class="card form-card" id="vim-card" style="margin:0;"></div>', { id: 'vi-modal', maxWidth: 620, noClose: true });
     this._renderVimBody(existing ? existing.id : null);
   },
   _vimClose() {
@@ -314,10 +314,9 @@ S.TheftRisk = {
         '<div style="padding:9px 0;border-top:1px solid var(--b2);">'
         + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + (i + 1) + '. ' + esc(st.title) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:2px;">' + esc(st.detail) + '</div></div>').join('');
-      card.innerHTML = '<div class="card-title" style="border-bottom:none;margin-bottom:6px;padding-bottom:0;">Open Investigation</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(v.sku) + '</div>' + sub
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:12px 0 4px;">This tracks the product through the six-step variance process. You work it right here, and it lives in Loss Prevention so nothing slips.</div>'
-        + '<div style="margin:4px 0 2px;">' + prev + '</div>'
+      card.innerHTML = '<div class="card-title">Open Investigation</div>'
+        + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(v.sku) + '</div>' + sub
+        + '<div style="margin:12px 0 2px;">' + prev + '</div>'
         + '<div class="card-actions"><button class="btn btn-primary" id="vim-open">Open Investigation</button>'
         + '<button class="btn btn-ghost" id="vim-cancel">Cancel</button></div>';
       card.querySelector('#vim-open').addEventListener('click', () => this._vimCreate());
@@ -346,17 +345,16 @@ S.TheftRisk = {
         + '<input type="text" class="vim-finding" data-step="' + idx + '" value="' + esc(s.finding) + '" placeholder="What you found" style="' + iSt + 'width:100%;"/>'
         + '</div></div>';
     });
-    card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:none;margin-bottom:6px;padding-bottom:0;"><span>Investigation</span>'
-      + '<span id="vim-progress" style="font-size:11px;font-weight:700;color:' + (doneN0 === 6 ? 'var(--green)' : 'var(--t3)') + ';">' + doneN0 + ' / 6 steps</span></div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Opened ' + esc(inv.opened_date) + '</div>' + sub
-      + '<div style="max-height:44vh;overflow-y:auto;margin-top:12px;">' + steps
+    card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Investigation</span>'
+      + '<span id="vim-view" style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:none;color:var(--gold);cursor:pointer;white-space:nowrap;">View in Loss Prevention &rsaquo;</span></div>'
+      + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(inv.sku) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Opened ' + esc(inv.opened_date) + ' &middot; <span id="vim-progress" style="font-weight:700;color:' + (doneN0 === 6 ? 'var(--green)' : 'var(--t3)') + ';">' + doneN0 + ' / 6 steps</span></div>' + sub
+      + '<div style="max-height:42vh;overflow-y:auto;margin-top:12px;padding-right:10px;">' + steps
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
       + '<textarea class="vim-resolution" rows="2" placeholder="The conclusion, even if inconclusive" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(inv.resolution || '') + '</textarea></div></div>'
-      + '<div class="card-actions" style="flex-wrap:wrap;">'
+      + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vim-save">Save &amp; Close</button>'
       + '<button class="btn btn-ghost" id="vim-resolve">Resolve &amp; Close</button>'
-      + '<button class="btn btn-ghost" id="vim-view">View in Loss Prevention &rsaquo;</button>'
       + '<button class="btn btn-danger" id="vim-del" style="margin-left:auto;">Delete</button></div>';
 
     const flush = () => {
