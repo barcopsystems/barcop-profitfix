@@ -901,7 +901,7 @@ S.RecoveryPlaybook = {
             { t: 'cross', rows: [
               { leak: 'Menu mix', capture: 'Menu Items recipes and costs', show: 'Menu Engineering + Dog Test Tracker', fixLabel: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
               { leak: 'Pricing', capture: 'Menu Items costs by ingredient', show: 'Price Calculator + Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
-              { leak: 'Labor cost', capture: 'Build Schedule + Revenue Forecast', show: 'Labor Reports + Overtime Watch', fixLabel: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
+              { leak: 'Labor cost', capture: 'Build Schedule + Revenue Forecast', show: 'Labor History + Overtime Watch', fixLabel: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
               { leak: 'Labor productivity', capture: 'Build Schedule hours against the week', show: 'This Week revenue per labor hour', fixLabel: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
               { leak: 'Check average', capture: 'Server Check covers and sales', show: 'Server Check scorecard', fixLabel: 'Check Average system', screen: 'r-fix', focus: 'check-average' },
               { leak: 'Server performance', capture: 'Server Check by server', show: 'Server Check scorecard', fixLabel: 'Server Performance system', screen: 'r-fix', focus: 'server-performance' }
@@ -1019,7 +1019,7 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Labor is the most controllable major expense you have. Your lease does not flex with revenue; your labor should, and in most bars it does not because the schedule is built the same way every week. The fix is not cutting staff or wages, it is building the schedule from a revenue number instead of from memory. And a blended labor percent hides the problem: 32 percent total can be a tight bar carrying a kitchen and floor that are both five points over.' },
             { t: 'p', text: 'Overtime is a scheduling failure, not a staffing solution. A few overtime earners at five premium hours a week runs well into five figures a year, paid as a premium on hours you were already going to have. And slow shifts are the quiet leak: Monday and Tuesday do half the weekend revenue at three-quarters of the headcount because the extra body feels safe.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'Revenue Forecast sets the number for the week. You build to it in Build Schedule, which shows the labor budget in hours before you write a single name. Overtime Watch catches the premium before it runs, and Labor Reports split the percentage by department so nothing hides in the blend.' },
+            { t: 'p', text: 'Revenue Forecast sets the number for the week. You build to it in Build Schedule, which shows the labor budget in hours before you write a single name. Overtime Watch catches the premium before it runs, and Labor History splits the percentage by department so nothing hides in the blend.' },
             { t: 'go', label: 'Build Schedule', screen: 'lc-build-schedule' },
             { t: 'go', label: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
             { t: 'h', text: 'Quick Reference' },
