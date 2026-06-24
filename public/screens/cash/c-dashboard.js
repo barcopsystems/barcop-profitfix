@@ -232,7 +232,7 @@ S.CashDashboard = {
         App.fmtCurrency(it.free, 0))).join('');
       return explain('You have <strong style="color:var(--gold);">' + App.fmtCurrency(t.total, 0) + '</strong> trapped: ' + App.fmtCurrency(t.dead, 0) + ' in dead stock and ' + App.fmtCurrency(t.overPar, 0) + ' sitting above par. Run the dogs down, feature them, or cut the par so you stop reordering them.')
         + rows
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-movers">Dead Stock</button><button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>' + this.markBtn('trapped', 'Mark Done'));
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button><button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>' + this.markBtn('trapped', 'Mark Done'));
     }
 
     if (k === 'order') {
@@ -249,7 +249,7 @@ S.CashDashboard = {
         ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Bringing everything to par this week runs <strong>' + App.fmtCurrency(st.reorder.total, 0) + '</strong> across ' + st.reorder.count + ' item' + (st.reorder.count === 1 ? '' : 's') + '.</div>'
         : '';
       return explain(lead) + reorderLine
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Order Sheet</button>' + this.markBtn('order', 'Mark Done'));
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-purchasing">Purchasing</button><button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Order Sheet</button>' + this.markBtn('order', 'Mark Done'));
     }
 
     if (k === 'week') {
