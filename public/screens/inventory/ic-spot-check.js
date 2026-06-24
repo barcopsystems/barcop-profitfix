@@ -799,9 +799,11 @@ S.InventorySpotCheck = {
       const cu = (it.category === 'Bottle Beer') ? 'btls' : App.unitAbbr(App.productUnit(p || { category: it.category }));
       const cus = cu ? ' ' + cu : '';
       const sw = (it.category === 'Bottle Beer') ? 'btls' : 'pours';
-      const investigating = it.product_id && (App.data.variance_investigations || []).some(i => i.product_id === it.product_id && i.status !== 'resolved');
-      const action = (it.product_id && (it.flagged || investigating))
-        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">' + (investigating ? 'Reviewing' : 'Review') + '</button>'
+      const invList = it.product_id ? (App.data.variance_investigations || []).filter(i => i.product_id === it.product_id) : [];
+      const invOpen = invList.some(i => i.status !== 'resolved');
+      const invResolved = !invOpen && invList.some(i => i.status === 'resolved');
+      const action = (it.product_id && (it.flagged || invOpen || invResolved))
+        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="' + (invResolved ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + '">' + (invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Review') + '</button>'
         : '';
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
