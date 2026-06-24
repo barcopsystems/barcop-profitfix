@@ -935,7 +935,7 @@ S.InventoryVarianceReport = {
     return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
-  pct(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : v.toFixed(1) + '%'; },
+  pct(v) { if (v == null) return '<span style="color:var(--t4);">-</span>'; const x = Number(v.toFixed(1)) === 0 ? 0 : v; return x.toFixed(1) + '%'; },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
   salesRows() {
