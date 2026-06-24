@@ -225,8 +225,9 @@ S.InventoryDeliveryHistory = {
         ? (it.container_size_oz != null ? it.container_size_oz + ' oz btl &middot; ' + it.case_size_at_receive + '/case' : it.case_size_at_receive + ' btl/case')
         : (it.container_size_oz != null ? it.container_size_oz + ' oz' : '-');
       const disc = this.discForLine(d, it);
-      const dlabel = !disc ? 'File' : (disc.status === 'Resolved' ? 'Resolved' : 'Filed');
-      const dstyle = (disc && disc.status === 'Resolved') ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);';
+      const dlabel = !disc ? 'Flag' : (disc.status === 'Resolved' ? 'Resolved' : 'Filed');
+      // Unfiled = subtle plain ghost (any line CAN be flagged later); Filed = gold; Resolved = green.
+      const dstyle = !disc ? '' : (disc.status === 'Resolved' ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);');
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + containerCol + '</td>'
