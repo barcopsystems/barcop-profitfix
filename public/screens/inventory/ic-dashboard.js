@@ -512,9 +512,7 @@ S.InventoryDashboard = {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-go="ic-spot-check">Spot Check</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-adjustments">Adjustments</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Par Suggestions</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-count-history">Count History</button>'
       + '</div>';
   },
 
