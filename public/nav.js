@@ -167,6 +167,24 @@ const Traffic = {
   }
 };
 
+/* ── Cash Recovery Nav ── */
+const Cash = {
+  navHTML() {
+    return `
+      ${App.sectionSelectorHTML()}
+      <div class="nav-section">Support</div>
+      <div class="nav-item" data-screen="c-help" id="nav-c-help">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
+        <span class="nav-label">Help and FAQ</span>
+      </div>
+      <div class="nav-item" data-nav="report-bug" id="nav-c-report-bug">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Report a Bug</span>
+      </div>
+    `;
+  }
+};
+
 /* ── Events Nav ── */
 const Events = {
   navHTML() {

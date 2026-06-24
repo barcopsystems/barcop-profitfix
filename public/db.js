@@ -284,6 +284,8 @@ const DB = {
     't-audit':'traffic-recovery','t-fix':'traffic-recovery',
     't-presence':'traffic-recovery','t-forecast':'traffic-recovery',
     't-help':'_always',
+    // Cash Recovery
+    'c-dashboard':'cash-recovery','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'

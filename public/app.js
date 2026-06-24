@@ -1117,6 +1117,7 @@ const App = {
     ['hub',       'The Hub'],
     ['profit',    'Profit Recovery'],
     ['revenue',   'Revenue Recovery'],
+    ['cash',      'Cash Recovery'],
     ['traffic',   'Traffic Recovery'],
     ['events',    'Events'],
     ['inventory', 'Inventory Control'],
@@ -1125,7 +1126,7 @@ const App = {
   ],
 
   // The dashboard screen each module lands on when entered.
-  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', traffic: 't-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', traffic: 't-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
 
   // Markup for the section switcher. currentKey defaults to the active module
   // (set before the module nav renders); the Hub sidebar passes 'hub'. Text
@@ -1168,6 +1169,8 @@ const App = {
       nav.innerHTML = Revenue.navHTML();
     } else if (module === 'traffic') {
       nav.innerHTML = Traffic.navHTML();
+    } else if (module === 'cash') {
+      nav.innerHTML = Cash.navHTML();
     } else if (module === 'events') {
       nav.innerHTML = Events.navHTML();
     } else if (module === 'inventory') {
@@ -1184,7 +1187,7 @@ const App = {
     // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
-    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift', 'events', 'profit', 'revenue', 'traffic'];
+    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift', 'events', 'profit', 'revenue', 'cash', 'traffic'];
     const mstyle = MSTYLE_SECTIONS.indexOf(module) !== -1;
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
@@ -1422,7 +1425,7 @@ const App = {
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
   _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['events','Events'],['books','Books']],
-  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['traffic','Traffic']],
+  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash'],['traffic','Traffic']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
@@ -1948,6 +1951,7 @@ const App = {
     if (/^ev-/.test(id)) return 'events';
     if (/^r-/.test(id))  return 'revenue';
     if (/^t-/.test(id))  return 'traffic';
+    if (/^c-/.test(id))  return 'cash';
     return 'profit';
   },
 
@@ -4189,6 +4193,26 @@ const App = {
       document.getElementById('topbar-title').textContent = title;
       document.getElementById('topbar-sub').textContent = sub;
       const screen = trafficScreens[id];
+      if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
+      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
+      return;
+    }
+
+    // Cash Recovery module screens
+    if (this._activeModule === 'cash') {
+      const cashTitles = {
+        'hub':           ['Recovery Hub', ''],
+        'c-dashboard':   ['Dashboard', 'Cash Recovery'],
+        'c-help':        ['Help and FAQ', ''],
+      };
+      const cashScreens = {
+        'c-dashboard':   S.CashDashboard,
+        'c-help':        S.CashHelp,
+      };
+      const [title, sub] = cashTitles[id] || [id, ''];
+      document.getElementById('topbar-title').textContent = title;
+      document.getElementById('topbar-sub').textContent = sub;
+      const screen = cashScreens[id];
       if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
       else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
       return;
