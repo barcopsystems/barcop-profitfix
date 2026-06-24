@@ -65,11 +65,8 @@ S.InventoryOrderSheet = {
   belowParByVendor() {
     const asc = this.countsAsc();
     if (asc.length === 0) return null;
-    const latest = asc[asc.length - 1];
-    const onHand = {};
-    (latest.items || []).forEach(it => {
-      onHand[it.product_id] = (onHand[it.product_id] || 0) + (it.total || 0);
-    });
+    const latest = asc[asc.length - 1];   // kept for the "suggestions based on your … count" date line
+    const onHand = App.currentOnHand();
 
     const groups = {};
     Object.keys(onHand).forEach(pid => {
