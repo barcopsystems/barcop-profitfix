@@ -45,12 +45,16 @@ S.InventoryVarianceReport = {
   DEFAULT_THRESHOLDS: {
     'Liquor':        { flag: 2 },
     'Wine':          { flag: 3 },
+    'Bottle Beer':   { flag: 2 },
     'Draft Beer':    { flag: 10 },
     'Misc':          { flag: 10 },
     'Food':          { flag: 5 },
     'By the Bottle': { bottles: 1 }
   },
-  STD_ORDER: ['Liquor', 'Wine', 'Draft Beer', 'Misc', 'Food', 'By the Bottle'],
+  // 'Bottle Beer' (a %) drives the Quick Variance Check, where bottle beer is a
+  // category-level dollar variance. Bottle beer PRODUCTS in the deep-dive still
+  // map to 'By the Bottle' (a bottle count) via stdKey.
+  STD_ORDER: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc', 'Food', 'By the Bottle'],
 
   thresholds() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -388,9 +392,12 @@ S.InventoryVarianceReport = {
       + '<div class="sh" style="margin:0;">Dig Deeper: Product-by-Product Detail</div>'
       + (this.runs().length ? '<button class="btn btn-ghost btn-sm" id="vr-view-saved">View saved reports</button>' : '')
       + '</div>'
-      + this.varianceStandardsCard() + importBlock;
+      + importBlock;
 
+    // Standards sit up top: one global setting governing both the Quick Variance
+    // Check below and the deep-dive run reports.
     this.container.innerHTML = '<div class="screen">'
+      + this.varianceStandardsCard()
       + periodRow + this.quickStatStrip() + this.quickCheckCard() + this.quickTrendStrip() + digDeeper + '</div>';
 
     // Period scroller.
@@ -491,6 +498,29 @@ S.InventoryVarianceReport = {
     return { theo, actual, variance: theo - actual, pct: theo ? (theo - actual) / theo * 100 : null };
   },
 
+  // ── Quick Variance Check flagging (off the per-category Variance Standards) ──
+  // A beverage category flags when its variance % exceeds its own standard, so the
+  // Quick Check and the deep-dive run reports judge against the same numbers.
+  quickFlagPct(cat) {
+    const t = this.thresholds()[cat];
+    return (t && t.flag != null) ? parseFloat(t.flag) : null;
+  },
+  quickOver(cat, pct) {
+    const f = this.quickFlagPct(cat);
+    return (f != null && pct != null && Math.abs(pct) > f);
+  },
+  // Did any entered category breach its standard in a given period (trend strip).
+  periodAnyOver(endCountId) {
+    const theoMap = this.categoryTheoForPeriod(endCountId);
+    const actuals = this.categorySalesFor(endCountId);
+    return this.QUICK_CATS.some(c => {
+      if (!theoMap[c] || actuals[c] == null) return false;
+      const t = theoMap[c].theo;
+      const pct = t ? (t - (parseFloat(actuals[c]) || 0)) / t * 100 : null;
+      return this.quickOver(c, pct);
+    });
+  },
+
   // The overall headline tiles up top (selected period, fills in as actuals are
   // keyed; everything compares only the categories you've entered).
   quickStatStrip() {
@@ -498,12 +528,17 @@ S.InventoryVarianceReport = {
     const theoMap = this.categoryTheoretical();
     const actuals = this.categorySalesFor(period.endC.id);
     const cats = this.QUICK_CATS.filter(c => theoMap[c] && theoMap[c].total > 0);
-    let theo = 0, actual = 0, any = false;
-    cats.forEach(c => { if (actuals[c] == null) return; theo += theoMap[c].theo; actual += parseFloat(actuals[c]) || 0; any = true; });
+    let theo = 0, actual = 0, any = false, anyOver = false;
+    cats.forEach(c => {
+      if (actuals[c] == null) return;
+      theo += theoMap[c].theo; actual += parseFloat(actuals[c]) || 0; any = true;
+      const cpct = theoMap[c].theo ? (theoMap[c].theo - (parseFloat(actuals[c]) || 0)) / theoMap[c].theo * 100 : null;
+      if (this.quickOver(c, cpct)) anyOver = true;
+    });
     const dash = '<span style="color:var(--t4);">-</span>';
     const variance = any ? theo - actual : null;
     const pct = (any && theo) ? variance / theo * 100 : null;
-    const pctCol = (pct != null && Math.abs(pct) > 5) ? 'color:var(--amber);' : '';
+    const pctCol = anyOver ? 'color:var(--amber);' : '';
     return this.statsCard(
       this.statItem('Theoretical Sales', '<span id="qv-stat-theo">' + (any ? App.fmtCurrency(theo) : dash) + '</span>')
       + this.statItem('Actual POS Sales', '<span id="qv-stat-actual">' + (any ? App.fmtCurrency(actual) : dash) + '</span>')
@@ -541,6 +576,7 @@ S.InventoryVarianceReport = {
       const entered = av != null;
       const v = entered ? t - (parseFloat(av) || 0) : null;
       const pct = (entered && t) ? v / t * 100 : null;
+      const over = this.quickOver(c, pct);
       const pp = priorPct(c);
       const cov = (theoMap[c].priced < theoMap[c].total)
         ? ' <span style="font-size:9px;color:var(--t3);">(' + theoMap[c].priced + ' of ' + theoMap[c].total + ' priced)</span>' : '';
@@ -549,7 +585,7 @@ S.InventoryVarianceReport = {
         + '<td>' + App.fmtCurrency(t) + '</td>'
         + '<td><div class="fw" style="max-width:150px;"><span class="pre">$</span><input class="form-input pre qv-in" data-cat="' + esc(c) + '" type="number" min="0" step="0.01" value="' + (entered ? esc(String(av)) : '') + '" placeholder="0.00"/></div></td>'
         + '<td class="qv-var" data-cat="' + esc(c) + '">' + (entered ? App.fmtCurrency(v) : dash) + '</td>'
-        + '<td class="qv-pct" data-cat="' + esc(c) + '">' + (pct != null ? pct.toFixed(1) + '%' : dash) + '</td>'
+        + '<td class="qv-pct" data-cat="' + esc(c) + '"' + (over ? ' style="color:var(--amber);font-weight:700;"' : '') + '>' + (pct != null ? pct.toFixed(1) + '%' : dash) + '</td>'
         + '<td style="color:var(--t3);">' + (pp != null ? pp.toFixed(1) + '%' : dash) + '</td>'
         + '</tr>';
     }).join('');
@@ -561,19 +597,25 @@ S.InventoryVarianceReport = {
   recomputeQuickCheck() {
     const theo = this._qvTheo || {};
     const dash = '<span style="color:var(--t4);">-</span>';
-    let totTheo = 0, totActual = 0, any = false;
+    let totTheo = 0, totActual = 0, any = false, anyOver = false;
     this.container.querySelectorAll('.qv-in').forEach(inp => {
       const cat = inp.dataset.cat, t = theo[cat] || 0, raw = inp.value;
       const varCell = this.container.querySelector('.qv-var[data-cat="' + cat + '"]');
       const pctCell = this.container.querySelector('.qv-pct[data-cat="' + cat + '"]');
       if (raw === '' || raw == null || isNaN(parseFloat(raw))) {
         if (varCell) varCell.innerHTML = dash;
-        if (pctCell) pctCell.innerHTML = dash;
+        if (pctCell) { pctCell.innerHTML = dash; pctCell.style.color = ''; pctCell.style.fontWeight = ''; }
         return;
       }
       const actual = parseFloat(raw) || 0, v = t - actual, pct = t ? v / t * 100 : null;
       if (varCell) varCell.textContent = App.fmtCurrency(v);
-      if (pctCell) pctCell.textContent = pct == null ? '-' : pct.toFixed(1) + '%';
+      if (pctCell) {
+        pctCell.textContent = pct == null ? '-' : pct.toFixed(1) + '%';
+        const over = this.quickOver(cat, pct);
+        pctCell.style.color = over ? 'var(--amber)' : '';
+        pctCell.style.fontWeight = over ? '700' : '';
+        if (over) anyOver = true;
+      }
       totTheo += t; totActual += actual; any = true;
     });
     const variance = any ? totTheo - totActual : null;
@@ -585,7 +627,7 @@ S.InventoryVarianceReport = {
     const pctEl = document.getElementById('qv-stat-pct');
     if (pctEl) {
       pctEl.innerHTML = pct != null ? pct.toFixed(1) + '%' : dash;
-      pctEl.style.color = (pct != null && Math.abs(pct) > 5) ? 'var(--amber)' : '';
+      pctEl.style.color = anyOver ? 'var(--amber)' : '';
     }
   },
 
@@ -596,11 +638,11 @@ S.InventoryVarianceReport = {
     const periods = asc.slice(1).map(c => ({ endId: c.id, label: this.fmtDate(c.date) })).reverse().slice(0, 5);
     const items = periods.map(p => {
       const ov = this.overallVarianceForPeriod(p.endId);
-      return ov && ov.pct != null ? { label: p.label, pct: ov.pct } : null;
+      return ov && ov.pct != null ? { label: p.label, pct: ov.pct, endId: p.endId } : null;
     }).filter(Boolean);
     if (items.length < 2) return '';
     const cells = items.reverse().map(it => {   // oldest → newest, left to right
-      const col = Math.abs(it.pct) > 5 ? 'var(--amber)' : 'var(--t1)';
+      const col = this.periodAnyOver(it.endId) ? 'var(--amber)' : 'var(--t1)';
       return '<div style="text-align:center;">'
         + '<div style="font-size:16px;font-weight:700;color:' + col + ';white-space:nowrap;">' + it.pct.toFixed(1) + '%</div>'
         + '<div style="font-size:10px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(it.label) + '</div></div>';
