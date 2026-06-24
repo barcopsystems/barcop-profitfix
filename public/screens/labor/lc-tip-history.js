@@ -91,7 +91,7 @@ S.LaborTipHistory = {
         title: 'Tip History',
         lead: 'Tip History summarizes the tips you log, by staff and by week, plus the tip pools you save, over any date range.',
         steps: [
-          { title: 'Log your first tips', desc: 'Tips and pools you record in the Tip Log show up here. Log some to get started.', btn: 'Go to Tip Log', screen: 'lc-tip-log', done: false }
+          { title: 'Log your first tips', desc: 'Tips and pools you record in Tip Tracking show up here. Log some to get started.', btn: 'Go to Tip Tracking', screen: 'lc-tip-log', done: false }
         ]
       });
       return;

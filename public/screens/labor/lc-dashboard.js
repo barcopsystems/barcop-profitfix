@@ -16,9 +16,9 @@ S.LaborDashboard = {
   showHowTo() {
     App.showHelpModal('How the Labor Cockpit Works', [
       { p: ['This is your weekly close-out for Labor. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
-      { h: 'The Steps', p: ['1. Import this week\'s hours: drop your timeclock export and Bar Cop matches the hours to your roster. 2. Log this week\'s tips: drop a tips export, or enter them in Tip Log. 3. Build next week\'s schedule: set next week\'s shifts and labor budget in Build Schedule. 4. Review labor flags: overtime risk, uncovered call-outs, and expiring certifications worth a look.'] },
+      { h: 'The Steps', p: ['1. Import this week\'s hours: drop your timeclock export and Bar Cop matches the hours to your roster. 2. Log this week\'s tips: drop a tips export, or enter them in Tip Tracking. 3. Build next week\'s schedule: set next week\'s shifts and labor budget in Build Schedule. 4. Review labor flags: overtime risk, uncovered call-outs, and expiring certifications worth a look.'] },
       { h: 'Working A Step', p: ['Click a step to open it. The hours and tips imports run right in the cockpit. Build Schedule and Overtime Watch open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector at the top steps you back to a prior week to close it out.'] },
-      { h: 'The Bottom Strip', p: ['Once hours are in, the strip shows the week\'s labor cost, hours, and overtime risk at a glance. Below it, the as-needed jobs (Staff Roster, Call-Out Log, Payroll Export, Labor Reports) are one tap away whenever you need them, not part of the weekly flow.'] }
+      { h: 'The Bottom Strip', p: ['Once hours are in, the strip shows the week\'s labor cost, hours, and overtime risk at a glance. Below it, the as-needed jobs (Staff Roster, Call-Out Log, Payroll Export, Labor History) are one tap away whenever you need them, not part of the weekly flow.'] }
     ]);
   },
 
@@ -145,7 +145,7 @@ S.LaborDashboard = {
 
   _META: {
     hours:    { n: 1, title: 'Import this week\'s hours',   sub: 'Drop your weekly timeclock export' },
-    tips:     { n: 2, title: 'Log this week\'s tips',       sub: 'Drop a tips export, or enter in Tip Log' },
+    tips:     { n: 2, title: 'Log this week\'s tips',       sub: 'Drop a tips export, or enter in Tip Tracking' },
     schedule: { n: 3, title: 'Build next week\'s schedule', sub: 'Set next week\'s shifts and budget' },
     review:   { n: 4, title: 'Review labor flags',          sub: 'Overtime, call-outs, expiring certs' }
   },
@@ -192,10 +192,10 @@ S.LaborDashboard = {
         + '<div id="lc-ck-hours-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
     if (k === 'tips') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Log. Mark this done once it is handled, or if there are no tips to log.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Tracking. Mark this done once it is handled, or if there are no tips to log.</div>'
         + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-res"></div>'
         + '<div id="lc-ck-tips-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-        + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Log</button>'
+        + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Tracking</button>'
         + this.markBtn('tips', 'Mark Done') + '</div>';
     }
     if (k === 'schedule') {
@@ -283,7 +283,7 @@ S.LaborDashboard = {
       + '<button class="btn btn-ghost btn-sm" data-go="lc-callout-log">Call-Out Log</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-time-off">Time Off</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="lc-payroll-export">Payroll Export</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="lc-reports">Labor Reports</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="lc-reports">Labor History</button>'
       + '</div>';
   },
 

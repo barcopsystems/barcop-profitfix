@@ -141,8 +141,8 @@ S.LaborReports = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Labor Reports Work', [
-      { p: ['Labor Reports is one place to see your logged labor, three ways. Switch the tab at the top: Day for a single day, Week for a full week, Range for any stretch of dates.'] },
+    App.showHelpModal('How Labor History Works', [
+      { p: ['Labor History is one place to see your logged labor, three ways. Switch the tab at the top: Day for a single day, Week for a full week, Range for any stretch of dates.'] },
       { h: 'Day', p: ['One day at a time: who worked, their hours and cost, and how the day compared to the schedule. Move between days with the date box or the arrows, and Today snaps back to the current day. The Scheduled This Day table flags anyone who was scheduled but has no hours logged yet, so a missed entry never slips by. Click Edit Hours to fix an entry without leaving the page.'] },
       { h: 'Week', p: ['A full week rolled up by staff and by day, with labor percentage and revenue per labor hour against the week\'s forecast. Pick the week from the chips or the arrows; This Week snaps back to the current one. Use it Monday morning before building the next week. Salaried staff carry their fixed weekly salary.'] },
       { h: 'Range', p: ['Any date range, broken down by department and by staff, with labor cost (straight time plus overtime premium), labor percent and revenue per labor hour from logged shift revenue, and tips. Pick a range with the chips, or Custom to set your own dates. Click a staff row to open their page.'] },
@@ -154,8 +154,8 @@ S.LaborReports = {
     this.actions.innerHTML = '';
     if (this.actuals().length === 0) {
       App.setupCard(this.container, {
-        title: 'Labor Reports',
-        lead: 'Labor Reports show your logged labor by day, by week, and over any range, with cost, labor percentage, and tips.',
+        title: 'Labor History',
+        lead: 'Labor History shows your logged labor by day, by week, and over any range, with cost, labor percentage, and tips.',
         steps: [
           { title: 'Log some hours', desc: 'Hours you log in Log Hours feed every view here. Log some to get started.', btn: 'Go to Log Hours', screen: 'lc-log-hours', done: false }
         ]
