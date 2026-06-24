@@ -1052,7 +1052,7 @@ S.InventoryVarianceReport = {
     const cols = [];
     for (let i = 0; i < n; i++) {
       if (i === 0) cols.push('<col style="width:260px;"/>');
-      else if (i === n - 1) cols.push('<col style="width:92px;"/>');
+      else if (i === n - 1) cols.push('<col style="width:118px;"/>');   // fits the Review / Reviewing button
       else cols.push('<col/>');
     }
     return '<colgroup>' + cols.join('') + '</colgroup>';
