@@ -153,9 +153,9 @@ S.InventoryTakeInventory = {
 
     let body, startAction = '';
     if (locs.length === 0) {
-      body = '<div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
+      body = '<div class="card"><div class="empty" style="margin:0;"><div class="empty-title">No locations set up yet</div>'
         + '<div class="empty-sub">Add storage locations in the Locations screen first. Inventory counts are organized by location.</div>'
-        + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div>';
+        + '<button class="btn btn-primary" id="ti-go-locs">Go to Locations</button></div></div>';
     } else {
       const tiles = locs.map(l => {
         const productCount = this.products().filter(p => App.productLocations(p).includes(l.name)).length;
@@ -324,10 +324,10 @@ S.InventoryTakeInventory = {
   renderCounting(keepScroll) {
     const groups = this.groups();
     if (groups.length === 0) {
-      this.container.innerHTML = '<div class="screen"><div class="empty">'
+      this.container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
         + '<div class="empty-title">No products match this count</div>'
         + '<div class="empty-sub">No active products fall under a ' + esc(this.draft.type) + ' count.</div>'
-        + '<button class="btn btn-ghost" id="ti-back">Back to Setup</button></div></div>';
+        + '<button class="btn btn-ghost" id="ti-back">Back to Setup</button></div></div></div>';
       document.getElementById('ti-back')?.addEventListener('click', () => { this.clearDraft(); this.renderSetup(); });
       return;
     }
