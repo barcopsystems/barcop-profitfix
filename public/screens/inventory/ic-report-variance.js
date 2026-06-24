@@ -397,7 +397,6 @@ S.InventoryVarianceReport = {
     document.getElementById('vrq-period-prev')?.addEventListener('click', () => this.stepPeriod(-1));
     document.getElementById('vrq-period-next')?.addEventListener('click', () => this.stepPeriod(1));
     document.getElementById('vrq-period-latest')?.addEventListener('click', () => { const a = this.countsAsc(); if (a.length) { this.endCountId = a[a.length - 1].id; this.posRows = null; this._unmatchedCollapsed = null; this.draw(); } });
-    this.container.querySelectorAll('.vrq-period-chip').forEach(b => b.addEventListener('click', () => { this.endCountId = b.dataset.v; this.posRows = null; this._unmatchedCollapsed = null; this.draw(); }));
     document.getElementById('vr-view-saved')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); this.scrollTop(); } });
 
     // Quick Variance Check: live recompute on input, save the actuals per period
@@ -610,36 +609,26 @@ S.InventoryVarianceReport = {
       + '<div class="card"><div class="qv-trend">' + cells + '</div></div>';
   },
 
+  // Single-pill period selector, exactly like the Inventory cockpit week selector.
   periodStepper() {
-    const asc = this.countsAsc();
-    const periods = asc.slice(1).map((c, i) => ({ endId: c.id, label: this.fmtDate(asc[i].date) + ' - ' +this.fmtDate(c.date) }));
-    const len = periods.length;
+    const ids = this.countsAsc().slice(1).map(c => c.id);   // end-count ids, oldest → newest
+    const len = ids.length;
     const cur = this.currentPeriod();
-    let selIdx = periods.findIndex(p => p.endId === (cur ? cur.endC.id : null));
+    let selIdx = ids.indexOf(cur ? cur.endC.id : null);
     if (selIdx < 0) selIdx = len - 1;
-    const chip = idx => {
-      const p = periods[idx];
-      const on = idx === selIdx, isNewest = idx === len - 1;
-      return '<button type="button" class="vrq-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + esc(p.label)
-        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let winStart = selIdx - 1;
-    if (winStart < 0) winStart = 0;
-    if (winStart > len - 2) winStart = Math.max(0, len - 2);
-    let chips = '';
-    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
-    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
-    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
-    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="vrq-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
-      + chips
-      + '<button class="btn btn-ghost btn-sm" id="vrq-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
-      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="vrq-period-latest" style="margin-left:4px;">Latest</button>' : '')
-      + '</div>';
+    const isNewest = selIdx >= len - 1, atOldest = selIdx <= 0;
+    const label = cur ? (this.fmtDate(cur.startC.date) + ' - ' + this.fmtDate(cur.endC.date)).toUpperCase() : '';
+    const nowBadge = isNewest ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = atOldest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&lsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="vrq-period-prev" aria-label="Older period" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isNewest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="vrq-period-next" aria-label="Newer period" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(label) + nowBadge + '</span>';
+    const latestBtn = isNewest ? '' : '<button class="btn btn-ghost btn-sm" id="vrq-period-latest" style="margin-left:4px;">Latest</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + latestBtn + '</div>';
   },
   stepPeriod(delta) {
     const ids = this.countsAsc().slice(1).map(c => c.id);
@@ -821,7 +810,6 @@ S.InventoryVarianceReport = {
     document.getElementById('vr-period-prev')?.addEventListener('click', () => this.stepRun(-1));
     document.getElementById('vr-period-next')?.addEventListener('click', () => this.stepRun(1));
     document.getElementById('vr-period-latest')?.addEventListener('click', () => { const r = this.runsSorted()[0]; if (r) { this.loadRun(r); this.draw(); } });
-    this.container.querySelectorAll('.vr-run-chip').forEach(b => b.addEventListener('click', () => { const r = this.runs().find(x => x.id === b.dataset.v); if (r) { this.loadRun(r); this.draw(); } }));
     this.container.querySelectorAll('.vr-hist-row').forEach(row => row.addEventListener('click', () => {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
@@ -832,37 +820,26 @@ S.InventoryVarianceReport = {
     }));
   },
 
-  // ── Period scroller (two saved runs at a time, like the Usage report) ───────
+  // ── Period scroller (single pill over the saved runs, like the cockpit) ─────
   runStepper() {
     const asc = this.runsSorted().slice().reverse();   // oldest → newest
     const len = asc.length;
     let selIdx = asc.findIndex(r => r.id === this._viewRunId);
     if (selIdx < 0) selIdx = len - 1;
-    const chip = idx => {
-      const r = asc[idx];
-      const on = idx === selIdx, isNewest = idx === len - 1;
-      return '<button type="button" class="vr-run-chip btn btn-sm" data-v="' + esc(r.id) + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.fmtDate(r.start_date) + ' - ' +this.fmtDate(r.end_date)
-        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    // Always show two adjacent periods: the selected on the right with its older
-    // neighbor on the left, except at the oldest end.
-    let winStart = selIdx - 1;
-    if (winStart < 0) winStart = 0;
-    if (winStart > len - 2) winStart = Math.max(0, len - 2);
-    let chips = '';
-    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
-    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
-    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
-    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="vr-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
-      + chips
-      + '<button class="btn btn-ghost btn-sm" id="vr-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
-      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="vr-period-latest" style="margin-left:4px;">Latest</button>' : '')
-      + '</div>';
+    const isNewest = selIdx >= len - 1, atOldest = selIdx <= 0;
+    const r = asc[selIdx];
+    const label = r ? (this.fmtDate(r.start_date) + ' - ' + this.fmtDate(r.end_date)).toUpperCase() : '';
+    const nowBadge = isNewest ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = atOldest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&lsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="vr-period-prev" aria-label="Older period" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isNewest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="vr-period-next" aria-label="Newer period" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(label) + nowBadge + '</span>';
+    const latestBtn = isNewest ? '' : '<button class="btn btn-ghost btn-sm" id="vr-period-latest" style="margin-left:4px;">Latest</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + latestBtn + '</div>';
   },
   stepRun(delta) {
     const ids = this.runsSorted().slice().reverse().map(r => r.id);  // oldest → newest
