@@ -1,28 +1,30 @@
 'use strict';
 
-/* ── Inventory Control — Dashboard (landing screen) ───────────────────────────
-   A decision tool: how much cash is tied up, what to order (off real usage via
-   Dynamic Pars), what's moving, what changed since last count, and where you're
-   leaking. Every number is computed from real data — no composite scores (that's
-   what the audits are for). Quantities are in container units (cases for bottle
-   beer); reorder dollars match the Order Sheet.
-
-   Card standard (matches the Shift / Labor dashboards): KPI metric tiles, a
-   full-width banded hero, two equal-height rows of heading-outside panels, then
-   Quick Actions, with a day-one Get Started state until the first count lands. */
+/* ── Inventory Control — Weekly Cockpit (landing screen) ──────────────────────
+   Same pattern as the Shift / Labor cockpits: a "CLOSE OUT YOUR WEEK" banner
+   with a week-stepper and progress bar, then the week's inventory steps top to
+   bottom (take the count, receive deliveries, place orders, review flags). The
+   current step opens inline; deeper work (Take Inventory, Order Sheet, the
+   reports) launches out. A status strip carries the KPIs, and once the week is
+   current the rich readout (cash by category, movement, since-last-count, leaks)
+   drops in as the payoff. Every number is computed from real data — no scores. */
 
 S.InventoryDashboard = {
+  _weekStart: null,   // Monday of the selected week
+  _openStep: null,
+  _flash: null,
+  _st: null,
+
   showHowTo() {
-    App.showHelpModal('How the Inventory Dashboard Works', [
-      { p: ['This is the Inventory landing screen, built to answer four questions at a glance: how much cash is sitting on your shelves, what you need to reorder, what is moving, and where you are leaking. Every number is figured from your real counts, deliveries, and logs. There are no made-up scores here, that is what the Bar Cop Audit is for. Until your first count lands, the screen shows a Get Started strip with the four steps to fill it in.'] },
-      { h: 'The Four Tiles Up Top', p: ['Inventory Value is the dollars on hand from your latest count, with a rough read on how many weeks of usage that covers. To Reorder is the cost to bring everything back to par, with the item and vendor count behind it. Used This Period is the cost of what you went through between your last two counts. Count Freshness is how many days since you last counted, and it turns amber once a count is more than ten days old, because a stale count makes every number below it soft.'] },
-      { h: 'Reorder Plan', p: ['The wide band under the tiles is your order, grouped by vendor and totaled. It uses the same below-par math as the Order Sheet, so if House Cabernet drops under par it shows up under its vendor with the cost to refill. Hit Create Order on a vendor that still needs one; a vendor you have already ordered shows its live status (Open or Submitted) straight from the Order Sheet, and Open Order Sheet in the header jumps to the full thing. If a handful of pars look off versus your real usage, a nudge points you to Dynamic Pars, because the reorder number is only as good as the pars behind it.'] },
-      { h: 'Where Your Cash Sits And Movement', p: ['Where Your Cash Sits breaks your counted value down by category, so you can see if you are carrying too deep on Liquor versus Bottle Beer. Movement reads the last period three ways: Fast Movers (the workhorses to keep stocked deep), Slow Movers (crawling), and Dead Stock (counted, paid for, and did not move at all). A bottle of an odd amaro sitting at 40 dollars tied up with zero usage is exactly what Dead Stock is there to surface.'] },
-      { h: 'Since Last Count And Leaks', p: ['Since Last Count is an honest better-or-worse readout on real signals: percent in stock versus reorder, how close your pars track usage, shrinkage written off, days between counts, and dead stock, each showing the prior value next to the current one so you can read the direction. Leaks and Watch surfaces the three things worth chasing in the last 30 days: shrinkage written off in the Adjustment Log, spot-check flags, and any item 86d twice or more. Tap any line to jump straight to it. A clean 30 days says so in plain words.'] },
-      { h: 'Quick Actions And Day One', p: ['The buttons at the bottom jump you to the jobs you run most: Start Count, Receive Delivery, Order Sheet, and Spot Check. Before your first count, the dashboard shows this same layout in placeholder form with a Get Started strip: list vendors, add products, set locations, then take your first count. The moment that count lands, every panel fills with real numbers.'] }
+    App.showHelpModal('How the Inventory Cockpit Works', [
+      { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week" and the full readout drops in below.'] },
+      { h: 'The Steps', p: ['1. Take this week\'s count: count your inventory in Take Inventory. 2. Receive deliveries: log anything that came in since your last count, or mark it none. 3. Place your orders: everything below par, grouped by vendor, with the cost to refill, and create the orders in the Order Sheet. 4. Review the flags: shrinkage written off, spot-check flags, and dead stock worth chasing.'] },
+      { h: 'Working A Step', p: ['Click a step to open it. Take Inventory, Receive Delivery, and the Order Sheet open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] },
+      { h: 'The Readout', p: ['The strip shows Inventory Value, what is on the reorder, and what you used since the last count. Once the week is current, the readout below breaks your cash down by category, shows what is moving fast, slow, and not at all, the honest direction since your last count, and any leaks worth chasing. The As-needed row keeps Spot Check, Adjustments, Par Suggestions, and Count History one tap away.'] }
     ]);
   },
 
+  // ── Data ─────────────────────────────────────────────────────────────────────
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
@@ -31,6 +33,8 @@ S.InventoryDashboard = {
   products()     { return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false); },
   adjustments()  { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
   spotChecks()   { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
+  locations()    { return ((App.inventoryData && App.inventoryData.ic_locations) || []); },
+  vendors()      { return ((App.inventoryData && App.inventoryData.ic_vendors) || []); },
   productById(id){ return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
   fmtDate(str) {
     if (!str) return '-';
@@ -50,8 +54,6 @@ S.InventoryDashboard = {
   },
 
   // ── Health signals at a given count index — raw, honest metrics (no score) ──
-  // Each carries its real value + which direction is "good", so Since-Last-Count
-  // can show an honest better/worse without inventing a composite number.
   _signalsAt(asc, idx) {
     const latest = asc[idx];
     if (!latest) return null;
@@ -59,7 +61,6 @@ S.InventoryDashboard = {
     const onHand = this._onHand(latest);
     const comps = [];
 
-    // In-stock vs reorder (not stocked out)
     let counted = 0, atRisk = 0;
     Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid); if (!p) return;
@@ -69,7 +70,6 @@ S.InventoryDashboard = {
     });
     if (counted > 0) comps.push({ key: 'stock', label: 'In-stock vs reorder', raw: (counted - atRisk) / counted * 100, lowerBetter: false, fmt: v => Math.round(v) + '% stocked' });
 
-    // Par accuracy vs usage (Dynamic Pars)
     const PS = S.InventoryParSuggestions;
     if (prevC && PS && PS.settings && PS.computeSuggestion) {
       const settings = PS.settings();
@@ -86,7 +86,6 @@ S.InventoryDashboard = {
       if (withPar > 0) comps.push({ key: 'par', label: 'Par accuracy', raw: tuned / withPar * 100, lowerBetter: false, fmt: v => Math.round(v) + '% on target', off: withPar - tuned });
     }
 
-    // Shrinkage written off in the 30 days ending at this count
     const end = new Date(latest.date + 'T00:00:00').getTime();
     const start = end - 30 * 86400000;
     let shrink = 0;
@@ -98,13 +97,11 @@ S.InventoryDashboard = {
     });
     comps.push({ key: 'shrink', label: 'Shrinkage (30d)', raw: shrink, lowerBetter: true, fmt: v => App.fmtCurrency(v) });
 
-    // Days between counts (gap to prior count)
     if (prevC) {
       const gap = (end - new Date(prevC.date + 'T00:00:00').getTime()) / 86400000;
       comps.push({ key: 'count_gap', label: 'Days between counts', raw: gap, lowerBetter: true, fmt: v => Math.round(v) + 'd apart' });
     }
 
-    // Dead stock value (on hand but didn't move this period)
     if (prevC) {
       const base = App.computeUsagePair(prevC, latest, this.deliveries());
       let dead = 0;
@@ -119,113 +116,60 @@ S.InventoryDashboard = {
     return { comps };
   },
 
-  // ── Card standard helpers (match the Shift / Labor dashboards) ───────────────
-  metricCard(label, valHtml, target, cls) {
-    return '<div class="metric-card"><div class="metric-label">' + label + '</div>'
-      + '<div class="metric-val ' + (cls || '') + '">' + valHtml + '</div>'
-      + '<div class="metric-target">' + target + '</div><div class="metric-trend"> </div></div>';
+  // ── Week (Monday-based) ──────────────────────────────────────────────────────
+  mondayOf(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
+    return App.ymdLocal(date);
   },
-  // Full-width hero: a .form-card with a banded title (optional right action).
-  panelCard(title, bodyHtml, titleRight) {
-    return '<div class="card form-card" style="height:100%;">'
-      + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
-      + '<span>' + title + '</span>' + (titleRight || '') + '</div>'
-      + bodyHtml + '</div>';
-  },
-  // Grid panel: title OUTSIDE the card as a .sh heading so side-by-side panels
-  // line up on top; the card flexes to fill its row column for equal height.
-  shPanel(title, bodyHtml) {
-    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
-      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
-  },
-  actionBtn(id, label) {
-    return '<button class="btn btn-primary ic-d-go" data-go="' + id + '" style="flex:1;min-width:150px;">' + label + '</button>';
-  },
-  quickActions() {
-    return '<div style="margin-top:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
-      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
-      + this.actionBtn('ic-take-inventory', 'Start Count')
-      + this.actionBtn('ic-receive-delivery', 'Receive Delivery')
-      + this.actionBtn('ic-order-sheet', 'Order Sheet')
-      + this.actionBtn('ic-spot-check', 'Spot Check')
-      + '</div></div>';
-  },
-  // Two equal-height columns: each column is a flex-column so the card inside
-  // (flex:1) grows to match its row-mate even with the .sh heading outside.
-  row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
-      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
+  addDays(dateStr, n) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  todayMonday()   { return this.mondayOf(new Date()); },
+  weekStart()     { return this._weekStart || this.todayMonday(); },
+  weekEnd()       { return this.addDays(this.weekStart(), 6); },
+  inWeek(d)       { const s = this.weekStart(), e = this.weekEnd(); d = String(d || '').slice(0, 10); return !!d && d >= s && d <= e; },
+  atCurrentWeek() { return this.weekStart() >= this.todayMonday(); },
+  _stepWeek(n) {
+    const next = this.addDays(this.weekStart(), n);
+    if (n > 0 && next > this.todayMonday()) return;
+    this._weekStart = next;
+    this._openStep = null;
+    this.render(this.container, this.actions);
   },
 
-  render(container, actions) {
-    this.container = container;
-    if (actions) actions.innerHTML = '';
+  // ── Per-week step-done stamps (operator-controlled, local to the device) ─────
+  _doneKey() { return 'ic_cockpit_done_' + this.weekStart(); },
+  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
+  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
+
+  ORDER: ['count', 'deliveries', 'orders', 'review'],
+  // A step is done if it carries an operator stamp, else it falls back to what
+  // the week's data shows: a count taken this week, or nothing left to reorder.
+  stepDone(st) {
+    const dm = this.doneMap();
+    const derive = {
+      count:      st.hasCountThisWeek,
+      deliveries: false,
+      orders:     st.reorderCount === 0,
+      review:     false
+    };
+    const r = {};
+    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    return r;
+  },
+
+  // ── Heavy compute, once per render, shared by steps + strip + readout ────────
+  computeState() {
     const asc = this.countsAsc();
     const latest = asc.length ? asc[asc.length - 1] : null;
-    if (!latest) this.renderDayOne();
-    else this.renderFull(asc, latest, asc.length >= 2 ? asc[asc.length - 2] : null);
-    this.wire();
-  },
+    const prev = asc.length >= 2 ? asc[asc.length - 2] : null;
+    const onHand = latest ? this._onHand(latest) : {};
+    const inventoryValue = latest ? (parseFloat(latest.total_value) || 0) : 0;
+    const lastAge = latest ? this.daysSince(latest.date) : null;
+    const hasCountThisWeek = asc.some(c => this.inWeek(c.date));
 
-  // ── Day-one: the real layout in placeholder form + Get Started ───────────────
-  renderDayOne() {
-    const hasProducts  = this.products().length > 0;
-    const hasLocations = ((App.inventoryData && App.inventoryData.ic_locations) || []).length > 0;
-    const hasVendors   = ((App.inventoryData && App.inventoryData.ic_vendors) || []).length > 0;
-    const step = (done, num, label, screen) =>
-      '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
-      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
-
-    const startStrip = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this dashboard fills in with what to reorder, where your cash is tied up, and where you are leaking.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(hasVendors,   1, 'List vendors',          'ic-vendors')
-      + step(hasProducts,  2, 'Add products',          'ic-product-setup')
-      + step(hasLocations, 3, 'Set locations',         'ic-locations')
-      + step(false,        4, 'Take your first count', 'ic-take-inventory')
-      + '</div></div>';
-
-    const cards =
-        this.metricCard('Inventory Value', '$0', 'After your first count')
-      + this.metricCard('To Reorder', '&mdash;', 'After your first count')
-      + this.metricCard('Used This Period', '&mdash;', 'Needs two counts')
-      + this.metricCard('Count Freshness', 'No counts', 'Take your first count');
-
-    const hero = this.panelCard('Reorder Plan',
-      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">Add products and take a count, then Bar Cop builds your reorder plan by vendor right here.</div>'
-      + '<button class="btn btn-primary btn-sm ic-d-go" data-go="ic-take-inventory" style="margin:0;">Take Your First Count</button></div>');
-
-    const emptyBody = msg => '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
-    const catCard      = this.shPanel('Where Your Cash Sits', emptyBody('Take a count to see how much cash is tied up in each category.'));
-    const movementCard = this.shPanel('Movement', emptyBody('Take two counts to see what is moving fast, slow, and not at all.'));
-    const sinceCard    = this.shPanel('Since Last Count', emptyBody('Trends appear once you have two counts.'));
-    const leakCard     = this.shPanel('Leaks &amp; Watch', emptyBody('Shrinkage and spot-check flags surface here as you log.'));
-
-    this.container.innerHTML = '<div class="screen">'
-      + startStrip
-      + '<div class="metric-grid">' + cards + '</div>'
-      + '<div style="margin-bottom:16px;">' + hero + '</div>'
-      + this.row(catCard, movementCard)
-      + this.row(sinceCard, leakCard)
-      + this.quickActions()
-      + '</div>';
-  },
-
-  // ── Populated dashboard ──────────────────────────────────────────────────────
-  renderFull(asc, latest, prev) {
-    const items = latest.items || [];
-    const onHand = this._onHand(latest);
-    const inventoryValue = parseFloat(latest.total_value) || 0;
-    const lastAge = this.daysSince(latest.date);
-
-    // Last-period usage (one computeUsagePair, reused for COGS + movement).
     let base = null, periodCost = null, weeklyCogs = null, weeksOnHand = null;
-    if (prev) {
+    if (latest && prev) {
       base = App.computeUsagePair(prev, latest, this.deliveries());
       periodCost = Object.values(base).reduce((s, b) => s + (b.unitCost != null ? Math.max(0, b.rawUsed) * b.unitCost : 0), 0);
       const span = (new Date(latest.date + 'T00:00:00').getTime() - new Date(prev.date + 'T00:00:00').getTime()) / 86400000;
@@ -234,8 +178,7 @@ S.InventoryDashboard = {
       weeksOnHand = (weeklyCogs && weeklyCogs > 0) ? inventoryValue / weeklyCogs : null;
     }
 
-    // Since-last-count signals (raw metrics + direction).
-    const sigNow = this._signalsAt(asc, asc.length - 1);
+    const sigNow = latest ? this._signalsAt(asc, asc.length - 1) : null;
     const sigPrev = asc.length >= 3 ? this._signalsAt(asc, asc.length - 2) : null;
     const prevRaw = {};
     if (sigPrev) sigPrev.comps.forEach(c => { prevRaw[c.key] = c.raw; });
@@ -255,11 +198,10 @@ S.InventoryDashboard = {
       reorderTotal += cost; reorderCount++;
     });
     const vendors = Object.values(byVendor).sort((a, b) => b.cost - a.cost);
-
     let parOff = 0;
     if (sigNow) { const pc = sigNow.comps.find(c => c.key === 'par'); if (pc) parOff = pc.off || 0; }
 
-    // Movement — fast / slow / dead, from the last period.
+    // Movement — fast / slow / dead from the last period.
     const move = Object.keys(onHand).map(pid => {
       const p = this.productById(pid); if (!p) return null;
       const used = base && base[pid] ? Math.max(0, base[pid].rawUsed) : 0;
@@ -270,6 +212,7 @@ S.InventoryDashboard = {
     const dead = base ? [...move].filter(m => m.used <= 0.001 && m.oh > 0 && m.tied >= 15).sort((a, b) => b.tied - a.tied).slice(0, 3) : [];
     const fastIds = new Set(fast.map(m => m.p.id));
     const slow = base ? [...move].filter(m => m.used > 0.001 && m.oh > 0 && !fastIds.has(m.p.id)).sort((a, b) => a.cost - b.cost).slice(0, 3) : [];
+    const deadAll = base ? move.filter(m => m.used <= 0.001 && m.oh > 0 && m.tied >= 15).length : 0;
 
     // Leaks (last 30 days).
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
@@ -289,62 +232,221 @@ S.InventoryDashboard = {
 
     // Inventory value by category.
     const byCat = {};
-    items.forEach(it => { const c = it.category || 'Other'; byCat[c] = (byCat[c] || 0) + (parseFloat(it.value) || 0); });
+    (latest ? latest.items || [] : []).forEach(it => { const c = it.category || 'Other'; byCat[c] = (byCat[c] || 0) + (parseFloat(it.value) || 0); });
     const catRows = Object.entries(byCat).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
     const catMax = catRows.length ? catRows[0][1] : 1;
 
-    // ── KPI tiles ──
-    const freshCls = lastAge != null && lastAge <= 10 ? 'on-target' : 'over-target';
-    const cards =
-        this.metricCard('Inventory Value', App.fmtCurrency(inventoryValue),
-             weeksOnHand != null ? '&asymp; ' + weeksOnHand.toFixed(1) + ' weeks on hand' : this.fmtDate(latest.date) + ' count')
-      + this.metricCard('To Reorder', App.fmtCurrency(reorderTotal),
-             reorderCount ? reorderCount + ' item' + (reorderCount === 1 ? '' : 's') + ' &middot; ' + vendors.length + ' vendor' + (vendors.length === 1 ? '' : 's') : 'Everything at par',
-             reorderCount ? 'over-target' : 'on-target')
-      + this.metricCard('Used This Period', periodCost != null ? App.fmtCurrency(periodCost) : '-',
-             prev ? this.fmtDate(prev.date) + ' &rarr; ' + this.fmtDate(latest.date) : 'Needs two counts')
-      + this.metricCard('Count Freshness', lastAge === 0 ? 'Today' : lastAge + 'd ago', esc(latest.type || 'Count') + ' count', freshCls);
+    const deliveriesThisWeek = this.deliveries().filter(d => this.inWeek(d.date)).length;
 
-    // ── Reorder Plan (full-width banded hero) ──
-    let reorderHero;
-    const openOsBtn = '<button class="btn btn-ghost btn-sm ic-d-go" data-go="ic-order-sheet" style="margin:0;">Open Order Sheet</button>';
-    if (!reorderCount) {
-      reorderHero = this.panelCard('Reorder Plan',
-        '<div style="font-size:13px;color:var(--t2);padding:6px 0;">Everything is at or above par. Nothing to reorder right now.</div>'
-        + (parOff ? this.parNudge(parOff) : ''),
-        openOsBtn);
-    } else {
-      // Reflect the live Order Sheet state: a vendor with an in-flight order shows
-      // its status (Open / Submitted); only vendors with no order get Create Order.
-      const vRows = vendors.map((v, i) => {
+    return {
+      asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek,
+      base, periodCost, weeksOnHand, sigNow, prevRaw,
+      vendors, reorderTotal, reorderCount, parOff,
+      fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek
+    };
+  },
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+  render(container, actions) {
+    this.container = container; this.actions = actions;
+    if (actions) actions.innerHTML = '';
+    if (!this.countsAsc().length) { this.renderDayOne(); this.wire(); return; }
+
+    const st = this._st = this.computeState();
+    const done = this.stepDone(st);
+    const doneCount = this.ORDER.filter(k => done[k]).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
+    const allDone = doneCount === this.ORDER.length;
+    const flash = this._flash; this._flash = null;
+
+    container.innerHTML = '<div class="screen">'
+      + this.banner(doneCount, this.ORDER.length)
+      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
+      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
+      +   this.ORDER.map(k => this.stepRow(k, done)).join('')
+      + '</div>'
+      + this.statusStrip(st)
+      + (allDone ? this.readout(st) : '')
+      + this.outlierStrip()
+      + '</div>';
+    this.wire();
+  },
+
+  // ── Week selector: ‹ [JUN 16 - JUN 22 NOW] › ─────────────────────────────────
+  weekSelector() {
+    const isCur = this.atCurrentWeek();
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm ic-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm ic-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm ic-wk-now" style="margin-left:4px;">This Week</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
+  },
+
+  banner(doneCount, total) {
+    const allDone = doneCount === total;
+    const pct = Math.round(doneCount / total * 100);
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
+      + '</div>'
+      + '<div style="padding:18px 22px;">'
+      +   this.weekSelector()
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Have ready: time to count, and any delivery invoices since your last count.</div>')
+      + '</div>'
+      + '</div>';
+  },
+
+  _META: {
+    count:      { n: 1, title: 'Take this week\'s count', sub: 'Count your inventory' },
+    deliveries: { n: 2, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
+    orders:     { n: 3, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
+    review:     { n: 4, title: 'Review the flags',        sub: 'Shrinkage, spot checks, dead stock' }
+  },
+  stepStatus(k, isDone) {
+    const st = this._st;
+    if (k === 'count') {
+      if (st.hasCountThisWeek) return 'Counted ' + this.fmtDate(st.latest.date);
+      if (st.lastAge != null) return 'Last count ' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ', not counted this week';
+      return this._META.count.sub;
+    }
+    if (k === 'deliveries') {
+      const n = st.deliveriesThisWeek;
+      return n ? (n + ' deliver' + (n === 1 ? 'y' : 'ies') + ' logged this week') : (isDone ? 'None this week' : this._META.deliveries.sub);
+    }
+    if (k === 'orders') {
+      return st.reorderCount
+        ? App.fmtCurrency(st.reorderTotal) + ' to reorder, ' + st.vendors.length + ' vendor' + (st.vendors.length === 1 ? '' : 's')
+        : 'Everything at par';
+    }
+    if (k === 'review') {
+      const flags = (st.shrink > 0 ? 1 : 0) + (st.spotFlags > 0 ? 1 : 0) + (st.deadAll > 0 ? 1 : 0);
+      return isDone ? 'Reviewed' : (flags ? flags + ' flag' + (flags === 1 ? '' : 's') + ' to review' : 'Nothing flagged');
+    }
+    return '';
+  },
+  stepRow(k, done) {
+    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+    const circle = isDone
+      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
+      + '<div class="ic-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
+      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, isDone) + '</div></div>'
+      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
+      + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
+    return html + '</div>';
+  },
+
+  markBtn(k, label) {
+    return this._isDone
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
+  },
+  workspace(k, isDone) {
+    this._isDone = isDone;
+    const st = this._st;
+    const explain = txt => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
+    const btnRow = inner => '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + inner + '</div>';
+
+    if (k === 'count') {
+      const lastInfo = st.latest
+        ? 'Last count: ' + this.fmtDate(st.latest.date) + (st.lastAge != null ? ' (' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ')' : '')
+        : 'No counts yet';
+      return explain('Count your inventory for the week. Bar Cop values it, builds your reorder plan, and reads what you used since your last count.')
+        + '<div style="font-size:12px;color:var(--t2);">' + lastInfo + '</div>'
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-take-inventory">Start Count</button>' + this.markBtn('count', 'Mark Done'));
+    }
+    if (k === 'deliveries') {
+      return explain('Log anything that came in since your last count, checking each invoice against the order. Re-priced items feed Vendor Tracker. Nothing came in? Mark this done.')
+        + '<div style="font-size:12px;color:var(--t2);">' + st.deliveriesThisWeek + ' deliver' + (st.deliveriesThisWeek === 1 ? 'y' : 'ies') + ' logged this week.</div>'
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-receive-delivery">Receive Delivery</button>' + this.markBtn('deliveries', 'Mark Done'));
+    }
+    if (k === 'orders') {
+      if (st.reorderCount === 0) {
+        return '<div style="font-size:13px;color:var(--t2);padding:2px 0;">Everything is at or above par. Nothing to reorder right now.</div>'
+          + (st.parOff ? this.parNudge(st.parOff) : '')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>' + this.markBtn('orders', 'Mark Done'));
+      }
+      const vRows = st.vendors.map((v, i) => {
         const order = (S.InventoryOrderSheet && S.InventoryOrderSheet.openOrderForVendor) ? S.InventoryOrderSheet.openOrderForVendor(v.vendor) : null;
         const action = order
-          ? '<span class="ic-d-go" data-go="ic-order-sheet" style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;color:' + (order.status === 'Submitted' ? 'var(--green)' : 'var(--gold)') + ';">Order ' + esc(order.status || 'Open') + '</span>'
-          : '<button class="btn btn-ghost btn-sm ic-d-go" data-go="ic-order-sheet" style="margin:0;">Create Order</button>';
-        return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'
-          + (i < vendors.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+          ? '<span data-go="ic-order-sheet" style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;color:' + (order.status === 'Submitted' ? 'var(--green)' : 'var(--gold)') + ';">Order ' + esc(order.status || 'Open') + '</span>'
+          : '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet" style="margin:0;">Create Order</button>';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;' + (i < st.vendors.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(v.vendor) + '</div>'
           + '<div style="font-size:11px;color:var(--t3);">' + v.items + ' item' + (v.items === 1 ? '' : 's') + ' below par</div></div>'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(v.cost) + '</div>'
           + '<div style="width:130px;flex-shrink:0;display:flex;justify-content:center;">' + action + '</div></div>';
       }).join('');
-      reorderHero = this.panelCard('Reorder Plan',
-        '<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Bring everything to par: <strong style="color:var(--gold);font-size:15px;">' + App.fmtCurrency(reorderTotal) + '</strong></div>'
-        + vRows + (parOff ? this.parNudge(parOff) : ''),
-        openOsBtn);
+      return '<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Bring everything to par: <strong style="color:var(--gold);font-size:15px;">' + App.fmtCurrency(st.reorderTotal) + '</strong></div>'
+        + vRows + (st.parOff ? this.parNudge(st.parOff) : '')
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>' + this.markBtn('orders', 'Mark Done'));
     }
+    // review
+    const line = (label, val, screen, warn) =>
+      '<div data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+      + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
+      + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
+    const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0;
+    return line('Shrinkage written off (30d)', App.fmtCurrency(st.shrink), 'ic-adjustments', st.shrink > 0)
+      + line('Spot-check flags (30d)', String(st.spotFlags), 'ic-spot-check', st.spotFlags > 0)
+      + line('Dead stock items', String(st.deadAll), 'ic-report-movers', st.deadAll > 0)
+      + (anyFlag ? '' : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">Nothing flagged in the last 30 days. Clean.</div>')
+      + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Open Variance</button>' + this.markBtn('review', 'Mark Reviewed'));
+  },
 
-    // ── Where Your Cash Sits (the one bar chart on the page) ──
-    const catBody = catRows.length
-      ? catRows.map(([cat, valv]) => {
-          const pct = Math.max(2, Math.round(valv / catMax * 100));
+  // ── Status strip (the KPIs) ──────────────────────────────────────────────────
+  statusStrip(st) {
+    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
+    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
+      + item('Inventory Value', App.fmtCurrency(st.inventoryValue))
+      + div
+      + item('To Reorder', App.fmtCurrency(st.reorderTotal), st.reorderCount ? 'warn' : '')
+      + div
+      + item('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost) : '-')
+      + '</div>';
+  },
+
+  // ── Rich readout (the done-state payoff) ─────────────────────────────────────
+  shPanel(title, bodyHtml) {
+    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
+      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
+  },
+  row(a, b) {
+    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
+      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
+      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
+  },
+  catBody(st) {
+    return st.catRows.length
+      ? st.catRows.map(([cat, valv]) => {
+          const pct = Math.max(2, Math.round(valv / st.catMax * 100));
           return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
             + '<span style="color:var(--t2);">' + esc(cat) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(valv) + '</span></div>'
             + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
         }).join('')
       : '<div style="font-size:12px;color:var(--t3);">No counted value yet.</div>';
-
-    // ── Movement — fast / slow / dead in one panel ──
+  },
+  moveBody(st) {
     const moveLine = (m, right) =>
       '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;">'
       + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(m.name) + '</div>'
@@ -354,16 +456,16 @@ S.InventoryDashboard = {
       + '<div style="display:flex;align-items:center;gap:6px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">'
       + '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';"></span>' + title + '</div>'
       + (rows.length ? rows : '<div style="font-size:11px;color:var(--t4);padding:2px 0;">' + emptyMsg + '</div>') + '</div>';
-    const moveBody = !base
+    return !st.base
       ? '<div style="font-size:12px;color:var(--t3);">Take a second count to see what is moving fast, slow, and not at all.</div>'
-      : moveBlock('Fast Movers', fast.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'No usage recorded.', 'var(--gold)')
-        + moveBlock('Slow Movers', slow.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'Nothing crawling.', 'var(--steel)')
-        + moveBlock('Dead Stock', dead.map(m => moveLine(m, App.fmtCurrency(m.tied) + ' tied')).join(''), 'Nothing stale. Every product moved.', 'var(--red)');
-
-    // ── Since Last Count — directional readout, no bars ──
-    const sinceBody = sigNow && sigNow.comps.length
-      ? sigNow.comps.map((c, i) => {
-          const pv = prevRaw[c.key];
+      : moveBlock('Fast Movers', st.fast.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'No usage recorded.', 'var(--gold)')
+        + moveBlock('Slow Movers', st.slow.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'Nothing crawling.', 'var(--steel)')
+        + moveBlock('Dead Stock', st.dead.map(m => moveLine(m, App.fmtCurrency(m.tied) + ' tied')).join(''), 'Nothing stale. Every product moved.', 'var(--red)');
+  },
+  sinceBody(st) {
+    return st.sigNow && st.sigNow.comps.length
+      ? st.sigNow.comps.map((c, i) => {
+          const pv = st.prevRaw[c.key];
           let icon = '&#8226;', word = '', col = 'var(--t4)';
           if (pv != null) {
             const eps = 1e-6;
@@ -374,45 +476,87 @@ S.InventoryDashboard = {
             else { icon = '&#8211;'; word = 'Flat'; col = 'var(--t4)'; }
           }
           const detail = pv != null ? esc(c.fmt(pv)) + ' &rarr; ' + esc(c.fmt(c.raw)) : esc(c.fmt(c.raw));
-          return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
-            + (i < sigNow.comps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+          return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;' + (i < st.sigNow.comps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
             + '<span style="width:14px;text-align:center;color:' + col + ';font-size:12px;flex-shrink:0;">' + icon + '</span>'
             + '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:var(--t1);">' + c.label + '</div>'
             + '<div style="font-size:11px;color:var(--t3);">' + detail + '</div></div>'
             + '<span style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap;">' + word + '</span></div>';
         }).join('')
       : '<div style="font-size:12px;color:var(--t3);">Trends appear once you have two counts.</div>';
-
-    // ── Leaks & Watch ──
+  },
+  leakBody(st) {
     const leakRow = (label, val, screen, warn) =>
-      '<div class="ic-d-go" data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
+      '<div data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
       + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
-    const anyLeak = shrink > 0 || spotFlags > 0;
-    const leakBody = leakRow('Shrinkage written off (30d)', App.fmtCurrency(shrink), 'ic-adjustments', shrink > 0)
-      + leakRow('Spot-check flags (30d)', String(spotFlags), 'ic-spot-check', spotFlags > 0)
+    const anyLeak = st.shrink > 0 || st.spotFlags > 0;
+    return leakRow('Shrinkage written off (30d)', App.fmtCurrency(st.shrink), 'ic-adjustments', st.shrink > 0)
+      + leakRow('Spot-check flags (30d)', String(st.spotFlags), 'ic-spot-check', st.spotFlags > 0)
       + (anyLeak ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
                  : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">No leaks flagged in the last 30 days. Clean.</div>');
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="metric-grid">' + cards + '</div>'
-      + '<div style="margin-bottom:16px;">' + reorderHero + '</div>'
-      + this.row(this.shPanel('Where Your Cash Sits', catBody), this.shPanel('Movement', moveBody))
-      + this.row(this.shPanel('Since Last Count', sinceBody), this.shPanel('Leaks &amp; Watch', leakBody))
-      + this.quickActions()
+  },
+  readout(st) {
+    return '<div style="margin-top:22px;">'
+      + this.row(this.shPanel('Where Your Cash Sits', this.catBody(st)), this.shPanel('Movement', this.moveBody(st)))
+      + this.row(this.shPanel('Since Last Count', this.sinceBody(st)), this.shPanel('Leaks &amp; Watch', this.leakBody(st)))
       + '</div>';
   },
 
   parNudge(n) {
-    return '<div class="ic-d-go" data-go="ic-par-suggestions" style="margin-top:12px;padding:11px 13px;background:var(--input);border:1px solid var(--b2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    return '<div data-go="ic-par-suggestions" style="margin-top:12px;padding:11px 13px;background:var(--input);border:1px solid var(--b2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span style="font-size:13px;color:var(--t1);line-height:1.5;"><strong style="color:var(--gold);">' + n + ' par' + (n === 1 ? '' : 's') + '</strong> look off versus your real usage. Tuning them sharpens these reorder numbers.</span>'
       + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>';
   },
 
+  outlierStrip() {
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-spot-check">Spot Check</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-adjustments">Adjustments</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Par Suggestions</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-count-history">Count History</button>'
+      + '</div>';
+  },
+
+  // ── Day-one: setup steps until the first count lands ─────────────────────────
+  renderDayOne() {
+    const hasProducts  = this.products().length > 0;
+    const hasLocations = this.locations().length > 0;
+    const hasVendors   = this.vendors().length > 0;
+    const step = (done, num, label, screen) =>
+      '<div data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
+      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
+
+    this.container.innerHTML = '<div class="screen">'
+      + '<div class="card form-card" style="margin-bottom:16px;">'
+      +   '<div class="card-title">Get Started</div>'
+      +   '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this becomes your weekly cockpit: what to reorder, where your cash is tied up, and where you are leaking.</div>'
+      +   '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +     step(hasVendors,   1, 'List vendors',          'ic-vendors')
+      +     step(hasProducts,  2, 'Add products',          'ic-product-setup')
+      +     step(hasLocations, 3, 'Set locations',         'ic-locations')
+      +     step(false,        4, 'Take your first count', 'ic-take-inventory')
+      +   '</div>'
+      + '</div>'
+      + this.outlierStrip()
+      + '</div>';
+  },
+
+  // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
-      const go = ev.target.closest('.ic-d-go');
-      if (go && go.dataset.go) App.navigate(go.dataset.go);
+      const head = ev.target.closest('.ic-step-head');
+      if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
+      const dn = ev.target.closest('[data-done]');
+      if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
+      const un = ev.target.closest('[data-undone]');
+      if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      const go = ev.target.closest('[data-go]');
+      if (go && go.dataset.go) { App.navigate(go.dataset.go); return; }
+      if (ev.target.closest('.ic-wk-prev')) { this._stepWeek(-7); return; }
+      if (ev.target.closest('.ic-wk-next')) { this._stepWeek(7); return; }
+      if (ev.target.closest('.ic-wk-now'))  { this._weekStart = null; this._openStep = null; this.render(this.container, this.actions); return; }
     };
   }
 };
