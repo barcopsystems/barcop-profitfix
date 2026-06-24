@@ -100,9 +100,12 @@ S.LaborPositions = {
       + '<span id="lp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
-    let below;
+    const headHtml = '<thead><tr>'
+      + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
+      + '</tr></thead>';
+    let bodyHtml;
     if (list.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No positions yet. Add your first one above. Positions drive scheduling, hours, and labor cost.</div>';
+      bodyHtml = '<tbody><tr><td colspan="5" style="color:var(--t3);">No positions yet. Add your first one above.</td></tr></tbody>';
     } else {
       const rows = list.map(p => '<tr class="lp-row" data-id="' + p.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(p.name || '-') + '</div></td>'
@@ -115,11 +118,10 @@ S.LaborPositions = {
         + (App.canEdit('lc-positions') ? '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>' : '')
         + (App.canEdit('lc-positions') ? '<button class="btn btn-danger btn-sm lp-del" data-id="' + p.id + '">Delete</button>' : '')
         + '</div></td></tr>').join('');
-      below = '<div class="sh" style="margin-top:24px;">Staff Positions</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      bodyHtml = '<tbody>' + rows + '</tbody>';
     }
+    const below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl">'
+      + '<table class="tbl">' + headHtml + bodyHtml + '</table></div></div>';
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
