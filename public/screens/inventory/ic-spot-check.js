@@ -799,8 +799,9 @@ S.InventorySpotCheck = {
       const cu = (it.category === 'Bottle Beer') ? 'btls' : App.unitAbbr(App.productUnit(p || { category: it.category }));
       const cus = cu ? ' ' + cu : '';
       const sw = (it.category === 'Bottle Beer') ? 'btls' : 'pours';
-      const action = (it.flagged && it.product_id)
-        ? '<button class="btn btn-ghost btn-sm sp-investigate" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">Investigate</button>'
+      const investigating = it.product_id && (App.data.variance_investigations || []).some(i => i.product_id === it.product_id && i.status !== 'resolved');
+      const action = (it.product_id && (it.flagged || investigating))
+        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">' + (investigating ? 'Reviewing' : 'Review') + '</button>'
         : '';
       return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
@@ -837,33 +838,9 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
-      const inv = ev.target.closest('.sp-investigate');
-      if (inv) { ev.stopPropagation(); this.openInvestigation(inv.dataset.pid, inv.dataset.name); }
+      const inv = ev.target.closest('.sp-review');
+      if (inv) { ev.stopPropagation(); S.TheftRisk.openInvestigationModal(inv.dataset.pid, inv.dataset.name, { onClose: () => this.renderDetail(id) }); }
     };
-  },
-
-  openInvestigation(productId, productName) {
-    App.data.variance_investigations = App.data.variance_investigations || [];
-    const existing = App.data.variance_investigations.find(i =>
-      i.product_id === productId && i.status !== 'resolved');
-    if (!existing) {
-      const steps = (S.TheftRisk && S.TheftRisk.VARIANCE_STEPS)
-        ? S.TheftRisk.VARIANCE_STEPS.map(() => ({ done: false, finding: '' }))
-        : [];
-      const inv = {
-        id: App.uid(),
-        product_id: productId,
-        sku: productName,
-        opened_date: App.todayLocal(),
-        created_at: new Date().toISOString(),
-        status: 'open',
-        steps,
-        resolution: ''
-      };
-      App.putRecord('core', 'variance_investigation', inv);
-    }
-    App.showApp('profit');
-    App.navigate('theft-risk');
   },
 
   async confirmDel(id) {
