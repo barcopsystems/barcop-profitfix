@@ -279,6 +279,106 @@ S.TheftRisk = {
     });
   },
 
+  // ── Shared investigation modal (Variance Report + Spot Check) ──────────────
+  // Both screens flag a product over its variance standard and open THIS modal,
+  // working the SAME canonical variance_investigations record Loss Prevention
+  // reads — no page leave. opts: { subtitle, onClose }. [[two-doors-same-data]]
+  openInvestigationModal(productId, productName, opts) {
+    opts = opts || {};
+    this._vim = { productId, sku: productName || '', subtitle: opts.subtitle || '', onClose: opts.onClose || null };
+    const existing = (App.data.variance_investigations || []).find(i => i.product_id === productId && i.status !== 'resolved');
+    App.openModal('<div class="card" id="vim-card" style="margin:0;"></div>', { id: 'vi-modal', maxWidth: 620, noClose: true });
+    this._renderVimBody(existing ? existing.id : null);
+  },
+  _vimClose() {
+    App.closeModal('vi-modal');
+    const cb = this._vim && this._vim.onClose; this._vim = null;
+    if (typeof cb === 'function') cb();
+  },
+  _vimCreate() {
+    const v = this._vim; if (!v) return;
+    const inv = { id: App.uid(), product_id: v.productId, sku: v.sku, opened_date: App.todayLocal(),
+      created_at: new Date().toISOString(), status: 'open',
+      steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })), resolution: '' };
+    App.putRecord('core', 'variance_investigation', inv);
+    this._renderVimBody(inv.id);
+  },
+  _renderVimBody(invId) {
+    const card = document.getElementById('vim-card'); if (!card) return;
+    const v = this._vim || {};
+    const sub = v.subtitle ? '<div style="font-size:12px;color:var(--t2);margin-top:3px;">' + esc(v.subtitle) + '</div>' : '';
+
+    // NEW: preview the six steps, primary "Open Investigation".
+    if (!invId) {
+      const prev = this.VARIANCE_STEPS.map((st, i) =>
+        '<div style="padding:9px 0;border-top:1px solid var(--b2);">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + (i + 1) + '. ' + esc(st.title) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:2px;">' + esc(st.detail) + '</div></div>').join('');
+      card.innerHTML = '<div class="card-title" style="border-bottom:none;margin-bottom:6px;padding-bottom:0;">Open Investigation</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(v.sku) + '</div>' + sub
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:12px 0 4px;">This tracks the product through the six-step variance process. You work it right here, and it lives in Loss Prevention so nothing slips.</div>'
+        + '<div style="margin:4px 0 2px;">' + prev + '</div>'
+        + '<div class="card-actions"><button class="btn btn-primary" id="vim-open">Open Investigation</button>'
+        + '<button class="btn btn-ghost" id="vim-cancel">Cancel</button></div>';
+      card.querySelector('#vim-open').addEventListener('click', () => this._vimCreate());
+      card.querySelector('#vim-cancel').addEventListener('click', () => this._vimClose());
+      return;
+    }
+
+    // WORKING: the canonical record, interactive (step checks update in place).
+    const inv = this._inv(invId); if (!inv) { this._vimClose(); return; }
+    const doneN0 = inv.steps.filter(s => s.done).length;
+    const stepDefs = inv.steps_def || this.VARIANCE_STEPS;
+    const live = inv.product_id ? this.investigationLiveData(inv.product_id) : { step2: '', step3: '' };
+    const iSt = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
+    let steps = '';
+    inv.steps.forEach((s, idx) => {
+      const st = stepDefs[idx] || { title: '', detail: '' };
+      let extra = '';
+      if (idx === 1 && live.step2) extra = live.step2;
+      if (idx === 2 && live.step3) extra = live.step3;
+      steps += '<div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--b2);">'
+        + '<input type="checkbox" class="bc-check vim-step" data-step="' + idx + '"' + (s.done ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;"/>'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div class="vim-step-title" data-step="' + idx + '" style="font-size:13px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + (idx + 1) + '. ' + esc(st.title) + '</div>'
+        + '<div style="font-size:12px;color:var(--t3);line-height:1.55;margin:3px 0 8px;">' + esc(st.detail) + '</div>'
+        + extra
+        + '<input type="text" class="vim-finding" data-step="' + idx + '" value="' + esc(s.finding) + '" placeholder="What you found" style="' + iSt + 'width:100%;"/>'
+        + '</div></div>';
+    });
+    card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:none;margin-bottom:6px;padding-bottom:0;"><span>Investigation</span>'
+      + '<span id="vim-progress" style="font-size:11px;font-weight:700;color:' + (doneN0 === 6 ? 'var(--green)' : 'var(--t3)') + ';">' + doneN0 + ' / 6 steps</span></div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(inv.sku) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">Opened ' + esc(inv.opened_date) + '</div>' + sub
+      + '<div style="max-height:44vh;overflow-y:auto;margin-top:12px;">' + steps
+      + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
+      + '<textarea class="vim-resolution" rows="2" placeholder="The conclusion, even if inconclusive" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(inv.resolution || '') + '</textarea></div></div>'
+      + '<div class="card-actions" style="flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="vim-save">Save &amp; Close</button>'
+      + '<button class="btn btn-ghost" id="vim-resolve">Resolve &amp; Close</button>'
+      + '<button class="btn btn-ghost" id="vim-view">View in Loss Prevention &rsaquo;</button>'
+      + '<button class="btn btn-danger" id="vim-del" style="margin-left:auto;">Delete</button></div>';
+
+    const flush = () => {
+      card.querySelectorAll('.vim-finding').forEach(i => { inv.steps[+i.dataset.step].finding = i.value; });
+      const ta = card.querySelector('.vim-resolution'); if (ta) inv.resolution = ta.value;
+    };
+    card.querySelectorAll('.vim-step').forEach(c => c.addEventListener('change', () => {
+      const idx = +c.dataset.step;
+      inv.steps[idx].done = c.checked;
+      const t = card.querySelector('.vim-step-title[data-step="' + idx + '"]'); if (t) t.style.color = c.checked ? 'var(--t3)' : 'var(--t1)';
+      const n = inv.steps.filter(s => s.done).length;
+      const pr = document.getElementById('vim-progress'); if (pr) { pr.textContent = n + ' / 6 steps'; pr.style.color = n === 6 ? 'var(--green)' : 'var(--t3)'; }
+      App.putRecord('core', 'variance_investigation', inv);
+    }));
+    card.querySelectorAll('.vim-finding').forEach(i => i.addEventListener('change', () => { inv.steps[+i.dataset.step].finding = i.value; App.putRecord('core', 'variance_investigation', inv); }));
+    card.querySelector('.vim-resolution')?.addEventListener('change', e => { inv.resolution = e.target.value; App.putRecord('core', 'variance_investigation', inv); });
+    card.querySelector('#vim-save').addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
+    card.querySelector('#vim-resolve').addEventListener('click', () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
+    card.querySelector('#vim-view').addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => { this._vimClose(); App.showApp('profit'); App.navigate('theft-risk'); }); });
+    card.querySelector('#vim-del').addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'variance_investigation', inv.id); this._vimClose(); });
+  },
+
   /* The Fix System's variance process as a trackable workflow. Step 5 is a
      controlled re-measure that stays attached to THIS investigation. */
   VARIANCE_STEPS: [
