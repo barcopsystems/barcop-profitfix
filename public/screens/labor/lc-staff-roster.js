@@ -249,7 +249,7 @@ S.LaborStaffRoster = {
         const roll = this.certRollup(s.id);
         const certCell = roll === 'expired'  ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
                        : roll === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
-                       : roll === 'ok'       ? '<span style="color:var(--green);font-weight:700;">Current</span>'
+                       : roll === 'ok'       ? '<span style="color:var(--t2);">Current</span>'
                        : '<span style="color:var(--t3);">&mdash;</span>';
         return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + esc(s.name || '-')
@@ -267,7 +267,8 @@ S.LaborStaffRoster = {
           + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;margin:24px 0 10px;">'
+      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+        + '<div class="sh" style="margin:0;">Staff Roster</div>'
         + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
@@ -548,7 +549,7 @@ S.LaborStaffRoster = {
       const status = this.certStatus(c);
       const badge = status === 'expired' ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
                  : status === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
-                 : '<span style="color:var(--green);font-weight:700;">Current</span>';
+                 : '<span style="color:var(--t2);">Current</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(c.cert_type || '-') + '</div>'
         + (c.cert_number ? '<div style="font-size:10px;color:var(--t3);">#' + esc(c.cert_number) + '</div>' : '') + '</td>'
