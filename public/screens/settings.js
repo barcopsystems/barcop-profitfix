@@ -2027,6 +2027,13 @@ S.HubSettings = {
       ing('Large Eggs (dozen)', 0.25), ing('Flour Tortilla (case)', 0.02), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 0.08) ] });
     attachRecipe('Paloma', { mode: 'single', plate_yield: null, ingredients: [
       ing('Espolòn Tequila Blanco', 1), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02) ] });
+    // Demo seed for the cost-creep alert: the two highest-volume margaritas both
+    // pour Espolòn Tequila Blanco and carry a tight cost target, so they sit just
+    // under it (Margarita ~16% vs 17%, Paloma ~15% vs 16%). A single tequila price
+    // bump on a delivery then visibly tips both over — firing the Receive-Delivery
+    // notice + the cockpit flag.
+    if (rItem('House Margarita')) rItem('House Margarita').target_cost_pct = 17;
+    if (rItem('Paloma'))          rItem('Paloma').target_cost_pct = 16;
     attachRecipe('Whiskey Sour', { mode: 'single', plate_yield: null, ingredients: [
       ing('Bulleit Bourbon', 1.3), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
 
