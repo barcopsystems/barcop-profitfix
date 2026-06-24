@@ -172,6 +172,11 @@ const Cash = {
   navHTML() {
     return `
       ${App.sectionSelectorHTML()}
+      <div class="nav-section">Analysis</div>
+      <div class="nav-item" data-screen="c-fix" id="nav-c-fix">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Cash Fix</span>
+      </div>
       <div class="nav-section">Free Up Cash</div>
       <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>

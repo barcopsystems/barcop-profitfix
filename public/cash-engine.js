@@ -240,15 +240,52 @@ window.CashEngine = {
     return rows;
   },
 
-  // ── Realized cash freed (backward). Wired to the recovery engine once the
-  //    Cash Fix rail lands; until a cash fix is logged it reads "building". ──
+  // ── Realized cash freed (backward, honest). Trapped cash is computed at each
+  //    historical count, then "freed" is how far it has come down from your own
+  //    first-weeks baseline. No metric × revenue, no fix log to game: it is the
+  //    real reduction in capital tied up on the shelf. Reads "building" until a
+  //    couple of counts exist. ───────────────────────────────────────────────
+  _onHandFromCount(count) {
+    const m = {};
+    (count.items || []).forEach(it => {
+      if (it.counted === false) return;
+      const rec = m[it.product_id] || (m[it.product_id] = { onHand: 0, value: 0 });
+      rec.onHand += (it.total || 0);
+      rec.value += (it.value || 0);
+    });
+    return m;
+  },
+  _trappedFrom(oh, base) {
+    let dead = 0, overPar = 0;
+    Object.keys(oh).forEach(pid => {
+      const p = this.productById(pid); if (!p) return;
+      const qty = oh[pid].onHand; if (!(qty > 0)) return;
+      const uc = App.unitCost(p) || 0;
+      const tied = qty * uc;
+      const used = base && base[pid] ? Math.max(0, base[pid].rawUsed) : null;
+      const par = parseFloat(p.par_level);
+      if (used !== null && used <= 0.001 && tied >= 15) dead += tied;
+      else if (!isNaN(par) && par > 0 && qty > par) { const ex = (qty - par) * uc; if (ex >= 15) overPar += ex; }
+    });
+    return dead + overPar;
+  },
+  trappedAtCount(asc, idx) {
+    const latest = asc[idx], prev = idx >= 1 ? asc[idx - 1] : null;
+    if (!latest || !prev) return null;
+    return this._trappedFrom(this._onHandFromCount(latest), App.computeUsagePair(prev, latest, this.deliveries()));
+  },
+  trappedSeries() {
+    const asc = this.countsAsc();
+    const out = [];
+    for (let i = 1; i < asc.length; i++) { const v = this.trappedAtCount(asc, i); if (v != null) out.push({ date: asc[i].date, trapped: v }); }
+    return out;
+  },
   freed() {
-    if (window.Recovery && Recovery.moduleSummary) {
-      try {
-        const s = Recovery.moduleSummary('cash');
-        if (s && s.withFigure > 0) return { dollars: s.recovered, measured: s.withFigure, building: false };
-      } catch (e) {}
-    }
-    return { dollars: 0, measured: 0, building: true };
+    const series = this.trappedSeries();
+    if (series.length < 2) return { dollars: 0, building: true, measured: series.length };
+    const baseN = Math.min(3, series.length - 1);
+    const baseline = series.slice(0, baseN).reduce((s, p) => s + p.trapped, 0) / baseN;
+    const current = series[series.length - 1].trapped;
+    return { dollars: Math.max(0, baseline - current), building: false, baseline, current, measured: series.length };
   }
 };
