@@ -59,6 +59,9 @@ S.InventoryLocations = {
     const have = new Set(this.products().filter(p => p.active !== false).map(p => p.category));
     return App.IC_CATEGORIES.filter(c => have.has(c));
   },
+  // The category a picker lands on (no "All" tab; individual categories only, like
+  // the Add Products screen).
+  firstCat() { return this.presentCats()[0] || ''; },
   // Active products in a category ('All' = every category), sorted by name.
   catProducts(cat) {
     return this.products()
@@ -97,7 +100,7 @@ S.InventoryLocations = {
       { p: ['Locations are the places you keep product: your bars, coolers, and storerooms. Set them up here, then assign which products live in each one. Take Inventory walks you through one location at a time, counting the products you put there in the order you arrange them.'] },
       { h: 'Start With The Suggested Spots', p: ['Brand new with no locations yet? Hit add the suggested defaults to drop in a Front Bar, Back Bar, Walk-In Cooler, Dry Storage, and Office Storage in one tap. Rename or delete any that do not fit, then assign products. It saves you typing out the obvious spots before you can count anything.'] },
       { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. To build a bar or cooler fast, hit Select all in a category, or Copy from another location to pull its whole product list in one move. Your checks carry across the tabs and the running count shows how many you have picked. Save and you drop right into arranging it.'] },
-      { h: 'Mark Your Service Bars', p: ['Check Service bar (a register is here) on any spot that has a register and pours for guests, like your Front Bar or a patio well. That flag is what makes a location show up as a bar station when you run a Spot Check on a single shift. A stockroom or cooler stays unchecked. You can set it on a new location or toggle it later from the location\'s edit screen.'] },
+      { h: 'Mark Your Service Bars', p: ['Check Location with Register (for spot check) on any spot that has a register and pours for guests, like your Front Bar or a patio well. That flag is what makes a location show up as a bar station when you run a Spot Check on a single shift. A stockroom or cooler stays unchecked. You can set it on a new location or toggle it later from the location\'s edit screen.'] },
       { h: 'Arrange For Counting', p: ['Open a location to add or pull products and drag them into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room. Reorder the locations themselves on the main list to set which one you count first.'] },
       { h: 'The Numbers Up Top', p: ['The strip across the top reads Locations, Products Placed, and Need a Location at a glance. Locations is how many active spots you run. Products Placed is how many products sit in at least one of them. Need a Location turns amber when products are sitting nowhere and would count as zero, so chase that number down to nothing before you run a count.'] },
       { h: 'Products That Need A Location', p: ['A product not yet placed anywhere is flagged at the top of this screen as Need a Location, because it will not be counted until it has one. Tap Assign Products, pick where they live, and check them off. This is the quick way to place a batch you just imported.'] },
@@ -108,7 +111,7 @@ S.InventoryLocations = {
 
   // ── Shared: category tabs + checklist + bulk controls ──────────────────────
   catTabsHTML(activeCat, countFn, cats) {
-    cats = cats || ['All', ...this.presentCats()];
+    cats = cats || this.presentCats();
     return '<div class="ch-tabs">'
       + cats.map(c => {
           const on = c === activeCat;
@@ -125,7 +128,7 @@ S.InventoryLocations = {
       return '<div style="font-size:12px;color:var(--t4);padding:8px 0;">' + emptyMsg + '</div>';
     }
     const rowHtml = p => '<label style="display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--b1);font-size:13px;color:var(--t1);cursor:pointer;">'
-      + '<input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:15px;height:15px;"/>'
+      + '<input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/>'
       + '<span style="flex:1;min-width:0;">' + esc(p.name)
         + (p.brand ? ' <span style="color:var(--t3);">' + esc(p.brand) + '</span>' : '') + '</span>'
       + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(this.sizeLabel(p)) + '</span>'
@@ -184,22 +187,10 @@ S.InventoryLocations = {
   bulkControlsHTML(ctx) {
     const c = this._bulkCtx(ctx);
     const n = c.inCat().length;
-    const label = c.cat === 'All' ? 'Select all' : 'Select all in ' + esc(c.cat);
-    let copy = '';
-    if (ctx !== 'triage') {
-      const others = this.locations().filter(l => !l.archived && this.productCount(l.name) > 0 && !(ctx === 'edit' && l.id === this.editId));
-      if (others.length) {
-        copy = '<span style="color:var(--t4);font-size:11px;">or</span>'
-          + '<select class="il-copyfrom il-copysel" data-ctx="' + ctx + '" style="max-width:230px;">'
-          + '<option value="">Copy Location</option>'
-          + others.map(l => '<option value="' + esc(l.name) + '">' + esc(l.name) + ' (' + this.productCount(l.name) + ')</option>').join('')
-          + '</select>';
-      }
-    }
+    const label = c.cat ? 'Select all in ' + esc(c.cat) : 'Select all';
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;">'
       + '<button type="button" class="btn btn-ghost btn-sm il-selall" data-ctx="' + ctx + '"' + (n ? '' : ' disabled') + '>' + label + ' (' + n + ')</button>'
       + '<button type="button" class="btn btn-ghost btn-sm il-clearsel" data-ctx="' + ctx + '">Clear</button>'
-      + copy
       + '</div>';
   },
   selectAllCtx(ctx) { const c = this._bulkCtx(ctx); c.inCat().forEach(p => c.set.add(p.id)); c.rerender(); c.count(); },
@@ -215,7 +206,7 @@ S.InventoryLocations = {
   renderList() {
     this.actions.innerHTML = '';
     this.editId = null;
-    this.newCat = 'All';
+    this.newCat = this.firstCat();
     const locs = this.locations();
     const active = locs.filter(l => !l.archived);
     const archived = locs.filter(l => l.archived);
@@ -255,7 +246,7 @@ S.InventoryLocations = {
           + '</div></td></tr>';
       }).join('');
 
-      const listHeading = '<div class="sh" style="margin-top:24px;">Your Locations</div>';
+      const listHeading = '';
       const listCard = active.length
         ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
@@ -270,7 +261,8 @@ S.InventoryLocations = {
                 + '<td><div class="val">' + esc(l.name) + '</div></td>'
                 + '<td>' + this.holdsLabel(l.name) + '</td>'
                 + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
-                + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm il-unarchive" data-id="' + esc(l.id) + '">Restore</button></div></td>'
+                + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm il-unarchive" data-id="' + esc(l.id) + '">Restore</button>'
+                + '<button class="btn btn-danger btn-sm il-delperm" data-id="' + esc(l.id) + '">Delete Permanently</button></div></td>'
               + '</tr>'; }).join('')
             + '</tbody></table></div></div>'
         : '';
@@ -290,7 +282,7 @@ S.InventoryLocations = {
   },
 
   addFormCard() {
-    const linkLabel = this.pickerOpen ? '&#10003; Save Products' : '+ Add products';
+    const linkLabel = this.pickerOpen ? '+ Save Products to Location' : '+ Add Products to Location';
     const n = this.newChecked.size;
     let counter = '';
     if (this.pickerOpen) {
@@ -306,8 +298,8 @@ S.InventoryLocations = {
       + '<div class="f" style="max-width:300px;margin:0;"><label>Name Location</label>'
         + '<input type="text" id="il-new-name" placeholder="Walk-In Cooler" value="' + esc(this._newName || '') + '"' + nameErr + '/></div>'
       + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
-        + '<input type="checkbox" id="il-new-servicebar"' + (this._newServiceBar ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>'
-        + 'Service bar (a register is here)</label>'
+        + '<input type="checkbox" class="bc-check" id="il-new-servicebar"' + (this._newServiceBar ? ' checked' : '') + '/>'
+        + 'Location with Register (for spot check)</label>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-addprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + counter
@@ -341,7 +333,7 @@ S.InventoryLocations = {
       return '<div style="font-size:12px;color:var(--t4);padding:10px 2px;">No matching products yet. Add products on the Products screen first, then assign them here.</div>';
     }
     const rowHtml = p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
-      + '<td><input type="checkbox" class="' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/></td>'
+      + '<td><input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/></td>'
       + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
       + '<td>' + esc(p.category || '-') + '</td>'
       + '<td>' + esc(this.sizeLabel(p)) + '</td>'
@@ -398,13 +390,15 @@ S.InventoryLocations = {
       const edit = ev.target.closest('.il-edit');
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
+      const dperm = ev.target.closest('.il-delperm');
       const addD = ev.target.closest('#il-add-defaults');
-      if (save)      this.saveNewLocation();
-      else if (open) this.openEdit(open.dataset.id);
-      else if (edit) this.openEdit(edit.dataset.id);
-      else if (arch) this.confirmDelete(arch.dataset.id);
-      else if (un)   this.setArchived(un.dataset.id, false);
-      else if (addD) this.addDefaults();
+      if (save)       this.saveNewLocation();
+      else if (open)  this.openEdit(open.dataset.id);
+      else if (edit)  this.openEdit(edit.dataset.id);
+      else if (arch)  this.confirmDelete(arch.dataset.id);
+      else if (un)    this.setArchived(un.dataset.id, false);
+      else if (dperm) this.deletePermanently(dperm.dataset.id);
+      else if (addD)  this.addDefaults();
     };
     // Checkbox toggles accumulate into the running set so checks survive tab swaps.
     this.container.onchange = ev => {
@@ -477,7 +471,7 @@ S.InventoryLocations = {
   // Fresh entry from the list: reset mode, name draft, and the checked set.
   openEdit(id) {
     this.editMode = 'arrange';
-    this.editCat = 'All';
+    this.editCat = this.firstCat();
     this.editChecked = new Set();
     this._nameDraft = null;
     this._renderEdit(id);
@@ -500,14 +494,14 @@ S.InventoryLocations = {
 
     const cnt = products ? this.editChecked.size : assigned.length;
     const cntWord = products ? 'selected' : 'added';
-    const linkLabel = products ? '&#10003; Save Product Changes' : '+ Add/Delete Products';
+    const linkLabel = products ? '+ Save Product Changes' : '+ Add/Delete Products';
 
     const nameCard = '<div class="card form-card">'
       + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
       + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
       + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
-        + '<input type="checkbox" id="il-servicebar"' + (l.service_bar ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;"/>'
-        + 'Service bar (a register is here)</label>'
+        + '<input type="checkbox" class="bc-check" id="il-servicebar"' + (l.service_bar ? ' checked' : '') + '/>'
+        + 'Location with Register (for spot check)</label>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:24px;">'
         + '<span class="il-editprod-link" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">' + linkLabel + '</span>'
         + '<span id="il-edit-count" style="font-size:12px;color:var(--t3);margin-left:2px;">' + cnt + ' product' + (cnt === 1 ? '' : 's') + ' ' + cntWord + '</span>'
@@ -578,7 +572,7 @@ S.InventoryLocations = {
           this.saveProducts(l.id);          // commit the add/deletes, return to arrange
         } else {
           this.editMode = 'products';       // open with current products pre-checked
-          this.editCat = 'All';
+          this.editCat = this.firstCat();
           this.editChecked = new Set(this.sortedProductsForLocation(l.name).map(p => p.id));
           this._renderEdit(l.id);
         }
@@ -698,7 +692,8 @@ S.InventoryLocations = {
 
   // ── Triage: place products that are not in any location yet ─────────────────
   openTriage() {
-    this.triageCat = 'All';
+    const ucats = App.IC_CATEGORIES.filter(cat => this.unplacedProducts().some(p => p.category === cat));
+    this.triageCat = ucats[0] || '';
     this.triageChecked = new Set();
     const firstLoc = this.locations().find(l => !l.archived);
     this._triageDest = firstLoc ? firstLoc.name : '';
@@ -725,9 +720,9 @@ S.InventoryLocations = {
 
   triageFilterHTML() {
     const unplaced = this.unplacedProducts();
-    const cats = ['All', ...App.IC_CATEGORIES.filter(cat => unplaced.some(p => p.category === cat))];
-    const inCat = this.triageCat === 'All' ? unplaced : unplaced.filter(p => p.category === this.triageCat);
-    return this.catTabsHTML(this.triageCat, c => c === 'All' ? unplaced.length : unplaced.filter(p => p.category === c).length, cats)
+    const cats = App.IC_CATEGORIES.filter(cat => unplaced.some(p => p.category === cat));
+    const inCat = unplaced.filter(p => p.category === this.triageCat);
+    return this.catTabsHTML(this.triageCat, c => unplaced.filter(p => p.category === c).length, cats)
       + this.bulkControlsHTML('triage')
       + this.checklistPanelHTML(inCat, this.triageChecked, 'il-tri-cb', 'No products need a location.', this.triageCat);
   },
@@ -795,6 +790,35 @@ S.InventoryLocations = {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
     l.archived = val;
+    await App.saveInventory();
+    this.renderList();
+  },
+
+  // Remove a deleted location for good: strip its name off every product (so
+  // nothing points at a vanished location) and drop the record. Products left
+  // with no location fall back to Need a Location.
+  async deletePermanently(id) {
+    const l = this.locations().find(x => x.id === id);
+    if (!l) return;
+    const n = this.productCount(l.name);
+    const ok = await App.confirm({
+      title: 'Delete this location permanently?',
+      message: '"' + l.name + '" will be removed for good'
+        + (n ? ', and cleared off ' + n + ' product' + (n === 1 ? '' : 's') + ' (any left with no location go to Need a Location)' : '')
+        + '. This cannot be undone.',
+      confirmText: 'Delete Permanently', danger: true
+    });
+    if (!ok) return;
+    this.products().forEach(p => {
+      if (Array.isArray(p.locations) && p.locations.includes(l.name)) {
+        p.locations = p.locations.filter(x => x !== l.name);
+        if (p.primary_location === l.name) p.primary_location = p.locations[0] || '';
+      } else if (p.primary_location === l.name) {
+        p.primary_location = '';
+      }
+      if (p.location_sequences && p.location_sequences[l.name] != null) delete p.location_sequences[l.name];
+    });
+    App.inventoryData.ic_locations = this.locations().filter(x => x.id !== id);
     await App.saveInventory();
     this.renderList();
   },
