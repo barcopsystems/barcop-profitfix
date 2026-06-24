@@ -364,11 +364,15 @@ input,select,textarea{color-scheme:dark;}
 .co-sched-line:not(:empty){margin:-8px 0 14px;}
 /* Bar Cop checkbox: green fill + DARK check when checked (native accent-color
    forces a white check, so we render our own). Reusable on any interactive box. */
-.bc-check{appearance:none;-webkit-appearance:none;width:16px;height:16px;flex:none;border:1px solid var(--b1);border-radius:3px;background:var(--input);cursor:pointer;position:relative;margin:0;vertical-align:middle;}
+/* width/height/padding/radius are !important so the box keeps its 16px shape even
+   inside a .f field, where `.f input` (0,1,1) would otherwise stretch it full-width. */
+.bc-check{appearance:none;-webkit-appearance:none;width:16px!important;height:16px!important;padding:0!important;flex:none;border:1px solid var(--b1);border-radius:3px!important;background:var(--input);cursor:pointer;position:relative;margin:0;vertical-align:middle;}
 /* !important beats the global `.app input:not([type=file])` rule (specificity
    0,2,1) so a checked box turns green even in an inline form inside .app. */
 .bc-check:checked{background:var(--green)!important;border-color:var(--green)!important;}
 .bc-check:checked::after{content:'\2713';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--bg);font-size:11px;font-weight:700;line-height:1;}
+/* CSV import preview: header + rows sit on the darkest background. */
+.tbl.csvm-preview th,.tbl.csvm-preview td{background:var(--bg);}
 /* Edit Tips pop-up: the tip-out row's inner form-row is :last-of-type (margin 0),
    so add the gap below it (only when shown) before Notes. */
 .tl-tipout-wrap:not(:empty){margin-bottom:16px;}
