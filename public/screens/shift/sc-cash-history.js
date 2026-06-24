@@ -134,15 +134,17 @@ S.ShiftCashHistory = {
   noMatchRow(cols) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records in this range. Pick a wider range above.</td></tr>';
   },
-  emptyTab(line1, line2) {
-    return '<div style="padding:18px 4px;font-size:13px;color:var(--t3);">' + esc(line1) + ' ' + esc(line2)
-      + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Control</button></div>';
+  emptyTab(line1, line2, headers, cols) {
+    const msg = esc(line1) + ' ' + esc(line2)
+      + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Control</button>';
+    return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody><tr><td colspan="' + cols + '" style="color:var(--t3);">' + msg + '</td></tr></tbody></table></div></div>';
   },
 
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
   bodyDrops() {
     const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on Cash Control.') };
+    if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on Cash Control.', '<th>Date</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', 4) };
     const filtered = all.filter(d => this.inRange(d.date));
     const total = filtered.reduce((t, d) => t + (d.amount || 0), 0);
     const stats = this.statsCard(this.statItem('Drops', filtered.length) + this.statItem('Total Dropped', App.fmtCurrency(total)));
@@ -161,7 +163,7 @@ S.ShiftCashHistory = {
   // ── Safe Log tab ────────────────────────────────────────────────────────────
   bodySafe() {
     const chrono = S.ShiftSafeLog.chrono();
-    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on Cash Control.') };
+    if (!chrono.length) return { empty: this.emptyTab('No safe activity logged yet.', 'Log safe activity on Cash Control.', '<th>Date</th><th>Type</th><th>Performed By</th><th>Reference</th><th>Amount</th><th>Balance</th>', 6) };
     let bal = 0;
     const withBal = chrono.map(e => { const signed = (e.direction === 'out' ? -1 : 1) * (e.amount || 0); bal += signed; return { e, signed, bal }; });
     const lifetime = bal;
@@ -196,7 +198,7 @@ S.ShiftCashHistory = {
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
     const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on Cash Control.') };
+    if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on Cash Control.', '<th>Date</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', 7) };
     const filtered = all.filter(v => this.inRange(v.date));
     const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);
     const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
