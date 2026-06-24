@@ -2235,6 +2235,26 @@ const App = {
     if (el) el.remove();
   },
 
+  // Shared "Get Started" setup box for the Control cockpits (Inventory / Labor /
+  // Shift). Sits above the weekly cockpit and disappears once every step's data
+  // exists. steps: [{ num, label, screen, done }]; sectionLabel e.g. 'Inventory'.
+  // Step chips link to their setup screen via data-go (each cockpit's wire handles it).
+  controlGetStarted(sectionLabel, steps) {
+    if (!steps || !steps.length || steps.every(s => s.done)) return '';
+    const numWord = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' }[steps.length] || steps.length;
+    const chip = s =>
+      '<div data-go="' + s.screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid '
+      + (s.done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (s.done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
+      + (s.done ? 'background:var(--green);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (s.done ? '&#10003;' : s.num) + '</span>'
+      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + esc(s.label) + '</span></div>';
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Get Started</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + numWord + ' steps to getting started in ' + esc(sectionLabel) + ' Control.</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + steps.map(chip).join('') + '</div>'
+      + '</div>';
+  },
+
   // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
   // pars/orders in cases, draft in kegs, liquor/wine in bottles; Food/Misc use
   // the product's unit_type (lb, each, case, qt…). Keeps every category's
