@@ -352,7 +352,8 @@ S.InventorySpotCheck = {
       + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
       + '</div>';
 
-    const historyRow = '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 10px;">'
+    const historyRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Take Spot Check</div>'
       + '<button class="btn btn-ghost btn-sm" id="sp-history">View History</button></div>';
     this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + historyRow + setup + posCard
       + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
