@@ -699,6 +699,14 @@ S.InventoryReceiveDelivery = {
       created_at:     new Date().toISOString()
     };
 
+    // Cost creep: before the new costs land, snapshot the cost% of every menu
+    // item that uses a product whose price ROSE in this delivery, so afterward we
+    // can name the items pushed over their target and attribute the jump.
+    const risenUpdates = appliedUpdates.filter(u => u.newPrice > u.prevPrice);
+    const risenById = {}; risenUpdates.forEach(u => { risenById[u.product.id] = u; });
+    const creepItems = App.menuItemsUsingProducts(new Set(Object.keys(risenById)));
+    const creepBefore = {}; creepItems.forEach(it => { creepBefore[it.id] = App.menuItemPct(it); });
+
     // Apply selected price changes to the product master. For case-tracked
     // Bottle Beer, newPrice is per-case (operator enters per-case in the
     // form), so divide by case_size before computing cost_per_pour and
@@ -723,6 +731,26 @@ S.InventoryReceiveDelivery = {
         source:      'delivery'
       });
     });
+
+    // Now the new costs are live — name the menu items pushed over target by the
+    // price increases, with the ingredient(s) that drove each one.
+    const itemDrivers = it => {
+      const ids = new Set();
+      if (it.linked_product_id && risenById[it.linked_product_id]) ids.add(it.linked_product_id);
+      ((it.recipe && it.recipe.ingredients) || []).forEach(ing => {
+        const id = ing.id || ing.product_id;
+        if ((ing.source || (ing.product_id ? 'product' : null)) === 'product' && id && risenById[id]) ids.add(id);
+      });
+      return [...ids].map(id => risenById[id]);
+    };
+    const creepHits = creepItems
+      .map(it => ({ item: it, before: creepBefore[it.id], after: App.menuItemPct(it), drivers: itemDrivers(it) }))
+      .filter(c => c.after.over)
+      .sort((a, b) => {
+        const ac = (a.before && !a.before.over) ? 1 : 0, bc = (b.before && !b.before.over) ? 1 : 0;
+        if (ac !== bc) return bc - ac;   // items that just crossed over, first
+        return (b.after.pct - b.after.target) - (a.after.pct - a.after.target);
+      });
 
     const btn = document.getElementById('rd-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -753,7 +781,7 @@ S.InventoryReceiveDelivery = {
       App.markSetupDone('gs_ic_delivery');
       this._draft = null; this._draftLines = null;
       const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number });
-      this.renderDone(record, filed);
+      this.renderDone(record, filed, creepHits);
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
       fail('Save failed. Try again.');
@@ -789,7 +817,7 @@ S.InventoryReceiveDelivery = {
     return filed;
   },
 
-  renderDone(record, disputesFiled) {
+  renderDone(record, disputesFiled, creepHits) {
     const applied = record.price_change_applied_count || 0;
     const total   = record.price_change_count || 0;
     const disputeLine = disputesFiled > 0
@@ -801,11 +829,33 @@ S.InventoryReceiveDelivery = {
     if (applied > 0) {
       priceLine = '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
         + applied + ' price change' + (applied === 1 ? '' : 's')
-        + ' applied to the product master &middot; flagged for Vendor Watch</div>';
+        + ' applied to the product master &middot; flagged for Vendor Tracker</div>';
     } else if (total > 0) {
       priceLine = '<div style="font-size:11px;color:var(--t3);font-weight:700;margin-top:8px;">'
         + total + ' price change' + (total === 1 ? '' : 's')
         + ' logged on this delivery only &middot; product master cost unchanged</div>';
+    }
+    // Cost-creep notice: the price increases on this delivery just pushed these
+    // menu items over their cost target. Named + attributed, with a jump to the
+    // full Recipe Summary diagnostic.
+    let creepLine = '';
+    if (creepHits && creepHits.length) {
+      const rows = creepHits.slice(0, 6).map(c => {
+        const beforeTxt = (c.before && c.before.pct != null) ? Math.round(c.before.pct) + '% &rarr; ' : '';
+        const drv = (c.drivers || []).map(d => esc(d.product.name) + ' ' + App.fmtCurrency(d.prevPrice) + ' &rarr; ' + App.fmtCurrency(d.newPrice)).join(' &middot; ');
+        return '<div style="padding:7px 0;border-top:1px solid var(--b2);">'
+          + '<div style="font-size:12px;"><span style="color:var(--t1);font-weight:600;">' + esc(c.item.name) + '</span>'
+          + '<span style="color:var(--red);font-weight:700;margin-left:8px;">' + beforeTxt + Math.round(c.after.pct) + '% '
+          + '<span style="color:var(--t3);font-weight:400;">(target ' + Math.round(c.after.target) + '%)</span></span></div>'
+          + (drv ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + drv + '</div>' : '') + '</div>';
+      }).join('');
+      const n = creepHits.length;
+      creepLine = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:14px;text-align:left;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;">Cost Creep</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.5;">This delivery pushes ' + n + ' menu item' + (n === 1 ? '' : 's') + ' over ' + (n === 1 ? 'its' : 'their') + ' cost target:</div>'
+        + rows
+        + '<button class="btn btn-ghost btn-sm" id="rd-creep-review" style="margin-top:10px;">Review in Recipe Summary</button>'
+        + '</div>';
     }
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
@@ -817,6 +867,7 @@ S.InventoryReceiveDelivery = {
       + ' line item' + (record.item_count === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total) + '</div>'
       + priceLine + disputeLine
       + '</div>'
+      + creepLine
       + '<div class="card-actions" style="justify-content:center;">'
       + '<button class="btn btn-ghost" id="rd-again">Receive Another</button>'
       + '<button class="btn btn-primary" id="rd-history">View Delivery History</button>'
@@ -824,6 +875,7 @@ S.InventoryReceiveDelivery = {
     this.container.onclick = null;
     document.getElementById('rd-again')?.addEventListener('click', () => this.renderForm());
     document.getElementById('rd-history')?.addEventListener('click', () => App.navigate('ic-delivery-history'));
+    document.getElementById('rd-creep-review')?.addEventListener('click', () => App.openScreen('recipe-cost-analysis'));
   },
 
   // Promise-based: resolves null if cancelled, else { apply:Set, dispute:Set }
