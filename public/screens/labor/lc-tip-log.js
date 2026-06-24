@@ -1397,8 +1397,7 @@ S.LaborTipLog = {
       + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="sh" style="margin:24px 0 10px;">Saved Tip Pools</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
       + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
       + App.showOlderBar('lc', 'tip_pool', list, false);
