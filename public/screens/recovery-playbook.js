@@ -23,7 +23,7 @@ S.RecoveryPlaybook = {
   // so it just routes there and inherits the section sidebar, topbar, and shell.
   open(module) {
     this._module = module || 'profit';
-    App.openScreen(module === 'revenue' ? 'r-playbook' : module === 'traffic' ? 't-playbook' : 'recovery-playbook');
+    App.openScreen(module === 'revenue' ? 'r-playbook' : module === 'traffic' ? 't-playbook' : module === 'cash' ? 'c-playbook' : 'recovery-playbook');
   },
 
   doc() { return this.CONTENT[this._module] || this.CONTENT.profit; },
@@ -34,7 +34,7 @@ S.RecoveryPlaybook = {
   render(content, actions) {
     this.container = content;
     // The screen serves whichever Recovery section it is opened from.
-    this._module = (App._activeModule === 'revenue') ? 'revenue' : (App._activeModule === 'traffic') ? 'traffic' : 'profit';
+    this._module = (App._activeModule === 'revenue') ? 'revenue' : (App._activeModule === 'traffic') ? 'traffic' : (App._activeModule === 'cash') ? 'cash' : 'profit';
     this._diag = {};   // diagnostic answers, session-only (fresh each visit)
     const d = this.doc();
     const rail = d.sections.map(sec =>
@@ -108,8 +108,9 @@ S.RecoveryPlaybook = {
   },
 
   showHowTo() {
-    App.showHelpModal('How the Profit Playbook Works', [
-      { p: ['The strategic read behind your Profit Fix System: where the money leaks, what each leak quietly costs, and the exact Bar Cop screen that captures, measures, and closes it.'] },
+    const label = this.doc().label;
+    App.showHelpModal('How the ' + label + ' Playbook Works', [
+      { p: ['The strategic read behind your ' + label + ' Fix System: where the money leaks, what each leak quietly costs, and the exact Bar Cop screen that captures, measures, and closes it.'] },
       { h: 'Reading it', p: ['Use the list on the right to jump to any section. Every Open button drops you straight on the live screen it names, and every Download pulls the policy or worksheet for that step.'] },
       { h: 'Save PDF', p: ['Save PDF up top prints the whole playbook as a clean reference to hand a manager. The dollar figures in it are illustrative examples of what these gaps commonly cost, not a promise.'] }
     ]);
@@ -399,6 +400,104 @@ S.RecoveryPlaybook = {
 
   // ── Content (Profit) ──────────────────────────────────────────────────────────
   CONTENT: {
+    cash: {
+      label: 'Cash',
+      intro: 'The strategic read behind your Cash Fix System. Profit is your margin and Revenue is your top line, but Cash is the one that closes the doors. Plenty of bars are profitable on paper and still run tight. This is where the money gets stuck, what it costs you to leave it there, and the exact Bar Cop screen that frees it. No spreadsheets. Bar Cop does that math now.',
+      sections: [
+        {
+          id: 'worth', nav: 'What It Costs You', eyebrow: 'What tight cash costs',
+          title: 'Profitable on Paper, Broke in the Bank',
+          blocks: [
+            { t: 'lead', text: 'You can run a healthy margin, ring strong sales, and still sweat payroll on a slow Tuesday. Profit is what you earned. Cash is what is actually in the account on the day a bill is due, and the two are not the same number. The gap between them is where good bars die.' },
+            { t: 'p', text: 'Cash gets stuck in two places: on your shelves, as inventory you bought ahead of when you need it, and in the calendar, as money going out before the money comes in. Neither shows up on a P&L. Both are recoverable, and Bar Cop reads them straight off the data you already keep.' },
+            { t: 'box', tone: 'gold', label: 'The stakes', title: 'The number one killer of independent bars is not profit, it is cash', text: 'A bar can post a profit every month for a year and still close because it ran out of cash on the wrong week. Most operators never see it coming because nothing is watching the timing. Trapped inventory and a blind cash calendar are the two leaks behind almost every tight week.' },
+            { t: 'h', text: 'The Four Places It Gets Stuck' },
+            { t: 'p', text: 'It is rarely one thing. A bar that is profitable and still tight almost always has the same four leaks running at once.' },
+            { t: 'table',
+              head: ['The leak', 'What it looks like', 'Illustrative cost'],
+              rows: [
+                ['Dead stock', 'Slow premium bottles and odd one-offs that sit for months. Real money, frozen on the shelf.', 'A typical bar carries $2,000 to $6,000 in stock that has not moved in 60 days.'],
+                ['Overstock', 'Ordering to a comfort number instead of par. Cases you will not touch for a month.', 'A week of extra inventory across the bar is often $3,000 to $8,000 in idle cash.'],
+                ['Paying early', 'Paying every invoice the day it lands, handing vendors your cash weeks before it is owed.', 'On $30,000 a month in payables, holding to net terms frees thousands in float.'],
+                ['Tight-week surprises', 'A quarterly bill or a big order landing on a slow week, with nothing watching for it.', 'One scramble can mean an overdraft fee, a rushed loan, or a vendor putting you on hold.']
+              ] },
+            { t: 'h', text: 'What Freeing It Looks Like' },
+            { t: 'p', text: 'This is a worked example, not a promise. Take a bar carrying about four weeks of inventory when it uses two, paying on receipt with no terms set, and no forward look at the cash calendar. Here is the arc the first 90 days tends to follow.' },
+            { t: 'table',
+              head: ['Lever', 'Day 1', 'What changes', 'Cash freed'],
+              rows: [
+                ['Trapped inventory', '$5,800 in dead and overstock', 'Pars cut to real usage, dead stock run down', '$3,000 to $4,000 back in the account'],
+                ['Weeks on hand', '4.1 weeks', 'Order to par, not to fear', 'A week of inventory freed across the bar'],
+                ['Vendor terms', 'Paid on receipt', 'Net 30 set and held to the due date', 'Weeks of float on every payables dollar'],
+                ['Tight weeks', 'Found on Friday', 'Seen four weeks out on the forecast', 'Moved or covered before it bit']
+              ],
+              note: 'Illustrative example. Your real recovery depends on how much is trapped and how far you are paying ahead of terms. Bar Cop measures your actual number off your counts.' },
+            { t: 'box', tone: 'steel', title: 'This cash is yours, sitting still', text: 'Trapped cash is not lost, it is frozen. It is your money, on your shelf or in someone else\'s account early. The whole job of Cash Recovery is to thaw it and put it back to work.' }
+          ]
+        },
+        {
+          id: 'timeline', nav: 'The First 90 Days', eyebrow: 'What to expect and when',
+          title: 'Freeing Cash Has a Timeline',
+          blocks: [
+            { t: 'p', text: 'The first 30 days are about reading the truth. A couple of clean counts and Bar Cop shows you what is trapped, how many weeks you are carrying, and where the cash calendar gets tight. The number is usually bigger than the gut estimate.' },
+            { t: 'p', text: 'Days 30 to 60 are where the cash comes back. Pars get cut to real usage, the dead stock gets run down, and you start ordering to par instead of to fear. Weeks on hand drops, and the difference is cash in the account.' },
+            { t: 'p', text: 'By day 90 the timing is under control too. Vendor terms are set and held, the forecast is read every week, and a tight week gets spotted and covered before it lands. Same sales, same room, more cash on hand.' },
+            { t: 'table',
+              head: ['Phase', 'What is happening', 'What to expect'],
+              rows: [
+                ['Days 1-30', 'First counts, trapped cash read, weeks on hand and the cash calendar baselined', 'No results yet. This is reading the truth, not fixing it.'],
+                ['Days 30-60', 'Pars cut, dead stock run down, ordering to par', 'Trapped cash starts coming back, a few thousand is typical'],
+                ['Days 60-90', 'Vendor terms set and held, forecast read weekly, tight weeks covered early', 'Cash on hand climbs and the tight weeks stop surprising you'],
+                ['Day 90+', 'Every system running, the weekly cash sitting standard', 'Your real freed-cash number is established']
+              ],
+              note: 'The most common place it breaks is the moment a busy week knocks the count off schedule, because trapped cash reads off your counts. Bar Cop tracks whether each system is still running and flags the moment one slips.' }
+          ]
+        },
+        {
+          id: 'diagnostic', nav: 'Cash Diagnostic', eyebrow: 'Cash diagnostic',
+          title: 'How Tight Are You Right Now?',
+          blocks: [
+            { t: 'lead', text: 'Ten questions. Yes or no, no partial credit. If the answer is kind of, or I think so, that is a No. You either know the number this week or you do not.' },
+            { t: 'p', text: 'Most operators know last weekend sales cold. Ask how much cash is trapped on the shelf, or what next week looks like against the bills, and the room goes quiet. The monthly figure next to each No is an illustrative example of what that gap commonly costs, not your number.' },
+            { t: 'diag', items: [
+              { n: 1, cost: '$800', q: 'Do you know how much cash is trapped on your shelves right now, in dead stock and overstock?', yes: 'You can see your frozen capital and work the biggest pieces down. The cash comes back as you do.', no: 'You are carrying money on the shelf you cannot see. Dead bottles and overstock sit for months while you sweat the account.' },
+              { n: 2, cost: '$700', q: 'Do you know how many weeks of inventory you are carrying against what you actually use?', yes: 'You order to par, not to fear, so cash stops piling up on the shelf.', no: 'You are likely carrying weeks of extra inventory, which is weeks of idle cash you could be using elsewhere.' },
+              { n: 3, cost: '$600', q: 'Have you set the real payment terms on every vendor, net 7, 15, or 30?', yes: 'You hold your cash to the due date and take any early-pay discount worth taking. The float is yours.', no: 'You are likely paying on receipt, handing vendors your cash weeks before it is owed for nothing in return.' },
+              { n: 4, cost: '$900', q: 'Can you say right now whether next week has more cash going out than coming in?', yes: 'You see the tight weeks four weeks out and move a payment or hold an order before they bite.', no: 'You find the tight week on the day the truck wants a check. That is how a profitable bar ends up scrambling.' },
+              { n: 5, cost: '$500', q: 'Do you know your cash runway, how many weeks your cash on hand covers at this burn?', yes: 'You know exactly how much cushion you have, so a slow stretch is a plan, not a panic.', no: 'You are guessing at your cushion. A bad two weeks can put you against the wall with no warning.' },
+              { n: 6, cost: '$700', q: 'Did you run your slow movers down or cut a par in the last 30 days?', yes: 'You are actively thawing trapped cash, not just watching it.', no: 'Trapped cash only comes back when you work it. Sitting on it is the same as leaving the money on the shelf.' },
+              { n: 7, cost: '$400', q: 'Do you order to par off real usage, instead of padding every order just in case?', yes: 'Your orders right-size themselves and the overstock works off on its own.', no: 'The padding you add to feel safe is exactly the cash that ends up trapped.' },
+              { n: 8, cost: '$600', q: 'Do you read a forward cash look every week, not just last month\'s bank balance?', yes: 'You manage the timing, so the lumpy bills and big buys never catch you flat.', no: 'A bank balance tells you where you were. It says nothing about the bill landing next Thursday.' },
+              { n: 9, cost: '$300', q: 'Have you asked a vendor for better terms in the last 90 days?', yes: 'Your steady accounts move from net 15 to net 30 when you ask, and that is free float.', no: 'Most distributors give terms to a steady account that asks. If you never ask, you never get them.' },
+              { n: 10, cost: '$400', q: 'Could you cover a surprise $5,000 expense next week without a scramble?', yes: 'You have a real cushion and a forward look, so a surprise is an inconvenience, not a crisis.', no: 'A single surprise on the wrong week is how good bars end up borrowing at bad rates or paying late.' }
+            ] },
+            { t: 'diagscore' },
+            { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
+              'Profit is an opinion until the cash clears. The bank balance is the only number that cannot be argued with.',
+              'Money on the shelf is not inventory, it is frozen cash with a spoilage clock on it.',
+              'Every dollar you pay before its due date is a free loan to a vendor who did not even ask for it.',
+              'The tight week is always visible weeks ahead. The only question is whether anything is looking.',
+              'The bar that watches its cash is not the busiest on the block. It is the one that makes payroll in a slow February.'
+            ] }
+          ]
+        },
+        {
+          id: 'what', nav: 'What Bar Cop Does', eyebrow: 'What Bar Cop does for you',
+          title: 'Every Dollar: Found, Freed, Tracked',
+          blocks: [
+            { t: 'lead', text: 'You already keep the data. Your counts say what is on the shelf, your orders and bills say what is going out, your forecast says what is coming in. Bar Cop reads all of it and turns it into the four cash systems, then walks you into the exact screen that frees the money.' },
+            { t: 'p', text: 'Here is the map. Every leak, where you capture it, where Bar Cop shows it, and where you fix it. Tap any Fix button to jump straight there.' },
+            { t: 'cross', rows: [
+              { leak: 'Trapped inventory cash', capture: 'Take Inventory weekly count + product costs', show: 'Trapped Cash', fixLabel: 'Free Trapped Cash system', screen: 'c-fix', focus: 'free-trapped' },
+              { leak: 'Over-ordering', capture: 'Counts, the Order Sheet, and your pars', show: 'Purchasing', fixLabel: 'Order to Par system', screen: 'c-fix', focus: 'order-to-par' },
+              { leak: 'Cash timing', capture: 'Revenue forecast, schedule, and bills in Books', show: 'Cash Forecast', fixLabel: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
+              { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the cockpit Pay on Terms step', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
+            ] },
+            { t: 'p', text: 'And you do not read it alone. The Cash cockpit lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
+          ]
+        }
+      ]
+    },
     profit: {
       label: 'Profit',
       intro: 'The strategic read behind your Profit Fix System. The Fix screens tell you what to do this week. This is the why behind it: where the money leaks, what each leak quietly costs, and the exact Bar Cop screen that captures, measures, and closes it. No spreadsheets, no formulas. Bar Cop does that math now.',
