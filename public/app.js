@@ -3790,7 +3790,7 @@ const App = {
         week: 'weeks', theft_score: 'theft_scores',
         variance_investigation: 'variance_investigations',
         sales_review: 'sales_reviews',
-        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits',
+        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits', cash_audit: 'cash_audits',
         // Revenue pass — revenue_rate_cards stays in the blob (reusable pricing
         // templates / config); fix_log moves in its own shared pass.
         revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
@@ -4205,6 +4205,7 @@ const App = {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
         'c-dashboard':   ['Dashboard', 'Cash Recovery'],
+        'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
         'c-fix':         ['Cash Fix', 'Fix Process and Guidance'],
         'c-trapped':     ['Trapped Cash', 'Cash Recovery'],
@@ -4214,6 +4215,7 @@ const App = {
       };
       const cashScreens = {
         'c-dashboard':   S.CashDashboard,
+        'c-audit':       S.CashAudit,
         'c-playbook':    S.RecoveryPlaybook,
         'c-fix':         S.CashFix,
         'c-trapped':     S.CashTrapped,

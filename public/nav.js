@@ -173,6 +173,10 @@ const Cash = {
     return `
       ${App.sectionSelectorHTML()}
       <div class="nav-section">Analysis</div>
+      <div class="nav-item" data-screen="c-audit" id="nav-c-audit">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Cash Audit</span>
+      </div>
       <div class="nav-item" data-screen="c-playbook" id="nav-c-playbook">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Cash Playbook</span>
