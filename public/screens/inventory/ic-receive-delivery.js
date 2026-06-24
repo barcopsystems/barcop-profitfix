@@ -167,14 +167,16 @@ S.InventoryReceiveDelivery = {
       + '</div></div>'
       + '<div class="form-row" style="gap:16px;margin-top:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
       + '<textarea id="rd-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
-      + '<div style="margin-top:16px;display:flex;align-items:center;gap:8px;">'
+      + '</div>';
+
+    // Save actions sit below the card, like the other working screens.
+    const saveRow = '<div style="margin-top:16px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="rd-save">Save Delivery</button>'
       + '<button class="btn btn-ghost" id="rd-startover">Start Over</button>'
       + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
-      + '</div>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + formCard + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + saveRow + '</div>';
 
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
