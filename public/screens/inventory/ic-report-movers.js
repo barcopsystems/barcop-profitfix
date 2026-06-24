@@ -150,45 +150,30 @@ S.InventoryMoversReport = {
       if (ev.target.closest('#mv-period-prev')) { this.stepPeriod(-1); return; }
       if (ev.target.closest('#mv-period-next')) { this.stepPeriod(1); return; }
       if (ev.target.closest('#mv-period-latest')) { this.endCountId = null; this.draw(); return; }
-      const pchip = ev.target.closest('.mv-period-chip');
-      if (pchip) { this.endCountId = pchip.dataset.v; this.draw(); return; }
     };
   },
 
-  // Windowed period stepper: the selected period plus an adjacent neighbor,
-  // flanked by step arrows, the newest tagged NOW, with a Latest snap. Mirrors
-  // the Build Schedule week selector / Usage Report so a long count history
-  // stays compact instead of becoming a wall of chips.
+  // Single-pill period selector, exactly like the Inventory cockpit week selector:
+  // the selected period in one pill (newest tagged NOW), step arrows outside that
+  // grey at each end, and a Latest snap once you've stepped back.
   periodStepper(cur) {
-    const periods = this.pairs().map(p => ({ endId: p.endC.id, label: this.fmtDate(p.startC.date) + ' - ' +this.fmtDate(p.endC.date) }));
-    const len = periods.length;
-    let selIdx = periods.findIndex(p => p.endId === cur.endC.id);
+    const ids = this.pairs().map(p => p.endC.id);   // end-count ids, oldest → newest
+    const len = ids.length;
+    let selIdx = ids.indexOf(cur.endC.id);
     if (selIdx < 0) selIdx = len - 1;
-    const chip = i => {
-      const p = periods[i];
-      const on = i === selIdx, isNewest = i === len - 1;
-      return '<button type="button" class="mv-period-chip btn btn-sm" data-v="' + esc(p.endId) + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + esc(p.label)
-        + (isNewest ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    // Always show two adjacent periods: the selected sits on the right with its
-    // older neighbor on the left, except at the oldest end where it sits left.
-    let winStart = selIdx - 1;
-    if (winStart < 0) winStart = 0;
-    if (winStart > len - 2) winStart = Math.max(0, len - 2);
-    let chips = '';
-    for (let i = winStart; i <= winStart + 1 && i < len; i++) chips += chip(i);
-    const prevDis = selIdx <= 0 ? ' disabled style="opacity:0.35;"' : '';
-    const nextDis = selIdx >= len - 1 ? ' disabled style="opacity:0.35;"' : '';
-    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm" id="mv-period-prev" title="Older period" aria-label="Older period"' + prevDis + '>&lsaquo;</button>'
-      + chips
-      + '<button class="btn btn-ghost btn-sm" id="mv-period-next" title="Newer period" aria-label="Newer period"' + nextDis + '>&rsaquo;</button>'
-      + (selIdx !== len - 1 ? '<button type="button" class="btn btn-ghost btn-sm" id="mv-period-latest" style="margin-left:4px;">Latest</button>' : '')
-      + '</div>';
+    const isNewest = selIdx >= len - 1, atOldest = selIdx <= 0;
+    const label = (this.fmtDate(cur.startC.date) + ' - ' + this.fmtDate(cur.endC.date)).toUpperCase();
+    const nowBadge = isNewest ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = atOldest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&lsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="mv-period-prev" aria-label="Older period" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isNewest
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="mv-period-next" aria-label="Newer period" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(label) + nowBadge + '</span>';
+    const latestBtn = isNewest ? '' : '<button class="btn btn-ghost btn-sm" id="mv-period-latest" style="margin-left:4px;">Latest</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + latestBtn + '</div>';
   },
 
   // Step the selected period one older (-1) or newer (+1) through the count list.
@@ -285,7 +270,7 @@ S.InventoryMoversReport = {
         + '</tr>';
     };
     // Group by category (CAT_ORDER first, extras after), biggest swing first
-    // within each, the category name in the first header — mirrors Usage Data.
+    // within each, the category name alone in the first header — mirrors Usage Data.
     const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
     const byCat = {};
     rows.forEach(r => { const c = r.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
@@ -295,7 +280,7 @@ S.InventoryMoversReport = {
     });
     return cats.map(c => {
       const catRows = byCat[c].slice().sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
-      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''), this.trendColgroup());
+      return this.dataCard('<th>' + esc(c) + '</th>' + restHeaders, catRows.map(rowHtml).join(''), this.trendColgroup());
     }).join('');
   }
 };
