@@ -253,7 +253,6 @@ S.InventoryDashboard = {
   render(container, actions) {
     this.container = container; this.actions = actions;
     if (actions) actions.innerHTML = '';
-    if (!this.countsAsc().length) { this.renderDayOne(); this.wire(); return; }
 
     const st = this._st = this.computeState();
     const done = this.stepDone(st);
@@ -263,6 +262,7 @@ S.InventoryDashboard = {
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
+      + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -520,29 +520,14 @@ S.InventoryDashboard = {
       + '</div>';
   },
 
-  // ── Day-one: setup steps until the first count lands ─────────────────────────
-  renderDayOne() {
-    const hasProducts  = this.products().length > 0;
-    const hasLocations = this.locations().length > 0;
-    const hasVendors   = this.vendors().length > 0;
-    const step = (done, num, label, screen) =>
-      '<div data-go="' + screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
-      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card form-card" style="margin-bottom:16px;">'
-      +   '<div class="card-title">Get Started</div>'
-      +   '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps and this becomes your weekly cockpit: what to reorder, where your cash is tied up, and where you are leaking.</div>'
-      +   '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +     step(hasVendors,   1, 'List vendors',          'ic-vendors')
-      +     step(hasProducts,  2, 'Add products',          'ic-product-setup')
-      +     step(hasLocations, 3, 'Set locations',         'ic-locations')
-      +     step(false,        4, 'Take your first count', 'ic-take-inventory')
-      +   '</div>'
-      + '</div>'
-      + this.outlierStrip()
-      + '</div>';
+  // ── Get Started: setup steps above the cockpit until all four are done ───────
+  getStartedBox() {
+    return App.controlGetStarted('Inventory', [
+      { num: 1, label: 'List vendors',          screen: 'ic-vendors',        done: this.vendors().length > 0 },
+      { num: 2, label: 'Add products',          screen: 'ic-product-setup',  done: this.products().length > 0 },
+      { num: 3, label: 'Set locations',         screen: 'ic-locations',      done: this.locations().length > 0 },
+      { num: 4, label: 'Take your first count', screen: 'ic-take-inventory', done: this.countsAsc().length > 0 }
+    ]);
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
