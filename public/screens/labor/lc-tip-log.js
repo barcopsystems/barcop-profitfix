@@ -470,22 +470,28 @@ S.LaborTipLog = {
   // still used for the edit pop-up.
   batchBody() {
     const on = App.tipOutEnabled();
-    const header = '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div>';
-    const addBtn = '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
+    // The day picker sits in its own bounded bar so "pick the day" reads as a
+    // separate step from the entry below it.
+    const pickerBar = '<div style="border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px 0;margin-bottom:18px;">'
+      + '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div></div>';
+    const addBtn = '<div style="margin-bottom:16px;"><button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button></div>';
     const rows = this._addRows || [];
     if (!rows.length) {
-      return header + '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
+      return pickerBar + '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 14px;">'
         + (this._addDate
             ? 'No tipped staff scheduled for this day still need tips entered. Add staff below.'
             : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
-    const tbl = (head, body) => '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
-      + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    // Each entry section is a titled panel (a header band over a flush table), so
+    // the form reads as distinct blocks instead of one long stacked run.
+    const panel = (title, head, body) => '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:13px 18px;border-bottom:1px solid var(--b2);font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--t1);">' + title + '</div>'
+      + '<table class="ing-tbl" style="table-layout:fixed;width:100%;"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
     if (!on) {
       const body = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
-      const table = '<div id="tl-b-rows">' + tbl('<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash Tips</th><th style="width:110px;">Card Tips</th><th style="width:100px;">Total</th><th style="width:90px;"></th>', body) + '</div>';
-      return header + table + addBtn;
+      const table = '<div id="tl-b-rows">' + panel('Tips', '<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash Tips</th><th style="width:110px;">Card Tips</th><th style="width:100px;">Total</th><th style="width:90px;"></th>', body) + '</div>';
+      return pickerBar + table + addBtn;
     }
 
     // Tip-out on: two sections, EARNERS first then SUPPORT, so the form reads
@@ -500,25 +506,21 @@ S.LaborTipLog = {
       || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No staff on schedule. Add staff below if one worked.</td></tr>';
     const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
     const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
-    const eTable = '<div class="sh" style="margin:0 0 8px;">Pays / Receives Tip-Out</div>' + tbl(grid, eBody);
-    const sTable = '<div class="sh" style="margin:14px 0 8px;">Receives Tip-Out</div>' + tbl(sGrid, sBody);
-    const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
+    const tables = '<div id="tl-b-rows">' + panel('Pays / Receives Tip-Out', grid, eBody) + panel('Receives Tip-Out', sGrid, sBody) + '</div>';
     const recon = this.tipOutRecon(this._addRows);
-    // Reconciliation stats (a .calc box, same as the Pool Calculator) + the tip-out
-    // disclaimer below, UNDER the Add Staff button. Stays visible the whole time
-    // tip-out is on so the Not Distributed gap shows whether a support row is listed
-    // or not; recalcBatch keeps the numbers live as sales are typed.
+    // Reconciliation as its own stat panel, set apart from the entry tables;
+    // recalcBatch keeps the numbers live by id as sales are typed.
     const gapCls = Math.abs(recon.gap) > 0.01 ? 'warn' : 'good';
-    const reconBox = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+    const reconPanel = '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Collected</div><div class="calc-val" id="tl-b-collected">' + App.fmtCurrency(recon.collected, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Distributed</div><div class="calc-val" id="tl-b-distributed">' + App.fmtCurrency(recon.distributed, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Not Distributed</div><div class="calc-val ' + gapCls + '" id="tl-b-gap">' + App.fmtCurrency(recon.gap, 2) + '</div></div>'
-      + '</div>'
-      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
+      + '</div></div>';
+    const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
       + '</div>';
-    return header + tables + addBtn + reconBox;
+    return pickerBar + tables + addBtn + reconPanel + headsUp;
   },
 
   // Simple row (tip-out off): Staff / Tippable Hours / Cash / Card / Total.
@@ -1047,23 +1049,26 @@ S.LaborTipLog = {
         + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
       : '<div class="card" style="padding:14px 20px;margin-bottom:12px;"><div id="tp-rows" style="font-size:12px;color:var(--t3);">No participants yet. Pick a day above to load the crew, or add one below.</div></div>';
-    const calcAndHeads = rows.length
-      ? '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
+    // Stats as their own panel, set apart; recalcPool keeps the numbers live by id.
+    const statsPanel = rows.length
+      ? '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Participants</div><div class="calc-val" id="tp-c-count">0</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val" id="tp-c-hours">0</div></div>'
         + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tp-c-alloc">$0</div></div>'
         + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tp-c-rem">$0</div></div>'
-        + '</div>'
-        + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
-          + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-          + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
+        + '</div></div>'
+      : '';
+    const headsUp = rows.length
+      ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
         + '</div>'
       : '';
-    const card = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
-      + '<div class="collapse-body">'
-      + this.modeToggle()
-      + '<div id="tp-anchor">' + this.tlAnchor('tp', this._addWeekStart, this._addDate) + '</div>'
+    // Picker in its own bounded bar; the pool entry (amount, method, participants,
+    // add) grouped into one panel; stats + disclaimer set apart below.
+    const pickerBar = '<div style="border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px 0;margin-bottom:18px;">'
+      + '<div id="tp-anchor">' + this.tlAnchor('tp', this._addWeekStart, this._addDate) + '</div></div>';
+    const poolPanel = '<div class="card" style="margin-bottom:16px;">'
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pool Amount</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tp-pool" min="0" step="0.01" '
@@ -1074,7 +1079,15 @@ S.LaborTipLog = {
       + '</div>'
       + rowsBlock
       + '<button class="btn btn-ghost btn-sm" id="tp-add">+ Add Participant</button>'
-      + calcAndHeads
+      + '</div>';
+    const card = '<div class="card form-card">'
+      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
+      + '<div class="collapse-body">'
+      + this.modeToggle()
+      + pickerBar
+      + poolPanel
+      + statsPanel
+      + headsUp
       + '</div></div>';
     const actionsRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="tp-save">' + (this._poolEditId ? 'Update Tip Pool' : 'Save Tip Pool') + '</button>'
