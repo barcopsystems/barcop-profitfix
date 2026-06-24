@@ -40,28 +40,22 @@ S.LaborOvertimeWatch = {
     return null;
   },
 
-  // Monday week selector (mirrors Build Schedule / Labor Reports): week chips by
-  // Monday date (live week tagged NOW, selected gold-tint) + step arrows + a snap
-  // to the current week, Export on the right. Replaces the native Week Starting box.
+  // One week range pill (mirrors Build Schedule / the dashboards): the active-selector
+  // pill with a gold NOW on the current week, step arrows, and a snap to This Week.
+  // Forward IS allowed here since Overtime Watch projects ahead. Export on the right.
   weekSelector(ws) {
     const cur = this.mondayOf(new Date());
-    const chip = w => {
-      const on = w === ws, isCur = w === cur;
-      return '<button type="button" class="ow-week-chip btn btn-sm" data-ws="' + w + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + App.dateRangeLabel(w, App.periodEndFor(w))
-        + (isCur ? ' <span style="font-size:8px;font-weight:700;letter-spacing:1px;color:var(--gold);">NOW</span>' : '')
-        + '</button>';
-    };
-    let chips = '';
-    for (let i = -1; i <= 0; i++) chips += chip(this.addDays(ws, i * 7));
+    const isCur = ws === cur;
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">'
+      + App.dateRangeLabel(ws, App.periodEndFor(ws)).toUpperCase() + nowBadge + '</span>';
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-prev" title="Previous week" aria-label="Previous week">&lsaquo;</button>'
-      + chips
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-next" title="Next week" aria-label="Next week">&rsaquo;</button>'
-      + (ws !== cur ? '<button type="button" class="btn btn-ghost btn-sm" id="ow-now" style="margin-left:4px;">This Week</button>' : '')
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ow-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>'
+      + (isCur ? '' : '<button type="button" class="btn btn-ghost btn-sm" id="ow-now" style="margin-left:4px;">This Week</button>')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
       + '<button class="btn btn-ghost btn-sm" id="ow-export">Export PDF</button></div>'
@@ -195,7 +189,6 @@ S.LaborOvertimeWatch = {
     document.getElementById('ow-prev')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, -7); this.draw(); });
     document.getElementById('ow-next')?.addEventListener('click', () => { this.weekStart = this.addDays(this.weekStart, 7); this.draw(); });
     document.getElementById('ow-now')?.addEventListener('click', () => { this.weekStart = this.mondayOf(new Date()); this.draw(); });
-    this.container.querySelectorAll('.ow-week-chip').forEach(b => b.addEventListener('click', () => { this.weekStart = b.dataset.ws; this.draw(); }));
     document.getElementById('ow-view-schedule')?.addEventListener('click', () => this.openWeekInSchedule());
   },
 
