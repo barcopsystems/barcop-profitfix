@@ -175,12 +175,14 @@ S.CashFix = {
     const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
     const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
 
-    this.container.innerHTML = '<div class="screen">' + header
+    const playbookLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm cf-playbook">Read the Cash Playbook</button></div>';
+    this.container.innerHTML = '<div class="screen">' + header + playbookLink
       + '<div class="pf-2pane"><div class="pf-rail">' + rail + '</div>'
       + '<div class="pf-detail">' + detail + '</div></div></div>';
 
     this.container.querySelectorAll('.pf-tile').forEach(t =>
       t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
+    this.container.querySelector('.cf-playbook')?.addEventListener('click', () => { if (window.S && S.RecoveryPlaybook) S.RecoveryPlaybook.open('cash'); });
     this.wireWorkspace();
   },
 
