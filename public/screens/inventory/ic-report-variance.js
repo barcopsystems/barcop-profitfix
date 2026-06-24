@@ -974,7 +974,7 @@ S.InventoryVarianceReport = {
     });
     return cats.map(c => {
       const catRows = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      return this.dataCard('<th>' + esc(c) + ' Products</th>' + restHeaders, catRows.map(rowHtml).join(''), this.usageColgroup(8));
+      return this.dataCard('<th>' + esc(c) + '</th>' + restHeaders, catRows.map(rowHtml).join(''), this.usageColgroup(8));
     }).join('');
   },
 
@@ -1123,7 +1123,7 @@ S.InventoryVarianceReport = {
   },
   renderUsageCat(cat, rows) {
     // Misc rows are mixers, Food rows are recipe ingredients — name them so.
-    const label = cat === 'Misc' ? 'Misc Mixers' : cat === 'Food' ? 'Food Ingredients' : esc(cat) + ' Products';
+    const label = cat === 'Misc' ? 'Misc Mixers' : cat === 'Food' ? 'Food Ingredients' : esc(cat);
     if (cat === 'Bottle Beer') return this.usageTableBottleBeer(rows, label);
     if (cat === 'Draft Beer')  return this.usageTableDraft(rows, label);
     if (cat === 'Misc')        return this.usageTableMisc(rows, label);
