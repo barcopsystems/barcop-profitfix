@@ -913,11 +913,14 @@ S.InventoryVarianceReport = {
   badge(key, pct, unitVar, pid, name) {
     const s = this.status(key, pct, unitVar);
     if (pid) {
-      const investigating = (App.data.variance_investigations || []).some(i => i.product_id === pid && i.status !== 'resolved');
-      if (investigating || s.label === 'Flag') {
-        return '<button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
-          + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">' + (investigating ? 'Reviewing' : 'Review') + '</button>';
-      }
+      const list = (App.data.variance_investigations || []).filter(i => i.product_id === pid);
+      const open = list.some(i => i.status !== 'resolved');
+      const resolved = !open && list.some(i => i.status === 'resolved');
+      const btn = (label, color) => '<button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
+        + '" style="' + (color || 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;">' + label + '</button>';
+      if (open) return btn('Reviewing');
+      if (resolved) return btn('Resolved', 'color:var(--green);');
+      if (s.label === 'Flag') return btn('Review');
     } else if (s.label === 'Flag') {
       return '<span style="font-weight:700;color:' + s.color + ';">Review</span>';
     }
