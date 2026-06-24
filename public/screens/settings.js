@@ -349,7 +349,7 @@ S.HubSettings = {
 
     // Drop the cockpit's per-week "done" stamps (localStorage) so a fresh sample
     // does not inherit phantom step checks from a prior session.
-    try { Object.keys(localStorage).filter(k => k.indexOf('sc_cockpit_done_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
 
     const uid = () => App.uid();
     const today = new Date();
@@ -3693,7 +3693,7 @@ S.HubSettings = {
     await DB.clearEvents('core_events'); // drop the recovery event rows too
     // The cockpit's per-week "done" stamps live in localStorage (per device), so
     // clear them too or past weeks keep phantom checks after a wipe.
-    try { Object.keys(localStorage).filter(k => k.indexOf('sc_cockpit_done_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
