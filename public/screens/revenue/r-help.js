@@ -31,7 +31,7 @@ S.RevenueHelp = {
       { q: 'What flows from Shift Control into Revenue Recovery?',
         a: 'Shift revenue (bar plus floor) feeds This Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Revenue This Week sums it for you, so you confirm a week instead of typing it.' },
       { q: 'What flows from Labor Control into Revenue Recovery?',
-        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Log as the fallback for shifts without a saved pool.' },
+        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
       { q: 'What flows from Inventory Control into Revenue Recovery?',
         a: 'Product prices flow into Menu Items: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
       { q: 'How does the Recovery Scoreboard pick up a price change?',
