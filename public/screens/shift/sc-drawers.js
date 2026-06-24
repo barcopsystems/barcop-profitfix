@@ -73,7 +73,9 @@ S.ShiftDrawers = {
 
     let listHtml;
     if (all.length === 0) {
-      listHtml = '<div style="font-size:13px;color:var(--t3);padding:2px 2px 6px;">No registers yet. Add your first one above. Cash Drop and Variance Log pull from this list so every cash event lands on the right register.</div>';
+      listHtml = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Register Name</th><th>Default Opening Bank</th><th>Cash Tolerance</th><th>Notes</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No registers yet. Add your first one above.</td></tr></tbody></table></div></div>';
     } else {
       const row = d => '<tr>'
         + '<td><div class="val">' + esc(d.name) + '</div></td>'

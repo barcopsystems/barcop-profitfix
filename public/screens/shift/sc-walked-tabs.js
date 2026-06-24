@@ -136,7 +136,9 @@ S.ShiftWalkedTabs = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs logged yet. Use the form above to log the first one.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>When</th><th>Server</th><th>Check #</th><th>Amount</th><th>Reason</th><th>Manager</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No walked tabs logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
     } else {
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
@@ -144,7 +146,9 @@ S.ShiftWalkedTabs = {
         + '</div></div>';
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No walked tabs in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>When</th><th>Server</th><th>Check #</th><th>Amount</th><th>Reason</th><th>Manager</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No walked tabs in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'walked_tab')).map(r => '<tr class="wt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div>'

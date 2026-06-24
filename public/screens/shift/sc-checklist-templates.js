@@ -107,7 +107,9 @@ S.ShiftChecklistTemplates = {
     const all = this.templates();
     const saved = all.length
       ? (this.savedSection('Opening') + this.savedSection('Closing'))
-      : '<div style="font-size:13px;color:var(--t3);padding:10px 2px;">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</div>';
+      : '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Name</th><th>Items</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</td></tr></tbody></table></div></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {

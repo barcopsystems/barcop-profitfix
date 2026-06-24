@@ -155,7 +155,9 @@ S.ShiftMaintenance = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No maintenance issues logged yet. Use the form above to log the first one.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No maintenance issues logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');
@@ -170,7 +172,9 @@ S.ShiftMaintenance = {
 
       let listHtml;
       if (!filtered.length) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No issues in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No issues in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'maintenance')).map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'

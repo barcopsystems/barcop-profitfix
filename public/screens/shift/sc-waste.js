@@ -278,7 +278,9 @@ S.ShiftWaste = {
 
     let below;
     if (all.length === 0) {
-      below = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No waste logged yet. Use the form above to log the first one.</div>';
+      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
     } else {
       const totalCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food
@@ -290,7 +292,9 @@ S.ShiftWaste = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div style="font-size:13px;color:var(--t3);padding:8px 2px;">No waste in this range. Pick a wider range above.</div>';
+        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'waste')).map(r => {
           const p = this.productById(r.product_id);
