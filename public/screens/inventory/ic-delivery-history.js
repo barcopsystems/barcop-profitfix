@@ -224,6 +224,9 @@ S.InventoryDeliveryHistory = {
       const containerCol = isCase && it.case_size_at_receive
         ? (it.container_size_oz != null ? it.container_size_oz + ' oz btl &middot; ' + it.case_size_at_receive + '/case' : it.case_size_at_receive + ' btl/case')
         : (it.container_size_oz != null ? it.container_size_oz + ' oz' : '-');
+      const disc = this.discForLine(d, it);
+      const dlabel = !disc ? 'File' : (disc.status === 'Resolved' ? 'Resolved' : 'Filed');
+      const dstyle = (disc && disc.status === 'Resolved') ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);';
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + containerCol + '</td>'
@@ -231,11 +234,7 @@ S.InventoryDeliveryHistory = {
         + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'
-        + '<td class="no-print" style="text-align:right;">'
-        + (it.discrepancy_filed
-            ? '<span style="font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;">Discrepancy Filed in <span class="dh-vt-link" style="text-decoration:underline;cursor:pointer;">Vendor Tracker</span></span>'
-            : '<button class="btn btn-ghost btn-sm dh-flag" data-idx="' + i + '">File Discrepancy</button>')
-        + '</td>'
+        + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm dh-disc" data-idx="' + i + '" style="' + dstyle + 'white-space:nowrap;">' + dlabel + '</button></td>'
         + '</tr>';
     }).join('');
 
@@ -257,102 +256,44 @@ S.InventoryDeliveryHistory = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('.dh-vt-link')) { App.openScreen('vendor-tracker'); return; }
-      const fl = ev.target.closest('.dh-flag');
-      if (fl) { const it = items[parseInt(fl.dataset.idx, 10)]; if (it) this.openLineDiscrepancy(d, it); }
+      const db = ev.target.closest('.dh-disc');
+      if (db) {
+        const it = items[parseInt(db.dataset.idx, 10)]; if (!it) return;
+        const disc = this.discForLine(d, it);
+        S.VendorTracker.openDiscrepancyModal({
+          discrepancyId: disc ? disc.id : null,
+          prefill: this.discPrefill(d, it),
+          onFiled: rec => { it.discrepancy_id = rec.id; d.has_discrepancy = true; App.putRecord('ic', 'delivery', d); },
+          onClose: () => this.renderDetail(d.id)
+        });
+      }
     };
     document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Delivery History', root: this.container }));
   },
 
-  // ── File a discrepancy against a saved delivery line (after the fact) ──────
-  // The dock catches short counts + price changes live in Receive Delivery; this
-  // is the path for issues found later (invoice came after, damage found when a
-  // case was opened, a quality failure). Pre-filled from the saved line, tied to
-  // the delivery via delivery_id, and the claim lands in Vendor Tracker for
-  // credit follow-up ([[two-doors-same-data]]).
-  openLineDiscrepancy(d, it) {
+  // Find the vendor discrepancy filed against a delivery line (via the stamped id,
+  // else by delivery + product name) so the line reads File / Filed / Resolved.
+  discForLine(d, it) {
+    const recs = (App.data.vendor_discrepancies || []);
+    if (it.discrepancy_id) { const r = recs.find(x => x.id === it.discrepancy_id); if (r) return r; }
+    const name = (it.name || '').toLowerCase().trim();
+    return recs.find(x => x.delivery_id === d.id && (x.sku || '').toLowerCase().trim() === name) || null;
+  },
+
+  // Pre-fill for the shared discrepancy modal, computed from the saved line.
+  discPrefill(d, it) {
     const product = ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === it.product_id);
     const productName = it.name || product?.name || '';
     const agreedPrice = it.prev_price != null ? it.prev_price : (product?.unit_cost != null ? product.unit_cost : null);
     const invoicedPrice = it.price_per_unit != null ? it.price_per_unit : null;
     const qty = it.qty != null ? it.qty : 0;
-    const suggestedType = it.price_changed ? 'Price Overcharge' : 'Other';
     let overcharge = 0;
     if (it.price_changed && agreedPrice != null && invoicedPrice != null && qty) overcharge = Math.max(0, (invoicedPrice - agreedPrice) * qty);
-    const TYPES = ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'];
-    const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === suggestedType ? ' selected' : '') + '>' + t + '</option>').join('');
-
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">File Discrepancy</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Files a credit claim to Vendor Tracker for follow-up, tied to this delivery. Adjust if needed.</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="width:160px;"><label>Date</label><input class="form-input" type="date" id="dhd-date" value="' + esc(d.date || App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:160px;"><label>Vendor</label><input class="form-input" type="text" id="dhd-vendor" value="' + esc(d.vendor || '') + '" readonly/></div>'
-        + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input class="form-input" type="text" id="dhd-ref" value="' + esc(d.invoice_number || '') + '"/></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label><input class="form-input" type="text" id="dhd-product" value="' + esc(productName) + '"/></div>'
-        + '<div class="f" style="width:180px;"><label>Type</label><select class="form-input" id="dhd-type">' + typeOpts + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:12px;">'
-        + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input class="form-input" type="number" id="dhd-units" step="1" value="' + qty + '"/></div>'
-        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-agreed" step="0.01" value="' + (agreedPrice != null ? agreedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-invoiced" step="0.01" value="' + (invoicedPrice != null ? invoicedPrice.toFixed(2) : '') + '"/></div></div>'
-        + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="dhd-overcharge" step="0.01" value="' + overcharge.toFixed(2) + '"/></div></div>'
-      + '</div>'
-      + '<div class="f" style="margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="dhd-notes" placeholder="What was wrong, and who you contacted"/></div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="dhd-file">File Discrepancy</button>'
-        + '<button class="btn btn-ghost" id="dhd-cancel">Cancel</button>'
-        + '<span id="dhd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-    App.openModal(html, { id: 'dh-disc-modal', maxWidth: 640, noClose: true });
-
-    const recompute = () => {
-      const oc = document.getElementById('dhd-overcharge');
-      if (!oc || oc._touched) return;
-      const u = parseFloat(document.getElementById('dhd-units')?.value) || 0;
-      const a = parseFloat(document.getElementById('dhd-agreed')?.value);
-      const iv = parseFloat(document.getElementById('dhd-invoiced')?.value);
-      if (!isNaN(a) && !isNaN(iv) && u) oc.value = Math.max(0, (iv - a) * u).toFixed(2);
+    return {
+      date: d.date, vendor: d.vendor, reference: d.invoice_number || '',
+      sku: productName, type: it.price_changed ? 'Price Overcharge' : 'Other',
+      units: qty, agreed_price: agreedPrice, invoiced_price: invoicedPrice,
+      overcharge, delivery_id: d.id, source: 'delivery-history'
     };
-    ['dhd-units', 'dhd-agreed', 'dhd-invoiced'].forEach(id => document.getElementById(id)?.addEventListener('input', recompute));
-    document.getElementById('dhd-overcharge')?.addEventListener('input', e => { e.target._touched = true; });
-    document.getElementById('dhd-cancel')?.addEventListener('click', () => App.closeModal('dh-disc-modal'));
-    document.getElementById('dhd-file')?.addEventListener('click', () => this.saveLineDiscrepancy(d, it));
-  },
-
-  async saveLineDiscrepancy(d, it) {
-    const errEl = document.getElementById('dhd-err');
-    const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
-    const date = document.getElementById('dhd-date')?.value;
-    const vendor = (document.getElementById('dhd-vendor')?.value || d.vendor || '').trim();
-    if (!date) { fail('Date is required.'); return; }
-    if (!vendor) { fail('Vendor is required.'); return; }
-    const rec = {
-      id:             App.uid(),
-      date,
-      vendor,
-      reference:      document.getElementById('dhd-ref')?.value.trim() || '',
-      type:           document.getElementById('dhd-type')?.value || 'Other',
-      sku:            document.getElementById('dhd-product')?.value.trim() || '',
-      units:          parseFloat(document.getElementById('dhd-units')?.value) || 0,
-      agreed_price:   parseFloat(document.getElementById('dhd-agreed')?.value) || 0,
-      invoiced_price: parseFloat(document.getElementById('dhd-invoiced')?.value) || 0,
-      overcharge:     parseFloat(document.getElementById('dhd-overcharge')?.value) || 0,
-      notes:          document.getElementById('dhd-notes')?.value.trim() || '',
-      status:         'Open',
-      source:         'delivery-history',
-      delivery_id:    d.id,
-      created_at:     new Date().toISOString()
-    };
-    const ok = await App.putRecord('core', 'vendor_discrepancy', rec);
-    if (!ok) { fail('Could not save the discrepancy. Try again.'); return; }
-    // Mark the line as filed so the detail view shows "Discrepancy Filed" instead
-    // of re-offering the button, and flag the delivery so the list shows the flag.
-    if (it) it.discrepancy_filed = true;
-    d.has_discrepancy = true;
-    await App.putRecord('ic', 'delivery', d);
-    App.closeModal('dh-disc-modal');
-    this.renderDetail(d.id);
   }
 };
