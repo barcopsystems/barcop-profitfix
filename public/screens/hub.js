@@ -472,30 +472,36 @@ S.Hub = {
       const pct = total ? Math.round(dc / total * 100) : 0;
       return '<div style="height:5px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>';
     };
-    const stepRows = (steps) => (steps || []).map((s, i) =>
-      '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;background:#0D181E;border-radius:6px;font-size:12px;line-height:1.2;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
-      + (s.done
-          ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
-          : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
-      + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span></div>').join('');
+    // Each step row deep-links to its OWN step open on the section page (sets the
+    // section's _openStep before navigating); the outer card opens it at default.
+    const stepRows = (steps, objName, screen, mod) => (steps || []).map((s, i) => {
+      const go = 'event.stopPropagation();' + (objName ? 'S.' + objName + '._openStep=\'' + s.key + '\';' : '') + 'S.Hub._enter(\'' + screen + '\',\'' + (mod || '') + '\')';
+      return '<div class="hd-step" onclick="' + go + '" style="display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;background:#0D181E;border-radius:6px;font-size:12px;line-height:1.2;cursor:pointer;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+        + (s.done
+            ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
+            : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
+        + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span>'
+        + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>';
+    }).join('');
     const richCard = (o) => {
       const sum = o.sum;
+      const cardGo = (o.objName ? 'S.' + o.objName + '._openStep=null;' : '') + 'S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')';
       const body = statStrip(o.stats)
         + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
-                 + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps) + '</div>' : '')
+                 + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps, o.objName, o.screen, o.mod) + '</div>' : '')
         + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
       return '<div style="display:flex;flex-direction:column;min-width:0;">'
         + '<div class="sh" style="margin:0 0 10px;">' + esc(o.title) + '</div>'
-        + '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
+        + '<div class="hd-row" onclick="' + cardGo + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
         +   body + '</div></div>';
     };
     const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
     // Control: stat strip + step checklist, all from each section's hubSteps().
     const icSum = safeSteps(S.InventoryDashboard), lcSum = safeSteps(S.LaborDashboard), scSum = safeSteps(S.ShiftDashboard);
     const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date', 'created_at']);
-    const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
-    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
-    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
+    const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', objName:'InventoryDashboard', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
+    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', objName:'LaborDashboard', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
+    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
     // Recovery: stat strip (from the old dashboards) + audit line; steps land
     // when the Profit/Revenue/Cash Close The Week pages are built.
     const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
@@ -1063,6 +1069,7 @@ S.Hub = {
         .hub-app .hd-row:hover{background:var(--hover);}
         .hub-app .hd-arow{background:#0D181E;}
         .hub-app .hd-arow:hover{background:#0F1A21;}
+        .hub-app .hd-step:hover{background:#13212A;}
         @media (max-width:768px){.hub-app .hub-stat-div{display:none;}}
         /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
            when row count exceeds card height. Thin scrollbar so it does not
