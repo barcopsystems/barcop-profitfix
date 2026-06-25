@@ -22,10 +22,25 @@ S.CashFix = {
   // Which steps Bar Cop can verify, keyed by gap id then step index. Unlisted
   // steps are Guidance (no status, never counted as proof).
   TRACK: {
-    'free-trapped': { 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' } },
-    'order-to-par': { 2: { kind: 'recur', signal: 'order', maxDays: 14, every: 'every order you place' }, 3: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' } },
-    'stay-ahead':   { 0: { kind: 'state', key: 'tightweek' } },
-    'pay-on-terms': { 0: { kind: 'state', key: 'terms' } }
+    'free-trapped': {
+      0: { kind: 'recur', signal: 'view:c-trapped', maxDays: 9, every: 'every week' },
+      1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' },
+      2: { kind: 'recur', signal: 'view:ic-par-suggestions', maxDays: 9, every: 'every week' }
+    },
+    'order-to-par': {
+      0: { kind: 'recur', signal: 'view:c-purchasing', maxDays: 9, every: 'every week' },
+      1: { kind: 'recur', signal: 'view:ic-par-suggestions', maxDays: 9, every: 'every week' },
+      2: { kind: 'recur', signal: 'order', maxDays: 14, every: 'every order you place' },
+      3: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }
+    },
+    'stay-ahead': {
+      0: { kind: 'recur', signal: 'view:c-forecast', maxDays: 9, every: 'every week' },
+      1: { kind: 'state', key: 'tightweek' }
+    },
+    'pay-on-terms': {
+      0: { kind: 'state', key: 'terms' },
+      3: { kind: 'recur', signal: 'view:ic-vendors', maxDays: 95, every: 'once a quarter' }
+    }
   },
   SIGNALS: {
     count: () => (App.inventoryData && App.inventoryData.ic_counts) || [],
@@ -39,6 +54,12 @@ S.CashFix = {
 
   // ── Verification ────────────────────────────────────────────────────────────
   lastActivity(signal) {
+    // View-stamp signals (view:<key>) read the day a "review/read this screen"
+    // target was last opened, stamped automatically on navigate (App.fix_views).
+    if (signal && signal.indexOf('view:') === 0) {
+      const v = (App.data && App.data.fix_views) || {};
+      return v[signal.slice(5)] || null;
+    }
     const arr = (this.SIGNALS[signal] || (() => []))();
     let latest = null;
     arr.forEach(r => {
