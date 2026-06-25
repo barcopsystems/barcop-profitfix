@@ -1769,13 +1769,14 @@ S.HubSettings = {
       'Mezcal':'Mezcal', 'White Rum':'Rum', 'Mount Gay Eclipse':'Rum', 'Sailor Jerry Spiced':'Rum',
       'Bulleit Bourbon':'Bourbon', "Maker's Mark":'Bourbon', 'Woodford Reserve':'Bourbon', 'Buffalo Trace':'Bourbon',
       'Rittenhouse Rye':'Rye', 'Jameson':'Irish Whiskey', 'Macallan 12':'Scotch', "Dewar's":'Scotch',
-      'Hennessy VS':'Cognac', 'Campari':'Amaro', 'Aperol':'Aperitif',
+      'Hennessy VS':'Cognac', 'Hennessy XO':'Cognac', 'Campari':'Amaro', 'Aperol':'Aperitif',
+      'Macallan 18':'Scotch', 'Pappy Van Winkle 15':'Bourbon', 'Clase Azul Reposado':'Tequila',
       'Triple Sec':'Liqueur', 'Coffee Liqueur':'Liqueur', 'Maraschino Liqueur':'Liqueur',
       'St-Germain':'Liqueur', 'Cointreau':'Liqueur', 'Disaronno Amaretto':'Liqueur', 'Green Chartreuse':'Liqueur',
       // Wine
       'House Cabernet':'Red', 'Pinot Noir':'Red', 'Malbec':'Red', 'Red Blend':'Red', 'Cabernet Reserve':'Red',
       'House Chardonnay':'White', 'Sauvignon Blanc':'White', 'Pinot Grigio':'White', 'Chardonnay Reserve':'White',
-      'Rosé':'Rosé', 'Prosecco':'Sparkling', 'Champagne':'Champagne', 'Sweet Vermouth':'Vermouth', 'Dry Vermouth':'Vermouth',
+      'Rosé':'Rosé', 'Prosecco':'Sparkling', 'Champagne':'Champagne', 'Dom Pérignon':'Champagne', 'Sweet Vermouth':'Vermouth', 'Dry Vermouth':'Vermouth',
       // Bottle Beer
       'Bud Light':'Domestic', 'Lone Star':'Domestic', 'Modelo Especial':'Import', 'Corona':'Import', 'Stella Artois':'Import',
       'White Claw':'Seltzer', 'Austin Eastciders':'Cider', 'Athletic NA':'Non-Alcoholic',
