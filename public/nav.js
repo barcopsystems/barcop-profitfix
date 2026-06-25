@@ -122,51 +122,6 @@ const Revenue = {
   }
 };
 
-/* ── Traffic Recovery Nav ── */
-const Traffic = {
-  navHTML() {
-    return `
-      ${App.sectionSelectorHTML()}
-      <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="t-audit" id="nav-t-audit">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Traffic Audit</span>
-      </div>
-      <div class="nav-item" data-screen="t-playbook" id="nav-t-playbook">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Traffic Playbook</span>
-      </div>
-      <div class="nav-item" data-screen="t-fix" id="nav-t-fix">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Traffic Fix</span>
-      </div>
-      <div class="nav-section">Weekly</div>
-      <div class="nav-item" data-screen="t-this-week" id="nav-t-this-week">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">This Week</span>
-      </div>
-      <div class="nav-item" data-screen="t-forecast" id="nav-t-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Traffic Forecast</span>
-      </div>
-      <div class="nav-section">Online Tracker</div>
-      <div class="nav-item" data-screen="t-presence" id="nav-t-presence">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.2 8.5h12.6M8.5 2.1c2.2 2.3 2.2 10.5 0 12.8M8.5 2.1c-2.2 2.3-2.2 10.5 0 12.8" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Online Tracker</span>
-      </div>
-      <div class="nav-section">Support</div>
-      <div class="nav-item" data-screen="t-help" id="nav-t-help">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
-        <span class="nav-label">Help and FAQ</span>
-      </div>
-      <div class="nav-item" data-nav="report-bug" id="nav-t-report-bug">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <span class="nav-label">Report a Bug</span>
-      </div>
-    `;
-  }
-};
-
 /* ── Cash Recovery Nav ── */
 const Cash = {
   navHTML() {

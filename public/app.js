@@ -411,7 +411,7 @@ const App = {
     this.inventoryData = {};
     this.laborData     = {};
     this.shiftData     = {};
-    this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','traffic'], period_end:null };
+    this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','cash'], period_end:null };
     await S.HubSettings.loadSample();
     window.print = function () { App.demoBlock('Exporting to PDF'); };
     this._mountDemoBanner();
@@ -1003,7 +1003,7 @@ const App = {
     // Recovery
     { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
     { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
-    { group:'traffic-recovery',    label:'Traffic Recovery',         module:'traffic',   screen:'t-dashboard',          moduleName:'Traffic Recovery' },
+    { group:'cash-recovery',       label:'Cash Recovery',            module:'cash',      screen:'c-dashboard',          moduleName:'Cash Recovery' },
     { group:'events',              label:'Events',                   module:'events',    screen:'ev-dashboard',         moduleName:'Events' }
   ],
 
@@ -1118,7 +1118,6 @@ const App = {
     ['profit',    'Profit Recovery'],
     ['revenue',   'Revenue Recovery'],
     ['cash',      'Cash Recovery'],
-    ['traffic',   'Traffic Recovery'],
     ['events',    'Events'],
     ['inventory', 'Inventory Control'],
     ['labor',     'Labor Control'],
@@ -1126,7 +1125,7 @@ const App = {
   ],
 
   // The dashboard screen each module lands on when entered.
-  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', traffic: 't-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
 
   // Markup for the section switcher. currentKey defaults to the active module
   // (set before the module nav renders); the Hub sidebar passes 'hub'. Text
@@ -1167,8 +1166,6 @@ const App = {
     if (!nav) return;
     if (module === 'revenue') {
       nav.innerHTML = Revenue.navHTML();
-    } else if (module === 'traffic') {
-      nav.innerHTML = Traffic.navHTML();
     } else if (module === 'cash') {
       nav.innerHTML = Cash.navHTML();
     } else if (module === 'events') {
@@ -1187,7 +1184,7 @@ const App = {
     // Dashboard leaf is injected at the top (the mobile panel's Dashboard row),
     // routing to the section dashboard. Scoped via .nav-mstyle so the other
     // sections keep the standard accordion. (wireNavAccordion adds group icons.)
-    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift', 'events', 'profit', 'revenue', 'cash', 'traffic'];
+    const MSTYLE_SECTIONS = ['inventory', 'labor', 'shift', 'events', 'profit', 'revenue', 'cash'];
     const mstyle = MSTYLE_SECTIONS.indexOf(module) !== -1;
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
@@ -1426,7 +1423,7 @@ const App = {
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
   _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['events','Events'],['books','Books']],
-  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash'],['traffic','Traffic']],
+  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
@@ -1743,7 +1740,6 @@ const App = {
       if (k === 'events')    return Events.navHTML();
       if (k === 'profit')    return ProfitNav.html();
       if (k === 'revenue')   return Revenue.navHTML();
-      if (k === 'traffic')   return Traffic.navHTML();
       if (k === 'audit')     return S2.Hub._auditSidebarHTML();
       if (k === 'books')     return S2.Hub._booksSidebarHTML();
       if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
@@ -1766,7 +1762,7 @@ const App = {
       shift:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       profit:'<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       revenue:'<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      traffic:'<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      cash:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
       help:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       dash:'<rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/>'
@@ -1820,7 +1816,7 @@ const App = {
       { label: 'Recovery', items: [
         drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard', IC.profit),
         drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard', IC.revenue),
-        drill('Traffic', 'traffic', () => App.jumpToSection('traffic'), 'Dashboard', IC.traffic)
+        drill('Cash', 'cash', () => App.jumpToSection('cash'), 'Dashboard', IC.cash)
       ]},
       { label: 'Support', items: [
         { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() }
@@ -1953,7 +1949,6 @@ const App = {
     if (/^sc-/.test(id)) return 'shift';
     if (/^ev-/.test(id)) return 'events';
     if (/^r-/.test(id))  return 'revenue';
-    if (/^t-/.test(id))  return 'traffic';
     if (/^c-/.test(id))  return 'cash';
     return 'profit';
   },
@@ -3797,12 +3792,6 @@ const App = {
         revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
         revenue_server_check: 'revenue_server_checks', menu_dog_test: 'menu_dog_tests',
         revenue_price_log: 'revenue_price_log',
-        // Traffic pass — the 4 Guests & Planning lists (regulars, initiatives,
-        // holidays, inquiries) stay in the blob: low-volume CRM/planning the
-        // 24-month window would wrongly hide. fix_log moves in its own pass.
-        traffic_week: 'traffic_weeks', traffic_audit: 'traffic_audits',
-        traffic_review_reply: 'traffic_review_replies', traffic_gbp_post: 'traffic_gbp_posts',
-        traffic_social_post: 'traffic_social_posts', traffic_email_campaign: 'traffic_email_campaigns',
         // Events section — unified booking record (row-per-record). Replaces the
         // old revenue_event; rate cards / regulars / calendar stay in the blob.
         booking: 'bookings',
@@ -4169,37 +4158,6 @@ const App = {
       return;
     }
 
-    // Traffic module screens
-    if (this._activeModule === 'traffic') {
-      const trafficTitles = {
-        'hub':              ['Recovery Hub', ''],
-        't-dashboard':      ['Dashboard', 'Traffic Recovery'],
-        't-audit':          ['Traffic Audit', 'Monthly Score and Progress'],
-        't-playbook':       ['Traffic Playbook', 'The Strategy Behind the Fix'],
-        't-fix':            ['Traffic Fix', 'Fix Process and Guidance'],
-        't-this-week':      ['This Week', 'Weekly Entry'],
-        't-forecast':       ['Traffic Forecast', ''],
-        't-presence':       ['Online Tracker', ''],
-        't-help':           ['Help and FAQ', ''],
-      };
-      const trafficScreens = {
-        't-dashboard':      S.TrafficDashboard,
-        't-audit':          S.TrafficAudit,
-        't-playbook':       S.RecoveryPlaybook,
-        't-fix':            S.TrafficFix,
-        't-this-week':      S.TrafficThisWeek,
-        't-forecast':       S.TrafficForecast,
-        't-presence':       S.TrafficPresence,
-        't-help':           S.TrafficHelp,
-      };
-      const [title, sub] = trafficTitles[id] || [id, ''];
-      document.getElementById('topbar-title').textContent = title;
-      document.getElementById('topbar-sub').textContent = sub;
-      const screen = trafficScreens[id];
-      if (screen) { this._activeScreenObj = screen; screen.render(content, actions); this._exportBtn(id, actions); }
-      else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
-      return;
-    }
 
     // Cash Recovery module screens
     if (this._activeModule === 'cash') {

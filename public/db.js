@@ -279,11 +279,6 @@ const DB = {
     'r-menu-engineering':'revenue-recovery','r-price-calc':'revenue-recovery',
     'r-dog-test':'revenue-recovery',
     'r-help':'_always',
-    // Traffic Recovery
-    't-dashboard':'traffic-recovery','t-this-week':'traffic-recovery',
-    't-audit':'traffic-recovery','t-fix':'traffic-recovery',
-    't-presence':'traffic-recovery','t-forecast':'traffic-recovery',
-    't-help':'_always',
     // Cash Recovery
     'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-capital':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-bridge':'cash-recovery','c-help':'_always',
     // Events
@@ -855,11 +850,6 @@ const DB = {
         if (!(k in data.revenue_settings)) data.revenue_settings[k] = d.revenue_settings[k];
       });
     }
-    if (data.traffic_settings) {
-      Object.keys(d.traffic_settings).forEach(k => {
-        if (!(k in data.traffic_settings)) data.traffic_settings[k] = d.traffic_settings[k];
-      });
-    }
     return data;
   },
 
@@ -909,53 +899,6 @@ const DB = {
       menu_dog_tests: [],
       revenue_price_log: [],
       getting_started_revenue: {},
-      // Traffic Recovery data
-      traffic_settings: {
-        targets: {
-          google_rating:      4.3,
-          review_velocity:    8,
-          response_rate:      75,
-          monthly_sessions:   2000,
-          social_posts_month: 12
-        },
-        // Static digital-presence profile state — set once on the scorecard
-        // screens, not repeated on every weekly record.
-        profile: {},
-        // Operation links — the operator's public URLs for each platform.
-        // The audit fetches public data from these; Recovery screens use them
-        // for "Open Live" click-throughs. Empty until the operator enters them.
-        urls: {
-          website:         '',
-          gbp:             '',
-          yelp:            '',
-          instagram:       '',
-          facebook:        '',
-          doordash:        '',
-          ubereats:        '',
-          grubhub:         '',
-          email_platform:  ''
-        },
-        // Traffic Recovery Scoreboard conversion rates. These map a Traffic
-        // metric improvement to a dollar figure using check_avg from Revenue
-        // Recovery as the per-visit value. Defaults are industry benchmarks
-        // for restaurant digital channels; operator can override per channel.
-        conversion_rates: {
-          web_session_to_visit:    3,
-          gbp_view_to_visit:       2,
-          social_profile_to_visit: 1,
-          email_open_to_visit:     1
-        }
-      },
-      traffic_weeks:   [],
-      traffic_audits:  [],
-      // Traffic Recovery logs added in the Traffic deep dive — each holds the
-      // operator-typed history that feeds the matching screen card and the
-      // fix_log auto-emit thresholds.
-      traffic_review_replies:  [],
-      traffic_gbp_posts:       [],
-      traffic_social_posts:    [],
-      traffic_email_campaigns: [],
-      getting_started_traffic: {},
       // ── Events section (bookings, guests, planning) ────────────────────────
       // Unified booking record: lead -> quote -> booked -> completed/lost, one
       // per party. Row-per-record via core_events (kind 'booking'); replaces the
