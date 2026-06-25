@@ -477,6 +477,63 @@ window.CashEngine = {
     return { start: s, end: e, profit: p.profit, p, inv, co, cashKept, hasData: p.hasData };
   },
 
+  // ── Capital efficiency: the return on the cash parked in inventory, by
+  //    category. Turns = how many times a year you cycle the capital. GMROI =
+  //    gross margin dollars earned per dollar of inventory, the retail measure of
+  //    whether a category earns its shelf. ──────────────────────────────────────
+  _BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
+  _catDept(cat) { return this._BAR_CATS.indexOf(cat) !== -1 ? 'bar' : 'food'; },
+  _deptCostPct() {
+    const weeks = ((App.data && App.data.weeks) || []).slice().sort((a, b) => (String(a.period_end) < String(b.period_end) ? 1 : -1)).slice(0, 4);
+    let bRev = 0, bCogs = 0, fRev = 0, fCogs = 0;
+    weeks.forEach(w => { if (w.bar) { bRev += (+w.bar.revenue || 0); bCogs += (+w.bar.cogs || 0); } if (w.food) { fRev += (+w.food.revenue || 0); fCogs += (+w.food.cogs || 0); } });
+    return { bar: bRev > 0 ? bCogs / bRev : null, food: fRev > 0 ? fCogs / fRev : null };
+  },
+  capitalByCategory() {
+    const cats = this.categoryBreakdown(3);
+    const dept = this._deptCostPct();
+    return cats.map(c => {
+      const annualCogs = c.weeklyCogs * 52;
+      const turns = c.value > 0 ? annualCogs / c.value : null;
+      const d = this._catDept(c.cat);
+      const costPct = dept[d];
+      const marginPct = costPct != null ? (1 - costPct) : null;
+      const gmroi = (costPct != null && costPct > 0 && turns != null) ? turns * (marginPct / costPct) : null;
+      return { cat: c.cat, value: c.value, weeklyCogs: c.weeklyCogs, weeksOnHand: c.weeksOnHand, annualCogs, turns, dept: d, costPct, marginPct, gmroi };
+    }).filter(c => c.value > 0).sort((a, b) => (a.gmroi == null ? 99 : a.gmroi) - (b.gmroi == null ? 99 : b.gmroi));
+  },
+  capitalSummary() {
+    const rows = this.capitalByCategory();
+    const totalCap = rows.reduce((s, r) => s + r.value, 0);
+    const annualCogs = rows.reduce((s, r) => s + r.annualCogs, 0);
+    const turns = totalCap > 0 ? annualCogs / totalCap : null;
+    const gm = rows.reduce((s, r) => s + (r.gmroi != null ? r.gmroi * r.value : 0), 0);
+    const gmroi = totalCap > 0 ? gm / totalCap : null;
+    return { rows, totalCap, annualCogs, turns, gmroi };
+  },
+
+  // ── Cash conversion cycle: days your cash is locked up. Days of inventory on
+  //    hand, minus the days you take to pay your vendors (receivables ~ 0 for a
+  //    bar). The shorter it is, the less cash is trapped in the operating cycle. ─
+  _weightedDPO() {
+    const vendors = {};
+    this.vendors().forEach(v => { vendors[v.name] = this._netDays(v.payment_terms); });
+    let total = 0, w = 0;
+    const spend = {};
+    this.deliveries().forEach(d => { const v = d.vendor; if (!v) return; const amt = parseFloat(d.total) || 0; spend[v] = (spend[v] || 0) + amt; total += amt; });
+    if (total > 0) { Object.keys(spend).forEach(v => { w += spend[v] * (vendors[v] || 0); }); return w / total; }
+    const ds = Object.values(vendors); return ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
+  },
+  cashCycle() {
+    const o = this.overOrder(3);
+    if (!o.hasData || !o.weeklyCogs) return { hasData: false };
+    const dailyCogs = o.weeklyCogs / 7;
+    const dio = (o.weeksOnHand != null ? o.weeksOnHand : 0) * 7;
+    const dpo = this._weightedDPO();
+    const cycle = dio - dpo;
+    return { hasData: true, dio, dpo, cycle, dailyCogs, lockedCash: Math.max(0, cycle) * dailyCogs, value: o.value, weeklyCogs: o.weeklyCogs };
+  },
+
   // ── Realized cash freed (backward, honest). Trapped cash is computed at each
   //    historical count, then "freed" is how far it has come down from your own
   //    first-weeks baseline. No metric × revenue, no fix log to game: it is the
