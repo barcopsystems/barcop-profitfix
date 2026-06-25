@@ -64,7 +64,7 @@ S.CashTrapped = {
 
     const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:24px 0 12px;">'
       + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-report-movers">Dead Stock Report</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Dead Stock Report</button>'
       + '<button class="btn btn-ghost btn-sm" id="ct-export">Export PDF</button>'
       + '</div>';
 

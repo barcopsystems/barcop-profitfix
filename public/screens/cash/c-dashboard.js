@@ -314,7 +314,7 @@ S.CashDashboard = {
       }
       if (t.total <= 0) {
         return explain('Nothing dead and nothing piled up above par worth chasing. Your shelf cash is moving.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-movers">Dead Stock</button>' + this.markBtn('trapped', 'Mark Done'));
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Dead Stock</button>' + this.markBtn('trapped', 'Mark Done'));
       }
       const rows = t.items.slice(0, 4).map(it => itemLine(
         it.name + (it.kind === 'dead' ? ' (not moving)' : ' (over par)'),
