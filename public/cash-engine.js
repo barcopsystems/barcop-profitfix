@@ -5,7 +5,7 @@
    line, Cash = liquidity). It reads data that already lives in Control + Books
    and answers two questions: how much working capital is trapped on the shelf
    right now, and is the cash coming in this week enough to cover what is going
-   out. Every cash screen (the cockpit, Forecast, Trapped Cash, Purchasing,
+   out. Every cash screen (Close The Week, Forecast, Trapped Cash, Purchasing,
    Position, Audit) reads from here so the numbers never drift screen to screen.
    Nothing here writes; it only computes off the live stores. */
 

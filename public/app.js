@@ -1199,7 +1199,8 @@ const App = {
         dleaf.className = 'nav-item nav-leaf';
         dleaf.id = 'nav-' + dashScreen;
         dleaf.dataset.screen = dashScreen;
-        dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">Dashboard</span>';
+        const dleafLabel = (['inventory', 'labor', 'shift', 'cash'].indexOf(module) !== -1) ? 'Close The Week' : 'Dashboard';
+        dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg><span class="nav-label">' + dleafLabel + '</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
     }
@@ -4204,7 +4205,7 @@ const App = {
     if (this._activeModule === 'cash') {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
-        'c-dashboard':   ['Dashboard', 'Cash Recovery'],
+        'c-dashboard':   ['Close The Week', 'Cash Recovery'],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
         'c-fix':         ['Cash Fix', 'Fix Process and Guidance'],
@@ -4236,7 +4237,7 @@ const App = {
     if (this._activeModule === 'inventory') {
       const icTitles = {
         'hub':                 ['Recovery Hub', ''],
-        'ic-dashboard':        ['Dashboard', 'Inventory Control'],
+        'ic-dashboard':        ['Close The Week', 'Inventory Control'],
         'ic-product-setup':    ['Add Products', 'Inventory Control'],
         'ic-prep-batches':     ['Prep Batches', 'Inventory Control'],
         'ic-locations':        ['Set Locations', 'Inventory Control'],
@@ -4294,7 +4295,7 @@ const App = {
     if (this._activeModule === 'shift') {
       const scTitles = {
         'hub':                   ['Recovery Hub', ''],
-        'sc-dashboard':          ['Dashboard', 'Shift Control'],
+        'sc-dashboard':          ['Close The Week', 'Shift Control'],
         'sc-cash-control':       ['Cash Control', 'Shift Control'],
         'sc-cash-history':       ['Cash History', 'Shift Control'],
         'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
@@ -4330,7 +4331,7 @@ const App = {
     if (this._activeModule === 'labor') {
       const lcTitles = {
         'hub':                   ['Recovery Hub', ''],
-        'lc-dashboard':          ['Dashboard', 'Labor Control'],
+        'lc-dashboard':          ['Close The Week', 'Labor Control'],
         'lc-build-schedule':     ['Build Schedule', 'Labor Control'],        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
         'lc-log-hours':          ['Log Hours', 'Labor Control'],
         'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
