@@ -260,6 +260,7 @@ S.Hub = {
       .filter(m => m.status === 'warn' || m.status === 'bad')
       .map(m => ({
         sev: m.status,
+        label: m.label, value: m.disp + ' / ' + m.tgt,
         text: m.label + ' at ' + m.disp + ' · target ' + m.tgt,
         screen: m.screen, mod: m.mod
       }));
@@ -271,15 +272,15 @@ S.Hub = {
       { name:'Revenue', a:rA, screen:'r-audit', mod:'revenue' },
       { name:'Cash', a:cA, screen:'c-audit', mod:'cash' }
     ].forEach(d => {
-      if (!d.a) { auditAlerts.push({ sev:'warn', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
+      if (!d.a) { auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'not run', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
       const score  = d.a.overall_score;
       const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 70;
       if (score != null && score < target) {
-        auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen:d.screen, mod:d.mod });
+        auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', label: d.name + ' audit', value: score + ' / ' + target + '+', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen:d.screen, mod:d.mod });
       }
       const daysSince = d.a.date ? Math.floor((Date.now() - new Date(d.a.date + 'T00:00:00').getTime()) / 86400000) : null;
       if (daysSince != null && daysSince > 30) {
-        auditAlerts.push({ sev:'warn', text: d.name + ' audit overdue · last run ' + daysSince + ' days ago', screen:d.screen, mod:d.mod });
+        auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'overdue ' + daysSince + 'd', text: d.name + ' audit overdue · last run ' + daysSince + ' days ago', screen:d.screen, mod:d.mod });
       }
     });
     const alerts = metricAlerts.concat(this.forwardAlerts()).concat(auditAlerts)
@@ -426,22 +427,34 @@ S.Hub = {
         const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lmKey = App.ymdLocal(lm).slice(0, 7);
         const hasLastMo = (pWeeks || []).some(w => (((w.period_end || '') + '').slice(0, 7)) === lmKey);
-        if (hasLastMo) cadence.push({ sev:'due', text:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books, the month-end file', go:'S.HubBooks&&S.HubBooks.open()' });
+        if (hasLastMo) cadence.push({ sev:'due', label:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books', value:'month-end', go:'S.HubBooks&&S.HubBooks.open()' });
       }
     })();
     const bandItems = alerts.concat(cadence);
-    const dotOf = s => s === 'bad' ? 'var(--red)' : s === 'warn' ? 'var(--amber)' : 'var(--t3)';
-    const goOf  = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
+    const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
     let needsBand;
     if (bandItems.length) {
-      const rows = bandItems.slice(0, 8).map(a =>
-        '<div class="hd-row" onclick="' + goOf(a) + '" style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:var(--r);background:#0D181E;cursor:pointer;min-width:0;">'
-        + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotOf(a.sev) + ';flex-shrink:0;"></span>'
-        + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</span>'
-        + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>').join('');
-      const more = bandItems.length > 8 ? '<div style="font-size:10px;color:var(--t4);grid-column:1/-1;padding-top:2px;">+' + (bandItems.length - 8) + ' more in the sections below</div>' : '';
+      // Two severity columns. Each row: the issue (left) + its key value (right,
+      // colored) — a data row, not a sentence. The full detail lives on the
+      // screen the row links to.
+      const critical = bandItems.filter(a => a.sev === 'bad');
+      const watch    = bandItems.filter(a => a.sev !== 'bad');   // warn + cadence-due
+      const rowOf = (a, dot) =>
+        '<div class="hd-step" onclick="' + goOf(a) + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;background:#0D181E;border-radius:6px;cursor:pointer;min-width:0;">'
+        + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
+        + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.label || a.text || '') + '</span>'
+        + (a.value ? '<span style="flex-shrink:0;font-size:11px;font-weight:700;color:' + dot + ';white-space:nowrap;">' + esc(a.value) + '</span>' : '<span style="flex-shrink:0;color:var(--t4);">&rsaquo;</span>') + '</div>';
+      const colHtml = (title, items, dot) =>
+        '<div style="min-width:0;display:flex;flex-direction:column;">'
+        + '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + dot + ';">' + title + '</div>'
+        + (items.length ? items.map(a => rowOf(a, dot)).join('')
+                        : '<div style="font-size:11px;color:var(--t3);margin-top:6px;padding:9px 2px;">Nothing right now.</div>')
+        + '</div>';
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
-        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + rows + more + '</div></div>';
+        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:grid;grid-template-columns:1fr 1fr;gap:18px;">'
+        +   colHtml('Act Now', critical, 'var(--red)')
+        +   colHtml('Keep An Eye', watch, 'var(--amber)')
+        + '</div></div>';
     } else {
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
         + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:10px;">'
@@ -1333,6 +1346,7 @@ S.Hub = {
     });
     if (otCount > 0) out.push({
       sev: otCount >= 3 ? 'bad' : 'warn',
+      label: 'Overtime projected', value: otCount + ' staff · ~' + App.fmtCurrency(otCost, 0),
       text: 'Overtime projected: ' + otCount + ' staff over 40 hours this week, about ' + App.fmtCurrency(otCost, 0) + ' in extra OT premium.',
       screen: 'lc-overtime-watch', mod: 'labor'
     });
@@ -1347,6 +1361,7 @@ S.Hub = {
       const monthlyOver = (gap / 100) * monthlyRev;
       out.push({
         sev: gap > 3 ? 'bad' : 'warn',
+        label: 'Prime cost over target', value: lw.prime_cost_pct.toFixed(1) + '% / ' + primeT + '%',
         text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
         screen: 'dashboard', mod: 'profit'
       });
@@ -1360,6 +1375,7 @@ S.Hub = {
       const shorts = recent.filter(r => r.status === 'Short').length;
       if (shorts >= 2) out.push({
         sev: shorts >= 3 ? 'bad' : 'warn',
+        label: 'Cash shortages, recurring', value: shorts + ' of ' + recent.length + ' counts',
         text: 'Cash came up short in ' + shorts + ' of the last ' + recent.length + ' drawer counts. Recurring shortages point to a process gap, not a one-off.',
         screen: 'cash-recon', mod: 'profit'
       });
@@ -1378,18 +1394,21 @@ S.Hub = {
           if (sf.hasOpening && sf.runway != null) {
             out.push({
               sev: 'bad',
+              label: 'Cash crunch ahead', value: 'runway ' + (sf.runway === 0 ? '~1 wk' : sf.runway + ' wk' + (sf.runway === 1 ? '' : 's')),
               text: 'Cash crunch ahead: your account runs dry in about ' + (sf.runway === 0 ? 'a week' : sf.runway + ' week' + (sf.runway === 1 ? '' : 's')) + (low ? ', bottoming out the week of ' + wk + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. Free trapped cash and move a payment now.',
               screen: 'c-forecast', mod: 'cash'
             });
           } else if (sf.hasOpening && low && CashEngine.reserveTarget() > 0 && low.balance >= 0 && low.balance < CashEngine.reserveTarget()) {
             out.push({
               sev: 'warn',
+              label: 'Cash dips under reserve', value: 'wk of ' + wk,
               text: 'Cash dips under your reserve the week of ' + wk + ', down to ' + App.fmtCurrency(low.balance, 0) + '. Hold payments to their due dates and free trapped cash to keep the cushion.',
               screen: 'c-forecast', mod: 'cash'
             });
           } else if (!sf.hasOpening && sf.tightWeeks >= 2) {
             out.push({
               sev: 'warn',
+              label: 'Tight weeks ahead', value: sf.tightWeeks + ' of 13',
               text: sf.tightWeeks + ' of the next 13 weeks have more cash going out than coming in. Set your opening balance in Cash Position to see your real runway.',
               screen: 'c-position', mod: 'cash'
             });
@@ -1409,18 +1428,21 @@ S.Hub = {
       if (days < 0) {
         out.push({
           sev: 'bad',
+          label: (p.name || 'Permit'), value: 'expired ' + Math.abs(days) + 'd ago',
           text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Review and renew right away.',
           screen: 'permits', mod: 'hub'
         });
       } else if (days <= 14) {
         out.push({
           sev: 'bad',
+          label: (p.name || 'Permit'), value: 'renew in ' + days + 'd',
           text: (p.name || 'Permit') + ' renewal due in ' + days + ' day' + (days===1?'':'s') + '. Mark Renewed once paid so Books picks up the cost.',
           screen: 'permits', mod: 'hub'
         });
       } else if (days <= 30) {
         out.push({
           sev: 'warn',
+          label: (p.name || 'Permit'), value: 'due in ' + days + 'd',
           text: (p.name || 'Permit') + ' renewal due in ' + days + ' days. Get the check or card ready.',
           screen: 'permits', mod: 'hub'
         });
@@ -1442,18 +1464,21 @@ S.Hub = {
       if (days < 0) {
         out.push({
           sev: 'bad',
+          label: certLabel, value: 'expired ' + Math.abs(days) + 'd ago',
           text: certLabel + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Not current until renewed.',
           screen: 'lc-staff-roster', mod: 'labor'
         });
       } else if (days <= 14) {
         out.push({
           sev: 'bad',
+          label: certLabel, value: 'expires in ' + days + 'd',
           text: certLabel + ' expires in ' + days + ' day' + (days===1?'':'s') + '. Schedule renewal now.',
           screen: 'lc-staff-roster', mod: 'labor'
         });
       } else if (days <= 30) {
         out.push({
           sev: 'warn',
+          label: certLabel, value: 'expires in ' + days + 'd',
           text: certLabel + ' expires in ' + days + ' days. Renewal window opens soon.',
           screen: 'lc-staff-roster', mod: 'labor'
         });
@@ -1469,6 +1494,7 @@ S.Hub = {
       const label = (urgentOpen[0].issue || urgentOpen[0].item || 'An urgent issue');
       out.push({
         sev: 'bad',
+        label: 'Urgent maintenance', value: urgentOpen.length + ' open',
         text: urgentOpen.length === 1
           ? label + ' is flagged Urgent and still open in the Maintenance Log. Handle it before it costs you a shift.'
           : urgentOpen.length + ' urgent maintenance issues are still open, including ' + label + '. Handle them before they cost you a shift.',
@@ -1488,6 +1514,7 @@ S.Hub = {
     });
     if (incCount >= 2) out.push({
       sev: 'warn',
+      label: 'Vendor prices rose', value: incCount + ' items · 45d',
       text: 'Vendor prices rose on ' + incCount + ' items in deliveries over the last 45 days. Verify these against quoted sheets before they stick.',
       screen: 'vendor-watch', mod: 'profit'
     });
@@ -1504,11 +1531,13 @@ S.Hub = {
       const soft = flags.length - severe;
       if (severe > 0) out.push({
         sev: 'bad',
+        label: 'Theft flags to act on', value: String(severe),
         text: severe + ' theft flag' + (severe === 1 ? '' : 's') + ' in the last 7 days that need action now. Investigate them in Loss Prevention.',
         screen: 'theft-risk', mod: 'profit'
       });
       if (soft > 0) out.push({
         sev: 'warn',
+        label: 'Loss-prevention flags', value: soft + ' to review',
         text: soft + ' item' + (soft === 1 ? '' : 's') + ' flagged for review in Loss Prevention over the last 7 days. Check anything that does not add up.',
         screen: 'theft-risk', mod: 'profit'
       });
