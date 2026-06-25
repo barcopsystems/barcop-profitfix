@@ -96,6 +96,20 @@ S.CashDashboard = {
     const st = this._st = this.computeState();
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
+
+    // A PAST week renders as a closed-out summary, not the live action steps. The
+    // trapped cash, runway, and safe-to-spend are current-state reads with no
+    // per-week history, so re-showing them under a past week would be misleading.
+    // The current week is the live close; a past week shows what you closed out.
+    if (!this.atCurrentWeek()) {
+      container.innerHTML = '<div class="screen">'
+        + this.banner(doneCount, this.ORDER.length)
+        + this.pastWeekCard(done)
+        + '</div>';
+      this.wire();
+      return;
+    }
+
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
 
@@ -109,6 +123,30 @@ S.CashDashboard = {
       + this.statusStrip(st)
       + '</div>';
     this.wire();
+  },
+
+  // Closed-out summary for a past week: the four steps as a read-only checklist
+  // (still toggleable, so you can close out a week you missed), no live numbers.
+  pastWeekCard(done) {
+    const rows = this.ORDER.map((k, idx) => {
+      const m = this._META[k], isDone = done[k];
+      const bb = idx === this.ORDER.length - 1 ? '' : 'border-bottom:1px solid var(--b2);';
+      const circle = isDone
+        ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+        : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
+      const toggle = isDone
+        ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+        : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>';
+      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;' + bb + '">'
+        + circle
+        + '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+        +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (isDone ? 'Closed out' : 'Not done') + '</div></div>'
+        + toggle + '</div>';
+    }).join('');
+    return '<div class="card" style="padding:0;overflow:hidden;">' + rows + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:12px;line-height:1.6;">'
+      +   'This is your close for the week of ' + this.fmtWk(this.weekStart()) + ' to ' + this.fmtWk(this.weekEnd()) + '. '
+      +   'Your live trapped cash, runway, and safe-to-spend are on <strong>This Week</strong>.</div>';
   },
 
   // ── Recovery Scoreboard (the cash money hero) ────────────────────────────────
