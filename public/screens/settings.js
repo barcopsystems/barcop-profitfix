@@ -309,6 +309,14 @@ S.HubSettings = {
         const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
         localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
       }
+      // Control sections, current week mid-close: the first two close steps are
+      // done, the last two still to do. Keyed to each page's own done-key (the
+      // current week), so it rolls forward week to week with no stale dates.
+      if (window.S) {
+        if (S.InventoryDashboard) localStorage.setItem(S.InventoryDashboard._doneKey(), JSON.stringify({ deliveries: true }));
+        if (S.LaborDashboard)     localStorage.setItem(S.LaborDashboard._doneKey(),     JSON.stringify({ hours: true, tips: true }));
+        if (S.ShiftDashboard)     localStorage.setItem(S.ShiftDashboard._doneKey(),     JSON.stringify({ import: true, cash: true }));
+      }
     } catch (e) {}
 
     const uid = () => App.uid();
@@ -2151,17 +2159,16 @@ S.HubSettings = {
         scDays.push({ date:date, manager:mgrs[di % 3] });
       });
     });
-    // Current partial week: the demo operator has rung this week's days up to
-    // yesterday, so Shift's Close The Week shows in-progress sales like every
-    // other section instead of an empty page. In the live app a fresh week
-    // starts at zero and fills as the operator imports the week's POS export.
+    // Current week, mid-close: the operator has run their end-of-week sales
+    // import (one file, the whole week), so Shift's Close The Week shows the full
+    // week's revenue with step 1 done. Live: a fresh week is zero until imported.
     const curWk = ANCHS.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHS.weeks[0]);
-    const monAgo = (sunOff === 0 ? 6 : sunOff - 1);
-    if (curWk) for (let ago = monAgo; ago >= 1; ago--) {
-      const w = dayW[monAgo - ago] || 0.12;
+    const curBaseAgo = sunOff - 7;   // days-ago of THIS week's Sunday (negative mid-week)
+    if (curWk) for (let di = 0; di < 7; di++) {
+      const w = dayW[di] || 0.12;
       const dBar = Math.round(curWk.bar_rev * w), dFloor = Math.round(curWk.food_rev * w);
       scShifts.push({
-        id:uid(), date:dateStr(ago), bar_revenue:dBar, floor_revenue:dFloor,
+        id:uid(), date:dateStr(curBaseAgo + 6 - di), bar_revenue:dBar, floor_revenue:dFloor,
         total_revenue:dBar + dFloor, covers:Math.round(curWk.covers * w),
         shift_type:'Full Day', status:'Closed', imported:true, created_at:new Date().toISOString()
       });
@@ -2832,6 +2839,16 @@ S.HubSettings = {
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
       lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
     });
+    // Current week, mid-close: the operator has imported this week's hours, so
+    // Labor's Close The Week shows the full week with step 1 done. Live: zero
+    // until imported. Latest week's labor through the same allocator.
+    const curL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
+    const curLBase = sunOff - 7;
+    if (curL) {
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       curL.bar_labor,        curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       curL.food_labor * 0.5, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], curL.food_labor * 0.5, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+    }
     App.laborData.lc_actuals   = lcActuals;
 
     // ── Schedules — the two most recent weeks, built from the roster ──
