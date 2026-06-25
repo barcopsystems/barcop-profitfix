@@ -476,24 +476,36 @@ S.Hub = {
         +   (o.line2 ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);padding-top:10px;">' + o.line2 + '</div>' : '')
         + '</div></div>';
     };
-    const icCard = secCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory',
-      big: icCounted ? 'On Track' : (icLast ? 'Count Due' : 'Set Up'),
-      bigColor: icCounted ? 'var(--green)' : 'var(--amber)',
-      bigSub: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet',
-      line2: 'Close the week: count, order, receive, review the flags.' });
-    const lcCard = secCard({ title:'Labor', screen:'lc-dashboard', mod:'labor',
-      statusOk: lcLogged, statusText: lcLogged ? 'Logged' : 'Log hours',
-      big: rW?.labor_pct_blended != null ? App.fmtPct(rW.labor_pct_blended) : '-',
-      bigColor: rW?.labor_pct_blended != null ? bandColor(band(rW.labor_pct_blended, laborT, 'low')) : 'var(--t4)',
-      bigSub: 'Labor cost · target ' + laborT + '%',
-      line2: 'Close the week: build the schedule, log the hours, watch overtime.' });
+    // Control cards mirror each section's real Close The Week as a mini-checklist
+    // (steps + done marks read straight off the section via hubSteps()), with the
+    // section's key stat as a footer. One source of truth: the page owns the steps.
+    const stepCard = (title, screen, mod, sum, footer) => {
+      sum = sum || { steps: [], doneCount: 0, total: 0 };
+      const allDone = sum.total > 0 && sum.doneCount === sum.total;
+      const pill = sum.total > 0
+        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (allDone ? 'var(--green)' : 'var(--t3)') + ';">' + sum.doneCount + ' of ' + sum.total + ' done</span>'
+        : '';
+      const rows = sum.steps.map(s =>
+        '<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;line-height:1.3;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+        + (s.done
+            ? '<span style="flex-shrink:0;width:15px;text-align:center;color:var(--green);font-weight:800;">&#10003;</span>'
+            : '<span style="flex-shrink:0;width:15px;display:flex;justify-content:center;"><span style="width:6px;height:6px;border-radius:50%;background:var(--t4);"></span></span>')
+        + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span></div>').join('');
+      return '<div style="display:flex;flex-direction:column;min-width:0;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + esc(title) + '</div>' + pill + '</div>'
+        + '<div class="hd-row" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
+        +   rows
+        +   (footer ? '<div style="font-size:11px;color:var(--t3);border-top:1px solid var(--row-div);margin-top:8px;padding-top:9px;">' + footer + '</div>' : '')
+        + '</div></div>';
+    };
+    const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
     const scRev = (pW ? (pW.bar?.revenue || 0) + (pW.food?.revenue || 0) : 0);
-    const scCard = secCard({ title:'Shift', screen:'sc-dashboard', mod:'shift',
-      statusOk: pfCurrent, statusText: pfCurrent ? 'Imported' : 'Import sales',
-      big: pW ? App.fmtCurrency(scRev, 0) : '-',
-      bigColor: 'var(--t1)',
-      bigSub: pW ? 'Last week sales' : 'No week logged yet',
-      line2: 'Close the week: import POS sales, reconcile cash, clear exceptions.' });
+    const icCard = stepCard('Inventory', 'ic-dashboard', 'inventory', safeSteps(S.InventoryDashboard),
+      icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet');
+    const lcCard = stepCard('Labor', 'lc-dashboard', 'labor', safeSteps(S.LaborDashboard),
+      rW?.labor_pct_blended != null ? 'Labor ' + App.fmtPct(rW.labor_pct_blended) + ' · target ' + laborT + '%' : 'No week logged yet');
+    const scCard = stepCard('Shift', 'sc-dashboard', 'shift', safeSteps(S.ShiftDashboard),
+      pW ? 'Last week ' + App.fmtCurrency(scRev, 0) : 'No week logged yet');
     const pfCard = secCard({ title:'Profit', screen:'dashboard', mod:'profit',
       statusOk: pfCurrent, statusText: pfCurrent ? 'Week in' : 'Confirm week',
       big: pW?.prime_cost_pct != null ? App.fmtPct(pW.prime_cost_pct) : '-',
