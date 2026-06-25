@@ -171,11 +171,55 @@ window.AuditOutlook = {
     if (auditType === 'profit')   return 'Profit Recovery';
     if (auditType === 'revenue')  return 'Revenue Recovery';
     if (auditType === 'traffic')  return 'Traffic Recovery';
+    if (auditType === 'cash')     return 'Cash Recovery';
     if (auditType === 'bar-cop')  return 'Bar Cop';
     return 'Operational';
   },
 
   _buildPrompt(auditType, audit) {
+    if (auditType === 'cash') return this._buildCashPrompt(audit);
+    return this._buildScorePrompt(auditType, audit);
+  },
+
+  // Cash audits do not have a per-action monthly dollar (the opportunity is a
+  // one-time amount and the rest is timing), so the generic score prompt would
+  // miss the point. This one leads with the survival story off the 13-week
+  // forecast and names the single move that fixes the tight week.
+  _buildCashPrompt(audit) {
+    const d = audit.raw || {};
+    const date  = (audit.date || '').slice(0, 10) || 'unknown';
+    const score = audit.overall_score != null ? audit.overall_score : 'n/a';
+    const sections = audit.sections || {};
+    const sectionLines = Object.keys(sections).map(n => '- ' + n + ': ' + (sections[n] != null ? sections[n] : 'n/a')).join('\n') || '- none';
+    const m = (v) => v == null ? 'n/a' : '$' + Math.round(v).toLocaleString();
+    const dys = (v) => v == null ? 'n/a' : Math.round(v) + ' days';
+    const runway = d.HAS_OPENING ? (d.RUNWAY == null ? 'holds all 13 weeks' : (d.RUNWAY === 0 ? 'runs out this week' : d.RUNWAY + ' weeks')) : 'not set (no opening balance)';
+    const low = d.HAS_OPENING && d.LOW_POINT_WEEK ? (d.LOW_POINT_WEEK + ' at ' + m(d.LOW_POINT_BAL)) : 'n/a';
+
+    return 'You are a 30-year bar and restaurant operator writing a brief cash analysis for a fellow owner. '
+      + 'This is the survival read: can they make it through the next quarter, and where is their money really going. '
+      + 'Write 2 to 3 short paragraphs. Direct operator-to-operator voice. Plain sentences. Specific numbers from the data below. '
+      + 'Strict rules: no emdashes, no "--" double dashes, no bullet points, no headers, no AI words like "cadence" or "leverage" or "robust" or "going forward" or "ecosystem" or "synthesize". '
+      + 'First paragraph: the survival story. Lead with the runway and the tightest week, what the cash picture says about the next 13 weeks right now. '
+      + 'Second paragraph: where the cash is stuck, the trapped shelf cash and how many days the cash stays locked in the cycle, with the numbers. '
+      + 'Third paragraph: the single most important move to make this week to cover the tight week or free the cash. One clear action. '
+      + 'Total length: 150 to 200 words.\n\n'
+      + 'AUDIT DATE: ' + date + '\n'
+      + 'OVERALL CASH SCORE: ' + score + '\n\n'
+      + 'SECTION SCORES:\n' + sectionLines + '\n\n'
+      + 'THE 13-WEEK SURVIVAL PICTURE:\n'
+      + '- Runway: ' + runway + '\n'
+      + '- Tightest week: ' + low + '\n'
+      + '- Tight weeks (more cash out than in): ' + (d.TIGHT_WEEKS != null ? d.TIGHT_WEEKS : 'n/a') + ' of 13\n'
+      + '- Safe to spend right now: ' + (d.SAFE_TO_SPEND != null ? m(d.SAFE_TO_SPEND) : 'n/a (opening balance not set)') + '\n\n'
+      + 'WHERE THE CASH IS STUCK:\n'
+      + '- Cash to free (one-time, dead stock + above par): ' + m(d.TRAPPED_CASH) + '\n'
+      + '- Of that, dead stock: ' + m(d.DEAD_STOCK) + '; above par: ' + m(d.OVERSTOCK) + '\n'
+      + '- Cash locked in the cycle: ' + dys(d.CYCLE_DAYS) + ' (product sits ' + dys(d.DIO) + ', you take ' + dys(d.DPO) + ' to pay)\n'
+      + '- Vendors on terms: ' + (d.VENDORS_ON_TERMS != null ? d.VENDORS_ON_TERMS + ' of ' + d.TOTAL_VENDORS : 'n/a') + '\n';
+  },
+
+  _buildScorePrompt(auditType, audit) {
     const typeLabel  = this._typeLabel(auditType);
     const date       = (audit.date || '').slice(0, 10) || 'unknown';
     const score      = audit.overall_score != null ? audit.overall_score : 'n/a';
