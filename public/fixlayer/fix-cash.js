@@ -47,7 +47,7 @@ FIX.cash = [
       steps: [
         { kind: 'result', target: 'c-purchasing', targetLabel: 'Purchasing',
           title: 'Check how many weeks you are carrying',
-          detail: 'Open Purchasing and read your weeks on hand against your usage, and which categories are overstocked. Two to three weeks is healthy for most bars.' },
+          detail: 'Open Purchasing and read your weeks on hand against your usage, and which categories are overstocked. Two to three weeks is healthy for most bars. Capital Efficiency goes deeper, showing which categories turn slowest, where your cash sits longest.' },
         { kind: 'action', target: 'ic-par-suggestions', targetLabel: 'Dynamic Pars',
           title: 'Tune your pars to real usage',
           detail: 'Set pars off what you actually use, not a comfort number. If a category keeps coming in overstocked, the par is too high.' },
@@ -70,12 +70,12 @@ FIX.cash = [
     id: 'stay-ahead',
     name: 'Stay Ahead of the Week',
     module: 'cash',
-    summary: 'Cash is about timing as much as amount. Line up what is going out against what is coming in two to four weeks ahead, so a heavy week does not catch you short.',
+    summary: 'Cash is about timing as much as amount. Line up what is going out against what is coming in across the quarter ahead, so a heavy week does not catch you short.',
     process: {
       steps: [
         { kind: 'result', target: 'c-forecast', targetLabel: 'Cash Forecast',
-          title: 'Read the next four weeks',
-          detail: 'Open the Cash Forecast and read cash in against cash out, week by week. Enter your cash on hand to see a running balance and a runway.' },
+          title: 'Read the quarter ahead',
+          detail: 'Open the Cash Forecast and read cash in against cash out across the next thirteen weeks. Enter your cash on hand to see a running balance, your low-point week, and your runway, and stress-test a slow season or a big buy before you commit to it.' },
         { kind: 'action',
           title: 'Spot any tight week',
           detail: 'Find the week where cash out beats cash in. A quarterly bill landing on a slow week, the same week as a big order, is the kind of thing that catches an operator short.' },
