@@ -1,13 +1,13 @@
 'use strict';
 /* ── Shared Audit UI ───────────────────────────────────────────────────────
-   THE single source of truth for the Profit / Revenue / Traffic audit layout:
+   THE single source of truth for the Profit / Revenue / Cash audit layout:
    the landing request card, the merged Latest-Audit card (summary + section
    breakdown rows), the 12-month score-history bars, the Audit History list, and
    the full-view hero + recoverable strip + Action Items + scored-section blocks
    + Fix buttons. Each audit screen supplies only its own section DEFINITIONS and
    data; the LAYOUT lives here so all three stay identical and a future tweak is
    made once. `pfx` = the screen's button-class prefix ('at' profit / 'ra'
-   revenue / 'ta' traffic). Built off the Profit audit (audit-tracker.js). */
+   revenue / 'ca' cash). Built off the Profit audit (audit-tracker.js). */
 const AuditUI = {
 
   // Data-quality tier badge — app colors only (gold-tint full / neutral else).

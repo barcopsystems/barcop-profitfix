@@ -150,7 +150,7 @@ S.Dashboard = {
     const weeks = (App.data.weeks || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
-    // Once-a-week cache (shared with Revenue and Traffic): re-open the stored
+    // Once-a-week cache (shared with Revenue and Cash): re-open the stored
     // read for free, regenerate only when it is a week old. No manual refresh.
     const rec = DashUI._insRec('profit');
     if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }

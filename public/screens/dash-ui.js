@@ -1,5 +1,5 @@
 'use strict';
-// Shared layout for the Recovery dashboards (Profit/Revenue/Traffic). Holds only
+// Shared layout for the Recovery dashboards (Profit/Revenue/Cash). Holds only
 // the layout skeleton + generic panels; each screen supplies its own content
 // (the Recovery Scoreboard hero + leak rows come from FixPanel; forecast,
 // insights, and audit data are per-module). Same move as AuditUI, so a layout
