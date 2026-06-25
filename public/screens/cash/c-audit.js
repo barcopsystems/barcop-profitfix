@@ -1,19 +1,23 @@
 'use strict';
 
 /* ── Cash Recovery — Cash Audit ───────────────────────────────────────────────
-   The weekly cash-health score on the shared AuditUI shell, identical in layout
-   to the Profit/Revenue audits. The one difference is honest by necessity: those
-   score on the server; Cash scores CLIENT-side off CashEngine, because the cash
-   math lives here and duplicating it on the server would be a place for the
-   numbers to drift. Four sections: Inventory Capital, Purchasing Discipline, Cash
-   Position, Payment Terms. The opportunity hero is "Cash to Free", a one-time
-   amount, so it does NOT use the shared monthly-times-twelve strip, which would
-   misstate it. Reads CashEngine; stores in cash_audits. */
+   The weekly read on cash health, scored on the four disciplines that decide
+   whether a profitable bar runs flush or tight: Capital Efficiency (how hard the
+   cash on the shelf works), the Cash Conversion Cycle (how many days your money
+   is locked), Liquidity and Runway (whether the weeks ahead hold), and Payment
+   Terms (whether you keep your float instead of paying early). It scores CLIENT
+   side off CashEngine, because all the cash math lives there and a second copy on
+   the server would be a place for the numbers to drift. The opportunity hero is
+   "Cash to Free", a one-time amount, so it does NOT use the shared monthly-times-
+   twelve strip, which would misstate it. Reads CashEngine; stores in cash_audits. */
 
 S.CashAudit = {
-  SECTION_NAMES: ['Inventory Capital', 'Purchasing Discipline', 'Cash Position', 'Payment Terms'],
+  SECTION_NAMES: ['Capital Efficiency', 'Cash Conversion Cycle', 'Liquidity & Runway', 'Payment Terms'],
 
   audits() { return (App.data.cash_audits || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)); },
+
+  fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
+  runwayLabel(r) { return r == null ? '13+ wks' : r === 0 ? 'This week' : r + ' wk' + (r === 1 ? '' : 's'); },
 
   render(container, actions) {
     this.container = container;
@@ -29,7 +33,7 @@ S.CashAudit = {
     const daysSince = latest && latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 7;
     const daysLeft = canRun ? 0 : 7 - daysSince;
-    const desc = 'A weekly read on your cash health: how much capital is trapped on the shelf, how disciplined your buying is, whether the weeks ahead are tight, and if you are holding your vendor terms. It reads straight off your counts, orders, and bills, nothing to type.';
+    const desc = 'A weekly read on your cash health: how hard the cash on your shelves works, how many days your money stays locked, whether the weeks ahead run tight, and if you are holding your vendor terms. It reads straight off your counts, orders, schedule, and bills, nothing to type.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.requestCard('ca', 'Cash Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : AuditUI.emptyState())
@@ -48,18 +52,20 @@ S.CashAudit = {
     this.actions.appendChild(back);
 
     const counts = CashEngine.countsAsc().length;
-    const orders = ((App.inventoryData && App.inventoryData.ic_orders) || []).length;
+    const sched = ((App.laborData && App.laborData.lc_schedules) || []).length;
     const bills = CashEngine.bills().length;
     const terms = CashEngine.termVendors().length;
+    const opening = CashEngine.openingCash() != null;
     const checks = [
-      { label: counts + ' inventory count' + (counts === 1 ? '' : 's'), ok: counts > 0 },
-      { label: 'Orders and deliveries', ok: orders > 0 },
+      { label: counts + ' inventory count' + (counts === 1 ? '' : 's'), ok: counts > 1 },
+      { label: 'Schedule and sales', ok: sched > 0 },
       { label: bills + ' bill' + (bills === 1 ? '' : 's') + ' in Books', ok: bills > 0 },
-      { label: terms + ' vendor' + (terms === 1 ? '' : 's') + ' on terms', ok: terms > 0 }
+      { label: terms + ' vendor' + (terms === 1 ? '' : 's') + ' on terms', ok: terms > 0 },
+      { label: 'Opening cash balance', ok: opening }
     ];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.formCard('Generate Your Cash Audit',
-          AuditUI.intakeHasBlock('What Bar Cop Reads', 'The Cash Audit scores off the data you already keep. Nothing to enter; the more current your counts, the sharper it reads.', checks))
+          AuditUI.intakeHasBlock('What Bar Cop Reads', 'The Cash Audit scores off the data you already keep. Nothing to enter. Setting your opening cash balance in Cash Position sharpens the runway read.', checks))
       + AuditUI.intakeSubmit('ca')
       + '</div>';
     document.getElementById('ca-iz-submit')?.addEventListener('click', () => this.generate());
@@ -76,52 +82,95 @@ S.CashAudit = {
     setTimeout(() => this.viewAudit(0), 100);
   },
 
-  // ── Client-side scoring, honest by construction (reads the same CashEngine the
-  //    cash screens show). Each section null when there is no basis yet. ────────
+  // ── Client-side scoring on the four real treasury disciplines, honest by
+  //    construction (reads the same CashEngine the cash screens show). Each
+  //    section is null when there is no basis for it yet. ──────────────────────
   _computeAudit() {
-    const trapped = CashEngine.trapped();
-    const over = CashEngine.overOrder(3);
-    const fc = CashEngine.forecast(4);
-    const tv = CashEngine.termVendors();
-    const totalV = CashEngine.vendors().length;
-    const invValue = CashEngine.onHand().value;
-    const tight = fc.filter(r => r.net < 0).length;
-    const thisWeekNet = fc.length ? fc[0].net : 0;
-    const fourNet = fc.reduce((s, r) => s + r.net, 0);
+    const E = CashEngine;
     const clamp = v => Math.max(0, Math.min(100, Math.round(v)));
 
+    // S1 Capital Efficiency: the share of shelf cash that is lazy (dead + above
+    // par), with the per-category turns/GMROI as the depth behind the number.
+    const trapped = E.trapped();
+    const cap = E.capitalSummary();
+    const invValue = E.onHand().value;
     let s1 = null;
     if (trapped.hasData && invValue > 0) s1 = clamp(100 - (trapped.total / invValue) * 250);
+    const lazyCats = cap.rows.filter(r => r.gmroi != null && r.gmroi < 1.5).map(r => r.cat);
+
+    // S2 Cash Conversion Cycle: days your cash is locked (product sits minus days
+    // you take to pay). Zero or negative is ideal; 25 days is below target.
+    const cyc = E.cashCycle();
     let s2 = null;
-    if (over.hasData && over.weeksOnHand != null) s2 = clamp(100 - Math.max(0, over.weeksOnHand - over.targetWeeks) * 20);
-    const s3 = clamp(100 - tight * 25);
-    const s4 = totalV > 0 ? clamp(tv.length / totalV * 100) : null;
+    if (cyc.hasData) s2 = clamp(100 - Math.max(0, cyc.cycle) * 2);
+
+    // S3 Liquidity & Runway: the 13-week survival picture. Tight weeks (net cash
+    // out) is the always-available base; opening cash refines it with runway and
+    // a Safe-to-Spend check.
+    const sf = E.survivalForecast(13);
+    const pos = E.position();
+    let s3 = null;
+    if (sf.hasData) {
+      let v = 100 - sf.tightWeeks * 8;
+      if (sf.hasOpening) {
+        if (sf.runway != null) v = Math.min(v, sf.runway * 7);
+        if (pos.safe < 0) v -= 20;
+      }
+      s3 = clamp(v);
+    }
+
+    // S4 Payment Terms: how much of your buying is on terms, and the float you
+    // actually hold (spend-weighted days to pay).
+    const tv = E.termVendors();
+    const totalV = E.vendors().length;
+    const dpo = E._weightedDPO();
+    let s4 = null;
+    if (totalV > 0) {
+      const onTermsPct = tv.length / totalV;
+      const dpoScore = Math.min(1, dpo / 30);
+      s4 = clamp((onTermsPct * 0.6 + dpoScore * 0.4) * 100);
+    }
 
     const names = this.SECTION_NAMES;
     const sections = {};
     [s1, s2, s3, s4].forEach((v, i) => { if (v != null) sections[names[i]] = v; });
     const vals = [s1, s2, s3, s4].filter(v => v != null);
     const overall = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-    const cashToFree = trapped.total + (over.excess || 0);
 
+    // The opportunity hero is the de-duplicated trapped total (dead stock + above
+    // par per product). The over-order excess is a different framing of the same
+    // overstock, so it is NOT added here, which would double count.
+    const cashToFree = trapped.total;
+
+    const cur = v => App.fmtCurrency(v);
     const ai = [];
-    if (trapped.hasData && trapped.total > 0) ai.push({ s: s1, action: 'Free ' + App.fmtCurrency(trapped.total) + ' trapped on your shelves: ' + App.fmtCurrency(trapped.dead) + ' in dead stock, ' + App.fmtCurrency(trapped.overPar) + ' above par.', gap_id: 'free-trapped' });
-    if (over.hasData && over.excess > 0) ai.push({ s: s2, action: 'You are carrying ' + over.weeksOnHand.toFixed(1) + ' weeks of inventory. Order to par to free about ' + App.fmtCurrency(over.excess) + '.', gap_id: 'order-to-par' });
-    if (tight > 0) ai.push({ s: s3, action: tight + ' tight week' + (tight === 1 ? '' : 's') + ' in the next four. Move a payment or hold an order to cover it.', gap_id: 'stay-ahead' });
+    if (trapped.hasData && trapped.total > 0) ai.push({ s: s1, action: 'Free ' + cur(trapped.total) + ' of lazy shelf cash: ' + cur(trapped.dead) + ' in dead stock, ' + cur(trapped.overPar) + ' above par.', gap_id: 'free-trapped' });
+    if (cyc.hasData && cyc.cycle > 7) ai.push({ s: s2, action: 'Your cash is locked about ' + Math.round(cyc.cycle) + ' days. Order to par to free roughly ' + cur(cyc.dailyCogs) + ' for each day you shorten it.', gap_id: 'order-to-par' });
+    if (sf.hasData && sf.tightWeeks > 0) ai.push({ s: s3, action: sf.tightWeeks + ' tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next thirteen' + (sf.hasOpening && sf.lowPoint ? ', bottoming out ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + cur(sf.lowPoint.balance) : '') + '. Move a payment or hold an order to cover it.', gap_id: 'stay-ahead' });
     if (totalV > 0 && tv.length < totalV) ai.push({ s: s4, action: 'Set payment terms on the ' + (totalV - tv.length) + ' vendor' + ((totalV - tv.length) === 1 ? '' : 's') + ' without them, so you stop paying early.', gap_id: 'pay-on-terms' });
     ai.sort((a, b) => (a.s == null ? 100 : a.s) - (b.s == null ? 100 : b.s));
     const action_items = ai.map(x => ({ action: x.action, gap_id: x.gap_id }));
 
-    const cur = v => App.fmtCurrency(v);
     const raw = {
+      // S1
       TRAPPED_CASH: trapped.total, INVENTORY_VALUE: invValue, DEAD_STOCK: trapped.dead, OVERSTOCK: trapped.overPar,
-      WEEKS_ON_HAND: over.weeksOnHand, TARGET_WEEKS: over.targetWeeks, EXCESS_CASH: over.excess,
-      TIGHT_WEEKS: tight, THIS_WEEK_NET: thisWeekNet, FOUR_WEEK_NET: fourNet,
-      VENDORS_ON_TERMS: tv.length, TOTAL_VENDORS: totalV,
-      S1_FINDING: s1 == null ? '' : (trapped.total > 0 ? 'You have ' + cur(trapped.total) + ' of your shelf cash frozen in stock that is not moving or sitting above par. Freeing it puts real money back in the account.' : 'Almost none of your shelf cash is trapped. Your inventory is working.'),
-      S2_FINDING: s2 == null ? '' : (over.excess > 0 ? 'You are carrying ' + over.weeksOnHand.toFixed(1) + ' weeks of inventory against a ' + over.targetWeeks + '-week target, about ' + cur(over.excess) + ' tied up beyond what you use.' : 'Your buying is tight, right in line with your usage.'),
-      S3_FINDING: tight > 0 ? tight + ' of the next four weeks have more cash going out than coming in. Catch them on the forecast and move a payment or hold an order before they land.' : 'No tight weeks in the next four. Your cash timing looks clear.',
-      S4_FINDING: s4 == null ? '' : (tv.length < totalV ? tv.length + ' of ' + totalV + ' vendors are on terms. Set terms on the rest and hold every bill to its due date to keep your float.' : 'Every vendor is on terms. Hold each bill to its due date to keep the float yours.')
+      BLENDED_TURNS: cap.turns, BLENDED_GMROI: cap.gmroi, LAZY_CATS: lazyCats,
+      // S2
+      DIO: cyc.hasData ? cyc.dio : null, DPO: cyc.hasData ? cyc.dpo : null, CYCLE_DAYS: cyc.hasData ? cyc.cycle : null,
+      LOCKED_CASH: cyc.hasData ? cyc.lockedCash : null, DAILY_COGS: cyc.hasData ? cyc.dailyCogs : null,
+      // S3
+      TIGHT_WEEKS: sf.hasData ? sf.tightWeeks : null, RUNWAY: sf.runway, HAS_OPENING: sf.hasOpening,
+      OPENING_CASH: sf.hasOpening ? sf.opening : null, END_BALANCE: sf.hasData ? sf.end : null,
+      LOW_POINT_BAL: (sf.hasData && sf.lowPoint) ? sf.lowPoint.balance : null,
+      LOW_POINT_WEEK: (sf.hasData && sf.lowPoint) ? this.fmtWk(sf.lowPoint.ws) : '',
+      SAFE_TO_SPEND: pos.hasOpening ? pos.safe : null,
+      // S4
+      VENDORS_ON_TERMS: tv.length, TOTAL_VENDORS: totalV, WEIGHTED_DPO: dpo,
+      // findings
+      S1_FINDING: this._s1Finding(s1, trapped, invValue, cap, lazyCats),
+      S2_FINDING: this._s2Finding(s2, cyc),
+      S3_FINDING: this._s3Finding(s3, sf, pos),
+      S4_FINDING: this._s4Finding(s4, tv.length, totalV, dpo)
     };
 
     return {
@@ -137,6 +186,40 @@ S.CashAudit = {
     };
   },
 
+  _s1Finding(s1, trapped, invValue, cap, lazyCats) {
+    if (s1 == null) return '';
+    const cur = v => App.fmtCurrency(v);
+    const turnsTxt = cap.turns != null ? ' Your shelf cash turns ' + cap.turns.toFixed(1) + ' times a year at a ' + (cap.gmroi != null ? '$' + cap.gmroi.toFixed(2) + ' GMROI' : 'thin return') + '.' : '';
+    const lazyTxt = lazyCats.length ? ' The capital working hardest against you sits in ' + lazyCats.join(', ') + '.' : '';
+    if (trapped.total > 0) return 'You have ' + cur(trapped.total) + ' of your shelf cash frozen in stock that is not moving or sitting above par, against ' + cur(invValue) + ' on hand. Freeing it puts real money back in the account.' + turnsTxt + lazyTxt;
+    return 'Almost none of your shelf cash is trapped. Your inventory is working.' + turnsTxt;
+  },
+  _s2Finding(s2, cyc) {
+    if (s2 == null || !cyc.hasData) return '';
+    const cur = v => App.fmtCurrency(v);
+    const d = v => Math.round(v) + ' day' + (Math.round(v) === 1 ? '' : 's');
+    if (cyc.cycle > 0) return 'Your cash is locked about ' + d(cyc.cycle) + ': product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay. About ' + cur(cyc.lockedCash) + ' is tied up in that cycle, and every day you shorten it frees roughly ' + cur(cyc.dailyCogs) + '. Order to par to cut the days product sits, and hold your terms to stretch the days you pay.';
+    return 'Your cash comes back before the bills are due. Product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay, so your vendors are financing your inventory. Hold that.';
+  },
+  _s3Finding(s3, sf, pos) {
+    if (s3 == null || !sf.hasData) return '';
+    const cur = v => App.fmtCurrency(v);
+    if (!sf.hasOpening) {
+      if (sf.tightWeeks > 0) return sf.tightWeeks + ' of the next thirteen weeks have more cash going out than coming in. Set your opening cash balance in Cash Position to turn this into a real runway and see exactly which week runs thin.';
+      return 'No tight weeks in the next thirteen, your cash timing looks clear. Set your opening cash balance in Cash Position to see the full runway.';
+    }
+    const lowTxt = sf.lowPoint ? ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + cur(sf.lowPoint.balance) + '.' : '';
+    const safeTxt = (pos.safe != null && pos.safe < 0) ? ' Your Safe to Spend is under zero, you are leaning on money already spoken for.' : '';
+    if (sf.runway != null) return 'Your cash runs about ' + this.runwayLabel(sf.runway) + ' before it would go negative.' + lowTxt + ' Free trapped cash and hold payments to their due dates to push the runway out.' + safeTxt;
+    return 'Your cash holds all thirteen weeks.' + lowTxt + ' ' + (sf.tightWeeks > 0 ? sf.tightWeeks + ' week' + (sf.tightWeeks === 1 ? '' : 's') + ' run tight on flow, catch them on the forecast before they land.' : 'No tight weeks ahead.') + safeTxt;
+  },
+  _s4Finding(s4, onTerms, totalV, dpo) {
+    if (s4 == null) return '';
+    const d = Math.round(dpo);
+    if (onTerms < totalV) return onTerms + ' of ' + totalV + ' vendors are on terms, and you hold about ' + d + ' day' + (d === 1 ? '' : 's') + ' on average before you pay. Set terms on the rest and pay each bill on its due date, not early, to keep the float.';
+    return 'Every vendor is on terms and you hold about ' + d + ' day' + (d === 1 ? '' : 's') + ' on average. Keep paying on the due date, not before, to keep the float yours.';
+  },
+
   viewAudit(idx) {
     const audit = this.audits()[idx];
     if (!audit) return;
@@ -147,27 +230,33 @@ S.CashAudit = {
     const d = audit.raw || {};
     const sx = audit.sections || {};
     const cur = v => v != null && v !== 0 ? App.fmtCurrency(v) : '';
-    const signed = v => v != null ? (v < 0 ? '-' : '+') + App.fmtCurrency(Math.abs(v)) : '';
+    const days = v => v != null ? Math.round(v) + 'd' : '';
     const N = this.SECTION_NAMES;
     const sections = [
       AuditUI.sectionBlock(1, N[0], sx[N[0]], [
         ['Trapped Cash', cur(d.TRAPPED_CASH), d.TRAPPED_CASH > 0 ? 'warn' : 'good'],
         ['In Dead Stock', cur(d.DEAD_STOCK), d.DEAD_STOCK > 0 ? 'warn' : ''],
         ['Above Par', cur(d.OVERSTOCK), d.OVERSTOCK > 0 ? 'warn' : ''],
-        ['Inventory Value', cur(d.INVENTORY_VALUE)]
+        ['Inventory Value', cur(d.INVENTORY_VALUE)],
+        ['Blended Turns', d.BLENDED_TURNS != null ? d.BLENDED_TURNS.toFixed(1) + 'x' : ''],
+        ['Blended GMROI', d.BLENDED_GMROI != null ? '$' + d.BLENDED_GMROI.toFixed(2) : '', (d.BLENDED_GMROI != null && d.BLENDED_GMROI < 1.5) ? 'warn' : '']
       ], null, d),
       AuditUI.sectionBlock(2, N[1], sx[N[1]], [
-        ['Weeks On Hand', d.WEEKS_ON_HAND != null ? d.WEEKS_ON_HAND.toFixed(1) + 'w' : '', (d.WEEKS_ON_HAND != null && d.WEEKS_ON_HAND > d.TARGET_WEEKS) ? 'warn' : 'good'],
-        ['Target', d.TARGET_WEEKS != null ? d.TARGET_WEEKS + 'w' : ''],
-        ['Tied Beyond Target', cur(d.EXCESS_CASH), d.EXCESS_CASH > 0 ? 'warn' : '']
+        ['Cash Locked', d.CYCLE_DAYS != null ? days(d.CYCLE_DAYS) : '', (d.CYCLE_DAYS != null && d.CYCLE_DAYS > 30) ? 'warn' : 'good'],
+        ['Product Sits', days(d.DIO)],
+        ['You Take to Pay', days(d.DPO)],
+        ['Cash Tied in Cycle', cur(d.LOCKED_CASH), d.LOCKED_CASH > 0 ? 'warn' : '']
       ], null, d),
       AuditUI.sectionBlock(3, N[2], sx[N[2]], [
         ['Tight Weeks Ahead', d.TIGHT_WEEKS != null ? String(d.TIGHT_WEEKS) : '', d.TIGHT_WEEKS > 0 ? 'warn' : 'good'],
-        ['This Week Net', signed(d.THIS_WEEK_NET), d.THIS_WEEK_NET < 0 ? 'warn' : ''],
-        ['Four-Week Net', signed(d.FOUR_WEEK_NET), d.FOUR_WEEK_NET < 0 ? 'warn' : '']
+        ['Runway', d.HAS_OPENING ? this.runwayLabel(d.RUNWAY) : '', d.HAS_OPENING && d.RUNWAY != null ? 'warn' : ''],
+        ['Low-Point Week', d.HAS_OPENING ? d.LOW_POINT_WEEK : ''],
+        ['Low Point', d.HAS_OPENING ? cur(d.LOW_POINT_BAL) : '', (d.HAS_OPENING && d.LOW_POINT_BAL < 0) ? 'warn' : ''],
+        ['Safe to Spend', d.SAFE_TO_SPEND != null ? App.fmtCurrency(d.SAFE_TO_SPEND) : '', (d.SAFE_TO_SPEND != null && d.SAFE_TO_SPEND < 0) ? 'warn' : '']
       ], null, d),
       AuditUI.sectionBlock(4, N[3], sx[N[3]], [
-        ['Vendors On Terms', d.TOTAL_VENDORS ? d.VENDORS_ON_TERMS + ' of ' + d.TOTAL_VENDORS : '', (d.TOTAL_VENDORS && d.VENDORS_ON_TERMS < d.TOTAL_VENDORS) ? 'warn' : 'good']
+        ['Vendors On Terms', d.TOTAL_VENDORS ? d.VENDORS_ON_TERMS + ' of ' + d.TOTAL_VENDORS : '', (d.TOTAL_VENDORS && d.VENDORS_ON_TERMS < d.TOTAL_VENDORS) ? 'warn' : 'good'],
+        ['Days You Hold', d.WEIGHTED_DPO ? Math.round(d.WEIGHTED_DPO) + 'd' : '']
       ], null, d)
     ].join('');
 
@@ -183,14 +272,16 @@ S.CashAudit = {
     this.container.querySelectorAll('.ca-fix-btn').forEach(btn => btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('c-fix'); }));
   },
 
-  // The opportunity hero: Cash to Free is a ONE-TIME amount, never annualized.
+  // The opportunity hero spans the disciplines: the one-time cash you can free,
+  // how long it stays locked, and whether the weeks ahead run tight. Cash to Free
+  // is a ONE-TIME amount, never annualized.
   cashStrip(audit) {
     const d = audit.raw || {};
     const calc = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calc('Cash to Free', App.fmtCurrency(audit.cash_to_free || 0), 'good')
-      + calc('Weeks On Hand', d.WEEKS_ON_HAND != null ? d.WEEKS_ON_HAND.toFixed(1) + 'w' : '-')
-      + calc('Tight Weeks', String(d.TIGHT_WEEKS || 0), d.TIGHT_WEEKS > 0 ? 'warn' : '')
+      + calc('Cash Locked', d.CYCLE_DAYS != null ? Math.round(d.CYCLE_DAYS) + 'd' : '-', (d.CYCLE_DAYS != null && d.CYCLE_DAYS > 30) ? 'warn' : '')
+      + calc('Tight Weeks', d.TIGHT_WEEKS != null ? String(d.TIGHT_WEEKS) : '-', d.TIGHT_WEEKS > 0 ? 'warn' : '')
       + '</div></div>';
   },
 
@@ -216,10 +307,11 @@ S.CashAudit = {
 
   showHowTo() {
     App.showHelpModal('How the Cash Audit Works', [
-      { p: ['The Cash Audit is a weekly score on your cash health, from 0 to 100, with a breakdown across the four things that decide whether a profitable bar runs flush or tight. It reads straight off your counts, orders, and bills, so there is nothing to type.'] },
-      { h: 'The Four Sections', p: ['Inventory Capital is how much of your shelf cash is working versus frozen in dead stock and overstock. Purchasing Discipline is how many weeks of inventory you carry against what you use. Cash Position is whether the weeks ahead are tight. Payment Terms is whether you are holding your vendor terms instead of paying early.'] },
-      { h: 'Cash to Free', p: ['The opportunity number up top is the cash you can free right now, the trapped inventory plus the overstock beyond par. It is a one-time amount you can put back in the account, not a monthly figure, so Bar Cop shows it as exactly that.'] },
-      { h: 'Action Items', p: ['Each audit ranks what to work first by where you are weakest, and every Fix This button drops you straight into that Cash Fix system. Run it weekly and watch the score climb as you free the cash.'] }
+      { p: ['The Cash Audit is a weekly score on your cash health, from 0 to 100, with a breakdown across the four things that decide whether a profitable bar runs flush or tight. It reads straight off your counts, orders, schedule, and bills, so there is nothing to type.'] },
+      { h: 'The Four Sections', p: ['Capital Efficiency is how hard the cash on your shelves works, by turns and the dead stock dragging it. The Cash Conversion Cycle is how many days your money stays locked from buying product to selling it, net of the days you take to pay. Liquidity and Runway is whether the thirteen weeks ahead hold and how long your cash covers you. Payment Terms is whether you are keeping your float instead of paying early.'] },
+      { h: 'Cash to Free', p: ['The opportunity number up top is the cash you can free right now, the dead stock plus the overstock above par. It is a one-time amount you can put back in the account, not a monthly figure, so Bar Cop shows it as exactly that.'] },
+      { h: 'Sharpen the Runway', p: ['Set your opening cash balance in Cash Position and the audit reads a real runway, the week you would run thin, and what is actually safe to spend. Without it, the liquidity read still scores your tight weeks, the ones where more cash goes out than comes in.'] },
+      { h: 'Action Items', p: ['Each audit ranks what to work first by where you are weakest, and every Fix This button drops you straight into that Cash Fix system. Run it weekly and watch the score climb as you free the cash and tighten the cycle.'] }
     ]);
   }
 };
