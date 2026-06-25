@@ -93,7 +93,7 @@ S.CashAudit = {
     // par), with the per-category turns/GMROI as the depth behind the number.
     const trapped = E.trapped();
     const cap = E.capitalSummary();
-    const invValue = E.onHand().value;
+    const invValue = E.avgInventoryValue();   // capital efficiency reads off average inventory
     let s1 = null;
     if (trapped.hasData && invValue > 0) s1 = clamp(100 - (trapped.total / invValue) * 130);
     const lazyCats = cap.rows.filter(r => r.gmroi != null && r.gmroi < 1.5).map(r => r.cat);
