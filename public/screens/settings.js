@@ -369,7 +369,7 @@ S.HubSettings = {
     // weeks fully closed and leave the current week open so there is work to do.
     try {
       const _mon = (d) => { const x = new Date(d); const wd = x.getDay(); x.setDate(x.getDate() + (wd === 0 ? -6 : 1 - wd)); return App.ymdLocal(x); };
-      const _curMon = _mon(today);
+      const _curMon = _mon(new Date());
       for (let w = 1; w <= 8; w++) {
         const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
         localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
