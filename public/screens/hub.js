@@ -473,31 +473,29 @@ S.Hub = {
       return '<div style="height:5px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>';
     };
     const stepRows = (steps) => (steps || []).map((s, i) =>
-      '<div style="display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12px;line-height:1.25;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+      '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;background:#0D181E;border-radius:6px;font-size:12px;line-height:1.2;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
       + (s.done
           ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
           : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
       + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span></div>').join('');
     const richCard = (o) => {
       const sum = o.sum;
-      const pill = sum
-        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (sum.total > 0 && sum.doneCount === sum.total ? 'var(--green)' : 'var(--t3)') + ';">' + sum.doneCount + ' of ' + sum.total + ' done</span>'
-        : '';
       const body = statStrip(o.stats)
         + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
-                 + '<div style="margin-top:10px;display:flex;flex-direction:column;">' + stepRows(sum.steps) + '</div>' : '')
-        + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '10px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
+                 + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps) + '</div>' : '')
+        + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
       return '<div style="display:flex;flex-direction:column;min-width:0;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + esc(o.title) + '</div>' + pill + '</div>'
+        + '<div class="sh" style="margin:0 0 10px;">' + esc(o.title) + '</div>'
         + '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
         +   body + '</div></div>';
     };
     const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
     // Control: stat strip + step checklist, all from each section's hubSteps().
     const icSum = safeSteps(S.InventoryDashboard), lcSum = safeSteps(S.LaborDashboard), scSum = safeSteps(S.ShiftDashboard);
+    const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date', 'created_at']);
     const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
-    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', stats: lcSum && lcSum.stats, sum: lcSum });
-    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', stats: scSum && scSum.stats, sum: scSum });
+    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
+    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
     // Recovery: stat strip (from the old dashboards) + audit line; steps land
     // when the Profit/Revenue/Cash Close The Week pages are built.
     const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
