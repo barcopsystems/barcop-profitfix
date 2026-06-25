@@ -570,7 +570,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .pf-line{padding:14px 16px;}
 .pf-line + .pf-line{border-top:1px solid var(--row-div);}
 .pf-progbar{height:6px;background:#0D181E;border-radius:4px;overflow:hidden;}
-.pf-progbar>span{display:block;height:100%;background:var(--gold);border-radius:4px;transition:width .4s ease;}
+.pf-progbar>span{display:block;height:100%;background:var(--green);border-radius:4px;transition:width .4s ease;}
 .pf-step{border:1px solid var(--b-edge);border-radius:9px;margin-bottom:10px;background:var(--surface);transition:border-color .15s,background .15s;}
 .pf-step.cur{border-color:var(--gold);background:#0D181E;}
 .pf-step.up{cursor:pointer;}

@@ -2092,7 +2092,7 @@ const App = {
   // Profit Fix view-tracking: stamp the day a "review/read this screen" target
   // was opened, so the Fix steps that are reviews (not records) can verify
   // against it. Keyed to the screen the operator actually lands on.
-  _VIEW_STAMP: { 'dashboard': 'dashboard', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker', 'r-menu-engineering': 'r-menu-engineering', 'lc-overtime-watch': 'lc-overtime-watch', 'lc-reports': 'lc-reports' },
+  _VIEW_STAMP: { 'dashboard': 'dashboard', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker', 'r-menu-engineering': 'r-menu-engineering', 'lc-overtime-watch': 'lc-overtime-watch', 'lc-reports': 'lc-reports', 'c-trapped': 'c-trapped', 'c-purchasing': 'c-purchasing', 'c-forecast': 'c-forecast', 'ic-par-suggestions': 'ic-par-suggestions', 'ic-vendors': 'ic-vendors' },
   stampFixView(key) {
     if (!this.data) return;
     this.data.fix_views = this.data.fix_views || {};
