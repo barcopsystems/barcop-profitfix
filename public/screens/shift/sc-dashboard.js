@@ -73,7 +73,7 @@ S.ShiftDashboard = {
     const sv = this._weekEnd; this._weekEnd = (App.nextSunday ? App.nextSunday() : App.todayLocal());
     try {
       const done = this.stepDone();
-      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
       const wkS = this.shifts().filter(s => this.inWeek(s.date));
       const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
       const voidTot = this.voidComps().filter(r => this.inWeek(r.date) && r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
