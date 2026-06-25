@@ -371,7 +371,7 @@ window.CashEngine = {
       const lab = this.laborForWeek(ws);
       const billRecs = this.projectedBills(ws, we);
       const bills = billRecs.reduce((s, b) => s + b.amount, 0);
-      const ofRecs = this.outflowsBetween(ws, we);
+      const ofRecs = this.outflowsBetween(ws, we).concat(this.projectedTaxRemittances(ws, we));
       const outflows = ofRecs.reduce((s, o) => s + o.amount, 0);
       let extraOut = 0;
       extra.forEach(x => { if (x.recurring || x.week === i || (x.week == null && i === 0)) extraOut += (parseFloat(x.amount) || 0); });
@@ -496,6 +496,53 @@ window.CashEngine = {
     const r = { draw: 0, loan: 0, capital: 0, tax: 0, total: 0, list: [] };
     this.outflowsBetween(s, e).forEach(o => { r[o.type] = (r[o.type] || 0) + o.amount; r.total += o.amount; r.list.push(o); });
     return r;
+  },
+
+  // ── Projected sales-tax remittance ────────────────────────────────────────
+  // Bar Cop knows your rate and your filing schedule, so it projects the tax
+  // payment onto its due date (the 20th, the month after the period it covers)
+  // and into the forecast as scheduled cash out, the way the biggest periodic
+  // outflow actually lands. Sized from the sales of the period it covers, actual
+  // where past and run-rate where projected. Suppressed for any month you have
+  // already logged a tax outflow, so a remittance is never doubled. Empty until a
+  // tax rate is set.
+  _daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime()) / 86400000); },
+  _salesForRange(s, e) {
+    const today = App.todayLocal();
+    let total = 0;
+    if (s <= today) total += this._salesBetween(s, e < today ? e : today);
+    const projStart = s > today ? s : this._addDays(today, 1);
+    if (projStart <= e) {
+      const days = this._daysBetween(projStart, e) + 1;
+      if (days > 0) total += (this._trailingWeeklySales() / 7) * days;
+    }
+    return total;
+  },
+  projectedTaxRemittances(startYmd, endYmd) {
+    const rate = this.salesTaxRate();
+    if (!(rate > 0)) return [];
+    const quarterly = this.taxFrequency() === 'quarterly';
+    const manualMonths = new Set();
+    this.cashOutflows().forEach(o => { if (o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
+    const out = [];
+    const startD = new Date(startYmd + 'T00:00:00');
+    let d = new Date(startD.getFullYear(), startD.getMonth(), 20);
+    if (App.ymdLocal(d) < startYmd) d = new Date(d.getFullYear(), d.getMonth() + 1, 20);
+    let guard = 0;
+    while (App.ymdLocal(d) <= endYmd && guard++ < 60) {
+      const m = d.getMonth();
+      const isDue = quarterly ? (m === 0 || m === 3 || m === 6 || m === 9) : true;
+      const monthKey = App.ymdLocal(d).slice(0, 7);
+      if (isDue && !manualMonths.has(monthKey)) {
+        const back = quarterly ? 3 : 1;
+        const pStart = App.ymdLocal(new Date(d.getFullYear(), m - back, 1));
+        const pEnd = App.ymdLocal(new Date(d.getFullYear(), m, 0));
+        const amount = this._salesForRange(pStart, pEnd) * rate / 100;
+        if (amount > 0) out.push({ date: App.ymdLocal(d), amount, type: 'tax', label: 'Sales tax remittance', projected: true });
+      }
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 20);
+    }
+    return out;
   },
 
   // ── The Cash Bridge: profit to cash. You earned a profit; here is where it
