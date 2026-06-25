@@ -336,6 +336,79 @@ window.CashEngine = {
     };
   },
 
+  // ── True Available Cash: the money that is actually yours and safe to spend.
+  //    Your balance, minus the money that isn't yours (the tax you collected and
+  //    owe, plus tips held), minus the reserve you should keep. Config is light
+  //    and kept on this device. ──────────────────────────────────────────────
+  _cfgNum(key, def) { const v = parseFloat(localStorage.getItem(key)); return isNaN(v) ? def : v; },
+  _cfgSet(key, v) { try { if (v == null || v === '') localStorage.removeItem(key); else localStorage.setItem(key, String(v)); } catch (e) {} },
+  salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
+  setSalesTaxRate(v) { this._cfgSet('cash_sales_tax_rate', v); },
+  taxFrequency()   { return localStorage.getItem('cash_tax_freq') || 'monthly'; },
+  setTaxFrequency(v) { try { localStorage.setItem('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); } catch (e) {} },
+  payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
+  setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
+  reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },
+  setReserveWeeks(v) { this._cfgSet('cash_reserve_weeks', v); },
+
+  // Weekly fixed overhead: the recurring bills (rent, utilities, insurance, loan),
+  // normalized to a week. The nut you owe even on a dead week.
+  weeklyFixedCosts() {
+    let monthly = 0;
+    this.bills().forEach(b => { if (b.recurring) monthly += (parseFloat(b.amount) || 0); });
+    return monthly / (52 / 12);
+  },
+
+  _taxPeriodBounds() {
+    const now = new Date();
+    if (this.taxFrequency() === 'quarterly') {
+      const q = Math.floor(now.getMonth() / 3);
+      return { start: App.ymdLocal(new Date(now.getFullYear(), q * 3, 1)), end: App.ymdLocal(now), label: 'this quarter' };
+    }
+    return { start: App.ymdLocal(new Date(now.getFullYear(), now.getMonth(), 1)), end: App.ymdLocal(now), label: 'this month' };
+  },
+  _salesBetween(s, e) {
+    let t = 0;
+    ((App.shiftData && App.shiftData.sc_shifts) || []).forEach(sh => {
+      const d = String(sh.date || '').slice(0, 10); if (!d || d < s || d > e) return;
+      t += (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
+    });
+    return t;
+  },
+  _wagesBetween(s, e) {
+    let t = 0;
+    ((App.laborData && App.laborData.lc_actuals) || []).forEach(a => {
+      const d = String(a.date || '').slice(0, 10); if (!d || d < s || d > e) return;
+      t += (parseFloat(a.cost) || 0);
+    });
+    return t;
+  },
+
+  // The money that isn't yours: tax collected this period, plus tips you are
+  // holding. Sales tax is the big one and the classic killer.
+  setAside() {
+    const b = this._taxPeriodBounds();
+    const sales = this._salesBetween(b.start, b.end);
+    const salesTax = sales * (this.salesTaxRate() / 100);
+    const wages = this._wagesBetween(b.start, b.end);
+    const payrollTax = wages * (this.payrollBurden() / 100);
+    let tipsOwed = 0;
+    ((App.laborData && App.laborData.lc_tip_pools) || []).forEach(p => { tipsOwed += Math.max(0, parseFloat(p.unallocated) || 0); });
+    return { salesTax, payrollTax, tipsOwed, total: salesTax + payrollTax + tipsOwed, sales, wages, periodLabel: b.label };
+  },
+
+  reserveTarget() { return this.reserveWeeks() * this.weeklyFixedCosts(); },
+
+  // The whole position: balance, set-aside, reserve, the cushion (yours before
+  // reserve), and Safe to Spend (free and clear).
+  position() {
+    const opening = this.openingCash();
+    const sa = this.setAside();
+    const reserve = this.reserveTarget();
+    const cushion = (opening || 0) - sa.total;
+    return { opening, hasOpening: opening != null, setAside: sa, reserve, cushion, safe: cushion - reserve };
+  },
+
   // ── Realized cash freed (backward, honest). Trapped cash is computed at each
   //    historical count, then "freed" is how far it has come down from your own
   //    first-weeks baseline. No metric × revenue, no fix log to game: it is the
