@@ -430,31 +430,44 @@ S.Hub = {
         if (hasLastMo) cadence.push({ sev:'due', label:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books', value:'month-end', go:'S.HubBooks&&S.HubBooks.open()' });
       }
     })();
-    const bandItems = alerts.concat(cadence);
     const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
+    const rowDiv = (onclick, dot, label, value, valColor) =>
+      '<div class="hd-step" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;background:#0D181E;border-radius:6px;cursor:pointer;min-width:0;">'
+      + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
+      + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(label) + '</span>'
+      + (value ? '<span style="flex-shrink:0;font-size:11px;font-weight:600;color:' + valColor + ';white-space:nowrap;">' + esc(value) + '</span>' : '')
+      + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>';
+    const cardWrap = (title, inner) => '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">' + title + '</div>'
+      + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;flex:1;">' + inner + '</div></div>';
+
+    // ── Priority Actions: the biggest recovery $ moves across all systems, ranked,
+    //    each row a tap into its Fix step. The recovery/metric leaks live here, not
+    //    in Needs Attention. ──
+    const paiRow = (it) => {
+      const lbl = (String(it.action || '').split(/\.\s|\.$/)[0] || it.action || '').trim();
+      const val = it.impact > 0 ? App.fmtCurrency(it.impact, 0) + '/mo' : '';
+      return rowDiv('S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')', 'var(--gold)', lbl, val, 'var(--gold)');
+    };
+    const priorityCard = cardWrap('Priority Actions', topItems.length
+      ? '<div style="max-height:188px;overflow-y:auto;">' + topItems.map(paiRow).join('') + '</div>'
+      : '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Run an audit and your biggest money moves rank here, each a tap from its fix.</div>');
+
+    // ── Needs Attention: operational outliers only (permits, certs, OT, cash,
+    //    maintenance, vendor, loss-prevention, month-end Books). Act Now over Keep
+    //    An Eye. Audits + recovery leaks live elsewhere. ──
+    const bandItems = this.forwardAlerts().concat(cadence);
     let needsBand;
     if (bandItems.length) {
-      // Two severity columns. Each row: the issue (left) + its key value (right,
-      // colored) — a data row, not a sentence. The full detail lives on the
-      // screen the row links to.
       const critical = bandItems.filter(a => a.sev === 'bad');
-      const watch    = bandItems.filter(a => a.sev !== 'bad');   // warn + cadence-due
-      const rowOf = (a, dot) =>
-        '<div class="hd-step" onclick="' + goOf(a) + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;background:#0D181E;border-radius:6px;cursor:pointer;min-width:0;">'
-        + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
-        + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.label || a.text || '') + '</span>'
-        + (a.value ? '<span style="flex-shrink:0;font-size:11px;font-weight:700;color:' + dot + ';white-space:nowrap;">' + esc(a.value) + '</span>' : '<span style="flex-shrink:0;color:var(--t4);">&rsaquo;</span>') + '</div>';
-      const colHtml = (title, items, dot) =>
-        '<div style="min-width:0;display:flex;flex-direction:column;">'
-        + '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + dot + ';">' + title + '</div>'
-        + (items.length ? items.map(a => rowOf(a, dot)).join('')
-                        : '<div style="font-size:11px;color:var(--t3);margin-top:6px;padding:9px 2px;">Nothing right now.</div>')
-        + '</div>';
-      needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
-        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:grid;grid-template-columns:1fr 1fr;gap:18px;">'
-        +   colHtml('Act Now', critical, 'var(--red)')
-        +   colHtml('Keep An Eye', watch, 'var(--amber)')
-        + '</div></div>';
+      const watch    = bandItems.filter(a => a.sev !== 'bad');
+      const naRow = (a, dot) => rowDiv(goOf(a), dot, a.label || a.text || '', a.value || '', 'var(--t2)');
+      const grp = (title, items, dot, mt) => items.length
+        ? '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + dot + ';margin-top:' + mt + ';">' + title + '</div>' + items.map(a => naRow(a, dot)).join('')
+        : '';
+      needsBand = cardWrap('Needs Attention', '<div style="max-height:188px;overflow-y:auto;">'
+        + grp('Act Now', critical, 'var(--red)', '0')
+        + grp('Keep An Eye', watch, 'var(--amber)', critical.length ? '12px' : '0')
+        + '</div>');
     } else {
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
         + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:10px;">'
@@ -1058,7 +1071,7 @@ S.Hub = {
     //    week. Cards are content-height (no fixed rows), so the page breathes. ──
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${tiles}</div>
-          ${needsBand}
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;">${priorityCard}${needsBand}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
         </div>`;
