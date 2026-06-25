@@ -20,7 +20,7 @@ S.CashDashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Cash. Cash is the third lever Bar Cop watches: Profit is your margin, Revenue is your top line, Cash is your liquidity, the money actually in the account. Plenty of bars look fine on paper and still run tight, and this is where you catch it.'] },
-      { h: 'The Scoreboard', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.'] },
+      { h: 'The Scoreboard', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.', 'Under it is the survival read, will you make it to next quarter: your runway, the tightest week ahead, and what is actually safe to spend, projected thirteen weeks out. Set your opening balance in Cash Position to make the runway real.'] },
       { h: 'The Steps', p: ['1. Free trapped cash: run down the dead stock and cut pars that are too high. 2. Order to par: buy what you use, not what you fear, so cash stops piling up on the shelf. 3. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 4. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
       { h: 'Working A Step', p: ['Open a step to read the numbers, then launch into the screen that does the work and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week. None of this is daily, it is the weekly sit-down.'] }
     ]);
@@ -34,6 +34,8 @@ S.CashDashboard = {
     return App.ymdLocal(date);
   },
   addDays(dateStr, n) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
+  runwayLabel(r) { return r == null ? '13+ wks' : r === 0 ? 'This week' : r + ' wk' + (r === 1 ? '' : 's'); },
   todayMonday()   { return this.mondayOf(new Date()); },
   weekStart()     { return this._weekStart || this.todayMonday(); },
   weekEnd()       { return this.addDays(this.weekStart(), 6); },
@@ -78,7 +80,12 @@ S.CashDashboard = {
     const freed = CashEngine.freed();
     const termVendors = CashEngine.termVendors();
     const outThisWeek = billsWeek.total + reorder.total;
-    return { trapped, over, reorder, billsWeek, freed, termVendors, outThisWeek };
+    // The deep treasury reads: the 13-week survival curve, what is truly safe to
+    // spend, and how long the cash stays locked in the operating cycle.
+    const survival = CashEngine.survivalForecast(13);
+    const position = CashEngine.position();
+    const cycle = CashEngine.cashCycle();
+    return { trapped, over, reorder, billsWeek, freed, termVendors, outThisWeek, survival, position, cycle };
   },
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -130,7 +137,45 @@ S.CashDashboard = {
       + '<div class="card-title">Cash Scoreboard</div>'
       + heroBody
       + '<div style="font-size:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">' + freedLine + '</div>'
+      + this.survivalStrip(st)
       + '</div>';
+  },
+
+  // ── Survival read (the deep treasury headline) ───────────────────────────────
+  // The trapped-cash hero above answers "what is stuck on my shelf"; this answers
+  // "am I going to make it to next quarter." Runway, the tightest week, and what
+  // is truly safe to spend, off the 13-week forecast. Color is meaning only.
+  survivalStrip(st) {
+    const sf = st.survival, pos = st.position;
+    const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Will You Make It To Next Quarter?</div>'
+      + inner + '</div>';
+    if (!sf || !sf.hasData) {
+      return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
+    }
+    const mini = (label, val, col) => '<div style="flex:1;min-width:108px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    if (!sf.hasOpening) {
+      const tw = sf.tightWeeks;
+      return wrap('<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">'
+        + mini('Tight Weeks Ahead', tw + ' of 13', tw > 0 ? 'var(--amber)' : 'var(--green)')
+        + '<div style="flex:2;min-width:190px;font-size:12px;color:var(--t3);line-height:1.6;">'
+        +   (tw > 0 ? tw + ' week' + (tw === 1 ? '' : 's') + ' have more cash going out than coming in. ' : 'Your cash timing looks clear. ')
+        +   'Set your opening balance to see your real runway and the week you would run thin.</div>'
+        + '</div>'
+        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
+    }
+    const low = sf.lowPoint;
+    const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
+    const lowCol = (low && low.balance < 0) ? 'var(--red)' : (low && pos.reserve > 0 && low.balance < pos.reserve ? 'var(--amber)' : 'var(--t1)');
+    const safeCol = (pos.safe != null && pos.safe < 0) ? 'var(--red)' : 'var(--t1)';
+    return wrap('<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">'
+      + mini('Runway', this.runwayLabel(sf.runway), runwayCol)
+      + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
+      + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
+      + '</div>'
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
   },
 
   weekSelector() {
@@ -180,7 +225,13 @@ S.CashDashboard = {
       const w = st.over.weeksOnHand;
       return w != null ? w.toFixed(1) + ' weeks on hand' + (st.over.excess > 0 ? ', ' + App.fmtCurrency(st.over.excess, 0) + ' over' : '') : this._META.order.sub;
     }
-    if (k === 'week')  return st.billsWeek.total > 0 ? App.fmtCurrency(st.outThisWeek, 0) + ' going out this week' : 'Nothing scheduled out this week';
+    if (k === 'week') {
+      const sf = st.survival;
+      if (sf && sf.hasOpening && sf.runway != null) return 'Cash runs ' + this.runwayLabel(sf.runway);
+      if (sf && sf.tightWeeks > 0) return sf.tightWeeks + ' tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13';
+      if (sf && sf.hasData) return 'No tight weeks in the next 13';
+      return this._META.week.sub;
+    }
     if (k === 'terms') return st.termVendors.length ? st.termVendors.length + ' vendor' + (st.termVendors.length === 1 ? '' : 's') + ' on terms' : this._META.terms.sub;
     return '';
   },
@@ -253,17 +304,25 @@ S.CashDashboard = {
     }
 
     if (k === 'week') {
-      const b = st.billsWeek;
-      if (b.total <= 0 && st.reorder.total <= 0) {
-        return explain('Nothing scheduled out this week that Bar Cop can see. As bills and orders land, this is where you catch a day where cash goes out faster than it comes in.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
+      const sf = st.survival;
+      if (!sf || !sf.hasData) {
+        return explain('Bar Cop projects your cash thirteen weeks out off your sales, schedule, and bills. As that data lands, this is where you catch a week where more cash goes out than comes in.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button>' + this.markBtn('week', 'Mark Done'));
       }
-      const rows = b.list.slice(0, 4).map(x => itemLine(x.vendor, App.fmtCurrency(x.amount, 0))).join('');
-      const reorderLine = st.reorder.total > 0
-        ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Plus about ' + App.fmtCurrency(st.reorder.total, 0) + ' to reorder to par.</div>'
+      if (!sf.hasOpening) {
+        const tw = sf.tightWeeks;
+        return explain((tw > 0 ? '<strong style="color:var(--gold);">' + tw + ' of the next thirteen weeks</strong> have more cash going out than coming in. ' : 'No tight weeks in the next thirteen on flow. ')
+            + 'Set your opening cash balance and Bar Cop turns this into a real runway and the exact week you would run thin.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button>' + this.markBtn('week', 'Mark Done'));
+      }
+      const low = sf.lowPoint;
+      const lead = sf.runway != null
+        ? 'Your cash runs about <strong style="color:var(--gold);">' + this.runwayLabel(sf.runway) + '</strong> before it would go negative' + (low ? ', bottoming out the week of ' + this.fmtWk(low.ws) + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. Free trapped cash, hold payments to their due dates, and move a big buy off that week.'
+        : 'Your cash holds all thirteen weeks' + (low ? ', with the low point the week of ' + this.fmtWk(low.ws) + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. ' + (sf.tightWeeks > 0 ? sf.tightWeeks + ' week' + (sf.tightWeeks === 1 ? '' : 's') + ' run tight on flow, catch them before they land.' : 'No tight weeks ahead.');
+      const outLine = st.outThisWeek > 0
+        ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">This week, about ' + App.fmtCurrency(st.outThisWeek, 0) + ' goes out in bills and buys.</div>'
         : '';
-      return explain('Going out this week: <strong style="color:var(--t1);">' + App.fmtCurrency(st.outThisWeek, 0) + '</strong> (' + App.fmtCurrency(b.total, 0) + ' in bills and buys). Line it up against the cash coming in so a heavy day does not catch you short.')
-        + rows + reorderLine
+      return explain(lead) + outLine
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
     }
 
@@ -282,18 +341,24 @@ S.CashDashboard = {
       + btnRow('<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button><button class="btn btn-ghost btn-sm" data-go="ic-vendors">Vendor Terms</button>' + this.markBtn('terms', 'Mark Done'));
   },
 
-  // ── Status strip (the KPIs) ──────────────────────────────────────────────────
+  // ── Status strip (the treasury vitals) ───────────────────────────────────────
+  // The three numbers an operator lives by: what is truly free to spend, how long
+  // the cash lasts, and how many days it stays locked in the cycle. Trapped cash
+  // already headlines the scoreboard above, so it is not repeated here.
   statusStrip(st) {
     const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
     const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    const weeks = st.over.weeksOnHand != null ? st.over.weeksOnHand.toFixed(1) + 'w' : '-';
+    const sf = st.survival, pos = st.position, cyc = st.cycle;
+    const safe = pos && pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-';
+    const runway = sf && sf.hasOpening ? this.runwayLabel(sf.runway) : (sf && sf.hasData ? sf.tightWeeks + ' tight' : '-');
+    const locked = cyc && cyc.hasData ? Math.round(cyc.cycle) + 'd' : '-';
     return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('Trapped Cash', st.trapped.hasData ? App.fmtCurrency(st.trapped.total, 0) : '-', st.trapped.total > 0 ? 'warn' : '')
+      + item('Safe to Spend', safe, (pos && pos.hasOpening && pos.safe < 0) ? 'warn' : '')
       + div
-      + item('Out This Week', st.outThisWeek > 0 ? App.fmtCurrency(st.outThisWeek, 0) : '-')
+      + item('Runway', runway, (sf && sf.hasOpening && sf.runway != null) ? 'warn' : '')
       + div
-      + item('Weeks On Hand', weeks, (st.over.excess > 0 ? 'warn' : ''))
+      + item('Cash Locked', locked, (cyc && cyc.hasData && cyc.cycle > 30) ? 'warn' : '')
       + '</div>';
   },
 
