@@ -81,8 +81,6 @@ S.HubGroupDashboard = {
     const lastW = this._latest(weeks, 'period_end');
     const rWeeks = (d.revenue_weeks || []).filter(w => w && ((w.bar_revenue || 0) + (w.floor_revenue || 0) > 0));
     const lastR = this._latest(rWeeks, 'period_end');
-    const tWeeks = (d.traffic_weeks || []).filter(w => w && w.period_end);
-    const lastT = this._latest(tWeeks, 'period_end');
     const barRev = lastW?.bar?.revenue || 0;
     const foodRev = lastW?.food?.revenue || 0;
     // Bar Cop Audit — the executive monthly score across the whole operation.
@@ -96,13 +94,11 @@ S.HubGroupDashboard = {
       foodCost:  lastW?.food?.cost_pct ?? null,
       primeCost: lastW?.prime_cost_pct ?? null,
       laborPct:  lastR?.labor_pct_blended ?? null,
-      googleRating: lastT?.google_rating ?? null,
       targets: {
         pourCost:  t.bar_pour_cost_pct ?? 22,
         foodCost:  t.food_cost_pct ?? 32,
         primeCost: t.prime_cost_pct ?? 60,
-        laborPct:  t.labor_cost_pct ?? 30,
-        googleRating: t.google_rating ?? 4.3
+        laborPct:  t.labor_cost_pct ?? 30
       }
     };
   },
@@ -155,7 +151,7 @@ S.HubGroupDashboard = {
     const numCell = 'font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;white-space:nowrap;';
     const header = '<thead><tr>'
       + '<th>Bar</th><th>Bar Cop Audit</th><th>Weekly Revenue</th><th>Pour Cost</th>'
-      + '<th>Food Cost</th><th>Prime Cost</th><th>Labor %</th><th>Google Rating</th>'
+      + '<th>Food Cost</th><th>Prime Cost</th><th>Labor %</th>'
       + '</tr></thead>';
     const rows = accounts.map(a => {
       const m = this._metrics(dataByAccount[a.id]);
@@ -163,7 +159,6 @@ S.HubGroupDashboard = {
       const foodBand  = this._band(m.foodCost,  m.targets.foodCost,  'low');
       const primeBand = this._band(m.primeCost, m.targets.primeCost, 'low');
       const laborBand = this._band(m.laborPct,  m.targets.laborPct,  'low');
-      const grBand    = this._band(m.googleRating, m.targets.googleRating, 'high');
       const auditColor = this._scoreColor(m.barCopAudit);
       return '<tr class="gd-row" data-account="' + esc(a.id) + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(a.name) + '</div></td>'
@@ -173,7 +168,6 @@ S.HubGroupDashboard = {
         + '<td style="' + numCell + 'color:' + this._bandColor(foodBand) + ';">' + this._fmtPct(m.foodCost) + '</td>'
         + '<td style="' + numCell + 'color:' + this._bandColor(primeBand) + ';">' + this._fmtPct(m.primeCost) + '</td>'
         + '<td style="' + numCell + 'color:' + this._bandColor(laborBand) + ';">' + this._fmtPct(m.laborPct) + '</td>'
-        + '<td style="' + numCell + 'color:' + this._bandColor(grBand) + ';">' + this._fmtRating(m.googleRating) + '</td>'
         + '</tr>';
     }).join('');
     return '<div class="card card-bleed data-card" style="margin:0;"><div class="card-bleed-tbl"><table class="tbl">' + header + '<tbody>' + rows + '</tbody></table></div></div>';

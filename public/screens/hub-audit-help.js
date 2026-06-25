@@ -20,7 +20,7 @@ S.HubAuditHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Bar Cop Audit?',
-        a: 'It is your weekly read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Traffic tell you where money is leaking and how to fix it. The Bar Cop Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
+        a: 'It is your weekly read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Cash tell you where money is leaking and how to fix it. The Bar Cop Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
       { q: 'How often do I run it?',
         a: 'Once a week, the same rhythm as the recovery audits. Between runs the page counts down to the next one. It scores your trailing 30 days, so the window stays wide enough for each measure to mean something while you still get a fresh read every week.' },
       { q: 'Do I have to enter anything to run it?',
@@ -35,7 +35,7 @@ S.HubAuditHelp = {
         a: 'It averages only the sub-scores that actually have data, and it needs at least three of the six covered before it shows an overall at all. A score off one or two thin signals would say almost nothing, so Bar Cop holds the overall until it can stand behind it.' }
     ]},
     { t: 'The Recovery Audits', qa: [
-      { q: 'How is this different from my Profit, Revenue, and Traffic audits?',
+      { q: 'How is this different from my Profit, Revenue, and Cash audits?',
         a: 'Those three are diagnostic: each scores its own area and hands you a Fix System to recover the money. The Bar Cop Audit sits above them as the operational read. The sidebar links to all three so you can reach them in one place, but each opens in its own Recovery section right next to its Fix System, where the work happens.' },
       { q: 'Does running a recovery audit affect my Bar Cop Audit?',
         a: 'Yes. Running your recovery audits on time and acting on what they surface both feed the Bar Cop Audit, through the Recovery Action and Operational Discipline sub-scores. An operation that diagnoses and fixes scores higher than one that lets gaps sit.' }

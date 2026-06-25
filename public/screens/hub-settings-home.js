@@ -94,12 +94,8 @@ S.HubSettingsHome = {
     // ── Configuration snapshot — how Bar Cop is tuned, at a glance ──
     const t    = s.targets || {};
     const rt   = ((App.data.revenue_settings || {}).targets) || {};
-    const tg   = ((App.data.traffic_settings || {}).targets) || {};
-    const urls = ((App.data.traffic_settings || {}).urls) || {};
     const fmt$0 = (v) => App.fmtCurrency(v || 0, 0);
     const periods = (s.service_periods || []).map(p => p && p.name).filter(Boolean);
-    const platforms = App.TRAFFIC_PLATFORMS || [];
-    const connected = platforms.filter(p => urls[p.urlKey]).length;
 
     const profileRows = [
       kvRow('Operation', esc(s.bar_name || '') || dash),
@@ -108,8 +104,7 @@ S.HubSettingsHome = {
       kvRow('Address', esc(s.address || '') || dash),
       kvRow('Bar Sales', s.annual_bar_revenue ? fmt$0(s.annual_bar_revenue) + '/yr' : dash),
       kvRow('Food Sales', s.annual_food_revenue ? fmt$0(s.annual_food_revenue) + '/yr' : dash),
-      kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash),
-      kvRow('Links', platforms.length ? (connected + ' of ' + platforms.length + ' connected') : dash)
+      kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash)
     ];
     const profileCard = card('Business Profile', 'settings-profile', 'Edit', profileRows);
 
@@ -118,8 +113,7 @@ S.HubSettingsHome = {
       kvRow('Pour Cost', (t.bar_pour_cost_pct ?? 22) + '%'),
       kvRow('Food Cost', (t.food_cost_pct ?? 32) + '%'),
       kvRow('Labor Cost', (t.labor_cost_pct ?? 30) + '%'),
-      kvRow('Check Average', fmt$0(rt.check_avg ?? 35)),
-      kvRow('Google Rating', (tg.google_rating ?? 4.3) + ' ★')
+      kvRow('Check Average', fmt$0(rt.check_avg ?? 35))
     ];
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 

@@ -850,7 +850,7 @@ S.HubYearEnd = {
     const buckets = [
       { label: 'Profit',  list: App.data?.audits || [] },
       { label: 'Revenue', list: App.data?.revenue_audits || [] },
-      { label: 'Traffic', list: App.data?.traffic_audits || [] }
+      { label: 'Cash', list: App.data?.cash_audits || [] }
     ];
     const allAudits = [];
     buckets.forEach(b => {
@@ -888,7 +888,7 @@ S.HubYearEnd = {
       });
     }
 
-    this._pushFooter(rows, merges, 'Source: Profit Audit, Revenue Audit, Traffic Audit records. Monthly Opportunity is the sum of action_items.monthly_impact at the time the audit was saved.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Source: Profit Audit, Revenue Audit, Cash Audit records. Monthly Opportunity is the sum of action_items.monthly_impact at the time the audit was saved.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1046,7 +1046,7 @@ S.HubYearEnd = {
     [
       { label: 'Profit',  list: App.data?.audits || [] },
       { label: 'Revenue', list: App.data?.revenue_audits || [] },
-      { label: 'Traffic', list: App.data?.traffic_audits || [] }
+      { label: 'Cash', list: App.data?.cash_audits || [] }
     ].forEach(bk => {
       bk.list.filter(a => inYear(a.date)).forEach(a => {
         (a.action_items || []).forEach(it => {
@@ -1118,7 +1118,7 @@ S.HubYearEnd = {
 
     b.sectionTitle('Top Opportunities Surfaced This Year');
     if (topFive.length === 0) {
-      b.paragraph('No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Traffic audit to surface opportunities.', { gray: 100 });
+      b.paragraph('No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Cash audit to surface opportunities.', { gray: 100 });
     } else {
       b.paragraph('Total annualized opportunity across every audit run this year: ' + fmt$(totalAnnualOpp) + '.');
       b.table(['System', 'Opportunity', 'Monthly $', 'Annual $'],

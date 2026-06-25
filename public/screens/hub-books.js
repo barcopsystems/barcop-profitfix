@@ -97,7 +97,7 @@ S.HubBooks = {
     const audits = [
       { label: 'Profit',  audit: latestBefore(App.data?.audits) },
       { label: 'Revenue', audit: latestBefore(App.data?.revenue_audits) },
-      { label: 'Traffic', audit: latestBefore(App.data?.traffic_audits) }
+      { label: 'Cash', audit: latestBefore(App.data?.cash_audits) }
     ];
     const totalMonthlyOpp = audits.reduce((s, a) => {
       const items = a.audit?.action_items || [];
@@ -178,7 +178,7 @@ S.HubBooks = {
 
     b.sectionTitle('Top Opportunities From Your Audits');
     if (topFive.length === 0) {
-      b.paragraph('No open audit action items on file. Run a Profit, Revenue, or Traffic audit to surface opportunities.', { gray: 100 });
+      b.paragraph('No open audit action items on file. Run a Profit, Revenue, or Cash audit to surface opportunities.', { gray: 100 });
     } else {
       b.paragraph('Total monthly opportunity across all systems: ' + fmt$(totalMonthlyOpp)
         + '. Annualized: ' + fmt$(totalMonthlyOpp * 12) + '.');
@@ -497,8 +497,8 @@ S.HubBooks = {
   // Disclaimer split into 3 short lines so each fits in a merged-row cell
   // without depending on wrap-text style (community SheetJS does not write
   // style). Reads from App.deliverableFooter() so every Bar Cop deliverable
-  // (Books, Year-End, Weekly P&L Brief, Traffic Month End Brief, Bar Cop
-  // Audit PDF) shares one canonical disclaimer.
+  // (Books, Year-End, Weekly P&L Brief, Bar Cop Audit PDF) shares one
+  // canonical disclaimer.
   _disclaimerLines() {
     return App.deliverableFooter().disclaimerLines;
   },
@@ -1257,7 +1257,7 @@ S.HubBooks = {
 
     const profitAudit  = latestBefore(App.data?.audits);
     const revenueAudit = latestBefore(App.data?.revenue_audits);
-    const trafficAudit = latestBefore(App.data?.traffic_audits);
+    const cashAudit = latestBefore(App.data?.cash_audits);
 
     const blank = () => this._blankRow(COL_COUNT);
     const rows = [];
@@ -1301,10 +1301,10 @@ S.HubBooks = {
 
     renderAudit('Profit Recovery',  profitAudit);
     renderAudit('Revenue Recovery', revenueAudit);
-    renderAudit('Traffic Recovery', trafficAudit);
+    renderAudit('Cash Recovery', cashAudit);
 
     this._pushFooter(rows, merges,
-      'Source: latest Profit, Revenue, and Traffic audits at or before ' + monthEnd + '. Action items and their dollar impacts come from the audit you ran in Bar Cop.',
+      'Source: latest Profit, Revenue, and Cash audits at or before ' + monthEnd + '. Action items and their dollar impacts come from the audit you ran in Bar Cop.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);

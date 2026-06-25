@@ -3,7 +3,7 @@
 /* ── Hub Getting Started — the unified whole-app setup checklist ──────────────
    A Hub-owned view (map Section 1, Section 9). One ordered, checkable setup
    plan across all six modules: the Capture layer first (Inventory, Labor,
-   Shift), then the Diagnose layer (Profit, Revenue, Traffic). Progress is
+   Shift), then the Diagnose layer (Profit, Revenue, Cash). Progress is
    stored in hub_setup_progress. Each task deep-links to the screen that does
    it. Renders into the Hub container, never the module app shell. */
 S.HubGettingStarted = {
@@ -28,15 +28,15 @@ S.HubGettingStarted = {
     { group:'foundation', id:'gs_service_periods', screen:'settings-profile',
       label:'Set your service periods in Settings: the dayparts you run. These drive your schedules and every shift-type field across Bar Cop.' },
     { group:'foundation', id:'gs_targets', screen:'settings-targets',
-      label:'Set your Profit, Revenue, and Traffic targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
+      label:'Set your Profit and Revenue targets in Settings. Industry benchmarks are pre-filled; adjust them to your operation.' },
 
     // ── Phase 2: Baseline Diagnosis — three audits give immediate scored value
     { group:'baseline', id:'gs_p_audit', screen:'audit-tracker',
       label:'Run your first Profit Audit for a baseline score.' },
     { group:'baseline', id:'gs_r_audit', screen:'r-audit',
       label:'Run your first Revenue Audit for a baseline score.' },
-    { group:'baseline', id:'gs_t_audit', screen:'t-audit',
-      label:'Run your first Traffic Audit for a baseline score.' },
+    { group:'baseline', id:'gs_c_audit', screen:'c-audit',
+      label:'Run your first Cash Audit for a baseline score.' },
 
     // ── Phase 3: Capture System — operational setup. Control feeds Recovery.
     { group:'capture', id:'gs_ic_products', screen:'ic-product-setup',
@@ -74,13 +74,7 @@ S.HubGettingStarted = {
     { group:'weekly', id:'gs_r_week', screen:'r-this-week',
       label:'Confirm your first week in Revenue This Week.' },
     { group:'weekly', id:'gs_r_eng', screen:'r-menu-engineering',
-      label:'Run Menu Engineering to see your Stars, Plowhorses, Puzzles, and Dogs.' },
-    { group:'weekly', id:'gs_t_gbp', screen:'t-presence',
-      label:'Set up your Google Business listing in Online Tracker.' },
-    { group:'weekly', id:'gs_t_reviews', screen:'t-presence',
-      label:'Set your review baseline in Online Tracker.' },
-    { group:'weekly', id:'gs_t_week', screen:'t-this-week',
-      label:'Enter your first week of digital metrics in Traffic This Week.' }
+      label:'Run Menu Engineering to see your Stars, Plowhorses, Puzzles, and Dogs.' }
   ],
 
   progress() { return App.data.hub_setup_progress || {}; },

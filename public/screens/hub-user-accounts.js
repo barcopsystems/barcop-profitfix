@@ -41,7 +41,7 @@ S.HubUserAccounts = {
     // Recovery
     { module: 'Recovery',          key: 'profit-recovery',  label: 'Profit Recovery (all)' },
     { module: 'Recovery',          key: 'revenue-recovery', label: 'Revenue Recovery (all)' },
-    { module: 'Recovery',          key: 'traffic-recovery', label: 'Traffic Recovery (all)' },
+    { module: 'Recovery',          key: 'cash-recovery',    label: 'Cash Recovery (all)' },
     { module: 'Events',            key: 'events',           label: 'Events (all)' }
   ],
 

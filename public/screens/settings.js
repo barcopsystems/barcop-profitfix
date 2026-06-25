@@ -12,8 +12,8 @@ S.HubSettings = {
   // ServicePeriods and saves the sections actually present, so a subset renders
   // safely.
   _GROUPS: {
-    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'service', 'links'] },
-    'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue', 'traffic', 'tconv'] }
+    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'service'] },
+    'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue'] }
   },
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps.
@@ -28,10 +28,7 @@ S.HubSettings = {
       { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
       { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
-      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
-      { id:'traffic', title:'Traffic Targets',           body:this.secTraffic(),       save:true },
-      { id:'links',   title:'Operation Links',           body:this.secLinks(),         save:true },
-      { id:'tconv',   title:'Traffic Conversion Rates',  body:this.secTrafficConv(),   save:true }
+      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true }
     ];
     const grp = this._GROUPS[group];
     const secs = grp ? allSecs.filter(s => grp.ids.indexOf(s.id) !== -1) : allSecs;
@@ -103,44 +100,6 @@ S.HubSettings = {
       + '<div class="f" style="width:130px;"><label>Dinner RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Bar RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Event Close Rate</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '</div>';
-  },
-
-  secTraffic() {
-    const tg = ((App.data.traffic_settings||{}).targets) || {};
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:140px;"><label>Google Rating</label><div class="fw"><input class="suf" type="number" id="hs-t-gr" value="' + (tg.google_rating ?? 4.3) + '" step="0.1" min="1" max="5"/><span class="suf">&#9733;</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>New Reviews / Mo</label><div class="fw"><input class="suf" type="number" id="hs-t-rv" value="' + (tg.review_velocity ?? 8) + '" step="1"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Response Rate</label><div class="fw"><input class="suf" type="number" id="hs-t-rr" value="' + (tg.response_rate ?? 75) + '" step="1"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Monthly Sessions</label><div class="fw"><input class="suf" type="number" id="hs-t-ms" value="' + (tg.monthly_sessions ?? 2000) + '" step="100"/><span class="suf">/mo</span></div></div>'
-      + '<div class="f" style="width:140px;"><label>Social Posts / Mo</label><div class="fw"><input class="suf" type="number" id="hs-t-sp" value="' + (tg.social_posts_month ?? 12) + '" step="1"/><span class="suf">posts</span></div></div>'
-      + '</div>';
-  },
-
-  // Operation Links — operator's public URLs for each digital platform. The
-  // Traffic Audit fetches public data from these (where possible) and Recovery
-  // screens use them for "Open Live" click-throughs to the operator's actual
-  // listings. One-time setup.
-  secLinks() {
-    const u = ((App.data.traffic_settings || {}).urls) || {};
-    const field = (id, label, val, ph) =>
-      '<div class="f" style="width:100%;"><label>' + label + '</label>'
-      + '<input type="url" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"/></div>';
-    const rows = App.TRAFFIC_PLATFORMS.map(p =>
-      field('hs-url-' + p.urlKey, p.label, u[p.urlKey], p.placeholder)
-    ).join('');
-    return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;">' + rows + '</div>';
-  },
-
-  // Traffic Recovery Scoreboard conversion rates. Each rate maps a Traffic
-  // metric improvement to a dollar figure via check_avg × this rate. Defaults
-  // are industry benchmarks; operator can override per channel based on their
-  // own data once they have it.
-  secTrafficConv() {
-    const c = ((App.data.traffic_settings || {}).conversion_rates) || {};
-    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:200px;"><label>Website Session to Visit</label><div class="fw"><input class="suf" type="number" id="hs-conv-web" value="' + (c.web_session_to_visit ?? 3) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
-      + '<div class="f" style="width:200px;"><label>Email Open to Visit</label><div class="fw"><input class="suf" type="number" id="hs-conv-email" value="' + (c.email_open_to_visit ?? 1) + '" step="0.1" min="0" max="100"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
 
@@ -220,30 +179,6 @@ S.HubSettings = {
       delete rs.targets.kitchen_labor_pct;
       delete rs.targets.floor_labor_pct;
       keys.push('revenue_settings');
-    } else if (which === 'traffic') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      ts.targets = Object.assign({}, ts.targets, {
-        google_rating:      numOr('hs-t-gr', 4.3),
-        review_velocity:    numOr('hs-t-rv', 8),
-        response_rate:      numOr('hs-t-rr', 75),
-        monthly_sessions:   numOr('hs-t-ms', 2000),
-        social_posts_month: numOr('hs-t-sp', 12)
-      });
-      keys.push('traffic_settings');
-    } else if (which === 'links') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      const strOr = (id) => (document.getElementById(id)?.value || '').trim();
-      const next = Object.assign({}, ts.urls);
-      App.TRAFFIC_PLATFORMS.forEach(p => { next[p.urlKey] = strOr('hs-url-' + p.urlKey); });
-      ts.urls = next;
-      keys.push('traffic_settings');
-    } else if (which === 'tconv') {
-      const ts = App.data.traffic_settings = App.data.traffic_settings || {};
-      ts.conversion_rates = Object.assign({}, ts.conversion_rates, {
-        web_session_to_visit:    numOr('hs-conv-web',    3),
-        email_open_to_visit:     numOr('hs-conv-email',  1)
-      });
-      keys.push('traffic_settings');
     } else {
       return;
     }
@@ -252,9 +187,9 @@ S.HubSettings = {
       this._flashSaved(which);
       App.updatePeriod();
       // Saving any target group counts as completing the Hub Getting Started
-      // targets task — Profit, Revenue, or Traffic. Profile is auto-completed
+      // targets task — Profit or Revenue. Profile is auto-completed
       // by the onboarding wizard, so this is the second Foundation task.
-      if (which === 'profit' || which === 'revenue' || which === 'traffic') {
+      if (which === 'profit' || which === 'revenue') {
         App.markSetupDone('gs_targets');
       }
       if (which === 'service') App.markSetupDone('gs_service_periods');
@@ -633,7 +568,7 @@ S.HubSettings = {
     const ANCH_DAYS = [0, 30, 60, 90];
     const FILL_DAYS = [7, 14, 21, 37, 44, 51, 67, 74, 81];
     const weeklySeries = (mod, richByDay) => {
-      const PFX = mod === 'profit' ? 'PFA' : mod === 'revenue' ? 'RFA' : 'TFA';
+      const PFX = mod === 'profit' ? 'PFA' : mod === 'revenue' ? 'RFA' : 'CA';
       const all = ANCH_DAYS.map(d => richByDay[d]);
       FILL_DAYS.forEach(D => {
         const hiD = ANCH_DAYS.filter(d => d < D).sort((a, b) => b - a)[0];   // newer milestone (fewer days ago)
@@ -643,9 +578,8 @@ S.HubSettings = {
         const raw = ipRaw(lo, hi, t);
         const id = PFX + '-2026-' + String(++_ipSerial).padStart(4, '0');
         raw.AUDIT_ID = id; raw.AUDIT_PERIOD = periodLabel(D);
-        if (mod === 'traffic') {
-          const score = Math.round(lo.OVERALL_SCORE + (hi.OVERALL_SCORE - lo.OVERALL_SCORE) * t);
-          all.push(mkTrafficAudit(dateStr(D), daysAgoISO(D), id, periodLabel(D), score, raw.DATA_TIER_LABEL, raw));
+        if (mod === 'cash') {
+          all.push(mkCashAudit(dateStr(D), daysAgoISO(D), id, periodLabel(D), raw));
         } else {
           all.push(mkAudit(mod, { date: dateStr(D), generated_at: daysAgoISO(D), raw }));
         }
@@ -1270,19 +1204,6 @@ S.HubSettings = {
         hypothesis:'Tightened prep pars so the kitchen stopped over-producing and dumping at close.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
     ];
 
-    // ── Traffic Initiative Tracker — demand experiments, each watching an online
-    // metric that climbed across the arc, so the before/after lift is a real win.
-    App.data.traffic_initiatives = [
-      { id:uid(), name:'Ask Every Table for a Google Review', start_date:dateStr(49), type:'Review Push', metric:'new_reviews',
-        hypothesis:'Put a review QR on every check and trained servers to ask at payout.', status:'Active', created_at:daysAgoISO(49) },
-      { id:uid(), name:'Reply to Every Review Within a Day', start_date:dateStr(42), type:'Posting Routine', metric:'response_rate',
-        hypothesis:'Set a daily ten-minute block to answer every new review, good or bad.', status:'Active', created_at:daysAgoISO(42) },
-      { id:uid(), name:'Weekly Google Posts', start_date:dateStr(35), type:'Posting Routine', metric:'monthly_sessions',
-        hypothesis:'Posted a special or an event to the Google profile every Monday.', status:'Active', created_at:daysAgoISO(35) },
-      { id:uid(), name:'Monthly Regulars Email', start_date:dateStr(70), type:'Email Campaign', metric:'google_rating',
-        hypothesis:'Emailed regulars a what\'s-new note with a soft ask to leave an honest rating.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(7) }
-    ];
-
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote
@@ -1376,380 +1297,6 @@ S.HubSettings = {
       { id:uid(), date:dateStr(-18), name:'Big Game Sunday',       type:'Big Game',    checklist:{ menu:true,  promo:true,  staffing:true,  reservations:true  }, notes:'Wing and bucket specials. All hands.' },
       { id:uid(), date:dateStr(-40), name:'Patio Season Kickoff',  type:'Promotion',   checklist:{ menu:false, promo:false, staffing:false, reservations:false }, notes:'' },
     ];
-
-    // ════════════════════════════════════════════════════════════════════
-    //  TRAFFIC RECOVERY — the Anchor's digital presence over 12 weeks plus
-    //  a three-audit recovery arc and a complete scorecard profile.
-    // ════════════════════════════════════════════════════════════════════
-    App.data.traffic_settings = App.data.traffic_settings || {};
-    App.data.traffic_settings.targets = { google_rating:4.3, review_velocity:8,
-      response_rate:75, monthly_sessions:3000, social_posts_month:12 };
-    App.data.traffic_settings.profile = {
-      // GBP scorecard
-      gbp_claimed:true, gbp_hours:true, gbp_phone:true, gbp_website:true,
-      gbp_menu:true, gbp_category:true, gbp_attributes:true, gbp_qa:false,
-      gbp_photos:138, gbp_posts:10, gbp_reviewed_at:daysAgoISO(4),
-      // Review tracker
-      rev_age:4, rev_patterns:'No recurring complaint pattern in the last 30 days. Earlier weekend-service mentions have dropped off.',
-      rev_reviewed_at:daysAgoISO(3),
-      // Search and SEO
-      search_maps_pack:true, search_nap:true, search_name:true, search_address:true,
-      search_phone:true, search_titles:true, search_keyword:'austin sports bar',
-      search_citations:42, search_reviewed_at:daysAgoISO(6),
-      // Website scorecard
-      web_exists:true, web_mobile:true, web_menu:true, web_online_order:true, web_reservations:true, web_analytics:true,
-      web_avg_duration:96, web_top_source:'Organic Search', web_reviewed_at:daysAgoISO(7),
-      // Social
-      social_stories:true, social_reels:true, social_ig_engagement:2.4, social_fb_posts:6,
-      social_content_mix:'Balanced', social_reviewed_at:daysAgoISO(5),
-      // Delivery
-      dd_active:'yes', dd_rating:4.6, dd_photos:26, dd_menu:true, dd_promo:true,
-      ue_active:'yes', ue_rating:4.4, ue_photos:22, ue_menu:true, ue_promo:false,
-      gh_active:'no', gh_photos:null, gh_menu:false, gh_promo:false,
-      delivery_reviewed_at:daysAgoISO(8),
-      // Email and loyalty
-      email_last_send:dateStr(5), email_frequency:'Weekly', email_growth:'WiFi login capture',
-      email_reviewed_at:daysAgoISO(5)
-    };
-
-    // ── Traffic weeks — recovery arc, oldest to newest ──
-    // Five tracked-metric series (monthly_sessions, gbp_views, social_profile_visits,
-    // email_list_size+open_rate, delivery_orders+avg_order_value) hold flat through
-    // the first ~5-7 weeks then climb after the matching fix dates seeded below in
-    // fix_log. That gives the Traffic Recovery Scoreboard real before/after data so
-    // every tracked gap dollarizes on demo. Reviews and SEO stay untracked (Rule
-    // 14a — too indirect to defend) and ride along as context.
-    const tw = {
-      google_rating:        [3.9,3.9,4.0,4.0,4.1,4.1,4.2,4.3,4.3,4.4,4.5,4.5],
-      google_total:         [240,246,253,261,268,275,284,293,302,310,318,326],
-      new_reviews:          [3,4,4,5,5,6,8,9,9,10,11,11],
-      response_rate:        [38,42,48,54,60,68,74,78,82,84,86,88],
-      yelp_rating:          [3.7,3.7,3.8,3.8,3.8,3.9,3.9,4.0,4.0,4.0,4.1,4.1],
-      yelp_total:           [80,81,83,84,86,88,90,92,95,98,101,104],
-      monthly_sessions:     [1180,1240,1300,1380,1480,1620,1780,1940,2080,2200,2320,2420],
-      monthly_reservations: [95,100,108,115,122,130,138,145,152,158,164,170],
-      bounce_rate:          [74,73,72,70,68,66,64,62,60,58,57,56],
-      gbp_views:            [1500,1520,1540,1560,1580,1680,1820,1980,2120,2240,2340,2400],
-      ig_followers:         [1880,1920,1965,2010,2060,2120,2200,2280,2360,2440,2520,2600],
-      ig_posts_month:       [5,6,6,7,8,9,10,11,12,13,14,14],
-      fb_followers:         [1050,1060,1075,1085,1100,1115,1135,1155,1175,1195,1215,1240],
-      social_profile_visits:[260,265,270,280,290,300,340,400,460,510,560,600],
-      dd_rating:            [4.2,4.2,4.3,4.3,4.3,4.4,4.4,4.5,4.5,4.5,4.6,4.6],
-      ue_rating:            [4.0,4.0,4.1,4.1,4.1,4.2,4.2,4.3,4.3,4.3,4.4,4.4],
-      delivery_orders:      [120,122,125,128,130,132,135,148,162,178,190,200],
-      delivery_avg_order_value:[28,28,29,29,29,30,30,31,32,33,34,36],
-      email_list_size:      [380,410,445,480,520,560,605,650,690,720,745,760],
-      emails_sent:          [1,1,2,2,2,3,3,3,4,4,4,4],
-      email_open_rate:      [18,19,20,21,22,24,25,26,27,27,28,28],
-    };
-    // The traffic metrics above are a 12-week hand-authored series (separate from
-    // the 52-week P&L arc). Map them onto the most recent 12 weeks so recent
-    // traffic reads full and older weeks stay realistically empty until the
-    // Traffic sweep extends the series to a full year.
-    const twN = tw.google_rating.length;
-    App.data.traffic_weeks = window.ANCHOR.weeks.slice(-twN).map((a, i) => ({
-      id: Date.now() + i, week_num: a.wk, period_end: dateStr(sunOff + window.ANCHOR.endAgo(a)),
-      saved_at: new Date().toISOString(),
-      google_rating: tw.google_rating[i], google_total: tw.google_total[i],
-      new_reviews: tw.new_reviews[i], response_rate: tw.response_rate[i],
-      yelp_rating: tw.yelp_rating[i], yelp_total: tw.yelp_total[i],
-      monthly_sessions: tw.monthly_sessions[i], monthly_reservations: tw.monthly_reservations[i], bounce_rate: tw.bounce_rate[i],
-      gbp_views: tw.gbp_views[i],
-      ig_followers: tw.ig_followers[i], ig_posts_month: tw.ig_posts_month[i],
-      fb_followers: tw.fb_followers[i],
-      social_profile_visits: tw.social_profile_visits[i],
-      dd_active: 'yes', dd_rating: tw.dd_rating[i],
-      ue_active: 'yes', ue_rating: tw.ue_rating[i],
-      gh_active: 'no',  gh_rating: null,
-      delivery_orders: tw.delivery_orders[i],
-      delivery_avg_order_value: tw.delivery_avg_order_value[i],
-      email_list_size: tw.email_list_size[i], emails_sent: tw.emails_sent[i],
-      email_open_rate: tw.email_open_rate[i],
-      notes: ''
-    }));
-
-    // ── Traffic audits — three-audit recovery arc, Feb / Mar / Apr ──
-    const mkTrafficAudit = (date, generated_at, audit_id, period, score, tier, raw) => {
-      const sections = {
-        'Google Business': raw.S1_SCORE, 'Website': raw.S2_SCORE,
-        'Reviews': raw.S3_SCORE, 'Search and SEO': raw.S4_SCORE,
-        'Social Media': raw.S5_SCORE, 'Delivery Platforms': raw.S6_SCORE,
-        'Email Marketing': raw.S7_SCORE
-      };
-      // Traffic carries NO dollar gaps (matches the live computeTrafficAudit
-      // contract). Zero every section gap and build deficit-based action items
-      // with no dollar impact, so the demo never shows a recoverable-dollar strip
-      // the real product cannot produce.
-      [1, 2, 3, 4, 5, 6, 7].forEach(n => { raw['S' + n + '_MONTHLY_GAP'] = 0; });
-      const items = [];
-      const push = (n, action, gid) => { if (raw['S' + n + '_SCORE'] != null && raw['S' + n + '_SCORE'] < 65) items.push({ action: action, gap_id: gid }); };
-      push(1, 'Fill every Google Business field, load photos toward 100, and post weekly.', 'gbp');
-      push(2, 'Add online ordering and a reservation link, and make the menu load fast on a phone.', 'website');
-      push(3, 'Reply to every review and ask every happy table.', 'reviews');
-      push(4, 'Match your name, address, and phone everywhere and get into the Google Maps pack.', 'search-seo');
-      push(5, 'Post three times a week, mixing food, people, and the room.', 'social');
-      push(6, 'Run a first-order promo and load food photos on each delivery platform.', 'delivery');
-      push(7, 'Send at least monthly and add a sign-up so new guests opt in.', 'email-loyalty');
-      raw.OVERALL_SCORE = score;
-      raw.BAR_NAME = 'The Anchor Bar & Kitchen';
-      raw.AUDIT_ID = audit_id;
-      raw.AUDIT_PERIOD = period;
-      raw.DATA_TIER_LABEL = tier;
-      raw.INDUSTRY_AVG = 58;
-      raw.TARGET_SCORE = 70;
-      return { id:uid(), date:date, bar_name:raw.BAR_NAME, overall_score:score,
-        audit_id:audit_id, audit_period:period, grade:tier,
-        sections:sections, action_items:items, raw:raw, generated_at:generated_at };
-    };
-
-    App.data.traffic_audits = weeklySeries('traffic', {
-      90: mkTrafficAudit(dateStr(90), daysAgoISO(90), 'TFA-2026-0006',
-        periodLabel(90), 35,
-        'Tier 2 Analysis, Standard Data Submitted', {
-        S1_SCORE:32, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Partial',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'No', S1_PHOTO_COUNT:41,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:2, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:52, S1_MONTHLY_GAP:480,
-        S1_NARRATIVE:'This first read is built from the digital stats you entered at intake. The Google Business Profile is claimed but only half complete. Two posts in 30 days against an 8-post benchmark.',
-        S1_FINDING:'Photos are well below 100, the menu link is missing, and posts barely run.',
-        S1_TOOL:'Add the menu link, post weekly offers, and load 60 more photos this month.',
-        S2_SCORE:34, S2_MOBILE_OPTIMIZED:'No', S2_MONTHLY_SESSIONS:1180,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:74, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'No', S2_ONLINE_ORDERING_PRESENT:'No', S2_MONTHLY_GAP:720,
-        S2_NARRATIVE:'Site traffic of 1,180 monthly sessions is roughly 40% below benchmark, and the homepage is not mobile-optimized.',
-        S2_FINDING:'Bounce rate is 74% and the site has no online ordering.',
-        S2_TOOL:'Rebuild the homepage above-the-fold for mobile and add a menu page that loads fast.',
-        S3_SCORE:26, S3_GOOGLE_RATING:3.9, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:240, S3_RESPONSE_RATE:38, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:19, S3_YELP_RATING:3.7,
-        S3_UNANSWERED:148, S3_NEGATIVE_PATTERN:'Slow weekend service mentioned in 4 of the last 10 reviews.',
-        S3_MONTHLY_GAP:1280,
-        S3_NARRATIVE:'Google rating is 3.9 against a 4.3 benchmark, and the response rate is just 38%.',
-        S3_FINDING:'148 reviews sit unanswered, and a slow-weekend-service pattern shows in the recent ones.',
-        S3_TOOL:'Respond to every unanswered review this week and address the weekend pacing issue on the floor.',
-        S4_SCORE:36, S4_MAPS_PACK_CONFIRMED:'No', S4_NAP_CONSISTENT:'No',
-        S4_NAP_BUSINESS_NAME:'Inconsistent across Yelp and Apple Maps',
-        S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'The business does not appear in the Google Maps pack for its primary keyword.',
-        S4_FINDING:'Name, address and phone vary across Yelp, Apple Maps and the website footer.',
-        S4_TOOL:'Pick the canonical NAP and fix every directory listing to match it exactly.',
-        S5_SCORE:38, S5_IG_FOLLOWERS:1880, S5_IG_POSTS_LAST_30:5, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1050, S5_CONTENT_TYPE:'Mostly promotional', S5_MONTHLY_GAP:380,
-        S5_NARRATIVE:'Instagram posting runs 5 per 30 days against a 12 benchmark.',
-        S5_FINDING:'Content is mostly promotional graphics, not food and people.',
-        S5_TOOL:'Move to a balanced mix of food, people and the room. Post three times a week.',
-        S6_SCORE:42, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.2, S6_UBEREATS_RATING:4.0,
-        S6_PHOTO_COUNT_DELIVERY:11, S6_MENU_COMPLETE:'Partial', S6_PROMO_ACTIVE:'No',
-        S6_MONTHLY_GAP:540,
-        S6_NARRATIVE:'Both delivery platforms are live but ratings sit below the 4.5 benchmark and photos are sparse.',
-        S6_FINDING:'No promo is active on either platform.',
-        S6_TOOL:'Add 15 more food photos per platform and run a first-order promo on DoorDash.',
-        S7_SCORE:34, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:380, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:42, S7_SEND_FREQUENCY:'Rarely', S7_OPEN_RATE:18, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'No active mechanism', S7_MONTHLY_GAP:420,
-        S7_NARRATIVE:'A 380-contact list has not been emailed in over six weeks.',
-        S7_FINDING:'The list is going cold, opens are below benchmark, and there is no way for new guests to opt in.',
-        S7_TOOL:'Send a monthly email starting this week and add a WiFi sign-up capture.',
-        S8_SIG1_SCORE:'HIGH', S8_SIG1_LABEL:'Review velocity dead',
-        S8_SIG1_EVIDENCE:'Most recent review is 19 days old.',
-        S8_SIG1_GAP:'Nothing fresh on the listing for searching guests.',
-        S8_SIG1_TOOL:'Drop QR table cards asking for a Google review at every check.',
-        S8_SIG2_SCORE:'HIGH', S8_SIG2_LABEL:'Unanswered reviews piling up',
-        S8_SIG2_EVIDENCE:'148 Google reviews sit with no response.',
-        S8_SIG2_GAP:'Every searching guest sees them sitting unanswered.',
-        S8_SIG2_TOOL:'Clear the backlog this week, then 10 minutes a day to stay current.',
-        S8_SIG3_SCORE:'MEDIUM', S8_SIG3_LABEL:'Email list going cold',
-        S8_SIG3_EVIDENCE:'Last email send was 42 days ago.',
-        S8_SIG3_GAP:'A 380-name list earning nothing.',
-        S8_SIG3_TOOL:'Send a monthly email this week, even a simple one.',
-        S8_SIG4_SCORE:'MEDIUM', S8_SIG4_LABEL:'No delivery promos',
-        S8_SIG4_EVIDENCE:'No promo active on DoorDash or UberEats.',
-        S8_SIG4_GAP:'Sitting below the competitors who run offers.',
-        S8_SIG4_TOOL:'Launch a first-order promo on DoorDash this week.'
-      }),
-      60: mkTrafficAudit(dateStr(60), daysAgoISO(60), 'TFA-2026-0010',
-        periodLabel(60), 42,
-        'Tier 2 Analysis, Standard Data Submitted', {
-        S1_SCORE:42, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:64,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:4, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:68, S1_MONTHLY_GAP:360,
-        S1_NARRATIVE:'The menu link and hours are in and photo count climbed to 64. Posting is up to four in 30 days.',
-        S1_FINDING:'The profile is two-thirds complete. More photos and weekly posts close the rest.',
-        S1_TOOL:'Set a weekly post slot and load 20 more photos this month.',
-        S2_SCORE:40, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:1400,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:70, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'No', S2_MONTHLY_GAP:520,
-        S2_NARRATIVE:'A mobile rebuild started and sessions rose to 1,400. Bounce rate is down but still high.',
-        S2_FINDING:'Online ordering is not live yet and bounce rate sits at 70%.',
-        S2_TOOL:'Add online ordering and finish the mobile page-speed pass.',
-        S3_SCORE:36, S3_GOOGLE_RATING:4.0, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:256, S3_RESPONSE_RATE:55, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:11, S3_YELP_RATING:3.8,
-        S3_UNANSWERED:112, S3_NEGATIVE_PATTERN:'Weekend service mentions easing.',
-        S3_MONTHLY_GAP:900,
-        S3_NARRATIVE:'Google rating ticked up to 4.0 and the response rate reached 55% as replies began.',
-        S3_FINDING:'112 reviews remain unanswered. The reply routine is working but not yet daily.',
-        S3_TOOL:'Set a daily 10-minute review-response slot and clear the backlog.',
-        S4_SCORE:44, S4_MAPS_PACK_CONFIRMED:'Sometimes', S4_NAP_CONSISTENT:'Mostly',
-        S4_NAP_BUSINESS_NAME:'Consistent on Google, off on Yelp', S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'NAP is fixed on Google but still off on Yelp.',
-        S4_FINDING:'The bar shows in the Maps pack on some keywords. Citations are climbing.',
-        S4_TOOL:'Fix the Yelp listing to match and add ten local directories.',
-        S5_SCORE:44, S5_IG_FOLLOWERS:1980, S5_IG_POSTS_LAST_30:7, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1080, S5_CONTENT_TYPE:'Improving mix', S5_MONTHLY_GAP:300,
-        S5_NARRATIVE:'Posting rose to seven per 30 days with a more balanced mix.',
-        S5_FINDING:'Follower growth is following the schedule. Five more posts a month hits benchmark.',
-        S5_TOOL:'Lock a Tuesday and Friday content slot.',
-        S6_SCORE:48, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.3, S6_UBEREATS_RATING:4.1,
-        S6_PHOTO_COUNT_DELIVERY:14, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'No',
-        S6_MONTHLY_GAP:420,
-        S6_NARRATIVE:'Delivery menus are complete and ratings are climbing, but no promo is running.',
-        S6_FINDING:'A first-order promo would lift order volume off both platforms.',
-        S6_TOOL:'Launch a first-order promo on DoorDash and add 10 photos per platform.',
-        S7_SCORE:42, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:470, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:14, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:21, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture added', S7_MONTHLY_GAP:300,
-        S7_NARRATIVE:'The first monthly email went out and a WiFi sign-up capture is now live.',
-        S7_FINDING:'The list is near 500 and opens beat benchmark. Consistency is the next step.',
-        S7_TOOL:'Send on a fixed monthly date and grow the list past 600.',
-        S8_SIG1_SCORE:'HIGH', S8_SIG1_LABEL:'Review backlog still large',
-        S8_SIG1_EVIDENCE:'112 Google reviews remain unanswered.',
-        S8_SIG1_GAP:'Searching guests still see unanswered reviews.',
-        S8_SIG1_TOOL:'Clear the backlog with a daily response slot.',
-        S8_SIG2_SCORE:'MEDIUM', S8_SIG2_LABEL:'No delivery promo',
-        S8_SIG2_EVIDENCE:'No promo active on DoorDash or UberEats.',
-        S8_SIG2_GAP:'Sitting below competitors who run offers.',
-        S8_SIG2_TOOL:'Launch a first-order promo on DoorDash this week.',
-        S8_SIG3_SCORE:'MEDIUM', S8_SIG3_LABEL:'Online ordering missing',
-        S8_SIG3_EVIDENCE:'The site still has no online ordering.',
-        S8_SIG3_GAP:'Orders leak to the delivery apps at a higher fee.',
-        S8_SIG3_TOOL:'Add first-party online ordering to the site.'
-      }),
-      30: mkTrafficAudit(dateStr(30), daysAgoISO(30), 'TFA-2026-0015',
-        periodLabel(30), 50,
-        'Tier 3 Analysis, Full Data Submitted', {
-        S1_SCORE:52, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:84,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:6, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:80, S1_MONTHLY_GAP:280,
-        S1_NARRATIVE:'GBP is now 80% complete with the menu link live and weekly posts running.',
-        S1_FINDING:'Photo count has doubled to 84 and weekly posts are landing. Two more posts a month and 16 more photos close the gap to benchmark.',
-        S1_TOOL:'Add two posts a week and finish loading the food photo library.',
-        S2_SCORE:48, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:1620,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:66, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:380,
-        S2_NARRATIVE:'Mobile rebuild lifted sessions to 1,620 and bounce rate dropped to 66%.',
-        S2_FINDING:'Online ordering is now live and the menu page is in the top three viewed. Sessions and bounce still trail benchmark, but the trend is solid.',
-        S2_TOOL:'Add a reservations link in the header and run a quick Lighthouse pass on page speed.',
-        S3_SCORE:46, S3_GOOGLE_RATING:4.1, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:275, S3_RESPONSE_RATE:68, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:8, S3_YELP_RATING:3.9,
-        S3_UNANSWERED:88, S3_NEGATIVE_PATTERN:'Weekend service mentions have dropped.',
-        S3_MONTHLY_GAP:640,
-        S3_NARRATIVE:'Google rating climbed to 4.1 and response rate is up to 68% as the reply routine took hold.',
-        S3_FINDING:'88 reviews remain unanswered. Hitting the 75% response benchmark closes the rest of this gap.',
-        S3_TOOL:'Clear the unanswered backlog and set a daily 10-minute response slot.',
-        S4_SCORE:52, S4_MAPS_PACK_CONFIRMED:'Sometimes', S4_NAP_CONSISTENT:'Yes',
-        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'NAP is now consistent across the major directories.',
-        S4_FINDING:'The business appears in the Maps pack on most keyword variations. Citation count is climbing.',
-        S4_TOOL:'Add the bar to ten more local-bar directories.',
-        S5_SCORE:52, S5_IG_FOLLOWERS:2120, S5_IG_POSTS_LAST_30:9, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1115, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:200,
-        S5_NARRATIVE:'Posting is up to 9 per 30 days and content shifted to a balanced mix.',
-        S5_FINDING:'Follower growth followed the schedule change. Three more posts per month hits the benchmark.',
-        S5_TOOL:'Set a Tuesday and Friday content slot and stick to it.',
-        S6_SCORE:54, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.4, S6_UBEREATS_RATING:4.2,
-        S6_PHOTO_COUNT_DELIVERY:18, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'DoorDash',
-        S6_MONTHLY_GAP:280,
-        S6_NARRATIVE:'DoorDash promo is live and ratings are up. UberEats lags by two-tenths.',
-        S6_FINDING:'More photos and a UberEats promo would close the remaining gap.',
-        S6_TOOL:'Mirror the DoorDash promo on UberEats and add 8 more food photos to each.',
-        S7_SCORE:48, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:560, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:9, S7_SEND_FREQUENCY:'Monthly', S7_OPEN_RATE:24, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture', S7_MONTHLY_GAP:220,
-        S7_NARRATIVE:'List grew past 500 and sends became monthly. Open rate of 24% beats the 20% benchmark.',
-        S7_FINDING:'Sending monthly works. Moving to weekly during event months grows revenue per send.',
-        S7_TOOL:'Add a weekly Thursday email during event-heavy weeks.',
-        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Posting schedule inconsistent',
-        S8_SIG1_EVIDENCE:'IG posts at 9 per 30 days, but clustered in two bursts.',
-        S8_SIG1_GAP:'Two bursts, then quiet, not steady.',
-        S8_SIG1_TOOL:'Lock a Tuesday and Friday content slot.',
-        S8_SIG2_SCORE:'MEDIUM', S8_SIG2_LABEL:'UberEats trails DoorDash',
-        S8_SIG2_EVIDENCE:'UberEats rating 4.2 vs DoorDash 4.4.',
-        S8_SIG2_GAP:'Trailing DoorDash by two-tenths.',
-        S8_SIG2_TOOL:'Mirror the DoorDash photo and promo plan on UberEats.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Email still monthly',
-        S8_SIG3_EVIDENCE:'Sending once a month, opens at 24%.',
-        S8_SIG3_GAP:'Room to send weekly during event months.',
-        S8_SIG3_TOOL:'Add a weekly email during event-heavy weeks.'
-      }),
-      0: mkTrafficAudit(dateStr(0), daysAgoISO(0), 'TFA-2026-0020',
-        periodLabel(0), 57,
-        'Tier 3 Analysis, Full Data Submitted', {
-        S1_SCORE:60, S1_LISTING_CLAIMED:'Yes', S1_HOURS_COMPLETE:'Yes',
-        S1_WEBSITE_LINKED:'Yes', S1_MENU_LINK_ACTIVE:'Yes', S1_PHOTO_COUNT:112,
-        S1_PHOTO_BENCHMARK:100, S1_POSTS_LAST_30_DAYS:9, S1_POSTS_BENCHMARK:8,
-        S1_PROFILE_COMPLETENESS_PCT:90, S1_MONTHLY_GAP:120,
-        S1_NARRATIVE:'GBP is 90% complete with 112 photos and 9 posts in the last 30 days, both at or above benchmark.',
-        S1_FINDING:'The Q and A section and a handful of attributes are the last gaps. The profile is now a strong discovery asset.',
-        S1_TOOL:'Seed the Q and A with the questions guests ask most.',
-        S2_SCORE:56, S2_MOBILE_OPTIMIZED:'Yes', S2_MONTHLY_SESSIONS:2200,
-        S2_SESSIONS_BENCHMARK:2000, S2_BOUNCE_RATE:59, S2_BOUNCE_BENCHMARK:55,
-        S2_MENU_PAGE_IN_TOP_3:'Yes', S2_ONLINE_ORDERING_PRESENT:'Yes', S2_MONTHLY_GAP:160,
-        S2_NARRATIVE:'Sessions cleared 2,200 and bounce rate is within four points of benchmark.',
-        S2_FINDING:'Online ordering and reservations are both live and visible above the fold on mobile.',
-        S2_TOOL:'Run a page-speed pass and add a quarterly content refresh to the events page.',
-        S3_SCORE:56, S3_GOOGLE_RATING:4.3, S3_GOOGLE_RATING_BENCHMARK:4.3,
-        S3_GOOGLE_REVIEW_COUNT:312, S3_RESPONSE_RATE:78, S3_RESPONSE_BENCHMARK:75,
-        S3_MOST_RECENT_REVIEW_DAYS:5, S3_YELP_RATING:4.0,
-        S3_UNANSWERED:54, S3_NEGATIVE_PATTERN:'No recurring theme in the last 30 days.',
-        S3_MONTHLY_GAP:240,
-        S3_NARRATIVE:'Google rating reached the 4.3 benchmark and response rate is up to 78%.',
-        S3_FINDING:'Review velocity is healthy but reputation is the slowest lever; 54 older reviews are still unanswered.',
-        S3_TOOL:'Keep the daily response slot and sweep the older unanswered reviews.',
-        S4_SCORE:58, S4_MAPS_PACK_CONFIRMED:'Yes', S4_NAP_CONSISTENT:'Yes',
-        S4_NAP_BUSINESS_NAME:'Consistent', S4_PRIMARY_KEYWORD:'austin sports bar',
-        S4_NARRATIVE:'The bar appears in the Maps pack for most tracked keywords.',
-        S4_FINDING:'NAP is consistent and citation count is near the local benchmark. Search is performing.',
-        S4_TOOL:'Audit citations quarterly and add new directories as they appear.',
-        S5_SCORE:58, S5_IG_FOLLOWERS:2420, S5_IG_POSTS_LAST_30:12, S5_IG_POSTS_BENCHMARK:12,
-        S5_FB_FOLLOWERS:1190, S5_CONTENT_TYPE:'Balanced', S5_MONTHLY_GAP:140,
-        S5_NARRATIVE:'Posting hit the 12-per-month benchmark with a balanced mix and steady follower growth.',
-        S5_FINDING:'Engagement is climbing and Reels are now in rotation. Consistency is the win to protect.',
-        S5_TOOL:'Hold the Tuesday and Friday slots and add one staff post a month.',
-        S6_SCORE:60, S6_DOORDASH_ACTIVE:'Yes', S6_UBEREATS_ACTIVE:'Yes', S6_GRUBHUB_ACTIVE:'No',
-        S6_DOORDASH_RATING:4.5, S6_UBEREATS_RATING:4.3,
-        S6_PHOTO_COUNT_DELIVERY:32, S6_MENU_COMPLETE:'Yes', S6_PROMO_ACTIVE:'Both platforms',
-        S6_MONTHLY_GAP:160,
-        S6_NARRATIVE:'Both delivery platforms run promos and DoorDash reached the 4.5 mark.',
-        S6_FINDING:'Photo and menu coverage are strong. Grubhub is off by choice given the local mix.',
-        S6_TOOL:'Test a free-delivery threshold promo on DoorDash next month.',
-        S7_SCORE:54, S7_EMAIL_LIST_EXISTS:'Yes', S7_LIST_SIZE:680, S7_LIST_BENCHMARK:500,
-        S7_LAST_SEND_DAYS_AGO:6, S7_SEND_FREQUENCY:'Weekly', S7_OPEN_RATE:26, S7_OPEN_BENCHMARK:20,
-        S7_GROWTH_MECHANISM:'WiFi login capture',
-        S7_MONTHLY_GAP:120,
-        S7_NARRATIVE:'List grew to 680 with weekly sends and 26% opens.',
-        S7_FINDING:'The email channel is becoming a real revenue line. Keep sending weekly and growing the list.',
-        S7_TOOL:'Keep sending weekly and add a segmented email for your regulars.',
-        S8_SIG1_SCORE:'MEDIUM', S8_SIG1_LABEL:'Reputation is the slow lever',
-        S8_SIG1_EVIDENCE:'Rating reached 4.3 but reviews move slower than the other systems.',
-        S8_SIG1_GAP:'Reputation takes months; keep asking every happy table.',
-        S8_SIG1_TOOL:'Drop QR review cards at every check and reply daily.',
-        S8_SIG2_SCORE:'LOW', S8_SIG2_LABEL:'Photo library steady',
-        S8_SIG2_EVIDENCE:'112 photos current, with 28 added in the last 30 days.',
-        S8_SIG2_GAP:'On track. Refresh photos seasonally.',
-        S8_SIG2_TOOL:'Replace the menu cover shots quarterly with current plating.',
-        S8_SIG3_SCORE:'LOW', S8_SIG3_LABEL:'Grubhub inactive by choice',
-        S8_SIG3_EVIDENCE:'Grubhub listing remains off.',
-        S8_SIG3_GAP:'Confirm this is intentional given local order mix.',
-        S8_SIG3_TOOL:'Review Grubhub local order share annually before deciding.'
-      })
-    });
 
     // ════════════════════════════════════════════════════════════════════
     //  INVENTORY CONTROL — The Anchor's stockroom. The last two counts feed
@@ -2851,7 +2398,7 @@ S.HubSettings = {
     // exactly as a live user's would. No backdated "fix landed here" fantasy.
     const fxAt = (n) => ({ date: dateStr(n), logged_at: daysAgoISO(n) });
     App.data.fix_log = (App.data.fix_log || [])
-      .filter(e => e.module !== 'profit' && e.module !== 'revenue' && e.module !== 'traffic')
+      .filter(e => e.module !== 'profit' && e.module !== 'revenue')
       .concat([
       { id:uid(), module:'profit', gap_id:'pour-cost',  gap_name:'Pour Cost',           ...fxAt(78) },
       { id:uid(), module:'profit', gap_id:'theft-loss', gap_name:'Theft and Loss',      ...fxAt(74) },
@@ -2860,12 +2407,6 @@ S.HubSettings = {
       { id:uid(), module:'revenue', gap_id:'check-average',    gap_name:'Check Average and Upsell',  ...fxAt(64) },
       { id:uid(), module:'revenue', gap_id:'labor-scheduling', gap_name:'Labor Cost and Scheduling', ...fxAt(50) },
       { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  ...fxAt(18) },
-      { id:uid(), module:'traffic', gap_id:'gbp',           gap_name:'Google Business',         ...fxAt(62) },
-      { id:uid(), module:'traffic', gap_id:'website',       gap_name:'Website',                 ...fxAt(44) },
-      { id:uid(), module:'traffic', gap_id:'reviews',       gap_name:'Reviews',                 ...fxAt(30) },
-      { id:uid(), module:'traffic', gap_id:'delivery',      gap_name:'Delivery Platforms',      ...fxAt(26) },
-      { id:uid(), module:'traffic', gap_id:'social',        gap_name:'Social Media',            ...fxAt(22) },
-      { id:uid(), module:'traffic', gap_id:'email-loyalty', gap_name:'Email Marketing',          ...fxAt(14) },
     ]);
 
     // ── Variance Investigations ──
@@ -3693,6 +3234,99 @@ S.HubSettings = {
         action_items: exposures.map(e => ({ action: e.label + '. ' + e.detail, gap_id: e.gap_id || null, monthly_impact: 0 }))
       };
     };
+    // ════════════════════════════════════════════════════════════════════
+    //  CASH RECOVERY — the Anchor's first-quarter cash-recovery arc. Four
+    //  milestone audits plus weekly fills trace cash health climbing as trapped
+    //  stock is freed, the cash cycle tightens, and vendors move onto terms.
+    //  The current (day-0) audit is regenerated by the LIVE CashEngine on the
+    //  seeded data, so it matches the Cash screens exactly and behaves like a
+    //  real user's. The older milestones are hand-authored frozen history.
+    // ════════════════════════════════════════════════════════════════════
+    const mkCashAudit = (date, generated_at, audit_id, period, raw) => {
+      const N = (window.S && S.CashAudit) ? S.CashAudit.SECTION_NAMES
+              : ['Capital Efficiency', 'Cash Conversion Cycle', 'Liquidity & Runway', 'Payment Terms'];
+      const sections = {};
+      [raw.S1_SCORE, raw.S2_SCORE, raw.S3_SCORE, raw.S4_SCORE].forEach((v, i) => { if (v != null) sections[N[i]] = v; });
+      const cur = v => App.fmtCurrency(v);
+      const items = [];
+      if (raw.TRAPPED_CASH > 0) items.push({ action: 'Free ' + cur(raw.TRAPPED_CASH) + ' of lazy shelf cash: ' + cur(raw.DEAD_STOCK) + ' in dead stock, ' + cur(raw.OVERSTOCK) + ' above par.', gap_id: 'free-trapped' });
+      if (raw.CYCLE_DAYS > 7) items.push({ action: 'Your cash is locked about ' + Math.round(raw.CYCLE_DAYS) + ' days. Order to par to free roughly ' + cur(raw.DAILY_COGS) + ' for each day you shorten it.', gap_id: 'order-to-par' });
+      if (raw.TIGHT_WEEKS > 0) items.push({ action: raw.TIGHT_WEEKS + ' tight week' + (raw.TIGHT_WEEKS === 1 ? '' : 's') + ' in the next thirteen. Move a payment or hold an order to cover it.', gap_id: 'stay-ahead' });
+      if (raw.TOTAL_VENDORS && raw.VENDORS_ON_TERMS < raw.TOTAL_VENDORS) items.push({ action: 'Set payment terms on the ' + (raw.TOTAL_VENDORS - raw.VENDORS_ON_TERMS) + ' vendor' + ((raw.TOTAL_VENDORS - raw.VENDORS_ON_TERMS) === 1 ? '' : 's') + ' without them, so you stop paying early.', gap_id: 'pay-on-terms' });
+      return {
+        id: uid(), date: date, bar_name: 'The Anchor Bar & Kitchen',
+        overall_score: raw.OVERALL_SCORE, grade: '', audit_period: period, audit_id: audit_id,
+        sections: sections, action_items: items, cash_to_free: raw.TRAPPED_CASH || 0,
+        raw: raw, signals: [], generated_at: generated_at
+      };
+    };
+    const cashRaw = (o) => Object.assign({
+      BAR_NAME: 'The Anchor Bar & Kitchen', HAS_OPENING: true, OPENING_CASH: 45000,
+      INVENTORY_VALUE: 38000, BLENDED_TURNS: 7.0, DAILY_COGS: 250, WEIGHTED_DPO: 18,
+      TOTAL_VENDORS: 6, LOW_POINT_WEEK: ''
+    }, o);
+    App.data.cash_audits = weeklySeries('cash', {
+      90: mkCashAudit(dateStr(90), daysAgoISO(90), 'CA-2026-0006', periodLabel(90), cashRaw({
+        OVERALL_SCORE: 42, S1_SCORE: 38, S2_SCORE: 40, S3_SCORE: 44, S4_SCORE: 46,
+        TRAPPED_CASH: 6200, DEAD_STOCK: 4100, OVERSTOCK: 2100, BLENDED_TURNS: 6.0,
+        DIO: 42, DPO: 12, CYCLE_DAYS: 30, LOCKED_CASH: 7600, DAILY_COGS: 240,
+        TIGHT_WEEKS: 2, RUNWAY: 6, LOW_POINT_BAL: 3200, SAFE_TO_SPEND: 4200,
+        VENDORS_ON_TERMS: 2, WEIGHTED_DPO: 11,
+        S1_FINDING: 'About $6,200 of shelf cash is frozen in slow movers and overstock against $38,000 on hand. Your inventory is working too little of it.',
+        S2_FINDING: 'Cash is locked about 30 days: product sits 42 and you take 12 to pay. Order to par and hold your terms.',
+        S3_FINDING: '2 of the next thirteen weeks run tight. Free trapped cash and move a payment to cover them.',
+        S4_FINDING: '2 of 6 vendors are on terms and you hold about 11 days before paying. Set terms on the rest.'
+      })),
+      60: mkCashAudit(dateStr(60), daysAgoISO(60), 'CA-2026-0011', periodLabel(60), cashRaw({
+        OVERALL_SCORE: 52, S1_SCORE: 48, S2_SCORE: 50, S3_SCORE: 54, S4_SCORE: 56,
+        TRAPPED_CASH: 4800, DEAD_STOCK: 3100, OVERSTOCK: 1700, BLENDED_TURNS: 6.6,
+        DIO: 36, DPO: 14, CYCLE_DAYS: 24, LOCKED_CASH: 6000, DAILY_COGS: 245,
+        TIGHT_WEEKS: 1, RUNWAY: 8, LOW_POINT_BAL: 6400, SAFE_TO_SPEND: 7800,
+        VENDORS_ON_TERMS: 3, WEIGHTED_DPO: 15,
+        S1_FINDING: 'Trapped cash is down to about $4,800 as the slow premium stock moves. Keep cutting the dead weight.',
+        S2_FINDING: 'The cash cycle tightened to about 24 days. Product sits 36 and you take 14 to pay.',
+        S3_FINDING: '1 tight week ahead. Catch it on the forecast before it lands.',
+        S4_FINDING: '3 of 6 vendors are on terms now, holding about 15 days. Two more to go.'
+      })),
+      30: mkCashAudit(dateStr(30), daysAgoISO(30), 'CA-2026-0016', periodLabel(30), cashRaw({
+        OVERALL_SCORE: 62, S1_SCORE: 60, S2_SCORE: 60, S3_SCORE: 62, S4_SCORE: 66,
+        TRAPPED_CASH: 3400, DEAD_STOCK: 2200, OVERSTOCK: 1200, BLENDED_TURNS: 7.0,
+        DIO: 30, DPO: 16, CYCLE_DAYS: 18, LOCKED_CASH: 4500, DAILY_COGS: 248,
+        TIGHT_WEEKS: 1, RUNWAY: 10, LOW_POINT_BAL: 9200, SAFE_TO_SPEND: 11200,
+        VENDORS_ON_TERMS: 4, WEIGHTED_DPO: 17,
+        S1_FINDING: 'About $3,400 still tied up, mostly a couple of premium bottles. Run them down or feature them.',
+        S2_FINDING: 'Cash cycle down to about 18 days. The pars are closer to real usage now.',
+        S3_FINDING: '1 tight week ahead, but the runway is out to about 10 weeks.',
+        S4_FINDING: '4 of 6 vendors on terms, holding about 17 days. Pay on the due date, not before.'
+      })),
+      0: mkCashAudit(dateStr(0), daysAgoISO(0), 'CA-2026-0021', periodLabel(0), cashRaw({
+        OVERALL_SCORE: 70, S1_SCORE: 70, S2_SCORE: 68, S3_SCORE: 72, S4_SCORE: 72,
+        TRAPPED_CASH: 2400, DEAD_STOCK: 1600, OVERSTOCK: 800, BLENDED_TURNS: 7.4,
+        DIO: 26, DPO: 18, CYCLE_DAYS: 14, LOCKED_CASH: 3500, DAILY_COGS: 250,
+        TIGHT_WEEKS: 0, RUNWAY: 12, LOW_POINT_BAL: 12800, SAFE_TO_SPEND: 14600,
+        VENDORS_ON_TERMS: 4, WEIGHTED_DPO: 18,
+        S1_FINDING: 'Down to about $2,400 trapped, mostly slow premium liquor. The shelf is working.',
+        S2_FINDING: 'Cash cycle about 14 days and holding. Keep ordering to par.',
+        S3_FINDING: 'No tight weeks in the next thirteen. The runway is clear.',
+        S4_FINDING: '4 of 6 vendors on terms, holding about 18 days. Set terms on the last two.'
+      }))
+    });
+    // Regenerate the current (day-0) audit from the LIVE engine so it matches the
+    // Cash screens exactly; the hand-authored day-0 above only seeds the weekly
+    // fill interpolation. Keep its display id/date.
+    try {
+      if (window.S && S.CashAudit && window.CashEngine && S.CashAudit._computeAudit) {
+        const engCash = S.CashAudit._computeAudit();
+        if (engCash && App.data.cash_audits[0]) {
+          engCash.audit_id     = App.data.cash_audits[0].audit_id;
+          engCash.audit_period = App.data.cash_audits[0].audit_period;
+          engCash.date         = App.data.cash_audits[0].date;
+          engCash.generated_at = App.data.cash_audits[0].generated_at;
+          App.data.cash_audits[0] = engCash;
+        }
+      }
+    } catch (e) { /* keep the hand-authored day-0 if the engine cannot read yet */ }
+
     App.data.bar_cop_audits = [
       // ── Day 30 (61 days ago) — overall 49. The first Bar Cop audit, on only a
       //    few weeks of logged data. Recovery Action and Operational Consistency
@@ -3707,7 +3341,7 @@ S.HubSettings = {
             d('Shifts logged', '12 shifts in window', 40),
             d('Profit Recovery audit on time', 'Current', 100),
             d('Revenue Recovery audit on time', 'Current', 100),
-            d('Traffic Recovery audit on time', 'Current', 100),
+            d('Cash Recovery audit on time', 'Current', 100),
             d('Maintenance backlog cleared', '4 open over 14 days', 20) ],
           [ d('Cash variance trend (lower is better)', '0.62% of revenue handled', 38),
             d('Drawer counts per operating day', '8 counts on 14 operating days', 57),
@@ -3753,7 +3387,7 @@ S.HubSettings = {
             d('Shifts logged', '17 shifts in window', 57),
             d('Profit Recovery audit on time', 'Current', 100),
             d('Revenue Recovery audit on time', 'Current', 100),
-            d('Traffic Recovery audit on time', 'Current', 100),
+            d('Cash Recovery audit on time', 'Current', 100),
             d('Maintenance backlog cleared', '2 open over 14 days', 60) ],
           [ d('Cash variance trend (lower is better)', '0.50% of revenue handled', 50),
             d('Drawer counts per operating day', '14 counts on 22 operating days', 64),
@@ -3821,7 +3455,7 @@ S.HubSettings = {
 
     // Reset every data key to its default. App.data.settings (bar name,
     // targets, etc.) is preserved — that is "user settings" the dialog says
-    // it keeps. Everything else — Profit, Revenue, Traffic, fix log —
+    // it keeps. Everything else — Profit, Revenue, Cash, fix log —
     // goes back to its empty default.
     const s = App.data.settings;
     const defaults = DB._defaultData();
