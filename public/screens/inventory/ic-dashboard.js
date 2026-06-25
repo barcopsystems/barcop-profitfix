@@ -151,7 +151,7 @@ S.InventoryDashboard = {
     try {
       const st = this.computeState();
       const done = this.stepDone(st);
-      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
       const cur = v => App.fmtCurrency(v);
       const stats = [
         { label: 'Inventory Value', value: cur(st.inventoryValue) },
