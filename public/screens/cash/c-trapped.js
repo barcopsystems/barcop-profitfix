@@ -1,7 +1,7 @@
 'use strict';
 
 /* ── Cash Recovery — Trapped Cash ─────────────────────────────────────────────
-   The deep view behind the cockpit's "free up trapped cash" step. Working
+   The deep view behind the Close The Week "free up trapped cash" step. Working
    capital stuck on the shelf: dead stock that has not moved, and overstock above
    par. Ranked by the dollars you can free. Built to the report standard (stats
    card + .ch-tabs + .data-card). It diagnoses; the moves happen in Dynamic Pars

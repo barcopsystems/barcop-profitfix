@@ -1,98 +1,100 @@
 'use strict';
 
 /* ── Cash Recovery — Purchasing ───────────────────────────────────────────────
-   The deep view behind the cockpit's "order to par, not to fear" step. How many
-   weeks of inventory you are carrying versus what you actually use, which
-   categories are overstocked, and what the next order to par costs by vendor.
-   The point: buy what you use, not a number that feels safe, so cash stops
-   piling up on the shelf. Reads CashEngine, writes nothing; the order itself is
-   placed in the Order Sheet. */
+   The deep view behind the Close The Week "order to par" step. How many weeks of
+   inventory you carry versus what you use, which categories are overstocked, and
+   what the next order to par costs by vendor. Built to the report standard (stats
+   card + .sh headings + .data-card). Reads CashEngine; the order is placed in the
+   Order Sheet. */
 
 S.CashPurchasing = {
   TARGET_WEEKS: 3,
 
   showHowTo() {
     App.showHelpModal('How Purchasing Works', [
-      { p: ['Over-ordering is the quiet way cash gets trapped. Every case you buy ahead of when you need it is money off your account and onto the shelf. This view shows how many weeks of inventory you are carrying against what you actually use, so you can order to par instead of to a number that feels safe.'] },
-      { h: 'Weeks On Hand', p: ['Bar Cop divides what you are holding by what you use in a week. Around two to three weeks is healthy for most bars. Well above that and you have cash sitting still that you could be using elsewhere. The category table shows where the overstock is, so you know which order to tighten first.'] },
-      { h: 'Order To Par', p: ['The reorder list is what it costs to bring everything back to par this week, grouped by vendor. Place it in the Order Sheet. If a category keeps coming in overstocked, the par is too high; cut it in Dynamic Pars and the orders right-size themselves.'] },
-      { h: 'Buy On Your Cash Cycle', p: ['Consolidating to fewer, fuller orders and timing them to land near when your sales come in keeps more cash in your account longer. The week-ahead read on the cockpit lines the buys up against the cash coming in.'] }
+      { p: ['Over-ordering is the quiet way cash gets trapped. Every case you buy ahead of when you need it is money off your account and onto the shelf. This view shows how many weeks of inventory you are carrying against what you actually use, so you order to par instead of to a number that feels safe.'] },
+      { h: 'Weeks On Hand', p: ['Bar Cop divides what you are holding by what you use in a week. Around two to three weeks is healthy for most bars. Well above that and you have cash sitting still. The category table shows where the overstock is, so you know which order to tighten first.'] },
+      { h: 'Order To Par', p: ['The reorder list is what it costs to bring everything to par this week, grouped by vendor. Place it in the Order Sheet. If a category keeps coming in overstocked, the par is too high; cut it in Dynamic Pars and the orders right-size themselves.'] },
+      { h: 'Buy On Your Cash Cycle', p: ['Consolidating to fewer, fuller orders and timing them near when your sales come in keeps more cash in your account longer.'] }
     ]);
   },
 
+  statItem(label, val, cls) {
+    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
+  },
+  statsCard(items) {
+    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+  dataCard(headers, rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  },
+  sh(t) { return '<div class="sh" style="margin:24px 0 10px;">' + t + '</div>'; },
+
   render(container, actions) {
     this.container = container;
+    this.actions = actions;
     if (actions) actions.innerHTML = '';
-    const o = CashEngine.overOrder(this.TARGET_WEEKS);
-    const cats = CashEngine.categoryBreakdown(this.TARGET_WEEKS);
-    const reorder = CashEngine.reorderToPar();
+    this.draw();
+  },
 
+  draw() {
+    const o = CashEngine.overOrder(this.TARGET_WEEKS);
     if (!o.hasData) {
-      container.innerHTML = '<div class="screen">' + this.statStrip(o, reorder)
-        + '<div class="card" style="margin-top:16px;"><div style="font-size:13px;color:var(--t2);line-height:1.7;">Once you have two counts, Bar Cop shows how many weeks of inventory you are carrying and flags the cash tied up beyond what you use.</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button></div></div></div>';
-      this.wire();
+      App.setupCard(this.container, {
+        title: 'Purchasing',
+        lead: 'Purchasing shows how many weeks of inventory you are carrying against what you use, and what the next order to par costs.',
+        steps: [
+          { title: 'Take two inventory counts', desc: 'Weeks on hand reads off the usage between two counts. Take them and this fills in.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: false }
+        ]
+      });
       return;
     }
 
-    container.innerHTML = '<div class="screen">'
-      + this.statStrip(o, reorder)
-      + '<div class="sh" style="margin:20px 0 8px;">Where You Are Overstocked</div>'
-      + this.catCard(cats)
-      + '<div class="sh" style="margin:22px 0 8px;">Order to Par This Week</div>'
-      + this.reorderCard(reorder)
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Adjust Pars</button>'
-      + '</div>'
-      + '</div>';
-    this.wire();
-  },
-
-  statStrip(o, reorder) {
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
+    const cats = CashEngine.categoryBreakdown(this.TARGET_WEEKS);
+    const reorder = CashEngine.reorderToPar();
     const woh = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) + 'w' : '-';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('Weeks On Hand', woh, o.excess > 0 ? 'warn' : '')
-      + div + item('Tied Beyond ' + this.TARGET_WEEKS + 'w', o.excess > 0 ? App.fmtCurrency(o.excess, 0) : '$0')
-      + div + item('Order to Par', reorder.total > 0 ? App.fmtCurrency(reorder.total, 0) : '-')
+
+    const stats = this.statsCard(
+      this.statItem('Weeks On Hand', woh, o.excess > 0 ? 'warn' : '')
+      + this.statItem('Tied Beyond ' + this.TARGET_WEEKS + 'w', o.excess > 0 ? App.fmtCurrency(o.excess) : '$0.00')
+      + this.statItem('Order to Par', reorder.total > 0 ? App.fmtCurrency(reorder.total) : '-'));
+
+    const actionRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:24px 0 12px;">'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Adjust Pars</button>'
+      + '<button class="btn btn-ghost btn-sm" id="cp-export">Export PDF</button>'
       + '</div>';
-  },
 
-  catCard(cats) {
-    const head = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;padding:9px 14px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--b2);">'
-      + '<div>Category</div><div style="text-align:right;">On Hand</div><div style="text-align:right;">Weeks</div><div style="text-align:right;">Over</div></div>';
-    if (!cats.length) return '<div class="card" style="padding:0;overflow:hidden;">' + head + '<div style="padding:16px 14px;font-size:12px;color:var(--t3);">No category value yet.</div></div>';
-    const rows = cats.map((c, i) => {
-      const woh = c.weeksOnHand != null ? c.weeksOnHand.toFixed(1) : '-';
-      const warn = c.excess > 0;
-      return '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;padding:11px 14px;align-items:center;' + (i < cats.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + 'background:' + (i % 2 ? 'var(--bg)' : 'transparent') + ';">'
-        + '<div style="font-size:13px;color:var(--t1);">' + esc(c.cat) + '</div>'
-        + '<div style="text-align:right;font-size:12px;color:var(--t2);">' + App.fmtCurrency(c.value, 0) + '</div>'
-        + '<div style="text-align:right;font-size:12px;font-weight:600;color:' + (warn ? 'var(--amber)' : 'var(--t2)') + ';">' + woh + '</div>'
-        + '<div style="text-align:right;font-size:13px;font-weight:600;color:' + (warn ? 'var(--gold)' : 'var(--t4)') + ';">' + (c.excess > 0 ? App.fmtCurrency(c.excess, 0) : '-') + '</div>'
-        + '</div>';
-    }).join('');
-    return '<div class="card" style="padding:0;overflow:hidden;">' + head + rows + '</div>';
-  },
+    // Where you are overstocked, by category.
+    const catHead = '<th>Category</th><th>On Hand</th><th>Weeks</th><th>Over</th>';
+    const catRows = cats.length
+      ? cats.map(c => {
+          const w = c.weeksOnHand != null ? c.weeksOnHand.toFixed(1) : '-';
+          const warn = c.excess > 0;
+          return '<tr><td style="color:var(--t1);">' + esc(c.cat) + '</td>'
+            + '<td class="val">' + App.fmtCurrency(c.value) + '</td>'
+            + '<td class="val"' + (warn ? ' style="color:var(--amber);font-weight:600;"' : '') + '>' + w + '</td>'
+            + '<td class="val"' + (warn ? ' style="color:var(--gold);font-weight:600;"' : '') + '>' + (c.excess > 0 ? App.fmtCurrency(c.excess) : '-') + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="4" style="color:var(--t3);">No category value yet.</td></tr>';
 
-  reorderCard(reorder) {
-    if (!reorder.count) {
-      return '<div class="card"><div style="font-size:12px;color:var(--t2);">Everything is at or above par. Nothing to order to par right now, which is exactly where you want to be.</div></div>';
-    }
-    const rows = reorder.vendors.map((v, i) =>
-      '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;' + (i < reorder.vendors.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-      + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(v.vendor) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);">' + v.items + ' item' + (v.items === 1 ? '' : 's') + ' below par</div></div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(v.cost, 0) + '</div></div>').join('');
-    return '<div class="card">'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:4px;">Bringing everything to par runs <strong style="color:var(--gold);">' + App.fmtCurrency(reorder.total, 0) + '</strong> across ' + reorder.count + ' item' + (reorder.count === 1 ? '' : 's') + '.</div>'
-      + rows + '</div>';
-  },
+    // The order to par this week, by vendor.
+    const venHead = '<th>Vendor</th><th>Below Par</th><th>Cost</th>';
+    const venRows = reorder.count
+      ? reorder.vendors.map(v => '<tr><td style="color:var(--t1);">' + esc(v.vendor) + '</td>'
+          + '<td class="val">' + v.items + '</td>'
+          + '<td class="val">' + App.fmtCurrency(v.cost) + '</td></tr>').join('')
+      : '<tr><td colspan="3" style="color:var(--t3);">Everything is at or above par. Nothing to order to par right now.</td></tr>';
 
-  wire() {
+    this.container.innerHTML = '<div class="screen">'
+      + stats + actionRow
+      + this.sh('Where You Are Overstocked') + this.dataCard(catHead, catRows)
+      + this.sh('Order to Par This Week') + this.dataCard(venHead, venRows)
+      + '</div>';
+
     this.container.onclick = ev => {
+      if (ev.target.closest('#cp-export')) { App.exportPDF({ title: 'Purchasing', root: this.container }); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };

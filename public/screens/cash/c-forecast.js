@@ -20,7 +20,7 @@ S.CashForecast = {
       { p: ['The forecast lines up the cash coming in against the cash going out for the next four weeks, so you catch a tight week before it bites. A quarterly insurance bill landing the same week as a big order, on a slow stretch, is the kind of thing that catches an operator short. Here you see it coming.'] },
       { h: 'What Is In It', p: ['Cash in is your projected sales, from your revenue forecast or Bar Cop\'s same-weekday baseline. Cash out is three pieces: overhead bills due that week from Books, your labor (your built schedule if you have one, otherwise a trailing average of what you actually pay), and your recurring purchases, estimated at your weekly cost of goods. Net is in minus out.'] },
       { h: 'Cash On Hand And Runway', p: ['Enter your cash on hand now and the weekly net becomes a running balance, so you see your actual cushion week to week and how many weeks it covers. That number is the one thing Bar Cop cannot read for you, so it stays on this device. Leave it blank and you still see the weekly net and any tight week.'] },
-      { h: 'A Tight Week', p: ['A week where more goes out than comes in is flagged. One tight week with a cushion behind it is fine. A tight week with no cushion is your cue to move a payment to its due date, lean out a slow shift, or hold a big order a week. The cockpit steps are where you do something about it.'] }
+      { h: 'A Tight Week', p: ['A week where more goes out than comes in is flagged. One tight week with a cushion behind it is fine. A tight week with no cushion is your cue to move a payment to its due date, lean out a slow shift, or hold a big order a week. Closing the week is where you do something about it.'] }
     ]);
   },
 

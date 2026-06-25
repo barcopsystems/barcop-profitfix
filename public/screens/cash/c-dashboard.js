@@ -1,7 +1,7 @@
 'use strict';
 
-/* ── Cash Recovery — Weekly Cockpit (landing screen) ─────────────────────────
-   Same model as the Control cockpits (Inventory / Labor / Shift): a recovery
+/* ── Cash Recovery — Close The Week (landing screen) ─────────────────────────
+   Same model as the Control weekly closes (Inventory / Labor / Shift): a recovery
    scoreboard up top, then "CLOSE OUT YOUR WEEK" with a week-stepper and the
    week's cash steps top to bottom. The one difference Kyle called for is the
    Recovery Scoreboard hero (the trapped-cash money number); everything below it
@@ -18,7 +18,7 @@ S.CashDashboard = {
   _st: null,
 
   showHowTo() {
-    App.showHelpModal('How the Cash Cockpit Works', [
+    App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Cash. Cash is the third lever Bar Cop watches: Profit is your margin, Revenue is your top line, Cash is your liquidity, the money actually in the account. Plenty of bars look fine on paper and still run tight, and this is where you catch it.'] },
       { h: 'The Scoreboard', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.'] },
       { h: 'The Steps', p: ['1. Free trapped cash: run down the dead stock and cut pars that are too high. 2. Order to par: buy what you use, not what you fear, so cash stops piling up on the shelf. 3. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 4. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
