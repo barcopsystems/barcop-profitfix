@@ -64,6 +64,7 @@ S.CashForecast = {
       + (opening != null ? this.curveCard(fc) : '')
       + this.table(fc, opening)
       + this.lowNote(fc, opening)
+      + this.billsCard()
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;">'
       +   '<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>'
       +   '<button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Schedule</button>'
@@ -171,6 +172,24 @@ S.CashForecast = {
     const note = '<div style="font-size:11px;color:var(--t4);margin-top:10px;">In is projected sales plus event balances. Out is payroll, purchases, and every bill due that week. '
       + (est ? 'Labor for unscheduled weeks is a trailing average; build the schedule to firm it up.' : 'Labor reads off your built schedule.') + '</div>';
     return this.dataCard(headers, body) + note;
+  },
+
+  // Who to pay this week: bills coming due, by date, so Pay on Terms is concrete.
+  billsCard() {
+    const bills = CashEngine.billsToPay(14);
+    const heading = '<div class="sh" style="margin:24px 0 10px;">Bills Due, Next Two Weeks</div>';
+    if (!bills.length) {
+      return heading + '<div class="card"><div style="font-size:12px;color:var(--t3);">No bills due in the next two weeks. Hold any that land to their due date.</div></div>';
+    }
+    const rows = bills.map(b => {
+      const termTxt = b.netDays > 0 ? 'Net ' + b.netDays : (b.terms || '-');
+      return '<tr><td style="color:var(--t1);">' + this.fmtWk(b.date) + '</td>'
+        + '<td>' + esc(b.vendor || b.category || 'Bill') + '</td>'
+        + '<td class="val">' + App.fmtCurrency(b.amount) + '</td>'
+        + '<td>' + esc(termTxt) + '</td></tr>';
+    }).join('');
+    const note = '<div style="font-size:11px;color:var(--t4);margin-top:10px;">Hold each to its due date, not the day it lands, and take any early-pay discount that beats idle cash.</div>';
+    return heading + this.dataCard('<th>Due</th><th>Pay</th><th>Amount</th><th>Terms</th>', rows) + note;
   },
 
   lowNote(fc, opening) {
