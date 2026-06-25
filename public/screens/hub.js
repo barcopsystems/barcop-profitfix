@@ -374,6 +374,24 @@ S.Hub = {
         +   dueRows
         + '</div>';
     }
+    // ── Cash + section status for the new section-card Hub ──
+    const trapped   = (window.CashEngine && CashEngine.trapped) ? CashEngine.trapped() : { total: 0, hasData: false };
+    const trappedCash = trapped.total || 0;
+    const cashSF    = (window.CashEngine && CashEngine.survivalForecast) ? CashEngine.survivalForecast(13) : { hasData:false };
+    const runwayTxt = !cashSF.hasData ? null : (cashSF.runway == null ? '13+ wks' : cashSF.runway === 0 ? 'This wk' : cashSF.runway + ' wk' + (cashSF.runway === 1 ? '' : 's'));
+
+    const latestOf = (arr, fields) => { let m=''; (arr||[]).forEach(r=>{ fields.forEach(f=>{ const v=(r&&r[f])?(''+r[f]):''; if(v>m)m=v; }); }); return m||null; };
+    const within7  = d => d != null && d <= 7;
+    const icCounts = (App.inventoryData && App.inventoryData.ic_counts) || [];
+    const icLast   = latestOf(icCounts, ['date','created_at','saved_at']);
+    const icCounted= within7(daysSince(icLast));
+    const lcActuals= (App.laborData && App.laborData.lc_actuals) || [];
+    const lcLast   = latestOf(lcActuals, ['date','week_start','created_at','saved_at']);
+    const lcLogged = within7(daysSince(lcLast));
+    const pfCurrent= (wkMods.find(m => m.name === 'Profit')  || {}).current;
+    const rvCurrent= (wkMods.find(m => m.name === 'Revenue') || {}).current;
+
+    // ── Top card: the money line (Opportunity · Recovered · Trapped Cash · Bar Cop) ──
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
@@ -381,19 +399,117 @@ S.Hub = {
       +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
       + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
-      + tile('Total Monthly Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
+      + tile('Total Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
-             anyAudit ? 'Recovery + revenue opportunity' : 'Run an audit to surface this')
+             anyAudit ? 'On the table to recover' : 'Run an audit to surface this')
       + statDiv
-      + tile('Recovery Scoreboard', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
+      + tile('Recovered', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
-             recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') + ' recovered' : 'Mark a fix in any recovery system to start')
+             recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') : 'Mark a fix to start')
+      + statDiv
+      + tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
+             trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
+             trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
       + statDiv
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
-      + whatsDueRight
       + '</div></div>';
+
+    // ── Needs Attention band: the fires (alerts) + section-less cadence nudges
+    //    (month-end Books, etc.). Catches what does not belong to a weekly section
+    //    card. Condition-gated, so it is never a nag; collapses to All Clear. ──
+    const cadence = [];
+    (function () {
+      const now = new Date();
+      if (now.getDate() <= 10) {
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lmKey = App.ymdLocal(lm).slice(0, 7);
+        const hasLastMo = (pWeeks || []).some(w => (((w.period_end || '') + '').slice(0, 7)) === lmKey);
+        if (hasLastMo) cadence.push({ sev:'due', text:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books, the month-end file', go:'S.HubBooks&&S.HubBooks.open()' });
+      }
+    })();
+    const bandItems = alerts.concat(cadence);
+    const dotOf = s => s === 'bad' ? 'var(--red)' : s === 'warn' ? 'var(--amber)' : 'var(--t3)';
+    const goOf  = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
+    let needsBand;
+    if (bandItems.length) {
+      const rows = bandItems.slice(0, 8).map(a =>
+        '<div class="hd-row" onclick="' + goOf(a) + '" style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:var(--r);background:#0D181E;cursor:pointer;min-width:0;">'
+        + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotOf(a.sev) + ';flex-shrink:0;"></span>'
+        + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</span>'
+        + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>').join('');
+      const more = bandItems.length > 8 ? '<div style="font-size:10px;color:var(--t4);grid-column:1/-1;padding-top:2px;">+' + (bandItems.length - 8) + ' more in the sections below</div>' : '';
+      needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
+        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + rows + more + '</div></div>';
+    } else {
+      needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
+        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:10px;">'
+        + '<span style="color:var(--green);font-weight:800;font-size:15px;">&#10003;</span>'
+        + '<span style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</span></div></div>';
+    }
+
+    // ── Section cards: one per section, Control row + Recovery row. Each mirrors
+    //    its section, a headline number/state + the weekly-close status + a jump
+    //    into that section. The whole card is the deep link. ──
+    const nextIn = a => (a && a.date != null) ? Math.max(0, 7 - (daysSince(a.date) || 0)) : null;
+    const auditLine = (a) => {
+      if (!a || a.overall_score == null) return '<span style="color:var(--t4);">No audit yet, run it for a baseline</span>';
+      const ni = nextIn(a);
+      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b> · ' + (ni === 0 ? 'due now' : 'next in ' + ni + 'd');
+    };
+    const secCard = (o) => {
+      const pill = o.statusText
+        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;color:' + (o.statusOk ? 'var(--green)' : 'var(--amber)') + ';">'
+            + (o.statusOk ? '<span>&#10003;</span>' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);"></span>') + esc(o.statusText) + '</span>'
+        : '';
+      return '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" '
+        + 'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:15px 16px;cursor:pointer;display:flex;flex-direction:column;gap:11px;min-width:0;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'
+        +   '<div style="font-size:11px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--t1);">' + esc(o.title) + '</div>' + pill
+        + '</div>'
+        + '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:33px;font-weight:600;line-height:0.95;color:' + (o.bigColor || 'var(--t1)') + ';">' + o.big + '</div>'
+        +   (o.bigSub ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;">' + esc(o.bigSub) + '</div>' : '') + '</div>'
+        + (o.line2 ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);padding-top:10px;">' + o.line2 + '</div>' : '')
+        + '</div>';
+    };
+    const icCard = secCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory',
+      big: icCounted ? 'On Track' : (icLast ? 'Count Due' : 'Set Up'),
+      bigColor: icCounted ? 'var(--green)' : 'var(--amber)',
+      bigSub: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet',
+      line2: 'Close the week: count, order, receive, review the flags.' });
+    const lcCard = secCard({ title:'Labor', screen:'lc-dashboard', mod:'labor',
+      statusOk: lcLogged, statusText: lcLogged ? 'Logged' : 'Log hours',
+      big: rW?.labor_pct_blended != null ? App.fmtPct(rW.labor_pct_blended) : '-',
+      bigColor: rW?.labor_pct_blended != null ? bandColor(band(rW.labor_pct_blended, laborT, 'low')) : 'var(--t4)',
+      bigSub: 'Labor cost · target ' + laborT + '%',
+      line2: 'Close the week: build the schedule, log the hours, watch overtime.' });
+    const scRev = (pW ? (pW.bar?.revenue || 0) + (pW.food?.revenue || 0) : 0);
+    const scCard = secCard({ title:'Shift', screen:'sc-dashboard', mod:'shift',
+      statusOk: pfCurrent, statusText: pfCurrent ? 'Imported' : 'Import sales',
+      big: pW ? App.fmtCurrency(scRev, 0) : '-',
+      bigColor: 'var(--t1)',
+      bigSub: pW ? 'Last week sales' : 'No week logged yet',
+      line2: 'Close the week: import POS sales, reconcile cash, clear exceptions.' });
+    const pfCard = secCard({ title:'Profit', screen:'dashboard', mod:'profit',
+      statusOk: pfCurrent, statusText: pfCurrent ? 'Week in' : 'Confirm week',
+      big: pW?.prime_cost_pct != null ? App.fmtPct(pW.prime_cost_pct) : '-',
+      bigColor: pW?.prime_cost_pct != null ? bandColor(band(pW.prime_cost_pct, primeT, 'low')) : 'var(--t4)',
+      bigSub: 'Prime cost · target ' + primeT + '%',
+      line2: auditLine(pA) });
+    const rvCard = secCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue',
+      statusOk: rvCurrent, statusText: rvCurrent ? 'Week in' : 'Confirm week',
+      big: rW?.check_avg != null ? App.fmtCurrency(rW.check_avg) : '-',
+      bigColor: rW?.check_avg != null ? bandColor(band(rW.check_avg, caT, 'high')) : 'var(--t4)',
+      bigSub: 'Check average · target ' + App.fmtCurrency(caT),
+      line2: auditLine(rA) });
+    const csCard = secCard({ title:'Cash', screen:'c-dashboard', mod:'cash',
+      statusOk: cashSF.hasData ? (cashSF.tightWeeks === 0) : false,
+      statusText: !cashSF.hasData ? 'Set up' : (cashSF.tightWeeks > 0 ? cashSF.tightWeeks + ' tight wk' + (cashSF.tightWeeks === 1 ? '' : 's') : 'Clear ahead'),
+      big: runwayTxt || '-',
+      bigColor: !cashSF.hasData ? 'var(--t4)' : (cashSF.runway != null && cashSF.runway <= 4 ? 'var(--red-soft)' : 'var(--t1)'),
+      bigSub: 'Cash runway',
+      line2: auditLine(cA) });
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
@@ -910,17 +1026,20 @@ S.Hub = {
     // with the action band taller than the detail band so the eye lands on the
     // win and the next move first. Flip to false to restore the prior
     // equal-weight grid exactly (kept intact below; panels are unchanged).
-    const NEW_HUB_LAYOUT = false;
-    const hubGrid = NEW_HUB_LAYOUT
-      ? `<div class="hub-grid" style="display:grid;grid-template-rows:auto 500px 430px;gap:18px;padding-bottom:18px;">
+    // ── Hub landing layout: the money line, the Needs Attention band, then the
+    //    six section cards (Control row + Recovery row) the operator closes each
+    //    week. Cards are content-height (no fixed rows), so the page breathes. ──
+    const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${tiles}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${alertsPanel}${readoutPanel}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${auditPanel}${metricsPanel}${chartPanel}</div>
-        </div>`
-      : `<div class="hub-grid" style="display:grid;grid-template-rows:auto 464px 470px;gap:18px;padding-bottom:18px;">
-          <div class="hub-grid-tiles">${tiles}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${actionPanel}${readoutPanel}${auditPanel}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${alertsPanel}${chartPanel}${metricsPanel}</div>
+          ${needsBand}
+          <div style="display:flex;flex-direction:column;min-width:0;">
+            <div class="sh" style="margin:0 0 10px;">Control</div>
+            <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${icCard}${lcCard}${scCard}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0;">
+            <div class="sh" style="margin:0 0 10px;">Recovery</div>
+            <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${pfCard}${rvCard}${csCard}</div>
+          </div>
         </div>`;
 
     // ── Compose ──
