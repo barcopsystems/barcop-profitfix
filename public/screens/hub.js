@@ -1365,6 +1365,39 @@ S.Hub = {
       });
     }
 
+    // 4d. Cash crunch — the 13-week survival forecast runs the account to zero or
+    // thin. The most urgent thing Bar Cop can surface: a profitable bar that runs
+    // out of cash still closes the doors. Runway-to-zero fires the top-severity
+    // alert; a dip under the reserve or a stretch of tight weeks warns.
+    if (window.CashEngine) {
+      try {
+        const sf = CashEngine.survivalForecast(13);
+        if (sf && sf.hasData) {
+          const low = sf.lowPoint;
+          const wk = low ? new Date(low.ws + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+          if (sf.hasOpening && sf.runway != null) {
+            out.push({
+              sev: 'bad',
+              text: 'Cash crunch ahead: your account runs dry in about ' + (sf.runway === 0 ? 'a week' : sf.runway + ' week' + (sf.runway === 1 ? '' : 's')) + (low ? ', bottoming out the week of ' + wk + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. Free trapped cash and move a payment now.',
+              screen: 'c-forecast', mod: 'cash'
+            });
+          } else if (sf.hasOpening && low && CashEngine.reserveTarget() > 0 && low.balance >= 0 && low.balance < CashEngine.reserveTarget()) {
+            out.push({
+              sev: 'warn',
+              text: 'Cash dips under your reserve the week of ' + wk + ', down to ' + App.fmtCurrency(low.balance, 0) + '. Hold payments to their due dates and free trapped cash to keep the cushion.',
+              screen: 'c-forecast', mod: 'cash'
+            });
+          } else if (!sf.hasOpening && sf.tightWeeks >= 2) {
+            out.push({
+              sev: 'warn',
+              text: sf.tightWeeks + ' of the next 13 weeks have more cash going out than coming in. Set your opening balance in Cash Position to see your real runway.',
+              screen: 'c-position', mod: 'cash'
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
     // 4b. Permits and licenses coming due — pulled from the Permits and
     // Compliance log. Expired or due within 14 days = critical; within 30 = warn.
     const permits = data.permits_compliance || [];
