@@ -73,7 +73,20 @@ S.LaborDashboard = {
     try {
       const done = this.stepDone();
       const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
-      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+      const wkStart = this.weekStart(), wkEnd = this.weekEnd();
+      const today = App.todayLocal();
+      const endCap = wkEnd < today ? wkEnd : today;
+      const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
+      const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
+      const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
+      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+      let otRisk = 0; try { const p = this.weekProjection(); otRisk = (p.over || 0) + (p.approaching || 0); } catch (e) {}
+      const stats = [
+        { label: 'Labor Cost', value: App.fmtCurrency(wkCost) },
+        { label: 'Labor Hours', value: wkHours.toFixed(1) },
+        { label: 'OT Risk', value: String(otRisk), warn: otRisk > 0 }
+      ];
+      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
     } finally { this._weekStart = sv; }
   },
   // A step is done if it carries an explicit operator stamp, else it falls back to
