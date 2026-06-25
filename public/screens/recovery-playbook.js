@@ -255,12 +255,13 @@ S.RecoveryPlaybook = {
   },
 
   partsHtml(b) {
+    const fixScreen = this._module === 'revenue' ? 'r-fix' : this._module === 'traffic' ? 't-fix' : this._module === 'cash' ? 'c-fix' : 'profit-fix';
     const cards = b.items.map(it =>
       '<div class="pb-part">'
       + '<div class="pb-part-label">' + esc(it.label) + '</div>'
       + '<div class="pb-part-name">' + esc(it.name) + '</div>'
       + '<div class="pb-part-desc">' + esc(it.desc) + '</div>'
-      + '<div class="pb-part-go">' + this.goBtn({ label: it.name, screen: 'profit-fix', focus: it.focus }) + '</div>'
+      + '<div class="pb-part-go">' + this.goBtn({ label: it.name, screen: fixScreen, focus: it.focus }) + '</div>'
       + '</div>').join('');
     return '<div class="pb-parts">' + cards + '</div>';
   },
@@ -494,6 +495,172 @@ S.RecoveryPlaybook = {
               { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the Pay on Terms step on Close The Week', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
             ] },
             { t: 'p', text: 'And you do not read it alone. Close The Week lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
+          ]
+        },
+        {
+          id: 'benchmarks', nav: 'Benchmarks', eyebrow: 'Benchmarks',
+          title: 'The Numbers to Run Against',
+          blocks: [
+            { t: 'p', text: 'These are your reference points. Bar Cop measures against them for you every week, but know them cold. Know how many weeks of each category you should carry, when trapped cash crosses from normal into a problem, what terms your vendors will actually give you, and how much runway is healthy.' },
+            { t: 'h', text: 'Weeks of Inventory On Hand' },
+            { t: 'table',
+              head: ['Category', 'Target weeks', 'High warning', 'Too much', 'Why'],
+              rows: [
+                ['Liquor', '2-3', '4', '5+', 'Long shelf life tempts overbuying; premium bottles sit the longest'],
+                ['Wine', '3-4', '5', '6+', 'A by-the-bottle list needs depth, but slow SKUs quietly trap cash'],
+                ['Bottle beer', '1-2', '3', '4+', 'Dated product; overstock risks code dates and dumps'],
+                ['Draft beer', '1-1.5', '2', '3+', 'Kegs are perishable; carry close to what you actually pour'],
+                ['Food', '0.5-1', '1.5', '2+', 'Perishable; carry to the next delivery, not past it'],
+                ['Overall bar', '2-3', '4', '5+', 'Above three weeks blended, run the category breakdown to find the overstock']
+              ] },
+            { t: 'h', text: 'Trapped Cash Thresholds' },
+            { t: 'table',
+              head: ['Signal', 'Healthy', 'Watch', 'Act now', 'What it means'],
+              rows: [
+                ['Trapped as % of inventory value', 'Under 5%', '5-12%', '12%+', 'Dead stock plus overstock against your total shelf value'],
+                ['Dead stock, no movement in 60 days', 'Under $500', '$500-$2,000', '$2,000+', 'Cash frozen with a spoilage clock running on it'],
+                ['Any single slow SKU tied up', 'Under $150', '$150-$400', '$400+', 'Usually one premium program that went cold']
+              ] },
+            { t: 'h', text: 'Vendor Payment Terms' },
+            { t: 'table',
+              head: ['Vendor type', 'Common terms', 'Worth asking for', 'Note'],
+              rows: [
+                ['Broadline / major distributor', 'Net 14-30', 'Net 30', 'A steady account gets net 30 just by asking'],
+                ['Local / specialty', 'COD to Net 7', 'Net 15', 'Smaller vendors guard cash; build the relationship first'],
+                ['Produce / perishable', 'Net 7-14', 'Net 14', 'Fast turns, so shorter terms are normal here'],
+                ['Beer and wine', 'COD to Net 30', 'Net 15-30', 'Some states restrict alcohol terms; know your local rules']
+              ],
+              note: 'Terms are state-dependent for alcohol. Where they are allowed, ask. The float is free money and most distributors extend it to an account that asks.' },
+            { t: 'h', text: 'Cash Runway' },
+            { t: 'table',
+              head: ['Runway your cash on hand covers', 'Position', 'What to do'],
+              rows: [
+                ['8+ weeks', 'Strong', 'You can absorb a slow stretch and a surprise without flinching'],
+                ['4-8 weeks', 'Healthy', 'Normal for a well-run bar; just watch the tight weeks on the forecast'],
+                ['2-4 weeks', 'Thin', 'Free your trapped cash and tighten terms before the next slow patch'],
+                ['Under 2 weeks', 'Tight', 'One bad fortnight is a crisis; work every lever in this playbook now']
+              ],
+              note: 'Runway needs your cash on hand, the one number only you know. Enter it on the Cash Forecast and the weekly net becomes a real runway.' }
+          ]
+        },
+        {
+          id: 'connect', nav: 'How It Connects', eyebrow: 'How the systems connect',
+          title: 'Four Systems, One Cash Position',
+          blocks: [
+            { t: 'p', text: 'These are not four separate chores. Free your trapped cash but keep ordering to a comfort number and the shelf refills in a month. Hold your vendor terms but never look at the week ahead and a quarterly bill still catches you flat. Cash control fails when it is treated as separate problems instead of one connected position you manage every week.' },
+            { t: 'p', text: 'The four systems are sequenced on purpose. Free the trapped cash first, because that is the biggest one-time pile and it funds the cushion. Then stop refilling it by ordering to par. Then manage the timing with the forecast and your terms so the cash you freed stays free.' },
+            { t: 'parts', items: [
+              { label: 'System 1', name: 'Free Trapped Inventory Cash', desc: 'The biggest one-time pile. Turn dead stock and overstock back into account cash.', focus: 'free-trapped' },
+              { label: 'System 2', name: 'Order to Par', desc: 'Stop refilling the pile. Buy what you use, not a number that feels safe.', focus: 'order-to-par' },
+              { label: 'System 3', name: 'Stay Ahead of the Week', desc: 'Manage the timing. See the tight weeks two to four weeks out and cover them early.', focus: 'stay-ahead' },
+              { label: 'System 4', name: 'Pay on Terms', desc: 'Keep the float. Hold every bill to its due date and take the discounts worth taking.', focus: 'pay-on-terms' }
+            ] },
+            { t: 'box', tone: 'gold', label: 'The logic in plain language', text: 'Trapped cash is the fastest money to free, so start there and it pays for the breathing room. But freeing it once does nothing if you keep over-ordering, so System 2 stops the shelf from refilling. Systems 3 and 4 are the timing half: the forecast shows you the tight weeks before they land, and holding your terms keeps the cash you freed in your account longer. Start by freeing what is trapped. Everything after that is about keeping it free.' },
+            { t: 'go', label: 'Cash Fix System', screen: 'c-fix', focus: 'free-trapped' }
+          ]
+        },
+        {
+          id: 'c1', nav: 'System 1: Free Trapped Cash', eyebrow: 'System 1 - the biggest pile',
+          title: 'Free Trapped Inventory Cash',
+          blocks: [
+            { t: 'lead', text: 'A craft cocktail bar in Denver, strong margins, busy four nights a week. The owner is proud of a deep back bar, forty-some premium and rare bottles. We counted and ran it: $6,200 sitting in bottles that had not poured a single drink in two months. Not spoiled, not stolen. Just bought for a cocktail program that changed, and never moved since. Six thousand dollars frozen on a shelf the owner walked past every day.' },
+            { t: 'p', text: 'Trapped cash is the quietest drain in the building because it does not look like a loss. It looks like inventory. A full, deep shelf feels like strength, and a slow premium bottle feels like an investment. But cash on the shelf is not working. It is not in your account when the rent is due, and the longer it sits the more it risks a code date or a dusty bottle nobody orders.' },
+            { t: 'p', text: 'There are two kinds and Bar Cop separates them so you do not double count. Dead stock is product that did not move at all between your last two counts; its full value is frozen. Overstock is product still moving but sitting well above its par; the cash is in the extra you did not need yet. A bar carrying four weeks of inventory it uses in two is sitting on a week or two of idle cash across the whole room, and that is usually thousands of dollars.' },
+            { t: 'p', text: 'Freeing it is not complicated, it is just deliberate. Run a dead bottle down: feature it, build a cocktail around it, put it on a special, or eighty-six it and stop reordering. For overstock, cut the par so the next order is smaller and the extra works off on its own. Done across the back bar, that is real money back in the account inside a few weeks.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'You count in Take Inventory and the moment it saves, Trapped Cash ranks every product by the dollars you can free, dead stock and overstock both. Dynamic Pars is where you cut the pars that run above your usage so the shelf stops refilling. Cash Freed on your Cash Fix tracks the drop in trapped capital from your own first weeks, so you see the money come back.' },
+            { t: 'go', label: 'Trapped Cash', screen: 'c-trapped' },
+            { t: 'go', label: 'Dynamic Pars', screen: 'ic-par-suggestions' },
+            { t: 'go', label: 'Free Trapped Cash system', screen: 'c-fix', focus: 'free-trapped' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Count on the same day every week, so trapped cash and the cash you free stay honest.',
+              'Work the Trapped Cash list top down: the biggest dollars first.',
+              'Run a dead bottle down before it dusts: feature it, special it, build a cocktail, or 86 it.',
+              'Cut the par on anything you keep reordering before it runs low.',
+              'Give a slow SKU two counts of no movement before you call it dead, so a seasonal item does not get cut early.',
+              'Re-count the following week and watch Cash Freed climb.'
+            ] }
+          ]
+        },
+        {
+          id: 'c2', nav: 'System 2: Order to Par', eyebrow: 'System 2 - stop refilling the pile',
+          title: 'Order to Par, Not to Fear',
+          blocks: [
+            { t: 'lead', text: 'A neighborhood bar orders the same way every week: walk the shelf, eyeball what looks low, and round every order up a case "to be safe." Nobody ever ran the math. We did: four and a half weeks of inventory on hand for a bar that turns its product in two. The padding the owner added every week to feel safe was about $7,000 in cash sitting on the shelf at any given moment. Safe was expensive.' },
+            { t: 'p', text: 'Over-ordering is how the trapped pile refills the moment you free it. Every case you buy ahead of when you need it is cash off your account and onto the shelf, and it is the easiest leak in the business to rationalize because running out feels worse than overbuying. But a bar that carries two to three weeks of most categories almost never runs out, and it keeps weeks of cash in the account instead of on the rack.' },
+            { t: 'p', text: 'The fix is to order to par off real usage, not a comfort number. Par is what you actually use between deliveries plus a thin safety buffer, and Bar Cop sets it off your counts instead of your gut. Where a category keeps coming in overstocked, the par is too high; cut it and the orders right-size themselves. And consolidating to fewer, fuller orders timed near when your sales come in keeps the cash in your account a few extra days each cycle.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Purchasing shows your weeks on hand against your usage and which categories are overstocked, so you know which order to tighten first. Dynamic Pars sets pars off real usage. The Order Sheet brings everything to par and no further. Re-count the next week and watch your weeks on hand settle toward target.' },
+            { t: 'go', label: 'Purchasing', screen: 'c-purchasing' },
+            { t: 'go', label: 'Order Sheet', screen: 'ic-order-sheet' },
+            { t: 'go', label: 'Order to Par system', screen: 'c-fix', focus: 'order-to-par' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Read your weeks on hand in Purchasing before you place the order.',
+              'Order to par, not to a number that feels safe. The buffer is in the par already.',
+              'If a category keeps coming in overstocked, the par is too high. Cut it in Dynamic Pars.',
+              'Consolidate to fewer, fuller orders and time them near when your sales land.',
+              'Targets by category are in the Benchmarks section.',
+              'Re-count the following week and confirm weeks on hand is coming down.'
+            ] }
+          ]
+        },
+        {
+          id: 'c3', nav: 'System 3: Stay Ahead', eyebrow: 'System 3 - manage the timing',
+          title: 'Stay Ahead of the Week',
+          blocks: [
+            { t: 'lead', text: 'A profitable bar, six years open, never missed a payroll. Then a slow February week landed the same days as the quarterly insurance bill and a big liquor reorder, and there was not enough in the account on Thursday when the truck wanted a check. The owner moved money from savings and made it work, but it was a scramble that a single glance at the weeks ahead would have turned into a non-event. Profit was never the problem. Timing was.' },
+            { t: 'p', text: 'Cash is about timing as much as amount. A bar can be profitable for the month and still be short on the wrong Thursday, because the bills, the orders, and the labor do not line up neatly with the days the sales come in. The lumpy ones do the damage: a quarterly bill, an annual license, a big equipment buy, the things that do not show up on a normal week and are exactly the ones a busy operator forgets are coming.' },
+            { t: 'p', text: 'The fix is to look two to four weeks ahead, every week, and line up what is going out against what is coming in. A week where more goes out than comes in is a tight week, and seeing it on Sunday gives you options a Friday scramble never does: move a payment to its actual due date, hold a big order a week, lean out a slow shift, or just know to keep the cushion in place. The move is small. The cost of not seeing it is not.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'The Cash Forecast lines up your projected sales against your bills, labor, and recurring purchases for the next four weeks, and flags any tight week in red. Enter your cash on hand and the weekly net becomes a running balance and a runway, so you see exactly how much cushion you have. The bills come from Books, the sales from your forecast, the labor from your schedule.' },
+            { t: 'go', label: 'Cash Forecast', screen: 'c-forecast' },
+            { t: 'go', label: 'Review Bills', screen: 'books' },
+            { t: 'go', label: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Read the Cash Forecast every week, not once a quarter. Tight weeks form on a few days notice.',
+              'Enter your cash on hand so the net becomes a real running balance and runway.',
+              'Find the week where cash out beats cash in, and cover it before it lands.',
+              'Watch for the lumpy ones: quarterly bills, annual licenses, big equipment buys.',
+              'To cover a tight week, move a payment to its due date, hold a big order, or lean out a slow shift.',
+              'Confirm the week is back in the black after your moves.'
+            ] }
+          ]
+        },
+        {
+          id: 'c4', nav: 'System 4: Pay on Terms', eyebrow: 'System 4 - keep the float',
+          title: 'Pay on Terms',
+          blocks: [
+            { t: 'lead', text: 'An owner pays every invoice the day it lands, always has, takes a kind of pride in it. His main distributor gives him net 30. He pays on day three. We ran it: on about $28,000 a month in payables, paying three to four weeks early was handing the distributor the use of his cash for nothing, every single month. Not a penny of discount for it. Just a habit of paying fast that quietly cost him his float.' },
+            { t: 'p', text: 'If a vendor gives you net 30, paying on day 5 hands them the use of your money for three weeks for free. That float is real: it is cash that could be covering a tight week, freeing you from a savings transfer, or just sitting in your account earning a little instead of theirs. Paying on the due date is not slow-paying or playing games. It is using the terms you already negotiated.' },
+            { t: 'p', text: 'There is a flip side, and it is the one exception. An early-pay discount, two percent off for paying in ten days, usually beats what the cash is worth to you that month, so take those. The discipline is simple: hold every bill to its due date unless there is a discount that beats holding it. And ask for terms you do not have. Most distributors extend net 30 to a steady account that simply asks at the quarterly review.' },
+            { t: 'h', text: 'How Bar Cop runs it' },
+            { t: 'p', text: 'Set the real terms on each vendor record in List Vendors, net 7, 15, or 30. Bar Cop uses them to flag anything you are paying ahead of the due date and to time the cash-out side of your forecast. Your bills live in Books, where you pay on the due date and take the discounts worth taking.' },
+            { t: 'go', label: 'List Vendors', screen: 'ic-vendors' },
+            { t: 'go', label: 'Review Bills', screen: 'books' },
+            { t: 'go', label: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' },
+            { t: 'h', text: 'Quick Reference' },
+            { t: 'list', items: [
+              'Set the real payment terms on every vendor record.',
+              'Pay on the due date, not the day the invoice lands.',
+              'Take an early-pay discount when it beats what the cash is worth to you that month.',
+              'Ask every vendor for better terms at your quarterly review. Steady accounts get net 30 by asking.',
+              'Know your local rules; some states restrict terms on alcohol.',
+              'Terms norms by vendor type are in the Benchmarks section.'
+            ] }
+          ]
+        },
+        {
+          id: 'close', nav: 'Start Tonight', eyebrow: 'Start tonight',
+          title: 'Profit Is an Opinion, Cash Is a Fact',
+          blocks: [
+            { t: 'lead', text: 'A bar in Portland, profitable on paper for two straight years, always tight, always sweating the slow weeks. The owner ran the whole system: counted weekly, freed the trapped cash, cut the pars, set vendor terms and held them, read the forecast every Sunday. Ninety days later there was an extra few thousand dollars sitting in the account that used to live on the shelf, the tight weeks stopped being surprises, and a slow February was a plan instead of a panic. Same sales. Same room. The cash had just been somewhere it could not help.' },
+            { t: 'p', text: 'What separates a bar that runs flush from one that is always tight is rarely sales. It is whether anyone is watching where the cash sits and when it moves. The tools are not complicated and the math is not advanced. What it takes is reading the number every week, freeing what is frozen, and holding your terms, whether or not it feels urgent. The week it feels least urgent is usually the week a tight one is forming.' },
+            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Trapped Cash and read what is frozen on your shelves. Open the Cash Forecast and look at the next four weeks. Set the payment terms on your top three vendors in List Vendors. Then open your Cash Fix and work the first system, so Bar Cop starts tracking the cash you free.' },
+            { t: 'p', text: 'The gap between what you are earning and what is actually in the account is not a mystery. It is a timing and a trapped-cash problem, and both are fixable. Start freeing it tonight.' },
+            { t: 'go', label: 'Cash Fix System', screen: 'c-fix', focus: 'free-trapped' }
           ]
         }
       ]
