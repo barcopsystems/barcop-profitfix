@@ -182,8 +182,90 @@ S.CashAudit = {
       audit_period: 'As of ' + App.todayLocal(),
       audit_id: 'CA-' + (this.audits().length + 1),
       sections, action_items, cash_to_free: cashToFree, raw,
+      signals: this._riskSignals(),
       generated_at: new Date().toISOString()
     };
+  },
+
+  _lastMonthBounds() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { s: App.ymdLocal(start), e: App.ymdLocal(end) };
+  },
+
+  // ── Cash Risk Signals: cross-cutting liquidity risks the four scored sections
+  //    do not isolate. Each fires ONLY when its condition is actually true,
+  //    computed live off CashEngine, so a flush bar shows few or none. Severity
+  //    HIGH/MEDIUM/LOW, with the evidence and the screen that fixes it. ──────────
+  _riskSignals() {
+    const E = CashEngine;
+    const out = [];
+    const cur = v => App.fmtCurrency(v);
+    const sf = E.survivalForecast(13);
+    const pos = E.position();
+
+    if (sf.hasData && sf.hasOpening && sf.runway != null) {
+      out.push({
+        label: 'Cash crunch ahead', score: 'HIGH',
+        evidence: 'Your account runs dry in about ' + (sf.runway === 0 ? 'a week' : sf.runway + ' week' + (sf.runway === 1 ? '' : 's')) + (sf.lowPoint ? ', bottoming out the week of ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + cur(sf.lowPoint.balance) : '') + '.',
+        gap: 'A profitable bar that runs out of cash still closes its doors. This is the most urgent thing to cover.',
+        tool: 'Free trapped cash and move a payment, on the Cash Forecast.'
+      });
+    }
+    if (pos.hasOpening && pos.safe < 0) {
+      out.push({
+        label: 'Spending money that is not yours', score: 'HIGH',
+        evidence: 'Safe to Spend is ' + cur(pos.safe) + ', under zero. You are holding ' + cur(pos.setAside.total) + ' in tax and tips owed against a ' + cur(pos.opening || 0) + ' balance.',
+        gap: 'You are leaning on the sales tax you collected or your reserve. Spending the tax is the classic way a profitable bar cannot pay its tax bill.',
+        tool: 'See what is truly free, on Cash Position.'
+      });
+    }
+    const b = this._lastMonthBounds();
+    const br = E.bridge(b.s, b.e);
+    if (br.hasData) {
+      const ownerOut = (br.co.draw || 0) + (br.co.loan || 0);
+      if (ownerOut > 0 && ownerOut > Math.max(0, br.cashKept)) {
+        out.push({
+          label: 'Draws and debt outpacing what you keep', score: br.cashKept < 0 ? 'HIGH' : 'MEDIUM',
+          evidence: 'Last month ' + cur(ownerOut) + ' left for owner draws and loan payments while the business kept ' + cur(br.cashKept) + '.',
+          gap: 'When draws and debt service take most of the cash the operation generates, there is little left to build a cushion. Fine for a month, a problem as a pattern.',
+          tool: 'See where the profit went, on the Cash Bridge.'
+        });
+      }
+    }
+    if (pos.hasOpening && pos.reserve > 0 && pos.cushion < pos.reserve) {
+      out.push({
+        label: 'Reserve underfunded', score: 'MEDIUM',
+        evidence: 'Your cushion is ' + cur(Math.max(0, pos.cushion)) + ' against a ' + cur(pos.reserve) + ' reserve target, ' + cur(pos.reserve - pos.cushion) + ' short.',
+        gap: 'A slow stretch with no sales has no buffer. Free trapped cash to close the gap, then hold a little aside each week.',
+        tool: 'Size your reserve, on Cash Position.'
+      });
+    }
+    if (sf.hasData && !sf.hasOpening) {
+      out.push({
+        label: 'Flying blind on cash', score: 'MEDIUM',
+        evidence: 'No opening cash balance is set, so the forecast cannot read a real runway or what is safe to spend.',
+        gap: 'You can see whether the weeks ahead run tight on flow, but not how much cushion you actually have.',
+        tool: 'Enter your balance, on Cash Position.'
+      });
+    }
+    const rank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    out.sort((a, b2) => (rank[a.score] == null ? 3 : rank[a.score]) - (rank[b2.score] == null ? 3 : rank[b2.score]));
+    return out;
+  },
+
+  // Section 5 in the full view: the signal cards, or a clear state when none fire.
+  riskSection(audit) {
+    const signals = audit.signals || [];
+    if (signals.length) return AuditUI.sectionBlock(5, 'Cash Risk Signals', null, [], signals, null);
+    return '<div class="card" style="margin-bottom:14px;">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">'
+      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section 5</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Cash Risk Signals</div></div>'
+      + '<div style="color:var(--green);font-weight:800;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Clear</div></div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No cash risks flagged. Your runway, what is safe to spend, your draws, and your reserve are all in a healthy range.</div>'
+      + '</div>';
   },
 
   _s1Finding(s1, trapped, invValue, cap, lazyCats) {
@@ -264,6 +346,7 @@ S.CashAudit = {
       + this.cashStrip(audit)
       + AuditUI.actionsArea(audit, 'cash', 'ca')
       + sections
+      + this.riskSection(audit)
       + '</div>';
 
     AuditUI.attachOutlook('ca', audit, 'cash');
@@ -298,6 +381,10 @@ S.CashAudit = {
       b.heading(nm + '  (' + (audit.sections[nm] != null ? audit.sections[nm] : 'N/A') + ')', 12);
       const f = d['S' + (i + 1) + '_FINDING']; if (f) b.paragraph(f, { gray: 55 });
     });
+    if ((audit.signals || []).length) {
+      b.spacer(4); b.sectionTitle('Cash Risk Signals');
+      audit.signals.forEach(s => { b.heading(s.label + '  (' + (s.score || '') + ')', 12); if (s.evidence) b.paragraph(s.evidence, { gray: 55 }); });
+    }
     const f = App.deliverableFooter();
     b.disclaimer(f.workbookSubject);
     const venue = (App.data && App.data.settings && App.data.settings.bar_name) || 'Bar Cop';
@@ -310,6 +397,7 @@ S.CashAudit = {
       { h: 'The Four Sections', p: ['Capital Efficiency is how hard the cash on your shelves works, by turns and the dead stock dragging it. The Cash Conversion Cycle is how many days your money stays locked from buying product to selling it, net of the days you take to pay. Liquidity and Runway is whether the thirteen weeks ahead hold and how long your cash covers you. Payment Terms is whether you are keeping your float instead of paying early.'] },
       { h: 'Cash to Free', p: ['The opportunity number up top is the cash you can free right now, the dead stock plus the overstock above par. It is a one-time amount you can put back in the account, not a monthly figure, so Bar Cop shows it as exactly that.'] },
       { h: 'Sharpen the Runway', p: ['Set your opening cash balance in Cash Position and the audit reads a real runway, the week you would run thin, and what is actually safe to spend. Without it, the liquidity read still scores your tight weeks, the ones where more cash goes out than comes in.'] },
+      { h: 'Cash Risk Signals', p: ['The last section flags the cross-cutting risks the four scores do not isolate: a cash crunch coming in the next thirteen weeks, a Safe to Spend gone negative, owner draws and debt outpacing what the business keeps, a reserve running thin. Each one fires only when it is actually true, so a flush bar shows few or none.'] },
       { h: 'Action Items', p: ['Each audit ranks what to work first by where you are weakest, and every Fix This button drops you straight into that Cash Fix system. Run it weekly and watch the score climb as you free the cash and tighten the cycle.'] }
     ]);
   }
