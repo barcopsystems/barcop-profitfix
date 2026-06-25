@@ -22,13 +22,13 @@ FIX.cash = [
           detail: 'Open Trapped Cash and read what is not moving and what is sitting above par, ranked by the dollars you can free. Work the biggest ones first.' },
         { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
           title: 'Count on the same day every week',
-          detail: 'Trapped cash reads off your counts, so a steady weekly count keeps both the trapped number and the cash you free honest.' },
+          detail: 'Count the same day every week, so the trapped number and the cash you free stay honest.' },
         { kind: 'action', target: 'ic-par-suggestions', targetLabel: 'Dynamic Pars',
           title: 'Cut the pars that run above your usage',
-          detail: 'In Dynamic Pars, drop the par on anything you keep reordering before it runs low. A lower par stops you buying ahead of what you actually use.' },
-        { kind: 'action', target: 'ic-report-movers', targetLabel: 'Movement',
+          detail: 'In Dynamic Pars, drop the par on anything you keep reordering before it runs low. A lower par stops the shelf refilling.' },
+        { kind: 'action', target: 'ic-report-stock', targetLabel: 'Stock Report',
           title: 'Run the dead stock down',
-          detail: 'Feature a dead bottle, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. Money on the shelf is not money in the bank.' }
+          detail: 'Open the Stock report\'s Dead Stock view for what has not moved, then feature a dead bottle, special it, build a cocktail around it, or eighty-six it and stop reordering.' }
       ]
     },
     commonMistakes: [
@@ -70,7 +70,7 @@ FIX.cash = [
     id: 'stay-ahead',
     name: 'Stay Ahead of the Week',
     module: 'cash',
-    summary: 'Cash is about timing as much as amount. Line up what is going out against what is coming in across the quarter ahead, so a heavy week does not catch you short.',
+    summary: 'Line up what is going out against what is coming in across the quarter ahead, so a heavy week does not catch you short.',
     process: {
       steps: [
         { kind: 'result', target: 'c-forecast', targetLabel: 'Cash Forecast',
@@ -78,7 +78,7 @@ FIX.cash = [
           detail: 'Open the Cash Forecast and read cash in against cash out across the next thirteen weeks. Enter your cash on hand to see a running balance, your low-point week, and your runway, and stress-test a slow season or a big buy before you commit to it.' },
         { kind: 'action',
           title: 'Spot any tight week',
-          detail: 'Find the week where cash out beats cash in. A quarterly bill landing on a slow week, the same week as a big order, is the kind of thing that catches an operator short.' },
+          detail: 'Find the week where cash out beats cash in. A quarterly bill on a slow week, the same week as a big order, is what catches you short.' },
         { kind: 'action', target: 'books', targetLabel: 'Books',
           title: 'Move a payment or hold an order to cover it',
           detail: 'Slide a bill to its due date, hold a big buy a week, or lean out a slow shift so the tight week clears. Small moves, made early, beat scrambling on Friday.' },
@@ -106,7 +106,7 @@ FIX.cash = [
           detail: 'On each vendor record, set the terms they actually give you, net 7, 15, or 30. Bar Cop uses it to flag anything you are paying faster than you have to.' },
         { kind: 'action', target: 'books', targetLabel: 'Books',
           title: 'Hold every bill to its due date',
-          detail: 'Pay on the due date, not the day it lands. That cash stays in your account working for you until the day it is owed.' },
+          detail: 'Pay on the due date, not the day it lands. Until then the cash is yours, not theirs.' },
         { kind: 'action',
           title: 'Take early-pay discounts worth taking',
           detail: 'If a vendor knocks two percent off for paying in ten days, that usually beats what the cash is worth sitting idle. Take those; hold the rest.' },
