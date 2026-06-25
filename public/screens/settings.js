@@ -508,10 +508,25 @@ S.HubSettings = {
     //    and the forecast projects them forward. The tax remittance is the classic
     //    killer: real money leaving on the 20th that was never yours to keep. ────
     App.data.cash_outflows = [
-      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',          recurring:true, term_months:24, recur_day:1,  created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan',      recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 20), type:'tax',  amount:6800, notes:'Sales tax remittance', recurring:true, term_months:24, recur_day:20, created_at:new Date().toISOString() }
+      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',     recurring:true, term_months:24, recur_day:1,  created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan', recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
+      // Past tax remittances feed the Cash Bridge (where the profit went). The
+      // FORECAST projects the upcoming remittances automatically off the tax rate
+      // and due date, so these stay non-recurring history, not a forward series.
+      { id:uid(), date:monthAnchor(2, 20), type:'tax', amount:6750, notes:'Sales tax remittance', created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(1, 20), type:'tax', amount:6850, notes:'Sales tax remittance', created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(0, 20), type:'tax', amount:6800, notes:'Sales tax remittance', created_at:new Date().toISOString() }
     ];
+
+    // Pre-stamp the Fix view-tracking so the Cash Fix systems read on track from
+    // the first look, the way a bar that has run Bar Cop for 90 days would: the
+    // operator has been reviewing Trapped Cash, Purchasing, the Forecast, Dynamic
+    // Pars, and vendor terms recently. A real user's stamps fill in as they
+    // navigate to each screen.
+    App.data.fix_views = Object.assign({}, App.data.fix_views, {
+      'c-trapped': dateStr(2), 'c-purchasing': dateStr(3), 'c-forecast': dateStr(2),
+      'ic-par-suggestions': dateStr(4), 'ic-vendors': dateStr(12)
+    });
 
     // Permits and licenses: a realistic Austin bar/restaurant set so the page
     // shows the full status spread (on track, due soon, expired) and the Needs
