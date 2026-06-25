@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
-const { computeProfitAudit, computeRevenueAudit, computeTrafficAudit } = require('./audit-compute');
+const { computeProfitAudit, computeRevenueAudit } = require('./audit-compute');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -192,97 +192,6 @@ async function callClaudeForJSON(apiKey, content, maxTokens) {
   return JSON.parse(rawText.slice(first, last + 1));
 }
 
-// ── Traffic audit — JSON only, no PDF ─────────────────────────────────────────
-app.post('/api/generate-traffic-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: 'Form parse error: ' + err.message });
-
-    const appDataStr = fields.appData?.[0] || '{}';
-    let appData = {};
-    try { appData = JSON.parse(appDataStr); } catch(e) {}
-    let practices = {};
-    try { practices = JSON.parse(fields.practices?.[0] || '{}'); } catch(e) {}
-    // Operator's saved links. Server reads the website live via PageSpeed; Google
-    // and Yelp ratings come from uploaded screenshots (no external rating APIs).
-    let urls = null;
-    try { urls = JSON.parse(fields.urls?.[0] || 'null'); } catch(e) {}
-
-    const uploadedFiles = [];
-    for (const [key, fileArr] of Object.entries(files)) {
-      for (const f of fileArr) {
-        if (f.size > 0) uploadedFiles.push({ field: key, path: f.path, name: f.originalFilename, size: f.size });
-      }
-    }
-
-    try {
-      const urlData = await fetchTrafficUrlData(urls);
-      const auditData = await generateTrafficAudit(apiKey, uploadedFiles, appData, practices, urlData);
-      res.json({ ok: true, auditData });
-    } catch(e) {
-      console.error('Traffic audit error:', e);
-      res.status(500).json({ error: e.message || 'Audit generation failed' });
-    } finally {
-      for (const f of uploadedFiles) fs.unlink(f.path, () => {});
-    }
-  });
-});
-
-/* ── Traffic audit — honest pipeline, NO dollar figures ───────────────────────
-   urlData (live link reads) + screenshot extraction -> computeTrafficAudit ->
-   narrative (deficits, never dollars) -> merge with computed numbers winning. */
-async function generateTrafficAudit(apiKey, files, appData, practices, urlData) {
-  const extracted = await extractTrafficInputs(apiKey, files);
-  Object.assign(extracted, practices || {});
-  const numbers = computeTrafficAudit(appData, null, extracted, urlData);
-  numbers.AUDIT_ID = 'TFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateTrafficNarrative(apiKey, numbers);
-  return Object.assign({}, prose, numbers);
-}
-
-async function extractTrafficInputs(apiKey, files) {
-  const fileContent = buildFileContent(files);
-  if (fileContent.length === 0) return {};
-  const instruction = `You are reading uploaded screenshots and exports for a bar and restaurant digital-presence (TRAFFIC) audit: Google Business Profile, website analytics, Google/Yelp review pages, search results, Instagram/Facebook, delivery dashboards, email platform. Extract ONLY what you can see. Booleans as true/false, numbers as plain numbers, percentages as plain numbers. NO dollar figures, NO scores. Use null for anything not present. Respond with a single JSON object, no other text:
-{"listing_claimed":[true/false/null],"hours_complete":[t/f/null],"website_linked":[t/f/null],"menu_link_active":[t/f/null],"photo_count":[int/null],"posts_last_30":[int/null],"profile_completeness":[percent/null],"mobile_optimized":[t/f/null],"monthly_sessions":[int/null],"bounce_rate":[percent/null],"menu_page_top3":[t/f/null],"online_ordering":[t/f/null],"reservation_system":[t/f/null],"click_to_call":[true if the homepage shows a tappable phone number, else t/f/null],"hours_present":[true if business hours are shown on the homepage, else t/f/null],"menu_is_web":[true if the menu is a real web page, false if it is a PDF or image, else null],"google_rating":[number/null],"google_review_count":[int/null],"response_rate":[percent/null],"most_recent_review_days":[int/null],"unanswered":[int/null],"negative_pattern":[short text/null],"yelp_rating":[number/null],"maps_pack":[t/f/null],"nap_consistent":[t/f/null],"primary_keyword":[text/null],"ig_followers":[int/null],"ig_posts_last_30":[int/null],"fb_followers":[int/null],"content_type":[text/null],"doordash_active":[t/f/null],"ubereats_active":[t/f/null],"grubhub_active":[t/f/null],"doordash_rating":[number/null],"ubereats_rating":[number/null],"delivery_markup":[true if delivery menu prices are visibly higher than dine-in to offset commission, else t/f/null],"delivery_commission_pct":[platform commission percent if shown, else null],"photo_count_delivery":[int/null],"menu_complete":[t/f/null],"promo_active":[t/f/null],"email_list_exists":[t/f/null],"list_size":[int/null],"open_rate":[percent/null],"send_frequency":[text/null],"last_send_days":[int/null],"growth_mechanism":[t/f/null]}`;
-  const content = fileContent.concat([{ type: 'text', text: instruction }]);
-  try {
-    return await callClaudeForJSON(apiKey, content, 1500);
-  } catch (e) {
-    console.warn('[audit] traffic extraction failed, proceeding with link/weekly data only:', e.message);
-    return {};
-  }
-}
-
-async function generateTrafficNarrative(apiKey, d) {
-  const instruction = `You are a 30-year bar and restaurant operator writing the narrative for a digital-presence (TRAFFIC) audit that another seasoned owner will read. The NUMBERS BELOW ARE FINAL AND CORRECT. Never change, recompute, or contradict them, and reference them verbatim where relevant.
-
-VOICE, follow exactly:
-- Write operator to operator. The reader runs a bar and knows the trade. State findings and give direct orders. Never explain a concept, define a term, or justify why a metric matters. The reader already knows.
-- Banned framing that reads like teaching or a consultant: "this tells you", "this shows you", "what this means is", "the key is", "keep in mind", "remember that", "because", "reads as". Cut them. State the fact, not the lesson behind it.
-- NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst gap, the concentration. TOOL: a direct instruction naming the action, like "Reply to every review inside 48 hours." Never soft advice or "you should consider".
-- Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
-- Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
-- Plain words. No emdashes (use a period or comma). Banned words: "leverage", "compounds", "robust", "seamless", "utilize", "synergy", "cadence", "package", "ecosystem".
-- CRITICAL: this audit has NO dollar figures. Express every gap as a real deficit, e.g. "response rate 45% versus a 75% benchmark" or "6 posts in 30 days versus 12". Never invent or imply a dollar amount.
-
-Respond with a single JSON object, no other text, with exactly these prose fields:
-{"S1_NARRATIVE":"","S1_FINDING":"","S1_TOOL":"","S2_NARRATIVE":"","S2_FINDING":"","S2_TOOL":"","S3_NARRATIVE":"","S3_FINDING":"","S3_TOOL":"","S4_NARRATIVE":"","S4_FINDING":"","S4_TOOL":"","S5_NARRATIVE":"","S5_FINDING":"","S5_TOOL":"","S6_NARRATIVE":"","S6_FINDING":"","S6_TOOL":"","S7_NARRATIVE":"","S7_FINDING":"","S7_TOOL":"","S8_SIG1_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG1_LABEL":"","S8_SIG1_EVIDENCE":"","S8_SIG1_GAP":"","S8_SIG1_TOOL":"","S8_SIG2_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG2_LABEL":"","S8_SIG2_EVIDENCE":"","S8_SIG2_GAP":"","S8_SIG2_TOOL":"","S8_SIG3_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG3_LABEL":"","S8_SIG3_EVIDENCE":"","S8_SIG3_GAP":"","S8_SIG3_TOOL":"","S8_SIG4_SCORE":"[HIGH/MEDIUM/LOW]","S8_SIG4_LABEL":"","S8_SIG4_EVIDENCE":"","S8_SIG4_GAP":"","S8_SIG4_TOOL":""}
-
-COMPUTED NUMBERS (final):
-${JSON.stringify(d, null, 1)}`;
-  try {
-    return await callClaudeForJSON(apiKey, [{ type: 'text', text: instruction }], 4000);
-  } catch (e) {
-    console.warn('[audit] traffic narrative failed, returning numbers without prose:', e.message);
-    return {};
-  }
-}
-
 // ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-revenue-audit', (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -372,153 +281,6 @@ ${JSON.stringify(d, null, 1)}`;
   }
 }
 
-// ── Fetch public URL data for the Traffic Audit ───────────────────────────────
-// Pulls live data from the operator's saved URLs in traffic_settings.urls so
-// the audit can score what is publicly visible without requiring a screenshot.
-//
-// One source: the operator's Website, via the Google PageSpeed Insights API
-// (free, sanctioned). Returns performance, accessibility, SEO, and best-practices
-// scores. Requires PAGESPEED_API_KEY env var. If missing or the call fails,
-// returns null and the audit falls back to operator screenshot uploads.
-//
-// Google + Yelp ratings are screenshot-only by design — no external rating APIs
-// (attribution/terms baggage, and Bar Cop's solo-operator model favors zero
-// external dependencies). The engine reads google_rating / yelp_rating from
-// uploaded screenshots instead.
-//
-// The fetch has a short timeout and fails safe: any error returns null and the
-// rest of the audit continues normally.
-async function fetchTrafficUrlData(urls) {
-  if (!urls || typeof urls !== 'object') return null;
-  const out = { website: null };
-
-  // PageSpeed Insights for the operator's website (mobile strategy)
-  const psKey = process.env.PAGESPEED_API_KEY;
-  if (urls.website && psKey) {
-    try {
-      const target = encodeURIComponent(urls.website);
-      const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed'
-        + '?url=' + target
-        + '&strategy=mobile'
-        + '&category=performance&category=accessibility&category=seo&category=best-practices'
-        + '&key=' + psKey;
-      const ctrl = new AbortController();
-      const tmo = setTimeout(() => ctrl.abort(), 30000);
-      const r = await fetch(apiUrl, { signal: ctrl.signal });
-      clearTimeout(tmo);
-      if (r.ok) {
-        const data = await r.json();
-        const lh = data.lighthouseResult || {};
-        const cats = lh.categories || {};
-        const audits = lh.audits || {};
-        const pct = (id) => cats[id] && typeof cats[id].score === 'number' ? Math.round(cats[id].score * 100) : null;
-        const ms  = (id) => audits[id] && audits[id].numericValue != null ? Math.round(audits[id].numericValue) : null;
-        out.website = {
-          url: urls.website,
-          performance:    pct('performance'),
-          accessibility:  pct('accessibility'),
-          seo:            pct('seo'),
-          bestPractices:  pct('best-practices'),
-          firstContentfulPaintMs: ms('first-contentful-paint'),
-          largestContentfulPaintMs: ms('largest-contentful-paint'),
-          totalBlockingTimeMs: ms('total-blocking-time'),
-          cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue ?? null,
-          speedIndexMs:  ms('speed-index'),
-          fetchedAt: new Date().toISOString()
-        };
-      }
-    } catch (e) {
-      console.warn('[audit] PageSpeed Insights fetch failed:', e.message);
-    }
-  }
-
-  // Raw HTML structural read (free, no API key) — conversion elements a code
-  // fetch can detect honestly: online ordering, reservations, click-to-call,
-  // mobile viewport, hours on the page, and whether the menu is a PDF.
-  if (urls.website) {
-    const structure = await fetchWebsiteStructure(urls.website);
-    if (structure) {
-      out.website = out.website || { url: urls.website, fetchedAt: new Date().toISOString() };
-      out.website.structure = structure;
-    }
-  }
-
-  return out.website ? out : null;
-}
-
-/* Raw HTML fetch -> code-detectable website conversion structure. Heuristic but
-   honest: a positive match means the element is present. tel: links and the
-   viewport meta are exact; ordering/reservations/hours use broad keyword sets to
-   minimize false negatives; menu_is_pdf is only set when a menu link is found.
-   Any failure returns null and S2 falls back to screenshot/PageSpeed only. */
-async function fetchWebsiteStructure(url) {
-  try {
-    const ctrl = new AbortController();
-    const tmo = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BarCopBot/1.0; +https://barcop.com)' } });
-    clearTimeout(tmo);
-    if (!r.ok) return null;
-    let html = await r.text();
-    if (!html) return null;
-    html = html.slice(0, 600000);
-    const low = html.toLowerCase();
-    const has = (re) => re.test(low);
-    const online_ordering = has(/toasttab|chownow|doordash|ubereats|uber eats|grubhub|seamless|slice\.com|order ?online|online ?order|\border now\b|\/order(?:[\/"'?]|$)|menufy|olo\.com|popmenu order|square ?online|clover ?online/);
-    const reservations    = has(/opentable|resy\.com|sevenrooms|exploretock|tock\.com|\breserve\b|reservation|book a table|\bbook now\b|booking/);
-    const click_to_call   = has(/href=["']tel:/);
-    const mobile_viewport = has(/<meta[^>]+name=["']viewport["']/);
-    const hours_present   = has(/\bhours\b|hours of operation|open today|we'?re open|\bmon(?:day)?\b[^<]{0,12}[-–—][^<]{0,12}|\bsun(?:day)?\b[^<]{0,12}[-–—]/);
-    // Menu link target — is the menu a real web page or a PDF?
-    let menu_is_pdf = null;
-    const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
-    for (const a of anchors) {
-      const hrefMatch = a.match(/href=["']([^"']+)["']/i);
-      if (!hrefMatch) continue;
-      const href = hrefMatch[1].toLowerCase();
-      const text = a.replace(/<[^>]+>/g, '').toLowerCase();
-      if (text.includes('menu') || /\/menu|menu\.|-menu/.test(href)) {
-        if (/\.pdf(\?|$)/.test(href)) { menu_is_pdf = true; break; }
-        menu_is_pdf = false;   // a menu link that is not a PDF — keep scanning in case a later one is a PDF
-      }
-    }
-    return { url, online_ordering, reservations, click_to_call, mobile_viewport, hours_present, menu_is_pdf, fetchedAt: new Date().toISOString() };
-  } catch (e) {
-    console.warn('[audit] website structure fetch failed:', e.message);
-    return null;
-  }
-}
-
-function formatTrafficUrlDataForPrompt(urlData) {
-  if (!urlData) return '';
-  const lines = ['FETCHED LIVE URL DATA — Use this as primary input for the sections it covers:'];
-  if (urlData.website) {
-    const w = urlData.website;
-    lines.push('');
-    lines.push('WEBSITE (Google PageSpeed Insights, mobile): ' + w.url);
-    lines.push('  Performance score: '   + (w.performance   != null ? w.performance + '/100'   : 'unavailable'));
-    lines.push('  Accessibility:     '   + (w.accessibility != null ? w.accessibility + '/100' : 'unavailable'));
-    lines.push('  SEO:               '   + (w.seo           != null ? w.seo + '/100'           : 'unavailable'));
-    lines.push('  Best Practices:    '   + (w.bestPractices != null ? w.bestPractices + '/100' : 'unavailable'));
-    if (w.firstContentfulPaintMs   != null) lines.push('  First Contentful Paint: '   + w.firstContentfulPaintMs   + ' ms');
-    if (w.largestContentfulPaintMs != null) lines.push('  Largest Contentful Paint: ' + w.largestContentfulPaintMs + ' ms');
-    if (w.totalBlockingTimeMs      != null) lines.push('  Total Blocking Time: '      + w.totalBlockingTimeMs      + ' ms');
-    if (w.cumulativeLayoutShift    != null) lines.push('  Cumulative Layout Shift: '  + w.cumulativeLayoutShift.toFixed(3));
-    if (w.speedIndexMs             != null) lines.push('  Speed Index: '              + w.speedIndexMs             + ' ms');
-    if (w.structure) {
-      const s = w.structure;
-      const yn = (v) => v === true ? 'yes' : v === false ? 'no' : 'unknown';
-      lines.push('  Website conversion structure (read from the live page HTML):');
-      lines.push('    Online ordering link: ' + yn(s.online_ordering));
-      lines.push('    Reservation/booking link: ' + yn(s.reservations));
-      lines.push('    Click-to-call (tel: link): ' + yn(s.click_to_call));
-      lines.push('    Mobile viewport set: ' + yn(s.mobile_viewport));
-      lines.push('    Hours on the page: ' + yn(s.hours_present));
-      lines.push('    Menu is a real web page (not a PDF): ' + (s.menu_is_pdf === true ? 'no, it is a PDF' : s.menu_is_pdf === false ? 'yes' : 'no menu link found'));
-    }
-  }
-  return lines.join('\n');
-}
-
 // ── Parse spreadsheet/CSV file into readable text for Claude ──────────────────
 function parseSpreadsheetToText(filePath, fileName) {
   const ext = path.extname(fileName).toLowerCase();
@@ -556,7 +318,6 @@ async function extractAuditData(apiKey, auditType, files, appData, notes='', con
   const prompts = {
     profit:  getExtractionPrompt_Profit(appData, controlData),
     revenue: getExtractionPrompt_Revenue(appData, controlData),
-    traffic: getExtractionPrompt_Traffic(appData, urlData),
   };
 
   const prompt = prompts[auditType] || prompts.profit;
@@ -874,84 +635,9 @@ Return this exact JSON (all values calculated):
 "S6_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S6_SIG4_LABEL":[specific],"S6_SIG4_EVIDENCE":[specific],"S6_SIG4_GAP":[specific],"S6_SIG4_TOOL":[action]`
 }
 
-function getExtractionPrompt_Traffic(appData, urlData=null) {
-  const settings      = appData.settings || {};
-  const targets       = (appData.traffic_settings && appData.traffic_settings.targets) || {};
-  const weeks         = appData.traffic_weeks || [];
-  const recentWeeks   = weeks.slice(-4);
-  const avg = (fn) => { const v = recentWeeks.map(fn).filter(x=>x!=null&&!isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
-  const avgGR  = avg(w=>w.google_rating);
-  const urlBlock = formatTrafficUrlDataForPrompt(urlData);
-  const avgRV  = avg(w=>w.new_reviews);
-  const avgRR  = avg(w=>w.response_rate);
-  const avgSS  = avg(w=>w.monthly_sessions);
-  const avgBR  = avg(w=>w.bounce_rate);
-  const avgIGF = avg(w=>w.ig_followers);
-  const avgIGP = avg(w=>w.ig_posts_month);
-
-  // Build weekly data summary
-  const weeklySummary = recentWeeks.length
-    ? recentWeeks.map((w,i) => {
-        const parts = ['Week ' + (i+1)];
-        if (w.week_end) parts.push(w.week_end);
-        if (w.google_rating) parts.push('Google ' + w.google_rating + 'star');
-        if (w.new_reviews) parts.push('New reviews: ' + w.new_reviews);
-        if (w.response_rate) parts.push('Response rate: ' + w.response_rate + '%');
-        if (w.monthly_sessions) parts.push('Sessions: ' + w.monthly_sessions);
-        if (w.ig_followers) parts.push('IG followers: ' + w.ig_followers);
-        if (w.ig_posts_month) parts.push('IG posts: ' + w.ig_posts_month);
-        return '  ' + parts.join(' | ');
-      }).join('\n')
-    : '  No weekly traffic data entered yet';
-
-  return `TRAFFIC AUDIT — respond with a single JSON object, no other text. Use app data, fetched live URL data when present, and any uploaded screenshots. Never output 0 for a score.
-
-${urlBlock}
-
-
-SCORING (out of 100 each):
-S1 GBP: claimed+verified=20, hours+phone+website=15, menu linked=10, photos>50=15, posts>4/mo=15, response>75%=15, Q&A=10.
-S2 Website: exists+mobile=25, sessions vs 2000/mo benchmark scored, bounce<60%=15, menu in top3=15, online ordering=20.
-S3 Reviews: rating≥4.5=30, 4.3-4.5=20, 4.0-4.3=10, <4.0=0. Response rate scored. Review velocity scored. Recency scored.
-S4 Search: maps pack=40, NAP consistent=30, primary keyword=20, citations=10.
-S5 Social: IG profile=20, followers scored, post freq vs 12/mo scored, engagement if available.
-S6 Delivery: active platforms 20pts each (max 3), ratings scored, photos>10=15, menu complete=15, promo=10.
-S7 Email: list exists=20, size vs 500 benchmark, frequency scored, open rate if available.
-S8: 4 specific traffic-side risk signals with HIGH/MEDIUM/LOW ratings (review velocity drops, unanswered review backlog, GBP staleness, platform-specific issues, posting schedule gaps, email channel dormancy, anything an experienced operator would flag on a walkthrough). Not scored, surfaced as signals only.
-OVERALL: weighted avg S1-S7.
-
-APP DATA:
-bar_name=${settings.bar_name||''} | city=${settings.city_state||''}
-google_rating_target=${targets.google_rating||4.3} | review_velocity_target=${targets.review_velocity||8}/mo
-response_rate_target=${targets.response_rate||75}% | sessions_target=${targets.monthly_sessions||2000}/mo
-social_posts_target=${targets.social_posts_month||12}/mo | weeks_tracked=${weeks.length}
-avg_google_rating=${avgGR?avgGR.toFixed(2):'not tracked'} | avg_new_reviews_mo=${avgRV?avgRV.toFixed(1):'not tracked'}
-avg_response_rate=${avgRR?avgRR.toFixed(1)+'%':'not tracked'} | avg_monthly_sessions=${avgSS?Math.round(avgSS):'not tracked'}
-avg_bounce_rate=${avgBR?avgBR.toFixed(1)+'%':'not tracked'} | avg_ig_followers=${avgIGF?Math.round(avgIGF):'not tracked'}
-avg_ig_posts_mo=${avgIGP?avgIGP.toFixed(1):'not tracked'}
-${weeklySummary?'WEEKLY:\n'+weeklySummary:''}
-
-TOOL RULE: every _TOOL field must name a real Bar Cop tool or a plain real-world action. Never invent a Bar Cop worksheet, report, or feature. Real Bar Cop tools: Traffic Fix, This Week, Google Business, Review Tracker, Search and SEO, Website Scorecard, Social Media, Delivery Platforms, Email Marketing. Plain real-world actions (respond to a review, post photos, fix NAP, run a delivery promo) are fine.
-
-Return this exact JSON (all values calculated):
-"BAR_NAME","BAR_CITY_STATE","REVENUE_TIER","AUDIT_DATE","AUDIT_ID":"TFA-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}","AUDIT_PERIOD","DATA_TIER_LABEL","WEEKLY_GAP_AMT","GAP_SOURCES","INDUSTRY_AVG":58,"TARGET_SCORE":70,
-"OVERALL_SCORE":[calc],
-"S1_SCORE":[calc],"S1_LISTING_CLAIMED":[screenshot],"S1_LISTING_VERIFIED":[screenshot],"S1_HOURS_COMPLETE":[screenshot],"S1_PHONE_PRESENT":[screenshot],"S1_WEBSITE_LINKED":[screenshot],"S1_MENU_LINK_ACTIVE":[screenshot],"S1_CATEGORY_SET":[screenshot],"S1_ATTRIBUTES_COMPLETE":[screenshot],"S1_PHOTO_COUNT":[screenshot or 0],"S1_PHOTO_BENCHMARK":100,"S1_POSTS_LAST_30_DAYS":[screenshot or 0],"S1_POSTS_BENCHMARK":8,"S1_REVIEW_COUNT_GOOGLE":[screenshot],"S1_RATING_GOOGLE":[app:${avgGR?avgGR.toFixed(2):0}],"S1_REVIEW_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S1_RESPONSE_BENCHMARK":75,"S1_QA_POPULATED":[screenshot],"S1_PROFILE_COMPLETENESS_PCT":[calc],"S1_MONTHLY_GAP":[est],"S1_ANNUAL_GAP":[calc],
-"S2_SCORE":[calc],"S2_WEBSITE_EXISTS":[screenshot],"S2_MOBILE_OPTIMIZED":[screenshot],"S2_MONTHLY_SESSIONS":[app:${avgSS?Math.round(avgSS):0}],"S2_SESSIONS_BENCHMARK":2000,"S2_BOUNCE_RATE":[app:${avgBR?avgBR.toFixed(1):0}],"S2_BOUNCE_BENCHMARK":60,"S2_MENU_PAGE_IN_TOP_3":[analytics],"S2_MENU_PAGE_SESSIONS":[analytics or 0],"S2_TOP_PAGES":[],"S2_ONLINE_ORDERING_PRESENT":[screenshot],"S2_RESERVATION_SYSTEM":[screenshot],"S2_AVG_SESSION_DURATION_SEC":[analytics or 0],"S2_PAGE_LOAD_SCORE":null,"S2_SOURCE_BREAKDOWN":null,"S2_MONTHLY_GAP":[est],"S2_ANNUAL_GAP":[calc],
-"S3_SCORE":[calc],"S3_GOOGLE_RATING":[app:${avgGR?avgGR.toFixed(2):0}],"S3_GOOGLE_RATING_BENCHMARK":4.3,"S3_GOOGLE_REVIEW_COUNT":[screenshot],"S3_GOOGLE_COUNT_BENCHMARK":200,"S3_RESPONSE_RATE":[app:${avgRR?Math.round(avgRR):0}],"S3_RESPONSE_BENCHMARK":75,"S3_YELP_RATING":[screenshot or 0],"S3_YELP_RATING_BENCHMARK":4.0,"S3_YELP_REVIEW_COUNT":[screenshot or 0],"S3_TRIPADVISOR_PRESENT":false,"S3_MOST_RECENT_REVIEW_DAYS":[screenshot],"S3_RECENCY_BENCHMARK":7,"S3_NEGATIVE_PATTERN":[obs],"S3_MONTHLY_GAP":[est],"S3_ANNUAL_GAP":[calc],"S3_UNANSWERED":[screenshot or 0],
-"S4_SCORE":[calc],"S4_MAPS_PACK_CONFIRMED":[screenshot],"S4_RANKING_REPORT_SUBMITTED":false,"S4_NAP_CONSISTENT":[screenshots],"S4_NAP_BUSINESS_NAME":"${settings.bar_name||''}","S4_NAP_ADDRESS":[screenshot],"S4_NAP_PHONE":[screenshot],"S4_WEBSITE_TITLES_ASSESSED":false,"S4_CITATION_COUNT":null,"S4_PRIMARY_KEYWORD":"${settings.bar_name?(settings.bar_name.split(' ')[0]||'').toLowerCase()+' bar':'bar [city]'}","S4_SECONDARY_KEYWORDS":[],"S4_MONTHLY_GAP":null,
-"S5_SCORE":[calc],"S5_IG_PROFILE_SUBMITTED":[true if uploaded],"S5_IG_FOLLOWERS":[app:${avgIGF?Math.round(avgIGF):0}],"S5_IG_POSTS_LAST_30":[app:${avgIGP?Math.round(avgIGP):0}],"S5_IG_POSTS_BENCHMARK":12,"S5_IG_ENGAGEMENT_RATE":[analytics or null],"S5_FB_FOLLOWERS":[screenshot or 0],"S5_FB_POSTS_LAST_30":[screenshot or 0],"S5_CONTENT_TYPE":[screenshot obs],"S5_FOOD_PHOTO_RATIO":[screenshot or 0],"S5_MONTHLY_GAP":[est],"S5_ANNUAL_GAP":[calc],
-"S6_SCORE":[calc],"S6_DOORDASH_ACTIVE":[screenshot],"S6_UBEREATS_ACTIVE":[screenshot],"S6_GRUBHUB_ACTIVE":[screenshot],"S6_PLATFORM_COUNT":[count],"S6_DOORDASH_RATING":[screenshot or null],"S6_UBEREATS_RATING":[screenshot or null],"S6_PHOTO_COUNT_DELIVERY":[screenshot or 0],"S6_MENU_COMPLETE":[screenshot],"S6_PROMO_ACTIVE":[screenshot],"S6_MONTHLY_GAP":[est],"S6_ANNUAL_GAP":[calc],
-"S7_SCORE":[calc],"S7_EMAIL_LIST_EXISTS":[screenshot],"S7_LIST_SIZE":[screenshot or 0],"S7_LIST_BENCHMARK":500,"S7_LAST_SEND_DAYS_AGO":[screenshot or null],"S7_SEND_FREQUENCY":[screenshot],"S7_OPEN_RATE":[analytics or null],"S7_OPEN_BENCHMARK":35,"S7_GROWTH_MECHANISM":[obs],"S7_MONTHLY_GAP":[est],"S7_ANNUAL_GAP":[calc],
-"S8_SIG1_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG1_LABEL":[specific title],"S8_SIG1_EVIDENCE":[specific with numbers],"S8_SIG1_GAP":[specific gap],"S8_SIG1_TOOL":[action],
-"S8_SIG2_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG2_LABEL":[specific],"S8_SIG2_EVIDENCE":[specific],"S8_SIG2_GAP":[specific],"S8_SIG2_TOOL":[action],
-"S8_SIG3_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG3_LABEL":[specific],"S8_SIG3_EVIDENCE":[specific],"S8_SIG3_GAP":[specific],"S8_SIG3_TOOL":[action],
-"S8_SIG4_SCORE":[HIGH/MEDIUM/LOW],"S8_SIG4_LABEL":[specific],"S8_SIG4_EVIDENCE":[specific],"S8_SIG4_GAP":[specific],"S8_SIG4_TOOL":[action]`
-}
-
 // ── Stripe checkout session ───────────────────────────────────────────────────
 const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
-const ALL_MODULES     = ['profit', 'revenue', 'traffic'];
+const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
   const { userId } = req.body;
