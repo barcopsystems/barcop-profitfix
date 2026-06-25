@@ -498,7 +498,7 @@ S.Hub = {
     const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
     // Control: stat strip + step checklist, all from each section's hubSteps().
     const icSum = safeSteps(S.InventoryDashboard), lcSum = safeSteps(S.LaborDashboard), scSum = safeSteps(S.ShiftDashboard);
-    const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date', 'created_at']);
+    const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date']);
     const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', objName:'InventoryDashboard', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
     const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', objName:'LaborDashboard', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
     const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });

@@ -2151,6 +2151,21 @@ S.HubSettings = {
         scDays.push({ date:date, manager:mgrs[di % 3] });
       });
     });
+    // Current partial week: the demo operator has rung this week's days up to
+    // yesterday, so Shift's Close The Week shows in-progress sales like every
+    // other section instead of an empty page. In the live app a fresh week
+    // starts at zero and fills as the operator imports the week's POS export.
+    const curWk = ANCHS.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHS.weeks[0]);
+    const monAgo = (sunOff === 0 ? 6 : sunOff - 1);
+    if (curWk) for (let ago = monAgo; ago >= 1; ago--) {
+      const w = dayW[monAgo - ago] || 0.12;
+      const dBar = Math.round(curWk.bar_rev * w), dFloor = Math.round(curWk.food_rev * w);
+      scShifts.push({
+        id:uid(), date:dateStr(ago), bar_revenue:dBar, floor_revenue:dFloor,
+        total_revenue:dBar + dFloor, covers:Math.round(curWk.covers * w),
+        shift_type:'Full Day', status:'Closed', imported:true, created_at:new Date().toISOString()
+      });
+    }
     App.shiftData.sc_shifts = scShifts;
 
     // ── Checklist Templates + Opening / Closing runs ──
