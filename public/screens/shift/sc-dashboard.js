@@ -74,7 +74,16 @@ S.ShiftDashboard = {
     try {
       const done = this.stepDone();
       const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
-      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+      const wkS = this.shifts().filter(s => this.inWeek(s.date));
+      const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
+      const voidTot = this.voidComps().filter(r => this.inWeek(r.date) && r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+      const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
+      const stats = [
+        { label: 'Revenue', value: App.fmtCurrency(rev) },
+        { label: 'Voids', value: App.fmtCurrency(voidTot) },
+        { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
+      ];
+      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
     } finally { this._weekEnd = sv; }
   },
   // ── Render ──────────────────────────────────────────────────────────────────
