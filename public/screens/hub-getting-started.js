@@ -58,7 +58,7 @@ S.HubGettingStarted = {
     { group:'capture', id:'gs_sc_checklists', screen:'sc-checklist-templates',
       label:'Set your opening and closing checklist templates in Shift Control.' },
     { group:'capture', id:'gs_sc_shift', screen:'sc-dashboard',
-      label:'Import your first week of POS sales in the Shift cockpit. Revenue and covers feed Profit and Revenue Recovery.' },
+      label:'Import your first week of POS sales on Close The Week in Shift Control. Revenue and covers feed Profit and Revenue Recovery.' },
     { group:'capture', id:'gs_sc_cash', screen:'sc-cash-control',
       label:'Record a cash drop and a drawer count so cash data starts flowing.' },
 

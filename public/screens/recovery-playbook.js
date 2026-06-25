@@ -491,9 +491,9 @@ S.RecoveryPlaybook = {
               { leak: 'Trapped inventory cash', capture: 'Take Inventory weekly count + product costs', show: 'Trapped Cash', fixLabel: 'Free Trapped Cash system', screen: 'c-fix', focus: 'free-trapped' },
               { leak: 'Over-ordering', capture: 'Counts, the Order Sheet, and your pars', show: 'Purchasing', fixLabel: 'Order to Par system', screen: 'c-fix', focus: 'order-to-par' },
               { leak: 'Cash timing', capture: 'Revenue forecast, schedule, and bills in Books', show: 'Cash Forecast', fixLabel: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
-              { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the cockpit Pay on Terms step', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
+              { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the Pay on Terms step on Close The Week', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
             ] },
-            { t: 'p', text: 'And you do not read it alone. The Cash cockpit lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
+            { t: 'p', text: 'And you do not read it alone. Close The Week lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
           ]
         }
       ]
