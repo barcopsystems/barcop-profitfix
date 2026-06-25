@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Labor Control — Weekly Cockpit (landing screen) ──────────────────────────
+/* ── Labor Control — Close The Week (landing screen) ──────────────────────────
    Not a stack of status cards. A guided weekly close-out, same pattern as the
    Shift cockpit: a "CLOSE OUT YOUR WEEK" banner with a week-stepper, a progress
    bar, and the week's steps top to bottom. The current step opens inline as a
@@ -14,10 +14,10 @@ S.LaborDashboard = {
   _flash: null,
 
   showHowTo() {
-    App.showHelpModal('How the Labor Cockpit Works', [
+    App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Labor. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
       { h: 'The Steps', p: ['1. Import this week\'s hours: drop your timeclock export and Bar Cop matches the hours to your roster. 2. Log this week\'s tips: drop a tips export, or enter them in Tip Tracking. 3. Build next week\'s schedule: set next week\'s shifts and labor budget in Build Schedule. 4. Review labor flags: overtime risk, uncovered call-outs, and expiring certifications worth a look.'] },
-      { h: 'Working A Step', p: ['Click a step to open it. The hours and tips imports run right in the cockpit. Build Schedule and Overtime Watch open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector at the top steps you back to a prior week to close it out.'] },
+      { h: 'Working A Step', p: ['Click a step to open it. The hours and tips imports run right on the page. Build Schedule and Overtime Watch open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector at the top steps you back to a prior week to close it out.'] },
       { h: 'The Bottom Strip', p: ['Once hours are in, the strip shows the week\'s labor cost, hours, and overtime risk at a glance. Below it, the as-needed jobs (Staff Roster, Call-Out Log, Payroll Export, Labor History) are one tap away whenever you need them, not part of the weekly flow.'] }
     ]);
   },
