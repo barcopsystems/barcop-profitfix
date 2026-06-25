@@ -72,7 +72,7 @@ S.LaborDashboard = {
     const sv = this._weekStart; this._weekStart = this.todayMonday();
     try {
       const done = this.stepDone();
-      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
       const wkStart = this.weekStart(), wkEnd = this.weekEnd();
       const today = App.todayLocal();
       const endCap = wkEnd < today ? wkEnd : today;
