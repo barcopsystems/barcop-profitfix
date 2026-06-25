@@ -32,6 +32,36 @@ window.CashEngine = {
     return { oh, value };
   },
 
+  // ── Average inventory over the recent counts ──────────────────────────────
+  // A single count catches one moment, usually the pre-delivery low, which makes
+  // turns and GMROI read far too high. The textbook basis for capital efficiency
+  // is AVERAGE inventory, so the capital reads use this. Trapped cash still reads
+  // the CURRENT count (onHand), which is what is on the shelf right now.
+  recentCounts(n) {
+    const asc = this.countsAsc();
+    return asc.slice(Math.max(0, asc.length - (n || 4)));
+  },
+  avgInventoryValue(n) {
+    const cs = this.recentCounts(n);
+    if (!cs.length) return this.onHand().value;
+    let t = 0;
+    cs.forEach(c => { t += (c.items || []).reduce((s, it) => s + (it.counted === false ? 0 : (it.value || 0)), 0); });
+    return t / cs.length;
+  },
+  avgCategoryValue(n) {
+    const cs = this.recentCounts(n);
+    if (!cs.length) return {};
+    const acc = {};
+    cs.forEach(c => (c.items || []).forEach(it => {
+      if (it.counted === false) return;
+      const cat = (this.productById(it.product_id) || {}).category || it.category || 'Other';
+      acc[cat] = (acc[cat] || 0) + (it.value || 0);
+    }));
+    const out = {}, k = cs.length;
+    Object.keys(acc).forEach(cat => { out[cat] = acc[cat] / k; });
+    return out;
+  },
+
   // Usage between the last two counts, the velocity behind dead/slow + weeks-on-hand.
   usageBase() {
     const asc = this.countsAsc();
@@ -517,15 +547,18 @@ window.CashEngine = {
   },
   capitalByCategory() {
     const cats = this.categoryBreakdown(3);
+    const avgCat = this.avgCategoryValue(4);   // turns/GMROI read off AVERAGE inventory
     const dept = this._deptCostPct();
     return cats.map(c => {
+      const value = (avgCat[c.cat] != null && avgCat[c.cat] > 0) ? avgCat[c.cat] : c.value;
       const annualCogs = c.weeklyCogs * 52;
-      const turns = c.value > 0 ? annualCogs / c.value : null;
+      const turns = value > 0 ? annualCogs / value : null;
+      const weeksOnHand = c.weeklyCogs > 0 ? value / c.weeklyCogs : null;
       const d = this._catDept(c.cat);
       const costPct = dept[d];
       const marginPct = costPct != null ? (1 - costPct) : null;
       const gmroi = (costPct != null && costPct > 0 && turns != null) ? turns * (marginPct / costPct) : null;
-      return { cat: c.cat, value: c.value, weeklyCogs: c.weeklyCogs, weeksOnHand: c.weeksOnHand, annualCogs, turns, dept: d, costPct, marginPct, gmroi };
+      return { cat: c.cat, value, weeklyCogs: c.weeklyCogs, weeksOnHand, annualCogs, turns, dept: d, costPct, marginPct, gmroi };
     }).filter(c => c.value > 0).sort((a, b) => (a.gmroi == null ? 99 : a.gmroi) - (b.gmroi == null ? 99 : b.gmroi));
   },
   capitalSummary() {
