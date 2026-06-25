@@ -351,6 +351,18 @@ S.HubSettings = {
     // does not inherit phantom step checks from a prior session.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
 
+    // Cash Recovery device-local config (opening balance, tax rate, reserve). These
+    // live on the device, not in App.data, so the sample sets them here to light up
+    // the survival forecast, Cash Position, and Safe to Spend. The Anchor runs a
+    // realistic operating balance for a roughly $1M bar: profitable but cash-tight,
+    // the exact bar Cash Recovery is built for.
+    try {
+      localStorage.setItem('cash_opening_balance', '45000');
+      localStorage.setItem('cash_sales_tax_rate', '8.25');
+      localStorage.setItem('cash_tax_freq', 'monthly');
+      localStorage.setItem('cash_reserve_weeks', '8');
+    } catch (e) {}
+
     const uid = () => App.uid();
     const today = new Date();
     const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
@@ -464,7 +476,29 @@ S.HubSettings = {
       { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
     );
+    // The major fixed overhead as forward recurring bills, so the 13-week survival
+    // forecast carries real cash-out and the reserve target is sized off the real
+    // nut. Anchored to next month so they never overlap the dated historical opex
+    // above (which already covers the 90-day window for Books and the P&L). Books
+    // shows these as the recurring bills going forward; the forecast projects them.
+    operatingExpenses.push(
+      { id:uid(), date:monthAnchor(-1, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(-1, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(-1, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() }
+    );
     App.data.operating_expenses = operatingExpenses;
+
+    // ── Cash outflows (the new store): owner draw, equipment loan, and the sales
+    //    tax remittance. These feed BOTH the Cash Bridge (where the profit went,
+    //    past period) and the 13-week survival forecast (scheduled cash out).
+    //    Recurring and anchored two months back so the Bridge reads recent history
+    //    and the forecast projects them forward. The tax remittance is the classic
+    //    killer: real money leaving on the 20th that was never yours to keep. ────
+    App.data.cash_outflows = [
+      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',          recurring:true, term_months:24, recur_day:1,  created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan',      recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 20), type:'tax',  amount:6800, notes:'Sales tax remittance', recurring:true, term_months:24, recur_day:20, created_at:new Date().toISOString() }
+    ];
 
     // Permits and licenses: a realistic Austin bar/restaurant set so the page
     // shows the full status spread (on track, due soon, expired) and the Needs
