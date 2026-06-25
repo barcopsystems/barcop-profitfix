@@ -240,6 +240,102 @@ window.CashEngine = {
     return rows;
   },
 
+  // ── 13-Week Survival Forecast: the full quarter of cash in versus out, pulling
+  //    from every section. Sales + event balances in; labor + purchases + every
+  //    bill (one-time and forward-projected recurring) out. A running balance off
+  //    your opening cash, the low-point week, and your runway. The stress lever
+  //    (slow-season sales adjust + scenario costs) powers "Can I Afford It". ─────
+  _OPENING_KEY: 'cash_opening_balance',
+  openingCash() { const v = parseFloat(localStorage.getItem(this._OPENING_KEY)); return isNaN(v) ? null : v; },
+  setOpeningCash(v) { try { if (v == null || v === '') localStorage.removeItem(this._OPENING_KEY); else localStorage.setItem(this._OPENING_KEY, String(v)); } catch (e) {} },
+
+  // Event balance payments collected around the event date (the deposit is
+  // already in hand). Booked + completed only.
+  eventInflow(startYmd, endYmd) {
+    const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
+    let total = 0; const list = [];
+    bookings.forEach(b => {
+      if (b.stage !== 'Booked' && b.stage !== 'Completed') return;
+      const d = String(b.event_date || '').slice(0, 10);
+      if (!d || d < startYmd || d > endYmd) return;
+      const bal = Math.max(0, (parseFloat(b.quoted_total) || 0) - (parseFloat(b.deposit_amount) || 0));
+      if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d }); }
+    });
+    return { total, list };
+  },
+
+  // Every bill due in a window: the dated records you have, PLUS future recurring
+  // occurrences not yet generated (recurring children only run to this month). A
+  // parent or child already covering a month suppresses the projection for it, so
+  // nothing double counts.
+  projectedBills(startYmd, endYmd) {
+    const bills = this.bills();
+    const out = [];
+    const covered = new Set();
+    bills.forEach(b => {
+      const d = String(b.date || '').slice(0, 10);
+      if (!d) return;
+      covered.add((b.recurring_parent || b.id) + '@' + d.slice(0, 7));
+      if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(b.amount) || 0, vendor: b.vendor || b.category || 'Bill', category: b.category || '', recurring: !!b.recurring });
+    });
+    bills.filter(b => b.recurring).forEach(p => {
+      const amt = parseFloat(p.amount) || 0;
+      const base = new Date((p.date || startYmd) + 'T00:00:00');
+      if (isNaN(base.getTime())) return;
+      const day = parseInt(p.recur_day, 10) || base.getDate();
+      const term = parseInt(p.term_months, 10) || 12;
+      for (let m = 0; m < term; m++) {
+        const occ = new Date(base.getFullYear(), base.getMonth() + m, day);
+        const ymd = App.ymdLocal(occ);
+        if (ymd < startYmd || ymd > endYmd) continue;
+        const key = p.id + '@' + ymd.slice(0, 7);
+        if (covered.has(key)) continue;
+        covered.add(key);
+        out.push({ date: ymd, amount: amt, vendor: p.vendor || p.category || 'Bill', category: p.category || '', recurring: true, projected: true });
+      }
+    });
+    return out;
+  },
+
+  survivalForecast(numWeeks, opts) {
+    numWeeks = numWeeks || 13;
+    opts = opts || {};
+    const salesAdj = opts.salesAdj != null ? opts.salesAdj : 0;   // % slow-season slider
+    const extra = Array.isArray(opts.extra) ? opts.extra : [];     // [{week, amount, recurring}]
+    const opening = (opts.opening != null) ? opts.opening : (this.openingCash() || 0);
+    const start = this._mondayOf(new Date());
+    const purch = this.recurringPurchases();
+    let bal = opening;
+    const rows = [];
+    for (let i = 0; i < numWeeks; i++) {
+      const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
+      const sales = this.revenueForWeek(ws) * (1 + salesAdj / 100);
+      const ev = this.eventInflow(ws, we);
+      const inflow = sales + ev.total;
+      const lab = this.laborForWeek(ws);
+      const billRecs = this.projectedBills(ws, we);
+      const bills = billRecs.reduce((s, b) => s + b.amount, 0);
+      let extraOut = 0;
+      extra.forEach(x => { if (x.recurring || x.week === i || (x.week == null && i === 0)) extraOut += (parseFloat(x.amount) || 0); });
+      const out = lab.cost + purch + bills + extraOut;
+      const net = inflow - out;
+      bal += net;
+      rows.push({ ws, we, i, sales, events: ev.total, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, extra: extraOut, out, net, balance: bal });
+    }
+    let lowIdx = 0;
+    rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
+    let runway = null;
+    for (let i = 0; i < rows.length; i++) { if (rows[i].balance < 0) { runway = i; break; } }
+    return {
+      rows, opening, hasOpening: this.openingCash() != null,
+      lowPoint: rows[lowIdx] || null, lowIdx,
+      runway, negativeWeeks: rows.filter(r => r.balance < 0).length,
+      tightWeeks: rows.filter(r => r.net < 0).length,
+      end: rows.length ? rows[rows.length - 1].balance : opening,
+      hasData: rows.some(r => r.inflow > 0 || r.out > 0)
+    };
+  },
+
   // ── Realized cash freed (backward, honest). Trapped cash is computed at each
   //    historical count, then "freed" is how far it has come down from your own
   //    first-weeks baseline. No metric × revenue, no fix log to game: it is the
