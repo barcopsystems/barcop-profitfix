@@ -142,7 +142,18 @@ S.InventoryDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['count', 'orders', 'deliveries', 'review'],
+  ORDER: ['count', 'deliveries', 'orders', 'review'],
+  // Compact step summary for the Hub Inventory card. Reuses this page's own
+  // ORDER + stepDone + labels, forced to the current week, so the two can never
+  // drift. Returns { steps:[{label,done}], doneCount, total }.
+  hubSteps() {
+    const sv = this._weekStart; this._weekStart = this.todayMonday();
+    try {
+      const done = this.stepDone(this.computeState());
+      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+    } finally { this._weekStart = sv; }
+  },
   // A step is done if it carries an operator stamp, else it falls back to what
   // the week's data shows: a count taken this week, or nothing left to reorder.
   stepDone(st) {
@@ -315,8 +326,8 @@ S.InventoryDashboard = {
 
   _META: {
     count:      { n: 1, title: 'Take this week\'s count', sub: 'Count your inventory' },
-    orders:     { n: 2, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
-    deliveries: { n: 3, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
+    deliveries: { n: 2, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
+    orders:     { n: 3, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
     review:     { n: 4, title: 'Review the flags',        sub: 'Shrinkage, spot checks, dead stock' }
   },
   stepStatus(k, isDone) {
