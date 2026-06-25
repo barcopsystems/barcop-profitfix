@@ -315,12 +315,14 @@ window.CashEngine = {
       const lab = this.laborForWeek(ws);
       const billRecs = this.projectedBills(ws, we);
       const bills = billRecs.reduce((s, b) => s + b.amount, 0);
+      const ofRecs = this.outflowsBetween(ws, we);
+      const outflows = ofRecs.reduce((s, o) => s + o.amount, 0);
       let extraOut = 0;
       extra.forEach(x => { if (x.recurring || x.week === i || (x.week == null && i === 0)) extraOut += (parseFloat(x.amount) || 0); });
-      const out = lab.cost + purch + bills + extraOut;
+      const out = lab.cost + purch + bills + outflows + extraOut;
       const net = inflow - out;
       bal += net;
-      rows.push({ ws, we, i, sales, events: ev.total, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, extra: extraOut, out, net, balance: bal });
+      rows.push({ ws, we, i, sales, events: ev.total, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
@@ -407,6 +409,72 @@ window.CashEngine = {
     const reserve = this.reserveTarget();
     const cushion = (opening || 0) - sa.total;
     return { opening, hasOpening: opening != null, setAside: sa, reserve, cushion, safe: cushion - reserve };
+  },
+
+  // ── Non-bill cash outflows (owner draws, loan principal, capital buys, tax
+  //    remittances). Their own store so they feed BOTH the forecast (scheduled
+  //    cash out) and the bridge (where the profit went). Same forward-recurring
+  //    projection as bills. ──────────────────────────────────────────────────
+  cashOutflows() { return (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : []; },
+  _outflowLabel(t) { return t === 'draw' ? 'Owner draw' : t === 'loan' ? 'Loan payment' : t === 'tax' ? 'Tax remittance' : 'Capital'; },
+  outflowsBetween(startYmd, endYmd) {
+    const recs = this.cashOutflows();
+    const out = []; const covered = new Set();
+    recs.forEach(o => {
+      const d = String(o.date || '').slice(0, 10); if (!d) return;
+      covered.add((o.recurring_parent || o.id) + '@' + d.slice(0, 7));
+      if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(o.amount) || 0, type: o.type || 'capital', label: o.notes || this._outflowLabel(o.type) });
+    });
+    recs.filter(o => o.recurring).forEach(p => {
+      const amt = parseFloat(p.amount) || 0; const base = new Date((p.date || startYmd) + 'T00:00:00'); if (isNaN(base.getTime())) return;
+      const day = parseInt(p.recur_day, 10) || base.getDate(); const term = parseInt(p.term_months, 10) || 12;
+      for (let m = 0; m < term; m++) {
+        const occ = new Date(base.getFullYear(), base.getMonth() + m, day); const ymd = App.ymdLocal(occ);
+        if (ymd < startYmd || ymd > endYmd) continue; const key = p.id + '@' + ymd.slice(0, 7); if (covered.has(key)) continue; covered.add(key);
+        out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true });
+      }
+    });
+    return out;
+  },
+  outflowsInPeriod(s, e) {
+    const r = { draw: 0, loan: 0, capital: 0, tax: 0, total: 0, list: [] };
+    this.outflowsBetween(s, e).forEach(o => { r[o.type] = (r[o.type] || 0) + o.amount; r.total += o.amount; r.list.push(o); });
+    return r;
+  },
+
+  // ── The Cash Bridge: profit to cash. You earned a profit; here is where it
+  //    went instead of into the account, so the "profitable but broke" gap
+  //    becomes a list you can see. ───────────────────────────────────────────
+  profitForPeriod(s, e) {
+    const weeks = (App.data && App.data.weeks) || [];
+    let rev = 0, cogs = 0, labor = 0, fees = 0, any = false;
+    weeks.forEach(w => {
+      const pe = String(w.period_end || '').slice(0, 10); if (!pe || pe < s || pe > e) return;
+      any = true;
+      ['bar', 'food', 'catering', 'other'].forEach(k => { const d = w[k]; if (d) { rev += (parseFloat(d.revenue) || 0); cogs += (parseFloat(d.cogs) || 0); labor += (parseFloat(d.labor) || 0); } });
+      fees += (parseFloat(w.platform_fees) || 0);
+    });
+    const overhead = this.billsDue(s, e).total;
+    return { profit: rev - cogs - labor - fees - overhead, rev, cogs, labor, fees, overhead, hasData: any };
+  },
+  inventoryChange(s, e) {
+    const asc = this.countsAsc();
+    if (asc.length < 2) return { change: 0, hasData: false };
+    const valAt = cut => {
+      let c = null; asc.forEach(x => { const d = String(x.date).slice(0, 10); if (d <= cut && (!c || d > String(c.date).slice(0, 10))) c = x; });
+      if (!c) return null;
+      const m = this._onHandFromCount(c); return Object.keys(m).reduce((t, pid) => t + (m[pid].value || 0), 0);
+    };
+    const startVal = valAt(s), endVal = valAt(e);
+    if (startVal == null || endVal == null) return { change: 0, hasData: false };
+    return { change: endVal - startVal, startVal, endVal, hasData: true };
+  },
+  bridge(s, e) {
+    const p = this.profitForPeriod(s, e);
+    const inv = this.inventoryChange(s, e);
+    const co = this.outflowsInPeriod(s, e);
+    const cashKept = p.profit - inv.change - co.total;
+    return { start: s, end: e, profit: p.profit, p, inv, co, cashKept, hasData: p.hasData };
   },
 
   // ── Realized cash freed (backward, honest). Trapped cash is computed at each

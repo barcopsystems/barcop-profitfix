@@ -203,6 +203,10 @@ const Cash = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7.2h13" stroke="currentColor" stroke-width="1.2"/><path d="M11 10.3h2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Cash Position</span>
       </div>
+      <div class="nav-item" data-screen="c-bridge" id="nav-c-bridge">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11c2-5 11-5 13 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2 11v2.5M15 11v2.5M6.5 9v4.5M10.5 9v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash Bridge</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="c-help" id="nav-c-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>

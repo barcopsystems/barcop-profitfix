@@ -285,7 +285,7 @@ const DB = {
     't-presence':'traffic-recovery','t-forecast':'traffic-recovery',
     't-help':'_always',
     // Cash Recovery
-    'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-help':'_always',
+    'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-bridge':'cash-recovery','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'
@@ -904,6 +904,7 @@ const DB = {
       revenue_weeks: [],
       revenue_audits: [],
       cash_audits: [],
+      cash_outflows: [],
       revenue_server_checks: [],
       menu_dog_tests: [],
       revenue_price_log: [],
