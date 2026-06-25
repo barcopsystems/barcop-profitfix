@@ -2,7 +2,7 @@
 
 /* ── Bar Cop Audit — Hub-level executive weekly operational audit ───────────
    The owner-operator's weekly read on the entire operation. Distinct from
-   the three recovery audits (Profit, Revenue, Traffic) which answer
+   the three recovery audits (Profit, Revenue, Cash) which answer
    "what's broken, where to fix" with financial outcomes. Bar Cop Audit
    answers a different question: "is the operation being run well, is there
    discipline." Uses Control data and cross-cutting operational metadata,
@@ -52,7 +52,7 @@ S.HubBarCopAudit = {
               : screen.startsWith('lc-') ? 'labor'
               : screen.startsWith('sc-') ? 'shift'
               : screen.startsWith('r-')  ? 'revenue'
-              : screen.startsWith('t-')  ? 'traffic'
+              : screen.startsWith('c-')  ? 'cash'
               : 'profit'; // Profit-domain screens carry no prefix
     if (window.S && S.Hub && S.Hub._enter) S.Hub._enter(screen, mod);
   },
@@ -187,7 +187,7 @@ S.HubBarCopAudit = {
     const recoveryAudits = [
       { name: 'Profit Recovery',  list: App.data?.audits },
       { name: 'Revenue Recovery', list: App.data?.revenue_audits },
-      { name: 'Traffic Recovery', list: App.data?.traffic_audits }
+      { name: 'Cash Recovery',    list: App.data?.cash_audits }
     ];
     recoveryAudits.forEach(r => {
       const arr = r.list || [];
@@ -360,7 +360,7 @@ S.HubBarCopAudit = {
     const latestAudits = [
       App.latestEvent(App.data?.audits || []),
       App.latestEvent(App.data?.revenue_audits || []),
-      App.latestEvent(App.data?.traffic_audits || [])
+      App.latestEvent(App.data?.cash_audits || [])
     ].filter(Boolean);
     const gapIds = new Set();
     latestAudits.forEach(a => {
@@ -547,7 +547,7 @@ S.HubBarCopAudit = {
     [
       { name: 'Profit Recovery',  list: App.data?.audits,         screen: 'audit-tracker' },
       { name: 'Revenue Recovery', list: App.data?.revenue_audits, screen: 'r-audit' },
-      { name: 'Traffic Recovery', list: App.data?.traffic_audits, screen: 't-audit' }
+      { name: 'Cash Recovery',    list: App.data?.cash_audits,    screen: 'c-audit' }
     ].forEach(r => {
       const arr = r.list || [];
       const latest = App.latestEvent(arr);
@@ -585,7 +585,6 @@ S.HubBarCopAudit = {
     const actuals    = (App.laborData?.lc_actuals)      || [];
     const discrep    = (App.data?.vendor_discrepancies) || [];
     const counts     = (App.inventoryData?.ic_counts)   || [];
-    const reviews    = (App.data?.traffic_review_replies) || [];
     const notes      = (App.laborData?.lc_staff_notes)  || [];
 
     const since90 = (dateStr) => this._withinWindow(dateStr, 90);
@@ -696,7 +695,7 @@ S.HubBarCopAudit = {
     const latestAudits = [
       App.latestEvent(App.data?.audits || []),
       App.latestEvent(App.data?.revenue_audits || []),
-      App.latestEvent(App.data?.traffic_audits || [])
+      App.latestEvent(App.data?.cash_audits || [])
     ].filter(Boolean);
     const gapIds = new Set();
     latestAudits.forEach(a => {
@@ -808,7 +807,7 @@ S.HubBarCopAudit = {
 
   // ── Render: landing ─────────────────────────────────────────────────────
   // Uses the shared AuditUI helpers so the Bar Cop Audit landing is identical to
-  // the Profit / Revenue / Traffic audits: request card, merged Latest-Audit card
+  // the Profit / Revenue / Cash audits: request card, merged Latest-Audit card
   // with the six sub-scores as the section rows, the 12-month score-history bars,
   // and the Audit History data-card. This audit reads from logged data (no upload),
   // so the request card shows only a countdown when locked, and the history hides

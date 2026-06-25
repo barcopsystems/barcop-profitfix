@@ -18,7 +18,7 @@ S.Hub = {
       audit:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      cash:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
       history: '<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
@@ -35,7 +35,7 @@ S.Hub = {
       + '<div class="nav-section">By Recovery System</div>'
       + row('enter', 'Profit Audit',  'profit',  [['data-mod', 'profit'],  ['data-screen', 'audit-tracker']])
       + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
-      + row('enter', 'Traffic Audit', 'traffic', [['data-mod', 'traffic'], ['data-screen', 't-audit']])
+      + row('enter', 'Cash Audit', 'cash', [['data-mod', 'cash'], ['data-screen', 'c-audit']])
       + '<div class="nav-section">Support</div>'
       + row('audit-help', 'Help and FAQ', 'help', [])
       + row('report-bug', 'Report a Bug', 'bug',  []);
@@ -177,14 +177,12 @@ S.Hub = {
     const s   = data.settings || {};
     const pt  = s.targets || {};
     const rt  = (data.revenue_settings || {}).targets || {};
-    const tTar= (data.traffic_settings || {}).targets || {};
 
     const pWeeks  = data.weeks || [];
     const rWeeks  = (data.revenue_weeks || []).filter(w => (w.bar_revenue||0)+(w.floor_revenue||0) > 0);
-    const tWeeks  = data.traffic_weeks || [];
     const pAudits = data.audits || [];
     const rAudits = data.revenue_audits || [];
-    const tAudits = data.traffic_audits || [];
+    const cAudits = data.cash_audits || [];
     // Cash data is owned by Shift Control (sc_variances), not the legacy
     // user_data reconciliations key — that key is empty for a real operator.
     const recs    = (App.shiftData && App.shiftData.sc_variances) || [];
@@ -198,8 +196,8 @@ S.Hub = {
     const _newest = a => a.slice().sort((x, y) => _rd(y).localeCompare(_rd(x)));
     const last  = a => a.length ? _newest(a)[0] : null;
     const prior = a => a.length >= 2 ? _newest(a)[1] : null;
-    const pW = last(pWeeks), rW = last(rWeeks), tW = last(tWeeks);
-    const pA = last(pAudits), rA = last(rAudits), tA = last(tAudits);
+    const pW = last(pWeeks), rW = last(rWeeks);
+    const pA = last(pAudits), rA = last(rAudits), cA = last(cAudits);
 
     // ── Helpers ──
     const daysSince = (str) => {
@@ -213,18 +211,17 @@ S.Hub = {
     const shortDate = (str) => str ? new Date(String(str).length<=10 ? str+'T00:00:00' : str).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
 
     // ── Cross-system rollup ──
-    const sysScores = [pA, rA, tA].map(a => a ? a.overall_score : null).filter(v => v != null);
+    const sysScores = [pA, rA, cA].map(a => a ? a.overall_score : null).filter(v => v != null);
     const overall   = sysScores.length ? Math.round(sysScores.reduce((a,b)=>a+b,0)/sysScores.length) : null;
-    const anyAudit  = !!(pAudits.length || rAudits.length || tAudits.length);
-    const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(tA);
-    const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(tAudits)].filter(v => v != null);
+    const anyAudit  = !!(pAudits.length || rAudits.length || cAudits.length);
+    const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(cA);
+    const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(cAudits)].filter(v => v != null);
     const netTrend  = trendVals.length ? trendVals.reduce((a,b)=>a+b,0) : null;
 
     // ── Weekly status ──
     const wkMods = [
       { name:'Profit',  d: daysSince(pW?.period_end) },
       { name:'Revenue', d: daysSince(rW?.period_end) },
-      { name:'Traffic', d: daysSince(tW?.period_end) },
     ].map(m => ({ ...m, current: m.d != null && m.d <= this.WEEKLY_CUTOFF }));
     const wkCount   = wkMods.filter(m => m.current).length;
     const wkOverdue = wkMods.filter(m => !m.current).map(m => m.name);
@@ -248,7 +245,6 @@ S.Hub = {
     const primeT= pt.prime_cost_pct ?? 60;
     const caT   = rt.check_avg ?? 35;
     const laborT= App.laborTargetPct();
-    const grT   = tTar.google_rating ?? 4.3;
 
     const metrics = [
       { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low'), screen:'dashboard', mod:'profit' },
@@ -256,7 +252,6 @@ S.Hub = {
       { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low'), screen:'dashboard', mod:'profit' },
       { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
       { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
-      { label:'Google Rating', val: tW?.google_rating ?? null, disp: tW?.google_rating!=null?tW.google_rating.toFixed(1)+' / 5.0':null, tgt: grT.toFixed(1)+' stars', status: band(tW?.google_rating ?? null, grT, 'high'), screen:'t-dashboard', mod:'traffic' },
     ];
 
     // ── Alerts — metric breaches plus forward-looking signals ──
@@ -274,7 +269,7 @@ S.Hub = {
     const auditAlerts = [];
     [ { name:'Profit', a:pA, screen:'audit-tracker', mod:'profit' },
       { name:'Revenue', a:rA, screen:'r-audit', mod:'revenue' },
-      { name:'Traffic', a:tA, screen:'t-audit', mod:'traffic' }
+      { name:'Cash', a:cA, screen:'c-audit', mod:'cash' }
     ].forEach(d => {
       if (!d.a) { auditAlerts.push({ sev:'warn', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
       const score  = d.a.overall_score;
@@ -307,7 +302,7 @@ S.Hub = {
     };
     collect(pA, 'Profit',  'profit');
     collect(rA, 'Revenue', 'revenue');
-    collect(tA, 'Traffic', 'traffic');
+    collect(cA, 'Cash', 'cash');
     itemRows.sort((a,b) => b.impact - a.impact);
     // Cap visible PAIs at 8 — top by impact — so the most important items are
     // never hidden behind a scrollbar. Overflow flagged in a small footer.
@@ -467,9 +462,9 @@ S.Hub = {
         const parts = [];
         // Module-aware: Profit cost leaks read "Leaking" (red); Revenue is mostly
         // projected growth so it reads "Opportunity" (gold), never pooled as a
-        // leak; Traffic carries no dollar figures, so no weekly dollar line.
-        if (mod === 'traffic') {
-          // no dollar line for Traffic — deficits live in the audit itself
+        // leak; Cash's cash-to-free is a one-time amount, so no weekly dollar line.
+        if (mod === 'cash') {
+          // no weekly dollar line for Cash — the cash to free is a one-time amount in the audit
         } else if (weekly > 0) {
           if (mod === 'revenue') {
             parts.push('<span style="color:var(--t3);">Opportunity <span style="color:var(--t2);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
@@ -506,7 +501,7 @@ S.Hub = {
       <div style="display:flex;flex-direction:column;gap:14px;flex:1;">
         ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
         ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
-        ${auditRow('Traffic', tA, sysTrend(tAudits), 't-audit',       'traffic', false)}
+        ${auditRow('Cash',    cA, sysTrend(cAudits), 'c-audit',       'cash',    false)}
       </div>${shWrapClose}`;
 
     // Setup catch-up banner — shows above the dashboard whenever the Hub
@@ -669,7 +664,7 @@ S.Hub = {
       if (withMarkers && window.Recovery && window.FixPanel) {
         const refWeeks = pWeeks.slice(-series.length);
         if (refWeeks.length >= 2) {
-          const marks = ['profit','revenue','traffic']
+          const marks = ['profit','revenue']
             .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);
           const mxFn = i => P.l + (refWeeks.length > 1 ? (i/(refWeeks.length-1))*cw : cw/2);
           markerSvg = FixPanel.markerSvg(marks, mxFn, P.t, H-P.b);
@@ -727,7 +722,7 @@ S.Hub = {
           const modBadgeColors = {
             Profit:  { c: 'var(--t3)', bg: 'transparent' },
             Revenue: { c: 'var(--t3)', bg: 'transparent' },
-            Traffic: { c: 'var(--t3)', bg: 'transparent' }
+            Cash:    { c: 'var(--t3)', bg: 'transparent' }
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
           return '<div class="hd-row hd-arow" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
@@ -763,7 +758,7 @@ S.Hub = {
     const startHereGuide =
         '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;padding:2px 2px 8px;">Welcome to Bar Cop. It finds the money leaking out of your operation and tells you exactly how to plug it. Three steps to your first recovery number:</div>'
       + ghStep(1, 'Finish your setup', 'Add your bar\'s basics so the audits have real numbers to measure against.', 'Continue Setup', 'if(window.S&&S.HubGettingStarted)S.HubGettingStarted.open()')
-      + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Traffic. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
+      + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Cash. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
       + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
     const aiCount = itemRows.length;
     const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
@@ -843,7 +838,7 @@ S.Hub = {
       audits: {
         profit:  pA ? pA.overall_score : null,
         revenue: rA ? rA.overall_score : null,
-        traffic: tA ? tA.overall_score : null,
+        cash:    cA ? cA.overall_score : null,
         barCop:  bcScore,
         target:  (pA && pA.raw && pA.raw.TARGET_SCORE) || 70
       },
@@ -860,7 +855,7 @@ S.Hub = {
     const navIcons = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       revenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      traffic: '<circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8.5h12M8.5 2.5c2.5 3 2.5 9 0 12M8.5 2.5c-2.5 3-2.5 9 0 12" stroke="currentColor" stroke-width="1.2"/>',
+      cash:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
       inv:     '<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
       labor:   '<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       shift:   '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
@@ -1132,17 +1127,16 @@ S.Hub = {
     App.showApp(module || 'profit');
     if (gapId) App._fixFocus = gapId;
     const scr = module === 'revenue' ? 'r-fix'
-              : module === 'traffic' ? 't-fix'
+              : module === 'cash' ? 'c-fix'
               : 'profit-fix';
     App.navigate(scr);
   },
 
   /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
      biggest first. Profit and Revenue read live from Recovery.gapImpact (same
-     engine the dashboards use). Traffic doesn't have weekly dollar-quantifiable
-     live metrics, so its leak figures come from the latest traffic_audit's
-     action_items.monthly_impact divided by 4.345. A gap-area only counts when
-     its weekly dollar loss computes from real data. */
+     engine the dashboards use). A gap-area only counts when its weekly dollar
+     loss computes from real data. Cash's opportunity is a one-time trapped
+     amount, not a weekly leak, so it lives on the Cash screens, not here. */
   weeklyReadout() {
     if (!window.Recovery || !window.FIX) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
     const seen = {};
@@ -1164,37 +1158,6 @@ S.Hub = {
                      weekly: imp.dollars / 52, band: imp.band });
       });
     });
-
-    // Traffic — audit-based. Map each action item to its traffic gap-area
-    // and use the gap's short name as the label, so the readout stays
-    // consistent with the noun-phrase labels Profit and Revenue produce
-    // (e.g. "Reviews" not "Close the review velocity and response gap").
-    const tA = ((App.data || {}).traffic_audits || []).slice()
-      .sort((x, y) => ((y.date || y.generated_at || '') + '').localeCompare((x.date || x.generated_at || '') + ''))[0];
-    if (tA && Array.isArray(tA.action_items)) {
-      const hints = [
-        { rx: /google business|gbp/i,           id: 'gbp' },
-        { rx: /website|bounce|conversion/i,     id: 'website' },
-        { rx: /review/i,                        id: 'reviews' },
-        { rx: /search|seo|maps pack|nap/i,      id: 'search-seo' },
-        { rx: /social|instagram|facebook|post/i, id: 'social' },
-        { rx: /delivery|doordash|uber/i,        id: 'delivery' },
-        { rx: /email|loyalty/i,                 id: 'email-loyalty' }
-      ];
-      const trafficGaps = (window.FIX && FIX.traffic) || [];
-      tA.action_items.forEach(it => {
-        if (!it || !(it.monthly_impact > 0)) return;
-        const raw = it.action || '';
-        const hint = hints.find(h => h.rx.test(raw));
-        const gapId = hint ? hint.id : 'gbp';
-        const gap   = trafficGaps.find(g => g.id === gapId);
-        const label = gap ? gap.name : 'Traffic';
-        if (seen[label]) return;
-        seen[label] = true;
-        items.push({ label, gapId, module: 'traffic', kind: 'revenue',
-                     weekly: it.monthly_impact / 4.345, band: 'over' });
-      });
-    }
 
     items.sort((a, b) => b.weekly - a.weekly);
     const leakTotal = items.filter(x => x.kind === 'cost').reduce((s, x) => s + x.weekly, 0);
@@ -1259,97 +1222,6 @@ S.Hub = {
         text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
         screen: 'dashboard', mod: 'profit'
       });
-    }
-
-    // 3. Declining review velocity — latest period below its recent average
-    const tw = _byDateDesc(data.traffic_weeks || []);
-    if (tw.length >= 3) {
-      const latestT = tw[0];
-      const prior = tw.slice(1, 5).map(w => w.new_reviews).filter(v => v != null);
-      if (latestT && latestT.new_reviews != null && prior.length >= 2) {
-        const avg = prior.reduce((a, b) => a + b, 0) / prior.length;
-        if (avg > 0 && latestT.new_reviews < avg * 0.8) out.push({
-          sev: 'warn',
-          text: 'Review velocity is sliding: ' + latestT.new_reviews + ' new reviews this period against a ' + avg.toFixed(0) + ' average. Reviews drive local ranking.',
-          screen: 't-presence', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b. Review response rate below target — guests see unanswered reviews
-    // long after they're posted. Response rate is a Traffic target.
-    const tTar = (data.traffic_settings || {}).targets || {};
-    const respTarget = tTar.response_rate ?? 75;
-    if (tw.length) {
-      const latestT = tw[0];
-      if (latestT && latestT.response_rate != null && latestT.response_rate < respTarget) {
-        const gap = respTarget - latestT.response_rate;
-        out.push({
-          sev: gap > 20 ? 'bad' : 'warn',
-          text: 'Review response rate at ' + latestT.response_rate + '%, ' + gap.toFixed(0) + ' points under your ' + respTarget + '% target. Unanswered reviews are visible to every guest searching you.',
-          screen: 't-presence', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b-2. New reviews below absolute target — a Traffic target, separate from
-    // the relative "velocity sliding" check above. Catches the operator who
-    // has been consistently low rather than recently dropping.
-    const velTarget = tTar.review_velocity ?? 8;
-    if (tw.length) {
-      const latestT = tw[0];
-      if (latestT && latestT.new_reviews != null && latestT.new_reviews < velTarget) {
-        const gap = velTarget - latestT.new_reviews;
-        out.push({
-          sev: latestT.new_reviews < velTarget / 2 ? 'bad' : 'warn',
-          text: 'New reviews running at ' + latestT.new_reviews + ' a month, ' + gap + ' below your ' + velTarget + '/month target. Ask satisfied guests this week to close the gap.',
-          screen: 't-presence', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3b-3. Traffic data going stale — the latest logged period is more than
-    // 10 days old. The dashboard stops being useful once data ages out.
-    if (tw.length) {
-      const latestT = tw[0];
-      if (latestT && latestT.period_end) {
-        const dt = new Date(String(latestT.period_end).length <= 10 ? latestT.period_end + 'T00:00:00' : latestT.period_end);
-        const age = isNaN(dt.getTime()) ? null : Math.floor((Date.now() - dt.getTime()) / 86400000);
-        if (age != null && age > 10) {
-          out.push({
-            sev: 'warn',
-            text: 'Traffic data is ' + age + ' days old. Log this week in This Week so the trend stays current.',
-            screen: 't-this-week', mod: 'traffic'
-          });
-        }
-      }
-    }
-
-    // 3d. No marketing emails logged this period — a list you never email
-    // goes cold within 30 days.
-    if (tw.length) {
-      const latestT = tw[0];
-      if (latestT && latestT.email_list_size && (!latestT.emails_sent || latestT.emails_sent === 0)) {
-        out.push({
-          sev: 'warn',
-          text: 'No marketing emails sent this period against a list of ' + latestT.email_list_size + '. A list you never email goes cold inside 30 days.',
-          screen: 't-presence', mod: 'traffic'
-        });
-      }
-    }
-
-    // 3c. Social posting frequency below benchmark — quiet feeds lose
-    // discovery on Instagram and Facebook fast.
-    const postTarget = tTar.social_posts_month ?? 12;
-    if (tw.length) {
-      const latestT = tw[0];
-      if (latestT && latestT.ig_posts_month != null && latestT.ig_posts_month < postTarget * 0.7) {
-        out.push({
-          sev: latestT.ig_posts_month < postTarget * 0.4 ? 'bad' : 'warn',
-          text: 'Instagram posting ran ' + latestT.ig_posts_month + ' posts this period vs your ' + postTarget + '/month target. Quiet feeds lose the discovery algorithm fast.',
-          screen: 't-presence', mod: 'traffic'
-        });
-      }
     }
 
     // 4. Recurring cash shortages — repeated shorts in recent drawer counts
