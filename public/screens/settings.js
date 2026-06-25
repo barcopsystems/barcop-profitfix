@@ -2233,6 +2233,17 @@ S.HubSettings = {
         icTotals[i] = [icTotals[i][0] / p.case_size, icTotals[i][1] / p.case_size];
       }
     });
+    // Lift every count off the seeded sawtooth trough to a believable safety level
+    // (about a week and a half of stock at the low point) by adding the SAME
+    // per-product constant to every count, recent and old. Because the constant is
+    // identical across all counts, every count-to-count delta is unchanged, so the
+    // weekly COGS and the variance window stay exactly as seeded; only the absolute
+    // on-hand, and therefore inventory value, turns, and weeks-on-hand, reads like a
+    // real bar instead of bottoming near zero. Flat items (the idle top-shelf
+    // bottles) have a zero delta, so they get no lift and stay dead stock.
+    const icLift = {};
+    Object.keys(icTotals).forEach(k => { icLift[k] = 1.5 * (icTotals[k][1] - icTotals[k][0]); });
+
     // On-hand value = counted quantity x unit_cost, in container units for every
     // category (cases for beer, bottles for liquor/wine, kegs for draft, stock
     // unit for food). unit_cost is stored per container, so this is a straight
@@ -2276,11 +2287,11 @@ S.HubSettings = {
       [56, 0.95], [63, 1.09]
     ];
     App.inventoryData.ic_counts = [
-      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
-      mkCount(7,  i => icTotals[i][1]),
-      mkCount(0,  i => icTotals[i][0]),
+      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0]) + icLift[i]),
+      mkCount(7,  i => icTotals[i][1] + icLift[i]),
+      mkCount(0,  i => icTotals[i][0] + icLift[i]),
       ...icOlderWeeks.map(([d, m], k) =>
-        mkCount(d, i => +(icTotals[i][1] * m).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
+        mkCount(d, i => +(icTotals[i][1] * m + icLift[i]).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
     ];
 
     // Deliveries — all dated 8+ days back so none fall inside the last count
