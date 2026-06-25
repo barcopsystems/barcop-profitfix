@@ -95,7 +95,7 @@ S.CashAudit = {
     const cap = E.capitalSummary();
     const invValue = E.onHand().value;
     let s1 = null;
-    if (trapped.hasData && invValue > 0) s1 = clamp(100 - (trapped.total / invValue) * 250);
+    if (trapped.hasData && invValue > 0) s1 = clamp(100 - (trapped.total / invValue) * 130);
     const lazyCats = cap.rows.filter(r => r.gmroi != null && r.gmroi < 1.5).map(r => r.cat);
 
     // S2 Cash Conversion Cycle: days your cash is locked (product sits minus days
@@ -189,7 +189,7 @@ S.CashAudit = {
   _s1Finding(s1, trapped, invValue, cap, lazyCats) {
     if (s1 == null) return '';
     const cur = v => App.fmtCurrency(v);
-    const turnsTxt = cap.turns != null ? ' Your shelf cash turns ' + cap.turns.toFixed(1) + ' times a year at a ' + (cap.gmroi != null ? '$' + cap.gmroi.toFixed(2) + ' GMROI' : 'thin return') + '.' : '';
+    const turnsTxt = cap.turns != null ? ' Your shelf cash turns about ' + cap.turns.toFixed(1) + ' times a year.' : '';
     const lazyTxt = lazyCats.length ? ' The capital working hardest against you sits in ' + lazyCats.join(', ') + '.' : '';
     if (trapped.total > 0) return 'You have ' + cur(trapped.total) + ' of your shelf cash frozen in stock that is not moving or sitting above par, against ' + cur(invValue) + ' on hand. Freeing it puts real money back in the account.' + turnsTxt + lazyTxt;
     return 'Almost none of your shelf cash is trapped. Your inventory is working.' + turnsTxt;
@@ -238,8 +238,7 @@ S.CashAudit = {
         ['In Dead Stock', cur(d.DEAD_STOCK), d.DEAD_STOCK > 0 ? 'warn' : ''],
         ['Above Par', cur(d.OVERSTOCK), d.OVERSTOCK > 0 ? 'warn' : ''],
         ['Inventory Value', cur(d.INVENTORY_VALUE)],
-        ['Blended Turns', d.BLENDED_TURNS != null ? d.BLENDED_TURNS.toFixed(1) + 'x' : ''],
-        ['Blended GMROI', d.BLENDED_GMROI != null ? '$' + d.BLENDED_GMROI.toFixed(2) : '', (d.BLENDED_GMROI != null && d.BLENDED_GMROI < 1.5) ? 'warn' : '']
+        ['Blended Turns', d.BLENDED_TURNS != null ? d.BLENDED_TURNS.toFixed(1) + 'x' : '']
       ], null, d),
       AuditUI.sectionBlock(2, N[1], sx[N[1]], [
         ['Cash Locked', d.CYCLE_DAYS != null ? days(d.CYCLE_DAYS) : '', (d.CYCLE_DAYS != null && d.CYCLE_DAYS > 30) ? 'warn' : 'good'],
