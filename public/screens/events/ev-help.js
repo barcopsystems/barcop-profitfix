@@ -53,8 +53,8 @@ S.EventsHelp = {
         a: 'Offsite catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and Year-End. The staff you check as working an event feed their labor into its Event P&L. So the work you do here keeps the weekly numbers and the books current.' },
       { q: 'How does staffing an event work?',
         a: 'There is no separate event scheduler. From a booking, Schedule Staff for this Event jumps to Build Schedule on the event date, and you check the "Working [event]" box on each person working it. Only those hours land on the Event P&L. Catering and offsite gigs use the Event shift so an odd-time job fits the schedule.' },
-      { q: 'Why is Events its own section now instead of part of Revenue and Traffic?',
-        a: 'Because it is one job. The lead, the booking, the deposit, the event, and the guest relationship all belong together, and they were split across two sections before. Pulling them into one place means the lead becomes the booking with no re-entry, and it keeps Revenue and Traffic focused on what they do best.' }
+      { q: 'Why is Events its own section instead of part of Revenue?',
+        a: 'Because it is one job. The lead, the booking, the deposit, the event, and the guest relationship all belong together, and they were scattered across other sections before. Pulling them into one place means the lead becomes the booking with no re-entry, and it keeps Revenue focused on what it does best.' }
     ]}
   ],
 
