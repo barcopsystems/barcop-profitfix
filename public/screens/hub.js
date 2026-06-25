@@ -458,73 +458,68 @@ S.Hub = {
       const ni = nextIn(a);
       return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b> · ' + (ni === 0 ? 'due now' : 'next in ' + ni + 'd');
     };
-    const secCard = (o) => {
-      const pill = o.statusText
-        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;color:' + (o.statusOk ? 'var(--green)' : 'var(--amber)') + ';">'
-            + (o.statusOk ? '<span>&#10003;</span>' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);"></span>') + esc(o.statusText) + '</span>'
-        : '';
-      // Section name is an OUTSIDE heading (matches the heading-outside card
-      // pattern used across the app); status pill rides the heading row, right.
-      return '<div style="display:flex;flex-direction:column;min-width:0;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;">'
-        +   '<div class="sh" style="margin:0;">' + esc(o.title) + '</div>' + pill
-        + '</div>'
-        + '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" '
-        +   'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:15px 16px;cursor:pointer;display:flex;flex-direction:column;gap:11px;min-width:0;flex:1;">'
-        +   '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:33px;font-weight:600;line-height:0.95;color:' + (o.bigColor || 'var(--t1)') + ';">' + o.big + '</div>'
-        +     (o.bigSub ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;">' + esc(o.bigSub) + '</div>' : '') + '</div>'
-        +   (o.line2 ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);padding-top:10px;">' + o.line2 + '</div>' : '')
-        + '</div></div>';
+    // ── Section card: a snapshot of the section (3-stat strip from its own
+    //    dashboard) over the weekly-close checklist. Control cards carry the
+    //    step checklist + progress bar; Recovery cards carry the stat strip +
+    //    audit line until their Close The Week pages are built. ──
+    const statStrip = (stats) => '<div style="display:flex;align-items:flex-start;">'
+      + (stats || []).map((s, i) =>
+          (i > 0 ? '<div style="width:1px;align-self:stretch;background:var(--b2);margin:0 11px;flex-shrink:0;"></div>' : '')
+          + '<div style="min-width:0;flex:1;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(s.label) + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:21px;font-weight:600;line-height:1;margin-top:4px;color:' + (s.color || (s.warn ? 'var(--amber)' : 'var(--t1)')) + ';">' + s.value + '</div></div>'
+        ).join('') + '</div>';
+    const progBar = (dc, total) => {
+      const pct = total ? Math.round(dc / total * 100) : 0;
+      return '<div style="height:5px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>';
     };
-    // Control cards mirror each section's real Close The Week as a mini-checklist
-    // (steps + done marks read straight off the section via hubSteps()), with the
-    // section's key stat as a footer. One source of truth: the page owns the steps.
-    const stepCard = (title, screen, mod, sum, footer) => {
-      sum = sum || { steps: [], doneCount: 0, total: 0 };
-      const allDone = sum.total > 0 && sum.doneCount === sum.total;
-      const pill = sum.total > 0
-        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (allDone ? 'var(--green)' : 'var(--t3)') + ';">' + sum.doneCount + ' of ' + sum.total + ' done</span>'
+    const stepRows = (steps) => (steps || []).map((s, i) =>
+      '<div style="display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12px;line-height:1.25;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
+      + (s.done
+          ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
+          : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
+      + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span></div>').join('');
+    const richCard = (o) => {
+      const sum = o.sum;
+      const pill = sum
+        ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (sum.total > 0 && sum.doneCount === sum.total ? 'var(--green)' : 'var(--t3)') + ';">' + sum.doneCount + ' of ' + sum.total + ' done</span>'
         : '';
-      const rows = sum.steps.map(s =>
-        '<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;line-height:1.3;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
-        + (s.done
-            ? '<span style="flex-shrink:0;width:15px;text-align:center;color:var(--green);font-weight:800;">&#10003;</span>'
-            : '<span style="flex-shrink:0;width:15px;display:flex;justify-content:center;"><span style="width:6px;height:6px;border-radius:50%;background:var(--t4);"></span></span>')
-        + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span></div>').join('');
+      const body = statStrip(o.stats)
+        + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
+                 + '<div style="margin-top:10px;display:flex;flex-direction:column;">' + stepRows(sum.steps) + '</div>' : '')
+        + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '10px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
       return '<div style="display:flex;flex-direction:column;min-width:0;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + esc(title) + '</div>' + pill + '</div>'
-        + '<div class="hd-row" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
-        +   rows
-        +   (footer ? '<div style="font-size:11px;color:var(--t3);border-top:1px solid var(--row-div);margin-top:8px;padding-top:9px;">' + footer + '</div>' : '')
-        + '</div></div>';
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + esc(o.title) + '</div>' + pill + '</div>'
+        + '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
+        +   body + '</div></div>';
     };
     const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
-    const scRev = (pW ? (pW.bar?.revenue || 0) + (pW.food?.revenue || 0) : 0);
-    const icCard = stepCard('Inventory', 'ic-dashboard', 'inventory', safeSteps(S.InventoryDashboard),
-      icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet');
-    const lcCard = stepCard('Labor', 'lc-dashboard', 'labor', safeSteps(S.LaborDashboard),
-      rW?.labor_pct_blended != null ? 'Labor ' + App.fmtPct(rW.labor_pct_blended) + ' · target ' + laborT + '%' : 'No week logged yet');
-    const scCard = stepCard('Shift', 'sc-dashboard', 'shift', safeSteps(S.ShiftDashboard),
-      pW ? 'Last week ' + App.fmtCurrency(scRev, 0) : 'No week logged yet');
-    const pfCard = secCard({ title:'Profit', screen:'dashboard', mod:'profit',
-      statusOk: pfCurrent, statusText: pfCurrent ? 'Week in' : 'Confirm week',
-      big: pW?.prime_cost_pct != null ? App.fmtPct(pW.prime_cost_pct) : '-',
-      bigColor: pW?.prime_cost_pct != null ? bandColor(band(pW.prime_cost_pct, primeT, 'low')) : 'var(--t4)',
-      bigSub: 'Prime cost · target ' + primeT + '%',
-      line2: auditLine(pA) });
-    const rvCard = secCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue',
-      statusOk: rvCurrent, statusText: rvCurrent ? 'Week in' : 'Confirm week',
-      big: rW?.check_avg != null ? App.fmtCurrency(rW.check_avg) : '-',
-      bigColor: rW?.check_avg != null ? bandColor(band(rW.check_avg, caT, 'high')) : 'var(--t4)',
-      bigSub: 'Check average · target ' + App.fmtCurrency(caT),
-      line2: auditLine(rA) });
-    const csCard = secCard({ title:'Cash', screen:'c-dashboard', mod:'cash',
-      statusOk: cashSF.hasData ? (cashSF.tightWeeks === 0) : false,
-      statusText: !cashSF.hasData ? 'Set up' : (cashSF.tightWeeks > 0 ? cashSF.tightWeeks + ' tight wk' + (cashSF.tightWeeks === 1 ? '' : 's') : 'Clear ahead'),
-      big: runwayTxt || '-',
-      bigColor: !cashSF.hasData ? 'var(--t4)' : (cashSF.runway != null && cashSF.runway <= 4 ? 'var(--red-soft)' : 'var(--t1)'),
-      bigSub: 'Cash runway',
-      line2: auditLine(cA) });
+    // Control: stat strip + step checklist, all from each section's hubSteps().
+    const icSum = safeSteps(S.InventoryDashboard), lcSum = safeSteps(S.LaborDashboard), scSum = safeSteps(S.ShiftDashboard);
+    const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
+    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', stats: lcSum && lcSum.stats, sum: lcSum });
+    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', stats: scSum && scSum.stats, sum: scSum });
+    // Recovery: stat strip (from the old dashboards) + audit line; steps land
+    // when the Profit/Revenue/Cash Close The Week pages are built.
+    const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
+    const pfStats = [
+      { label:'Pour Cost', value: pW?.bar?.cost_pct != null ? App.fmtPct(pW.bar.cost_pct) : '-', color: tcol(pW?.bar?.cost_pct, pourT, 'low') },
+      { label:'Food Cost', value: pW?.food?.cost_pct != null ? App.fmtPct(pW.food.cost_pct) : '-', color: tcol(pW?.food?.cost_pct, foodT, 'low') },
+      { label:'Prime Cost', value: pW?.prime_cost_pct != null ? App.fmtPct(pW.prime_cost_pct) : '-', color: tcol(pW?.prime_cost_pct, primeT, 'low') }
+    ];
+    const rvStats = [
+      { label:'Check Avg', value: rW?.check_avg != null ? App.fmtCurrency(rW.check_avg) : '-', color: tcol(rW?.check_avg, caT, 'high') },
+      { label:'RPLH', value: rW?.rplh_blended != null ? App.fmtCurrency(rW.rplh_blended, 0) : '-' },
+      { label:'Labor %', value: rW?.labor_pct_blended != null ? App.fmtPct(rW.labor_pct_blended) : '-', color: tcol(rW?.labor_pct_blended, laborT, 'low') }
+    ];
+    const cashPos = (window.CashEngine && CashEngine.position) ? CashEngine.position() : { hasOpening:false };
+    const csStats = [
+      { label:'Trapped Cash', value: trapped.hasData ? App.fmtCurrency(trappedCash, 0) : '-' },
+      { label:'Runway', value: runwayTxt || '-', color: (cashSF.hasData && cashSF.runway != null && cashSF.runway <= 4) ? 'var(--red-soft)' : 'var(--t1)' },
+      { label:'Safe to Spend', value: cashPos.hasOpening ? App.fmtCurrency(cashPos.safe, 0) : '-', color: (cashPos.hasOpening && cashPos.safe < 0) ? 'var(--red-soft)' : 'var(--t1)' }
+    ];
+    const pfCard = richCard({ title:'Profit', screen:'dashboard', mod:'profit', stats: pfStats, footer: auditLine(pA) });
+    const rvCard = richCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue', stats: rvStats, footer: auditLine(rA) });
+    const csCard = richCard({ title:'Cash', screen:'c-dashboard', mod:'cash', stats: csStats, footer: auditLine(cA) });
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
