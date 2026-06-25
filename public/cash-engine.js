@@ -192,6 +192,20 @@ window.CashEngine = {
     return m ? parseInt(m[1], 10) : 0;
   },
 
+  // ── Who to pay this week: the bills coming due in the next `days`, by date,
+  //    with each vendor's terms where they are on file. Turns Pay on Terms into a
+  //    concrete weekly list, hold each to its due date. ────────────────────────
+  billsToPay(days) {
+    days = days || 14;
+    const start = App.todayLocal();
+    const end = this._addDays(start, days - 1);
+    const terms = {};
+    this.vendors().forEach(v => { if (v.name) terms[v.name] = v.payment_terms || ''; });
+    return this.projectedBills(start, end)
+      .map(b => ({ date: b.date, amount: b.amount, vendor: b.vendor, category: b.category, terms: terms[b.vendor] || '', netDays: this._netDays(terms[b.vendor] || '') }))
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  },
+
   // ── Cash Forecast: net cash 2-4 weeks out, in (projected sales) versus out
   //    (overhead bills + labor + recurring purchases). Catches a week where
   //    heavy cash goes out before the sales come in. ───────────────────────────
