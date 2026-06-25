@@ -149,9 +149,16 @@ S.InventoryDashboard = {
   hubSteps() {
     const sv = this._weekStart; this._weekStart = this.todayMonday();
     try {
-      const done = this.stepDone(this.computeState());
+      const st = this.computeState();
+      const done = this.stepDone(st);
       const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
-      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+      const cur = v => App.fmtCurrency(v);
+      const stats = [
+        { label: 'Inventory Value', value: cur(st.inventoryValue) },
+        { label: 'To Reorder', value: cur(st.reorderTotal), warn: st.reorderCount > 0 },
+        { label: 'Used', value: st.periodCost != null ? cur(st.periodCost) : '-' }
+      ];
+      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
     } finally { this._weekStart = sv; }
   },
   // A step is done if it carries an operator stamp, else it falls back to what
