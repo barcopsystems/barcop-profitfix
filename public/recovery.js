@@ -6,8 +6,8 @@
 
    Honesty rule: a dollar figure is shown only when it can be computed from
    real data the app already holds, never from an invented conversion rate.
-   A gap-area with no clean weekly dollar metric (all of Traffic, and any
-   Recovery gap-area whose metric does not dollarize) is simply absent from
+   A gap-area with no clean weekly dollar metric (any Recovery gap-area
+   whose metric does not dollarize) is simply absent from
    METRICS and returns status 'untracked'. The fix still logs, it just carries
    no dollar figure, and recovery for it shows as the module score moving.
 
@@ -37,7 +37,6 @@ window.Recovery = {
   // 'unit' means dollars = improvement x base x 52.
   _ptargets() { return (App.data.settings || {}).targets || {}; },
   _rtargets() { return ((App.data.revenue_settings || {}).targets) || {}; },
-  _tconv()    { return ((App.data.traffic_settings || {}).conversion_rates) || {}; },
   _checkAvg() { return Recovery._rtargets().check_avg ?? 35; },
 
   METRICS: {
@@ -92,62 +91,12 @@ window.Recovery = {
       fmt: v => '$' + v.toFixed(0)
     },
 
-    // ── Traffic Recovery metrics ─────────────────────────────────────────────
-    // Three Traffic gap-areas dollarize: Website (monthly_sessions), Email
-    // Marketing (list × open_rate × conv), and Delivery (orders × AOV).
-    // Reviews, SEO, GBP, and Social stay absent and show as Fix Logged
-    // markers on the chart without dollar credit. GBP + Social previously
-    // dollarized from weekly gbp_views and social_profile_visits, but those
-    // fields were killed from the weekly wizard during the Traffic deep dive
-    // (operators don't pull those numbers weekly). Their fix_log entries still
-    // record the work and show as chart markers; dollar credit waits until
-    // those gaps have a weekly signal worth typing.
-
-    // Website — monthly_sessions ÷ 4.33 weekly × (web_session_to_visit% × check_avg) × 52 = annual $
-    'website': {
-      series: 'traffic_weeks', label: 'Website Sessions', lowerBetter: false,
-      value: w => w.monthly_sessions != null ? w.monthly_sessions / 4.33 : null,
-      base:  () => ((Recovery._tconv().web_session_to_visit ?? 3) / 100) * Recovery._checkAvg(),
-      baseKind: 'unit',
-      // `value` is WEEKLY sessions (monthly / 4.33), so the target is normalized
-      // to weekly too — otherwise gapImpact compares a weekly value to a monthly
-      // target and the website leak reads ~4x too high.
-      target: () => ((((App.data.traffic_settings || {}).targets || {}).monthly_sessions ?? 2000)) / 4.33,
-      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
-    },
-
-    // Email Marketing — (list × open_rate% × email_open_to_visit%) ÷ 4.33 weekly visits × check_avg × 52
-    'email-loyalty': {
-      series: 'traffic_weeks', label: 'Email-Driven Visits', lowerBetter: false,
-      value: w => {
-        const list = w.email_list_size, open = w.email_open_rate;
-        if (list == null || open == null) return null;
-        const conv = (Recovery._tconv().email_open_to_visit ?? 1) / 100;
-        return (list * (open / 100) * conv) / 4.33;
-      },
-      base:  () => Recovery._checkAvg(),
-      baseKind: 'unit',
-      target: () => null,
-      fmt: v => Math.round(v * 4.33).toLocaleString() + ' visits/mo'
-    },
-
-    // Delivery Platforms — delivery_orders ÷ 4.33 weekly orders × delivery_avg_order_value × 52
-    // No conversion rate: orders × avg order value is direct revenue.
-    'delivery': {
-      series: 'traffic_weeks', label: 'Delivery Orders', lowerBetter: false,
-      value: w => w.delivery_orders != null ? w.delivery_orders / 4.33 : null,
-      base:  w => w.delivery_avg_order_value,
-      baseKind: 'unit',
-      target: () => null,
-      fmt: v => Math.round(v * 4.33).toLocaleString() + '/mo'
-    }
   },
 
   _series(key) {
     if (key === 'weeks') return (App.data.weeks || []);
     if (key === 'revenue_weeks') return (App.data.revenue_weeks || [])
       .filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0);
-    if (key === 'traffic_weeks') return (App.data.traffic_weeks || []);
     return [];
   },
 

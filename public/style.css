@@ -592,7 +592,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .at-mtbl td:last-child{color:var(--t1);font-weight:600;text-align:right;}
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
-/* Fix This buttons hover like ghost buttons (text to white). Inline base color/border need !important to lose to the hover. Shared across the Profit/Revenue/Traffic audits. */
+/* Fix This buttons hover like ghost buttons (text to white). Inline base color/border need !important to lose to the hover. Shared across the Profit/Revenue/Cash audits. */
 .at-fix-btn,.ra-fix-btn,.ta-fix-btn{transition:border-color .15s,color .15s;}
 .at-fix-btn:hover,.ra-fix-btn:hover,.ta-fix-btn:hover{border-color:rgba(255,255,255,0.28)!important;color:var(--w)!important;}
 /* Row being dragged (opt-in via DragReorder dragClass:'dr-dragging') = the standard gold-tint selection look: gold-tint fill + a solid gold-tint frame. Drawn with inset box-shadow (not real borders) so the full frame, top included, renders through the table's collapsed borders. */

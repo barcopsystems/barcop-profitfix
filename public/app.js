@@ -98,19 +98,6 @@ const TT = {
     'ra-events':        {t:'Event Revenue Records',b:'One record per event with date, covers, F&B minimum, and actual spend. Minimum 3 months. Used to calculate event frequency, average event revenue, and minimum compliance rate.',e:'Private dining log showing 8 events last month at average $3,400 spend'},
     'ra-catering':      {t:'Catering Revenue Records',b:'One record per catering booking with date, guests, package type, and total revenue. Used to assess catering program performance and repeat client rate.',e:'Catering log or your booking software export'},
     'ra-rate-card':     {t:'Private Dining Rate Card',b:'Current pricing for private dining including room fees, F&B minimums, and per-head options. Used to assess pricing position and minimum structure against market benchmarks.',e:'Your private dining or events package PDF'},
-    'ta-gbp-profile':    {t:'GBP Full Profile Screenshot',b:'A screenshot of your Google Business Profile as it appears in Google Maps or Search. Capture the full listing including name, address, phone, hours, website link, category, and the photo and review summary. Phone screenshots are fine.',e:'Search your bar name on Google Maps and screenshot the full listing panel'},
-    'ta-gbp-insights':   {t:'GBP Insights Export',b:'Monthly impressions, search queries, direction requests, and phone calls from your GBP dashboard. Go to your Google Business Profile, click Performance, and screenshot or export the overview. Shows how many people found you and what they did next.',e:'GBP dashboard: Performance > Overview > Screenshot'},
-    'ta-analytics':      {t:'Website Analytics',b:'Monthly sessions, bounce rate, top pages, and menu page performance. Export from Google Analytics, Squarespace, Wix, or any analytics platform. A screenshot of the overview dashboard is accepted. This is the highest-value file in the traffic audit.',e:'Google Analytics: Reports > Overview > Screenshot or Export'},
-    'ta-mobile-site':    {t:'Mobile Homepage Screenshot',b:'A screenshot of your homepage as it appears on a phone. Open your website on your phone and take a screenshot. Shows whether your phone number, address, and call-to-action are visible without scrolling.',e:'Open your website on your phone and screenshot what appears above the fold'},
-    'ta-google-reviews': {t:'Google Review Page Screenshot',b:'Screenshot of your Google listing showing your star rating, total review count, and the most recent 5 to 10 reviews. In Google Maps click your listing and scroll down to Reviews. Capture the rating, review count, and recent review text.',e:'Google Maps > Your Listing > Scroll to Reviews > Screenshot'},
-    'ta-yelp':           {t:'Yelp Listing Screenshot',b:'Screenshot of your Yelp business page showing star rating, review count, and recent reviews. Submit if you have a Yelp listing. Skip this if you do not have one.',e:'yelp.com > Search your bar name > Screenshot your listing'},
-    'ta-search':         {t:'Search Results Screenshots',b:'Open an incognito or private browser window so your personal search history does not affect results. Search for your bar type and city, then your neighborhood and bar. Screenshot the full results page including the Google Maps pack at the top.',e:'Incognito Chrome: search "sports bar Austin" > screenshot full results page'},
-    'ta-instagram':      {t:'Instagram Profile Screenshot',b:'Screenshot of your Instagram profile showing follower count, post count, bio, and the most recent 9 to 12 posts in grid view. Go to your profile page and screenshot. Phone screenshot is fine.',e:'Open Instagram > Your Profile > Screenshot the full profile page'},
-    'ta-facebook':       {t:'Facebook Page Screenshot',b:'Screenshot of your Facebook business page showing follower count and recent posts. Go to your Facebook page and screenshot the overview.',e:'Facebook > Your Business Page > Screenshot'},
-    'ta-ig-analytics':   {t:'Instagram Analytics Screenshot',b:'Screenshot from Instagram Insights showing reach, impressions, and engagement for the last 30 days. Only available on business or creator accounts. In Instagram go to Professional Dashboard and select Insights.',e:'Instagram > Professional Dashboard > Insights > Screenshot'},
-    'ta-delivery':       {t:'Delivery Platform Dashboard Screenshot',b:'Screenshot of your merchant dashboard on DoorDash, Uber Eats, or Grubhub showing your current rating, photo count, and menu status. Log into the merchant portal for each platform and screenshot the overview page. Submit one screenshot per platform.',e:'DoorDash Merchant Portal > Your Restaurant > Overview > Screenshot'},
-    'ta-email':          {t:'Email Platform Screenshot',b:'Screenshot of your email platform dashboard showing list size, last send date, and any campaign performance visible on the overview screen. Works with Mailchimp, Klaviyo, Constant Contact, or any email platform.',e:'Mailchimp > Audience > Overview > Screenshot showing list size and last send'},
-    'ta-email-analytics':{t:'Email Analytics Export',b:'Campaign performance history showing open rate, click rate, and unsubscribe rate for the last 6 to 12 months. Export from your email platform as PDF or CSV.',e:'Mailchimp: Reports > All Campaigns > Export CSV'},
     'r-labor-hours':    {t:'Labor Hours',b:'Total hours worked by all staff in this department for the week. Pull from your scheduling system or time clock.',e:'8 bartenders × avg 30 hrs = 240 bar labor hours'},
     'r-labor-cost':     {t:'Labor Cost',b:'Total wages paid to this department for the week. Exclude tips unless you have a tip pool that affects your payroll cost.',e:'240 hours × $15/hr avg = $3,600 bar labor cost'},
     'r-labor-pct':      {t:'Labor %',b:'Labor Cost ÷ Revenue for this department. Compare to your target. Over target means you are overstaffed or understaffed in productivity.',e:'$3,600 labor ÷ $12,000 bar revenue = 30%'},
@@ -129,43 +116,6 @@ const TT = {
     'r-vol-change':     {t:'Estimated Volume Change',b:'How much you expect covers to change as a percentage if you change the price. Negative means fewer covers. Use 0 if you expect no change.',e:'-10% means you expect to sell 10% fewer of this item at the new price'},
     'r-contrib-margin-eng': {t:'Contribution Margin',b:'Menu price minus item cost. What each sale contributes to covering overhead and profit after product cost is deducted.',e:'$15 price - $4.50 cost = $10.50 contribution margin'},
     'r-event-covers':   {t:'Event Covers',b:'Total guests at the event. Used with F&B minimum to calculate per-head minimum and track whether events are on pace.',e:'40-guest corporate dinner'},
-    // Traffic Recovery tooltips
-    't-google-rating':  {t:'Google Rating',b:'Your current star rating on Google. The industry benchmark is 4.3 or higher. Below 4.0 is a direct revenue impact. Guests filter by rating before choosing a venue.',e:'4.6 stars from 312 reviews'},
-    't-review-vel':     {t:'Review Velocity',b:'New reviews received per month. Consistent new reviews signal to Google that your business is active and relevant. Target 8 or more per month.',e:'12 new reviews this month'},
-    't-response-rate':  {t:'Response Rate',b:'Percentage of reviews you have responded to. Industry benchmark is 75 percent or higher. Responding to every review, positive and negative, is a direct ranking signal.',e:'Responded to 38 of 50 reviews = 76%'},
-    't-monthly-sessions':{t:'Monthly Website Sessions',b:'Total visits to your website per month. Benchmark is 2,000 or more for a typical bar or restaurant. Under 500 means your digital presence is not driving real discovery traffic.',e:'1,840 sessions last month'},
-    't-bounce-rate':    {t:'Bounce Rate',b:'Percentage of visitors who leave without viewing a second page. Above 70 percent means your homepage is not converting visitors to menu, reservations, or contact.',e:'62% bounce rate'},
-    't-social-posts':   {t:'Monthly Posts',b:'Total posts across Instagram and Facebook combined for the month. Benchmark is 12 or more. Consistency matters more than volume. Posting 3 times per week beats a burst of daily posts followed by silence.',e:'14 posts last month (10 IG, 4 FB)'},
-    't-digital-score':  {t:'Digital Presence Score',b:'Composite score across all 7 traffic categories: Google Business Profile, website, reviews, search and SEO, social media, delivery platforms, and email. Industry average is 58. Target is 65 or higher.',e:'Score of 71 puts you in the top 30% of operators in your market'},
-    't-google-total':   {t:'Google Reviews',b:'Your all-time total review count on Google. A high total builds trust before a guest reads a single review. New reviews each month matter more for ranking, but the running total is the first number guests see.',e:'312 total reviews at 4.6 stars'},
-    't-yelp-rating':    {t:'Yelp Rating',b:'Your current star rating on Yelp. Yelp ratings run lower than Google because the platform filters reviews aggressively, but anything under 4.0 costs you bookings. Many guests still check Yelp first.',e:'4.1 stars on Yelp from 88 reviews'},
-    't-yelp-total':     {t:'Yelp Reviews',b:'Your all-time total review count on Yelp. A thin Yelp listing signals a business that is not engaged. Even when Google is your main channel, keep the Yelp count growing.',e:'88 total Yelp reviews'},
-    't-delivery-active':{t:'Delivery Platform Active',b:'Whether you currently have a live, order-taking listing on this delivery platform. Each platform is its own discovery channel where guests browse and order from whoever shows up. Being absent means missed orders.',e:'Set Yes once your menu is live and accepting orders'},
-    't-delivery-rating':{t:'Delivery Platform Rating',b:'Your current star rating on this delivery platform. Delivery ratings drive feed placement. A low rating pushes your listing down where fewer guests see it. Benchmark is 4.5 stars or higher.',e:'4.6 stars on DoorDash'},
-    't-delivery-photos':{t:'Photo Count',b:'Number of photos on this delivery platform listing. Platforms favor listings with strong food photography in search and feed placement. Aim for 20 or more clear, well-lit shots.',e:'24 photos on the DoorDash menu'},
-    't-email-list':     {t:'Email List Size',b:'Total contacts on your email marketing list. An owned email list is the one marketing channel no algorithm controls. Benchmark is 500 or more for an established bar or restaurant.',e:'740 contacts on the list'},
-    't-emails-sent':    {t:'Emails Sent Per Month',b:'How many marketing emails or campaigns you sent in the last month. A list you never email is a dead asset. Send at least once a month, and weekly when you have offers or events.',e:'4 emails sent this month, one per week'},
-    't-email-open':     {t:'Email Open Rate',b:'Percentage of recipients who opened your most recent email. Industry benchmark is 20% or higher. A low open rate usually means weak subject lines or sending at the wrong time.',e:'28 of 100 recipients opened = 28% open rate'},
-    't-gbp-photos':     {t:'Photo Count',b:'Total photos on your Google Business Profile. Listings with more photos get more clicks and direction requests. Benchmark is 100 or more across food, drinks, the room, and the exterior.',e:'GBP shows 134 photos across all categories'},
-    't-gbp-posts':      {t:'GBP Posts Per Month',b:'How many Google Business Profile posts you published in the last month. Posts such as offers, events, and updates signal to Google that the listing is active. Benchmark is 8 or more per month.',e:'10 GBP posts this month: 4 events, 6 offers'},
-    't-review-age':     {t:'Most Recent Review Age',b:'How many days ago your newest review was posted, on any platform. If the most recent review is more than 14 days old, your review flow has gone quiet. Prompt guests this week.',e:'Newest review posted 6 days ago'},
-    't-review-patterns':{t:'Negative Patterns Noted',b:'Recurring complaints or themes you see across recent reviews, such as slow service, noise, or a specific dish. Logging the pattern is the first step. Fix the root cause in the operation, not just the public reply.',e:'"Slow service on weekends" appears in 4 of the last 10 reviews'},
-    't-search-keyword': {t:'Primary Local Keyword',b:'The exact phrase a guest would type into Google to find a bar like yours. Pick one phrase that names your city and concept, then use it in your Google Business Profile, page titles, and posts.',e:'"austin sports bar" or "downtown nashville cocktail bar"'},
-    't-search-citations':{t:'Citation Count',b:'Roughly how many online directories list your business, including Google, Yelp, Apple Maps, TripAdvisor, and local sites. More consistent citations build local search authority. Benchmark is 40 or more.',e:'Listed on about 35 directories'},
-    't-web-duration':   {t:'Avg Session Duration',b:'The average number of seconds a visitor spends on your website per visit. Short sessions mean visitors are not finding what they came for. Benchmark is 90 seconds or more.',e:'Google Analytics shows a 105 second average session'},
-    't-web-source':     {t:'Top Traffic Source',b:'Where most of your website visitors come from. Strong local SEO should make Organic Search your leading source. If Direct or Social leads, you are relying on people who already know you rather than new discovery.',e:'Analytics shows Organic Search drives 52% of sessions'},
-    't-social-engagement':{t:'IG Engagement Rate',b:'Likes, comments, saves, and shares as a percentage of your follower count, averaged across recent posts. Benchmark is 2% or higher. Low engagement means followers see your posts but do not interact.',e:'31 average interactions on 1,200 followers = 2.6%'},
-    't-social-fbposts': {t:'Facebook Posts Per Month',b:'How many posts you published on your Facebook page in the last month. Facebook reach is lower than Instagram, but the page still matters for events and the 35-plus crowd. Cross-post to keep it warm.',e:'8 Facebook posts this month'},
-    't-social-mix':     {t:'Content Mix',b:'An honest read on what your recent posts mostly show. A balanced mix of food, people, and the room outperforms a feed that is all promotions or all reposts. Pick the option that best describes your last 10 posts.',e:'Mostly food close-ups with a few event flyers = Balanced'},
-    't-email-lastsend': {t:'Last Send Date',b:'The date you last sent a marketing email to your list. If it has been more than a month, the list is going cold, recipients forget who you are, and open rates fall.',e:'Last campaign sent October 8'},
-    't-email-frequency':{t:'Send Frequency',b:'How often you typically email your list. Weekly or every two weeks keeps the list warm and engaged. Rarely or Never means the list is a dead asset, so move to at least monthly.',e:'A weekly Thursday email announcing the weekend lineup'},
-    't-email-growth':   {t:'List Growth Mechanism',b:'How new contacts get added to your email list. A passive list shrinks over time. A website signup form, an in-store capture point, or WiFi login capture all keep it growing.',e:'WiFi login capture adds about 30 contacts a week'},
-    't-gbp-views':      {t:'GBP Views/Mo',b:'Total monthly views of your Google Business Profile from your GBP Insights dashboard. The number of people who saw your listing in Google Search or Maps. This is the discovery metric Bar Cop multiplies against your conversion rate and check average to calculate Traffic recovery dollars from GBP work.',e:'GBP Insights shows 2,400 profile views this month'},
-    't-social-profile-visits':{t:'Profile Visits/Mo',b:'Total monthly visits to your social profile pages, combined across Instagram and Facebook. Pull from Instagram Insights (Professional Dashboard) and Facebook Page Insights. A profile visit is a stronger signal than a like or a follow because it shows someone clicked through from a post to learn more about the bar.',e:'IG Insights 380 profile visits + FB 120 = 500 total profile visits'},
-    't-delivery-orders':{t:'Total Orders/Mo',b:'Total monthly delivery orders across all active platforms (DoorDash, Uber Eats, Grubhub). Pull from each merchant dashboard and sum. This is the volume metric the Recovery Scoreboard uses to dollarize delivery fixes.',e:'120 DoorDash + 80 Uber Eats + 30 Grubhub = 230 total monthly orders'},
-    't-delivery-avg-order':{t:'Avg Order Value',b:'Average dollar value per delivery order, blended across all your active platforms. Pull from each platform\'s merchant dashboard. The Recovery Scoreboard multiplies your order volume by this value when calculating dollarized recovery from delivery improvements.',e:'$34 avg order across DoorDash, Uber Eats, and Grubhub'},
-    'hs-conv-web':      {t:'Website Session to Visit %',b:'Of all visitors who land on your website, how many show up at the bar within a reasonable window. Industry default is 3% for bar and restaurant sites. The Recovery Scoreboard uses this to dollarize website traffic improvements: weekly session lift × this rate × your check average × 52 = annual recovered dollars. Override once you have your own data.',e:'3% default. A strong site with clear call-to-action buttons runs higher.'},
-    'hs-conv-email':    {t:'Email Open to Visit %',b:'Of subscribers who open your marketing email, how many visit the bar within a reasonable window. Industry default is 1%. The Recovery Scoreboard uses this with list size and open rate to dollarize email work.',e:'1% default. Lists with strong personal-tone content and consistent monthly sends run higher.'},
     // Inventory Control tooltips
     'ic-par-level':     {t:'Par Level',b:'The target quantity to keep on hand for this product. When a count drops below par, the Order Sheet flags it for reordering. Set it to cover normal usage between deliveries plus a small safety buffer.',e:'You use 6 bottles of well vodka a week and order weekly, so par is 8'},
     'ic-reorder-point': {t:'Reorder Point',b:'The on-hand quantity that should trigger a reorder. Set it a little above zero so you never run out before the next delivery arrives. The Order Sheet flags any product at or below this point.',e:'A reorder point of 2 bottles means you reorder once only 2 are left'},
@@ -1442,7 +1392,7 @@ const App = {
     'hub': { title: 'How the Hub Works', sections: [
       { h: 'What this is', p: ['Your home screen and the cross-system command center. The Hub pulls the headline number from every part of Bar Cop into one view so you read the whole operation at a glance: what you have recovered, what is still on the table, your operation health, and what to work on right now. Tap any tile or row to jump straight to the screen behind it.'] },
       { h: 'The Where You Stand card', p: ['Total Monthly Opportunity is every recovery and revenue dollar your audits have surfaced but you have not closed yet. Recovery Scoreboard, in gold, is the proven dollars you have actually put back, counted only after a fix is marked implemented and measured. Bar Cop Audit is your latest operation-health score with the days until the next one is due. The Bar Cop Briefing button on this card writes a short read of the whole operation from your logged numbers, and refreshes once a week.'] },
-      { h: 'Audit Scores', p: ['Your Profit, Revenue, and Traffic audit scores side by side, each with its score bar, the leak or opportunity it carries per week, the change since the last audit, and a Run Audit button when one is due. Run each on the weekly rhythm to keep the trend honest.'] },
+      { h: 'Audit Scores', p: ['Your Profit, Revenue, and Cash audit scores side by side, each with its score bar, the leak or opportunity it carries per week, the change since the last audit, and a Run Audit button when one is due. Run each on the weekly rhythm to keep the trend honest.'] },
       { h: 'Weekly Gaps and Priority Action Items', p: ['Weekly Gaps reads off this week\'s numbers: the dollars leaking now, ranked biggest first, each one a tap from its fix. Priority Action Items ranks every move your audits surfaced by monthly dollar impact, so the highest-value work is always on top. Before you have run an audit, this becomes a Start Here guide with the three steps to your first recovery number.'] },
       { h: 'Alerts', p: ['Everything worth a look today, split into Critical and Watch: a metric off target, or an audit scoring low, overdue, or never run. All Clear shows only when your weekly metrics are on target and every audit is current and at or above target.'] },
       { h: 'Key Metrics and Trend', p: ['Key Metrics is your six headline numbers, each against its target and colored only when it slips. The Cost and Revenue Trend charts bar pour cost, check average, and prime cost over the last eight weeks; hover a point for that week\'s reading.'] },
@@ -1454,7 +1404,7 @@ const App = {
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
-        'Your weekly read on how well the whole operation is being run, separate from the Profit, Revenue, and Traffic audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and Labor Control, so there is nothing to upload.',
+        'Your weekly read on how well the whole operation is being run, separate from the Profit, Revenue, and Cash audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and Labor Control, so there is nothing to upload.',
         'The Operational Health score up top is the average of the six sub-scores that have enough data behind them. It needs at least three of the six covered to show a number; below that it reads N/A and fills in as you log more.'
       ] },
       { h: 'The six sub-scores', p: [
@@ -1469,7 +1419,7 @@ const App = {
       { h: 'Recovery Activity', p: ['The stat strip under the score tracks whether the recovery loop is moving: gaps surfaced by your latest audits, fixes you logged in the last 30 days, dollars recovered to date, and fixes still being measured before their result is in.'] },
       { h: 'Top Operational Exposures', p: ['The action list: the cross-system items worth handling now, worst first. Red is act-now (a high-priority maintenance item, an aging vendor credit, a permit about to lapse), amber is a watch. Open jumps you to the exact screen to work it. Bar Cop Outlook is a short written read of the whole audit, and Export PDF saves it.'] },
       { h: 'Recurring Patterns', p: ['Problems that keep showing up over a rolling 90 days: the same cashier short again and again, voids stacking on one shift type, chronic shrinkage on one product, a vendor with repeated discrepancies, or labor blowing out on the same day of week. Each names the pattern and a screen to act on it.'] },
-      { h: 'Landing and history', p: ['The landing holds the Generate button (run it once a week; it scores your trailing 30 days), the latest audit with its six section scores, and the Audit History list of past runs to reopen. Every audit is saved so you can watch the trend. The sidebar links across to your Profit, Revenue, and Traffic audits, which live with their Recovery Fix Systems.'] }
+      { h: 'Landing and history', p: ['The landing holds the Generate button (run it once a week; it scores your trailing 30 days), the latest audit with its six section scores, and the Audit History list of past runs to reopen. Every audit is saved so you can watch the trend. The sidebar links across to your Profit, Revenue, and Cash audits, which live with their Recovery Fix Systems.'] }
     ] },
     'books-home': { title: 'How the Books Overview Works', sections: [
       { h: 'What this page is', p: ['The Books overview: your back office at a glance. Books builds the files your accountant needs (Weekly P&L Brief, Month-End Books, Year-End Review) and tracks your permits, licenses, and operating expenses. This page rolls it all up from what you have logged, so the numbers match the Month-End file.'] },
@@ -1477,8 +1427,8 @@ const App = {
       { h: 'How to use it', p: ['Use the Quick Actions to jump to Month-End Books, the Weekly P&L Brief, Year-End Review, or Operating Expenses. Books for Accountant on the Current Month card opens the month-end file. Everything here is read-only; the work happens on the pages it links to.'] }
     ] },
     'settings-home': { title: 'How the Settings Overview Works', sections: [
-      { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details, service periods, and public links. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
-      { h: 'This page', p: ['While you are setting up, it shows how far along you are with a Continue Setup button. After that, it is a snapshot of how Bar Cop is tuned: your account and plan, your profile, sales, service periods, and links, and your targets, each with a quick Edit link so you can sanity-check it without opening every form. Admins also get a Manage Members shortcut to the team. Getting Started walks you through setup step by step and drops off once you are done.'] }
+      { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details and service periods. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
+      { h: 'This page', p: ['While you are setting up, it shows how far along you are with a Continue Setup button. After that, it is a snapshot of how Bar Cop is tuned: your account and plan, your profile, sales, service periods, and your targets, each with a quick Edit link so you can sanity-check it without opening every form. Admins also get a Manage Members shortcut to the team. Getting Started walks you through setup step by step and drops off once you are done.'] }
     ] },
     'weekly-pnl': { title: 'How the Weekly P&L Brief Works', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books file.'] },
@@ -1510,13 +1460,12 @@ const App = {
       { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
-      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, the service periods you run, and your public platform links. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
-      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] },
-      { h: 'Operation links', p: ['Paste the public URL for each platform: your website, Google Business Profile, and social pages. Bar Cop uses them for one-click access to your live listings and pulls public data into the Traffic Audit.'] }
+      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, and the service periods you run. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
+      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] }
     ] },
     'settings-targets': { title: 'How Recovery Targets Work', sections: [
       { h: 'What this page is', p: [
-        'Every target here sets the line your real numbers get measured against across the Profit, Revenue, and Traffic systems: the audits, the dashboards, This Week, and the Fix steps. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
+        'Every target here sets the line your real numbers get measured against across the Profit and Revenue systems: the audits, the dashboards, This Week, and the Fix steps. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
         'Industry defaults are pre-filled so you have a working line on day one. Set each one to your own goal as you learn your numbers. Each section saves on its own with its Save Data button.'
       ] },
       { h: 'Profit targets', p: [
@@ -1529,19 +1478,6 @@ const App = {
         'Check Average: the average guest check you are aiming for. Bar Cop measures your real check average against it and sizes the upsell opportunity in dollars. Raise it as your menu and service push add-ons.',
         'Lunch, Dinner, and Bar RPLH: revenue per labor hour, the sales each worked labor hour brings in, set separately for each daypart since a slow lunch and a packed bar are not the same job. Build Schedule uses these to set target hours, so a higher RPLH target tightens the schedule.',
         'Event Close Rate: the share of event inquiries you turn into booked events. The Events system grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
-      ] },
-      { h: 'Traffic targets', p: [
-        'Google Rating: the star rating you are holding the line at, 1 to 5. The default is 4.3. Slip below it and Traffic flags reputation as a leak.',
-        'New Reviews / Mo: how many fresh reviews you want coming in each month. Steady new reviews keep the rating current and the listing active; the default is 8.',
-        'Response Rate: the share of reviews you reply to. Answering the good and the bad signals an owner paying attention; the default is 75 percent.',
-        'Monthly Sessions: the website sessions you are targeting each month, the top of the funnel that feeds reservations and orders. The default is 2,000. Set it against what your site actually does.',
-        'Social Posts / Mo: how many posts you want out each month to stay in front of regulars. The default is 12, about three a week.'
-      ] },
-      { h: 'Conversion rates', p: [
-        'These two rates turn a digital gain into a dollar figure on the Traffic scoreboard, so a fix carries its real value. Each one is multiplied by your check average to price the visit it would drive.',
-        'Website Session to Visit: the share of website sessions that become an actual guest visit. The default is 3 percent.',
-        'Email Open to Visit: the share of email opens that become a visit. The default is 1 percent.',
-        'The defaults are industry benchmarks. Override them once your own data shows a different conversion, and every Traffic dollar figure re-prices to match.'
       ] }
     ] },
     'getting-started': { title: 'How Getting Started Works', sections: [
@@ -1562,7 +1498,7 @@ const App = {
       { h: 'Managing members', p: ['Everyone on the account lists below the invite form, with a Pending tag until they accept. Change anyone\'s role from the dropdown on their row. Edit Access re-opens the permissions grid for a Staff member so you can adjust what they see. Remove takes a person off the account and cuts their access on the spot. You cannot change your own role or remove yourself.'] }
     ] },
     'audit-help': { title: 'Bar Cop Audit Help', sections: [
-      { p: ['The full Help and FAQ for the Bar Cop Audit: what it measures, the weekly rhythm, and how it relates to your Profit, Revenue, and Traffic audits.'] },
+      { p: ['The full Help and FAQ for the Bar Cop Audit: what it measures, the weekly rhythm, and how it relates to your Profit, Revenue, and Cash audits.'] },
       { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
       { h: 'Directions for a specific page', p: ['Open the page you have a question about and tap this same info i button for its step-by-step. This FAQ covers the why.'] }
     ] },
@@ -2907,31 +2843,6 @@ const App = {
     'Lost':           'var(--red)'
   },
 
-  // ── Traffic Recovery canonical enums ────────────────────────────────────
-  // Single source for every list shared across Traffic screens (t-dashboard,
-  // t-this-week, t-gbp, t-reviews, t-search, t-website, t-social, t-delivery,
-  // t-email, t-reports, t-audit), Hub Settings → Operation Links, and the
-  // Recovery Scoreboard. Promoted from per-file local arrays so the lists
-  // never drift. Mirrors the MENU_* / EVENT_* migration pattern from Revenue.
-  //
-  // Public digital platforms the operator owns or maintains a listing on.
-  // urlKey: name of the field under traffic_settings.urls (set in Hub
-  //         Settings → Operation Links).
-  TRAFFIC_PLATFORMS: [
-    { key: 'website',        label: 'Website',         urlKey: 'website',        placeholder: 'https://yourbar.com' },
-    { key: 'gbp',            label: 'Google Business', urlKey: 'gbp',    placeholder: 'https://g.page/your-bar' },
-    { key: 'yelp',           label: 'Yelp',            urlKey: 'yelp',           placeholder: 'https://yelp.com/biz/your-bar' },
-    { key: 'instagram',      label: 'Instagram',       urlKey: 'instagram',      placeholder: 'https://instagram.com/yourbar' },
-    { key: 'facebook',       label: 'Facebook',        urlKey: 'facebook',       placeholder: 'https://facebook.com/yourbar' },
-    { key: 'doordash',       label: 'DoorDash',        urlKey: 'doordash',       placeholder: 'https://doordash.com/store/...' },
-    { key: 'ubereats',       label: 'Uber Eats',       urlKey: 'ubereats',       placeholder: 'https://ubereats.com/store/...' },
-    { key: 'grubhub',        label: 'Grubhub',         urlKey: 'grubhub',        placeholder: 'https://grubhub.com/restaurant/...' },
-    { key: 'ezcater',        label: 'ezCater',         urlKey: 'ezcater',        placeholder: 'https://ezcater.com/catering/...' },
-    { key: 'opentable',      label: 'OpenTable',       urlKey: 'opentable',      placeholder: 'https://opentable.com/...' },
-    { key: 'resy',           label: 'Resy',            urlKey: 'resy',           placeholder: 'https://resy.com/cities/...' },
-    { key: 'email_platform', label: 'Email Platform',  urlKey: 'email_platform', placeholder: 'https://mailchimp.com or your tool' }
-  ],
-
   // Reusable "How this works" modal. sections = [{ h:'Header', p:['para', ...] }].
   // A section with no h is intro paragraphs. Keeps step/explainer text off the
   // page itself (see memory: how-this-works-pattern).
@@ -3464,107 +3375,6 @@ const App = {
     return b;
   },
 
-  // Delivery platforms tracked individually in t-delivery, t-this-week, t-audit,
-  // and the average-rating math in t-reports + t-dashboard. Key prefix maps to
-  // the per-platform fields in traffic_weeks (dd_active, dd_rating, etc.) and
-  // traffic_settings.profile (dd_photos, dd_menu, dd_promo, dd_menu_synced_at).
-  // Independent operators in catering-heavy markets need ezCater; held the rest
-  // of the long tail out per [[value-bar]] — every added platform multiplies
-  // the operator's weekly typing burden.
-  TRAFFIC_DELIVERY_PLATFORMS: [
-    { key: 'dd', name: 'DoorDash' },
-    { key: 'ue', name: 'Uber Eats' },
-    { key: 'gh', name: 'Grubhub' },
-    { key: 'ez', name: 'ezCater' }
-  ],
-
-  // Benchmarks read by tip-generators, action-item math, and trend chart
-  // targets. Operator-tunable targets that move per operation (rating,
-  // review velocity, response rate, monthly sessions, social posts/mo) live
-  // under traffic_settings.targets and are set in Hub Settings → Traffic
-  // Targets. The values here are fixed industry benchmarks that don't vary.
-  TRAFFIC_BENCHMARKS: {
-    yelp_rating:       4.0,
-    delivery_rating:   4.5,
-    open_rate:         20,
-    list_size:         500,
-    citations:         40,
-    engagement_rate:   2,
-    gbp_photos:        100
-  },
-
-  // Profile-completeness checklist on t-gbp. Each entry is [key, label].
-  // The key is stored as a boolean on traffic_settings.profile.
-  TRAFFIC_GBP_TOGGLES: [
-    ['gbp_claimed',    'Listing claimed'],
-    ['gbp_hours',      'Hours complete'],
-    ['gbp_phone',      'Phone number present'],
-    ['gbp_website',    'Website linked'],
-    ['gbp_menu',       'Menu link active'],
-    ['gbp_category',   'Primary category set'],
-    ['gbp_attributes', 'Attributes complete'],
-    ['gbp_qa',         'Q and A populated']
-  ],
-
-  // Local SEO assessment on t-search.
-  TRAFFIC_SEARCH_TOGGLES: [
-    ['search_maps_pack', 'Confirmed in the Google Maps 3-pack'],
-    ['search_nap',       'Name, address, phone consistent everywhere'],
-    ['search_name',      'Business name correct on Google'],
-    ['search_address',   'Address correct on Google'],
-    ['search_phone',     'Phone number correct on Google'],
-    ['search_titles',    'Website page titles assessed for keywords']
-  ],
-
-  // Website setup checklist on t-website.
-  TRAFFIC_WEB_TOGGLES: [
-    ['web_exists',       'Website is live'],
-    ['web_mobile',       'Mobile optimized'],
-    ['web_menu',         'Menu linked from the homepage'],
-    ['web_online_order', 'Online ordering available'],
-    ['web_reservations', 'Reservation system in place'],
-    ['web_analytics',    'Google Analytics installed']
-  ],
-
-  // Email program enums on t-email.
-  TRAFFIC_EMAIL_FREQUENCY:      ['Weekly', 'Every two weeks', 'Monthly', 'Rarely', 'Never'],
-  TRAFFIC_EMAIL_GROWTH_SOURCES: ['Website signup form', 'In-store signup', 'WiFi login capture', 'Online order checkout', 'No active mechanism'],
-
-  // Social content mix on t-social.
-  TRAFFIC_SOCIAL_CONTENT_MIX: ['Balanced', 'Mostly promotional', 'Mostly reposts', 'Too few food photos'],
-
-  // ── Traffic fix_log auto-emit helper (Recovery Scoreboard wiring) ───────
-  // Every operator action that closes a Traffic gap writes a fix_log row so
-  // the Recovery Scoreboard, the 8-week dashboard chart's "Fix Logged"
-  // markers, and the Fix Areas card progress tally all credit the work.
-  // gap_id matches the FIX.traffic entry id (gbp, website, reviews,
-  // search-seo, social, delivery, email-loyalty). Writes `date` (the field
-  // recovery.js + fix-panel.js both read for cutoff + chart markers) along
-  // with the human-readable `gap_name` so chart tooltips render cleanly.
-  TRAFFIC_GAP_NAMES: {
-    'gbp':            'Google Business',
-    'website':        'Website',
-    'reviews':        'Reviews',
-    'search-seo':     'Search and SEO',
-    'social':         'Social Media',
-    'delivery':       'Delivery Platforms',
-    'email-loyalty':  'Email Marketing'
-  },
-  emitTrafficFix(gap_id, note) {
-    const today = this.todayLocal();
-    const rec = {
-      id: this.uid(),
-      module: 'traffic',
-      gap_id: gap_id,
-      gap_name: this.TRAFFIC_GAP_NAMES[gap_id] || gap_id,
-      date: today,
-      note: note || '',
-      source: 'traffic-auto',
-      saved_at: new Date().toISOString()
-    };
-    return this.putRecord('core', 'fix_log', rec);
-  },
-
   // ── Menu Items ───────────────────────────────────────────────────────────
   // Single canonical store for every sellable thing on the menu. Each item
   // can OPTIONALLY have a recipe attached (ingredient breakdown). When a
@@ -3843,7 +3653,7 @@ const App = {
     for (const kind of Object.keys(store.kinds)) {
       const recs = dataObj[store.kinds[kind]] || [];
       // Defensive: an event row with no id is silently dropped by putEventsBulk
-      // (this is what lost the traffic audits on reload). Assign one in place so
+      // (this is what lost the audits on reload). Assign one in place so
       // the in-memory record and the seeded row stay in sync.
       recs.forEach(r => { if (r && r.id == null) r.id = this.uid(); });
       const res = await DB.putEventsBulk(store.table, kind, recs);
@@ -4996,7 +4806,7 @@ const App = {
   // ── Deliverable footer + disclaimer (legal protection helper) ───────────
   // Single source for the disclaimer text + workbook Subject metadata + PDF
   // footer HTML used across every Bar Cop deliverable: Books, Year-End,
-  // Weekly P&L Brief, Traffic Month End Brief, Bar Cop Audit PDF, and any
+  // Weekly P&L Brief, Bar Cop Audit PDF, and any
   // future operator-facing export. Centralizing means the legal language
   // stays in lockstep when it gets edited.
   //
@@ -5006,7 +4816,7 @@ const App = {
   //     f.disclaimerLines  // array of 3 short strings, one per sheet footer row
   //     f.workbookSubject  // single-line string for wb.Props.Subject
   //
-  //   For PDF/HTML consumers (Traffic Month End Brief, Bar Cop Audit PDF):
+  //   For PDF/HTML consumers (Bar Cop Audit PDF):
   //     html += App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Audit' });
   //     returns a styled <div class="footer">...</div> block.
   //
