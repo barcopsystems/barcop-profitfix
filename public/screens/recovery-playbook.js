@@ -437,6 +437,17 @@ S.RecoveryPlaybook = {
           ]
         },
         {
+          id: 'bridge', nav: 'Where the Profit Went', eyebrow: 'Profit to cash',
+          title: 'You Earned a Profit. Where Did It Go?',
+          blocks: [
+            { t: 'lead', text: 'The P&L says you made money last month. The account says otherwise. That gap is not an accounting error and it is not theft. It is your profit sitting somewhere other than the bank, and there are only a few places it can be.' },
+            { t: 'p', text: 'Profit turns into cash, or it does not, through a short list of moves. Some went back onto the shelf as inventory you bought. Some left as an owner draw, which is real cash out even though it is not a business expense. Some went to loan principal, which a P&L barely shows. And some was sales tax you collected and paid through, money that was never yours to begin with. Add those up and the missing profit is accounted for to the dollar.' },
+            { t: 'box', tone: 'steel', title: 'Profit, minus where it went, equals the cash you kept', text: 'The Cash Bridge lays it out as a waterfall: your profit for the period, minus what went into inventory, minus owner draws, minus loan payments, minus tax remitted, equals the cash you actually kept. When that kept number is small against a healthy profit, this is the screen that tells you exactly why instead of leaving you to guess.' },
+            { t: 'p', text: 'This is less a leak to plug than a truth to see. Some of those outflows are necessary and some are choices, but you cannot manage what you cannot see. Read the bridge each month and the profitable-but-broke mystery stops being one.' },
+            { t: 'go', label: 'Cash Bridge', screen: 'c-bridge' }
+          ]
+        },
+        {
           id: 'timeline', nav: 'The First 90 Days', eyebrow: 'What to expect and when',
           title: 'Freeing Cash Has a Timeline',
           blocks: [
@@ -458,7 +469,7 @@ S.RecoveryPlaybook = {
           id: 'diagnostic', nav: 'Cash Diagnostic', eyebrow: 'Cash diagnostic',
           title: 'How Tight Are You Right Now?',
           blocks: [
-            { t: 'lead', text: 'Ten questions. Yes or no, no partial credit. If the answer is kind of, or I think so, that is a No. You either know the number this week or you do not.' },
+            { t: 'lead', text: 'Eleven questions. Yes or no, no partial credit. If the answer is kind of, or I think so, that is a No. You either know the number this week or you do not.' },
             { t: 'p', text: 'Most operators know last weekend sales cold. Ask how much cash is trapped on the shelf, or what next week looks like against the bills, and the room goes quiet. The monthly figure next to each No is an illustrative example of what that gap commonly costs, not your number.' },
             { t: 'diag', items: [
               { n: 1, cost: '$800', q: 'Do you know how much cash is trapped on your shelves right now, in dead stock and overstock?', yes: 'You can see your frozen capital and work the biggest pieces down. The cash comes back as you do.', no: 'You are carrying money on the shelf you cannot see. Dead bottles and overstock sit for months while you sweat the account.' },
@@ -470,7 +481,8 @@ S.RecoveryPlaybook = {
               { n: 7, cost: '$400', q: 'Do you order to par off real usage, instead of padding every order just in case?', yes: 'Your orders right-size themselves and the overstock works off on its own.', no: 'The padding you add to feel safe is exactly the cash that ends up trapped.' },
               { n: 8, cost: '$600', q: 'Do you read a forward cash look every week, not just last month\'s bank balance?', yes: 'You manage the timing, so the lumpy bills and big buys never catch you flat.', no: 'A bank balance tells you where you were. It says nothing about the bill landing next Thursday.' },
               { n: 9, cost: '$300', q: 'Have you asked a vendor for better terms in the last 90 days?', yes: 'Your steady accounts move from net 15 to net 30 when you ask, and that is free float.', no: 'Most distributors give terms to a steady account that asks. If you never ask, you never get them.' },
-              { n: 10, cost: '$400', q: 'Could you cover a surprise $5,000 expense next week without a scramble?', yes: 'You have a real cushion and a forward look, so a surprise is an inconvenience, not a crisis.', no: 'A single surprise on the wrong week is how good bars end up borrowing at bad rates or paying late.' }
+              { n: 10, cost: '$400', q: 'Could you cover a surprise $5,000 expense next week without a scramble?', yes: 'You have a real cushion and a forward look, so a surprise is an inconvenience, not a crisis.', no: 'A single surprise on the wrong week is how good bars end up borrowing at bad rates or paying late.' },
+              { n: 11, cost: '$600', q: 'Do you know how much of the cash in your account is actually yours to spend, after the sales tax and tips you owe?', yes: 'You spend off your Safe to Spend, so the tax bill never catches you having already spent money that was the state\'s.', no: 'You are reading the balance as if it is all yours. Spending the sales tax you collected is the classic way a profitable bar ends up unable to pay its tax bill.' }
             ] },
             { t: 'diagscore' },
             { t: 'box', tone: 'steel', label: 'Five things that are true about every bar', items: [
@@ -494,7 +506,19 @@ S.RecoveryPlaybook = {
               { leak: 'Cash timing', capture: 'Revenue forecast, schedule, and bills in Books', show: 'Cash Forecast', fixLabel: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
               { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the Pay on Terms step on Close The Week', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
             ] },
+            { t: 'p', text: 'Three more screens give you the whole cash picture beyond the four leaks. Cash Position shows what is truly safe to spend once the tax and tips you owe and your reserve are set aside. The Cash Bridge shows where last month\'s profit went instead of into the account. Capital Efficiency shows how hard the cash on your shelves is working. None of them is a chore; they are the read that tells you whether the systems are winning.' },
             { t: 'p', text: 'And you do not read it alone. Close The Week lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
+          ]
+        },
+        {
+          id: 'position', nav: "What's Actually Yours", eyebrow: 'True available cash',
+          title: 'The Balance Is Not the Number',
+          blocks: [
+            { t: 'lead', text: 'There is the number in your account and there is the number you can actually spend, and they are not the same. Part of that balance is money you are only holding: the sales tax you collected and owe the state, and tips you are holding for the staff. Spend it and you come up short the day it is due.' },
+            { t: 'p', text: 'Spending the sales tax you collected is the single most common way a profitable bar ends up unable to pay its tax bill. It does not feel like spending someone else\'s money, because it is sitting right there in the account, but every dollar of tax in a guest\'s check belonged to the state the moment they paid. Pooled tips you have not handed out yet are the same.' },
+            { t: 'p', text: 'Under that sits your reserve, the cushion a healthy bar keeps to cover its fixed bills through a slow stretch with no sales. What is left after the money you owe and the reserve you should hold is your Safe to Spend, the only number you can move on without putting the business at risk.' },
+            { t: 'box', tone: 'gold', label: 'The number that keeps you out of trouble', text: 'Set your sales tax rate and reserve target once. Cash Position carves the tax and tips you owe out of your balance, sizes the reserve off your real fixed overhead, and shows your Safe to Spend. If that number is negative, you are already leaning on money that is spoken for.' },
+            { t: 'go', label: 'Cash Position', screen: 'c-position' }
           ]
         },
         {
@@ -540,7 +564,17 @@ S.RecoveryPlaybook = {
                 ['2-4 weeks', 'Thin', 'Free your trapped cash and tighten terms before the next slow patch'],
                 ['Under 2 weeks', 'Tight', 'One bad fortnight is a crisis; work every lever in this playbook now']
               ],
-              note: 'Runway needs your cash on hand, the one number only you know. Enter it on the Cash Forecast and the weekly net becomes a real runway.' }
+              note: 'Runway needs your cash on hand, the one number only you know. Enter it on the Cash Forecast and the weekly net becomes a real runway.' },
+            { t: 'h', text: 'Cash Conversion Cycle' },
+            { t: 'table',
+              head: ['Days your cash is locked', 'Position', 'What it means'],
+              rows: [
+                ['Negative', 'Strong', 'You sell the product before the vendor bill is due; your vendors finance your inventory'],
+                ['0 to 15 days', 'Healthy', 'Cash comes back about as fast as you pay; normal for a tight, fast-turning bar'],
+                ['15 to 30 days', 'Watch', 'A couple of weeks of cash locked in the operating cycle; tighten pars or stretch terms'],
+                ['30+ days', 'Too much', 'A month of cash trapped between buying and selling; real money to free']
+              ],
+              note: 'The cash cycle is the days product sits on your shelf minus the days you take to pay your vendors. Order to par to cut the first, hold your terms to stretch the second. Capital Efficiency shows your number.' }
           ]
         },
         {
@@ -591,8 +625,9 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Over-ordering is how the trapped pile refills the moment you free it. Every case you buy ahead of when you need it is cash off your account and onto the shelf, and it is the easiest leak in the business to rationalize because running out feels worse than overbuying. But a bar that carries two to three weeks of most categories almost never runs out, and it keeps weeks of cash in the account instead of on the rack.' },
             { t: 'p', text: 'The fix is to order to par off real usage, not a comfort number. Par is what you actually use between deliveries plus a thin safety buffer, and Bar Cop sets it off your counts instead of your gut. Where a category keeps coming in overstocked, the par is too high; cut it and the orders right-size themselves. And consolidating to fewer, fuller orders timed near when your sales come in keeps the cash in your account a few extra days each cycle.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'Purchasing shows your weeks on hand against your usage and which categories are overstocked, so you know which order to tighten first. Dynamic Pars sets pars off real usage. The Order Sheet brings everything to par and no further. Re-count the next week and watch your weeks on hand settle toward target.' },
+            { t: 'p', text: 'Purchasing shows your weeks on hand against your usage and which categories are overstocked, so you know which order to tighten first. Capital Efficiency goes a level deeper, showing how many times a year you turn the cash in each category and how many days your cash stays locked from buying product to selling it, so you can see exactly where the cash is parked longest. Dynamic Pars sets pars off real usage. The Order Sheet brings everything to par and no further. Re-count the next week and watch your weeks on hand settle toward target.' },
             { t: 'go', label: 'Purchasing', screen: 'c-purchasing' },
+            { t: 'go', label: 'Capital Efficiency', screen: 'c-capital' },
             { t: 'go', label: 'Order Sheet', screen: 'ic-order-sheet' },
             { t: 'go', label: 'Order to Par system', screen: 'c-fix', focus: 'order-to-par' },
             { t: 'h', text: 'Quick Reference' },
@@ -600,6 +635,7 @@ S.RecoveryPlaybook = {
               'Read your weeks on hand in Purchasing before you place the order.',
               'Order to par, not to a number that feels safe. The buffer is in the par already.',
               'If a category keeps coming in overstocked, the par is too high. Cut it in Dynamic Pars.',
+              'Check Capital Efficiency for the categories with the lowest turns; that is where your cash sits longest.',
               'Consolidate to fewer, fuller orders and time them near when your sales land.',
               'Targets by category are in the Benchmarks section.',
               'Re-count the following week and confirm weeks on hand is coming down.'
@@ -612,9 +648,9 @@ S.RecoveryPlaybook = {
           blocks: [
             { t: 'lead', text: 'A profitable bar, six years open, never missed a payroll. Then a slow February week landed the same days as the quarterly insurance bill and a big liquor reorder, and there was not enough in the account on Thursday when the truck wanted a check. The owner moved money from savings and made it work, but it was a scramble that a single glance at the weeks ahead would have turned into a non-event. Profit was never the problem. Timing was.' },
             { t: 'p', text: 'Cash is about timing as much as amount. A bar can be profitable for the month and still be short on the wrong Thursday, because the bills, the orders, and the labor do not line up neatly with the days the sales come in. The lumpy ones do the damage: a quarterly bill, an annual license, a big equipment buy, the things that do not show up on a normal week and are exactly the ones a busy operator forgets are coming.' },
-            { t: 'p', text: 'The fix is to look two to four weeks ahead, every week, and line up what is going out against what is coming in. A week where more goes out than comes in is a tight week, and seeing it on Sunday gives you options a Friday scramble never does: move a payment to its actual due date, hold a big order a week, lean out a slow shift, or just know to keep the cushion in place. The move is small. The cost of not seeing it is not.' },
+            { t: 'p', text: 'The fix is to look the whole quarter ahead, every week, and line up what is going out against what is coming in. A week where more goes out than comes in is a tight week, and seeing it on Sunday gives you options a Friday scramble never does: move a payment to its actual due date, hold a big order a week, lean out a slow shift, or just know to keep the cushion in place. The move is small. The cost of not seeing it is not.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'The Cash Forecast lines up your projected sales against your bills, labor, and recurring purchases for the next four weeks, and flags any tight week in red. Enter your cash on hand and the weekly net becomes a running balance and a runway, so you see exactly how much cushion you have. The bills come from Books, the sales from your forecast, the labor from your schedule.' },
+            { t: 'p', text: 'The Cash Forecast projects the full quarter, thirteen weeks ahead, lining up your projected sales and event balances coming in against payroll, purchases, and every bill due that week, the recurring ones projected forward too. Enter your cash on hand and it becomes a running balance with your low-point week, your runway, and the line where you would go negative. Slide sales down to stress-test a slow season, or drop in a what-if, a second bartender, an equipment buy, an owner draw, and see whether you can carry it before you commit. Export it as a clean thirteen-week cash flow to walk into a lender. The bills come from Books, the sales from your forecast, the labor from your schedule.' },
             { t: 'go', label: 'Cash Forecast', screen: 'c-forecast' },
             { t: 'go', label: 'Review Bills', screen: 'books' },
             { t: 'go', label: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
@@ -624,6 +660,7 @@ S.RecoveryPlaybook = {
               'Enter your cash on hand so the net becomes a real running balance and runway.',
               'Find the week where cash out beats cash in, and cover it before it lands.',
               'Watch for the lumpy ones: quarterly bills, annual licenses, big equipment buys.',
+              'Stress-test a slow season or a big buy with the slider and Can I Afford It before you commit to it.',
               'To cover a tight week, move a payment to its due date, hold a big order, or lean out a slow shift.',
               'Confirm the week is back in the black after your moves.'
             ] }
