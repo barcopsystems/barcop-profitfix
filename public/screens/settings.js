@@ -3234,17 +3234,6 @@ S.HubSettings = {
         action_items: exposures.map(e => ({ action: e.label + '. ' + e.detail, gap_id: e.gap_id || null, monthly_impact: 0 }))
       };
     };
-    // The Anchor is an established operator 90 days in, so onboarding is done:
-    // mark every Getting Started task complete. Without this the Hub reads the
-    // demo as mid-setup (Continue-Setup banner, What's-Due suppressed) even though
-    // the operation is fully running.
-    try {
-      const gsTasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
-      const gsProg = {};
-      gsTasks.forEach(t => { if (t && t.id) gsProg[t.id] = daysAgoISO(80); });
-      App.data.hub_setup_progress = gsProg;
-    } catch (e) {}
-
     // ════════════════════════════════════════════════════════════════════
     //  CASH RECOVERY — the Anchor's first-quarter cash-recovery arc. Four
     //  milestone audits plus weekly fills trace cash health climbing as trapped

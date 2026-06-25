@@ -463,15 +463,18 @@ S.Hub = {
         ? '<span style="flex-shrink:0;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;color:' + (o.statusOk ? 'var(--green)' : 'var(--amber)') + ';">'
             + (o.statusOk ? '<span>&#10003;</span>' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);"></span>') + esc(o.statusText) + '</span>'
         : '';
-      return '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" '
-        + 'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:15px 16px;cursor:pointer;display:flex;flex-direction:column;gap:11px;min-width:0;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'
-        +   '<div style="font-size:11px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--t1);">' + esc(o.title) + '</div>' + pill
+      // Section name is an OUTSIDE heading (matches the heading-outside card
+      // pattern used across the app); status pill rides the heading row, right.
+      return '<div style="display:flex;flex-direction:column;min-width:0;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;">'
+        +   '<div class="sh" style="margin:0;">' + esc(o.title) + '</div>' + pill
         + '</div>'
-        + '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:33px;font-weight:600;line-height:0.95;color:' + (o.bigColor || 'var(--t1)') + ';">' + o.big + '</div>'
-        +   (o.bigSub ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;">' + esc(o.bigSub) + '</div>' : '') + '</div>'
-        + (o.line2 ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);padding-top:10px;">' + o.line2 + '</div>' : '')
-        + '</div>';
+        + '<div class="hd-row" onclick="S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')" '
+        +   'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:15px 16px;cursor:pointer;display:flex;flex-direction:column;gap:11px;min-width:0;flex:1;">'
+        +   '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:33px;font-weight:600;line-height:0.95;color:' + (o.bigColor || 'var(--t1)') + ';">' + o.big + '</div>'
+        +     (o.bigSub ? '<div style="font-size:10px;color:var(--t3);margin-top:4px;">' + esc(o.bigSub) + '</div>' : '') + '</div>'
+        +   (o.line2 ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);padding-top:10px;">' + o.line2 + '</div>' : '')
+        + '</div></div>';
     };
     const icCard = secCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory',
       big: icCounted ? 'On Track' : (icLast ? 'Count Due' : 'Set Up'),
@@ -1032,14 +1035,8 @@ S.Hub = {
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${tiles}</div>
           ${needsBand}
-          <div style="display:flex;flex-direction:column;min-width:0;">
-            <div class="sh" style="margin:0 0 10px;">Control</div>
-            <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${icCard}${lcCard}${scCard}</div>
-          </div>
-          <div style="display:flex;flex-direction:column;min-width:0;">
-            <div class="sh" style="margin:0 0 10px;">Recovery</div>
-            <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${pfCard}${rvCard}${csCard}</div>
-          </div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
         </div>`;
 
     // ── Compose ──
