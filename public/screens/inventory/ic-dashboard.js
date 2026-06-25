@@ -1,7 +1,7 @@
 'use strict';
 
-/* ── Inventory Control — Weekly Cockpit (landing screen) ──────────────────────
-   Same pattern as the Shift / Labor cockpits: a "CLOSE OUT YOUR WEEK" banner
+/* ── Inventory Control — Close The Week (landing screen) ──────────────────────
+   Same pattern as the Shift / Labor weekly closes: a "CLOSE OUT YOUR WEEK" banner
    with a week-stepper and progress bar, then the week's inventory steps top to
    bottom (take the count, receive deliveries, place orders, review flags). The
    current step opens inline; deeper work (Take Inventory, Order Sheet, the
@@ -16,7 +16,7 @@ S.InventoryDashboard = {
   _st: null,
 
   showHowTo() {
-    App.showHelpModal('How the Inventory Cockpit Works', [
+    App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week" and the full readout drops in below.'] },
       { h: 'The Steps', p: ['1. Take this week\'s count: count your inventory in Take Inventory. 2. Receive deliveries: log anything that came in since your last count, or mark it none. 3. Place your orders: everything below par, grouped by vendor, with the cost to refill, and create the orders in the Order Sheet. 4. Review the flags: shrinkage written off, spot-check flags, and dead stock worth chasing.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Take Inventory, Receive Delivery, and the Order Sheet open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] },
