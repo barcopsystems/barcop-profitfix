@@ -67,8 +67,17 @@ S.ShiftDashboard = {
     return r;
   },
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   ORDER: ['import', 'cash', 'exc', 'review'],
+  // Compact step summary for the Hub Shift card; mirrors this page exactly.
+  hubSteps() {
+    const sv = this._weekEnd; this._weekEnd = (App.nextSunday ? App.nextSunday() : App.todayLocal());
+    try {
+      const done = this.stepDone();
+      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+    } finally { this._weekEnd = sv; }
+  },
+  // ── Render ──────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container; this.actions = actions;
     if (actions) actions.innerHTML = '';
