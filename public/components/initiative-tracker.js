@@ -1,6 +1,6 @@
 'use strict';
-/* Shared, module-aware Initiative Tracker. Renders on the Profit, Revenue, and
-   Traffic Recovery dashboards in the same slot (under the forecast/audit row,
+/* Shared, module-aware Initiative Tracker. Renders on the Profit and Revenue
+   Recovery dashboards in the same slot (under the forecast/audit row,
    above Quick Actions). An initiative is the operator's OWN experiment, a change
    they chose to make, kept separate from the Fix System (audit-prescribed fixes)
    and the Recovery Scoreboard (recovered dollars). Bar Cop averages the eight
@@ -49,24 +49,6 @@ const InitiativeTracker = {
       namePh: 'New Cocktail Menu',
       hypPh: 'Launched 6 new cocktails Aug 1, expecting a check average lift',
       empty: 'No active initiatives. Start one when you launch a new menu item, run a promotion, or make a service change you want to measure.'
-    },
-    traffic: {
-      dataKey: 'traffic_initiatives',
-      weeks: () => (App.data && App.data.traffic_weeks) || [],
-      types: ['Review Push', 'Posting Routine', 'Promotion', 'Email Campaign', 'Other'],
-      metrics: [
-        { key: 'google_rating',    label: 'Google Rating',     fmt: 'rating' },
-        { key: 'new_reviews',      label: 'New Reviews / Mo',  fmt: 'int' },
-        { key: 'response_rate',    label: 'Review Response %', fmt: 'pct' },
-        { key: 'monthly_sessions', label: 'Website Visits',    fmt: 'int' }
-      ],
-      metricFor: (w, key) => {
-        const v = w ? w[key] : null;
-        return (v != null && v !== '') ? Number(v) : null;
-      },
-      namePh: 'Ask every table for a review',
-      hypPh: 'Put a review QR on every check Aug 1, expecting more reviews',
-      empty: 'No active initiatives. Start one when you launch a review push, a posting routine, or an email campaign you want to measure.'
     }
   },
 

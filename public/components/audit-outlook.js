@@ -5,7 +5,7 @@
    page. The button mounts inside the audit detail header card next to the
    score. On click the API call fires, the button shows "Analyzing...", and
    the paragraphs render in a popup modal layered over the audit (mirroring
-   the Trend Insights pattern on the Traffic Dashboard so the audit detail
+   the Trend Insights pattern on the Recovery dashboards so the audit detail
    page itself does not overflow with text).
 
    Caches the rendered HTML per audit id for the session. Re-clicks open the
@@ -13,7 +13,7 @@
 
    Replaces the equivalent Outlook plumbing that used to live inside the
    killed audit-diff.js Compare Other Audits modal. All four audits (Profit,
-   Revenue, Traffic, Bar Cop Audit) call AuditOutlook.attach() from inside
+   Revenue, Cash, Bar Cop Audit) call AuditOutlook.attach() from inside
    their audit detail header card. */
 
 window.AuditOutlook = {
@@ -47,7 +47,7 @@ window.AuditOutlook = {
      containerEl  — DOM node where the button should render
      audit        — the audit record (uses audit_id, date, overall_score,
                     sections, action_items)
-     auditType    — one of 'profit', 'revenue', 'traffic', 'bar-cop'
+     auditType    — one of 'profit', 'revenue', 'cash', 'bar-cop'
      opts         — { compact: true } shrinks button padding for headers
                     where space is tight                                        */
   attach(containerEl, audit, auditType, opts) {
@@ -170,7 +170,6 @@ window.AuditOutlook = {
   _typeLabel(auditType) {
     if (auditType === 'profit')   return 'Profit Recovery';
     if (auditType === 'revenue')  return 'Revenue Recovery';
-    if (auditType === 'traffic')  return 'Traffic Recovery';
     if (auditType === 'cash')     return 'Cash Recovery';
     if (auditType === 'bar-cop')  return 'Bar Cop';
     return 'Operational';

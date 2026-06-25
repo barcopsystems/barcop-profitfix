@@ -42,7 +42,7 @@ window.BarCopBriefing = {
   _hasData() {
     const d = App.data || {};
     const has = (arr) => Array.isArray(arr) && arr.length > 0;
-    return has(d.audits) || has(d.revenue_audits) || has(d.traffic_audits) || has(d.bar_cop_audits);
+    return has(d.audits) || has(d.revenue_audits) || has(d.cash_audits) || has(d.bar_cop_audits);
   },
 
   _fmtDate(iso) {
@@ -63,7 +63,7 @@ window.BarCopBriefing = {
     const stored = this._stored();
     if (stored && this._isFresh(stored)) { this._showModal(stored.text, stored.generated_at); return; }
     if (!this._hasData()) {
-      this._showError('Run an audit first. The briefing reads your Profit, Revenue, Traffic, and Bar Cop Audit scores to size up the whole operation.');
+      this._showError('Run an audit first. The briefing reads your Profit, Revenue, Cash, and Bar Cop Audit scores to size up the whole operation.');
       return;
     }
     this._generate(btn);
@@ -142,7 +142,7 @@ window.BarCopBriefing = {
     const auditLines = [
       auditLine('Profit Recovery audit', a.profit, true),
       auditLine('Revenue Recovery audit', a.revenue, true),
-      auditLine('Traffic Recovery audit', a.traffic, true),
+      auditLine('Cash Recovery audit', a.cash, true),
       auditLine('Bar Cop operational audit', a.barCop, false)
     ].join('\n');
 

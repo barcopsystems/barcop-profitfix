@@ -12,7 +12,7 @@
        the board). Everything for that one gap is visible at once: summary +
        dollar context, Watch Out For (the gap's commonMistakes, now inline), the
        fix process (each step a deep-link + checkbox), and Mark Implemented.
-   Shared by Profit / Revenue / Traffic Fix, so this rebuild lifts all three.
+   Shared by Profit / Revenue / Cash Fix, so this rebuild lifts all three.
 
    Step kinds:
      action    — deep-link to the Control/Recovery feature that does the task
@@ -34,7 +34,7 @@ window.FixPanel = {
 
   // The per-module Fix screen id a gap-area deep-links into.
   fixScreen(moduleKey) {
-    return moduleKey === 'revenue' ? 'r-fix' : moduleKey === 'traffic' ? 't-fix' : 'profit-fix';
+    return moduleKey === 'revenue' ? 'r-fix' : 'profit-fix';
   },
 
   // Infer which gap-area a Priority Action Item belongs to from its text.
@@ -60,15 +60,6 @@ window.FixPanel = {
         { id: 'rplh',               k: ['rplh', 'revenue per labor'] },
         { id: 'server-performance', k: ['server performance', 'server spread', 'bottom third'] },
         { id: 'events-catering',    k: ['event revenue', 'catering', 'private dining'] }
-      ],
-      traffic: [
-        { id: 'gbp',           k: ['google business', 'gbp', 'google profile', 'business profile'] },
-        { id: 'website',       k: ['website', 'web conversion', 'bounce', 'site conversion'] },
-        { id: 'reviews',       k: ['review velocity', 'review response', 'rating', 'reviews'] },
-        { id: 'search-seo',    k: ['search', 'seo', 'citation', 'ranking', 'nap'] },
-        { id: 'social',        k: ['social', 'instagram', 'facebook', 'tiktok', 'posting schedule'] },
-        { id: 'delivery',      k: ['delivery platform', 'doordash', 'ubereats', 'grubhub'] },
-        { id: 'email-loyalty', k: ['email', 'loyalty', 'list', 'newsletter'] }
       ]
     };
     const list = maps[moduleKey] || [];
@@ -234,7 +225,6 @@ window.FixPanel = {
 
   auditScreen(moduleKey) {
     return moduleKey === 'revenue' ? 'r-audit'
-         : moduleKey === 'traffic' ? 't-audit'
          : 'audit-tracker';
   },
 
@@ -253,7 +243,7 @@ window.FixPanel = {
 
   // Recovery dashboard hero set: the Scoreboard (what you have recovered) and
   // the ranked leak board (where you are leaking now), as two cards. Shared by
-  // the Profit, Revenue, and Traffic dashboards — designed once, lifts all three.
+  // the Profit, Revenue, and Cash dashboards — designed once, lifts all three.
   recoveryCard(moduleKey) {
     if (!window.Recovery) return '';
     return this._scoreboardCard(moduleKey) + this._leakBoardCard(moduleKey);
@@ -280,7 +270,7 @@ window.FixPanel = {
       const latest = App.latestEvent(audits);   // date-DESC store; never index by position
       const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
       const annual = monthly * 12;
-      const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Traffic';
+      const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Cash';
       const hasAudit = !!latest;
       // A dollarized opportunity headline when the latest audit surfaced gaps
       // with a number on them; otherwise just the loop.
@@ -342,7 +332,7 @@ window.FixPanel = {
       + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after and multiplies the improvement by your revenue base to get your per-week recovery. The Scoreboard shows that recovery realized to date, the weekly figure times the weeks since the fix, with the annual pace as a clearly labeled secondary line.')
       + p('You see a preliminary figure once 2 weeks of after-data exist. It firms up over the next 6 weeks and settles at 8.')
       + sh('The Honest Rule')
-      + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly (most Traffic fixes), it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
+      + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly, it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
       + '</div>';
     box.innerHTML = head + body;
     m.appendChild(box);
