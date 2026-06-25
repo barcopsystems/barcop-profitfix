@@ -181,7 +181,33 @@ window.CashEngine = {
   revenueForWeek(ws) {
     if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total) return f.total; }
     if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
-    return 0;
+    // Beyond the forecast's same-weekday lookback window, fall back to a trailing
+    // weekly sales run-rate so a far-out week reads a realistic number, not zero.
+    // (The same-weekday default returns 0 once a week is more than ~8 weeks past
+    // the last logged sales, which would otherwise crater the survival forecast.)
+    return this._trailingWeeklySales();
+  },
+
+  // Average weekly sales over the most recent COMPLETE weeks of actual shift
+  // revenue (bar + floor). The run-rate behind a forecast week with no nearer
+  // basis. Excludes the current in-progress week so a partial week never drags it.
+  _trailingWeeklySales() {
+    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
+    if (!shifts.length) return 0;
+    const curMon = this._mondayOf(new Date());
+    const byWeek = {};
+    shifts.forEach(s => {
+      const d = String(s.date || '').slice(0, 10); if (!d) return;
+      const r = (parseFloat(s.bar_revenue) || 0) + (parseFloat(s.floor_revenue) || 0);
+      if (r <= 0) return;
+      const wk = this._mondayOf(new Date(d + 'T00:00:00'));
+      if (wk >= curMon) return;
+      byWeek[wk] = (byWeek[wk] || 0) + r;
+    });
+    const weeks = Object.keys(byWeek).sort();
+    if (!weeks.length) return 0;
+    const recent = weeks.slice(-8);
+    return recent.reduce((s, w) => s + byWeek[w], 0) / recent.length;
   },
 
   // Labor cost for an upcoming week: the built schedule if one exists, otherwise
