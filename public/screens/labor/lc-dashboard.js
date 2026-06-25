@@ -67,6 +67,15 @@ S.LaborDashboard = {
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
   ORDER: ['hours', 'tips', 'schedule', 'review'],
+  // Compact step summary for the Hub Labor card; mirrors this page exactly.
+  hubSteps() {
+    const sv = this._weekStart; this._weekStart = this.todayMonday();
+    try {
+      const done = this.stepDone();
+      const steps = this.ORDER.map(k => ({ label: this._META[k].title, done: !!done[k] }));
+      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+    } finally { this._weekStart = sv; }
+  },
   // A step is done if it carries an explicit operator stamp, else it falls back to
   // what the week's data shows (hours logged, tips logged, next week scheduled).
   stepDone() {
