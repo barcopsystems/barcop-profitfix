@@ -1891,6 +1891,16 @@ S.HubSettings = {
       { name:'Topo Chico (each)',        category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.95, menu_price:4,    servings_per_unit:1,  cost_per_serving:0.95, par_level:48, reorder_point:24, primary_location:'Walk-in Cooler' },
       { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gal', vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
       { name:'Kettle Chips (bag)',       category:'Food', sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.85, menu_price:3.5, servings_per_unit:1, cost_per_serving:0.85, par_level:60, reorder_point:24, primary_location:'Dry Storage' },
+      // ── Top-shelf bottles that overstocked and barely move: a few thousand in
+      //    cash sitting on the shelf. They carry zero usage between counts, so they
+      //    never touch the COGS or variance window, but they read as dead stock in
+      //    Trapped Cash and as lazy capital in Capital Efficiency. The "trapped
+      //    premium liquor" the cash story is built to surface. Indices 105+.
+      { name:'Macallan 18',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:240.00, menu_price:38, par_level:2, reorder_point:1, primary_location:'Liquor Room' },
+      { name:'Pappy Van Winkle 15',      category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:260.00, menu_price:45, par_level:1, reorder_point:1, primary_location:'Liquor Room' },
+      { name:'Clase Azul Reposado',      category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:120.00, menu_price:28, par_level:2, reorder_point:1, primary_location:'Liquor Room' },
+      { name:'Hennessy XO',              category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:190.00, menu_price:32, par_level:2, reorder_point:1, primary_location:'Liquor Room' },
+      { name:'Dom Pérignon',             category:'Wine',   vendor:'Republic National', container_size_oz:25.4, pour_size_oz:2.0, unit_cost:185.00, menu_price:34, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler', serving_sizes:[{ label:'Bottle', size_oz:25.4, price:220 }] },
     ].map(p => {
       const pours = (p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null;
       // Bottle Beer unit_cost is per CASE; convert to per-bottle before costing
@@ -2204,7 +2214,11 @@ S.HubSettings = {
       96:[13,34], 97:[0.5,1.3], 98:[0.4,1], 99:[0.5,1.3], 100:[0.2,0.6], 101:[0.3,0.8],
       // Resale items appended to icProducts (Topo Chico, House Lemonade, Kettle
       // Chips) — every product index needs an entry here or mkCount throws.
-      102:[18,48], 103:[2,6], 104:[22,60]
+      102:[18,48], 103:[2,6], 104:[22,60],
+      // Idle top-shelf bottles (indices 105-109): FLAT levels so the on-hand is the
+      // same at every recent count, which means zero usage, which reads as dead
+      // stock in Trapped Cash without touching the COGS or variance window.
+      105:[6,6], 106:[3,3], 107:[8,8], 108:[6,6], 109:[6,6]
     };
     // Bottle beer is counted, ordered and valued by the CASE (the one canonical
     // unit). icTotals above were authored in bottles, so convert every beer index
