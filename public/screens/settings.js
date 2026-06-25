@@ -363,6 +363,19 @@ S.HubSettings = {
       localStorage.setItem('cash_reserve_weeks', '8');
     } catch (e) {}
 
+    // A history of closed-out weeks so the demo shows the operator has been doing
+    // the weekly Cash close, not starting cold. The Close The Week step stamps live
+    // in localStorage per week (the clear above wiped them); seed the last eight
+    // weeks fully closed and leave the current week open so there is work to do.
+    try {
+      const _mon = (d) => { const x = new Date(d); const wd = x.getDay(); x.setDate(x.getDate() + (wd === 0 ? -6 : 1 - wd)); return App.ymdLocal(x); };
+      const _curMon = _mon(today);
+      for (let w = 1; w <= 8; w++) {
+        const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
+        localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
+      }
+    } catch (e) {}
+
     const uid = () => App.uid();
     const today = new Date();
     const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
@@ -2217,8 +2230,10 @@ S.HubSettings = {
       102:[18,48], 103:[2,6], 104:[22,60],
       // Idle top-shelf bottles (indices 105-109): FLAT levels so the on-hand is the
       // same at every recent count, which means zero usage, which reads as dead
-      // stock in Trapped Cash without touching the COGS or variance window.
-      105:[6,6], 106:[3,3], 107:[8,8], 108:[6,6], 109:[6,6]
+      // stock in Trapped Cash without touching the COGS or variance window. A few
+      // slow bottles each, about $2,400 total, a believable amount for a craft bar
+      // to have over-bought and let sit, not a fake pile.
+      105:[2,2], 106:[1,1], 107:[3,3], 108:[2,2], 109:[5,5]
     };
     // Bottle beer is counted, ordered and valued by the CASE (the one canonical
     // unit). icTotals above were authored in bottles, so convert every beer index
@@ -2233,17 +2248,6 @@ S.HubSettings = {
         icTotals[i] = [icTotals[i][0] / p.case_size, icTotals[i][1] / p.case_size];
       }
     });
-    // Lift every count off the seeded sawtooth trough to a believable safety level
-    // (about a week and a half of stock at the low point) by adding the SAME
-    // per-product constant to every count, recent and old. Because the constant is
-    // identical across all counts, every count-to-count delta is unchanged, so the
-    // weekly COGS and the variance window stay exactly as seeded; only the absolute
-    // on-hand, and therefore inventory value, turns, and weeks-on-hand, reads like a
-    // real bar instead of bottoming near zero. Flat items (the idle top-shelf
-    // bottles) have a zero delta, so they get no lift and stay dead stock.
-    const icLift = {};
-    Object.keys(icTotals).forEach(k => { icLift[k] = 1.5 * (icTotals[k][1] - icTotals[k][0]); });
-
     // On-hand value = counted quantity x unit_cost, in container units for every
     // category (cases for beer, bottles for liquor/wine, kegs for draft, stock
     // unit for food). unit_cost is stored per container, so this is a straight
@@ -2287,11 +2291,11 @@ S.HubSettings = {
       [56, 0.95], [63, 1.09]
     ];
     App.inventoryData.ic_counts = [
-      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0]) + icLift[i]),
-      mkCount(7,  i => icTotals[i][1] + icLift[i]),
-      mkCount(0,  i => icTotals[i][0] + icLift[i]),
+      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
+      mkCount(7,  i => icTotals[i][1]),
+      mkCount(0,  i => icTotals[i][0]),
       ...icOlderWeeks.map(([d, m], k) =>
-        mkCount(d, i => +(icTotals[i][1] * m + icLift[i]).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
+        mkCount(d, i => +(icTotals[i][1] * m).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
     ];
 
     // Deliveries — all dated 8+ days back so none fall inside the last count
