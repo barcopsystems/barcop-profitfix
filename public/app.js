@@ -1146,7 +1146,7 @@ const App = {
         dleaf.className = 'nav-item nav-leaf';
         dleaf.id = 'nav-' + dashScreen;
         dleaf.dataset.screen = dashScreen;
-        const dleafLabel = (['inventory', 'labor', 'shift', 'cash'].indexOf(module) !== -1) ? 'Close The Week' : 'Dashboard';
+        const dleafLabel = (['inventory', 'labor', 'shift', 'cash'].indexOf(module) !== -1) ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
         dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-label">' + dleafLabel + '</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
