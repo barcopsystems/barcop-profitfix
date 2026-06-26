@@ -27,15 +27,15 @@ S.EventsDashboard = {
     if (actions) actions.innerHTML = '';
     const st = this._computeState();
     const gs = this.getStartedDone();
-    const done = this.stepDone(st);
-    const doneCount = this.ORDER.filter(k => done[k]).length;
-    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
+    const infos = {}; this.ORDER.forEach(k => { infos[k] = this.stepInfo(k, st); });
+    const doneCount = this.ORDER.filter(k => infos[k].done).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !infos[k].done) || '';
 
     container.innerHTML = '<div class="screen">'
       + (gs.all ? this.whereYouStand(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
-      +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
+      +   this.ORDER.map(k => this.stepRow(k, infos[k], st)).join('')
       + '</div>'
       + this.asNeeded()
       + '</div>';
@@ -69,16 +69,28 @@ S.EventsDashboard = {
     return { all, open, stale, booked, futureBooked, bookedRev, next, pipeline, depDueList, depositsDue, conv, soon14, noRunSheet, completedOpen };
   },
 
-  stepDone(st) {
-    // Day one: nothing is logged yet, so the pipeline work has not started. Show the
-    // steps as to-do, not auto-complete just because there is nothing pending.
-    if (!st.all.length) return { leads: false, deposits: false, prep: false, close: false };
-    return {
-      leads:    st.stale.length === 0,
-      deposits: st.depositsDue === 0,
-      prep:     st.noRunSheet.length === 0,
-      close:    st.completedOpen.length === 0
-    };
+  // ── Step completion: you mark a step done (your own checkmark), and it stays
+  // done until something NEW lands in it, then it reopens on its own. Mark Done
+  // snapshots the items pending right then; the step is done while nothing outside
+  // that snapshot is pending. Stored per-step on this device.
+  _ackKey(k) { return 'events_step_ack_' + k; },
+  ackOf(k)   { try { const v = localStorage.getItem(this._ackKey(k)); return v == null ? null : (JSON.parse(v) || []); } catch (e) { return null; } },
+  setAck(k, ids) { try { localStorage.setItem(this._ackKey(k), JSON.stringify(ids || [])); } catch (e) {} },
+  clearAck(k)    { try { localStorage.removeItem(this._ackKey(k)); } catch (e) {} },
+  pendingIds(k, st) {
+    const id = b => b.id;
+    if (k === 'leads')    return st.open.map(id);
+    if (k === 'deposits') return st.depDueList.map(id);
+    if (k === 'prep')     return st.noRunSheet.map(id);
+    if (k === 'close')    return st.completedOpen.map(id);
+    return [];
+  },
+  stepInfo(k, st) {
+    const ack = this.ackOf(k);
+    const pend = this.pendingIds(k, st);
+    const acked = ack != null;
+    const newPend = acked ? pend.filter(x => ack.indexOf(x) === -1) : pend;
+    return { acked, pend, newPend, done: acked && newPend.length === 0 };
   },
 
   // ── Where You Stand (booked revenue hero + three-stat read) ─────────────────
@@ -132,9 +144,9 @@ S.EventsDashboard = {
       + '</div>';
   },
 
-  // ── Expandable step (Books stepRow pattern; done is read off pipeline state) ─
-  stepRow(k, done, st) {
-    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+  // ── Expandable step (Books stepRow pattern; you mark it done, it reopens on new work) ─
+  stepRow(k, info, st) {
+    const m = this._META[k], isDone = info.done, isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
       : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
@@ -143,36 +155,40 @@ S.EventsDashboard = {
       + '<div class="ek-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
       +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
-      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, st) + '</div></div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, st, info) + '</div></div>'
       +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
       + '</div>';
-    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k) + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, info) + '</div>';
     return html + '</div>';
   },
 
-  stepStatus(k, st) {
-    if (k === 'leads') {
-      if (!st.open.length) return 'No open leads. The pipeline is clear.';
-      return st.open.length + ' open' + (st.stale.length ? ' &middot; ' + st.stale.length + ' need follow-up' : ', all current');
+  stepStatus(k, st, info) {
+    if (info.done) {
+      return { leads: 'Leads followed up.', deposits: 'Deposits handled.', prep: 'Run sheets handled.', close: 'Completed events closed.' }[k];
     }
-    if (k === 'deposits') return st.depositsDue > 0 ? this._money(st.depositsDue) + ' across ' + st.depDueList.length + ' event' + (st.depDueList.length === 1 ? '' : 's') : 'All deposits are in.';
-    if (k === 'prep') {
-      if (!st.soon14.length) return 'Nothing in the next two weeks.';
-      return st.soon14.length + ' in two weeks' + (st.noRunSheet.length ? ' &middot; ' + st.noRunSheet.length + ' need a run sheet' : ', run sheets started');
+    const n = info.newPend.length;
+    if (k === 'leads')    return n ? n + ' lead' + (n === 1 ? '' : 's') + ' to follow up' : 'No open leads right now';
+    if (k === 'deposits') {
+      const amt = st.depDueList.filter(b => info.newPend.indexOf(b.id) !== -1).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
+      return n ? this._money(amt) + ' due across ' + n + ' event' + (n === 1 ? '' : 's') : 'No deposits due right now';
     }
-    if (k === 'close') return st.completedOpen.length ? st.completedOpen.length + ' event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out' : 'Every completed event is closed.';
+    if (k === 'prep')     return n ? n + ' event' + (n === 1 ? '' : 's') + ' need a run sheet' : 'Nothing to prep right now';
+    if (k === 'close')    return n ? n + ' event' + (n === 1 ? '' : 's') + ' to close out' : 'Nothing to close right now';
     return '';
   },
 
-  workspace(k) {
+  workspace(k, info) {
     const explain = (txt) => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
     const M = {
-      leads:    'Follow up on open leads and quotes before they go cold. Three days without a touch and a lead flags stale.',
-      deposits: 'A booking is not locked until the deposit is in. Collect what is owed on your booked events.',
-      prep:     'Build the run sheet for every event in the next two weeks so the kitchen and floor know the plan.',
-      close:    'Enter the actual revenue and costs on completed events to lock in the Event P&L.'
+      leads:    'Follow up on open leads and quotes before they go cold, then mark this done. It reopens on its own when a new lead comes in.',
+      deposits: 'A booking is not locked until the deposit is in. Collect what is owed, then mark this done. It reopens when a new deposit comes due.',
+      prep:     'Build the run sheet for every event in the next two weeks so the kitchen and floor know the plan, then mark this done. It reopens for the next event to prep.',
+      close:    'Enter the actual revenue and costs on completed events to lock in the Event P&L, then mark this done. It reopens for the next event to close.'
     };
-    return explain(M[k]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div>';
+    const markBtn = info.done
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>';
+    return explain(M[k]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button>' + markBtn + '</div>';
   },
 
   asNeeded() {
@@ -212,13 +228,19 @@ S.EventsDashboard = {
     this.container.querySelectorAll('.ek-step-head').forEach(h => h.addEventListener('click', () => {
       const k = h.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container);
     }));
+    this.container.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.done; this.setAck(k, this.pendingIds(k, this._computeState())); this._openStep = null; this.render(this.container);
+    }));
+    this.container.querySelectorAll('[data-undone]').forEach(b => b.addEventListener('click', () => {
+      this.clearAck(b.dataset.undone); this.render(this.container);
+    }));
   },
 
   showHowTo() {
     App.showHelpModal('How the Events Landing Works', [
       { p: ['Your events room at a glance. Up top, Where You Stand: the revenue you have booked, your open pipeline, the deposits you are owed, and your win rate. Below it, Book Out Your Events walks the work that keeps the pipeline moving.'] },
       { h: 'Getting Set Up', p: ['Before you have data, a Get Started box points you at the four things that turn Events on: log a booking, build your rate card, add your regulars, and plan a date. Once those are in, Where You Stand takes its place.'] },
-      { h: 'Book Out Your Events', p: ['Four steps that handle themselves off your pipeline, no marking needed: work your open leads, collect deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. A step turns green when there is nothing left to do in it; when all four are clear, your events are handled.'] },
+      { h: 'Book Out Your Events', p: ['Four steps for the ongoing pipeline work: work your open leads, collect deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. A step stays open until you do the work and mark it done, your own checkmark that you handled it. It stays done until something new lands in it, a new lead, a deposit due, an event to prep or close, and then it reopens on its own showing just the new item. So the cockpit never goes stale and never marks itself done for you.'] },
       { h: 'As Needed', p: ['The planning tools sit at the bottom: the Event Calendar and your price packages.'] }
     ]);
   }
