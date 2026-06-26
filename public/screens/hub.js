@@ -344,7 +344,7 @@ S.Hub = {
     const bcA      = last(data.bar_cop_audits || []);
     const bcScore  = bcA ? bcA.overall_score : null;
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
-    const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 30 - bcDays) + 'd' : '';
+    const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 7 - bcDays) + 'd' : '';
     // Faint vertical divider between the stats (desktop only; hidden on mobile
     // where the stats stack — see .hub-stat-div in the hub style block).
     const statDiv = '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 10px;"></div>';

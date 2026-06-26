@@ -47,6 +47,71 @@ const AuditUI = {
       + '</div></div>';
   },
 
+  // ── First-audit gate ───────────────────────────────────────────────────────
+  // Until the first audit is run, the request card is replaced by a Getting
+  // Started box so nobody runs an empty audit. Computed audits (Cash, Bar Cop)
+  // show auto-tracked steps + a progress bar and unlock Generate once the data is
+  // there; upload audits (Profit, Revenue) show one confirm checkbox that enables
+  // Generate. After the first audit, the normal weekly request card takes over.
+  firstAuditCard(cfg) {
+    if (cfg.hasLatest || !cfg.gs) {
+      return this.requestCard(cfg.pfx, cfg.title, cfg.desc, cfg.canRun, cfg.hasLatest, cfg.daysLeft, cfg.opts);
+    }
+    const gs = cfg.gs;
+    if (gs.mode === 'auto' && gs.ready) {
+      // Unlocked: a real, active Generate First Audit button.
+      return this.requestCard(cfg.pfx, cfg.title, cfg.desc, true, false, 0, cfg.opts);
+    }
+    return gs.mode === 'check' ? this._gsCheckCard(cfg.pfx, cfg.title, gs)
+                               : this._gsAutoCard(cfg.pfx, cfg.title, gs);
+  },
+  _gsProgBar(done, total) {
+    const pct = total ? Math.round(done / total * 100) : 0;
+    return '<div style="height:6px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;margin:2px 0 14px;">'
+      + '<div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>';
+  },
+  _gsAutoCard(pfx, title, gs) {
+    const steps = gs.steps || [];
+    const doneCount = steps.filter(s => s.done).length;
+    const rows = steps.map((s, i) =>
+      '<div class="au-fa-step" data-go="' + s.go + '" style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:#0D181E;border-radius:8px;cursor:pointer;">'
+      + (s.done
+          ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+          : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + (i + 1) + '</span>')
+      + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(s.label) + '</div>'
+      + (s.done ? '<span style="font-size:11px;color:var(--green);font-weight:700;flex-shrink:0;">Done</span>'
+                : '<span style="color:var(--t4);font-size:13px;flex-shrink:0;">&rsaquo;</span>')
+      + '</div>').join('');
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px;">' + gs.intro + '</div>'
+      + this._gsProgBar(doneCount, steps.length)
+      + rows
+      + '<div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.55;">Finish these and Bar Cop unlocks your first audit. Once unlocked, run it again every 7 days.</div>'
+      + '</div>';
+  },
+  _gsCheckCard(pfx, title, gs) {
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(title) + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + gs.intro + '</div>'
+      + '<label style="display:flex;align-items:center;gap:11px;padding:12px 14px;background:#0D181E;border-radius:8px;cursor:pointer;">'
+      +   '<input type="checkbox" class="bc-check" id="' + pfx + '-fa-check" style="width:18px;height:18px;flex-shrink:0;cursor:pointer;">'
+      +   '<span style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(gs.checkLabel) + '</span>'
+      + '</label>'
+      + (gs.hint ? '<div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.55;">' + gs.hint + '</div>' : '')
+      + '<div style="display:flex;justify-content:flex-end;margin-top:16px;">'
+      +   '<button class="btn btn-primary" id="' + pfx + '-new-btn" disabled style="opacity:0.5;cursor:default;">Generate First Audit</button>'
+      + '</div></div>';
+  },
+  wireFirstAudit(container) {
+    if (!container) return;
+    container.querySelectorAll('.au-fa-step[data-go]').forEach(el =>
+      el.addEventListener('click', () => App.openScreen(el.dataset.go)));
+    container.querySelectorAll('input[id$="-fa-check"]').forEach(cb =>
+      cb.addEventListener('change', () => {
+        const btn = document.getElementById(cb.id.replace('-fa-check', '-new-btn'));
+        if (btn) { btn.disabled = !cb.checked; btn.style.opacity = cb.checked ? '' : '0.5'; btn.style.cursor = cb.checked ? '' : 'default'; }
+      }));
+  },
+
   // ── Landing: View-Full-Audit button + merged Latest-Audit card ─────────────
   // Summary on top, the section breakdown folded in as a compact row list (bar
   // beside the score; one row per section on mobile). View button sits above.

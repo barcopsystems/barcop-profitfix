@@ -18,10 +18,16 @@ S.AuditTracker = {
     const daysLeft = canRun ? 0 : 7 - daysSince;
     const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.requestCard('at', 'Profit Audit', desc, canRun, !!latest, daysLeft)
-      + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
+      + AuditUI.firstAuditCard({ pfx: 'at', title: 'Profit Audit', desc, canRun, hasLatest: !!latest, daysLeft,
+          gs: { mode: 'check',
+            intro: 'Your Profit Audit scores pour cost, food cost, theft and loss, vendors, and prime cost. Drop your P&L or POS sales export and Bar Cop reads a real baseline the day you start.',
+            checkLabel: 'I have a P&L or POS sales export ready to drop',
+            hint: 'One sales report is enough to start. The more you bring, a voids and comps report, invoices, recipe costs, the sharper your first audit.' } })
+      + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
       + '</div>';
     document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
+    AuditUI.wireFirstAudit(this.container);
     this.container.querySelectorAll('.at-view-btn').forEach(btn =>
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>

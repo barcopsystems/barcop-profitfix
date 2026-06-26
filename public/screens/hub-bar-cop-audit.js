@@ -823,11 +823,29 @@ S.HubBarCopAudit = {
     const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    const desc = 'Generate a new audit every week. Bar Cop runs the first one once you have enough logged data to score. It reads your trailing 30 days.';
+    const desc = 'Generate a new audit every week. It reads your trailing 30 days.';
+
+    const pAud = ((App.data && App.data.audits) || []).length >= 1;
+    const rAud = ((App.data && App.data.revenue_audits) || []).length >= 1;
+    const _shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
+    let _span = 0;
+    if (_shifts.length) {
+      const ds = _shifts.map(s => s && s.date).filter(Boolean).sort();
+      if (ds.length) _span = (new Date(ds[ds.length - 1] + 'T00:00:00') - new Date(ds[0] + 'T00:00:00')) / 86400000;
+    }
+    const ctrlWeeks = _span >= 13;
+    const bcReady = pAud && rAud && ctrlWeeks && enough;
 
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.requestCard('bca', 'Bar Cop Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true, notReady: !enough })
-      + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : (enough ? AuditUI.emptyState() : ''))
+      + AuditUI.firstAuditCard({ pfx: 'bca', title: 'Bar Cop Audit', desc, canRun, hasLatest: !!latest, daysLeft, opts: { lockedNoInputs: true, notReady: !enough },
+          gs: { mode: 'auto', ready: bcReady,
+            intro: 'The Bar Cop Audit scores how disciplined your whole operation runs, across cost control, cash, inventory, labor, and recovery. It reads your own logged data, so get these going and it unlocks.',
+            steps: [
+              { label: 'Run your Profit Audit', done: pAud, go: 'audit-tracker' },
+              { label: 'Run your Revenue Audit', done: rAud, go: 'r-audit' },
+              { label: 'Log 2 weeks of Control data', done: ctrlWeeks, go: 'ic-dashboard' }
+            ] } })
+      + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
       + '</div>';
 
@@ -835,6 +853,7 @@ S.HubBarCopAudit = {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     document.getElementById('bca-new-btn')?.addEventListener('click', () => this._generate());
+    AuditUI.wireFirstAudit(this.container);
     this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx, 10)));
     });
