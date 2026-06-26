@@ -56,7 +56,7 @@ S.HubYearEnd = {
       + '<div class="card form-card">'
         + '<div class="card-title">Annual Review</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
-          + '<div class="f" style="width:160px;"><label>Year</label><select id="hy-year">' + yearOpts + '</select></div>'
+          + '<div class="f" style="width:300px;"><label>Year</label><select id="hy-year">' + yearOpts + '</select></div>'
         + '</div>'
         + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
           + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
