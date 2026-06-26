@@ -328,7 +328,10 @@ window.CashEngine = {
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let total = 0; const list = [];
     bookings.forEach(b => {
-      if (b.stage !== 'Booked' && b.stage !== 'Completed') return;
+      // Only Booked events are future committed money. A Completed event's revenue
+      // is already realized through sales and This Week catering, so counting its
+      // balance here too would double it. A collected balance is in hand, not inflow.
+      if (b.stage !== 'Booked' || b.balance_paid_date) return;
       const d = String(b.event_date || '').slice(0, 10);
       if (!d || d < startYmd || d > endYmd) return;
       const bal = Math.max(0, this._eventTotal(b) - (parseFloat(b.deposit_amount) || 0));
