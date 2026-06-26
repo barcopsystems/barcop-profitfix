@@ -34,12 +34,24 @@ S.CashAudit = {
     const canRun = daysSince >= 7;
     const daysLeft = canRun ? 0 : 7 - daysSince;
     const desc = 'A weekly read on your cash health: how hard the cash on your shelves works, how many days your money stays locked, whether the weeks ahead run tight, and if you are holding your vendor terms. It reads straight off your counts, orders, schedule, and bills, nothing to type.';
+    const hasOpening = !!(window.CashEngine && CashEngine.position && CashEngine.position().hasOpening);
+    const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).length;
+    const sales  = ((App.shiftData && App.shiftData.sc_shifts) || []).length;
+    const cashReady = hasOpening && counts >= 2 && sales >= 1;
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.requestCard('ca', 'Cash Audit', desc, canRun, !!latest, daysLeft, { lockedNoInputs: true })
-      + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : AuditUI.emptyState())
+      + AuditUI.firstAuditCard({ pfx: 'ca', title: 'Cash Audit', desc, canRun, hasLatest: !!latest, daysLeft, opts: { lockedNoInputs: true },
+          gs: { mode: 'auto', ready: cashReady,
+            intro: 'Your Cash Audit scores how hard your shelf cash works, how many days your money stays locked, your runway, and your vendor terms. It reads straight off your own data, so set these up and it unlocks.',
+            steps: [
+              { label: 'Set your opening cash balance', done: hasOpening, go: 'c-position' },
+              { label: 'Take two inventory counts', done: counts >= 2, go: 'ic-take-inventory' },
+              { label: 'Import a week of POS sales', done: sales >= 1, go: 'sc-dashboard' }
+            ] } })
+      + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'cash_audit', 'ca', { hideGrade: true }) : '')
       + '</div>';
     document.getElementById('ca-new-btn')?.addEventListener('click', () => this.showIntake());
+    AuditUI.wireFirstAudit(this.container);
     this.container.querySelectorAll('.ca-view-btn').forEach(btn => btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.renderMain()));
   },
