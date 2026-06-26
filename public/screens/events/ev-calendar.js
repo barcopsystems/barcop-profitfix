@@ -113,13 +113,14 @@ S.EventsCalendar = {
     // Month chip styled like the week stepper: gold-tint on the current month, neutral otherwise.
     const t = new Date(today + 'T00:00:00');
     const isCurMonth = (y === t.getFullYear() && m === t.getMonth());
-    const monthChip = '<div style="display:inline-flex;align-items:center;justify-content:center;min-width:150px;padding:7px 14px;border-radius:var(--r2);font-size:13px;font-weight:700;'
-      + (isCurMonth ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(this.monthLabel(y, m)) + '</div>';
+    const nowBadge = isCurMonth ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(this.monthLabel(y, m).toUpperCase()) + nowBadge + '</span>';
     const headRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="evc-prev">&#8249;</button>'
-      + monthChip
-      + '<button class="btn btn-ghost btn-sm" id="evc-next">&#8250;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="evc-today">This Month</button>'
+      + '<button class="btn btn-ghost btn-sm" id="evc-prev" aria-label="Previous month" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + pill
+      + '<button class="btn btn-ghost btn-sm" id="evc-next" aria-label="Next month" style="margin:0;padding:3px 9px;">&rsaquo;</button>'
+      + (isCurMonth ? '' : '<button class="btn btn-ghost btn-sm" id="evc-today" style="margin-left:4px;">This Month</button>')
       + '</div>';
 
     const chipHtml = it => {
@@ -139,7 +140,7 @@ S.EventsCalendar = {
       const ds = this.ymd(y, m, d);
       const items = map[ds] || [];
       cells += '<div class="evcal-cell' + (ds === today ? ' evcal-today' : '') + '" data-day="' + ds + '">'
-        + '<div class="evcal-num">' + d + '</div>' + items.map(chipHtml).join('') + '</div>';
+        + '<div class="evcal-num"' + (ds === today ? ' style="color:var(--green);"' : '') + '>' + d + '</div>' + items.map(chipHtml).join('') + '</div>';
     }
     const grid = '<div class="evcal-grid">' + cells + '</div>';
 
@@ -151,7 +152,8 @@ S.EventsCalendar = {
       ? '<div style="color:var(--t3);font-size:13px;padding:10px 2px;">Nothing on the calendar this month. Add a date or book an event.</div>'
       : agendaDays.map(([ds, d, items]) => '<div class="card" style="margin-bottom:8px;"><div style="font-weight:700;color:var(--t1);margin-bottom:6px;">' + monShort + ' ' + d + (ds === today ? ' &middot; Today' : '') + '</div>' + items.map(chipHtml).join('') + '</div>').join('')) + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + headRow + grid + agenda
+    this.container.innerHTML = '<div class="screen">' + headRow
+      + '<div class="card">' + grid + agenda + '</div>'
       + '<div style="margin:16px 0 24px;"><button class="btn btn-primary" id="evc-add">Add New Date</button></div>'
       + '</div>';
     this.wire();
@@ -178,13 +180,13 @@ S.EventsCalendar = {
     const e = id ? this.entries().find(x => x.id === id) : null;
     const cl = (e && e.checklist) || {};
     const typeOpts = '<option value="">Select type...</option>' + this.TYPES.map(t => '<option' + (((e && e.type === t) || (!e && presetType === t)) ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
-    const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> ' + label + '</label>';
+    const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" class="bc-check" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + '/> ' + label + '</label>';
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (id ? 'Edit Date' : 'Add New Date') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f"><label>Date</label><input type="date" id="evcf-date" value="' + esc(e?.date || presetDate || '') + '"/></div>'
-        + '<div class="f"><label>Name</label><input type="text" id="evcf-name" value="' + esc(e?.name || presetName || '') + '" placeholder="Valentine\'s Day"/></div>'
-        + '<div class="f"><label>Type</label><select id="evcf-type" class="form-input">' + typeOpts + '</select></div>'
+        + '<div class="f" style="flex:1 1 140px;"><label>Date</label><input type="date" id="evcf-date" value="' + esc(e?.date || presetDate || '') + '"/></div>'
+        + '<div class="f" style="flex:1 1 140px;"><label>Name</label><input type="text" id="evcf-name" value="' + esc(e?.name || presetName || '') + '" placeholder="Valentine\'s Day"/></div>'
+        + '<div class="f" style="flex:1 1 140px;"><label>Type</label><select id="evcf-type" class="form-input">' + typeOpts + '</select></div>'
       + '</div>'
       + '<div class="sh" style="margin:6px 0 4px;">Planning Checklist</div>'
       + '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:8px;">'
