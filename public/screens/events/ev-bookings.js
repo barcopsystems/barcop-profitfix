@@ -484,6 +484,7 @@ S.EventsBookings = {
         + '<button class="btn btn-ghost btn-sm" id="eb-edit">Edit Details</button>'
         + '<button class="btn btn-ghost btn-sm eb-runsheet-open">Run Sheet</button>'
         + '<button class="btn btn-ghost btn-sm" id="eb-q-pdf">Quote PDF</button>'
+        + '<button class="btn btn-ghost btn-sm" id="eb-agreement">Agreement</button>'
       + '</div></div>';
 
     const dispRow = (label, val) => '<div class="f"><label>' + label + '</label><div style="font-size:13px;color:var(--t1);">' + (val ? esc(val) : '<span style="color:var(--t4);">-</span>') + '</div></div>';
@@ -640,6 +641,7 @@ S.EventsBookings = {
     document.getElementById('eb-viewback')?.addEventListener('click', () => { this._viewStep = null; this.renderDetail(id); });
     document.getElementById('eb-edit')?.addEventListener('click', () => this.showForm(id));
     document.getElementById('eb-q-pdf')?.addEventListener('click', () => this.quotePDF(this.bookings().find(x => x.id === id)));
+    document.getElementById('eb-agreement')?.addEventListener('click', () => this.agreementModal(id));
     // Quote
     this.container.querySelectorAll('.eb-rc-pill').forEach(p => p.addEventListener('click', () => this.applyRateCard(id, p.dataset.rc)));
     document.getElementById('eb-q-rc')?.addEventListener('change', e => this.applyRateCard(id, e.target.value));
@@ -968,6 +970,77 @@ S.EventsBookings = {
     Promise.resolve(App.exportPDF({ title: 'Run Sheet - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
   },
 
+  // ── Event Agreement (the terms worksheet the client signs to lock the date) ─
+  DEFAULT_AGREEMENT_TERMS:
+      'Deposit: The deposit shown above is due to confirm this booking and is non-refundable. Your date and space are not held until the deposit is received.\n\n'
+    + 'Final balance: The remaining balance is due on or before the event date.\n\n'
+    + 'Final guest count: A final guaranteed count is due several days before the event. You are billed for the guaranteed count or the actual count, whichever is higher.\n\n'
+    + 'Cancellation: Cancellations made well ahead of the date may refund any payment beyond the deposit. Closer to the date, payments are non-refundable.\n\n'
+    + 'Service charge and tax: A service charge and applicable sales tax are added to the food and beverage total, as shown above.\n\n'
+    + 'Damage and overages: You are responsible for any damage to the space and for charges beyond what is quoted, billed after the event.',
+  agreementTerms() { try { const v = localStorage.getItem('event_agreement_terms'); return (v != null && v !== '') ? v : this.DEFAULT_AGREEMENT_TERMS; } catch (e) { return this.DEFAULT_AGREEMENT_TERMS; } },
+
+  agreementModal(id) {
+    const b = this.bookings().find(x => x.id === id);
+    if (!b) return;
+    const p = this.quoteParts(b);
+    const money = [['Quoted Total', App.fmtCurrency(p.total)]];
+    if (b.deposit_amount) money.push(['Deposit to Confirm', App.fmtCurrency(b.deposit_amount)]);
+    money.push(['Balance Due', App.fmtCurrency(this.balanceDue(b))]);
+    const moneyHtml = money.map(r => '<div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;padding:3px 0;"><span style="color:var(--t3);">' + r[0] + '</span><span style="color:var(--t1);font-weight:600;">' + r[1] + '</span></div>').join('');
+    const sub = [b.event_date ? this.fmtDate(b.event_date) : '', esc(b.event_time || ''), esc(b.space || ''), b.party_size ? b.party_size + ' guests' : ''].filter(Boolean).join('  &middot;  ');
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Event Agreement</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(this.title(b)) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin:2px 0 12px;">' + sub + '</div>'
+      + '<div style="background:var(--input);border-radius:6px;padding:10px 12px;margin-bottom:14px;">' + moneyHtml + '</div>'
+      + '<div class="f" style="width:100%;"><label>Terms</label><textarea id="ag-terms" class="notes-ta" rows="10">' + esc(this.agreementTerms()) + '</textarea></div>'
+      + '<div style="font-size:11px;color:var(--t4);line-height:1.6;margin-top:8px;">These terms are a starting point. Set them to your own policy and have your attorney review the agreement before you rely on it. Bar Cop is a software tool, not legal advice.</div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ag-print">Save and Print</button>'
+      +   '<button class="btn btn-ghost" id="ag-cancel">Cancel</button></div></div>';
+    App.openModal(html, { id: 'eb-agreement-modal', maxWidth: 680, noClose: true });
+    document.getElementById('ag-cancel')?.addEventListener('click', () => App.closeModal('eb-agreement-modal'));
+    document.getElementById('ag-print')?.addEventListener('click', () => {
+      const terms = document.getElementById('ag-terms')?.value || '';
+      try { localStorage.setItem('event_agreement_terms', terms); } catch (e) {}
+      App.closeModal('eb-agreement-modal');
+      this.printAgreement(b, terms);
+    });
+  },
+
+  printAgreement(b, terms) {
+    if (!b) return;
+    if (App.demoBlock && App.demoBlock('Event Agreement')) return;
+    const barName = (App.data && App.data.settings && App.data.settings.bar_name) || 'Our Venue';
+    const p = this.quoteParts(b);
+    const money = n => App.fmtCurrency(n);
+    const lines = [['Event', this.title(b)]];
+    if (b.event_type) lines.push(['Type', b.event_type]);
+    if (b.event_date) lines.push(['Date', this.fmtDate(b.event_date) + (b.event_time ? ' ' + b.event_time : '')]);
+    if (b.space) lines.push(['Space', b.space]);
+    if (b.party_size) lines.push(['Guest Count', String(b.party_size)]);
+    lines.push(['F&B Subtotal', money(p.subtotal)]);
+    if (p.svcPct) lines.push(['Service Charge (' + p.svcPct + '%)', money(p.service)]);
+    if (p.taxPct) lines.push(['Tax (' + p.taxPct + '%)', money(p.tax)]);
+    lines.push(['Quoted Total', money(p.total)]);
+    if (b.deposit_amount) lines.push(['Deposit to Confirm', money(b.deposit_amount)]);
+    lines.push(['Balance Due', money(this.balanceDue(b))]);
+    const rowsHtml = lines.map(r => '<tr><td style="color:var(--t3);">' + esc(r[0]) + '</td><td style="text-align:right;font-weight:600;">' + esc(r[1]) + '</td></tr>').join('');
+    const sigBlock = (label) => '<div style="flex:1;min-width:200px;"><div style="border-bottom:1px solid var(--t1);height:34px;"></div><div style="font-size:11px;color:var(--t3);margin-top:4px;">' + label + '</div></div>';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:680px;background:var(--surface);padding:24px;';
+    wrap.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">Event Agreement</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Between ' + esc(barName) + ' and ' + esc(b.contact_name || 'the client') + ', prepared ' + this.fmtDate(App.todayLocal()) + '.</div>'
+      + '<table class="tbl"><tbody>' + rowsHtml + '</tbody></table>'
+      + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:18px 0 6px;">Terms</div>'
+      + '<div style="font-size:12px;color:var(--t1);line-height:1.7;white-space:pre-wrap;">' + esc(terms || this.agreementTerms()) + '</div>'
+      + '<div style="display:flex;gap:30px;flex-wrap:wrap;margin-top:30px;">' + sigBlock('Client signature and date') + sigBlock(esc(barName) + ' signature and date') + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);line-height:1.6;margin-top:18px;">This is a worksheet prepared from your inputs, not a contract or legal advice. Have it reviewed by your attorney before you rely on it.</div>'
+      + '</div></div>';
+    document.body.appendChild(wrap);
+    Promise.resolve(App.exportPDF({ title: 'Event Agreement - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
+  },
+
   worksheet() {
     App.printBlankSheet({
       title: 'Booking Inquiry Pad',
@@ -991,7 +1064,8 @@ S.EventsBookings = {
       { h: 'The Active Booking', p: ['Open a booking and the page follows its stage. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
       { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; it stays in the pipeline and you can reopen it.'] },
       { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the per head and guest count, the F&B minimum if you hold one, and your service charge and tax. Bar Cop builds the quote underneath: F&B subtotal, then service charge and tax on top, to the quoted total. Then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the full breakdown in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
-      { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
+      { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard, and booked balances feed your Cash Forecast as money coming in.'] },
+      { h: 'Agreement', p: ['Agreement, on the booking header, builds an event agreement from the booking: the event details, the money, your terms, and signature lines for you and the client. The terms start from a sensible template you edit once to your own policy, and Bar Cop remembers them for the next event. Save and Print gives you a clean copy to send for signature. It is a worksheet, not a contract; have your attorney review it.'] },
       { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
       { h: 'Run Sheet', p: ['Run Sheet is what the kitchen and floor work the event off: the timeline, the food and bar, allergies and dietary, the room setup, AV and rentals, the guaranteed headcount and when the final count is due, and who runs point on site. Open it from the booking header or the Booked stage, fill it in, and Print Run Sheet to hand the team a clean copy.'] },
       { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
