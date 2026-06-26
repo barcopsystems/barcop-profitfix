@@ -419,7 +419,7 @@ S.Hub = {
       // the divider lines up flush with the button's left edge.
       + '<div style="flex:1 1 16px;min-width:0;"></div>'
       + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
-      +   statDiv
+      +   '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin-right:14px;"></div>'
       +   tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
@@ -1192,13 +1192,17 @@ S.Hub = {
     if (window.BarCopBriefing) BarCopBriefing.attach(document.getElementById('hub-briefing-slot'), this._briefingData);
 
     // Line the Bar Cop Audit divider up flush with the Briefing button's left
-    // edge: both right-anchor to the card's right padding, so matching the audit
-    // cell's width to the mounted button's width aligns their left edges. rAF so
-    // the button is laid out before we measure.
+    // edge: both right-anchor to the card's right padding, so a right margin sized
+    // to the width difference shifts the whole audit cell (divider + score, gap
+    // intact) left until the divider sits under the button's left edge. rAF so the
+    // button is laid out before we measure.
     requestAnimationFrame(() => {
       const slot = document.getElementById('hub-briefing-slot');
       const cell = document.getElementById('hub-audit-cell');
-      if (slot && cell && slot.offsetWidth) cell.style.minWidth = slot.offsetWidth + 'px';
+      if (slot && cell && slot.offsetWidth) {
+        const extra = slot.offsetWidth - cell.offsetWidth;
+        cell.style.marginRight = (extra > 0 ? extra : 0) + 'px';
+      }
     });
 
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
