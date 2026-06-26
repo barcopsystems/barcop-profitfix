@@ -3087,6 +3087,18 @@ const App = {
     return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
   },
 
+  // Strip filename-illegal characters (Windows + macOS) from a string before it
+  // goes into a download filename, so a bar or venue name like "Mike's Bar /
+  // Grill" never produces an invalid name and a silently failed download.
+  // Collapses whitespace; falls back to 'Bar Cop' if nothing usable is left.
+  fileSafe(s) {
+    const cleaned = String(s == null ? '' : s)
+      .replace(/[\/\\:*?"<>|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned || 'Bar Cop';
+  },
+
   // jsPDF's built-in fonts only encode Latin-1. A single character above U+00FF
   // (e.g. the "->" arrow, the trend triangles) corrupts the WHOLE string into
   // garbage ("&M&a&y&..."), so map the glyphs the app actually uses to ASCII and
@@ -3245,6 +3257,7 @@ const App = {
   },
 
   async _savePDF(doc, filename) {
+    filename = App.fileSafe(filename);
     const blob = doc.output('blob');
     if (window.showSaveFilePicker) {
       try {
