@@ -321,6 +321,9 @@ window.CashEngine = {
 
   // Event balance payments collected around the event date (the deposit is
   // already in hand). Booked + completed only.
+  // The all-in event total (F&B subtotal + service charge + tax), from the Events
+  // section so it matches what the booking shows; falls back to the stored field.
+  _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b.quoted_total) || 0; } },
   eventInflow(startYmd, endYmd) {
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let total = 0; const list = [];
@@ -328,10 +331,29 @@ window.CashEngine = {
       if (b.stage !== 'Booked' && b.stage !== 'Completed') return;
       const d = String(b.event_date || '').slice(0, 10);
       if (!d || d < startYmd || d > endYmd) return;
-      const bal = Math.max(0, (parseFloat(b.quoted_total) || 0) - (parseFloat(b.deposit_amount) || 0));
+      const bal = Math.max(0, this._eventTotal(b) - (parseFloat(b.deposit_amount) || 0));
       if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d }); }
     });
     return { total, list };
+  },
+
+  // Booked event money for the forecast window: the balances still coming in, plus
+  // the deposits already in hand against future events (cash you hold but owe
+  // service for, so it is shown as context, never as safe to spend).
+  committedEventCash(numWeeks) {
+    numWeeks = numWeeks || 13;
+    const start = this._mondayOf(new Date());
+    const end = this._addDays(start, numWeeks * 7 - 1);
+    const ev = this.eventInflow(start, end);
+    const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
+    let deposits = 0;
+    bookings.forEach(b => {
+      if (b.stage !== 'Booked' || !b.deposit_paid_date) return;
+      const d = String(b.event_date || '').slice(0, 10);
+      if (!d || d < start) return;   // future booked events only
+      deposits += parseFloat(b.deposit_amount) || 0;
+    });
+    return { balanceTotal: ev.total, list: ev.list, deposits };
   },
 
   // Every bill due in a window: the dated records you have, PLUS future recurring
