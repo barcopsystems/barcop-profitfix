@@ -255,7 +255,7 @@ S.HubOperatingExpenses = {
   },
 
   _recurTag() {
-    return ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;white-space:nowrap;">Recurring</span>';
+    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring</span>';
   },
 
   // One real-record row: Date, Category (+Recurring tag), Vendor, Amount, actions.
@@ -274,7 +274,7 @@ S.HubOperatingExpenses = {
       if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button> ';
       actions += edit + del;
     } else {
-      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Duplicate</button> ' + edit + del;
+      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button> ' + edit + del;
     }
     return '<tr>'
       + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
@@ -376,7 +376,7 @@ S.HubOperatingExpenses = {
         +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
         +   '<div class="f" style="width:230px;"><label>Category</label><select id="oexa-cat">' + catOpts + '</select></div>'
         +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
-        +   '<div class="f" style="width:140px;"><label>Amount ($)</label><input type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div>'
+        +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
         + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
@@ -629,7 +629,7 @@ S.HubOperatingExpenses = {
       +   '<div class="f"><label>Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
       +   '<div class="f"><label>Category</label><select id="oex-f-cat">' + catOpts + '</select></div>'
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
-      +   '<div class="f"><label>Amount ($)</label><input type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div>'
+      +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + recurHtml
       + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oex-f-notes" placeholder="Optional context for the bookkeeper">' + esc(rec.notes || '') + '</textarea></div></div>'

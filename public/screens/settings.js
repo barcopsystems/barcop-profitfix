@@ -412,8 +412,9 @@ S.HubSettings = {
 
     // Operating expenses: a realistic monthly set across the sample window so the
     // Books income statement shows true operating costs, not zeros.
+    // Fixed overhead (Occupancy, Utilities, Insurance) is seeded as recurring
+    // vendor bills below, so it is NOT duplicated here as anonymous variable rows.
     const opexMonthly = [
-      ['Occupancy (Rent, Property Tax)', 12000], ['Utilities', 2600], ['Insurance', 1500],
       ['Marketing and Advertising', 1200], ['Professional Fees', 650], ['Bank and Credit Card Fees', 2100],
       ['Licenses and Permits', 300], ['Software and Subscriptions', 520], ['Other', 380]
     ];
@@ -432,15 +433,15 @@ S.HubSettings = {
       { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
     );
-    // The major fixed overhead as forward recurring bills, so the 13-week survival
-    // forecast carries real cash-out and the reserve target is sized off the real
-    // nut. Anchored to next month so they never overlap the dated historical opex
-    // above (which already covers the 90-day window for Books and the P&L). Books
-    // shows these as the recurring bills going forward; the forecast projects them.
+    // The major fixed overhead as recurring vendor bills, anchored at the start of
+    // the window like the Bar Cop and Sonitrol bills above. catchUpRecurring fills
+    // each elapsed month (so Books and the P&L read them) and the survival forecast
+    // projects them forward and sizes the reserve off the real nut. These ARE the
+    // Occupancy/Utilities/Insurance lines, with no anonymous variable duplicate.
     operatingExpenses.push(
-      { id:uid(), date:monthAnchor(-1, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(-1, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(-1, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() }
+      { id:uid(), date:monthAnchor(2, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() }
     );
     App.data.operating_expenses = operatingExpenses;
 
