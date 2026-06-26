@@ -414,12 +414,16 @@ S.Hub = {
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
       // The three figures above are dollars (the money line); the Bar Cop Audit is
       // a health score, not money, so a flex spacer pushes it to the right under
-      // the Briefing button — money line left, operation-health read right.
+      // the Briefing button — money line left, operation-health read right. The
+      // cell's width is matched to the Briefing button after mount (see below) so
+      // the divider lines up flush with the button's left edge.
       + '<div style="flex:1 1 16px;min-width:0;"></div>'
-      + statDiv
-      + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
+      + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
+      +   statDiv
+      +   tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
+      + '</div>'
       + '</div></div>';
 
     // ── Needs Attention band: the fires (alerts) + section-less cadence nudges
@@ -1186,6 +1190,16 @@ S.Hub = {
 
     // Mount the Bar Cop Briefing button (weekly cross-system narrative).
     if (window.BarCopBriefing) BarCopBriefing.attach(document.getElementById('hub-briefing-slot'), this._briefingData);
+
+    // Line the Bar Cop Audit divider up flush with the Briefing button's left
+    // edge: both right-anchor to the card's right padding, so matching the audit
+    // cell's width to the mounted button's width aligns their left edges. rAF so
+    // the button is laid out before we measure.
+    requestAnimationFrame(() => {
+      const slot = document.getElementById('hub-briefing-slot');
+      const cell = document.getElementById('hub-audit-cell');
+      if (slot && cell && slot.offsetWidth) cell.style.minWidth = slot.offsetWidth + 'px';
+    });
 
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
