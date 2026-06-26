@@ -1376,12 +1376,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1454,10 +1454,14 @@ const App = {
     ] },
     'operating-expenses': { title: 'How Operating Expenses Work', sections: [
       { h: 'What this page is', p: ['Where you log the bills that are not COGS or hourly labor: rent, utilities, insurance, marketing, professional fees, software, and the rest. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
-      { h: 'Current vs History', p: ['Current shows this month and next month, each split into Recurring (the same bill every month) and Variable (the ones that change). Next month lists your recurring bills as Expected before they post. History has the full log by date range plus the by-category breakdown. Export PDF lives on both.'] },
+      { h: 'This month and next', p: ['The page shows this month and next month, each split into Recurring (the same bill every month) and Variable (the ones that change). Next month lists your recurring bills as Expected before they post. The full back-record lives on Expense History, its own page in the sidebar.'] },
       { h: 'Recurring bills', p: ['Check Recurring on a bill that hits the same amount every month, rent, insurance, a software subscription, and Bar Cop logs it automatically each month and projects it onto your Cash Forecast. By default it recurs until you stop it, which is how most bills run. Only fill in "Ends after" when a bill stops after a fixed number of payments. To cancel one, hit Stop on the bill or on its Expected next-month row: past months stay on your books and it drops off going forward, including the Forecast. For a bill that moves around each month, like a utility, leave it Variable and use Repeat to copy last month forward and set the new amount.'] },
       { h: 'Importing', p: ['Switch the Add form to Import File and drop a CSV or Excel export. Map the columns once (date and amount are required), and the rows import; anything already logged is skipped.'] },
       { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
+    ] },
+    'expense-history': { title: 'How Expense History Works', sections: [
+      { h: 'What this page is', p: ['The full record of every operating expense you have logged, beyond the current and next month that live on Operating Expenses. The by-category breakdown sits on top, the dated log below.'] },
+      { h: 'Filter and export', p: ['The range chips, This Month, Last Month, Year to Date, Last 12 Months, or All Time, scope both the log and the category totals. Export PDF saves the full filtered list. You can still edit or delete any past entry right from its row.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, and the service periods you run. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
@@ -1658,6 +1662,7 @@ const App = {
         'year-end':           () => S2.HubYearEnd && S2.HubYearEnd.open(),
         'permits':            () => S2.HubPermits && S2.HubPermits.open(),
         'operating-expenses': () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open(),
+        'expense-history':    () => S2.HubExpenseHistory && S2.HubExpenseHistory.open(),
         'books-help':         () => S2.HubBooksHelp && S2.HubBooksHelp.open(),
         'getting-started':    () => S2.HubGettingStarted && S2.HubGettingStarted.open(),
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
