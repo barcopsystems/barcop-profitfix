@@ -392,7 +392,8 @@ S.Hub = {
     const pfCurrent= (wkMods.find(m => m.name === 'Profit')  || {}).current;
     const rvCurrent= (wkMods.find(m => m.name === 'Revenue') || {}).current;
 
-    // ── Top card: the money line (Opportunity · Recovered · Trapped Cash · Bar Cop) ──
+    // ── Top card: the money line (Opportunity · Recovered · Trapped Cash) on the
+    //    left, the Bar Cop Audit health score pushed right under the Briefing. ──
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
@@ -411,6 +412,10 @@ S.Hub = {
       + tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
+      // The three figures above are dollars (the money line); the Bar Cop Audit is
+      // a health score, not money, so a flex spacer pushes it to the right under
+      // the Briefing button — money line left, operation-health read right.
+      + '<div style="flex:1 1 16px;min-width:0;"></div>'
       + statDiv
       + tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
