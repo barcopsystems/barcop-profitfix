@@ -11,7 +11,7 @@ S.RevenueDashboard = {
       { p: ['The Revenue Recovery landing runs the whole loop on one page: how much you have recovered up top, where the top line is leaking right now and your numbers against target just under it, your forecast and audit below that, and the experiments you are running at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Revenue.'] },
       { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you added back to the top line since each fix started running. Realized to date, not a projection. A figure appears once a couple of weeks of after-data exist and firms up from there.'] },
       { h: 'Where You\'re Leaking Now', p: ['Your revenue gaps as plain text, biggest dollar first. Check average and menu mix dollarize at this week\'s cover count; the rest read as a Review row you tap to work on their own screen. Tap any row to open its fix process.'] },
-      { h: 'This Week vs Target', p: ['Your check average, labor cost, and revenue per labor hour from your latest confirmed week, each against its own target. Green is hitting it, red is missing it. Tap Bar Cop Insights for a written read on where the numbers are heading.'] },
+      { h: 'This Week vs Target', p: ['Your check average, labor cost, and revenue per labor hour from your latest confirmed week, each against its own target. Green is hitting it, red is missing it. Tap Bar Cop Briefing for a written read on where the numbers are heading.'] },
       { h: 'Revenue Forecast and Revenue Audit', p: ['Revenue Forecast shows what you expect to bring in for the coming week so Labor can build the schedule to a real number. Revenue Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
       { h: 'Initiative Tracker', p: ['Log a revenue experiment and Bar Cop measures whether it actually moved a number. Hit Start Initiative, name it, set the start date, and tag the Type so the list reads at a glance: Menu Change, Promotion, Service Change, Operational Change, or Other. Pick the Watch Metric you expect to move, Total Revenue, Covers, Check Average, or Labor %. Labor % is lower-is-better, so a drop counts as a win and shows gold; on every other metric a rise is the win.', 'Once it is running, Bar Cop averages the eight weeks before the start date against the eight weeks after and shows the lift on that watched metric, so the number is your own before-and-after, not a guess. When an experiment has run its course, hit Mark Complete to move it out of the active list and into Completed below, where the final lift stays on record. Delete drops one you do not want to track.'] }
     ]);
@@ -37,7 +37,7 @@ S.RevenueDashboard = {
 
     const leak = FixPanel.leakRowsText('revenue');
     const leakBody = leak || DashUI.ph('Run a Revenue Audit and log a week, and your biggest revenue gaps rank here, dollar first.');
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="r-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>';
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="r-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
     const metricsBody = DashUI.metricsPanel(this.metricsRows(latest, t), 'Confirm a week to see your numbers');
 
     container.innerHTML = '<div class="screen">'
@@ -153,16 +153,16 @@ S.RevenueDashboard = {
     DashUI.wireQuick(container);
   },
 
-  // Bar Cop Insights — a written read on the recent revenue + labor trend.
+  // Bar Cop Briefing — a written read on the recent revenue + labor trend.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
+    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
-    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Insights', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
+    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
     const rec = DashUI._insRec('revenue');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
     const btn = document.getElementById('r-insights-btn');
     const orig = btn ? btn.textContent : '';
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
 
     const t = App.data.revenue_settings?.targets || {};
     const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
@@ -188,15 +188,15 @@ S.RevenueDashboard = {
     fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Insights', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
         const text = data.content?.[0]?.text;
-        if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
+        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
         const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('revenue', html));
+        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('revenue', html));
         restore();
       })
-      .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
   }
 };
