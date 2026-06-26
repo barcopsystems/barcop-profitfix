@@ -831,7 +831,7 @@ S.RecoveryPlaybook = {
               { leak: 'Prime cost', capture: 'This Week rolls up COGS and labor for you', show: 'This Week + Profit Audit + the Hub', fixLabel: 'Prime Cost system', screen: 'profit-fix', focus: 'prime-cost' }
             ] },
             { t: 'p', text: 'The paper a system still needs lives inside it too. The signable pour standards policy, the theft and loss policy, the corrective action template, the portion audit, and the vendor terms checklist all download right from the step that calls for them in your Profit Fix System.' },
-            { t: 'p', text: 'And you do not read the numbers alone. Bar Cop Outlook writes a plain-language narrative on every audit, and Bar Cop Insights reads your trend on the Profit dashboard, so the story behind the numbers is already written for you.' }
+            { t: 'p', text: 'And you do not read the numbers alone. Bar Cop Briefing writes a plain-language narrative on every audit and reads your trend on the Profit dashboard, so the story behind the numbers is already written for you.' }
           ]
         },
         {
@@ -1210,7 +1210,7 @@ S.RecoveryPlaybook = {
               { leak: 'Server performance', capture: 'Server Check by server', show: 'Server Check scorecard', fixLabel: 'Server Performance system', screen: 'r-fix', focus: 'server-performance' }
             ] },
             { t: 'p', text: 'The paper a system still needs lives inside it too. The upsell standards and scripts, the pre-shift briefing, the table visit audit, the menu engineering review, and the quarterly pricing checklist all download right from the step that calls for them in your Revenue Fix System. Events and catering have their own section, and confirmed bookings feed your week and the Revenue Audit automatically.' },
-            { t: 'p', text: 'And you do not read the numbers alone. Bar Cop Outlook writes a plain-language narrative on every audit, and Bar Cop Insights reads your trend on the Revenue dashboard, so the story behind the numbers is already written for you.' }
+            { t: 'p', text: 'And you do not read the numbers alone. Bar Cop Briefing writes a plain-language narrative on every audit and reads your trend on the Revenue dashboard, so the story behind the numbers is already written for you.' }
           ]
         },
         {
