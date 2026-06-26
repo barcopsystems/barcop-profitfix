@@ -53,12 +53,13 @@ S.CashDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['trapped', 'order', 'week', 'terms'],
+  ORDER: ['audit', 'trapped', 'order', 'week', 'terms'],
   _META: {
-    trapped: { n: 1, title: 'Free up trapped cash',     sub: 'Dead stock and overstock to run down' },
-    order:   { n: 2, title: 'Order to par, not to fear', sub: 'Buy what you use, not what you fear' },
-    week:    { n: 3, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
-    terms:   { n: 4, title: 'Pay on terms',              sub: 'Hold cash to the vendor due date' }
+    audit:   { n: 1, title: 'Run the Cash audit',        sub: 'Score the week and update your Cash Fix' },
+    trapped: { n: 2, title: 'Free up trapped cash',      sub: 'Dead stock and overstock to run down' },
+    order:   { n: 3, title: 'Order to par, not to fear', sub: 'Buy what you use, not what you fear' },
+    week:    { n: 4, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
+    terms:   { n: 5, title: 'Pay on terms',              sub: 'Hold cash to the vendor due date' }
   },
   // Cash steps are reviewed and acted on, then marked. Nothing auto-completes
   // off data (you cannot infer "I ran down the dead stock" from a number), so
@@ -120,7 +121,7 @@ S.CashDashboard = {
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
-      + this.statusStrip(st)
+      + this.asNeeded()
       + '</div>';
     this.wire();
   },
@@ -163,18 +164,19 @@ S.CashDashboard = {
         + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
         +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--gold);">' + App.fmtCurrency(t.total, 0) + '</span>'
         +   '<span style="font-size:13px;color:var(--t2);">trapped on your shelves</span>'
-        + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:7px;">'
-        +   App.fmtCurrency(t.dead, 0) + ' in dead stock &middot; ' + App.fmtCurrency(t.overPar, 0) + ' sitting above par. Free it up in the steps below.'
         + '</div></div>';
     }
     const freedLine = f.building
       ? '<span style="color:var(--t3);">Cash Freed builds here as you count, the drop in trapped cash from your first weeks.</span>'
       : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> in cash freed so far, trapped cash down from your first weeks.</span>';
+    const showIns = t.hasData || (st.survival && st.survival.hasData);
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Cash Scoreboard</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">'
+      +   '<div class="card-title" style="margin:0;">Cash Scoreboard</div>'
+      +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>' : '')
+      + '</div>'
       + heroBody
-      + '<div style="font-size:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">' + freedLine + '</div>'
+      + '<div style="font-size:12px;margin-top:10px;">' + freedLine + '</div>'
       + this.survivalStrip(st)
       + '</div>';
   },
@@ -185,11 +187,8 @@ S.CashDashboard = {
   // is truly safe to spend, off the 13-week forecast. Color is meaning only.
   survivalStrip(st) {
     const sf = st.survival, pos = st.position;
-    const wrap = (inner, showBtn) => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Will You Make It To Next Quarter?</div>'
-      +   (showBtn ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>' : '')
-      + '</div>'
+    const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Will You Make It To Next Quarter?</div>'
       + inner + '</div>';
     if (!sf || !sf.hasData) {
       return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
@@ -205,7 +204,7 @@ S.CashDashboard = {
         +   (tw > 0 ? tw + ' week' + (tw === 1 ? '' : 's') + ' have more cash going out than coming in. ' : 'Your cash timing looks clear. ')
         +   'Set your opening balance to see your real runway and the week you would run thin.</div>'
         + '</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>', true);
+        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
     }
     const low = sf.lowPoint;
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
@@ -216,7 +215,7 @@ S.CashDashboard = {
       + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
       + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
       + '</div>'
-      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>', true);
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
   },
 
   weekSelector() {
@@ -257,6 +256,14 @@ S.CashDashboard = {
 
   stepStatus(k) {
     const st = this._st;
+    if (k === 'audit') {
+      const ca = App.latestEvent ? App.latestEvent(App.data.cash_audits || []) : null;
+      if (ca && ca.overall_score != null) {
+        const ds = ca.date ? Math.floor((Date.now() - new Date(ca.date + 'T00:00:00').getTime()) / 86400000) : null;
+        return 'Last scored ' + ca.overall_score + (ds != null ? (ds <= 0 ? ', today' : ', ' + ds + 'd ago') : '');
+      }
+      return this._META.audit.sub;
+    }
     if (k === 'trapped') {
       if (!st.trapped.hasData) return this._META.trapped.sub;
       return st.trapped.total > 0 ? App.fmtCurrency(st.trapped.total, 0) + ' to free up' : 'Nothing trapped right now';
@@ -308,6 +315,15 @@ S.CashDashboard = {
       '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;">'
       + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(label) + '</div>'
       + '<div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;">' + right + '</div></div>';
+
+    if (k === 'audit') {
+      const ca = App.latestEvent ? App.latestEvent(App.data.cash_audits || []) : null;
+      const lead = ca && ca.overall_score != null
+        ? 'Your last Cash audit scored <strong style="color:var(--gold);">' + ca.overall_score + '</strong>. Run a fresh one to score this week, then open the Cash Fix and check off what you have already handled so the steps below read where you really are.'
+        : 'Start the week here. The Cash audit scores your liquidity and feeds the fix steps. Run it, then open the Cash Fix and mark what you have handled.';
+      return explain(lead)
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-audit">Cash Audit</button><button class="btn btn-ghost btn-sm" data-go="c-fix">Cash Fix</button>' + this.markBtn('audit', 'Mark Done'));
+    }
 
     if (k === 'trapped') {
       const t = st.trapped;
@@ -386,21 +402,16 @@ S.CashDashboard = {
   // The three numbers an operator lives by: what is truly free to spend, how long
   // the cash lasts, and how many days it stays locked in the cycle. Trapped cash
   // already headlines the scoreboard above, so it is not repeated here.
-  statusStrip(st) {
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    const sf = st.survival, pos = st.position, cyc = st.cycle;
-    const safe = pos && pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-';
-    const runway = sf && sf.hasOpening ? this.runwayLabel(sf.runway) : (sf && sf.hasData ? sf.tightWeeks + ' tight' : '-');
-    const locked = cyc && cyc.hasData ? Math.round(cyc.cycle) + 'd' : '-';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('Safe to Spend', safe, (pos && pos.hasOpening && pos.safe < 0) ? 'warn' : '')
-      + div
-      + item('Runway', runway, (sf && sf.hasOpening && sf.runway != null) ? 'warn' : '')
-      + div
-      + item('Cash Locked', locked, (cyc && cyc.hasData && cyc.cycle > 30) ? 'warn' : '')
-      + '</div>';
+  // ── As needed: the deeper reads an operator opens when they want them, not
+  //    part of the weekly close. Capital Efficiency (turns and weeks on hand) and
+  //    the Cash Bridge (where the profit went) live here, off the main flow. ────
+  asNeeded() {
+    return '<div style="margin-top:24px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">As Needed</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +   '<button class="btn btn-ghost btn-sm" data-go="c-capital">Capital Efficiency</button>'
+      +   '<button class="btn btn-ghost btn-sm" data-go="c-bridge">Cash Bridge</button>'
+      + '</div></div>';
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
