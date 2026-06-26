@@ -3147,7 +3147,7 @@ const App = {
   // sub-headers, and tables — in document order, skipping no-print chrome.
   _collectPDFBlocks(root) {
     const blocks = [];
-    root.querySelectorAll('.card-title, .sh, .calc-item, table.tbl, .empty-title, .empty-sub, .alert-text').forEach(node => {
+    root.querySelectorAll('.card-title, .sh, .pdf-para, .calc-item, table.tbl, .empty-title, .empty-sub, .alert-text').forEach(node => {
       if (node.closest('.no-print')) return;
       if (node.matches('table.tbl')) {
         const t = this._pdfTableData(node);
@@ -3163,6 +3163,9 @@ const App = {
       } else if (node.matches('.sh')) {
         const text = this._pdfNodeText(node);
         if (text) blocks.push({ type: 'subheading', text });
+      } else if (node.matches('.pdf-para')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'para', text });
       } else {
         const text = this._pdfNodeText(node);
         if (text) blocks.push({ type: 'note', text });
@@ -3230,6 +3233,12 @@ const App = {
       } else if (b.type === 'kv' || b.type === 'note') {
         ensure(15); doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
         doc.text(b.text, margin, y); y += 14;
+      } else if (b.type === 'para') {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(55, 55, 55);
+        this._pdfSafe(b.text).split('\n').forEach(seg => {
+          doc.splitTextToSize(seg || ' ', pageW - 2 * margin).forEach(ln => { ensure(13); doc.text(ln, margin, y); y += 12.5; });
+        });
+        y += 6;
       } else if (b.type === 'table') {
         doc.autoTable({
           startY: y + 2,
