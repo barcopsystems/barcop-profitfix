@@ -45,16 +45,15 @@ S.HubBooksHome = {
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.container = mount;
-    const weeks = (App.data && App.data.weeks) || [];
-    if (!weeks.length) { mount.innerHTML = '<div class="screen">' + this._getStarted() + '</div>'; this._wire(); return; }
 
     const st = this._computeState();
+    const gs = this.getStartedDone();
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
 
     mount.innerHTML = '<div class="screen">'
-      + this.whereYouStand(st)
+      + (gs.all ? this.whereYouStand(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
@@ -198,19 +197,26 @@ S.HubBooksHome = {
       + '</div>';
   },
 
-  // ── Day one (no weeks logged): guided steps, books fill in as data lands ──
-  _getStarted() {
-    const step = (n, title, body, btn, act) => '<div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--gold-tint);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">' + n + '</div>'
-      + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + title + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:8px;">' + body + '</div>'
-      + (btn ? '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btn + '</button>' : '') + '</div></div>';
-    return '<div class="card form-card"><div class="card-title">Get Started</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Your books fill in from what you log across Bar Cop. Nothing to re-enter here. A few steps and the income statement builds itself.</div>'
-      + step(1, 'Log a week', 'Enter a week in Profit, This Week. Revenue, COGS, and labor roll up into your income statement.', 'Go to This Week', 'this-week')
-      + step(2, 'Add your fixed bills', 'Rent, utilities, insurance, and the rest go in Operating Expenses so your operating income is complete.', 'Operating Expenses', 'operating-expenses')
-      + step(3, 'Enter your permits and licenses', 'Renewal dates show up under As Needed before they lapse.', 'Permits and Licenses', 'permits')
-      + '</div>';
+  // ── Day one: four-step Get Started box (Cash Close The Week pattern). Each step
+  // reads done off real data; once all four are done the Where You Stand card
+  // takes its place. The Close Out Your Books steps and As Needed never change.
+  getStartedDone() {
+    const has = (a) => Array.isArray(a) && a.length > 0;
+    const hasWeeks   = has(App.data && App.data.weeks);
+    const hasOpex    = has(App.data && App.data.operating_expenses);
+    const hasInv     = has(App.inventoryData && App.inventoryData.ic_products);
+    const hasPermits = has(App.data && App.data.permits_compliance);
+    return { hasWeeks, hasOpex, hasInv, hasPermits, all: hasWeeks && hasOpex && hasInv && hasPermits };
+  },
+  getStartedBox(d) {
+    return DashUI.dayOneStrip(
+      'Your books build themselves from what you log. Four steps and this card fills in with your operating income, month to date and year to date.',
+      [
+        { done: d.hasWeeks,   num: 1, label: 'Log your first week',             go: 'this-week' },
+        { done: d.hasOpex,    num: 2, label: 'Add your operating expenses',     go: 'operating-expenses' },
+        { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-dashboard' },
+        { done: d.hasPermits, num: 4, label: 'Enter your permits and licenses', go: 'permits' }
+      ]);
   },
 
   _wire() {
@@ -221,8 +227,10 @@ S.HubBooksHome = {
       else if (act === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (act === 'permits')            S.HubPermits?.open?.();
       else if (act === 'this-week')          App.openScreen('this-week');
+      else if (act === 'ic-dashboard')       App.openScreen('ic-dashboard');
     };
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));
+    this.container.querySelectorAll('.db-go').forEach(el => el.addEventListener('click', () => go(el.dataset.go)));
     this.container.querySelectorAll('.bk-step-head').forEach(h => h.addEventListener('click', () => {
       const k = h.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container);
     }));
