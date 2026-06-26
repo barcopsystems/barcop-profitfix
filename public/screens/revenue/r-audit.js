@@ -22,10 +22,16 @@ S.RevenueAudit = {
     const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.requestCard('ra', 'Revenue Audit', desc, canRun, !!latest, daysLeft)
-      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : AuditUI.emptyState())      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra') : '')
+      + AuditUI.firstAuditCard({ pfx: 'ra', title: 'Revenue Audit', desc, canRun, hasLatest: !!latest, daysLeft,
+          gs: { mode: 'check',
+            intro: 'Your Revenue Audit scores check average, menu mix, server performance, labor efficiency, and events. Drop your POS sales export and Bar Cop reads a real baseline the day you start.',
+            checkLabel: 'I have a POS sales export ready to drop',
+            hint: 'One sales report is enough to start. Add your menu sales mix and labor export and the first audit gets sharper.' } })
+      + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra') : '')
       + '</div>';
     document.getElementById('ra-new-btn')?.addEventListener('click', () => this.showIntakeForm());
+    AuditUI.wireFirstAudit(this.container);
     this.container.querySelectorAll('.ra-view-btn').forEach(btn =>
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
