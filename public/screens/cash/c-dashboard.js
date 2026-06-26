@@ -68,6 +68,14 @@ S.CashDashboard = {
     const dm = this.doneMap();
     const r = {};
     this.ORDER.forEach(k => { r[k] = !!dm[k]; });
+    // The audit step completes off data: a Cash audit runs once a week, so if one
+    // was run within the week being viewed, this step is done. The operator can
+    // still mark it by hand. Every other step waits on a manual stamp.
+    if (!r.audit) {
+      const ws = this.weekStart(), we = this.weekEnd();
+      const ran = (App.data.cash_audits || []).some(a => { const d = ('' + ((a && a.date) || '')).slice(0, 10); return d && d >= ws && d <= we; });
+      if (ran) r.audit = true;
+    }
     return r;
   },
 
@@ -171,8 +179,7 @@ S.CashDashboard = {
       : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> in cash freed so far, trapped cash down from your first weeks.</span>';
     const showIns = t.hasData || (st.survival && st.survival.hasData);
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">'
-      +   '<div class="card-title" style="margin:0;">Cash Scoreboard</div>'
+      + '<div class="card-title"' + (showIns ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '><span>Cash Scoreboard</span>'
       +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>' : '')
       + '</div>'
       + heroBody
@@ -193,7 +200,7 @@ S.CashDashboard = {
     if (!sf || !sf.hasData) {
       return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
     }
-    const mini = (label, val, col) => '<div style="flex:1;min-width:108px;">'
+    const mini = (label, val, col) => '<div style="min-width:108px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
     if (!sf.hasOpening) {
@@ -210,7 +217,7 @@ S.CashDashboard = {
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
     const lowCol = (low && low.balance < 0) ? 'var(--red)' : (low && pos.reserve > 0 && low.balance < pos.reserve ? 'var(--amber)' : 'var(--t1)');
     const safeCol = (pos.safe != null && pos.safe < 0) ? 'var(--red)' : 'var(--t1)';
-    return wrap('<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">'
+    return wrap('<div style="display:flex;align-items:flex-start;gap:35px;flex-wrap:wrap;">'
       + mini('Runway', this.runwayLabel(sf.runway), runwayCol)
       + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
       + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
@@ -319,7 +326,7 @@ S.CashDashboard = {
     if (k === 'audit') {
       const ca = App.latestEvent ? App.latestEvent(App.data.cash_audits || []) : null;
       const lead = ca && ca.overall_score != null
-        ? 'Your last Cash audit scored <strong style="color:var(--gold);">' + ca.overall_score + '</strong>. Run a fresh one to score this week, then open the Cash Fix and check off what you have already handled so the steps below read where you really are.'
+        ? 'Your last Cash audit scored <strong style="color:' + App.scoreColor(ca.overall_score) + ';">' + ca.overall_score + '</strong>. Run a fresh one to score this week, then open the Cash Fix and check off what you have already handled so the steps below read where you really are.'
         : 'Start the week here. The Cash audit scores your liquidity and feeds the fix steps. Run it, then open the Cash Fix and mark what you have handled.';
       return explain(lead)
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-audit">Cash Audit</button><button class="btn btn-ghost btn-sm" data-go="c-fix">Cash Fix</button>' + this.markBtn('audit', 'Mark Done'));
@@ -395,7 +402,7 @@ S.CashDashboard = {
       : '';
     return explain('You have ' + tv.length + ' vendor' + (tv.length === 1 ? '' : 's') + ' on real terms. Hold your cash to the due date and take any early-pay discount that beats what the cash is worth sitting in the account.')
       + rows + billLine
-      + btnRow('<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button><button class="btn btn-ghost btn-sm" data-go="ic-vendors">Vendor Terms</button>' + this.markBtn('terms', 'Mark Done'));
+      + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-vendors">Vendor Terms</button>' + this.markBtn('terms', 'Mark Done'));
   },
 
   // ── Status strip (the treasury vitals) ───────────────────────────────────────
@@ -406,12 +413,11 @@ S.CashDashboard = {
   //    part of the weekly close. Capital Efficiency (turns and weeks on hand) and
   //    the Cash Bridge (where the profit went) live here, off the main flow. ────
   asNeeded() {
-    return '<div style="margin-top:24px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">As Needed</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      +   '<button class="btn btn-ghost btn-sm" data-go="c-capital">Capital Efficiency</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-go="c-bridge">Cash Bridge</button>'
-      + '</div></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
+      + '<button class="btn btn-ghost btn-sm" data-go="c-capital">Capital Efficiency</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="c-bridge">Cash Bridge</button>'
+      + '</div>';
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
