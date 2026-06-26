@@ -94,7 +94,7 @@ const DashUI = {
     }));
   },
 
-  // Shared Insights modal shell (Bar Cop Outlook style): title left, Close
+  // Shared Insights modal shell (Bar Cop Briefing style): title left, Close
   // top-right, overlay + Esc to close. Opens only when the text is ready.
   insightsModal(label, bodyHtml, generated_at) {
     const dateStr = generated_at ? this._insDate(generated_at) : '';
@@ -103,7 +103,7 @@ const DashUI = {
     const box = document.createElement('div');
     box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:var(--r);padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + (label || 'Bar Cop Insights') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + (label || 'Bar Cop Briefing') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
       + '<button class="btn btn-ghost btn-sm db-ins-close">Close</button></div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
       + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. A weekly read, refreshes once a week. Not financial or business advice.</div>' : '');

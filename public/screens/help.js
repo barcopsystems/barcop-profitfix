@@ -36,7 +36,7 @@ S.Help = {
         a: 'You give it your annual sales, optionally upload reports it cannot see yet (a P&L covers bar, food, and prime in one file), and answer a few questions about how you operate. Bar Cop scores five sections from your Control data plus those uploads and ranks the gaps by monthly dollar impact. The more you give it, the more it covers. You can run one every thirty days, which is enough time to act on the last one before scoring yourself again.' },
       { q: 'Why did a section come back N/A?',
         a: 'Because there was nothing to grade it on honestly. A cost section needs a cost percentage, and theft and loss needs real void, comp, or cash data or a documented control. With nothing there, Bar Cop leaves the section out rather than inventing a score. It fills in as you log more or upload a report that covers it.' },
-      { q: 'What is the Bar Cop Outlook?',
+      { q: 'What is the Bar Cop Briefing?',
         a: 'A short operator-voice read on your latest audit, written from your own numbers. It tells you what the score says and the one or two things to do this month, in plain language. It is cached per audit, so re-opening the same audit does not regenerate it.' },
       { q: 'How does Profit Fix close a gap?',
         a: 'Each gap has a fix process, an ordered set of steps that link straight to the Bar Cop screen that does the work. Bar Cop reads your progress from your real Control data, not from checkboxes you tick, so a step reads done only when the work actually shows up: a count logged, a recipe costed, a comp threshold set. The fix starts measuring on its own the first time you take a tracked action. There is no button to mark it implemented.' },
