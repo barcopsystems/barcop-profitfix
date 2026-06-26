@@ -57,11 +57,11 @@ S.EventsPricing = {
       + '<td>' + (r.fb_minimum ? App.fmtCurrency(r.fb_minimum) : '-') + '</td>'
       + '<td>' + (r.room_fee ? App.fmtCurrency(r.room_fee) : 'Included') + '</td>'
       + '<td>' + (r.per_head ? App.fmtCurrency(r.per_head) : '-') + '</td>'
-      + '<td><div class="row-actions"><button class="btn btn-danger btn-sm rp-del" data-id="' + esc(r.id) + '">Delete</button></div></td></tr>'
+      + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm rp-edit" data-id="' + esc(r.id) + '">Edit</button><button class="btn btn-danger btn-sm rp-del" data-id="' + esc(r.id) + '">Delete</button></div></td></tr>'
     ).join('') || '<tr><td colspan="7" style="color:var(--t3);text-align:center;padding:14px;">No packages yet. Build one above and it prefills your booking quotes.</td></tr>';
 
     const headingRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Packages</div>'
+      + '<div class="sh" style="margin:0;">Saved Packages</div>'
       + (rc.length ? '<button class="btn btn-ghost btn-sm" id="rp-export">Export PDF</button>' : '')
       + '</div>';
 
@@ -79,6 +79,7 @@ S.EventsPricing = {
     document.getElementById('rp-clear')?.addEventListener('click', () => this.draw());
     document.getElementById('rp-calc')?.addEventListener('click', () => this.cateringCalcModal());
     document.getElementById('rp-export')?.addEventListener('click', () => { const el = document.getElementById('rp-list'); if (el) App.exportPDF({ title: 'Rate Card', root: el }); });
+    this.container.querySelectorAll('.rp-edit').forEach(b => b.addEventListener('click', () => this.editModal(b.dataset.id)));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     this.container.querySelectorAll('.rp-del').forEach(b => b.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;
@@ -130,6 +131,49 @@ S.EventsPricing = {
     this.draw();
   },
 
+  editModal(id) {
+    const r = this.rateCards().find(x => x.id === id);
+    if (!r) return;
+    const v = x => (x != null && x !== 0 ? x : '');
+    const typeOpts = '<option value="">Select event...</option>' + this.types().map(t => '<option' + (r.event_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Package</div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;">'
+        + '<div class="f" style="flex:1 1 180px;"><label>Package Name</label><input type="text" id="rpe-name" value="' + esc(r.package_name || '') + '"/></div>'
+        + '<div class="f" style="flex:1 1 180px;"><label>Event Type</label><select id="rpe-type" class="form-input">' + typeOpts + '</select></div>'
+        + '<div class="f" style="flex:1 1 110px;"><label>Min Covers</label><input type="number" id="rpe-minc" value="' + v(r.min_covers) + '"/></div>'
+        + '<div class="f" style="flex:1 1 110px;"><label>Max Covers</label><input type="number" id="rpe-maxc" value="' + v(r.max_covers) + '"/></div>'
+        + '<div class="f" style="flex:1 1 110px;"><label>F&amp;B Minimum</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-fb" value="' + v(r.fb_minimum) + '"/></div></div>'
+        + '<div class="f" style="flex:1 1 110px;"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-room" value="' + v(r.room_fee) + '"/></div></div>'
+        + '<div class="f" style="flex:1 1 110px;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-ph" step="0.01" value="' + v(r.per_head) + '"/></div></div>'
+      + '</div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button>'
+      +   '<button class="btn btn-ghost" id="rpe-cancel">Cancel</button></div></div>';
+    App.openModal(html, { id: 'rp-edit-modal', maxWidth: 680, noClose: true });
+    document.getElementById('rpe-cancel')?.addEventListener('click', () => App.closeModal('rp-edit-modal'));
+    document.getElementById('rpe-save')?.addEventListener('click', () => this.saveEdit(id));
+  },
+
+  async saveEdit(id) {
+    const g = x => document.getElementById(x);
+    const name = g('rpe-name')?.value.trim();
+    if (!name) return;
+    const list = this.rateCards();
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) return;
+    list[i] = Object.assign({}, list[i], {
+      package_name: name,
+      event_type: g('rpe-type')?.value || '',
+      min_covers: parseFloat(g('rpe-minc')?.value) || 0,
+      max_covers: parseFloat(g('rpe-maxc')?.value) || 0,
+      fb_minimum: parseFloat(g('rpe-fb')?.value) || 0,
+      room_fee:   parseFloat(g('rpe-room')?.value) || 0,
+      per_head:   parseFloat(g('rpe-ph')?.value) || 0
+    });
+    await App.saveKey('event_rate_cards');
+    App.closeModal('rp-edit-modal');
+    this.draw();
+  },
+
   calc() {
     const g = x => parseFloat(document.getElementById(x)?.value) || 0;
     const el = document.getElementById('rpc-result');
@@ -158,7 +202,7 @@ S.EventsPricing = {
   showHowTo() {
     App.showHelpModal('How Price Packages Work', [
       { p: ['Your saved packages and a quick calculator, both feeding your booking quotes.'] },
-      { h: 'Rate Card', p: ['Build your standard packages: the per-head price, the food and beverage minimum, any room fee, and the cover range each fits. On a booking, picking a package prefills the quote so you are not retyping prices every time. Export PDF prints the list to hand a client or keep on file.'] },
+      { h: 'Rate Card', p: ['Build your standard packages: the per-head price, the food and beverage minimum, any room fee, and the cover range each fits. On a booking, picking a package prefills the quote so you are not retyping prices every time. Edit any saved package to update it, or Delete to remove it. Export PDF prints the list to hand a client or keep on file.'] },
       { h: 'Catering Calculator', p: ['Tap Catering Calculator for a one-off job. Enter the per-head food cost and a target food cost percent, and Bar Cop sets the per-head price. Add the bar cost, staff hours, and other costs, then check the Gross Margin to confirm the price covers everything. It starts from your average front-of-house wage from Labor Control. The same calculator is on every booking\'s quote.'] }
     ]);
   }
