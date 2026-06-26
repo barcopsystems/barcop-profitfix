@@ -864,9 +864,9 @@ S.EventsBookings = {
     wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:640px;background:var(--surface);padding:24px;';
     wrap.innerHTML = '<div class="screen"><div class="card">'
       + '<div class="card-title">Event Quote</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;">Prepared ' + this.fmtDate(App.todayLocal()) + (b.contact_name ? ' for ' + esc(b.contact_name) : '') + '</div>'
+      + '<div class="pdf-para">Prepared ' + this.fmtDate(App.todayLocal()) + (b.contact_name ? ' for ' + esc(b.contact_name) : '') + '</div>'
       + '<table class="tbl"><tbody>' + rowsHtml + '</tbody></table>'
-      + '<div style="font-size:10px;color:var(--t3);line-height:1.6;margin-top:14px;">This is a quote worksheet, an estimate prepared from your package pricing. Final charges may vary with headcount and selections. Not a contract.</div>'
+      + '<div class="pdf-para">This is a quote worksheet, an estimate prepared from your package pricing. Final charges may vary with headcount and selections. Not a contract.</div>'
       + '</div></div>';
     document.body.appendChild(wrap);
     Promise.resolve(App.exportPDF({ title: 'Event Quote - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
