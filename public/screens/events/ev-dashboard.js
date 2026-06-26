@@ -1,171 +1,226 @@
 'use strict';
 
-/* ── Events — Dashboard ──────────────────────────────────────────────────────
-   The Events landing (the top-nav Events link lands here; no sidebar Dashboard
-   row). A feeder section, so this is an at-a-glance, not an audit: pipeline value
-   and deposits owed up top, the next event and the leads to work, the regulars
-   to reach this month, and what is coming on the calendar. Day one shows a Get
-   Started strip until the first booking lands. */
+/* ── Events — Dashboard ("Book The Events" landing) ──────────────────────────
+   The Events landing, mirroring the Books "Close Out Your Books" pattern. Day
+   one shows a Get Started box that flips to a Where You Stand card (booked
+   revenue on top, a three-stat read below) once the room is set up. Below it,
+   a Book The Events step card walks the pipeline work, the steps complete
+   themselves off your pipeline state (no manual marking, since there is no
+   weekly or monthly reset), then an As Needed row for the planning tools. */
 
 S.EventsDashboard = {
+  _openStep: null,
+  ORDER: ['leads', 'deposits', 'prep', 'close'],
+  _META: {
+    leads:    { n: 1, title: 'Work your open leads' },
+    deposits: { n: 2, title: 'Collect deposits due' },
+    prep:     { n: 3, title: 'Prep upcoming events' },
+    close:    { n: 4, title: 'Close out completed events' }
+  },
+
   EB() { return S.EventsBookings; },
-  bookings() { return (App.data && App.data.bookings) || []; },
-  regulars() { return (App.data && App.data.event_regulars) || []; },
-  calendar() { return (App.data && App.data.event_calendar) || []; },
+  _money(v) { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
+  _runSheetStarted(b) { return !!(b.timeline || b.menu_notes || b.bev_notes || b.setup_notes || b.av_notes || b.guaranteed_count); },
 
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
-    if (this.bookings().length === 0 && this.regulars().length === 0 && this.calendar().length === 0) this.renderDayOne();
-    else this.renderFull();
+    const st = this._computeState();
+    const gs = this.getStartedDone();
+    const done = this.stepDone(st);
+    const doneCount = this.ORDER.filter(k => done[k]).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
+
+    container.innerHTML = '<div class="screen">'
+      + (gs.all ? this.whereYouStand(st) : this.getStartedBox(gs))
+      + this.banner(doneCount, this.ORDER.length)
+      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
+      +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
+      + '</div>'
+      + this.asNeeded(st)
+      + '</div>';
+    this.wire();
   },
 
-  // ── shared layout helpers (the Control/Recovery dashboard recipe) ──────────
-  metricCard(label, val, target, cls) {
-    return '<div class="metric-card"><div class="metric-label">' + label + '</div><div class="metric-val' + (cls ? ' ' + cls : '') + '">' + val + '</div><div class="metric-target">' + (target || '&nbsp;') + '</div><div class="metric-trend">&nbsp;</div></div>';
-  },
-  row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
-      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
-      + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
-  },
-  shPanel(title, body, titleRight) {
-    const sh = '<div class="sh" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:22px;margin:0 0 10px;">' + sh + (titleRight || '') + '</div>';
-    return head + '<div class="card" style="flex:1;">' + body + '</div>';
-  },
-  panelCard(title, body, titleRight) {
-    return '<div class="card form-card" style="height:100%;"><div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;"' : '') + '><span>' + title + '</span>' + (titleRight || '') + '</div>' + body + '</div>';
-  },
-
-  // ── computed numbers ───────────────────────────────────────────────────────
-  stats() {
-    const EB = this.EB(), all = this.bookings();
+  // ── Heavy compute, once per render ──────────────────────────────────────────
+  _computeState() {
+    const EB = this.EB();
+    const all = (App.data && App.data.bookings) || [];
+    const today = App.todayLocal();
     const open = all.filter(b => EB.isOpen(b.stage));
     const stale = open.filter(b => { const d = EB.daysSince(b.date_received); return d != null && d >= 3; });
     const booked = all.filter(b => b.stage === 'Booked');
-    const soon = booked.filter(b => { const d = EB.daysUntil(b.event_date); return d != null && d >= 0 && d <= 30; });
+    const futureBooked = booked.filter(b => b.event_date && b.event_date >= today);
+    const bookedRev = futureBooked.reduce((s, b) => s + EB.quoteTotal(b), 0);
+    const next = futureBooked.slice().sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''))[0] || null;
     const pipeline = open.reduce((s, b) => s + EB.quoteTotal(b), 0);
-    const depositsDue = booked.filter(b => !b.deposit_paid_date).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
-    const cutoff = (() => { const d = new Date(App.todayLocal() + 'T00:00:00'); d.setDate(d.getDate() - 90); return App.ymdLocal(d); })();
-    // A win is any booking that closed won (booked or already completed); a loss is Lost.
+    const depDueList = booked.filter(b => !b.deposit_paid_date && (parseFloat(b.deposit_amount) || 0) > 0);
+    const depositsDue = depDueList.reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
+
+    const cutoff = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() - 90); return App.ymdLocal(d); })();
     const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && (b.date_received || '') >= cutoff);
     const wins = closed.filter(b => b.stage === 'Booked' || b.stage === 'Completed').length;
     const conv = closed.length >= 5 ? Math.round(100 * wins / closed.length) + '%' : (closed.length ? wins + ' of ' + closed.length : '-');
-    return { open, stale, booked, soon, pipeline, depositsDue, conv };
+
+    const soon14 = futureBooked.filter(b => { const d = EB.daysUntil(b.event_date); return d != null && d >= 0 && d <= 14; });
+    const noRunSheet = soon14.filter(b => !this._runSheetStarted(b));
+    const completedOpen = all.filter(b => b.stage === 'Completed' && !(parseFloat(b.actual_revenue) > 0));
+
+    return { all, open, stale, booked, futureBooked, bookedRev, next, pipeline, depDueList, depositsDue, conv, soon14, noRunSheet, completedOpen };
   },
 
-  renderFull() {
-    const EB = this.EB(), s = this.stats(), today = App.todayLocal();
-
-    const tiles = '<div class="metric-grid">'
-      + this.metricCard('Pipeline Value', App.fmtCurrency(s.pipeline), s.open.length + ' open lead' + (s.open.length === 1 ? '' : 's'))
-      + this.metricCard('Booked, Next 30d', String(s.soon.length), 'confirmed events')
-      + this.metricCard('Conversion (90d)', s.conv, 'won vs lost')
-      + this.metricCard('Deposits Due', App.fmtCurrency(s.depositsDue), 'on booked events', s.depositsDue ? 'over-target' : 'on-target')
-      + '</div>';
-
-    // Hero — the next upcoming booked event. The action button rides the header.
-    const upcoming = this.bookings().filter(b => b.stage === 'Booked' && b.event_date && b.event_date >= today)
-      .sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''));
-    const next = upcoming[0];
-    let heroBody, heroBtn;
-    if (next) {
-      const dU = EB.daysUntil(next.event_date);
-      const bal = EB.balanceDue(next);
-      heroBtn = '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" data-focus="' + esc(next.id) + '" style="margin:0;">Open Booking</button>';
-      heroBody = '<div><div style="font-size:18px;font-weight:800;color:var(--t1);">' + esc(EB.title(next)) + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:3px;">' + EB.fmtDate(next.event_date) + (dU != null ? ' &middot; ' + (dU === 0 ? 'today' : 'in ' + dU + ' day' + (dU === 1 ? '' : 's')) : '') + (next.party_size ? ' &middot; ' + next.party_size + ' guests' : '') + (bal > 0 ? ' &middot; ' + App.fmtCurrency(bal) + ' balance due' : '') + '</div></div>';
-    } else {
-      heroBtn = '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" style="margin:0;">Open Bookings</button>';
-      heroBody = '<div style="font-size:13px;color:var(--t2);line-height:1.6;">No events booked yet. Log a lead and work it through to Booked, and your next event shows here.</div>';
-    }
-
-    // Upcoming + Leads
-    const upRows = upcoming.slice(0, 6).map(b => '<div class="ev-go" data-go="ev-bookings" data-focus="' + esc(b.id) + '" style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-div);cursor:pointer;"><span style="font-size:12px;color:var(--t1);">' + esc(EB.title(b)) + '</span><span style="font-size:11px;color:var(--t3);">' + EB.fmtDate(b.event_date) + '</span></div>').join('')
-      || '<div style="font-size:12px;color:var(--t3);">Nothing booked ahead yet.</div>';
-    const leads = s.open.slice().sort((a, b) => (EB.daysSince(b.date_received) || 0) - (EB.daysSince(a.date_received) || 0));
-    const leadRows = leads.slice(0, 6).map(b => { const st = EB.daysSince(b.date_received) >= 3; return '<div class="ev-go" data-go="ev-bookings" data-focus="' + esc(b.id) + '" style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-div);cursor:pointer;"><span style="font-size:12px;color:var(--t1);">' + esc(EB.title(b)) + '</span><span style="font-size:11px;color:' + (st ? 'var(--red)' : 'var(--t3)') + ';">' + (st ? 'follow up' : b.stage) + '</span></div>'; }).join('')
-      || '<div style="font-size:12px;color:var(--t3);">No open leads. The pipeline is clear.</div>';
-
-    // Regulars to reach + This month on the calendar
-    const RG = S.EventsRegulars, regs = this.regulars();
-    const m = new Date(today + 'T00:00:00').getMonth();
-    const reach = regs.filter(r => RG.monthOf(r.birthday) === m || RG.monthOf(r.anniversary) === m);
-    const quiet = regs.filter(r => RG.isQuiet(r));
-    const regBody = (reach.length || quiet.length)
-      ? (reach.length ? '<div style="font-size:12px;color:var(--t1);margin-bottom:6px;"><span style="color:var(--t1);font-weight:700;">' + reach.length + '</span> with a birthday or anniversary this month</div>' : '')
-        + (quiet.length ? '<div style="font-size:12px;color:var(--t2);"><span style="color:var(--amber);font-weight:700;">' + quiet.length + '</span> gone quiet (' + RG.QUIET_DAYS + '+ days)</div>' : '')
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-regulars">Open Regulars</button></div>'
-      : '<div style="font-size:12px;color:var(--t3);">No outreach due this month. Add regulars to build the list.</div><div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-regulars">Open Regulars</button></div>';
-
-    const cal = this.calendar().filter(e => e.date && new Date(e.date + 'T00:00:00').getMonth() === m && new Date(e.date + 'T00:00:00').getFullYear() === new Date(today + 'T00:00:00').getFullYear());
-    const calBody = cal.length
-      ? cal.slice(0, 6).map(e => { const done = ['menu', 'promo', 'staffing', 'reservations'].filter(k => (e.checklist || {})[k]).length; return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-div);"><span style="font-size:12px;color:var(--t1);">' + esc(e.name || '') + '</span><span style="font-size:11px;color:' + (done === 4 ? 'var(--green)' : 'var(--t3)') + ';">' + done + '/4 ready</span></div>'; }).join('')
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-calendar">Open Calendar</button></div>'
-      : '<div style="font-size:12px;color:var(--t3);">Nothing planned this month. Add holidays and local dates on the Calendar.</div><div style="margin-top:12px;"><button class="btn btn-ghost btn-sm ev-go" data-go="ev-calendar">Open Calendar</button></div>';
-
-    this.container.innerHTML = '<div class="screen">'
-      + tiles
-      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', heroBody, heroBtn) + '</div>'
-      + this.row(this.shPanel('Upcoming Events', upRows), this.shPanel('Leads to Work', leadRows))
-      + this.row(this.shPanel('Regulars to Reach', regBody), this.shPanel('This Month', calBody))
-      + this.quickActions()
-      + '</div>';
-    this.wire();
+  stepDone(st) {
+    return {
+      leads:    st.stale.length === 0,
+      deposits: st.depositsDue === 0,
+      prep:     st.noRunSheet.length === 0,
+      close:    st.completedOpen.length === 0
+    };
   },
 
-  quickActions() {
-    const btn = (go, label) => '<button class="btn btn-primary ev-go" data-go="' + go + '" style="flex:1;min-width:150px;">' + label + '</button>';
-    return '<div style="margin-top:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
-      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
-      + btn('ev-bookings', 'Bookings') + btn('ev-calendar', 'Calendar') + btn('ev-regulars', 'Regulars') + btn('ev-pricing', 'Pricing')
-      + '</div></div>';
-  },
-
-  renderDayOne() {
-    const step = (done, num, label, go) =>
-      '<div class="ev-go" data-go="' + go + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
-      + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (done ? '&#10003;' : num) + '</span>'
-      + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
-    const hasRC = ((App.data && App.data.event_rate_cards) || []).length > 0;
-    const strip = '<div class="card form-card" style="margin-bottom:14px;"><div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Events is where you run parties, buyouts, and catering, from the first call to the paid invoice. Log a booking, build your packages, add your regulars, and plan the dates that fill the room.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + step(false, 1, 'Log your first booking', 'ev-bookings')
-      + step(hasRC, 2, 'Build your rate card', 'ev-pricing')
-      + step(false, 3, 'Add your regulars', 'ev-regulars')
-      + step(false, 4, 'Plan a date', 'ev-calendar')
-      + '</div></div>';
-    const ph = msg => '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div>';
-    this.container.innerHTML = '<div class="screen">' + strip
-      + '<div class="metric-grid">'
-        + this.metricCard('Pipeline Value', App.fmtCurrency(0), 'After your first lead')
-        + this.metricCard('Booked, Next 30d', '0', 'confirmed events')
-        + this.metricCard('Conversion (90d)', '-', 'won vs lost')
-        + this.metricCard('Deposits Due', App.fmtCurrency(0), 'on booked events')
+  // ── Where You Stand (booked revenue hero + three-stat read) ─────────────────
+  whereYouStand(st) {
+    const EB = this.EB();
+    const nextLine = st.next
+      ? st.futureBooked.length + ' event' + (st.futureBooked.length === 1 ? '' : 's') + ' on the books &middot; next ' + EB.fmtDate(st.next.event_date)
+      : 'nothing booked ahead yet';
+    const hero = '<div style="padding:2px 0;">'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + this._money(st.bookedRev) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">booked, on the calendar</span>'
       + '</div>'
-      + '<div style="margin-bottom:16px;">' + this.panelCard('Next Event', ph('Your next booked event shows here. Log a lead and work it to Booked to start.'), '<button class="btn btn-ghost btn-sm ev-go" data-go="ev-bookings" style="margin:0;">Open Bookings</button>') + '</div>'
-      + this.row(this.shPanel('Upcoming Events', ph('Booked events show here, soonest first.')), this.shPanel('Leads to Work', ph('Open leads and the ones that have gone stale show here.')))
-      + this.row(this.shPanel('Regulars to Reach', ph('Birthdays, anniversaries, and quiet regulars surface here once you build the book.')), this.shPanel('This Month', ph('Holidays and local dates you plan around show here.')))
-      + this.quickActions()
+      + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + nextLine + '</div></div>';
+
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    const mini = (label, val, col) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">The Pipeline</div>'
+      + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+      +   mini('Open Pipeline', this._money(st.pipeline)) + vdiv
+      +   mini('Deposits Due', this._money(st.depositsDue), st.depositsDue > 0 ? 'var(--amber)' : 'var(--t1)') + vdiv
+      +   mini('Conversion, 90d', st.conv)
+      + '</div>'
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div></div>';
+
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
+      + hero + secondary + '</div>';
+  },
+
+  // ── Book The Events banner (the pipeline-work progress) ──────────────────────
+  banner(dc, total) {
+    const allDone = dc === total;
+    const pct = total ? Math.round(dc / total * 100) : 0;
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; Your events are handled</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total + ' handled</span>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Book The Events</div>'
+      + '</div>'
+      + '<div style="padding:18px 22px;">'
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">Work the leads, collect the deposits, prep the run sheets, and close out what is done.</div>')
+      + '</div>'
       + '</div>';
-    this.wire();
+  },
+
+  // ── Expandable step (Books stepRow pattern; done is read off pipeline state) ─
+  stepRow(k, done, st) {
+    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+    const circle = isDone
+      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
+      + '<div class="ek-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
+      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, st) + '</div></div>'
+      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
+      + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k) + '</div>';
+    return html + '</div>';
+  },
+
+  stepStatus(k, st) {
+    if (k === 'leads') {
+      if (!st.open.length) return 'No open leads. The pipeline is clear.';
+      return st.open.length + ' open' + (st.stale.length ? ' &middot; ' + st.stale.length + ' need follow-up' : ', all current');
+    }
+    if (k === 'deposits') return st.depositsDue > 0 ? this._money(st.depositsDue) + ' across ' + st.depDueList.length + ' event' + (st.depDueList.length === 1 ? '' : 's') : 'All deposits are in.';
+    if (k === 'prep') {
+      if (!st.soon14.length) return 'Nothing in the next two weeks.';
+      return st.soon14.length + ' in two weeks' + (st.noRunSheet.length ? ' &middot; ' + st.noRunSheet.length + ' need a run sheet' : ', run sheets started');
+    }
+    if (k === 'close') return st.completedOpen.length ? st.completedOpen.length + ' event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out' : 'Every completed event is closed.';
+    return '';
+  },
+
+  workspace(k) {
+    const explain = (txt) => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
+    const M = {
+      leads:    'Follow up on open leads and quotes before they go cold. Three days without a touch and a lead flags stale.',
+      deposits: 'A booking is not locked until the deposit is in. Collect what is owed on your booked events.',
+      prep:     'Build the run sheet for every event in the next two weeks so the kitchen and floor know the plan.',
+      close:    'Enter the actual revenue and costs on completed events to lock in the Event P&L.'
+    };
+    return explain(M[k]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div>';
+  },
+
+  asNeeded(st) {
+    const RG = S.EventsRegulars, regs = (App.data && App.data.event_regulars) || [];
+    let reach = 0;
+    if (RG && RG.monthOf) {
+      const m = new Date(App.todayLocal() + 'T00:00:00').getMonth();
+      reach = regs.filter(r => RG.monthOf(r.birthday) === m || RG.monthOf(r.anniversary) === m).length;
+    }
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
+      + '<button class="btn btn-ghost btn-sm" data-act="ev-calendar">Event Calendar</button>'
+      + '<button class="btn btn-ghost btn-sm" data-act="ev-regulars">Track Regulars' + (reach ? ' (' + reach + ' to reach)' : '') + '</button>'
+      + '<button class="btn btn-ghost btn-sm" data-act="ev-pricing">Price Packages</button>'
+      + '</div>';
+  },
+
+  // ── Day one: four-step Get Started box; flips to Where You Stand once set up ─
+  getStartedDone() {
+    const has = (a) => Array.isArray(a) && a.length > 0;
+    const hasBooking = has(App.data && App.data.bookings);
+    const hasRate    = has(App.data && App.data.event_rate_cards);
+    const hasReg     = has(App.data && App.data.event_regulars);
+    const hasCal     = has(App.data && App.data.event_calendar);
+    return { hasBooking, hasRate, hasReg, hasCal, all: hasBooking && hasRate && hasReg && hasCal };
+  },
+  getStartedBox(d) {
+    return DashUI.dayOneStrip(
+      'Set up your events room and this card fills in with your booked revenue, your pipeline, and the deposits you are owed.',
+      [
+        { done: d.hasBooking, num: 1, label: 'Log your first booking', go: 'ev-bookings' },
+        { done: d.hasRate,    num: 2, label: 'Build your rate card',    go: 'ev-pricing' },
+        { done: d.hasReg,     num: 3, label: 'Add your regulars',       go: 'ev-regulars' },
+        { done: d.hasCal,     num: 4, label: 'Plan a date',             go: 'ev-calendar' }
+      ]);
   },
 
   wire() {
-    this.container.querySelectorAll('.ev-go').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.focus) App._evBookingFocus = b.dataset.focus;
-      App.navigate(b.dataset.go);
+    this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => App.navigate(el.dataset.act)));
+    this.container.querySelectorAll('.db-go').forEach(el => el.addEventListener('click', () => App.navigate(el.dataset.go)));
+    this.container.querySelectorAll('.ek-step-head').forEach(h => h.addEventListener('click', () => {
+      const k = h.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container);
     }));
   },
 
   showHowTo() {
-    App.showHelpModal('How the Events Dashboard Works', [
-      { p: ['The Events landing, read top to bottom: the money in your pipeline and the deposits you are owed, your next event and the leads to work, who to reach out to this month, and what is coming on the calendar. Every number comes from your own bookings, regulars, and calendar.'] },
-      { h: 'The Numbers', p: ['Watch Deposits Due and clear it on each booking as the money comes in. Conversion counts your wins (booked and completed) against the ones you lost over 90 days, and holds a raw count until five bookings close, then shows a percent. Pipeline Value totals your open leads; Booked, Next 30d is your near-term confirmed events.'] },
-      { h: 'Working From Here', p: ['Next Event and the lead list open straight to the booking. Regulars to Reach is your monthly outreach list. This Month shows the dates you are planning around. The Quick Actions jump to Event Booking, Event Calendar, Track Regulars, and Price Packages.'] }
+    App.showHelpModal('How the Events Landing Works', [
+      { p: ['Your events room at a glance. Up top, Where You Stand: the revenue you have booked, your open pipeline, the deposits you are owed, and your win rate. Below it, Book The Events walks the work that keeps the pipeline moving.'] },
+      { h: 'Getting Set Up', p: ['Before you have data, a Get Started box points you at the four things that turn Events on: log a booking, build your rate card, add your regulars, and plan a date. Once those are in, Where You Stand takes its place.'] },
+      { h: 'Book The Events', p: ['Four steps that handle themselves off your pipeline, no marking needed: work your open leads, collect deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. A step turns green when there is nothing left to do in it; when all four are clear, your events are handled.'] },
+      { h: 'As Needed', p: ['The planning tools sit at the bottom: the Event Calendar, your regulars, and your price packages. Track Regulars flags how many have a birthday or anniversary this month.'] }
     ]);
   }
 };
