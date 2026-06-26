@@ -507,7 +507,7 @@ S.RecoveryPlaybook = {
               { leak: 'Paying early', capture: 'Vendor payment terms + bills in Books', show: 'the Pay on Terms step on Close The Week', fixLabel: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' }
             ] },
             { t: 'p', text: 'Three more screens give you the whole cash picture beyond the four leaks. Cash Position shows what is truly safe to spend once the tax and tips you owe and your reserve are set aside. The Cash Bridge shows where last month\'s profit went instead of into the account. Capital Efficiency shows how hard the cash on your shelves is working. None of them is a chore; they are the read that tells you whether the systems are winning.' },
-            { t: 'p', text: 'And you do not read it alone. Close The Week lands you on the week\'s steps in order, the scoreboard tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
+            { t: 'p', text: 'And you do not read it alone. Close The Week lands you on the week\'s steps in order, the Where You Stand card tracks what you have freed, and every figure reads live off your own counts and bills, never a made-up number.' }
           ]
         },
         {
