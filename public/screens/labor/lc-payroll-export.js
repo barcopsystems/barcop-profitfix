@@ -193,7 +193,7 @@ S.LaborPayrollExport = {
 
   _fileBase(ws) {
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
-    return barName + ' - Payroll Worksheet - ' + ws;
+    return App.fileSafe(barName) + ' - Payroll Worksheet - ' + ws;
   },
 
   // ── Workbook (.xlsx) — formatted like Month-End Books ─────────────────────
