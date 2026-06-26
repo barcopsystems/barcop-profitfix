@@ -92,6 +92,21 @@ S.EventsCalendar = {
       if ((map[h.date] || []).some(it => it.kind === 'date')) return;
       (map[h.date] = map[h.date] || []).push({ kind: 'holiday', date: h.date, label: h.name });
     });
+    // Same-space double-bookings on a day get a conflict flag on their chips.
+    const conflictIds = new Set();
+    Object.keys(map).forEach(k => {
+      const bk = map[k].filter(it => it.kind === 'booking');
+      if (bk.length < 2) return;
+      const bySpace = {};
+      bk.forEach(it => {
+        const rec = this.bookings().find(x => x.id === it.id);
+        const sp = rec && rec.space ? String(rec.space).trim().toLowerCase() : '';
+        if (sp) (bySpace[sp] = bySpace[sp] || []).push(it.id);
+      });
+      Object.keys(bySpace).forEach(sp => { if (bySpace[sp].length >= 2) bySpace[sp].forEach(id => conflictIds.add(id)); });
+    });
+    this._conflictIds = conflictIds;
+
     const startDow = new Date(y, m, 1).getDay();
     const daysIn = new Date(y, m + 1, 0).getDate();
 
@@ -108,7 +123,10 @@ S.EventsCalendar = {
       + '</div>';
 
     const chipHtml = it => {
-      if (it.kind === 'booking') return '<div class="evcal-chip evcal-booking" data-go="booking" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + '</div>';
+      if (it.kind === 'booking') {
+        const conf = this._conflictIds && this._conflictIds.has(it.id);
+        return '<div class="evcal-chip evcal-booking" data-go="booking" data-id="' + esc(it.id) + '" title="' + esc(it.label) + (conf ? ' (double-booked space)' : '') + '"' + (conf ? ' style="border-color:var(--red);"' : '') + '>' + (conf ? '&#9888; ' : '') + esc(it.label) + '</div>';
+      }
       if (it.kind === 'holiday') return '<div class="evcal-chip evcal-holiday" data-go="holiday" data-date="' + esc(it.date) + '" data-name="' + esc(it.label) + '" title="' + esc(it.label) + ' (tap to plan)">' + esc(it.label) + '</div>';
       return '<div class="evcal-chip evcal-date" data-go="date" data-id="' + esc(it.id) + '" title="' + esc(it.label) + '">' + esc(it.label) + ' <span style="opacity:0.7;">' + this.clDone(it.cl) + '/4</span></div>';
     };
@@ -210,7 +228,7 @@ S.EventsCalendar = {
     App.showHelpModal('How the Event Calendar Works', [
       { p: ['One month view of everything that fills the room: your booked events on their dates, the recognized holidays Bar Cop already knows, and the local dates you add yourself.'] },
       { h: 'Moving Around', p: ['Step months with the arrows, or jump back with This Month. The current month is tagged gold and today is highlighted. On a phone the grid becomes an agenda list of the days that have something on them.'] },
-      { h: 'Booked Events', p: ['Every booking marked Booked or Completed shows on its event date. Tap it to open the booking.'] },
+      { h: 'Booked Events', p: ['Every booking marked Booked or Completed shows on its event date. Tap it to open the booking. If two events land in the same space on the same day, both chips flag red so you catch a double-booking before it bites you.'] },
       { h: 'Holidays', p: ['The big ones show up every year on their own: New Year\'s, Valentine\'s, St. Patrick\'s, Cinco de Mayo, Mother\'s and Father\'s Day, the Fourth, Halloween, Thanksgiving, Christmas, New Year\'s Eve, and more. Tap one to drop it onto your calendar with a planning checklist.'] },
       { h: 'Planning Dates', p: ['Add New Date, below the calendar, drops a local event, big game, or promotion onto a day. Work the checklist (menu locked, promo created, staffing scheduled, reservations open); the 2 of 4 read is your prep status for that date.'] }
     ]);

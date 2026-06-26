@@ -148,6 +148,26 @@ S.EventsBookings = {
     return Math.max(0, quoted - dep);
   },
 
+  // Other active bookings holding the same space on the same day: a double-book risk.
+  conflicts(b) {
+    if (!b || !b.event_date || !b.space || !String(b.space).trim()) return [];
+    const date = String(b.event_date).slice(0, 10);
+    const space = String(b.space).trim().toLowerCase();
+    return this.bookings().filter(o => o.id !== b.id
+      && o.stage !== 'Lost' && o.stage !== 'Completed'
+      && String(o.event_date || '').slice(0, 10) === date
+      && String(o.space || '').trim().toLowerCase() === space);
+  },
+  conflictBanner(b) {
+    const conf = this.conflicts(b);
+    if (!conf.length) return '';
+    const hard = b.stage === 'Booked' && conf.some(o => o.stage === 'Booked');
+    const col = hard ? 'var(--red)' : 'var(--amber)';
+    const names = conf.map(o => esc(this.title(o)) + ' (' + esc(o.stage) + ')').join(', ');
+    return '<div style="border:1px solid ' + col + ';background:var(--input);border-radius:6px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
+      + '<span style="color:' + col + ';font-weight:800;">Double-booking</span> &middot; ' + esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + ' by ' + names + '. Move one or confirm the room fits both.</div>';
+  },
+
   // The event-staff roster table (who is charged to this event, and their hours).
   staffingHtml(b) {
     const people = this.eventStaffByPerson(b);
@@ -540,7 +560,7 @@ S.EventsBookings = {
     const viewBanner = viewingPast
       ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--t1);">Editing your ' + esc(viewStep) + ' step. Save your changes, then Back to ' + esc(stage) + '.</div>'
       : '';
-    const html = '<div class="screen">' + card1 + viewBanner + card2 + this.actionBar(stage, viewStep, viewingPast) + '</div>';
+    const html = '<div class="screen">' + this.conflictBanner(b) + card1 + viewBanner + card2 + this.actionBar(stage, viewStep, viewingPast) + '</div>';
     this.container.innerHTML = html;
     this.wireDetail(b);
   },
