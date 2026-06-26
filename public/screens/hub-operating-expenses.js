@@ -512,7 +512,7 @@ S.HubOperatingExpenses = {
     }).join('');
     return '<div class="card card-bleed data-card">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
-      +   '<colgroup><col style="width:22%"><col style="width:26%"><col style="width:18%"><col style="width:18%"><col style="width:16%"></colgroup>'
+      +   '<colgroup><col style="width:22%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"></colgroup>'
       +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>YTD % of Revenue</th></tr></thead>'
       +   '<tbody>' + catRows + '</tbody>'
       + '</table></div></div>';
