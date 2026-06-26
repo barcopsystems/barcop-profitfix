@@ -334,6 +334,7 @@ S.HubBooks = {
 
       const filename = barName + ' - Month-End Books Worksheet - ' + this._monthLabel(monthKey) + '.xlsx';
       XLSX.writeFile(wb, filename);
+      try { localStorage.setItem('books_report_run_monthend', new Date().toISOString()); } catch (e) {}
 
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {

@@ -278,6 +278,7 @@ S.Reports = {
 
     const filename = barName + ' - Weekly P&L Worksheet - ' + today + '.xlsx';
     XLSX.writeFile(wb, filename);
+    try { localStorage.setItem('books_report_run_weeklypnl', new Date().toISOString()); } catch (e) {}
     this._setStatus('Downloaded ' + filename, 'var(--gold)');
   }
 };

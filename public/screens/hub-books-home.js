@@ -1,15 +1,17 @@
 'use strict';
 
-/* ── Books home — "Close The Books" landing ──────────────────────────────────
+/* ── Books home — "Close Out Your Books" landing ─────────────────────────────
    The Books section landing, opened from the top-nav "Books" link. Mirrors the
    Control/Cash "Close The Week" pattern: a Where You Stand card (the headline
-   P&L number on top, a secondary read below), the monthly Close The Books step
-   checklist with a green progress bar, and an As Needed row. Cadence is monthly,
-   not weekly. Numbers roll up from the same S.HubBooks aggregators the Month-End
-   file is built from, so they always agree; the work happens on the screens the
-   steps link to. */
+   P&L number on top, a secondary read below), the monthly Close Out Your Books
+   step checklist (expandable steps + green progress bar), and an As Needed row.
+   Cadence is monthly, no week selector. Numbers roll up from the same S.HubBooks
+   aggregators the Month-End file is built from, so they always agree; the work
+   happens on the screens the steps link to. */
 
 S.HubBooksHome = {
+
+  _openStep: null,
 
   open() {
     App.openHubFullPage('Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
@@ -17,6 +19,8 @@ S.HubBooksHome = {
 
   _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
   _pct(v)    { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
+  _dateLbl(iso) { try { const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return null; } },
+  _lastRun(key) { try { const v = localStorage.getItem(key); return v ? this._dateLbl(v) : null; } catch (e) { return null; } },
 
   // ── Per-month "done" stamps (operator-controlled, local to the device) ──────
   _curKey() {
@@ -29,11 +33,12 @@ S.HubBooksHome = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['expenses', 'review', 'generate'],
+  ORDER: ['expenses', 'pnl', 'review', 'generate'],
   _META: {
-    expenses: { n: 1, title: 'Log this month\'s operating expenses', sub: 'Your recurring bills auto-fill, add the variable ones', act: 'operating-expenses' },
-    review:   { n: 2, title: 'Review your income statement',         sub: 'Check the month reads right before it goes out',    act: 'books' },
-    generate: { n: 3, title: 'Generate Month-End Books',             sub: 'The workbook and summary for your accountant',       act: 'books' }
+    expenses: { n: 1, title: 'Log this month\'s operating expenses', act: 'operating-expenses' },
+    pnl:      { n: 2, title: 'Generate your weekly P&L brief',        act: 'weekly-pnl' },
+    review:   { n: 3, title: 'Review your income statement',          act: 'books' },
+    generate: { n: 4, title: 'Generate Month-End Books',              act: 'books' }
   },
   stepDone() { const dm = this.doneMap(); const r = {}; this.ORDER.forEach(k => { r[k] = !!dm[k]; }); return r; },
 
@@ -46,12 +51,13 @@ S.HubBooksHome = {
     const st = this._computeState();
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
 
     mount.innerHTML = '<div class="screen">'
       + this.whereYouStand(st)
       + this.banner(doneCount, this.ORDER.length)
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
-      +   this.ORDER.map(k => this.stepRow(k, done)).join('')
+      +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
       + '</div>'
       + this.asNeeded(st)
       + '</div>';
@@ -88,7 +94,7 @@ S.HubBooksHome = {
     if (HP && HP._status) {
       permits.forEach(r => { const s = HP._status(r); if (s.key === 'expired' || s.key === 'critical' || s.key === 'warn') { dueCount++; if (s.key === 'expired') expiredCt++; } });
     }
-    return { monthName, cmRev, cmPrimePct, mInc, ytdInc, ytdNet, ytdMargin, dueCount, expiredCt };
+    return { curKey, monthName, cmRev, cmPrimePct, mInc, ytdInc, ytdNet, ytdMargin, dueCount, expiredCt };
   },
 
   // ── Where You Stand (hero + secondary, Cash-style) ──────────────────────────
@@ -118,31 +124,69 @@ S.HubBooksHome = {
       + hero + secondary + '</div>';
   },
 
+  // ── Close Out Your Books banner (Cash card pattern, no week selector) ────────
   banner(dc, total) {
+    const allDone = dc === total;
     const pct = total ? Math.round(dc / total * 100) : 0;
-    return '<div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">'
-      +   '<div class="sh" style="margin:0;">Close The Books</div>'
-      +   '<div style="font-size:11px;color:var(--t3);">' + dc + ' of ' + total + ' done</div>'
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; Your books are caught up</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total + ' done this month</span>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Books</div>'
       + '</div>'
-      + '<div style="height:5px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      + '<div style="padding:18px 22px;">'
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">A monthly pass: log your bills, check the numbers, and send the books to your accountant.</div>')
+      + '</div>'
       + '</div>';
   },
 
-  stepRow(k, done) {
-    const m = this._META[k], isDone = done[k];
+  // ── Expandable step (Cash stepRow pattern) ──────────────────────────────────
+  stepRow(k, done, st) {
+    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + m.n + '</span>';
-    return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;border:1px solid var(--b-edge);border-radius:var(--r);background:' + (isDone ? 'var(--input)' : 'var(--surface)') + ';flex-wrap:wrap;">'
-      + circle
-      + '<div style="flex:1;min-width:160px;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
-      +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + m.sub + '</div></div>'
-      + '<button class="btn btn-ghost btn-sm" data-act="' + m.act + '">Open</button>'
-      + (isDone
-          ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
-          : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>')
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
+      + '<div class="bk-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
+      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, st) + '</div></div>'
+      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
       + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
+    return html + '</div>';
+  },
+
+  stepStatus(k, st) {
+    if (k === 'expenses') {
+      const n = ((App.data && App.data.operating_expenses) || []).filter(r => r && r.date && String(r.date).slice(0, 7) === st.curKey).length;
+      return n ? n + ' bill' + (n === 1 ? '' : 's') + ' logged this month' : 'No bills logged yet this month';
+    }
+    if (k === 'pnl')      { const d = this._lastRun('books_report_run_weeklypnl'); return d ? 'Report last run ' + d : 'Not run yet'; }
+    if (k === 'review')   { return esc(st.monthName) + ' operating income ' + this._money(st.mInc); }
+    if (k === 'generate') { const d = this._lastRun('books_report_run_monthend'); return d ? 'Report last run ' + d : 'Not run yet'; }
+    return '';
+  },
+
+  workspace(k, isDone) {
+    const explain = (txt) => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
+    const markBtn = isDone
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>';
+    const M = {
+      expenses: ['Your recurring bills auto-fill each month. Add this month\'s variable ones so your operating income is complete.', '<button class="btn btn-ghost btn-sm" data-act="operating-expenses">Operating Expenses</button>'],
+      pnl:      ['A one-page profit and loss for any week range, the brief you keep for yourself or hand to your bookkeeper.', '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'],
+      review:   ['Open the income statement and make sure revenue, costs, and operating income read right before anything goes out.', '<button class="btn btn-ghost btn-sm" data-act="books">Income Statement</button>'],
+      generate: ['Build the full workbook and one-page summary for your accountant. Nothing to re-type, it pulls from everything you logged.', '<button class="btn btn-ghost btn-sm" data-act="books">Month-End Books</button>']
+    };
+    const cfg = M[k];
+    return explain(cfg[0]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + cfg[1] + markBtn + '</div>';
   },
 
   asNeeded(st) {
@@ -150,7 +194,6 @@ S.HubBooksHome = {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-act="permits">' + dueLabel + '</button>'
-      + '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'
       + '<button class="btn btn-ghost btn-sm" data-act="year-end">Annual Review</button>'
       + '</div>';
   },
@@ -180,7 +223,10 @@ S.HubBooksHome = {
       else if (act === 'this-week')          App.openScreen('this-week');
     };
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));
-    this.container.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', () => { this.setDone(b.dataset.done, true); this.render(this.container); }));
+    this.container.querySelectorAll('.bk-step-head').forEach(h => h.addEventListener('click', () => {
+      const k = h.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container);
+    }));
+    this.container.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', () => { this.setDone(b.dataset.done, true); this._openStep = null; this.render(this.container); }));
     this.container.querySelectorAll('[data-undone]').forEach(b => b.addEventListener('click', () => { this.setDone(b.dataset.undone, false); this.render(this.container); }));
   }
 
