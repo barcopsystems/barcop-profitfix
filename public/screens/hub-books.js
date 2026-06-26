@@ -332,7 +332,7 @@ S.HubBooks = {
         CreatedDate:  new Date()
       };
 
-      const filename = barName + ' - Month-End Books Worksheet - ' + this._monthLabel(monthKey) + '.xlsx';
+      const filename = App.fileSafe(barName) + ' - Month-End Books Worksheet - ' + this._monthLabel(monthKey) + '.xlsx';
       XLSX.writeFile(wb, filename);
       try { localStorage.setItem('books_report_run_monthend', new Date().toISOString()); } catch (e) {}
 
@@ -934,6 +934,8 @@ S.HubBooks = {
     if (Object.keys(byEmp).length) {
       rows.push(blank());
       rows.push(['Per-Employee Monthly Totals', '', '', '', '']);
+      rows.push(this._lineRow('Tips Reported here is net of tip-out, what each person keeps after tipping out support staff. The Per-Employee Tip Detail above is gross, before tip-out.', COL_COUNT));
+      mergeFull(rows.length - 1);
       rows.push(['Employee', 'Hours', 'Tips Reported', 'Share of Hours', 'Suggested Allocation (Line 7a x share)']);
       const totalHours = Object.values(byEmp).reduce((s, e) => s + e.hours, 0);
       Object.keys(byEmp).sort().forEach(name => {

@@ -172,7 +172,7 @@ S.HubYearEnd = {
         CreatedDate:  new Date()
       };
 
-      const filename = barName + ' - Annual Review Worksheet - ' + year + '.xlsx';
+      const filename = App.fileSafe(barName) + ' - Annual Review Worksheet - ' + year + '.xlsx';
       XLSX.writeFile(wb, filename);
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {
@@ -341,7 +341,7 @@ S.HubYearEnd = {
     row('Total Operating Expenses', totalOpExY, totalOpExP);
     rows.push(blank());
 
-    row('Operating Income (Net Revenue - COGS - Labor - OpEx)',
+    row('Operating Income (before taxes)',
         (Y.totalRev - (Y.compsLoss || 0)) - Y.totalCogs - Y.totalLabor - totalOpExY,
         (P.totalRev - (P.compsLoss || 0)) - P.totalCogs - P.totalLabor - totalOpExP);
     rows.push(blank());
@@ -1083,7 +1083,7 @@ S.HubYearEnd = {
       ['Cost of Goods Sold', fmt$(Y.totalCogs) + fmtDeltaPct(Y.totalCogs, P.totalCogs)],
       ['Labor', fmt$(Y.totalLabor) + fmtDeltaPct(Y.totalLabor, P.totalLabor)],
       ['Prime Cost (COGS + Labor)', fmt$(Y.totalCogs + Y.totalLabor) + fmtDeltaPct(Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor)],
-      ['Operating Income (after operating expenses)', fmt$(opIncomeYpdf)]
+      ['Operating Income (before taxes)', fmt$(opIncomeYpdf)]
     ], { columnStyles: { 1: { halign: 'right' } } });
 
     b.sectionTitle('The Year in Percentages');
