@@ -50,7 +50,7 @@ S.EventsHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What does Events feed into the rest of Bar Cop?',
-        a: 'Offsite catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and Year-End. The staff you check as working an event feed their labor into its Event P&L. So the work you do here keeps the weekly numbers and the books current.' },
+        a: 'Offsite catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and the Annual Review. The staff you check as working an event feed their labor into its Event P&L. So the work you do here keeps the weekly numbers and the books current.' },
       { q: 'How does staffing an event work?',
         a: 'There is no separate event scheduler. From a booking, Schedule Staff for this Event jumps to Build Schedule on the event date, and you check the "Working [event]" box on each person working it. Only those hours land on the Event P&L. Catering and offsite gigs use the Event shift so an odd-time job fits the schedule.' },
       { q: 'Why is Events its own section instead of part of Revenue?',
