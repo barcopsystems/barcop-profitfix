@@ -180,7 +180,7 @@ S.CashDashboard = {
     const showIns = t.hasData || (st.survival && st.survival.hasData);
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title"' + (showIns ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '><span>Cash Scoreboard</span>'
-      +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>' : '')
+      +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>' : '')
       + '</div>'
       + heroBody
       + '<div style="font-size:12px;margin-top:10px;">' + freedLine + '</div>'
@@ -439,37 +439,37 @@ S.CashDashboard = {
     };
   },
 
-  // ── Bar Cop Insights: a written read of the cash picture, same button Profit
+  // ── Bar Cop Briefing: a written read of the cash picture, same button Profit
   //    and Revenue carry. Cached once a week per section (DashUI helpers) so
   //    repeat opens do not spend on the API. ──────────────────────────────────
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
+    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const st = this._st || this.computeState();
     const sf = st.survival, t = st.trapped;
     if (!(sf && sf.hasData) && !(t && t.hasData)) {
-      DashUI.insightsModal('Bar Cop Insights', 'Take a couple of counts and add your sales, schedule, and bills, and Bar Cop can read your cash for you.');
+      DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and add your sales, schedule, and bills, and Bar Cop can read your cash for you.');
       return;
     }
     const rec = DashUI._insRec('cash');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
     const prompt = this._insPrompt(st);
     const btn = this.container.querySelector('[data-insights]');
     const orig = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
     fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Insights', 'Could not read your cash right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your cash right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
         const text = data.content && data.content[0] && data.content[0].text;
-        if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
+        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
         const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
         const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('cash', html));
+        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('cash', html));
         restore();
       })
-      .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
   },
 
   _insPrompt(st) {
