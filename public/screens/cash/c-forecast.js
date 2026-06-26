@@ -22,6 +22,7 @@ S.CashForecast = {
     App.showHelpModal('How the Survival Forecast Works', [
       { p: ['This is the thirteen-week cash forecast, a full quarter of money in against money out. It is the tool that keeps a profitable bar from running out of cash on the wrong week, and almost nobody runs it. Bar Cop runs it for you off data you already keep.'] },
       { h: 'What Is In It', p: ['Cash in is your projected sales plus any event balances coming due. Cash out is your payroll from the schedule, your purchases, and every bill due that week, including the recurring ones projected forward. Enter your cash on hand and each week shows a running balance, so you see your real cushion and exactly which week runs thin.'] },
+      { h: 'Event Money Coming In', p: ['Booked events put real money on the calendar. The Event Money Coming In card lists the balance due on each booked event by its date, already counted in the cash-in above. Deposits you have already collected show there too as context, money you hold but owe service for, so it is never counted as cash to spend.'] },
       { h: 'The Low Point And Runway', p: ['The low-point week is the tightest your account gets across the quarter, the one to plan around. Runway is how many weeks your cash covers before it would go negative. A long runway means you can absorb a slow stretch; a short one is your cue to free trapped cash and tighten terms now.'] },
       { h: 'Stress Test And Can I Afford It', p: ['Slide sales down for a slow season and watch which week cracks. Or drop in a what-if, a second bartender, an equipment buy, an owner draw, and see the runway move and whether you can carry it. Small moves made early beat a scramble on a Friday.'] },
       { h: 'Take It To The Bank', p: ['Export PDF gives you a clean thirteen-week cash flow to hand a lender for a line of credit. A bar that walks in with a real forecast gets a different conversation than one that does not.'] }
@@ -64,6 +65,7 @@ S.CashForecast = {
       + (opening != null ? this.curveCard(fc) : '')
       + this.table(fc, opening)
       + this.lowNote(fc, opening)
+      + this.eventsCard()
       + this.billsCard()
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;">'
       +   '<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>'
@@ -172,6 +174,25 @@ S.CashForecast = {
     const note = '<div style="font-size:11px;color:var(--t4);margin-top:10px;">In is projected sales plus event balances. Out is payroll, purchases, and every bill due that week. '
       + (est ? 'Labor for unscheduled weeks is a trailing average; build the schedule to firm it up.' : 'Labor reads off your built schedule.') + '</div>';
     return this.dataCard(headers, body) + note;
+  },
+
+  // Event money coming in: booked-event balances by event date (the mirror of the
+  // bills card), with deposits already held shown as context.
+  eventsCard() {
+    const ce = CashEngine.committedEventCash(this.WEEKS);
+    if (!ce.list.length && !ce.deposits) return '';
+    const heading = '<div class="sh" style="margin:24px 0 10px;">Event Money Coming In</div>';
+    if (!ce.list.length) {
+      return heading + '<div class="card"><div style="font-size:12px;color:var(--t3);">'
+        + App.fmtCurrency(ce.deposits) + ' in deposits is already in hand against booked events. No balances left to collect this quarter.</div></div>';
+    }
+    const rows = ce.list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(e =>
+      '<tr><td style="color:var(--t1);">' + this.fmtWk(e.date) + '</td>'
+      + '<td>' + esc(e.name) + '</td>'
+      + '<td class="val">' + App.fmtCurrency(e.amount) + '</td></tr>').join('');
+    const note = '<div style="font-size:11px;color:var(--t4);margin-top:10px;">Balances due on booked events, by event date, already counted in the forecast above.'
+      + (ce.deposits ? ' Another ' + App.fmtCurrency(ce.deposits) + ' in deposits is in hand and spoken for against these events.' : '') + '</div>';
+    return heading + this.dataCard('<th>Event Date</th><th>Event</th><th>Balance Due</th>', rows) + note;
   },
 
   // Who to pay this week: bills coming due, by date, so Pay on Terms is concrete.
