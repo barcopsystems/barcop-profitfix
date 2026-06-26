@@ -1036,10 +1036,9 @@ S.EventsBookings = {
       + '<div class="sh">Signatures</div>'
       + '<div class="pdf-para">Client signature: ______________________________     Date: ________________</div>'
       + '<div class="pdf-para">' + esc(barName) + ' signature: ______________________     Date: ________________</div>'
-      + '<div class="pdf-para">This is a worksheet prepared from your inputs, not a contract or legal advice. Have it reviewed by your attorney before you rely on it.</div>'
       + '</div>';
     document.body.appendChild(wrap);
-    Promise.resolve(App.exportPDF({ title: 'Event Agreement - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
+    Promise.resolve(App.exportPDF({ title: 'Event Agreement - ' + this.title(b), root: wrap, brand: barName, footer: '' })).finally(() => wrap.remove());
   },
 
   worksheet() {
