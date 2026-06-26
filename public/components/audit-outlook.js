@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Bar Cop Outlook — shared audit narrative helper ─────────────────────────
+/* ── Bar Cop Briefing — shared audit narrative helper ─────────────────────────
    One home for the operator-voice paragraph that goes on every audit detail
    page. The button mounts inside the audit detail header card next to the
    score. On click the API call fires, the button shows "Analyzing...", and
@@ -58,7 +58,7 @@ window.AuditOutlook = {
       ? 'font-size:10px;padding:5px 12px;letter-spacing:1px;'
       : 'font-size:11px;padding:6px 14px;letter-spacing:1px;';
     containerEl.insertAdjacentHTML('beforeend',
-      '<button class="btn btn-ghost btn-sm" id="' + btnId + '" style="' + btnStyle + '">Bar Cop Outlook</button>'
+      '<button class="btn btn-ghost btn-sm" id="' + btnId + '" style="' + btnStyle + '">Bar Cop Briefing</button>'
     );
     const btn = document.getElementById(btnId);
     if (!btn) return;
@@ -140,7 +140,7 @@ window.AuditOutlook = {
     const box = document.createElement('div');
     box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Outlook: ' + esc(typeLabel) + (period ? ' · ' + esc(period) : '') + '</div>'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Briefing: ' + esc(typeLabel) + (period ? ' · ' + esc(period) : '') + '</div>'
       +   '<button class="btn btn-ghost btn-sm ao-close">Close</button>'
       + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>';
