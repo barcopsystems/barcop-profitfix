@@ -70,6 +70,9 @@ S.EventsDashboard = {
   },
 
   stepDone(st) {
+    // Day one: nothing is logged yet, so the pipeline work has not started. Show the
+    // steps as to-do, not auto-complete just because there is nothing pending.
+    if (!st.all.length) return { leads: false, deposits: false, prep: false, close: false };
     return {
       leads:    st.stale.length === 0,
       deposits: st.depositsDue === 0,
