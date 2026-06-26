@@ -209,7 +209,7 @@ S.EventsRegulars = {
 
   showHowTo() {
     App.showHelpModal('How Tracking Regulars Works', [
-      { p: ['Your regulars book: your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The chips filter the list (birthdays, anniversaries, gone quiet, VIP), and Export PDF prints the book.'] },
+      { p: ['Your regulars book: your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The chips filter the list (birthdays, anniversaries, gone quiet, VIP), open any regular in the list to edit them, check VIP to mark your best, and Export PDF prints the book.'] },
       { h: 'Outreach', p: ['Birthdays and anniversaries this month are counted up top, and the chips filter the list to them. Work this as your monthly reach-out list.'] },
       { h: 'Gone Quiet', p: ['A regular with no visit logged in the last ' + this.QUIET_DAYS + ' days flags as quiet. Work that as your win-back list, and log a last visit when they come in to keep it honest.'] },
       { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them, and anything missing imports blank to fill later.'] }

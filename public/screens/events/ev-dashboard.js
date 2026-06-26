@@ -100,7 +100,7 @@ S.EventsDashboard = {
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       +   mini('Open Pipeline', this._money(st.pipeline)) + vdiv
       +   mini('Deposits Due', this._money(st.depositsDue), st.depositsDue > 0 ? 'var(--amber)' : 'var(--t1)') + vdiv
-      +   mini('Conversion, 90d', st.conv)
+      +   mini('Win Rate, 90d', st.conv)
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div></div>';
 
@@ -187,7 +187,10 @@ S.EventsDashboard = {
     const hasRate    = has(App.data && App.data.event_rate_cards);
     const hasReg     = has(App.data && App.data.event_regulars);
     const hasCal     = has(App.data && App.data.event_calendar);
-    return { hasBooking, hasRate, hasReg, hasCal, all: hasBooking && hasRate && hasReg && hasCal };
+    // Event Booking is the heart of the section and can run alone, so once a
+    // booking exists, show Where You Stand; the rate card, regulars, and calendar
+    // are optional and reachable from As Needed and the sidebar.
+    return { hasBooking, hasRate, hasReg, hasCal, all: hasBooking };
   },
   getStartedBox(d) {
     return DashUI.dayOneStrip(
