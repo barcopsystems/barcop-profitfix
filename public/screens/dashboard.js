@@ -189,13 +189,13 @@ S.Dashboard = {
         ? 'At this bar pour cost, the overage is costing about $' + barOver + ' a week.'
         : 'Bar pour cost is at or under target, so there is no pour overage to chase right now.'
     ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a brief, blunt read for a fellow owner. The facts below are already computed from this operator\'s own weekly numbers.\n\n'
-      + 'STRICT RULES, follow exactly:\n'
+    const prompt = 'You are a 30-year bar and restaurant operator writing a read for a fellow owner. The facts below are already computed from this operator\'s own weekly numbers.\n\n'
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
+      + 'STAY TRUE TO THE FACTS:\n'
       + '- Use only the facts below. Do not invent numbers, streaks, or week counts.\n'
       + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it. If current bar pour cost is 22.8%, do not say it is above 23% or stuck high.\n'
       + '- Respect the stated direction. If a metric is falling and improving, do not call it stuck or rising. If it is on or under target, say so plainly.\n'
-      + '- State over or under target exactly as given.\n'
-      + '- No emdashes, no dashes used as punctuation, no bullet points, no headers, no AI phrasing. Plain operator sentences.\n\n'
+      + '- State over or under target exactly as given.\n\n'
       + 'FACTS:\n' + facts.join('\n')
       + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
 
