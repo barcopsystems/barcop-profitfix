@@ -3526,7 +3526,7 @@ S.HubSettings = {
     // or a wiped account keeps the seeded opening balance, tax rate, and reserve
     // and reads as if the opening balance is already set (Cash Audit step 1 checks
     // off, Cash Position pre-fills). A real fresh signup never has these.
-    try { ['cash_opening_balance', 'cash_sales_tax_rate', 'cash_tax_freq', 'cash_payroll_burden', 'cash_reserve_weeks'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    try { ['cash_opening_balance', 'cash_sales_tax_rate', 'cash_tax_freq', 'cash_payroll_burden', 'cash_reserve_weeks', 'events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }

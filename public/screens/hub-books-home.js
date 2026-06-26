@@ -189,7 +189,7 @@ S.HubBooksHome = {
   },
 
   asNeeded(st) {
-    const dueLabel = st.dueCount ? 'Permits &amp; Renewals (' + st.dueCount + ' due)' : 'Permits &amp; Renewals';
+    const dueLabel = st.dueCount ? 'Permits &amp; Licenses (' + st.dueCount + ' due)' : 'Permits &amp; Licenses';
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-act="permits">' + dueLabel + '</button>'
