@@ -225,18 +225,35 @@ S.HubOperatingExpenses = {
   // ── Main render ────────────────────────────────────────────────────────
   renderMain() {
     this.catchUpRecurring();   // fill in any elapsed months for recurring bills
-    const tab = this._tab || 'current';
-    const tabBtn = (id, label) => '<button class="ch-tab' + (tab === id ? ' on' : '') + '" data-tab="' + id + '">' + label + '</button>';
-    const tabBar = '<div class="ch-tabs" style="margin-bottom:16px;">' + tabBtn('current', 'Current') + tabBtn('history', 'History') + '</div>';
-    const body = tab === 'history' ? this._renderHistory() : this._renderCurrent();
-    this.container.innerHTML = '<div class="screen">' + tabBar + body + '</div>';
+    this._view = 'current';
+    this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
-
-    this.container.querySelectorAll('.ch-tab').forEach(t => {
-      t.addEventListener('click', () => { this._tab = t.dataset.tab; this.renderMain(); });
-    });
-    if (tab === 'history') this._wireHistory(); else this._wireCurrent();
+    this._wireCurrent();
   },
+
+  // ── Expense History (its own Books page; the read-only log of past months) ──
+  renderHistory(mount) {
+    if (mount) this.container = mount;
+    this.catchUpRecurring();
+    this._view = 'history';
+    this.container.innerHTML = '<div class="screen">' + this._historyStats() + this._renderHistory() + '</div>';
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+    this._wireHistory();
+  },
+  _historyStats() {
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const recs = this.records();
+    const yr = String(new Date().getFullYear());
+    const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
+    return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + stat('Logged This Year', fmt$(ytd)) + stat('Logged All Time', fmt$(total)) + stat('Entries', String(recs.length))
+      + '</div></div>';
+  },
+  // Re-render whichever view is active (Operating Expenses or Expense History),
+  // so an edit / delete / stop redraws the page the operator is actually on.
+  _rerender() { if (this._view === 'history') this.renderHistory(); else this.renderMain(); },
 
   _nextMonthKey(mk) {
     const y = parseInt(mk.slice(0, 4), 10);
@@ -554,9 +571,9 @@ S.HubOperatingExpenses = {
       Promise.resolve(App.exportPDF({ title: 'Operating Expenses', root: node })).finally(() => node.remove());
     });
     this.container.querySelectorAll('.fc-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this.renderMain(); });
+      chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this._rerender(); });
     });
-    document.getElementById('oex-older')?.addEventListener('click', () => { this._histShown = (this._histShown || PAGE) + PAGE; this.renderMain(); });
+    document.getElementById('oex-older')?.addEventListener('click', () => { this._histShown = (this._histShown || PAGE) + PAGE; this._rerender(); });
     this._wireRows(this.container);
   },
 
@@ -685,7 +702,7 @@ S.HubOperatingExpenses = {
       }
       await App.saveKey('operating_expenses');
       App.closeModal(id);
-      this.renderMain();
+      this._rerender();
     });
   },
 
@@ -710,7 +727,7 @@ S.HubOperatingExpenses = {
     if (!ok) return;
     arr[pIdx] = Object.assign({}, p, { recurring: false, term_months: null });
     await App.saveKey('operating_expenses');
-    this.renderMain();
+    this._rerender();
   },
 
   // ── Duplicate ──────────────────────────────────────────────────────────
@@ -740,6 +757,16 @@ S.HubOperatingExpenses = {
     const idx = arr.findIndex(r => r.id === id);
     if (idx >= 0) arr.splice(idx, 1);
     await App.saveKey('operating_expenses');
-    this.renderMain();
+    this._rerender();
+  }
+};
+
+/* ── Expense History — the Books "Expense History" page ──────────────────────
+   A thin screen that opens its own Hub full-page and delegates rendering to
+   S.HubOperatingExpenses.renderHistory (the read-only-ish log of past months,
+   with its own stat box). Lives here so it shares all the same row helpers. */
+S.HubExpenseHistory = {
+  open() {
+    App.openHubFullPage('Expense History', (mount) => { S.HubOperatingExpenses.renderHistory(mount); }, 'expense-history');
   }
 };
