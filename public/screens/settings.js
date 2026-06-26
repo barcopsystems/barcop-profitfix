@@ -425,13 +425,13 @@ S.HubSettings = {
         operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), vendor:'', notes:'' });
       });
     });
-    // Two recurring-term bills (fixed cost + fixed term) so the page shows the
-    // recurring feature with data. Both were entered when the operator set up Books
-    // at the start of the 90-day window; Bar Cop fills in each elapsed month on load.
+    // Two ongoing recurring bills (recur every month until cancelled, no fixed
+    // term). Both were entered when the operator set up Books at the start of the
+    // 90-day window; Bar Cop fills in each elapsed month on load.
     const monthAnchor = (back, day) => App.ymdLocal(new Date(today.getFullYear(), today.getMonth() - back, day));
     operatingExpenses.push(
-      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, term_months:12, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, term_months:36, recur_day:5, created_at:new Date().toISOString() }
+      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, recur_day:5, created_at:new Date().toISOString() }
     );
     // The major fixed overhead as recurring vendor bills, anchored at the start of
     // the window like the Bar Cop and Sonitrol bills above. catchUpRecurring fills
@@ -439,9 +439,9 @@ S.HubSettings = {
     // projects them forward and sizes the reserve off the real nut. These ARE the
     // Occupancy/Utilities/Insurance lines, with no anonymous variable duplicate.
     operatingExpenses.push(
-      { id:uid(), date:monthAnchor(2, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, term_months:24, recur_day:5, created_at:new Date().toISOString() }
+      { id:uid(), date:monthAnchor(2, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, recur_day:5, created_at:new Date().toISOString() }
     );
     App.data.operating_expenses = operatingExpenses;
 

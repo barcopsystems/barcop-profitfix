@@ -249,7 +249,7 @@ S.HubPermits = {
             + '<td class="no-print" style="text-align:right;white-space:nowrap;">'
             +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button> '
             +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button> '
-            +   '<button class="btn btn-ghost btn-sm hp-del"  data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>'
+            +   '<button class="btn btn-danger btn-sm hp-del" data-id="' + esc(r.id) + '">Delete</button>'
             + '</td>'
           + '</tr>';
         }).join('');
@@ -357,7 +357,7 @@ S.HubPermits = {
       +   '<button class="btn btn-primary" id="hp-save">' + (isEdit ? 'Save Changes' : 'Add Permit') + '</button>'
       +   '<button class="btn btn-ghost" id="hp-cancel">Cancel</button>'
       +   '<span id="hp-f-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
-      +   (isEdit ? '<button class="btn btn-ghost" id="hp-modal-del" style="margin-left:auto;color:var(--red);">Delete</button>' : '')
+      +   (isEdit ? '<button class="btn btn-danger" id="hp-modal-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
     const showErr = (m) => { const e = document.getElementById('hp-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };

@@ -130,19 +130,21 @@ S.HubOperatingExpenses = {
   },
 
   // ── Recurring bills ──────────────────────────────────────────────────────
-  // A recurring bill is the parent record (recurring:true + term_months). Each
-  // elapsed month inside the term gets a generated child entry (recurring_parent)
-  // with the same cost. Only months that have actually arrived are created, never
-  // future months, so Books only ever shows recurring costs through this month.
-  // Honest by [[output-honesty]]: the operator confirmed a fixed cost AND a fixed
-  // term, so generating inside that term is calculating from what they entered.
+  // A recurring bill is the parent record (recurring:true). It is ongoing by
+  // default (recurs every month until the operator stops it); an optional
+  // term_months makes it stop after a fixed number of payments. Each elapsed
+  // month gets a generated child entry (recurring_parent) with the same cost.
+  // Only months that have actually arrived are created, never future months, so
+  // Books only ever shows recurring costs through this month. Honest by
+  // [[output-honesty]]: the operator confirmed a fixed monthly cost, so filling in
+  // each elapsed month is calculating from what they entered.
   _daysInMonth(y, m0) { return new Date(y, m0 + 1, 0).getDate(); },
 
   catchUpRecurring() {
     const arr = this.records();
     const now = new Date();
     const curIdx = now.getFullYear() * 12 + now.getMonth();
-    const parents = arr.filter(r => r && r.recurring && !r.recurring_parent && r.date && parseInt(r.term_months, 10) > 0);
+    const parents = arr.filter(r => r && r.recurring && !r.recurring_parent && r.date);
     let added = false;
     parents.forEach(p => {
       const start = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
@@ -150,7 +152,8 @@ S.HubOperatingExpenses = {
       const startIdx = start.getFullYear() * 12 + start.getMonth();
       const term = parseInt(p.term_months, 10);
       const recurDay = p.recur_day || start.getDate();
-      const lastIdx = Math.min(curIdx, startIdx + term - 1);  // never future, never past term end
+      // Ongoing (no term) fills through the current month; a fixed term stops at its end.
+      const lastIdx = term > 0 ? Math.min(curIdx, startIdx + term - 1) : curIdx;
       const have = new Set([start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0')]);
       arr.forEach(r => { if (r.recurring_parent === p.id && r.date) have.add(String(r.date).slice(0, 7)); });
       for (let idx = startIdx + 1; idx <= lastIdx; idx++) {
@@ -266,13 +269,13 @@ S.HubOperatingExpenses = {
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const isRec = !!(r.recurring || r.recurring_parent);
     const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> ';
-    const del  = '<button class="btn btn-ghost btn-sm oex-del" data-id="' + esc(r.id) + '" style="color:var(--red);">Delete</button>';
+    const del  = '<button class="btn btn-danger btn-sm oex-del" data-id="' + esc(r.id) + '">Delete</button>';
     let actions = '';
     if (opts.minimal) {
       actions = edit + del;
     } else if (isRec) {
       if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button> ';
-      actions += edit + del;
+      actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button> ' + edit + del;
     } else {
       actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button> ' + edit + del;
     }
@@ -290,11 +293,12 @@ S.HubOperatingExpenses = {
     const arr = this.records();
     const idx = parseInt(monthKey.slice(0, 4), 10) * 12 + (parseInt(monthKey.slice(5, 7), 10) - 1);
     const out = [];
-    arr.filter(p => p.recurring && !p.recurring_parent && parseInt(p.term_months, 10) > 0 && p.date).forEach(p => {
+    arr.filter(p => p.recurring && !p.recurring_parent && p.date).forEach(p => {
       const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
       if (isNaN(s.getTime())) return;
       const startIdx = s.getFullYear() * 12 + s.getMonth();
-      const endIdx = startIdx + parseInt(p.term_months, 10) - 1;
+      const term = parseInt(p.term_months, 10);
+      const endIdx = term > 0 ? startIdx + term - 1 : Infinity;   // no term = ongoing
       if (idx < startIdx || idx > endIdx) return;
       if (arr.some(r => (r.id === p.id || r.recurring_parent === p.id) && String(r.date || '').slice(0, 7) === monthKey)) return;
       out.push(p);
@@ -321,7 +325,7 @@ S.HubOperatingExpenses = {
       + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
       + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
-      + '<td class="no-print"></td></tr>';
+      + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(p.id) + '">Stop</button></td></tr>';
     // The first column header carries the section name; the rest are the columns.
     const sectionCard = (name, rowsHtml) => '<div class="card card-bleed data-card" style="margin-bottom:14px;">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
@@ -379,7 +383,7 @@ S.HubOperatingExpenses = {
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oexa-recurring" style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
-        + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="12"/></div></div>'
+        + '<div class="form-row" id="oexa-term-wrap" style="margin-top:12px;display:none;align-items:flex-end;gap:12px;flex-wrap:wrap;"><div class="f" style="width:170px;"><label>Ends after (months)</label><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing"/></div><div style="font-size:11px;color:var(--t3);padding-bottom:9px;max-width:330px;line-height:1.5;">Leave blank and it recurs every month until you stop it. Only set this for a bill that ends after a fixed number of payments.</div></div>'
         + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -563,6 +567,7 @@ S.HubOperatingExpenses = {
     scope.querySelectorAll('.oex-renew').forEach(b => b.addEventListener('click', () => openEdit(b)));
     scope.querySelectorAll('.oex-dup').forEach(b => b.addEventListener('click', () => this._duplicate(b.dataset.id)));
     scope.querySelectorAll('.oex-del').forEach(b => b.addEventListener('click', () => this._delete(b.dataset.id)));
+    scope.querySelectorAll('.oex-stop').forEach(b => b.addEventListener('click', () => this._stopRecurring(b.dataset.id)));
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
@@ -579,13 +584,13 @@ S.HubOperatingExpenses = {
     if (!date) { showErr('Pick a date.'); return; }
     if (!category) { showErr('Pick a category.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
-    if (recurring && (!term || term < 1)) { showErr('Enter the term in months for a recurring bill.'); return; }
+    if (recurring && g('oexa-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
     const rec = {
       id: App.uid ? App.uid() : ('oex-' + Date.now()),
       date, category, vendor, amount, notes,
       created_at: new Date().toISOString()
     };
-    if (recurring) { rec.recurring = true; rec.term_months = term; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
+    if (recurring) { rec.recurring = true; rec.term_months = (term && term > 0) ? term : null; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
     this.records().push(rec);
     await App.saveKey('operating_expenses');
     this.renderMain();
@@ -621,7 +626,7 @@ S.HubOperatingExpenses = {
     const parent = rec.recurring_parent ? (arr.find(r => r.id === rec.recurring_parent) || rec) : rec;
     const seriesOn = !!parent.recurring;
     const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" id="oex-f-recurring"' + (seriesOn ? ' checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;"/> Recurring monthly bill (same cost each month)</label></div>'
-      + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '"><div class="f" style="width:180px;"><label>Term (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="12"/></div></div>';
+      + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + 'align-items:flex-end;gap:12px;flex-wrap:wrap;"><div class="f" style="width:170px;"><label>Ends after (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="Ongoing"/></div><div style="font-size:11px;color:var(--t3);padding-bottom:9px;max-width:300px;line-height:1.5;">Leave blank to recur until you stop it. Only set this for a bill that ends after a fixed number of payments.</div></div>';
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</div>'
@@ -637,7 +642,7 @@ S.HubOperatingExpenses = {
       +   '<button class="btn btn-primary" id="oex-save">' + (isEdit ? 'Save Changes' : 'Add Expense') + '</button>'
       +   '<button class="btn btn-ghost" id="oex-cancel">Cancel</button>'
       +   '<span id="oex-f-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
-      +   (isEdit ? '<button class="btn btn-ghost" id="oex-modal-del" style="margin-left:auto;color:var(--red);">Delete</button>' : '')
+      +   (isEdit ? '<button class="btn btn-danger" id="oex-modal-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
     const showErr = (m) => { const e = document.getElementById('oex-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
@@ -660,7 +665,7 @@ S.HubOperatingExpenses = {
       const updates = { date, category, vendor, amount, notes };
       const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
       const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
-      if (recChecked && (!termV || termV < 1)) { showErr('Enter the term in months for a recurring bill.'); return; }
+      if (recChecked && document.getElementById('oex-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
@@ -670,18 +675,42 @@ S.HubOperatingExpenses = {
         const pIdx = arr.findIndex(r => r.id === parentId);
         if (pIdx >= 0) {
           arr[pIdx] = recChecked
-            ? Object.assign({}, arr[pIdx], { recurring: true, term_months: termV, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
+            ? Object.assign({}, arr[pIdx], { recurring: true, term_months: (termV && termV > 0) ? termV : null, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
             : Object.assign({}, arr[pIdx], { recurring: false, term_months: null });
         }
       } else {
         const newRec = Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates);
-        if (recChecked) { newRec.recurring = true; newRec.term_months = termV; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
+        if (recChecked) { newRec.recurring = true; newRec.term_months = (termV && termV > 0) ? termV : null; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
         arr.push(newRec);
       }
       await App.saveKey('operating_expenses');
       App.closeModal(id);
       this.renderMain();
     });
+  },
+
+  // ── Stop a recurring series ──────────────────────────────────────────────
+  // Turns recurring off on the series parent: past months stay on the books, but
+  // it stops projecting into next month and the Cash Forecast. This is the "until
+  // you cancel" end for an ongoing bill (or an early stop on a fixed-term one).
+  async _stopRecurring(id) {
+    const arr = this.records();
+    const r = arr.find(x => x.id === id);
+    if (!r) return;
+    const parentId = r.recurring_parent || r.id;
+    const pIdx = arr.findIndex(x => x.id === parentId);
+    if (pIdx < 0) return;
+    const p = arr[pIdx];
+    const who = p.vendor || p.category || 'This bill';
+    const ok = await App.confirm({
+      title: 'Stop this recurring bill?',
+      message: who + ' will stop recurring. Past months stay on your books, and it drops off next month and the Cash Forecast.',
+      confirmText: 'Stop Recurring', cancelText: 'Keep It'
+    });
+    if (!ok) return;
+    arr[pIdx] = Object.assign({}, p, { recurring: false, term_months: null });
+    await App.saveKey('operating_expenses');
+    this.renderMain();
   },
 
   // ── Duplicate ──────────────────────────────────────────────────────────
