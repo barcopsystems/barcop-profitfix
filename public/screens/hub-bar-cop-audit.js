@@ -827,14 +827,14 @@ S.HubBarCopAudit = {
 
     const pAud = ((App.data && App.data.audits) || []).length >= 1;
     const rAud = ((App.data && App.data.revenue_audits) || []).length >= 1;
-    const _shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    let _span = 0;
-    if (_shifts.length) {
-      const ds = _shifts.map(s => s && s.date).filter(Boolean).sort();
-      if (ds.length) _span = (new Date(ds[ds.length - 1] + 'T00:00:00') - new Date(ds[0] + 'T00:00:00')) / 86400000;
-    }
-    const ctrlWeeks = _span >= 13;
-    const bcReady = pAud && rAud && ctrlWeeks && enough;
+    const _spanDays = arr => {
+      const ds = (arr || []).map(r => r && (r.date || r.week_start)).filter(Boolean).sort();
+      return ds.length ? (new Date(ds[ds.length - 1] + 'T00:00:00') - new Date(ds[0] + 'T00:00:00')) / 86400000 : 0;
+    };
+    const invDone   = (((App.inventoryData && App.inventoryData.ic_counts) || []).length) >= 2;
+    const laborDone = _spanDays((App.laborData && App.laborData.lc_actuals) || []) >= 13;
+    const shiftDone = _spanDays((App.shiftData && App.shiftData.sc_shifts) || []) >= 13;
+    const bcReady = pAud && rAud && invDone && laborDone && shiftDone && enough;
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.firstAuditCard({ pfx: 'bca', title: 'Bar Cop Audit', desc, canRun, hasLatest: !!latest, daysLeft, opts: { lockedNoInputs: true, notReady: !enough },
@@ -843,7 +843,9 @@ S.HubBarCopAudit = {
             steps: [
               { label: 'Run your Profit Audit', done: pAud, go: 'audit-tracker' },
               { label: 'Run your Revenue Audit', done: rAud, go: 'r-audit' },
-              { label: 'Log 2 weeks of Control data', done: ctrlWeeks, go: 'ic-dashboard' }
+              { label: 'Take 2 inventory counts', done: invDone, go: 'ic-take-inventory' },
+              { label: 'Log 2 weeks of labor hours', done: laborDone, go: 'lc-log-hours' },
+              { label: 'Import 2 weeks of POS sales', done: shiftDone, go: 'sc-dashboard' }
             ] } })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
