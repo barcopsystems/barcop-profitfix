@@ -40,7 +40,7 @@ S.HubYearEnd = {
   // shows "YEAR-END REVIEW | Back to Dashboard". Action buttons live next to
   // the Year dropdown inside the picker card.
   open() {
-    App.openHubFullPage('Year-End Review', (mount) => this._render(mount), 'year-end');
+    App.openHubFullPage('Annual Review', (mount) => this._render(mount), 'year-end');
   },
 
   // ── Render the picker screen ───────────────────────────────────────────────
@@ -54,7 +54,7 @@ S.HubYearEnd = {
     mount.innerHTML =
       '<div class="screen">'
       + '<div class="card form-card">'
-        + '<div class="card-title">Year-End Review</div>'
+        + '<div class="card-title">Annual Review</div>'
         + '<div class="form-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
           + '<div class="f" style="width:160px;"><label>Year</label><select id="hy-year">' + yearOpts + '</select></div>'
         + '</div>'
@@ -126,8 +126,8 @@ S.HubYearEnd = {
   async _ackExport() {
     if (this._yeAckGiven) return true;
     const ok = await App.confirmExport({
-      title: 'Before You Export Your Year-End',
-      message: 'This Year-End Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed tax return or audited financial statement. Your accountant should review and verify it before you file anything.',
+      title: 'Before You Export Your Annual Review',
+      message: 'This Annual Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed tax return or audited financial statement. Your accountant should review and verify it before you file anything.',
       confirmText: 'I Understand, Continue',
       cancelText: 'Cancel'
     });
@@ -165,14 +165,14 @@ S.HubYearEnd = {
 
       const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
       wb.Props = {
-        Title:        barName + ' - Year-End Review, ' + year,
+        Title:        barName + ' - Annual Review, ' + year,
         Subject:      App.deliverableFooter().workbookSubject,
         Author:       barName,
         Company:      'Bar Cop',
         CreatedDate:  new Date()
       };
 
-      const filename = barName + ' - Year-End Review Worksheet - ' + year + '.xlsx';
+      const filename = barName + ' - Annual Review Worksheet - ' + year + '.xlsx';
       XLSX.writeFile(wb, filename);
       this._setStatus('Downloaded ' + filename, 'var(--gold)');
     } catch (e) {
@@ -1066,8 +1066,8 @@ S.HubYearEnd = {
     try { await App._ensurePDFLib(); }
     catch (e) { this._setStatus('Could not load the PDF engine. Check your connection and try again.', 'var(--red)'); return; }
 
-    const b = App._pdfBuilder('Year-End Review');
-    b.header({ right: 'Year-End Review', meta: year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') });
+    const b = App._pdfBuilder('Annual Review');
+    b.header({ right: 'Annual Review', meta: year + (hasPrior ? ' (with ' + priorYear + ' comparison)' : '') });
 
     // ── Headline numbers ──
     // True operating income (matches the workbook Annual Summary): net revenue

@@ -67,7 +67,7 @@ S.Hub = {
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
-      + row('year-end', 'Year-End Review', 'calendar')
+      + row('year-end', 'Annual Review', 'calendar')
       + '<div class="nav-section">Operations</div>'
       + row('permits', 'Permits and Licenses', 'shield')
       + row('operating-expenses', 'Operating Expenses', 'expense')

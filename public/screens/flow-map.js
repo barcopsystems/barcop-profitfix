@@ -54,7 +54,7 @@ S.FlowMap = {
     { id: 'hub', label: 'Hub', full: 'Hub Dashboard', layer: 'report', action: 'hub',
       what: 'The cross-system home. Surfaces the total recovered, the Bar Cop Audit score, and the top exposures across every section.' },
     { id: 'books', label: 'Books', full: 'Accounting / Books', layer: 'report', action: 'books',
-      what: 'Month-end Books, Year-End Review, and the Weekly P&L Brief. Built from This Week, labor and tips, operating expenses, and permits.' }
+      what: 'Month-end Books, Annual Review, and the Weekly P&L Brief. Built from This Week, labor and tips, operating expenses, and permits.' }
   ],
 
   EDGES: [
