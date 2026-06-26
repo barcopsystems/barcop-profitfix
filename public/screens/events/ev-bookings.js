@@ -272,14 +272,14 @@ S.EventsBookings = {
     const pipelineVal = open.reduce((s, b) => s + this.quoteTotal(b), 0);
     const depositsDue = booked.filter(b => !b.deposit_paid_date).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
 
-    const stat = (label, val, cls) =>
-      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + val + '</div></div>';
+    const stat = (label, val, color) =>
+      '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
-      + stat('Open Leads', String(open.length), open.length ? '' : 'dim')
-      + stat('Stale (3+ Days)', String(stale.length), stale.length ? 'warn' : '')
-      + stat('Booked, Next 30d', String(bookedSoon.length))
+      + stat('Open Leads', String(open.length), open.length ? '' : 'var(--t3)')
+      + stat('Stale (3+ Days)', String(stale.length), stale.length ? 'var(--amber)' : '')
       + stat('Pipeline Value', App.fmtCurrency(pipelineVal))
-      + stat('Deposits Due', App.fmtCurrency(depositsDue), depositsDue ? 'warn' : '')
+      + stat('Booked, Next 30d', String(bookedSoon.length))
+      + stat('Deposits Due', App.fmtCurrency(depositsDue), depositsDue ? 'var(--amber)' : '')
       + '</div></div>';
 
     // Inline New Booking form (persists in-progress via _addDraft). Buttons below
@@ -319,7 +319,7 @@ S.EventsBookings = {
           + '<td><div class="val" style="font-weight:600;">' + esc(this.title(b)) + '</div>'
           +   (b.contact_name && b.event_name ? '<div style="font-size:10px;color:var(--t3);">' + esc(b.contact_name) + '</div>' : '') + '</td>'
           + '<td>' + esc(b.event_type || '-') + '</td>'
-          + '<td>' + (b.event_date ? this.fmtDate(b.event_date) + (dUntil != null && dUntil >= 0 && dUntil <= 30 && b.stage === 'Booked' ? ' <span style="color:var(--t3);font-size:10px;">(' + dUntil + 'd)</span>' : '') : (isStale ? '<span style="color:var(--red);font-size:11px;">stale</span>' : '-')) + '</td>'
+          + '<td>' + (b.event_date ? this.fmtDate(b.event_date) + (dUntil != null && dUntil >= 0 && dUntil <= 30 && b.stage === 'Booked' ? ' <span style="color:var(--t3);font-size:10px;">(' + dUntil + 'd)</span>' : '') : (isStale ? '<span style="color:var(--amber);font-size:11px;">stale</span>' : '-')) + '</td>'
           + '<td>' + (b.party_size ? b.party_size : '-') + '</td>'
           + '<td>' + money + '</td>'
           + '<td>' + dep + '</td>'

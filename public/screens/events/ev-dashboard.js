@@ -37,7 +37,7 @@ S.EventsDashboard = {
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
       + '</div>'
-      + this.asNeeded(st)
+      + this.asNeeded()
       + '</div>';
     this.wire();
   },
@@ -117,7 +117,7 @@ S.EventsDashboard = {
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total + ' handled</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Book The Events</div>'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Book Out Your Events</div>'
       + '</div>'
       + '<div style="padding:18px 22px;">'
       +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
@@ -172,17 +172,10 @@ S.EventsDashboard = {
     return explain(M[k]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div>';
   },
 
-  asNeeded(st) {
-    const RG = S.EventsRegulars, regs = (App.data && App.data.event_regulars) || [];
-    let reach = 0;
-    if (RG && RG.monthOf) {
-      const m = new Date(App.todayLocal() + 'T00:00:00').getMonth();
-      reach = regs.filter(r => RG.monthOf(r.birthday) === m || RG.monthOf(r.anniversary) === m).length;
-    }
+  asNeeded() {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
       + '<button class="btn btn-ghost btn-sm" data-act="ev-calendar">Event Calendar</button>'
-      + '<button class="btn btn-ghost btn-sm" data-act="ev-regulars">Track Regulars' + (reach ? ' (' + reach + ' to reach)' : '') + '</button>'
       + '<button class="btn btn-ghost btn-sm" data-act="ev-pricing">Price Packages</button>'
       + '</div>';
   },
@@ -217,10 +210,10 @@ S.EventsDashboard = {
 
   showHowTo() {
     App.showHelpModal('How the Events Landing Works', [
-      { p: ['Your events room at a glance. Up top, Where You Stand: the revenue you have booked, your open pipeline, the deposits you are owed, and your win rate. Below it, Book The Events walks the work that keeps the pipeline moving.'] },
+      { p: ['Your events room at a glance. Up top, Where You Stand: the revenue you have booked, your open pipeline, the deposits you are owed, and your win rate. Below it, Book Out Your Events walks the work that keeps the pipeline moving.'] },
       { h: 'Getting Set Up', p: ['Before you have data, a Get Started box points you at the four things that turn Events on: log a booking, build your rate card, add your regulars, and plan a date. Once those are in, Where You Stand takes its place.'] },
-      { h: 'Book The Events', p: ['Four steps that handle themselves off your pipeline, no marking needed: work your open leads, collect deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. A step turns green when there is nothing left to do in it; when all four are clear, your events are handled.'] },
-      { h: 'As Needed', p: ['The planning tools sit at the bottom: the Event Calendar, your regulars, and your price packages. Track Regulars flags how many have a birthday or anniversary this month.'] }
+      { h: 'Book Out Your Events', p: ['Four steps that handle themselves off your pipeline, no marking needed: work your open leads, collect deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. A step turns green when there is nothing left to do in it; when all four are clear, your events are handled.'] },
+      { h: 'As Needed', p: ['The planning tools sit at the bottom: the Event Calendar and your price packages.'] }
     ]);
   }
 };
