@@ -122,8 +122,9 @@ S.CashDashboard = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
 
+    const gs = this.getStartedDone();
     container.innerHTML = '<div class="screen">'
-      + this.scoreboard(st)
+      + (gs.all ? this.scoreboard(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -156,6 +157,28 @@ S.CashDashboard = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:12px;line-height:1.6;">'
       +   'This is your close for the week of ' + this.fmtWk(this.weekStart()) + ' to ' + this.fmtWk(this.weekEnd()) + '. '
       +   'Your live trapped cash, runway, and safe-to-spend are on <strong>This Week</strong>.</div>';
+  },
+
+  // ── Day-one Get Started strip ────────────────────────────────────────────────
+  // With no data, this replaces Where You Stand (same DashUI strip Profit and
+  // Revenue use). Each step reads done off real data; once all four are done the
+  // Where You Stand card takes its place. The weekly steps below never change.
+  getStartedDone() {
+    const hasAudit = ((App.data && App.data.cash_audits) || []).length > 0;
+    const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
+    const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
+    const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
+    return { hasAudit, hasInv, hasShift, hasLabor, all: hasAudit && hasInv && hasShift && hasLabor };
+  },
+  getStartedBox(d) {
+    return DashUI.dayOneStrip(
+      'Four steps and this card fills in with your trapped cash, your runway, and what is safe to spend.',
+      [
+        { done: d.hasAudit, num: 1, label: 'Run your first Cash Audit', go: 'c-audit' },
+        { done: d.hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
+        { done: d.hasShift, num: 3, label: 'Set up Shift Control', go: 'sc-dashboard', cross: true },
+        { done: d.hasLabor, num: 4, label: 'Set up Labor Control', go: 'lc-dashboard', cross: true }
+      ]);
   },
 
   // ── Recovery Scoreboard (the cash money hero) ────────────────────────────────
