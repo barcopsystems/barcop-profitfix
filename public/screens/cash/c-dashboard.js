@@ -200,7 +200,7 @@ S.CashDashboard = {
     if (!sf || !sf.hasData) {
       return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
     }
-    const mini = (label, val, col) => '<div style="min-width:108px;">'
+    const mini = (label, val, col) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
     if (!sf.hasOpening) {
@@ -217,9 +217,12 @@ S.CashDashboard = {
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
     const lowCol = (low && low.balance < 0) ? 'var(--red)' : (low && pos.reserve > 0 && low.balance < pos.reserve ? 'var(--amber)' : 'var(--t1)');
     const safeCol = (pos.safe != null && pos.safe < 0) ? 'var(--red)' : 'var(--t1)';
-    return wrap('<div style="display:flex;align-items:flex-start;gap:35px;flex-wrap:wrap;">'
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       + mini('Runway', this.runwayLabel(sf.runway), runwayCol)
+      + vdiv
       + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
+      + vdiv
       + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
