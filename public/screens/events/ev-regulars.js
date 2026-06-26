@@ -37,7 +37,7 @@ S.EventsRegulars = {
       anniv: '<div class="f"><label>Anniversary</label><input type="date" id="' + p + '-anniv" value="' + esc(r?.anniversary || '') + '"/></div>',
       visit: '<div class="f"><label>Last Visit</label><input type="date" id="' + p + '-visit" value="' + esc(r?.last_visit || '') + '"/></div>'
     };
-    const vipRow = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin:4px 0 14px;"><input type="checkbox" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> This customer is a VIP regular</label>';
+    const vipRow = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin:4px 0 14px;"><input type="checkbox" class="bc-check" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + '/> This customer is a VIP regular</label>';
     const prefs = '<div class="f" style="width:100%;margin-bottom:14px;"><label>Drink Preferences</label><input type="text" id="' + p + '-prefs" value="' + esc(r?.drink_prefs || '') + '" placeholder="Negroni, Tito\'s soda, no IPAs"/></div>';
     const notes = '<div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + '-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
     const rowClass = compact ? 'form-row eb-crow' : 'form-row';
@@ -67,12 +67,12 @@ S.EventsRegulars = {
     const annivs = all.filter(r => this.monthOf(r.anniversary) === thisMonth);
     const quiet  = all.filter(r => this.isQuiet(r));
 
-    const stat = (l, v, cls) => '<div class="calc-item"><div class="calc-label">' + l + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + v + '</div></div>';
+    const stat = (l, v, color) => '<div class="calc-item"><div class="calc-label">' + l + '</div><div class="calc-val lg"' + (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
       + stat('Regulars', String(all.length))
-      + stat('Birthdays This Month', String(bdays.length), bdays.length ? 'good' : '')
-      + stat('Anniversaries This Month', String(annivs.length), annivs.length ? 'good' : '')
-      + stat('Gone Quiet (' + this.QUIET_DAYS + '+ Days)', String(quiet.length), quiet.length ? 'warn' : '')
+      + stat('Birthdays This Month', String(bdays.length), bdays.length ? 'var(--green)' : '')
+      + stat('Anniversaries This Month', String(annivs.length), annivs.length ? 'var(--green)' : '')
+      + stat('Gone Quiet (' + this.QUIET_DAYS + '+ Days)', String(quiet.length), quiet.length ? 'var(--amber)' : '')
       + '</div></div>';
 
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
