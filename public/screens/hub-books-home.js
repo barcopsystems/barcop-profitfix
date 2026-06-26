@@ -5,7 +5,7 @@
    Control/Cash "Close The Week" pattern: a Where You Stand card (the headline
    P&L number on top, a secondary read below), the monthly Close Out Your Books
    step checklist (expandable steps + green progress bar), and an As Needed row.
-   Cadence is monthly, no week selector. Numbers roll up from the same S.HubBooks
+   Monthly close, no week selector. Numbers roll up from the same S.HubBooks
    aggregators the Month-End file is built from, so they always agree; the work
    happens on the screens the steps link to. */
 

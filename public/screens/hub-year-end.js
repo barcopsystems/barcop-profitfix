@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Hub Year-End Review — Annual operations review deliverable ───────────────
+/* ── Hub Annual Review — annual operations review deliverable ─────────────────
    Sits alongside Month-End Books and Weekly P&L on the Hub Accounting menu.
    Builds an annual XLSX workbook + a styled multi-page PDF Executive Summary
    from data Bar Cop already has: revenue_weeks, weeks, lc_actuals, sc_shifts,
@@ -37,7 +37,7 @@ S.HubYearEnd = {
 
   // ── Entry point ────────────────────────────────────────────────────────────
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "YEAR-END REVIEW | Back to Dashboard". Action buttons live next to
+  // shows "ANNUAL REVIEW | Back to Dashboard". Action buttons live next to
   // the Year dropdown inside the picker card.
   open() {
     App.openHubFullPage('Annual Review', (mount) => this._render(mount), 'year-end');

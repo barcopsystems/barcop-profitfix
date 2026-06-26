@@ -130,7 +130,11 @@ S.Reports = {
 
   _filterWeeksByRange(weeks,range,customFrom,customTo){
     if(!weeks.length) return [];
-    const sorted=weeks.slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
+    // Parse a bare YYYY-MM-DD as LOCAL midnight (not UTC), so the boundary
+    // comparisons below line up with new Date(year,0,1) / the date inputs and a
+    // year-edge week never slips out by a day. See the local-date convention.
+    const pd=(s)=>new Date((s||'1970-01-01')+'T00:00:00');
+    const sorted=weeks.slice().sort((a,b)=>pd(a.period_end)-pd(b.period_end));
     if(range==='all') return sorted;
     if(range==='last1') return sorted.slice(-1);
     if(range==='last4') return sorted.slice(-4);
@@ -139,16 +143,16 @@ S.Reports = {
       const yearStart=new Date(new Date().getFullYear(),0,1);
       return sorted.filter(w=>{
         if(!w.period_end) return false;
-        return new Date(w.period_end)>=yearStart;
+        return pd(w.period_end)>=yearStart;
       });
     }
     if(range==='custom'){
       if(!customFrom||!customTo) return [];
-      const from=new Date(customFrom);
-      const to=new Date(customTo);
+      const from=pd(customFrom);
+      const to=pd(customTo);
       return sorted.filter(w=>{
         if(!w.period_end) return false;
-        const d=new Date(w.period_end);
+        const d=pd(w.period_end);
         return d>=from&&d<=to;
       });
     }
