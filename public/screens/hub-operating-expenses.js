@@ -300,7 +300,7 @@ S.HubOperatingExpenses = {
       + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag() : '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
-      + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
+      + '<td style="font-weight:700;color:var(--t1);text-align:right;white-space:nowrap;">' + fmt$(r.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;">' + actions + '</td>'
       + '</tr>';
   },
@@ -341,13 +341,13 @@ S.HubOperatingExpenses = {
       + '<td style="color:var(--t3);white-space:nowrap;">Expected</td>'
       + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
-      + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
+      + '<td style="color:var(--t2);text-align:right;white-space:nowrap;">' + fmt$(p.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(p.id) + '">Stop</button></td></tr>';
     // The first column header carries the section name; the rest are the columns.
     const sectionCard = (name, rowsHtml) => '<div class="card card-bleed data-card" style="margin-bottom:14px;">'
       + '<div class="card-bleed-tbl"><table class="tbl">'
       +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr><th>' + name + '</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
+      +   '<thead><tr><th>' + name + '</th><th>Category</th><th>Vendor</th><th style="text-align:right;">Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + rowsHtml + '</tbody>'
       + '</table></div></div>';
 
@@ -524,8 +524,8 @@ S.HubOperatingExpenses = {
       : recs.map(r => this._logRowHtml(r, { minimal: true })).join('');
     return '<div class="card card-bleed data-card"' + (id ? ' id="' + id + '"' : '') + '>'
       + '<div class="card-bleed-tbl"><table class="tbl">'
-      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
+      +   '<colgroup><col style="width:16%"><col style="width:26%"><col style="width:22%"><col style="width:20%"><col style="width:16%"></colgroup>'
+      +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th style="text-align:right;">Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
       + '</table></div></div>';
   },

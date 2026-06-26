@@ -99,7 +99,7 @@ S.HubBooksHome = {
 
   // ── Where You Stand (hero + secondary, Cash-style) ──────────────────────────
   whereYouStand(st) {
-    const incCol = st.ytdInc < 0 ? 'var(--red)' : 'var(--t1)';
+    const incCol = st.ytdInc < 0 ? 'var(--red)' : 'var(--w)';
     const hero = '<div style="padding:2px 0;">'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
       +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:' + incCol + ';">' + this._money(st.ytdInc) + '</span>'
