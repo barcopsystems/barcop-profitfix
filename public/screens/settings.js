@@ -3510,6 +3510,11 @@ S.HubSettings = {
     // The cockpit's per-week "done" stamps live in localStorage (per device), so
     // clear them too or past weeks keep phantom checks after a wipe.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    // Cash Recovery device-local config also lives in localStorage. Clear it too,
+    // or a wiped account keeps the seeded opening balance, tax rate, and reserve
+    // and reads as if the opening balance is already set (Cash Audit step 1 checks
+    // off, Cash Position pre-fills). A real fresh signup never has these.
+    try { ['cash_opening_balance', 'cash_sales_tax_rate', 'cash_tax_freq', 'cash_payroll_burden', 'cash_reserve_weeks'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
