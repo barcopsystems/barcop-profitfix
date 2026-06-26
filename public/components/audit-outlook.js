@@ -197,8 +197,8 @@ window.AuditOutlook = {
 
     return 'You are a 30-year bar and restaurant operator writing a brief cash analysis for a fellow owner. '
       + 'This is the survival read: can they make it through the next quarter, and where is their money really going. '
-      + 'Write 2 to 3 short paragraphs. Direct operator-to-operator voice. Plain sentences. Specific numbers from the data below. '
-      + 'Strict rules: no emdashes, no "--" double dashes, no bullet points, no headers, no AI words like "cadence" or "leverage" or "robust" or "going forward" or "ecosystem" or "synthesize". '
+      + 'Write 2 to 3 short paragraphs. '
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. Every point lands on a real number from the data. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless). '
       + 'First paragraph: the survival story. Lead with the runway and the tightest week, what the cash picture says about the next 13 weeks right now. '
       + 'Second paragraph: where the cash is stuck, the trapped shelf cash and how many days the cash stays locked in the cycle, with the numbers. '
       + 'Third paragraph: the single most important move to make this week to cover the tight week or free the cash. One clear action. '
@@ -238,8 +238,8 @@ window.AuditOutlook = {
     const monthlyTotal = (audit.action_items || []).reduce((s, i) => s + (i.monthly_impact || 0), 0);
 
     return 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner about their ' + typeLabel + ' audit. '
-      + 'Write 2 to 3 short paragraphs. Direct operator-to-operator voice. Plain sentences. Specific numbers from the data below. '
-      + 'Strict rules: no emdashes, no "--" double dashes, no bullet points in your output, no headers, no AI words like "cadence" or "leverage" or "robust" or "going forward" or "ecosystem" or "synthesize". '
+      + 'Write 2 to 3 short paragraphs. '
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. Every point lands on a real number from the data. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless). '
       + 'Lead with the overall story (what the score says about the operation right now). '
       + 'Second paragraph: the biggest concern or biggest win with specific numbers. '
       + 'Third paragraph (optional): the single most important action to take this month. '
