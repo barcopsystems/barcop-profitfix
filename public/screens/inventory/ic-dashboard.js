@@ -281,13 +281,13 @@ S.InventoryDashboard = {
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
+      + (st.latest ? this.whereYouStand(st) : '')
       + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
-      + this.statusStrip(st)
       + (allDone ? this.readout(st) : '')
       + this.outlierStrip()
       + '</div>';
@@ -437,18 +437,32 @@ S.InventoryDashboard = {
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Open Variance</button>' + this.markBtn('review', 'Mark Reviewed'));
   },
 
-  // ── Status strip (the KPIs) ──────────────────────────────────────────────────
-  statusStrip(st) {
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('Inventory Value', App.fmtCurrency(st.inventoryValue))
-      + div
-      + item('To Reorder', App.fmtCurrency(st.reorderTotal), st.reorderCount ? 'warn' : '')
-      + div
-      + item('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost) : '-')
-      + '</div>';
+  // ── Where You Stand (inventory headline + three-stat read + Briefing) ────────
+  whereYouStand(st) {
+    const counted = st.latest ? this.fmtDate(st.latest.date) : null;
+    const sub = counted
+      ? (st.weeksOnHand != null ? st.weeksOnHand.toFixed(1) + ' weeks on hand &middot; counted ' + counted : 'counted ' + counted)
+      : 'take your first count to fill this in';
+    const hero = '<div style="padding:2px 0;">'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + App.fmtCurrency(st.inventoryValue, 0) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">on hand</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + sub + '</div></div>';
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    const mini = (label, val, col) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">This Week</div>'
+      + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+      +   mini('To Reorder', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)') + vdiv
+      +   mini('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + vdiv
+      +   mini('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)')
+      + '</div></div>';
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
+      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+      + hero + secondary + '</div>';
   },
 
   // ── Rich readout (the done-state payoff) ─────────────────────────────────────
@@ -551,9 +565,62 @@ S.InventoryDashboard = {
     ]);
   },
 
+  // ── Bar Cop Briefing: a written read of the inventory week, the same button
+  //    the recovery dashboards carry. Cached a week per section (DashUI helpers)
+  //    so repeat opens do not spend on the API. ──────────────────────────────
+  showInsights() {
+    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
+    const st = this._st || this.computeState();
+    if (!st.latest) { DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and Bar Cop can read your inventory week for you.'); return; }
+    const rec = DashUI._insRec('inventory');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
+    const prompt = this._insPrompt(st);
+    const btn = this.container.querySelector('[data-insights]');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your inventory right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        const text = data.content && data.content[0] && data.content[0].text;
+        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('inventory', html));
+        restore();
+      })
+      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+  },
+
+  _insPrompt(st) {
+    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+    const facts = [
+      'Inventory value on hand: ' + m(st.inventoryValue),
+      'Weeks of inventory on hand: ' + (st.weeksOnHand != null ? st.weeksOnHand.toFixed(1) + ' weeks' : 'n/a, needs two counts'),
+      'Last counted: ' + (st.latest ? st.latest.date + (st.hasCountThisWeek ? ' (this week)' : ', ' + st.lastAge + ' days ago') : 'never'),
+      'Used this period (cost of goods): ' + (st.periodCost != null ? m(st.periodCost) : 'n/a, needs two counts'),
+      'To reorder, below par: ' + m(st.reorderTotal) + ' across ' + st.reorderCount + ' product' + (st.reorderCount === 1 ? '' : 's'),
+      'Shrinkage written off in the last 30 days: ' + m(st.shrink),
+      'Spot-check flags in the last 30 days: ' + st.spotFlags,
+      'Dead stock items (on hand, no movement): ' + st.deadAll,
+      'Top fast movers: ' + (st.fast.length ? st.fast.map(x => x.name + ' ' + m(x.cost)).join(', ') : 'none yet'),
+      'Dead stock tying up cash: ' + (st.dead.length ? st.dead.map(x => x.name + ' ' + m(x.tied)).join(', ') : 'none'),
+      'Pars that look off versus real usage: ' + st.parOff,
+      'Menu items now over their cost target: ' + st.menuOver
+    ].join('\n');
+    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the inventory side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
+      + 'STAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers.\n- If a number is not set or needs more counts, say so plainly instead of guessing.\n\n'
+      + 'FACTS:\n' + facts
+      + '\n\nWrite two or three short paragraphs: first where the inventory stands (value on hand, weeks on hand, whether the count is current), then where cash is leaking or stuck (shrinkage, dead stock, pars off versus usage), then the single move that matters most this week. Use the exact numbers from the facts.';
+  },
+
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const head = ev.target.closest('.ic-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
