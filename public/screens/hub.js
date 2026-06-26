@@ -69,9 +69,9 @@ S.Hub = {
       + row('books', 'Month-End Books', 'books')
       + row('year-end', 'Annual Review', 'calendar')
       + '<div class="nav-section">Operations</div>'
+      + row('permits', 'Permits and Licenses', 'shield')
       + row('operating-expenses', 'Operating Expenses', 'expense')
       + row('expense-history', 'Expense History', 'history')
-      + row('permits', 'Permits and Licenses', 'shield')
       + '<div class="nav-section">Support</div>'
       + row('books-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
