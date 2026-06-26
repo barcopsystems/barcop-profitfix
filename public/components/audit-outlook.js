@@ -220,6 +220,7 @@ window.AuditOutlook = {
 
   _buildScorePrompt(auditType, audit) {
     const typeLabel  = this._typeLabel(auditType);
+    const weekly = auditType === 'bar-cop';
     const date       = (audit.date || '').slice(0, 10) || 'unknown';
     const score      = audit.overall_score != null ? audit.overall_score : 'n/a';
     const sections   = audit.sections || {};
@@ -242,12 +243,14 @@ window.AuditOutlook = {
       + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. Every point lands on a real number from the data. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless). '
       + 'Lead with the overall story (what the score says about the operation right now). '
       + 'Second paragraph: the biggest concern or biggest win with specific numbers. '
-      + 'Third paragraph (optional): the single most important action to take this month. '
+      + 'Third paragraph (optional): the single most important action to take ' + (weekly ? 'this week' : 'this month') + '. '
       + 'Total length: 150 to 200 words.\n\n'
       + 'AUDIT DATE: ' + date + '\n'
       + 'OVERALL SCORE: ' + score + '\n\n'
       + 'SECTION SCORES:\n' + sectionLines + '\n\n'
-      + 'TOP ACTION ITEMS (ranked by monthly impact):\n' + itemLines + '\n\n'
-      + 'MONTHLY OPPORTUNITY (sum of all action items): $' + Math.round(monthlyTotal) + '\n';
+      + (weekly
+          ? 'TOP FINDINGS:\n' + itemLines + '\n'
+          : 'TOP ACTION ITEMS (ranked by monthly impact):\n' + itemLines + '\n\n'
+            + 'MONTHLY OPPORTUNITY (sum of all action items): $' + Math.round(monthlyTotal) + '\n');
   }
 };
