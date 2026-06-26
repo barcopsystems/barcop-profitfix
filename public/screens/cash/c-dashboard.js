@@ -164,17 +164,17 @@ S.CashDashboard = {
   // Revenue use). Each step reads done off real data; once all four are done the
   // Where You Stand card takes its place. The weekly steps below never change.
   getStartedDone() {
-    const hasAudit = ((App.data && App.data.cash_audits) || []).length > 0;
+    const hasOpening = !!(window.CashEngine && CashEngine.position && CashEngine.position().hasOpening);
     const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
-    return { hasAudit, hasInv, hasShift, hasLabor, all: hasAudit && hasInv && hasShift && hasLabor };
+    return { hasOpening, hasInv, hasShift, hasLabor, all: hasOpening && hasInv && hasShift && hasLabor };
   },
   getStartedBox(d) {
     return DashUI.dayOneStrip(
       'Four steps and this card fills in with your trapped cash, your runway, and what is safe to spend.',
       [
-        { done: d.hasAudit, num: 1, label: 'Run your first Cash Audit', go: 'c-audit' },
+        { done: d.hasOpening, num: 1, label: 'Set your Cash Position', go: 'c-position' },
         { done: d.hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
         { done: d.hasShift, num: 3, label: 'Set up Shift Control', go: 'sc-dashboard', cross: true },
         { done: d.hasLabor, num: 4, label: 'Set up Labor Control', go: 'lc-dashboard', cross: true }
@@ -353,7 +353,7 @@ S.CashDashboard = {
       const ca = App.latestEvent ? App.latestEvent(App.data.cash_audits || []) : null;
       const lead = ca && ca.overall_score != null
         ? 'Your last Cash audit scored <strong style="color:' + App.scoreColor(ca.overall_score) + ';">' + ca.overall_score + '</strong>. Run a fresh one to score this week, then open the Cash Fix and check off what you have already handled so the steps below read where you really are.'
-        : 'Start the week here. The Cash audit scores your liquidity and feeds the fix steps. Run it, then open the Cash Fix and mark what you have handled.';
+        : 'Run your Cash audit first. It scores your liquidity and feeds the fix steps below. Then open the Cash Fix and mark off what you have handled.';
       return explain(lead)
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-audit">Cash Audit</button><button class="btn btn-ghost btn-sm" data-go="c-fix">Cash Fix</button>' + this.markBtn('audit', 'Mark Done'));
     }
