@@ -185,8 +185,11 @@ S.CashDashboard = {
   // is truly safe to spend, off the 13-week forecast. Color is meaning only.
   survivalStrip(st) {
     const sf = st.survival, pos = st.position;
-    const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Will You Make It To Next Quarter?</div>'
+    const wrap = (inner, showBtn) => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Will You Make It To Next Quarter?</div>'
+      +   (showBtn ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Insights</button>' : '')
+      + '</div>'
       + inner + '</div>';
     if (!sf || !sf.hasData) {
       return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
@@ -202,7 +205,7 @@ S.CashDashboard = {
         +   (tw > 0 ? tw + ' week' + (tw === 1 ? '' : 's') + ' have more cash going out than coming in. ' : 'Your cash timing looks clear. ')
         +   'Set your opening balance to see your real runway and the week you would run thin.</div>'
         + '</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
+        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>', true);
     }
     const low = sf.lowPoint;
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
@@ -213,7 +216,7 @@ S.CashDashboard = {
       + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
       + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
       + '</div>'
-      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>', true);
   },
 
   weekSelector() {
@@ -414,7 +417,68 @@ S.CashDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.c-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.c-wk-next')) { this._stepWeek(7); return; }
+      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       if (ev.target.closest('.c-wk-now'))  { this._weekStart = null; this._openStep = null; this.render(this.container, this.actions); return; }
     };
+  },
+
+  // ── Bar Cop Insights: a written read of the cash picture, same button Profit
+  //    and Revenue carry. Cached once a week per section (DashUI helpers) so
+  //    repeat opens do not spend on the API. ──────────────────────────────────
+  showInsights() {
+    if (App.demoBlock && App.demoBlock('Bar Cop Insights')) return;
+    const st = this._st || this.computeState();
+    const sf = st.survival, t = st.trapped;
+    if (!(sf && sf.hasData) && !(t && t.hasData)) {
+      DashUI.insightsModal('Bar Cop Insights', 'Take a couple of counts and add your sales, schedule, and bills, and Bar Cop can read your cash for you.');
+      return;
+    }
+    const rec = DashUI._insRec('cash');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Insights', rec.html, rec.generated_at); return; }
+    const prompt = this._insPrompt(st);
+    const btn = this.container.querySelector('[data-insights]');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Insights'; } };
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { DashUI.insightsModal('Bar Cop Insights', 'Could not read your cash right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        const text = data.content && data.content[0] && data.content[0].text;
+        if (!text) { DashUI.insightsModal('Bar Cop Insights', 'No response came back. Try again.'); restore('Try Again'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Insights', html, DashUI._insSave('cash', html));
+        restore();
+      })
+      .catch(err => { DashUI.insightsModal('Bar Cop Insights', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+  },
+
+  _insPrompt(st) {
+    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+    const sf = st.survival || {}, pos = st.position || {}, cyc = st.cycle || {}, t = st.trapped || {}, f = st.freed || {};
+    const totalVendors = (window.CashEngine && CashEngine.vendors) ? CashEngine.vendors().length : 0;
+    const onTerms = (st.termVendors || []).length;
+    const runway = sf.hasOpening ? (sf.runway == null ? 'holds all 13 weeks' : (sf.runway === 0 ? 'runs out this week' : sf.runway + ' weeks')) : 'not set (no opening balance)';
+    const low = sf.hasOpening && sf.lowPoint ? (this.fmtWk(sf.lowPoint.ws) + ' at ' + m(sf.lowPoint.balance)) : 'n/a';
+    const facts = [
+      'Trapped cash on the shelf: ' + (t.hasData ? m(t.total) + ' (' + m(t.dead) + ' dead stock, ' + m(t.overPar) + ' above par)' : 'not counted yet'),
+      'Cash freed so far (drop from your first weeks): ' + (f.building ? 'still building, not enough counts yet' : m(f.dollars)),
+      'Runway: ' + runway,
+      'Tightest week ahead: ' + low,
+      'Tight weeks in the next 13 (more cash out than in): ' + (sf.tightWeeks != null ? sf.tightWeeks : 'n/a'),
+      'Safe to spend right now: ' + (pos.hasOpening ? m(pos.safe) : 'n/a (opening balance not set)'),
+      'Cash locked in the operating cycle: ' + (cyc.hasData ? Math.round(cyc.cycle) + ' days (product sits ' + Math.round(cyc.dio) + ' days, you take ' + Math.round(cyc.dpo) + ' days to pay)' : 'n/a'),
+      'Vendors on payment terms: ' + onTerms + ' of ' + totalVendors,
+      'Cash going out this week (bills plus reorder): ' + m(st.outThisWeek)
+    ].join('\n');
+    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the cash side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
+      + 'STAY TRUE TO THE FACTS:\n'
+      + '- Use only the facts below. Do not invent numbers or weeks.\n'
+      + '- If a number is not set or not counted yet, say so plainly instead of guessing.\n\n'
+      + 'FACTS:\n' + facts
+      + '\n\nWrite two or three short paragraphs: first the survival read (runway and the tightest week, can they make the next quarter), then where the cash is stuck (trapped shelf cash and how long cash stays locked), then the single move that matters most this week. Use the exact numbers from the facts.';
   }
 };
