@@ -20,7 +20,7 @@ S.CashDashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Cash. Cash is the third lever Bar Cop watches: Profit is your margin, Revenue is your top line, Cash is your liquidity, the money actually in the account. Plenty of bars look fine on paper and still run tight, and this is where you catch it.'] },
-      { h: 'The Scoreboard', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.', 'Under it is the survival read, will you make it to next quarter: your runway, the tightest week ahead, and what is actually safe to spend, projected thirteen weeks out. Set your opening balance in Cash Position to make the runway real.'] },
+      { h: 'Where You Stand', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.', 'Under it is the survival read, will you make it to next quarter: your runway, the tightest week ahead, and what is actually safe to spend, projected thirteen weeks out. Set your opening balance in Cash Position to make the runway real.'] },
       { h: 'The Steps', p: ['1. Free trapped cash: run down the dead stock and cut pars that are too high. 2. Order to par: buy what you use, not what you fear, so cash stops piling up on the shelf. 3. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 4. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
       { h: 'Working A Step', p: ['Open a step to read the numbers, then launch into the screen that does the work and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week. None of this is daily, it is the weekly sit-down.'] }
     ]);
@@ -179,7 +179,7 @@ S.CashDashboard = {
       : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> in cash freed so far, trapped cash down from your first weeks.</span>';
     const showIns = t.hasData || (st.survival && st.survival.hasData);
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title"' + (showIns ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '><span>Cash Scoreboard</span>'
+      + '<div class="card-title"' + (showIns ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '><span>Where You Stand</span>'
       +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>' : '')
       + '</div>'
       + heroBody
