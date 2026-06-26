@@ -144,6 +144,7 @@ async function generateProfitNarrative(apiKey, d) {
 VOICE, follow exactly:
 - Write operator to operator. The reader runs a bar and knows the trade. State findings and give direct orders. Never explain a concept, define a term, or justify why a metric matters. The reader already knows.
 - Banned framing that reads like teaching or a consultant: "this tells you", "this shows you", "what this means is", "the key is", "keep in mind", "remember that", "because", "reads as". Cut them. State the fact, not the lesson behind it.
+- You can be dry and a little funny, and a quick bit of bar-floor storytelling is fine where it makes a rough number read easy instead of stinging, never at the operator's expense and never invented. Give the good, the bad, and the ugly straight, and never talk down to the reader.
 - NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst offender, the concentration, the dollar gap. TOOL: a direct instruction that names the Bar Cop screen and the action, like "Jigger every well and watch pour variance in Spot Check." Never soft advice or "you should consider".
 - Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
 - Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
@@ -262,6 +263,7 @@ async function generateRevenueNarrative(apiKey, d) {
 VOICE, follow exactly:
 - Write operator to operator. The reader runs a bar and knows the trade. State findings and give direct orders. Never explain a concept, define a term, or justify why a metric matters. The reader already knows.
 - Banned framing that reads like teaching or a consultant: "this tells you", "this shows you", "what this means is", "the key is", "keep in mind", "remember that", "because", "reads as". Cut them. State the fact, not the lesson behind it.
+- You can be dry and a little funny, and a quick bit of bar-floor storytelling is fine where it makes a rough number read easy instead of stinging, never at the operator's expense and never invented. Give the good, the bad, and the ugly straight, and never talk down to the reader.
 - NARRATIVE: one or two sentences naming the number and what it indicates for this specific operation. FINDING: the specific data behind it, the worst offender, the concentration, the gap. TOOL: a direct instruction that names the Bar Cop screen and the action, like "Track check average by server in Server Check and coach the bottom two." Never soft advice or "you should consider".
 - Risk signals: EVIDENCE and GAP are short factual statements. TOOL is one direct action.
 - Keep every field specific to the numbers given. No generic best-practice lines that would fit any bar.
