@@ -462,6 +462,7 @@ S.EventsBookings = {
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="eb-edit">Edit Details</button>'
+        + '<button class="btn btn-ghost btn-sm eb-runsheet-open">Run Sheet</button>'
         + '<button class="btn btn-ghost btn-sm" id="eb-q-pdf">Quote PDF</button>'
       + '</div></div>';
 
@@ -520,6 +521,9 @@ S.EventsBookings = {
         + this.divider() + this.subLabel('Staffing')
         + this.staffingHtml(b)
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-staff">Schedule Staff for this Event</button></div>'
+        + this.divider() + this.subLabel('Run Sheet')
+        + this.runSheetReadout(b)
+        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm eb-runsheet-open">Open Run Sheet</button><button class="btn btn-ghost btn-sm eb-runsheet-print">Print Run Sheet</button></div>'
         + '</div>';
     } else if (viewStep === 'Completed') {
       card2 = '<div class="card form-card">' + this.subLabel('Close Out the P&amp;L')
@@ -629,6 +633,8 @@ S.EventsBookings = {
     document.getElementById('eb-bal-paid')?.addEventListener('click', () => this.patch(id, { balance_paid_date: App.todayLocal() }));
     // Staffing
     document.getElementById('eb-staff')?.addEventListener('click', () => { App._eventStaffTag = b.event_name || this.title(b); App._eventStaffDate = b.event_date || ''; App.openScreen('lc-build-schedule'); });
+    this.container.querySelectorAll('.eb-runsheet-open').forEach(el => el.addEventListener('click', () => this.runSheet(id)));
+    this.container.querySelectorAll('.eb-runsheet-print').forEach(el => el.addEventListener('click', () => this.printRunSheet(this.bookings().find(x => x.id === id))));
     // Event P&L
     document.getElementById('eb-pl-save')?.addEventListener('click', () => {
       const f = {
@@ -844,6 +850,104 @@ S.EventsBookings = {
     Promise.resolve(App.exportPDF({ title: 'Event Quote - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
   },
 
+  // ── Run Sheet (the operational doc the kitchen and floor run the event off) ─
+  runSheetFields(b) {
+    const ta = (lbl, id, val, ph, rows) => '<div class="f" style="width:100%;"><label>' + lbl + '</label><textarea id="' + id + '" class="notes-ta" rows="' + (rows || 2) + '" placeholder="' + ph + '">' + esc(val || '') + '</textarea></div>';
+    return '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:150px;"><label>Guaranteed Count</label><input type="number" id="rs-gcount" value="' + (b.guaranteed_count != null && b.guaranteed_count !== '' ? b.guaranteed_count : '') + '" placeholder="' + (b.party_size || '') + '"/></div>'
+        + '<div class="f" style="width:160px;"><label>Final Count Due</label><input type="date" id="rs-cdue" value="' + esc(b.count_due_date || '') + '"/></div>'
+        + '<div class="f" style="flex:1 1 160px;"><label>Day-of Contact</label><input type="text" id="rs-dcname" value="' + esc(b.day_contact_name || '') + '" placeholder="Who runs point on site"/></div>'
+        + '<div class="f" style="width:150px;"><label>Their Phone</label><input type="tel" id="rs-dcphone" value="' + esc(b.day_contact_phone || '') + '" placeholder="Optional"/></div>'
+      + '</div>'
+      + ta('Timeline', 'rs-timeline', b.timeline, 'Load-in 5:00, doors 6:30, dinner 7:00, last call 9:30, out by 10:30.', 3)
+      + ta('Food / Menu', 'rs-menu', b.menu_notes, 'Courses, passed apps, buffet, the cake. What the kitchen makes.', 3)
+      + ta('Bar / Beverage', 'rs-bev', b.bev_notes, 'Open bar, cash bar, drink tickets, wine on the tables, a toast.', 2)
+      + ta('Allergies and Dietary', 'rs-allergy', b.allergies, 'Nut allergy at table 3, two vegan, one gluten free.', 2)
+      + ta('Setup / Layout', 'rs-setup', b.setup_notes, 'Tables, head table, dance floor, linens, signage.', 2)
+      + ta('AV / Music / Rentals', 'rs-av', b.av_notes, 'Mic, projector, the playlist, rented chairs, who delivers.', 2);
+  },
+
+  collectRunSheet() {
+    const g = id => document.getElementById(id);
+    return {
+      guaranteed_count:  g('rs-gcount') ? (parseInt(g('rs-gcount').value) || null) : null,
+      count_due_date:    g('rs-cdue')?.value || '',
+      day_contact_name:  g('rs-dcname')?.value.trim() || '',
+      day_contact_phone: g('rs-dcphone')?.value.trim() || '',
+      timeline:          g('rs-timeline')?.value.trim() || '',
+      menu_notes:        g('rs-menu')?.value.trim() || '',
+      bev_notes:         g('rs-bev')?.value.trim() || '',
+      allergies:         g('rs-allergy')?.value.trim() || '',
+      setup_notes:       g('rs-setup')?.value.trim() || '',
+      av_notes:          g('rs-av')?.value.trim() || ''
+    };
+  },
+
+  runSheetReadout(b) {
+    const filled = [b.timeline, b.menu_notes, b.bev_notes, b.setup_notes, b.av_notes].filter(s => s && String(s).trim()).length;
+    const gc = b.guaranteed_count ? b.guaranteed_count + ' guaranteed' : (b.party_size ? b.party_size + ' estimated' : 'no count set');
+    const due = b.count_due_date ? 'count due ' + this.fmtDate(b.count_due_date) : '';
+    const allergy = (b.allergies && String(b.allergies).trim()) ? '<span style="color:var(--amber);font-weight:600;">allergies noted</span>' : '';
+    const prog = filled ? filled + ' of 5 sections filled' : 'not started';
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.8;">' + [gc, due, allergy, prog].filter(Boolean).join(' &middot; ') + '</div>';
+  },
+
+  runSheet(id) {
+    const b = this.bookings().find(x => x.id === id);
+    if (!b) return;
+    const sub = [b.event_date ? this.fmtDate(b.event_date) : '', esc(b.event_time || ''), esc(b.space || ''), b.party_size ? b.party_size + ' guests' : ''].filter(Boolean).join('  &middot;  ');
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Run Sheet</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(this.title(b)) + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin:2px 0 14px;">' + sub + '</div>'
+      + this.runSheetFields(b)
+      + '<div class="card-actions"><button class="btn btn-primary" id="rs-save">Save Run Sheet</button>'
+      +   '<button class="btn btn-ghost" id="rs-print">Print Run Sheet</button>'
+      +   '<button class="btn btn-ghost" id="rs-cancel">Cancel</button></div></div>';
+    App.openModal(html, { id: 'eb-runsheet-modal', maxWidth: 700, noClose: true });
+    document.getElementById('rs-cancel')?.addEventListener('click', () => App.closeModal('eb-runsheet-modal'));
+    document.getElementById('rs-save')?.addEventListener('click', async () => {
+      await this.patch(id, this.collectRunSheet());
+      App.closeModal('eb-runsheet-modal');
+    });
+    document.getElementById('rs-print')?.addEventListener('click', async () => {
+      await this.patch(id, this.collectRunSheet());
+      this.printRunSheet(this.bookings().find(x => x.id === id));
+    });
+  },
+
+  printRunSheet(b) {
+    if (!b) return;
+    if (App.demoBlock && App.demoBlock('Run Sheet')) return;
+    const sec = (lbl, val) => (val && String(val).trim()) ? '<div style="margin-top:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + esc(lbl) + '</div><div style="font-size:13px;color:var(--t1);line-height:1.6;white-space:pre-wrap;">' + esc(val) + '</div></div>' : '';
+    const headBits = [esc(b.event_type || ''), b.event_date ? this.fmtDate(b.event_date) : '', esc(b.event_time || ''), esc(b.space || '')].filter(Boolean).join('  &middot;  ');
+    const counts = [];
+    if (b.guaranteed_count) counts.push('Guaranteed count: ' + b.guaranteed_count);
+    else if (b.party_size) counts.push('Estimated count: ' + b.party_size);
+    if (b.count_due_date) counts.push('Final count due ' + this.fmtDate(b.count_due_date));
+    const dayc = [b.day_contact_name || '', b.day_contact_phone || ''].filter(Boolean).join('  ·  ');
+    const staff = this.eventStaffByPerson(b);
+    const staffHtml = staff.length ? '<table class="tbl" style="margin-top:6px;"><tbody>' + staff.map(p => '<tr><td>' + esc(p.name) + '</td><td style="text-align:right;color:var(--t3);">' + p.hours.toFixed(1) + 'h</td></tr>').join('') + '</tbody></table>' : '';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:680px;background:var(--surface);padding:24px;';
+    wrap.innerHTML = '<div class="screen"><div class="card">'
+      + '<div class="card-title">Event Run Sheet</div>'
+      + '<div style="font-size:18px;font-weight:800;color:var(--t1);">' + esc(this.title(b)) + '</div>'
+      + (headBits ? '<div style="font-size:12px;color:var(--t3);margin-top:3px;">' + headBits + '</div>' : '')
+      + (counts.length ? '<div style="font-size:13px;color:var(--t1);font-weight:700;margin-top:8px;">' + esc(counts.join('     ')) + '</div>' : '')
+      + sec('Day-of Contact', dayc)
+      + sec('Timeline', b.timeline)
+      + sec('Food / Menu', b.menu_notes)
+      + sec('Bar / Beverage', b.bev_notes)
+      + sec('Allergies and Dietary', b.allergies)
+      + sec('Setup / Layout', b.setup_notes)
+      + sec('AV / Music / Rentals', b.av_notes)
+      + sec('Notes', b.requests)
+      + (staffHtml ? '<div style="margin-top:14px;"><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Event Staff</div>' + staffHtml + '</div>' : '')
+      + '</div></div>';
+    document.body.appendChild(wrap);
+    Promise.resolve(App.exportPDF({ title: 'Run Sheet - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
+  },
+
   worksheet() {
     App.printBlankSheet({
       title: 'Booking Inquiry Pad',
@@ -869,6 +973,7 @@ S.EventsBookings = {
       { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the per head and guest count, the F&B minimum if you hold one, and your service charge and tax. Bar Cop builds the quote underneath: F&B subtotal, then service charge and tax on top, to the quoted total. Then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the full breakdown in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
       { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
       { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
+      { h: 'Run Sheet', p: ['Run Sheet is what the kitchen and floor work the event off: the timeline, the food and bar, allergies and dietary, the room setup, AV and rentals, the guaranteed headcount and when the final count is due, and who runs point on site. Open it from the booking header or the Booked stage, fill it in, and Print Run Sheet to hand the team a clean copy.'] },
       { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
       { h: 'Getting Back', p: ['The back arrow at the bottom right returns you to the pipeline from any booking.'] }
     ]);
