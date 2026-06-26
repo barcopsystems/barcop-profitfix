@@ -443,10 +443,21 @@ S.Hub = {
     // ── Priority Actions: the biggest recovery $ moves across all systems, ranked,
     //    each row a tap into its Fix step. The recovery/metric leaks live here, not
     //    in Needs Attention. ──
+    // A few action items name a lever that lives OUTSIDE a Fix screen, so a Fix
+    // deep-link would land shallow. Events have no Fix step (the work is in the
+    // Events section), so route that one to its real home; every other gap is a
+    // real Fix step and deep-links into its module's Fix screen at the gap.
+    const PA_DEST = { 'events-catering': { screen: 'ev-bookings', mod: 'events' } };
+    const paiGo = (it) => {
+      const d = PA_DEST[it.gap];
+      return d
+        ? 'S.Hub._enter(\'' + d.screen + '\',\'' + d.mod + '\')'
+        : 'S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')';
+    };
     const paiRow = (it) => {
       const lbl = (String(it.action || '').split(/\.\s|\.$/)[0] || it.action || '').trim();
       const val = it.impact > 0 ? App.fmtCurrency(it.impact, 0) + '/mo' : '';
-      return rowDiv('S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')', 'var(--gold)', lbl, val, 'var(--gold)');
+      return rowDiv(paiGo(it), 'var(--gold)', lbl, val, 'var(--gold)');
     };
     const priorityCard = cardWrap('Priority Actions', topItems.length
       ? '<div style="max-height:188px;overflow-y:auto;">' + topItems.map(paiRow).join('') + '</div>'
@@ -461,12 +472,14 @@ S.Hub = {
       const critical = bandItems.filter(a => a.sev === 'bad');
       const watch    = bandItems.filter(a => a.sev !== 'bad');
       const naRow = (a, dot) => rowDiv(goOf(a), dot, a.label || a.text || '', a.value || '', 'var(--t2)');
-      const grp = (title, items, dot, mt) => items.length
-        ? '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + dot + ';margin-top:' + mt + ';">' + title + '</div>' + items.map(a => naRow(a, dot)).join('')
-        : '';
+      // No group headers: severity reads from the dot color (red = act now,
+      // amber = keep an eye) and the order (reds first). A small gap sets the
+      // last red apart from the first amber.
+      const naGap = (critical.length && watch.length) ? '<div style="height:10px;"></div>' : '';
       needsBand = cardWrap('Needs Attention', '<div style="max-height:188px;overflow-y:auto;">'
-        + grp('Act Now', critical, 'var(--red)', '0')
-        + grp('Keep An Eye', watch, 'var(--amber)', critical.length ? '12px' : '0')
+        + critical.map(a => naRow(a, 'var(--red)')).join('')
+        + naGap
+        + watch.map(a => naRow(a, 'var(--amber)')).join('')
         + '</div>');
     } else {
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
