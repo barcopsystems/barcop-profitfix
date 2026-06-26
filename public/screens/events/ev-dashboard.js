@@ -45,7 +45,7 @@ S.EventsDashboard = {
     const stale = open.filter(b => { const d = EB.daysSince(b.date_received); return d != null && d >= 3; });
     const booked = all.filter(b => b.stage === 'Booked');
     const soon = booked.filter(b => { const d = EB.daysUntil(b.event_date); return d != null && d >= 0 && d <= 30; });
-    const pipeline = open.reduce((s, b) => s + (parseFloat(b.quoted_total) || 0), 0);
+    const pipeline = open.reduce((s, b) => s + EB.quoteTotal(b), 0);
     const depositsDue = booked.filter(b => !b.deposit_paid_date).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
     const cutoff = (() => { const d = new Date(App.todayLocal() + 'T00:00:00'); d.setDate(d.getDate() - 90); return App.ymdLocal(d); })();
     // A win is any booking that closed won (booked or already completed); a loss is Lost.

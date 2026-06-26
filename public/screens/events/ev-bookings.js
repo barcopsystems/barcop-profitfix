@@ -110,8 +110,40 @@ S.EventsBookings = {
   bookingLabor(b) {
     return this.eventStaffByPerson(b).reduce((sum, p) => sum + p.cost, 0);
   },
+  DEFAULT_SVC_PCT: 20,
+  // The default tax rate comes from the Cash section's sales-tax setting so events
+  // quote at the rate the rest of Bar Cop uses; a booking can override it.
+  defaultTaxPct() { try { return parseFloat(CashEngine.salesTaxRate()) || 0; } catch (e) { return 0; } },
+
+  // The quote math, one source of truth: an F&B subtotal (the bigger of per-head x
+  // headcount or the F&B minimum) plus a service charge and tax on that subtotal.
+  quoteParts(b) {
+    b = b || {};
+    const ph = parseFloat(b.per_head) || 0;
+    const party = parseInt(b.party_size) || 0;
+    const fbMin = parseFloat(b.fb_minimum) || 0;
+    const svcPct = (b.service_charge_pct != null && b.service_charge_pct !== '') ? (parseFloat(b.service_charge_pct) || 0) : this.DEFAULT_SVC_PCT;
+    const taxPct = (b.tax_pct != null && b.tax_pct !== '') ? (parseFloat(b.tax_pct) || 0) : this.defaultTaxPct();
+    const subtotal = Math.max(ph * party, fbMin);
+    const service = subtotal * svcPct / 100;
+    const tax = subtotal * taxPct / 100;
+    return { ph, party, fbMin, svcPct, taxPct, subtotal, service, tax, total: subtotal + service + tax };
+  },
+  quoteTotal(b) { return this.quoteParts(b).total; },
+  quoteBreakdownHtml(p) {
+    const line = (lbl, val, strong) => '<div style="display:flex;justify-content:space-between;gap:16px;padding:' + (strong ? '8px 0 0' : '5px 0') + ';' + (strong ? 'border-top:1px solid var(--b2);margin-top:4px;' : '') + 'font-size:' + (strong ? '14px' : '12px') + ';">'
+      + '<span style="color:' + (strong ? 'var(--t1)' : 'var(--t3)') + ';font-weight:' + (strong ? '700' : '400') + ';">' + lbl + '</span>'
+      + '<span style="color:' + (strong ? 'var(--gold)' : 'var(--t2)') + ';font-weight:' + (strong ? '800' : '600') + ';">' + App.fmtCurrency(val) + '</span></div>';
+    return '<div style="max-width:320px;">'
+      + line('F&amp;B Subtotal', p.subtotal)
+      + line('Service Charge (' + (p.svcPct || 0) + '%)', p.service)
+      + line('Tax (' + (p.taxPct || 0) + '%)', p.tax)
+      + line('Quoted Total', p.total, true)
+      + '</div>';
+  },
+
   balanceDue(b) {
-    const quoted = parseFloat(b.quoted_total) || 0;
+    const quoted = this.quoteTotal(b);
     const dep = parseFloat(b.deposit_amount) || 0;
     return Math.max(0, quoted - dep);
   },
@@ -217,7 +249,7 @@ S.EventsBookings = {
     const stale = open.filter(b => { const d = this.daysSince(b.date_received); return d != null && d >= 3; });
     const booked = all.filter(b => b.stage === 'Booked');
     const bookedSoon = booked.filter(b => { const d = this.daysUntil(b.event_date); return d != null && d >= 0 && d <= 30; });
-    const pipelineVal = open.reduce((s, b) => s + (parseFloat(b.quoted_total) || 0), 0);
+    const pipelineVal = open.reduce((s, b) => s + this.quoteTotal(b), 0);
     const depositsDue = booked.filter(b => !b.deposit_paid_date).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
 
     const stat = (label, val, cls) =>
@@ -256,8 +288,9 @@ S.EventsBookings = {
       const rows = list.slice(0, App.listLimit('core', 'booking')).map(b => {
         const dUntil = this.daysUntil(b.event_date);
         const isStale = this.isOpen(b.stage) && (this.daysSince(b.date_received) >= 3);
+        const qt = this.quoteTotal(b);
         const money = b.stage === 'Completed' ? App.fmtCurrency(this.bookingRevenue(b))
-          : (b.quoted_total ? App.fmtCurrency(b.quoted_total) : (b.fb_minimum ? App.fmtCurrency(b.fb_minimum) + ' min' : '-'));
+          : (qt ? App.fmtCurrency(qt) : '-');
         const dep = b.stage === 'Booked'
           ? (b.deposit_paid_date ? '<span style="color:var(--green);">Deposit paid</span>'
               : (b.deposit_amount ? '<span style="color:var(--amber);">' + App.fmtCurrency(b.deposit_amount) + ' due</span>' : '<span style="color:var(--t3);">-</span>'))
@@ -369,7 +402,8 @@ S.EventsBookings = {
     const t = [];
     if (stage === 'Lead' || stage === 'Quote Sent') {
       const ds = this.daysSince(b.date_received);
-      t.push(this.statTile('Quoted Total', b.quoted_total ? App.fmtCurrency(b.quoted_total) : '-', 'what you are quoting'));
+      const qt = this.quoteTotal(b);
+      t.push(this.statTile('Quoted Total', qt ? App.fmtCurrency(qt) : '-', 'all in, service and tax'));
       t.push(this.statTile('Per Head', b.per_head ? App.fmtCurrency(b.per_head) : '-', b.party_size ? b.party_size + ' guests' : 'set the headcount'));
       t.push(this.statTile('Party Size', b.party_size ? String(b.party_size) : '-', 'guests'));
       t.push(this.statTile('Days Open', ds != null ? String(ds) : '-', ds != null && ds >= 3 ? 'follow up' : 'since the inquiry', ds != null && ds >= 3 ? 'warn' : ''));
@@ -379,7 +413,7 @@ S.EventsBookings = {
       const cdSub = dU == null ? 'no date set' : dU < 0 ? 'event date passed' : dU === 0 ? 'event is today' : 'days out';
       const bal = this.balanceDue(b);
       t.push(this.statTile('Countdown', cd, cdSub, dU != null && dU >= 0 && dU <= 7 ? 'warn' : ''));
-      t.push(this.statTile('Quoted Total', App.fmtCurrency(parseFloat(b.quoted_total) || 0), 'the booking'));
+      t.push(this.statTile('Quoted Total', App.fmtCurrency(this.quoteTotal(b)), 'all in, service and tax'));
       t.push(this.statTile('Deposit', b.deposit_paid_date ? 'Paid' : (b.deposit_amount ? App.fmtCurrency(b.deposit_amount) : '-'), b.deposit_paid_date ? 'in hand' : (b.deposit_amount ? 'still due' : 'none set'), b.deposit_paid_date ? 'good' : (b.deposit_amount ? 'warn' : '')));
       t.push(this.statTile('Balance Due', App.fmtCurrency(bal), b.balance_paid_date ? 'paid in full' : 'on event day', bal > 0 ? '' : 'good'));
     } else if (stage === 'Completed') {
@@ -462,11 +496,14 @@ S.EventsBookings = {
       card2 = '<div class="card form-card">' + this.subLabel('Build the Quote')
         + '<div style="margin-bottom:16px;">' + rcPicker + '</div>'
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
-          + '<div class="f" style="width:150px;flex-shrink:0;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-q-ph" value="' + (b.per_head != null && b.per_head !== 0 ? b.per_head : '') + '" step="0.01"/></div></div>'
-          + '<div class="f" style="width:150px;flex-shrink:0;"><label>F&amp;B Minimum</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-q-fb" value="' + (b.fb_minimum != null && b.fb_minimum !== 0 ? b.fb_minimum : '') + '"/></div></div>'
-          + '<div class="f" style="width:160px;flex-shrink:0;"><label>Quoted Total</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-q-total" value="' + (b.quoted_total != null && b.quoted_total !== 0 ? b.quoted_total : '') + '"/></div></div>'
+          + '<div class="f" style="width:130px;flex-shrink:0;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre eb-q-in" type="number" id="eb-q-ph" value="' + (b.per_head != null && b.per_head !== 0 ? b.per_head : '') + '" step="0.01"/></div></div>'
+          + '<div class="f" style="width:100px;flex-shrink:0;"><label>Guests</label><input class="form-input eb-q-in" type="number" id="eb-q-party" value="' + (b.party_size != null && b.party_size !== 0 ? b.party_size : '') + '"/></div>'
+          + '<div class="f" style="width:140px;flex-shrink:0;"><label>F&amp;B Minimum</label><div class="fw"><span class="pre">$</span><input class="form-input pre eb-q-in" type="number" id="eb-q-fb" value="' + (b.fb_minimum != null && b.fb_minimum !== 0 ? b.fb_minimum : '') + '"/></div></div>'
+          + '<div class="f" style="width:120px;flex-shrink:0;"><label>Service Charge</label><div class="fw"><input class="form-input suf eb-q-in" type="number" id="eb-q-svc" value="' + (b.service_charge_pct != null && b.service_charge_pct !== '' ? b.service_charge_pct : this.DEFAULT_SVC_PCT) + '" step="0.5"/><span class="suf">%</span></div></div>'
+          + '<div class="f" style="width:110px;flex-shrink:0;"><label>Tax</label><div class="fw"><input class="form-input suf eb-q-in" type="number" id="eb-q-tax" value="' + (b.tax_pct != null && b.tax_pct !== '' ? b.tax_pct : this.defaultTaxPct()) + '" step="0.01"/><span class="suf">%</span></div></div>'
         + '</div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
+        + '<div id="eb-q-breakdown" style="margin-top:16px;">' + this.quoteBreakdownHtml(this.quoteParts(b)) + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
           + '<button class="btn btn-ghost btn-sm" id="eb-q-calc">Catering Calculator</button>'
         + '</div></div>';
     } else if (viewStep === 'Booked') {
@@ -535,12 +572,24 @@ S.EventsBookings = {
   },
 
   collectQuote() {
-    const ph = document.getElementById('eb-q-ph'), fb = document.getElementById('eb-q-fb'), tot = document.getElementById('eb-q-total');
+    const g = id => document.getElementById(id);
     const f = {};
-    if (ph)  f.per_head = parseFloat(ph.value) || 0;
-    if (fb)  f.fb_minimum = parseFloat(fb.value) || 0;
-    if (tot) f.quoted_total = parseFloat(tot.value) || 0;
+    if (g('eb-q-ph'))    f.per_head = parseFloat(g('eb-q-ph').value) || 0;
+    if (g('eb-q-party')) f.party_size = parseInt(g('eb-q-party').value) || null;
+    if (g('eb-q-fb'))    f.fb_minimum = parseFloat(g('eb-q-fb').value) || 0;
+    if (g('eb-q-svc'))   f.service_charge_pct = (g('eb-q-svc').value !== '') ? (parseFloat(g('eb-q-svc').value) || 0) : this.DEFAULT_SVC_PCT;
+    if (g('eb-q-tax'))   f.tax_pct = (g('eb-q-tax').value !== '') ? (parseFloat(g('eb-q-tax').value) || 0) : this.defaultTaxPct();
+    const cur = this.bookings().find(x => x.id === this._detailId) || {};
+    f.quoted_total = Math.round(this.quoteParts(Object.assign({}, cur, f)).total);
     return f;
+  },
+
+  // Live recompute of the breakdown as the operator types in the quote fields.
+  renderQuoteBreakdown() {
+    const el = document.getElementById('eb-q-breakdown');
+    if (!el) return;
+    const cur = this.bookings().find(x => x.id === this._detailId) || {};
+    el.innerHTML = this.quoteBreakdownHtml(this.quoteParts(Object.assign({}, cur, this.collectQuote())));
   },
 
   applyRateCard(id, rcId) {
@@ -551,9 +600,8 @@ S.EventsBookings = {
     if (rc) {
       if (rc.per_head != null) fields.per_head = rc.per_head;
       if (rc.fb_minimum != null) fields.fb_minimum = rc.fb_minimum;
-      if (rc.per_head && b && b.party_size) fields.quoted_total = Math.round(rc.per_head * b.party_size);
-      else if (rc.fb_minimum) fields.quoted_total = rc.fb_minimum;
     }
+    fields.quoted_total = Math.round(this.quoteParts(Object.assign({}, b, fields)).total);
     this.patch(id, fields);
   },
 
@@ -574,6 +622,7 @@ S.EventsBookings = {
     document.getElementById('eb-q-save')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
     document.getElementById('eb-q-update')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
     document.getElementById('eb-q-calc')?.addEventListener('click', () => this.quoteCalc(id));
+    this.container.querySelectorAll('.eb-q-in').forEach(el => el.addEventListener('input', () => this.renderQuoteBreakdown()));
     // Money
     document.getElementById('eb-dep-save')?.addEventListener('click', () => this.patch(id, { deposit_amount: parseFloat(document.getElementById('eb-dep')?.value) || 0 }));
     document.getElementById('eb-dep-paid')?.addEventListener('click', () => this.patch(id, { deposit_amount: parseFloat(document.getElementById('eb-dep')?.value) || (parseFloat(b.deposit_amount) || 0), deposit_paid_date: App.todayLocal() }));
@@ -643,9 +692,13 @@ S.EventsBookings = {
     if (b.event_date)  L.push('Date: ' + this.fmtDate(b.event_date) + (b.event_time ? ' at ' + b.event_time : ''));
     if (b.party_size)  L.push('Party size: ' + b.party_size + ' guests');
     if (b.space)       L.push('Space: ' + b.space);
-    if (b.per_head)    L.push('Per head: ' + App.fmtCurrency(b.per_head));
+    const p = this.quoteParts(b);
+    if (b.per_head)    L.push('Per head: ' + App.fmtCurrency(b.per_head) + (b.party_size ? ' x ' + b.party_size + ' guests' : ''));
     if (b.fb_minimum)  L.push('Food and beverage minimum: ' + App.fmtCurrency(b.fb_minimum));
-    L.push('Quoted total: ' + App.fmtCurrency(parseFloat(b.quoted_total) || 0));
+    L.push('Food and beverage subtotal: ' + App.fmtCurrency(p.subtotal));
+    if (p.svcPct) L.push('Service charge (' + p.svcPct + '%): ' + App.fmtCurrency(p.service));
+    if (p.taxPct) L.push('Tax (' + p.taxPct + '%): ' + App.fmtCurrency(p.tax));
+    L.push('Quoted total: ' + App.fmtCurrency(p.total));
     if (b.deposit_amount) L.push('Deposit to confirm: ' + App.fmtCurrency(b.deposit_amount));
     L.push('');
     L.push('Let me know and we will get you on the calendar.');
@@ -724,7 +777,9 @@ S.EventsBookings = {
       const r = recompute();
       App.closeModal('eb-calc-modal');
       if (!r || !r.perHeadPrice) return;
-      this.patch(id, { per_head: Math.round(r.perHeadPrice * 100) / 100, quoted_total: Math.round(r.totalRev) });
+      const ph = Math.round(r.perHeadPrice * 100) / 100;
+      const cur = this.bookings().find(x => x.id === id) || {};
+      this.patch(id, { per_head: ph, quoted_total: Math.round(this.quoteParts(Object.assign({}, cur, { per_head: ph })).total) });
     });
   },
 
@@ -768,9 +823,13 @@ S.EventsBookings = {
     if (b.event_date)  lines.push(['Date', this.fmtDate(b.event_date) + (b.event_time ? ' ' + b.event_time : '')]);
     if (b.party_size)  lines.push(['Party Size', String(b.party_size) + ' guests']);
     if (b.space)       lines.push(['Space', b.space]);
-    if (b.per_head)    lines.push(['Per Head', money(b.per_head)]);
+    const qp = this.quoteParts(b);
+    if (b.per_head)    lines.push(['Per Head', money(b.per_head) + (b.party_size ? ' x ' + b.party_size + ' guests' : '')]);
     if (b.fb_minimum)  lines.push(['Food & Beverage Minimum', money(b.fb_minimum)]);
-    lines.push(['Quoted Total', money(parseFloat(b.quoted_total) || 0)]);
+    lines.push(['F&B Subtotal', money(qp.subtotal)]);
+    if (qp.svcPct) lines.push(['Service Charge (' + qp.svcPct + '%)', money(qp.service)]);
+    if (qp.taxPct) lines.push(['Tax (' + qp.taxPct + '%)', money(qp.tax)]);
+    lines.push(['Quoted Total', money(qp.total)]);
     if (b.deposit_amount) lines.push(['Deposit to Confirm', money(b.deposit_amount)]);
     const rowsHtml = lines.map(([k, v]) => '<tr><td style="color:var(--t3);">' + esc(k) + '</td><td style="text-align:right;font-weight:600;">' + esc(v) + '</td></tr>').join('');
     const wrap = document.createElement('div');
@@ -807,7 +866,7 @@ S.EventsBookings = {
       { p: ['One record per party, worked from the first call to the paid invoice. Read the stat strip up top for what is open, stale, booked soon, and the deposits you are owed. Log a lead in the New Booking form on the page, or open any row to work it. Worksheet prints a blank inquiry pad to capture calls by the phone.'] },
       { h: 'The Active Booking', p: ['Open a booking and the page follows its stage. The header carries the stage, the progress rail carries the lifecycle, the tiles carry the numbers for this stage, and one big button moves it forward. Tap any reached step on the rail to jump back and edit it, then Back to where you left off.'] },
       { h: 'The Stages', p: ['A booking moves Lead, Quote Sent, Booked, Completed. Mark Lost any time before it completes; it stays in the pipeline and you can reopen it.'] },
-      { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the quoted total, then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the quote in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
+      { h: 'Quote and Send', p: ['On a Lead, tap a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost right on the booking. Set the per head and guest count, the F&B minimum if you hold one, and your service charge and tax. Bar Cop builds the quote underneath: F&B subtotal, then service charge and tax on top, to the quoted total. Then Send Quote. Capture the customer email on the booking first; Send Quote opens a ready-to-send email with the full breakdown in it, the same way you email a vendor order, and marks the booking Quote Sent. Quote PDF prints a clean copy to attach or hand over.'] },
       { h: 'Deposit and Balance', p: ['Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit; mark it paid when the money lands. Deposits still owed roll up on the pipeline and the dashboard.'] },
       { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
       { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
