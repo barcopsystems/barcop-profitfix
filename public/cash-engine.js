@@ -381,8 +381,10 @@ window.CashEngine = {
       if (b.stage !== 'Booked' || b.balance_paid_date) return;
       const d = String(b.event_date || '').slice(0, 10);
       if (!d || d < startYmd || d > endYmd) return;
-      const bal = Math.max(0, this._eventTotal(b) - (parseFloat(b.deposit_amount) || 0));
-      if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d }); }
+      const evTotal = this._eventTotal(b);
+      const dep = parseFloat(b.deposit_amount) || 0;
+      const bal = Math.max(0, evTotal - dep);
+      if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d, total: evTotal, deposit: dep }); }
     });
     return { total, list };
   },
