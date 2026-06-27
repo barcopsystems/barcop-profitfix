@@ -150,7 +150,7 @@ S.InventoryReceiveDelivery = {
       + '</div>'
       + '<div class="sh" style="margin-top:6px;">Line Items</div>'
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<table class="ing-tbl rd-pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:280px;">Product</th>'
       + '<th style="width:130px;">Qty Received</th>'
       + '<th style="width:140px;">Unit Price</th>'
