@@ -4,10 +4,10 @@
    The keystone diagnostic. You earned a profit; the account barely moved. This
    shows exactly where the rest went: into more inventory, owner draws, loan
    principal, equipment, tax you remitted. Profit minus those is the cash you
-   actually kept. It is the single screen that makes "profitable on paper, always
-   tight" finally make sense. Profit and inventory change compute automatically;
-   the cash outflows (draws, loans, capital, tax) you log here, and they feed the
-   Survival Forecast too. Built to the standard. Reads CashEngine. */
+   actually kept. The Cash You Kept hero gives the answer, the waterfall shows
+   where every dollar went. Profit and inventory change compute automatically; the
+   cash outflows (draws, loans, capital, tax) you log here, and they feed the
+   Survival Forecast too. Reads CashEngine. */
 
 S.CashBridge = {
   _period: 'last-month',
@@ -24,9 +24,6 @@ S.CashBridge = {
       { h: 'Cash You Kept', p: ['Profit, minus what went into inventory, draws, loans, capital, and tax, is the cash that actually stayed. When that number is far below your profit, this screen tells you exactly which line to work on.'] }
     ]);
   },
-
-  statItem(label, val, cls) { return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>'; },
-  statsCard(items) { return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>'; },
 
   periodBounds() {
     const now = new Date();
@@ -45,10 +42,13 @@ S.CashBridge = {
     this.draw();
   },
 
+  // Active selectors use the solid panel-fill token, not a gold border.
+  onSel(active) { return active ? 'background:var(--sel-active-bg);border-color:var(--b-edge);color:var(--t1);' : ''; },
+
   draw() {
     const b = this.periodBounds();
     const br = CashEngine.bridge(b.s, b.e);
-    const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + (this._period === k ? 'background:var(--gold-tint);border-color:var(--gold);color:var(--t1);' : '') + '">' + label + '</button>';
+    const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
     const periodRow = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' + this.PERIODS.map(chip).join('') + '</div>';
 
     if (!br.hasData) {
@@ -68,25 +68,31 @@ S.CashBridge = {
     this.wire();
   },
 
+  // ── Cash You Kept: the answer up top; the waterfall below shows where ─────────
   headline(br, b) {
-    const kept = br.cashKept;
-    const cls = kept < 0 ? 'warn' : '';
-    return this.statsCard(
-      this.statItem('Profit ' + b.label, App.fmtCurrency(br.profit))
-      + this.statItem('Cash You Kept', App.fmtCurrency(kept), cls)
-      + this.statItem('The Difference', App.fmtCurrency(br.profit - kept), (br.profit - kept) > 0 ? 'warn' : ''));
+    const kept = br.cashKept, diff = br.profit - kept;
+    const keptCol = kept < 0 ? 'var(--red)' : 'var(--w)';
+    return '<div class="card form-card"><div class="card-title">Cash You Kept</div>'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:' + keptCol + ';">' + App.fmtCurrency(kept, 0) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">of ' + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">'
+      +   (diff > 0.5
+            ? '<strong style="color:var(--amber);">' + App.fmtCurrency(diff) + '</strong> went somewhere other than the bank. The bridge below shows where.'
+            : 'You kept all of your profit this period. Nothing leaked out to inventory, draws, or capital.')
+      + '</div></div>';
   },
 
   waterfall(br) {
     const row = (label, amount, sub, isResult) => {
       const neg = amount < 0;
       const color = isResult ? (amount < 0 ? 'var(--red)' : 'var(--green)') : (neg ? 'var(--red)' : 'var(--green)');
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--b2);' + (isResult ? 'border-bottom:none;' : '') + '">'
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (isResult ? '' : 'border-bottom:1px solid var(--b2);') + '">'
         + '<div><div style="font-size:13px;' + (isResult ? 'font-weight:700;' : '') + 'color:var(--t1);">' + label + '</div>' + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + sub + '</div>' : '') + '</div>'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isResult ? '22px' : '18px') + ';font-weight:600;color:' + color + ';white-space:nowrap;">' + (neg ? '-' : isResult ? '' : '+') + App.fmtCurrency(Math.abs(amount)) + '</div></div>';
     };
-    const invChange = br.inv.change;
-    const co = br.co;
+    const invChange = br.inv.change, co = br.co;
     let rows = row('Profit you earned', br.profit, 'Revenue minus cost of goods, labor, and overhead');
     if (br.inv.hasData && Math.abs(invChange) >= 1) rows += row(invChange > 0 ? 'Into inventory' : 'Freed from inventory', -invChange, invChange > 0 ? 'You bought more than you used, cash onto the shelf' : 'You drew inventory down, cash came back');
     if (co.draw > 0) rows += row('Owner draws', -co.draw, 'Cash out, not a business expense');
@@ -100,22 +106,24 @@ S.CashBridge = {
 
   outflowLog(b) {
     const co = CashEngine.outflowsInPeriod(b.s, b.e);
-    const typeBtn = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-type" data-t="' + k + '" style="' + (this._addType === k ? 'background:var(--gold-tint);border-color:var(--gold);color:var(--t1);' : '') + '">' + label + '</button>';
+    const typeBtn = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-type" data-t="' + k + '" style="' + this.onSel(this._addType === k) + '">' + label + '</button>';
     const form = '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Log a Cash Outflow</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' + this.TYPES.map(typeBtn).join('') + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' + this.TYPES.map(typeBtn).join('') + '</div>'
       + '<div class="form-row">'
       +   '<div class="f" style="width:150px;"><label>Date</label><input type="date" id="cb-date" value="' + App.todayLocal() + '"/></div>'
-      +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input type="number" id="cb-amt" placeholder="0.00"/></div></div>'
+      +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cb-amt" placeholder="0.00"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:160px;"><label>Note (optional)</label><input type="text" id="cb-note" placeholder="e.g. SBA loan, March draw"/></div>'
       + '</div>'
-      + '<label class="bc-check" style="margin-top:10px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer;"><input type="checkbox" id="cb-recur" class="bc-check"/> Recurring monthly</label>'
+      + '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:14px;">'
+      +   '<label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer;"><input type="checkbox" id="cb-recur" class="bc-check"/> Recurring monthly</label>'
+      +   '<button class="btn btn-primary btn-sm" id="cb-add">Add Outflow</button>'
       + '</div>'
-      + '<div style="margin:16px 0 4px;display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" id="cb-add">Add Outflow</button></div>';
+      + '</div>';
 
     const listRows = co.list.length
       ? co.list.slice().sort((a, b2) => (a.date < b2.date ? 1 : -1)).map(o =>
-          '<tr><td>' + (o.date || '') + '</td><td>' + esc(CashEngine._outflowLabel(o.type)) + (o.projected ? ' <span style="color:var(--t4);font-size:10px;">recurring</span>' : '') + '</td>'
-          + '<td>' + esc(o.label || '') + '</td><td class="val">' + App.fmtCurrency(o.amount) + '</td>'
+          '<tr><td data-label="Date">' + (o.date || '') + '</td><td data-label="Type">' + esc(CashEngine._outflowLabel(o.type)) + (o.projected ? ' <span style="color:var(--t4);font-size:10px;">recurring</span>' : '') + '</td>'
+          + '<td data-label="Note">' + esc(o.label || '') + '</td><td data-label="Amount" class="val">' + App.fmtCurrency(o.amount) + '</td>'
           + '<td style="text-align:right;">' + (o.id ? '<button class="btn btn-ghost btn-sm cb-del" data-id="' + o.id + '">Delete</button>' : '') + '</td></tr>').join('')
       : '<tr><td colspan="5" style="color:var(--t3);">No cash outflows logged for ' + esc(b.label) + ' yet.</td></tr>';
     const list = '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
