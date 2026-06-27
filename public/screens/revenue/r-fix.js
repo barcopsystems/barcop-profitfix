@@ -178,20 +178,28 @@ S.RevenueFix = {
     return r;
   },
 
+  // Status ring (SVG literal hex per the SVG-fill rule). In progress: a thin
+  // neutral arc with the step count. On track: the exact thin green circle +
+  // check from the Delivery Recorded confirmation, scaled to size (f = size / 40).
   ring(done, total, size, full) {
-    const sw = Math.max(3, Math.round(size / 11));
-    const r = (size - sw) / 2, cx = size / 2, cy = size / 2;
+    const f = size / 40, fx = n => +(n * f).toFixed(2);
+    const cx = fx(20), cy = fx(20), r = fx(17);
+    const open = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" fill="none" style="flex-shrink:0;">';
+    if (full) {
+      return open
+        + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke="' + RF_GREEN + '" stroke-width="' + fx(1.8) + '"/>'
+        + '<path d="M' + fx(12) + ' ' + fx(20.5) + 'l' + fx(5.5) + ' ' + fx(5.5) + 'L' + fx(28) + ' ' + fx(14) + '" stroke="' + RF_GREEN + '" stroke-width="' + fx(2.2) + '" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    const sw = fx(1.8);
     const circ = 2 * Math.PI * r;
     const pct = total > 0 ? Math.min(1, done / total) : 0;
     const off = circ * (1 - pct);
-    const prog = full ? RF_GREEN : (pct > 0 ? RF_GREY : RF_DIM);   // a completed ring goes green to match the check; partial arc stays neutral grey
-    const center = full
-      ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + RF_GREEN + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
-      : '<text x="' + cx + '" y="' + (cy + size * 0.135) + '" text-anchor="middle" font-size="' + (size * 0.30) + '" font-weight="700" fill="' + RF_TXT + '" font-family="\'Barlow Condensed\',sans-serif">' + done + '/' + total + '</text>';
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="flex-shrink:0;">'
-      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + RF_TRACK + '" stroke-width="' + sw + '"/>'
-      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + prog + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')" style="transition:stroke-dashoffset .4s ease;"/>'
-      + center + '</svg>';
+    const prog = pct > 0 ? RF_GREY : RF_DIM;
+    return open
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke="' + RF_TRACK + '" stroke-width="' + sw + '"/>'
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke="' + prog + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')" style="transition:stroke-dashoffset .4s ease;"/>'
+      + '<text x="' + cx + '" y="' + (cy + size * 0.135) + '" text-anchor="middle" font-size="' + fx(12) + '" font-weight="700" fill="' + RF_TXT + '" font-family="\'Barlow Condensed\',sans-serif">' + done + '/' + total + '</text>'
+      + '</svg>';
   },
   stepIcon(kind) {
     const p = kind === 'result'
@@ -263,7 +271,7 @@ S.RevenueFix = {
       + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
     return '<div class="pf-tile' + (sel ? ' sel' : '') + '" data-gap="' + esc(g.id) + '">'
       + '<div style="display:flex;align-items:center;gap:12px;">'
-      + this.ring(h.good, h.watched, 44, h.state === 'running')
+      + this.ring(h.good, h.watched, 40, h.state === 'running')
       + '<div style="min-width:0;flex:1;">'
       + '<div style="font-size:14px;font-weight:600;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
       + '<div style="font-size:12px;margin-top:4px;line-height:1.4;">' + statusLine + '</div>'
