@@ -17,7 +17,7 @@ S.CashForecast = {
   _scAmt: null,
   _scRecurring: false,
   // Shared column layout for the in/out timeline tables, so they line up.
-  CFCOLS: '<colgroup><col style="width:14%"><col style="width:30%"><col style="width:19%"><col style="width:19%"><col style="width:18%"></colgroup>',
+  CFCOLS: '<colgroup><col style="width:13%"><col style="width:24%"><col style="width:21%"><col style="width:21%"><col style="width:21%"></colgroup>',
 
   cashOnHand() { return CashEngine.openingCash(); },
 
@@ -64,9 +64,9 @@ S.CashForecast = {
 
     this.container.innerHTML = '<div class="screen">'
       + this.positionCard(fc, opening, false)
+      + this.scenarioCard(fc, base)
       + '<div class="sh" style="margin:24px 0 10px;">Your Cash Across the Quarter</div>'
       + this.forecastCard(fc, opening)
-      + this.scenarioCard(fc, base)
       + this.eventsCard()
       + this.billsCard()
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;">'
