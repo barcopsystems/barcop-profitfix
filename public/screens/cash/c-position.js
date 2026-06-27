@@ -50,9 +50,12 @@ S.CashPosition = {
       +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" class="suf" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
       +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" class="suf" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
       +   '<div class="f" style="width:180px;"><label>Gift cards outstanding</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cp-gift" placeholder="0" value="' + (CashEngine.giftCardLiability() || '') + '"/></div></div>'
-      +   '<button class="btn btn-primary btn-sm" id="cp-save" style="margin-bottom:1px;">Save</button>'
       + '</div>'
       + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand and tax rate to see what is really free to spend.</div>' : '')
+      + '</div>'
+      + '<div style="margin:14px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +   '<button class="btn btn-primary btn-sm" id="cp-save">Run Numbers</button>'
+      +   '<button class="btn btn-ghost btn-sm" id="cp-reset">Start Over</button>'
       + '</div>';
   },
 
@@ -123,6 +126,12 @@ S.CashPosition = {
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Free Trapped Cash</button></div></div>';
   },
 
+  resetForm() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('cp-cash', ''); set('cp-tax', ''); set('cp-reserve', ''); set('cp-burden', ''); set('cp-gift', '');
+    const f = document.getElementById('cp-freq'); if (f) f.selectedIndex = 0;
+  },
+
   wire() {
     const save = document.getElementById('cp-save');
     if (save) save.addEventListener('click', () => {
@@ -134,8 +143,10 @@ S.CashPosition = {
       CashEngine.setGiftCardLiability(document.getElementById('cp-gift').value);
       this.draw();
     });
+    const reset = document.getElementById('cp-reset');
+    if (reset) reset.addEventListener('click', () => this.resetForm());
     this.container.onclick = ev => {
-      if (ev.target.closest('#cp-save')) return;
+      if (ev.target.closest('#cp-save') || ev.target.closest('#cp-reset')) return;
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
