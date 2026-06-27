@@ -207,7 +207,7 @@ S.ProfitFix = {
     const circ = 2 * Math.PI * r;
     const pct = total > 0 ? Math.min(1, done / total) : 0;
     const off = circ * (1 - pct);
-    const prog = pct > 0 ? PF_GREY : PF_DIM;   // progress arc and the full ring are neutral grey; only the check is green
+    const prog = full ? PF_GREEN : (pct > 0 ? PF_GREY : PF_DIM);   // a completed ring goes green to match the check; partial arc stays neutral grey
     const center = full
       ? '<path d="M' + (cx - size * 0.17) + ' ' + cy + ' l' + (size * 0.11) + ' ' + (size * 0.12) + ' l' + (size * 0.24) + ' -' + (size * 0.28) + '" fill="none" stroke="' + PF_GREEN + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<text x="' + cx + '" y="' + (cy + size * 0.135) + '" text-anchor="middle" font-size="' + (size * 0.30) + '" font-weight="700" fill="' + PF_TXT + '" font-family="\'Barlow Condensed\',sans-serif">' + done + '/' + total + '</text>';
