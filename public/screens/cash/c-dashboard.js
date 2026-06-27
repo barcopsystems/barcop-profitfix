@@ -206,7 +206,7 @@ S.CashDashboard = {
       +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>' : '')
       + '</div>'
       + heroBody
-      + '<div style="font-size:12px;margin-top:10px;">' + freedLine + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:10px;padding-bottom:2px;">' + freedLine + '</div>'
       + this.survivalStrip(st)
       + '</div>';
   },
@@ -234,7 +234,7 @@ S.CashDashboard = {
         +   (tw > 0 ? tw + ' week' + (tw === 1 ? '' : 's') + ' have more cash going out than coming in. ' : 'Your cash timing looks clear. ')
         +   'Set your opening balance to see your real runway and the week you would run thin.</div>'
         + '</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
+        + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
     }
     const low = sf.lowPoint;
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
@@ -248,7 +248,7 @@ S.CashDashboard = {
       + vdiv
       + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
       + '</div>'
-      + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
   },
 
   weekSelector() {
