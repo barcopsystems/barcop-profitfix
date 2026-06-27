@@ -1051,6 +1051,16 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ing-tbl td{padding:8px 10px;border-bottom:1px solid var(--row-div);vertical-align:middle;color:var(--t2);}
 .ing-tbl tr:last-child td{border-bottom:none;}
 
+/* TRIAL (revertible): .row-list pill rows on an EDITABLE ing-tbl line builder.
+   Opt-in via `.ing-tbl.rd-pill` so every other batch builder stays untouched.
+   The #0D181E row fill is already supplied by the .rd-line td rule; this only
+   separates the rows into rounded pills (6px gap) and rounds the pill ends.
+   Revert = drop ` rd-pill` from the table in ic-receive-delivery.js + this block. */
+.ing-tbl.rd-pill{border-collapse:separate;border-spacing:0 6px;}
+.ing-tbl.rd-pill td{border-bottom:none;border-radius:0;}
+.ing-tbl.rd-pill td:first-child{border-radius:8px 0 0 8px;}
+.ing-tbl.rd-pill td:last-child{border-radius:0 8px 8px 0;}
+
 /* ══ PROG BAR ══ */
 .prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
