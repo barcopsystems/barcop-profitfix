@@ -889,15 +889,10 @@ S.HubBarCopAudit = {
       const sc = isNA ? null : raw;
       const col = isNA ? 'var(--t3)' : App.scoreColor(sc);
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
-      const breakdown = detail.length
-        ? '<div class="at-metrics"><table class="at-mtbl">'
-          + detail.map(c => {
-              const naC = c.na || c.pct == null;
-              return '<tr><td>' + esc(c.label) + (c.extra ? ' <span style="color:var(--t4);">(' + esc(c.extra) + ')</span>' : '') + '</td>'
-                + '<td style="color:' + (naC ? 'var(--t3)' : App.scoreColor(c.pct)) + ';">' + (naC ? 'N/A' : c.pct) + '</td></tr>';
-            }).join('')
-          + '</table></div>'
-        : '';
+      const breakdown = AuditUI.metricRows(detail.map(c => {
+        const naC = c.na || c.pct == null;
+        return { label: c.label, extra: c.extra, value: naC ? 'N/A' : String(c.pct), valColor: naC ? 'var(--t3)' : App.scoreColor(c.pct) };
+      }));
       const scoreBlock = isNA
         ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
         : AuditUI.scoreRing(sc);

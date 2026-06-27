@@ -208,19 +208,11 @@ const AuditUI = {
   // d = the audit raw, for the inline Findings.
   sectionBlock(num, name, score, items, signals, d) {
     const naScore = score == null;
-    const bar     = Math.min(100, Math.max(0, score||0));
-    const color   = naScore ? 'var(--t3)' : App.scoreColor(score);
-    // Metrics as a responsive label-over-value grid (the dashboard stat look),
-    // scales cleanly from 2 metrics to a dozen; warn=red, good=green, else neutral.
-    const cells = (items||[]).filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
-      '<div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
-      + '<div style="font-size:17px;font-weight:600;line-height:1.3;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--green)':'var(--t1)') + ';">' + val + '</div>'
-      + '</div>'
-    ).join('');
-    const metricsBlock = cells
-      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 22px;padding:2px 0;">' + cells + '</div>'
-      : '';
+    // Metrics as flush recessed rows (the Hub card-row look, no bordered box):
+    // label left, value right, #0D181E with row dividers, full-bleed in the card.
+    const rows = (items||[]).filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0')
+      .map(([label, val, hl]) => ({ label: label, value: String(val), valColor: hl==='warn'?'var(--red)':hl==='good'?'var(--green)':'var(--t1)' }));
+    const rowsHtml = AuditUI.metricRows(rows);
     const sigRows = (signals||[]).map(sig => {
       const sc = (sig.score||'').toUpperCase();
       const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'var(--amber)':'var(--t3)';
@@ -242,7 +234,7 @@ const AuditUI = {
         : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
     const divider = '<div style="border-top:1px solid var(--b2);margin:14px 0;"></div>';
     const findingsHtml = AuditUI.findings(d, num);
-    const body = metricsBlock + sigRows;
+    const body = rowsHtml + sigRows;
     return '<div class="card" style="margin-bottom:14px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
@@ -268,6 +260,21 @@ const AuditUI = {
       + '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="' + hex + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="' + dash + '" transform="rotate(-90 ' + c + ' ' + c + ')"/>'
       + '<text x="' + c + '" y="' + c + '" text-anchor="middle" dominant-baseline="central" font-family="Barlow Condensed, sans-serif" font-size="' + Math.round(size * 0.4) + '" font-weight="700" fill="' + hex + '">' + score + '</text>'
       + '</svg>';
+  },
+
+  // ── Metric/check rows — the Hub card-row look: label left, value right, on a
+  //    #0D181E recessed strip with row dividers, full-bleed to the .card edges
+  //    (no bordered box). Shared by every audit section so all four read the
+  //    same. rows = [{ label, extra?, value, valColor? }]. ───────────────────────
+  metricRows(rows) {
+    if (!rows || !rows.length) return '';
+    const body = rows.map((r, i) =>
+      '<div style="display:flex;align-items:flex-start;gap:14px;padding:11px 20px;background:#0D181E;' + (i ? 'border-top:1px solid var(--row-div);' : '') + '">'
+      + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);line-height:1.45;">' + esc(r.label) + (r.extra ? ' <span style="color:var(--t4);">(' + esc(r.extra) + ')</span>' : '') + '</div>'
+      + '<div style="flex-shrink:0;font-size:13px;font-weight:600;text-align:right;white-space:nowrap;color:' + (r.valColor || 'var(--t1)') + ';">' + esc(r.value) + '</div>'
+      + '</div>'
+    ).join('');
+    return '<div style="margin:0 -20px;">' + body + '</div>';
   },
 
   // ── Full view: score hero — full-bleed divider header (title left, Briefing
