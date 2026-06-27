@@ -149,7 +149,8 @@ S.HubBooks = {
       + line('Labor % of Revenue', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null, { sub: 1, pct: 1 })
       + line('Prime Cost %', M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null, YTD.totalRev ? ((YTD.totalCogs + YTD.totalLabor) / YTD.totalRev) : null, { sub: 1, pct: 1 });
 
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
+    return '<div class="sh" style="margin:24px 0 10px;">' + esc(this._monthLabel(monthKey)) + ' Snapshot</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl is-pnl" style="table-layout:fixed;">'
       + '<colgroup><col style="width:50%"><col style="width:25%"><col style="width:25%"></colgroup>'
       + '<thead><tr><th>Income Statement</th><th>' + esc(this._monthLabel(monthKey)) + '</th><th>Year to Date</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div></div>';
@@ -171,7 +172,7 @@ S.HubBooks = {
     const rate = this._salesTaxRate(), freq = this._salesTaxFreq();
     if (!rate) {
       return '<div class="sh" style="margin:24px 0 10px;">Sales Tax</div>'
-        + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Set your sales tax rate in Cash Position and Bar Cop estimates the tax you collected, by month and quarter, off your taxable sales.</div></div>';
+        + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Set your sales tax rate in App Settings, under Business Profile, and Bar Cop estimates the tax you collected, by month and quarter, off your taxable sales.</div></div>';
     }
     const f = v => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const rateTxt = rate.toLocaleString('en-US', { maximumFractionDigits: 3 }) + '%';
