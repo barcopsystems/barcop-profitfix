@@ -62,10 +62,10 @@ S.CashPosition = {
   taxReadout() {
     const rate = CashEngine.salesTaxRate(), burden = CashEngine.payrollBurden();
     const freqLabel = CashEngine.taxFrequency() === 'quarterly' ? 'Quarterly' : 'Monthly';
-    const parts = [rate > 0 ? 'Sales tax ' + rate + '% &middot; ' + freqLabel : 'Sales tax not set'];
+    const parts = [rate > 0 ? 'Sales tax ' + rate + '% &middot; ' + freqLabel + ' filing' : 'Sales tax not set'];
     if (burden > 0) parts.push('Payroll tax ' + burden + '%');
     return '<div style="font-size:12px;color:var(--t3);margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">'
-      + parts.join(' &middot; ') + ' &middot; set in Business Profile</div>';
+      + parts.join(' &middot; ') + ' &middot; set in <span data-go="settings-profile" style="color:var(--gold);cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Business Profile</span></div>';
   },
 
   // ── Safe to Spend: the whole subtraction, so the relationship is visible ──────
