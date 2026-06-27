@@ -356,6 +356,7 @@ S.CashAudit = {
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.viewHero(audit, 'Cash Recovery Audit', 'ca')
       + this.cashStrip(audit)
+      + AuditUI.sectionScoreboard(audit, this.SECTION_NAMES, this.audits()[idx + 1])
       + AuditUI.actionsArea(audit, 'cash', 'ca')
       + sections
       + this.riskSection(audit)
