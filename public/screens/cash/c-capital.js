@@ -67,7 +67,6 @@ S.CashCapital = {
       + stats
       + '<div class="sh" style="margin:24px 0 10px;">Return on Your Shelf Cash</div>'
       + this.dataCard(headers, rows)
-      + '<div style="font-size:11px;color:var(--t4);margin-top:10px;">Turns is how many times a year you cycle the cash in a category, judged against your recent bar and food margins. Lazy capital, low turns on cash that just sits, is money you could free by cutting the par and running it down.</div>'
       + this.cycleSection()
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       +   '<button class="btn btn-ghost btn-sm" data-go="c-trapped">Free Trapped Cash</button>'
@@ -82,7 +81,7 @@ S.CashCapital = {
     const c = CashEngine.cashCycle();
     if (!c.hasData) return '';
     const days = v => Math.round(v) + ' day' + (Math.round(v) === 1 ? '' : 's');
-    const stat = (label, val, sub, cls) => '<div style="flex:1;min-width:130px;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
+    const stat = (label, val, sub, cls) => '<div style="flex:0 0 auto;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:600;line-height:1;color:' + (cls || 'var(--t1)') + ';">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + sub + '</div></div>';
     const cycleCol = c.cycle > 30 ? 'var(--amber)' : c.cycle <= 0 ? 'var(--green)' : 'var(--t1)';
