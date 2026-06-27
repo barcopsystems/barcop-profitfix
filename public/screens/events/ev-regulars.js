@@ -120,7 +120,7 @@ S.EventsRegulars = {
 
     const listSection = all.length === 0
       ? '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
-      : headRow + '<div id="rg-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      : headRow + '<div id="rg-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'event_regulars', list, !!this.filter);
 
     this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';

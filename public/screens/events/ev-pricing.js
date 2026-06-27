@@ -65,9 +65,9 @@ S.EventsPricing = {
       + (rc.length ? '<button class="btn btn-ghost btn-sm" id="rp-export">Export PDF</button>' : '')
       + '</div>';
 
-    const listCard = '<div id="rp-list" class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    const listCard = '<div id="rp-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Package</th><th>Type</th><th>Covers</th><th>F&amp;B Min</th><th>Room Fee</th><th>Per Head</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'event_rate_cards', rc, false);
 
     this.container.innerHTML = '<div class="screen">' + rateForm + headingRow + listCard + '</div>';

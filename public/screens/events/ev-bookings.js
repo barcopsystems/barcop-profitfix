@@ -330,9 +330,9 @@ S.EventsBookings = {
       }).join('') || '<tr><td colspan="8" style="color:var(--t3);text-align:center;padding:14px;">No bookings in this stage.</td></tr>';
 
       listSection = headRow
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Event</th><th>Type</th><th>Event Date</th><th>Party</th><th>Quote / Revenue</th><th>Deposit</th><th>Stage</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'booking', list, !!this.filterStage);
     }
 
