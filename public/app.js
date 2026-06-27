@@ -5157,10 +5157,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const sweepTables = root => {
     if (!root || root.nodeType !== 1) return;
-    if (root.matches && root.matches('.data-card .tbl, .ing-tbl, .audit-htbl')) stampTable(root);
-    if (root.querySelectorAll) root.querySelectorAll('.data-card .tbl, .ing-tbl, .audit-htbl').forEach(stampTable);
+    if (root.matches && root.matches('.data-card .tbl, .ing-tbl, .row-list')) stampTable(root);
+    if (root.querySelectorAll) root.querySelectorAll('.data-card .tbl, .ing-tbl, .row-list').forEach(stampTable);
     if (root.matches && root.matches('tr')) {            // a single "Add Line" row
-      const tbl = root.closest('.data-card .tbl, .ing-tbl, .audit-htbl');
+      const tbl = root.closest('.data-card .tbl, .ing-tbl, .row-list');
       if (tbl) stampRow(root, [...tbl.querySelectorAll('thead th')].map(th => th.textContent.trim()));
     }
   };

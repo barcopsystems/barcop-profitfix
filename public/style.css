@@ -594,24 +594,24 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* Audit History — column layout kept, but each row is a #0D181E pill (rounded
    ends, a 6px gap between rows via border-spacing). Headers carry an inset (not
    full-bleed) divider. */
-.audit-htbl{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
-.audit-htbl thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 12px 9px;border-bottom:1px solid var(--b2);white-space:nowrap;}
-.audit-htbl tbody td{background:#0D181E;padding:12px;color:var(--t2);vertical-align:middle;white-space:nowrap;}
-.audit-htbl tbody td:first-child{border-radius:6px 0 0 6px;}
-.audit-htbl tbody td:last-child{border-radius:0 6px 6px 0;text-align:right;}
+.row-list{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
+.row-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 12px 9px;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.row-list tbody td{background:#0D181E;padding:12px;color:var(--t2);vertical-align:middle;white-space:nowrap;}
+.row-list tbody td:first-child{border-radius:6px 0 0 6px;}
+.row-list tbody td:last-child{border-radius:0 6px 6px 0;text-align:right;}
 /* Smaller action buttons inside the pill rows, right-aligned with a small gap. */
-.audit-htbl tbody .btn{padding:4px 9px;font-size:9px;}
-.audit-htbl tbody td .btn + .btn{margin-left:6px;}
+.row-list tbody .btn{padding:4px 9px;font-size:9px;}
+.row-list tbody td .btn + .btn{margin-left:6px;}
 /* Mobile: stack each pill row into a label/value card instead of scrolling. */
 @media (max-width:900px){
-  .audit-htbl,.audit-htbl tbody{display:block;}
-  .audit-htbl thead{display:none;}
-  .audit-htbl tbody tr{display:block;background:#0D181E;border-radius:8px;padding:4px 14px;margin-bottom:8px;}
-  .audit-htbl tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;background:transparent;padding:9px 0;border-radius:0;white-space:normal;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
-  .audit-htbl tbody tr td:last-child{border-bottom:none;}
-  .audit-htbl tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;}
-  .audit-htbl tbody td[data-label=""]::before{content:none;}
-  .audit-htbl tbody td[data-label=""]{justify-content:flex-end;}
+  .row-list,.row-list tbody{display:block;}
+  .row-list thead{display:none;}
+  .row-list tbody tr{display:block;background:#0D181E;border-radius:8px;padding:4px 14px;margin-bottom:8px;}
+  .row-list tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;background:transparent;padding:9px 0;border-radius:0;white-space:normal;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
+  .row-list tbody tr td:last-child{border-bottom:none;}
+  .row-list tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;}
+  .row-list tbody td[data-label=""]::before{content:none;}
+  .row-list tbody td[data-label=""]{justify-content:flex-end;}
 }
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
