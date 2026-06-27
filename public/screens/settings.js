@@ -452,7 +452,7 @@ S.HubSettings = {
     //    and the forecast projects them forward. The tax remittance is the classic
     //    killer: real money leaving on the 20th that was never yours to keep. ────
     App.data.cash_outflows = [
-      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',     recurring:true, term_months:24, recur_day:1,  created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',     recurring:true, recur_day:1,  created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan', recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
       // Past tax remittances feed the Cash Bridge (where the profit went). The
       // FORECAST projects the upcoming remittances automatically off the tax rate
