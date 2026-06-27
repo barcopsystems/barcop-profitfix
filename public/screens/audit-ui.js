@@ -159,7 +159,7 @@ const AuditUI = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (naO ? 'N/A' : latest.overall_score) + '</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
-      + '<div style="margin:16px -20px -20px;">' + secRows + '</div>'
+      + '<div style="margin:16px -20px -20px;border-top:1px solid var(--row-div);">' + secRows + '</div>'
       + '</div>';
   },
 
