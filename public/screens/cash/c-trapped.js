@@ -47,11 +47,14 @@ S.CashTrapped = {
       + '<td data-label="To Free" class="num" style="color:var(--gold);font-weight:600;">' + App.fmtCurrency(it.free) + '</td>'
       + '</tr>';
   },
-  section(title, items, emptyMsg) {
+  section(title, items, emptyMsg, titleRight) {
     const rows = items.length
       ? items.map(it => this.rowHtml(it)).join('')
       : '<tr><td colspan="6" style="color:var(--t3);">' + emptyMsg + '</td></tr>';
-    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>' + this.dataCard(rows);
+    const head = titleRight
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + titleRight + '</div>'
+      : '<div class="sh" style="margin:0 0 10px;">' + title + '</div>';
+    return head + this.dataCard(rows);
   },
 
   render(container, actions) {
@@ -79,8 +82,7 @@ S.CashTrapped = {
       + this.statItem('Dead Stock', App.fmtCurrency(t.dead))
       + this.statItem('Above Par', App.fmtCurrency(t.overPar)));
 
-    const exportRow = '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 12px;">'
-      + '<button class="btn btn-ghost btn-sm" id="ct-export">Export PDF</button></div>';
+    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="ct-export">Export PDF</button>';
 
     const dead = t.items.filter(it => it.kind === 'dead');
     const over = t.items.filter(it => it.kind === 'over');
@@ -92,8 +94,8 @@ S.CashTrapped = {
 
     this.container.innerHTML = '<div class="screen">'
       + stats
-      + exportRow
-      + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.')
+      + '<div style="height:24px;"></div>'
+      + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.', exportBtn)
       + '<div style="height:18px;"></div>'
       + this.section('Overstock', over, 'Nothing above par right now.')
       + bottomRow
