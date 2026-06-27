@@ -40,23 +40,32 @@ S.CashPosition = {
   },
 
   configCard(p) {
-    const freq = CashEngine.taxFrequency();
-    const opt = (v, label) => '<option value="' + v + '"' + (freq === v ? ' selected' : '') + '>' + label + '</option>';
     return '<div class="card form-card"><div class="card-title">Your Numbers</div>'
       + '<div class="form-row">'
       +   '<div class="f" style="width:170px;"><label>Cash on hand</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cp-cash" placeholder="0.00" value="' + (p.opening != null ? p.opening : '') + '"/></div></div>'
-      +   '<div class="f" style="width:140px;"><label>Sales tax rate</label><div class="fw"><input type="number" class="suf" id="cp-tax" placeholder="0" step="0.01" value="' + (CashEngine.salesTaxRate() || '') + '"/><span class="suf">%</span></div></div>'
-      +   '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="cp-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
       +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" class="suf" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
-      +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" class="suf" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
       +   '<div class="f" style="width:180px;"><label>Gift cards outstanding</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cp-gift" placeholder="0" value="' + (CashEngine.giftCardLiability() || '') + '"/></div></div>'
       + '</div>'
-      + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand and tax rate to see what is really free to spend.</div>' : '')
+      + this.taxReadout()
+      + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand to see what is really free to spend.</div>' : '')
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
       +   '<button class="btn btn-primary" id="cp-save">Run Numbers</button>'
       +   '<button class="btn btn-ghost" id="cp-reset">Start Over</button>'
       + '</div>';
+  },
+
+  // The tax rate, filing frequency, and payroll burden are now set once in
+  // App Settings -> Business Profile (read by Cash, Books, and Events alike).
+  // Show the live values here as a read-only line so the operator can see what
+  // is feeding the set-aside without editing it in two places.
+  taxReadout() {
+    const rate = CashEngine.salesTaxRate(), burden = CashEngine.payrollBurden();
+    const freqLabel = CashEngine.taxFrequency() === 'quarterly' ? 'Quarterly' : 'Monthly';
+    const parts = [rate > 0 ? 'Sales tax ' + rate + '% &middot; ' + freqLabel : 'Sales tax not set'];
+    if (burden > 0) parts.push('Payroll tax ' + burden + '%');
+    return '<div style="font-size:12px;color:var(--t3);margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">'
+      + parts.join(' &middot; ') + ' &middot; set in Business Profile</div>';
   },
 
   // ── Safe to Spend: the whole subtraction, so the relationship is visible ──────
@@ -128,18 +137,14 @@ S.CashPosition = {
 
   resetForm() {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-    set('cp-cash', ''); set('cp-tax', ''); set('cp-reserve', ''); set('cp-burden', ''); set('cp-gift', '');
-    const f = document.getElementById('cp-freq'); if (f) f.selectedIndex = 0;
+    set('cp-cash', ''); set('cp-reserve', ''); set('cp-gift', '');
   },
 
   wire() {
     const save = document.getElementById('cp-save');
     if (save) save.addEventListener('click', () => {
       CashEngine.setOpeningCash(document.getElementById('cp-cash').value);
-      CashEngine.setSalesTaxRate(document.getElementById('cp-tax').value);
-      CashEngine.setTaxFrequency(document.getElementById('cp-freq').value);
       CashEngine.setReserveWeeks(document.getElementById('cp-reserve').value);
-      CashEngine.setPayrollBurden(document.getElementById('cp-burden').value);
       CashEngine.setGiftCardLiability(document.getElementById('cp-gift').value);
       this.draw();
     });
