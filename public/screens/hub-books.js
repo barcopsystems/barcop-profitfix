@@ -161,11 +161,15 @@ S.HubBooks = {
   //    against your POS tax report before filing. ─────────────────────────────
   _salesTaxRate() { return (window.CashEngine && CashEngine.salesTaxRate) ? CashEngine.salesTaxRate() : 0; },
   _salesTaxFreq() { return (window.CashEngine && CashEngine.taxFrequency) ? CashEngine.taxFrequency() : 'monthly'; },
+  // Taxable sales = revenue net of comps (comped product was never charged, so
+  // it is not a taxable sale), which also keeps this in step with the
+  // net-of-comps revenue on the Income Statement directly above it.
+  _taxableSales(monthKey) { const a = this._aggregateMonth(monthKey); return a.totalRev - (a.compsLoss || 0); },
   _quarterToDate(monthKey) {
     const year = monthKey.slice(0, 4), mNum = parseInt(monthKey.slice(5, 7), 10);
     const qStart = Math.floor((mNum - 1) / 3) * 3 + 1;
     let sales = 0;
-    for (let m = qStart; m <= mNum; m++) sales += this._aggregateMonth(year + '-' + String(m).padStart(2, '0')).totalRev;
+    for (let m = qStart; m <= mNum; m++) sales += this._taxableSales(year + '-' + String(m).padStart(2, '0'));
     return sales;
   },
   _salesTaxCard(monthKey) {
@@ -176,7 +180,7 @@ S.HubBooks = {
     }
     const f = v => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const rateTxt = rate.toLocaleString('en-US', { maximumFractionDigits: 3 }) + '%';
-    const monthSales = this._aggregateMonth(monthKey).totalRev, monthTax = monthSales * rate / 100;
+    const monthSales = this._taxableSales(monthKey), monthTax = monthSales * rate / 100;
     const qSales = this._quarterToDate(monthKey), qTax = qSales * rate / 100;
     const row = (period, sales, tax) => '<tr>'
       + '<td style="color:var(--t1);">' + period + '</td>'
@@ -614,7 +618,7 @@ S.HubBooks = {
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
     rows.push(this._blankRow(COL_COUNT));
     rows.push(['Period', 'Taxable Sales', 'Rate', 'Tax Due']);
-    const monthSales = this._aggregateMonth(monthKey).totalRev;
+    const monthSales = this._taxableSales(monthKey);
     rows.push([this._monthLabel(monthKey), monthSales, rateFrac, monthSales * rateFrac]);
     if (freq === 'quarterly') {
       const qSales = this._quarterToDate(monthKey);

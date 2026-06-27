@@ -86,7 +86,8 @@ S.HubYearEnd = {
       ['Tip Allocation',       'Annual Form 8027 Worksheet. Per-employee yearly totals. Your accountant transcribes to the actual IRS form.'],
       ['Cash Control Summary', 'Variance totals by month. Worst-offender shifts. The cash story for the whole year on one page.'],
       ['Audit History',        'Every audit you ran during the year. Score, monthly opportunity, top action items per audit.'],
-      ['Operational Events',   'Voids and comps, walked tabs, call-outs, certifications that lapsed during the year.']
+      ['Operational Events',   'Voids and comps, walked tabs, call-outs, certifications that lapsed during the year.'],
+      ['1099 Vendors',         'Vendors you paid 600 dollars or more this year, a starting point for 1099-NEC. Not the final list, your accountant confirms who actually needs one.']
     ];
     const listHtml = rows.map(r =>
       '<tr><td style="padding:8px 0;font-weight:700;color:var(--t1);width:240px;vertical-align:top;font-size:12px;">' + esc(r[0]) + '</td>'
