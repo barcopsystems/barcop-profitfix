@@ -475,9 +475,9 @@ S.InventorySpotCheck = {
     if (all.length === 0) {
       this.container.innerHTML = '<div class="screen">' + statsCard
         + '<div class="sh" style="margin:24px 0 10px;">Spot Check History</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Bar</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No spot checks saved yet.</td></tr></tbody></table></div></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No spot checks saved yet.</td></tr></tbody></table></div></div>';
       this.wireHistory();
       return;
     }
@@ -501,9 +501,9 @@ S.InventorySpotCheck = {
         + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
-    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Bar</th><th>Shift</th><th>Checked By</th><th>Products</th><th>Flagged</th><th>Variance</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No spot checks in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div>'
       + App.showOlderBar('ic', 'spot_check', filtered, this.filterPreset !== 'all');
 
     this.container.innerHTML = '<div class="screen">' + statsCard + this.filterRow() + listCard + '</div>';
@@ -832,10 +832,10 @@ S.InventorySpotCheck = {
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button></div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
       + '<th>Variance</th><th>Variance $</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
 
     this.container.onclick = ev => {

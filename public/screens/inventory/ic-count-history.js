@@ -130,10 +130,10 @@ S.InventoryCountHistory = {
           + (App.canEdit('ic-count-history') ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div>'
         + App.showOlderBar('ic', 'count', ordered, this.filterPreset !== 'all');
 
       html = statsCard + this.filterRow() + listCard;
@@ -288,10 +288,10 @@ S.InventoryCountHistory = {
       });
       bodyTable = cats.map(c => {
         const ms = byCat[c].slice().sort((x, y) => (x.name || '').localeCompare(y.name || ''));
-        return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
+        return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
           + '<colgroup><col style="width:260px;"/><col/><col/><col/></colgroup>'
           + '<thead><tr><th>' + esc(c) + '</th><th>' + dateB + '</th><th>' + dateA + '</th><th>Change</th></tr></thead>'
-          + '<tbody>' + ms.map(cmpRowHtml).join('') + '</tbody></table></div></div>';
+          + '<tbody>' + ms.map(cmpRowHtml).join('') + '</tbody></table></div>';
       }).join('');
       bodyNote = '<div style="font-size:11px;color:var(--t3);margin-top:10px;">'
         + (older
@@ -310,10 +310,10 @@ S.InventoryCountHistory = {
       });
       bodyTable = cats.map(c => {
         const catItems = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:620px;">'
+        return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
           + '<colgroup><col style="width:240px;"/><col/><col/><col/><col/><col/></colgroup>'
           + '<thead><tr><th>' + esc(c) + '</th><th>Full</th><th>Open</th><th>Total</th><th>Unit Cost</th><th>Value</th></tr></thead>'
-          + '<tbody>' + catItems.map(rowHtml).join('') + '</tbody></table></div></div>';
+          + '<tbody>' + catItems.map(rowHtml).join('') + '</tbody></table></div>';
       }).join('');
     }
 
