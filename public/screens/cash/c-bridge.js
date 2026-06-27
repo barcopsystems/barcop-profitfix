@@ -96,9 +96,9 @@ S.CashBridge = {
       + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-note" placeholder="e.g. SBA loan, March draw"></textarea></div></div>'
       + '<div id="cb-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
-    const buttons = '<div data-collapse-group="cb-add" style="margin:14px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary btn-sm" id="cb-save">Add Outflow</button>'
-      + '<button class="btn btn-ghost btn-sm" id="cb-clear">Start Over</button>'
+    const buttons = '<div data-collapse-group="cb-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="cb-save">Add Outflow</button>'
+      + '<button class="btn btn-ghost" id="cb-clear">Start Over</button>'
       + '</div>';
     return '<div class="card form-card">' + App.collapsibleCardTitle('cb-add', 'Log a Cash Outflow') + body + '</div>' + buttons;
   },

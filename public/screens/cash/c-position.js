@@ -53,9 +53,9 @@ S.CashPosition = {
       + '</div>'
       + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand and tax rate to see what is really free to spend.</div>' : '')
       + '</div>'
-      + '<div style="margin:14px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      +   '<button class="btn btn-primary btn-sm" id="cp-save">Run Numbers</button>'
-      +   '<button class="btn btn-ghost btn-sm" id="cp-reset">Start Over</button>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      +   '<button class="btn btn-primary" id="cp-save">Run Numbers</button>'
+      +   '<button class="btn btn-ghost" id="cp-reset">Start Over</button>'
       + '</div>';
   },
 
