@@ -21,7 +21,8 @@
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
   --steel:     #4888A8;
-  --focus:     #496477;                /* focus border on every input/select/textarea (+ active tab underline) */
+  --focus:     #496477;                /* active tab underline (steel) */
+  --focus-cell:#27353F;                /* focus border on a data-entry cell (input/select/textarea) when clicked into */
   --green:     #518A79;                /* Success: on-target, strong scores, positive trend */
   --green-bg:  rgba(81,138,121,0.12);
   --blue:      #4C8EAB;                /* Secondary accent: fix-process badges, minor variation */
@@ -62,20 +63,20 @@ input,select,textarea{color-scheme:dark;}
   background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;color-scheme:dark;
 }
-.app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--focus);outline:none;}
+.app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--focus-cell);outline:none;}
 .form-input{
   background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
   padding:7px 9px;outline:none;appearance:none;-webkit-appearance:none;
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
-.form-input:focus{border-color:var(--focus);}
+.form-input:focus{border-color:var(--focus-cell);}
 /* Bill-counter cells carry inline borders and sit in a modal, so they miss the
    global input focus styles — give them the app's steel focus, not the browser's white ring. */
-.ccd-cnt:focus,.ccd-coins:focus{border-color:var(--focus)!important;outline:none;}
+.ccd-cnt:focus,.ccd-coins:focus{border-color:var(--focus-cell)!important;outline:none;}
 .ccd-step:focus{outline:none;}
 /* Service-period drop-down inputs sit in a popover outside .app — give them the steel focus, not the browser white ring. */
-.sp-pop input:focus{border-color:var(--focus)!important;outline:none;}
+.sp-pop input:focus{border-color:var(--focus-cell)!important;outline:none;}
 .form-input[type=number]{-moz-appearance:textfield;}
 .form-input[type=number]::-webkit-inner-spin-button,
 .form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
@@ -396,7 +397,7 @@ input,select,textarea{color-scheme:dark;}
   padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;
   transition:border-color 0.12s;color-scheme:dark;width:100%;
 }
-.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--focus);outline:none;}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--focus-cell);outline:none;}
 .f.ob-invalid input,.f.ob-invalid select,.f.ob-invalid textarea{border-color:var(--red)!important;}
 /* Kill Chrome's autofill yellow tint on every form input. Chrome paints
    autofilled inputs yellow by default to signal "this is autofilled" —
@@ -666,11 +667,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .os-omenu .om-item.danger{color:var(--red);}
 /* Copy Location select styled to match the btn-ghost btn-sm controls beside it (same height, with a chevron). */
 .il-copysel{appearance:none;-webkit-appearance:none;background-color:transparent;border:1px solid var(--b1);border-radius:var(--r);color:var(--t2);font-family:'Barlow',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:5px 26px 5px 12px;line-height:1;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23889aa6' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;}
-.il-copysel:focus{outline:none;border-color:var(--focus);}
+.il-copysel:focus{outline:none;border-color:var(--focus-cell);}
 .il-copysel option{font-weight:400;letter-spacing:0;text-transform:none;color:var(--t1);background:var(--surface);}
 /* Recessed select with the soft-grey chevron (matches .f select), for selects outside a .f field. */
 .at-qsel{appearance:none;-webkit-appearance:none;color-scheme:dark;cursor:pointer;background-color:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);font-family:'Barlow',sans-serif;font-size:12px;padding:7px 26px 7px 10px;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
-.at-qsel:focus{border-color:var(--focus);}
+.at-qsel:focus{border-color:var(--focus-cell);}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
    Scoped to .page so the rest of the app (.screen) is byte-for-byte unchanged.
@@ -1124,7 +1125,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   transition:border-color 0.12s;
 }
 .bs-val::-webkit-inner-spin-button, .bs-val::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-.bs-val:focus { border-color:var(--focus); }
+.bs-val:focus { border-color:var(--focus-cell); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE SHELL (Layer 1 of the mobile-first pass)
