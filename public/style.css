@@ -612,6 +612,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* Smaller action buttons inside the pill rows, right-aligned with a small gap. */
 .row-list tbody .btn{padding:4px 9px;font-size:9px;}
 .row-list tbody td .btn + .btn{margin-left:6px;}
+/* When buttons are wrapped in .row-actions (its own flex gap handles spacing),
+   don't add the margin on top or the gap doubles. */
+.row-list tbody td .row-actions .btn + .btn{margin-left:0;}
 /* Narrow container: stack each pill row into a label/value card (never scroll). */
 @container (max-width:820px){
   .row-list,.row-list tbody{display:block;}
