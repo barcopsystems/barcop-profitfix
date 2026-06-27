@@ -65,15 +65,11 @@ S.CashForecast = {
     this.container.innerHTML = '<div class="screen">'
       + this.positionCard(fc, opening, false)
       + this.scenarioCard(fc, base)
-      + '<div class="sh" style="margin:24px 0 10px;">Your Cash Across the Quarter</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Your Cash Across the Quarter</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="cf-export">Export for Lender</button></div>'
       + this.forecastCard(fc, opening)
       + this.eventsCard()
       + this.billsCard()
-      + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;">'
-      +   '<button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Schedule</button>'
-      +   '<button class="btn btn-ghost btn-sm" id="cf-export">Export for Lender</button>'
-      + '</div>'
       + '</div>';
     this.wire();
     this.wireChart();
@@ -232,8 +228,8 @@ S.CashForecast = {
         + (ok ? '. The cushion holds.' : ', under zero. Free trapped cash or hold it until the runway is longer.') + '</div>';
     }
 
-    return '<div class="sh" style="margin:24px 0 10px;">Stress Test</div>'
-      + '<div class="card form-card">' + slow + afford + verdict + '</div>';
+    return '<div class="no-print"><div class="sh" style="margin:24px 0 10px;">Stress Test</div>'
+      + '<div class="card form-card">' + slow + afford + verdict + '</div></div>';
   },
 
   // ── Event money coming in: booked-event balances by date ──────────────────────
@@ -280,12 +276,11 @@ S.CashForecast = {
     this.container.onclick = ev => {
       if (ev.target.closest('#cf-save') || ev.target.closest('#cf-sc-run')) return;
       if (ev.target.closest('#cf-sc-clear')) { this._scAmt = null; this.draw(); return; }
-      if (ev.target.closest('#cf-export')) { App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container }); return; }
+      if (ev.target.closest('#cf-export')) { App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' }); return; }
       const adj = ev.target.closest('.cf-adj');
       if (adj) { this._salesAdj = parseInt(adj.dataset.adj, 10) || 0; this.draw(); return; }
       const mode = ev.target.closest('.cf-sc-mode');
       if (mode) { this._scRecurring = mode.dataset.mode === 'month'; this.draw(); return; }
-      if (ev.target.closest('[data-bills]')) { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.open) S.HubOperatingExpenses.open(); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
