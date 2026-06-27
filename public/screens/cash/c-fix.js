@@ -204,13 +204,15 @@ S.CashFix = {
     const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
     const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
 
-    const playbookLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm cf-playbook">Read the Cash Playbook</button></div>';
+    const playbookLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm cf-timeline">See Your Recovery Timeline</button><button class="btn btn-ghost btn-sm cf-playbook">Read the Cash Playbook</button></div>';
     this.container.innerHTML = '<div class="screen">' + header + playbookLink
       + '<div class="pf-2pane"><div class="pf-rail">' + rail + '</div>'
       + '<div class="pf-detail">' + detail + '</div></div></div>';
 
     this.container.querySelectorAll('.pf-tile').forEach(t =>
       t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
+    this.container.querySelector('.cf-timeline')?.addEventListener('click', () =>
+      App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'cash'); }));
     this.container.querySelector('.cf-playbook')?.addEventListener('click', () => { if (window.S && S.RecoveryPlaybook) S.RecoveryPlaybook.open('cash'); });
     this.wireWorkspace();
   },
@@ -290,7 +292,8 @@ S.CashFix = {
       { p: ['A fix is not a checklist you finish, it is a system you keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is happening.'] },
       { h: 'Your Cash Systems', p: ['Each system in the left list is one cash lever. The ring and status read off live data. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads On track only while its watched work is current; the moment one lapses it tells you exactly what is slipping or behind.'] },
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: your weekly count, the orders you place, a tight week sitting in your forecast, whether your vendor terms are set. You cannot fake a logged count. Steps it genuinely cannot see, holding a bill to its due date, asking a rep for better terms, are marked Guidance and never counted as proof.'] },
-      { h: 'Cash Freed', p: ['The figure up top is what you have actually freed: how far your trapped cash has come down from your own first weeks, read off your count history. It is the real reduction in capital tied up on the shelf, not a projection, and it builds as you count.'] }
+      { h: 'Cash Freed', p: ['The figure up top is what you have actually freed: how far your trapped cash has come down from your own first weeks, read off your count history. It is the real reduction in capital tied up on the shelf, not a projection, and it builds as you count.'] },
+      { h: 'See Your Recovery Timeline', p: ['The See Your Recovery Timeline button above the systems opens a chart of your Cash Freed building from zero to now, count by count, so you can see the climb instead of just one running total. It also shows which phase you are in, building your baseline, measuring, or live and tracked.'] }
     ]);
   }
 };
