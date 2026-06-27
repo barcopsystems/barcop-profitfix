@@ -563,18 +563,26 @@ window.CashEngine = {
     return t;
   },
 
-  // The money that isn't yours: tax collected this period, plus tips you are
-  // holding. Sales tax is the big one and the classic killer.
+  // The money that isn't yours: sales tax collected this period, payroll tax
+  // accrued, and outstanding gift cards. Sales tax is the big one and the
+  // classic killer.
   setAside() {
     const b = this._taxPeriodBounds();
     const sales = this._salesBetween(b.start, b.end);
-    const salesTax = sales * (this.salesTaxRate() / 100);
+    // Net out any sales tax already remitted this period (a tax outflow logged
+    // in Cash Bridge), so Set Aside never holds back money you have already
+    // paid. Matches the remittance suppression in the forecast.
+    let remitted = 0;
+    this.cashOutflows().forEach(o => {
+      if (o.type !== 'tax') return;
+      const d = String(o.date || '').slice(0, 10);
+      if (d >= b.start && d <= b.end) remitted += parseFloat(o.amount) || 0;
+    });
+    const salesTax = Math.max(0, sales * (this.salesTaxRate() / 100) - remitted);
     const wages = this._wagesBetween(b.start, b.end);
     const payrollTax = wages * (this.payrollBurden() / 100);
-    let tipsOwed = 0;
-    ((App.laborData && App.laborData.lc_tip_pools) || []).forEach(p => { tipsOwed += Math.max(0, parseFloat(p.unallocated) || 0); });
     const giftCards = this.giftCardLiability();
-    return { salesTax, payrollTax, tipsOwed, giftCards, total: salesTax + payrollTax + tipsOwed + giftCards, sales, wages, periodLabel: b.label };
+    return { salesTax, payrollTax, giftCards, total: salesTax + payrollTax + giftCards, sales, wages, periodLabel: b.label };
   },
 
   reserveTarget() { return this.reserveWeeks() * this.weeklyFixedCosts(); },
@@ -613,7 +621,11 @@ window.CashEngine = {
       const monthsToEnd = (endD.getFullYear() - base.getFullYear()) * 12 + (endD.getMonth() - base.getMonth());
       const lastM = term > 0 ? Math.min(term - 1, monthsToEnd) : monthsToEnd;
       for (let m = 0; m <= lastM; m++) {
-        const occ = new Date(base.getFullYear(), base.getMonth() + m, day);
+        // Clamp the day to the target month's last day so a series dated the
+        // 29th to 31st does not roll a short month forward (Jan 31 -> Mar 3)
+        // and silently skip the short month.
+        const dim = new Date(base.getFullYear(), base.getMonth() + m + 1, 0).getDate();
+        const occ = new Date(base.getFullYear(), base.getMonth() + m, Math.min(day, dim));
         const ymd = App.ymdLocal(occ);
         if (stop && ymd.slice(0, 7) >= stop) break;
         if (ymd < startYmd || ymd > endYmd) continue;
