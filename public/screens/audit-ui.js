@@ -163,7 +163,7 @@ const AuditUI = {
   historyCard(audits, listKey, pfx, opts) {
     opts = opts || {};
     // Column layout kept (Date / Score / Change / Data Quality / View), but each
-    // row is a #0D181E pill via the .audit-htbl table styling.
+    // row is a #0D181E pill via the .row-list table styling.
     const rows = audits.slice(0, App.listLimit('core', listKey)).map((a,i) => {
       const p    = audits[i+1];
       const naA  = a.overall_score == null;
@@ -178,7 +178,7 @@ const AuditUI = {
         + '</tr>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="audit-htbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th style="text-align:right;">Score</th><th style="text-align:right;">Change</th>' + (opts.hideGrade ? '' : '<th>Data Quality</th>') + '<th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', listKey, audits, false);

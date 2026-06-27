@@ -265,7 +265,7 @@ S.HubPermits = {
     // EXPERIMENT: permit list as the audit-history pill-row table (all cells
     // left-aligned). To revert, restore the .card-bleed data-card + .tbl version.
     const listCard = '<div class="card" id="hp-list" style="overflow-x:auto;">'
-      + '<table class="audit-htbl">'
+      + '<table class="row-list">'
       +   '<thead><tr>'
       +     '<th>Name</th><th>Type</th><th>Renewal Date</th><th>Recurrence</th>'
       +     '<th>Last Cost</th>'
