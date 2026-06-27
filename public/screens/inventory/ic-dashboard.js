@@ -454,12 +454,14 @@ S.InventoryDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
     const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">This Week</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Shelf Cash Went</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       +   mini('To Reorder', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)') + vdiv
       +   mini('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + vdiv
       +   mini('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)')
-      + '</div></div>';
+      + '</div>'
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Variance Report</button></div>'
+      + '</div>';
     return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
       + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
       + hero + secondary + '</div>';
