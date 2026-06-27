@@ -101,8 +101,7 @@ S.HubBooks = {
       const wt = o.bold ? 'font-weight:700;' : '';
       const lblCol = o.bold ? 'color:var(--t1);' : '';
       const valCol = 'color:' + (o.col || (o.neg ? 'var(--red)' : (o.bold ? 'var(--t1)' : 'var(--t2)'))) + ';';
-      const indent = o.sub ? 'padding-left:30px;' : '';
-      return '<tr><td style="' + wt + lblCol + indent + '">' + label + '</td>'
+      return '<tr><td style="' + wt + lblCol + '">' + label + '</td>'
         + '<td style="' + wt + valCol + '">' + fmt(m) + '</td>'
         + '<td style="' + wt + valCol + '">' + fmt(y) + '</td></tr>';
     };
