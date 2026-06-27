@@ -2,25 +2,24 @@
 
 /* ── Cash Recovery — Cash Position (True Available Cash) ───────────────────────
    The number an operator is desperate for and never has: how much of the money
-   in the account is actually free to spend. Your balance, minus the money that
-   isn't yours (the sales tax you collected and owe, plus tips you are holding),
-   minus the reserve you should keep to survive a slow stretch. Spending the
-   sales tax you collected is the classic way a profitable bar goes under; this is
-   where you stop doing it. Built to the report standard. Reads CashEngine. The
-   config (your tax rate, reserve target) is light and kept on this device. */
+   in the account is actually free to spend RIGHT NOW. A point-in-time snapshot,
+   not a forecast (that is the Forecast page). Your balance, minus the money that
+   isn't yours (the sales tax you collected and owe since your last filing, plus
+   tips you are holding), minus the reserve you should keep. The Safe to Spend
+   card shows the whole subtraction so you can see where every dollar goes.
+   Reads CashEngine. The config (tax rate, filing frequency, reserve) is light and
+   kept on this device. */
 
 S.CashPosition = {
   showHowTo() {
     App.showHelpModal('How Cash Position Works', [
-      { p: ['The money in your account is not all yours to spend. Some of it is tax you collected and owe, and some of it should be a reserve so a slow stretch does not end you. Cash Position carves both out and shows what is actually free: your Safe to Spend.'] },
-      { h: 'Money That Isn\'t Yours', p: ['When a guest pays, the sales tax in that check was never your money, it is the state\'s, and you hold it until you remit. Spending it is the single most common way a profitable bar ends up unable to pay its tax bill. Set your sales tax rate and Bar Cop tracks the running liability off your sales, plus any tips you are holding, so you never mistake it for cash you have.'] },
+      { p: ['The money in your account is not all yours to spend, and Cash Position is a snapshot of how much actually is, as of right now. Some of your balance is tax you collected and owe, and some should be a reserve so a slow stretch does not end you. This carves both out and shows what is truly free: your Safe to Spend.'] },
+      { h: 'A Snapshot, Not A Forecast', p: ['Your cash on hand changes every day, so this is a point-in-time read: enter your balance now and it tells you what is safe to move on today. Check it again whenever you need the number. The thirteen-week look ahead lives on the Forecast page.'] },
+      { h: 'Money That Isn\'t Yours', p: ['When a guest pays, the sales tax in that check was never your money, it is the state\'s, and you hold it until you remit. How often you file matters: a quarterly filer is sitting on up to three months of collected tax at once, a much bigger pile than a monthly filer who just remitted. Set your rate and how you file, and Bar Cop tracks the tax you have collected since your last filing, plus any tips you are holding.'] },
       { h: 'Your Reserve', p: ['A healthy bar keeps a cushion, enough to cover its fixed bills through a slow stretch with no sales. Set how many weeks you want to hold and Bar Cop sizes the target off your recurring overhead, shows where you stand, and what is left over as truly free cash.'] },
       { h: 'Safe To Spend', p: ['Your balance, minus the tax and tips you owe, minus your reserve target. That is the money you can actually move on without putting the business at risk. If it is negative, you are spending money that is already spoken for.'] }
     ]);
   },
-
-  statItem(label, val, cls) { return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>'; },
-  statsCard(items) { return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>'; },
 
   render(container, actions) {
     this.container = container;
@@ -31,12 +30,10 @@ S.CashPosition = {
 
   draw() {
     const p = CashEngine.position();
-    const sa = p.setAside;
-
     this.container.innerHTML = '<div class="screen">'
       + this.configCard(p)
-      + (p.hasOpening ? this.hero(p) : '')
-      + (p.hasOpening ? this.setAsideCard(sa) : '')
+      + (p.hasOpening ? this.heroCard(p) : '')
+      + (p.hasOpening ? this.setAsideCard(p.setAside) : '')
       + (p.hasOpening ? this.reserveCard(p) : '')
       + '</div>';
     this.wire();
@@ -44,28 +41,45 @@ S.CashPosition = {
 
   configCard(p) {
     const freq = CashEngine.taxFrequency();
-    const seg = (label, val, on) => '<button class="btn btn-ghost btn-sm cp-freq" data-freq="' + val + '" style="' + (on ? 'background:var(--gold-tint);border-color:var(--gold);color:var(--t1);' : '') + '">' + label + '</button>';
+    const opt = (v, label) => '<option value="' + v + '"' + (freq === v ? ' selected' : '') + '>' + label + '</option>';
     return '<div class="card form-card"><div class="card-title">Your Numbers</div>'
       + '<div class="form-row">'
-      +   '<div class="f" style="width:170px;"><label>Cash on hand</label><div class="fw"><span class="pre">$</span><input type="number" id="cp-cash" placeholder="0.00" value="' + (p.opening != null ? p.opening : '') + '"/></div></div>'
-      +   '<div class="f" style="width:140px;"><label>Sales tax rate</label><div class="fw"><input type="number" id="cp-tax" placeholder="0" step="0.01" value="' + (CashEngine.salesTaxRate() || '') + '"/><span class="suf">%</span></div></div>'
-      +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
-      +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;"><span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Remit tax</span>'
-      +   seg('Monthly', 'monthly', freq === 'monthly') + seg('Quarterly', 'quarterly', freq === 'quarterly') + '</div>'
+      +   '<div class="f" style="width:170px;"><label>Cash on hand</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cp-cash" placeholder="0.00" value="' + (p.opening != null ? p.opening : '') + '"/></div></div>'
+      +   '<div class="f" style="width:140px;"><label>Sales tax rate</label><div class="fw"><input type="number" class="suf" id="cp-tax" placeholder="0" step="0.01" value="' + (CashEngine.salesTaxRate() || '') + '"/><span class="suf">%</span></div></div>'
+      +   '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="cp-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
+      +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" class="suf" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
+      +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" class="suf" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div style="margin:16px 0 4px;display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" id="cp-save">Save</button>'
-      + (p.opening == null ? '<span style="font-size:12px;color:var(--t3);">Enter your cash on hand and tax rate to see what is really free to spend.</span>' : '') + '</div>';
+      + (p.opening == null ? '<span style="font-size:12px;color:var(--t3);">Enter your cash on hand and tax rate to see what is really free to spend.</span>' : '') + '</div>'
+      + '</div>';
   },
 
-  hero(p) {
-    const cls = p.safe < 0 ? 'warn' : '';
-    return '<div style="margin-top:6px;">' + this.statsCard(
-      this.statItem('Safe to Spend', App.fmtCurrency(p.safe), cls)
-      + this.statItem('Set Aside (not yours)', App.fmtCurrency(p.setAside.total), p.setAside.total > 0 ? 'warn' : '')
-      + this.statItem('Reserve Target', App.fmtCurrency(p.reserve))
-      + this.statItem('Your Balance', App.fmtCurrency(p.opening || 0)))
+  // ── Safe to Spend: the whole subtraction, so the relationship is visible ──────
+  heroCard(p) {
+    const today = new Date(App.todayLocal() + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    const safeCol = p.safe < 0 ? 'var(--red)' : 'var(--green)';
+    const eq = (label, val, opts) => {
+      opts = opts || {};
+      return '<div style="flex:0 0 auto;">'
+        + (label ? '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">' + label + '</div>' : '')
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (opts.big ? '40px' : '26px') + ';font-weight:600;line-height:0.9;color:' + (opts.col || 'var(--t1)') + ';">' + val + '</div></div>';
+    };
+    const op = sym => '<div style="align-self:flex-end;font-size:20px;color:var(--t4);padding-bottom:3px;">' + sym + '</div>';
+    return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Safe to Spend</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;">As of ' + today + '. A snapshot of your account right now, not a forecast.</div>'
+      + '<div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;">'
+      +   eq('Your Balance', App.fmtCurrency(p.opening || 0))
+      +   op('&minus;')
+      +   eq('Set Aside, Not Yours', App.fmtCurrency(p.setAside.total), { col: p.setAside.total > 0 ? 'var(--amber)' : 'var(--t1)' })
+      +   op('&minus;')
+      +   eq('Reserve Target', App.fmtCurrency(p.reserve))
+      +   op('=')
+      +   eq('Safe to Spend', App.fmtCurrency(p.safe), { big: true, col: safeCol })
+      + '</div>'
+      + (p.safe < 0
+          ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--red);">You are spending spoken-for money.</strong> Your balance is already claimed by tax, tips, and your reserve. Free trapped cash or hold any spend until this is back above zero.</div>'
+          : '')
       + '</div>';
   },
 
@@ -78,8 +92,8 @@ S.CashPosition = {
     return '<div class="sh" style="margin:24px 0 10px;">Money That Isn\'t Yours</div>'
       + '<div class="card">'
       + (rateSet
-          ? row('Sales tax collected', sa.salesTax, 'On ' + App.fmtCurrency(sa.sales) + ' in sales ' + sa.periodLabel + ', owed at remittance', true)
-          : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Set your sales tax rate above and Bar Cop tracks the tax you have collected and owe.</div>')
+          ? row('Sales tax collected', sa.salesTax, 'Tax on your ' + sa.periodLabel + ' sales (' + App.fmtCurrency(sa.sales) + '), owed at your next remittance', true)
+          : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Set your sales tax rate above and Bar Cop tracks the tax you have collected and owe since your last filing.</div>')
       + (CashEngine.payrollBurden() > 0 ? row('Payroll tax', sa.payrollTax, 'Estimated on ' + App.fmtCurrency(sa.wages) + ' in wages ' + sa.periodLabel, true) : '')
       + (sa.tipsOwed > 0 ? row('Tips held', sa.tipsOwed, 'Pooled tips not yet distributed', true) : '')
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 2px;">'
@@ -112,14 +126,13 @@ S.CashPosition = {
     if (save) save.addEventListener('click', () => {
       CashEngine.setOpeningCash(document.getElementById('cp-cash').value);
       CashEngine.setSalesTaxRate(document.getElementById('cp-tax').value);
+      CashEngine.setTaxFrequency(document.getElementById('cp-freq').value);
       CashEngine.setReserveWeeks(document.getElementById('cp-reserve').value);
       CashEngine.setPayrollBurden(document.getElementById('cp-burden').value);
       this.draw();
     });
     this.container.onclick = ev => {
       if (ev.target.closest('#cp-save')) return;
-      const fq = ev.target.closest('.cp-freq');
-      if (fq) { CashEngine.setTaxFrequency(fq.dataset.freq); this.draw(); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
