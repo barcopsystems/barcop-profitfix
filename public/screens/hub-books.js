@@ -67,22 +67,16 @@ S.HubBooks = {
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
     document.getElementById('hb-month')?.addEventListener('change', (e) => {
-      const w = document.getElementById('hb-review-wrap'); if (w) { w.innerHTML = this._reviewBlock(e.target.value); this._wireExport(); }
+      const w = document.getElementById('hb-review-wrap'); if (w) { w.innerHTML = this._reviewBlock(e.target.value); }
     });
-    this._wireExport();
   },
 
-  // ── On-screen review block: Export PDF + the Income Statement and Sales Tax,
-  //    below the generate workflow. Rebuilt when the month changes. ───────────
+  // ── On-screen review block: the Income Statement and Sales Tax, below the
+  //    generate workflow. A visual snapshot only; the sanctioned download is the
+  //    Generate File worksheet (gated by the export acknowledgment). Rebuilt when
+  //    the month changes. ──────────────────────────────────────────────────────
   _reviewBlock(monthKey) {
-    return '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 10px;"><button class="btn btn-ghost btn-sm" id="hb-is-export">Export PDF</button></div>'
-      + '<div id="hb-is-content">' + this._incomeStatementCard(monthKey) + this._salesTaxCard(monthKey) + '</div>';
-  },
-  _wireExport() {
-    document.getElementById('hb-is-export')?.addEventListener('click', () => {
-      const el = document.getElementById('hb-is-content');
-      if (el) App.exportPDF({ title: 'Income Statement', root: el });
-    });
+    return '<div id="hb-is-content">' + this._incomeStatementCard(monthKey) + this._salesTaxCard(monthKey) + '</div>';
   },
 
   // ── On-screen Income Statement (the same numbers as the export, readable
