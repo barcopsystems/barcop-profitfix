@@ -1060,6 +1060,25 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ing-tbl.rd-pill td{border-bottom:none;border-radius:0;}
 .ing-tbl.rd-pill td:first-child{border-radius:8px 0 0 8px;}
 .ing-tbl.rd-pill td:last-child{border-radius:0 8px 8px 0;}
+/* rd-pill trial: stack to clean label/value cards as soon as the BUILDER itself
+   gets too narrow for a flagged line (reason text + Flag + Delete), not at a
+   viewport breakpoint — the sidebar makes viewport width a poor proxy. Mirrors
+   the .row-list container-query approach so it compresses then stacks, never
+   horizontal-scrolls through that cramped middle zone. */
+.rd-lines-wrap{container-type:inline-size;}
+@container (max-width:680px){
+  .ing-tbl.rd-pill{border-spacing:0;display:block;width:100%;}
+  .ing-tbl.rd-pill thead{display:none;}
+  .ing-tbl.rd-pill tbody{display:block;width:100%;}
+  .ing-tbl.rd-pill tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
+  .ing-tbl.rd-pill tbody td{display:block;background:transparent;border:none;border-radius:0;padding:6px 0;}
+  .ing-tbl.rd-pill tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .ing-tbl.rd-pill tbody td[data-label=""]::before{content:none;}
+  .ing-tbl.rd-pill tbody td .form-input{width:100%;}
+  .ing-tbl.rd-pill tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
+  .ing-tbl.rd-pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
+  .ing-tbl.rd-pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
+}
 
 /* ══ PROG BAR ══ */
 .prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
@@ -1340,10 +1359,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      tr-transparent + td-#0D181E, which boxes every stacked field separately. The
      gold reason text + Flag button carry the flag. */
   .ing-tbl tbody td.rd-flag::before{content:none;}
-  /* rd-pill trial: stack the line's actions cell on mobile so the reason text +
-     Flag + Delete read top-to-bottom instead of cramming into one row. */
-  .ing-tbl.rd-pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
-  .ing-tbl.rd-pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
 
   /* Category-grouped tables (table-layout:fixed) on mobile: drop the desktop
      fixed layout + min-width so they stack FULL WIDTH like every other data
