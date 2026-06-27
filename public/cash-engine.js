@@ -487,12 +487,20 @@ window.CashEngine = {
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
-    let runway = null;
-    for (let i = 0; i < rows.length; i++) { if (rows[i].balance < 0) { runway = i; break; } }
+    const credit = this.availableCredit();
+    // Runway = weeks until you are truly out: cash drained AND the credit line
+    // maxed. cashRunway = the earlier week your own cash would run dry.
+    let runway = null, cashRunway = null;
+    for (let i = 0; i < rows.length; i++) {
+      if (cashRunway == null && rows[i].balance < 0) cashRunway = i;
+      if (rows[i].balance < -credit) { runway = i; break; }
+    }
+    const low = rows[lowIdx] || null;
     return {
       rows, opening, hasOpening: this.openingCash() != null,
-      lowPoint: rows[lowIdx] || null, lowIdx,
-      runway, negativeWeeks: rows.filter(r => r.balance < 0).length,
+      lowPoint: low, lowIdx, runway, cashRunway, credit,
+      drawsCredit: !!(credit > 0 && low && low.balance < 0 && low.balance >= -credit),
+      negativeWeeks: rows.filter(r => r.balance < 0).length,
       tightWeeks: rows.filter(r => r.net < 0).length,
       end: rows.length ? rows[rows.length - 1].balance : opening,
       hasData: rows.some(r => r.inflow > 0 || r.out > 0)
@@ -513,6 +521,14 @@ window.CashEngine = {
   setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
   reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },
   setReserveWeeks(v) { this._cfgSet('cash_reserve_weeks', v); },
+  // Available credit (a line of credit or card) is the backstop you actually lean
+  // on in a thin week, so it extends the survival runway past the bank balance.
+  availableCredit() { return Math.max(0, this._cfgNum('cash_available_credit', 0)); },
+  setAvailableCredit(v) { this._cfgSet('cash_available_credit', v); },
+  // Outstanding gift cards are cash you collected but owe product against, the same
+  // trap as spending the sales tax, so they are money that isn't yours to spend.
+  giftCardLiability() { return Math.max(0, this._cfgNum('cash_gift_card_liability', 0)); },
+  setGiftCardLiability(v) { this._cfgSet('cash_gift_card_liability', v); },
 
   // Weekly fixed overhead: the recurring bills (rent, utilities, insurance, loan),
   // normalized to a week. The nut you owe even on a dead week.
@@ -557,7 +573,8 @@ window.CashEngine = {
     const payrollTax = wages * (this.payrollBurden() / 100);
     let tipsOwed = 0;
     ((App.laborData && App.laborData.lc_tip_pools) || []).forEach(p => { tipsOwed += Math.max(0, parseFloat(p.unallocated) || 0); });
-    return { salesTax, payrollTax, tipsOwed, total: salesTax + payrollTax + tipsOwed, sales, wages, periodLabel: b.label };
+    const giftCards = this.giftCardLiability();
+    return { salesTax, payrollTax, tipsOwed, giftCards, total: salesTax + payrollTax + tipsOwed + giftCards, sales, wages, periodLabel: b.label };
   },
 
   reserveTarget() { return this.reserveWeeks() * this.weeklyFixedCosts(); },
