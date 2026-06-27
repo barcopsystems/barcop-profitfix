@@ -618,6 +618,21 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .row-list tbody td[data-label=""]::before{content:none;}
   .row-list tbody td[data-label=""]{justify-content:flex-end;}
 }
+/* Financial-statement pill rows (.pnl-list) — the on-screen Income Statement and
+   Sales Tax snapshots (the real export is the spreadsheet). Like .row-list pills
+   but KEEPS its columns on mobile (a statement loses meaning stacked) and supports
+   section-header rows (.pnl-sec) + inline sub-line indentation. Left-aligned. */
+.pnl-list{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:12px;}
+.pnl-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b2);}
+.pnl-list tbody td{background:#0D181E;padding:9px 14px;color:var(--t2);vertical-align:middle;}
+.pnl-list tbody td:first-child{border-radius:6px 0 0 6px;}
+.pnl-list tbody td:last-child{border-radius:0 6px 6px 0;}
+.pnl-list tbody tr.pnl-sec td{background:transparent;padding:15px 14px 2px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);}
+@media (max-width:600px){
+  .pnl-list{font-size:10px;}
+  .pnl-list thead th{padding:0 9px 8px;}
+  .pnl-list tbody td{padding:8px 9px;}
+}
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
 /* Fix This buttons hover like ghost buttons (text to white). Inline base color/border need !important to lose to the hover. Shared across the Profit/Revenue/Cash audits. */
