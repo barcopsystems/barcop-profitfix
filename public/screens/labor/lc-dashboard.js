@@ -112,15 +112,16 @@ S.LaborDashboard = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
+    const wys = this._wys();
 
     container.innerHTML = '<div class="screen">'
+      + (wys.hasHours ? this.whereYouStand(wys) : '')
       + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
-      + this.statusStrip()
       + this.outlierStrip()
       + '</div>';
 
@@ -288,7 +289,8 @@ S.LaborDashboard = {
     return { over, approaching, otPremium };
   },
 
-  statusStrip() {
+  // ── Where You Stand state (the week's labor headline + reads) ────────────────
+  _wys() {
     const wkStart = this.weekStart(), wkEnd = this.weekEnd();
     const today = App.todayLocal();
     const endCap = wkEnd < today ? wkEnd : today;
@@ -297,16 +299,107 @@ S.LaborDashboard = {
     const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
     const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
     const p = this.weekProjection();
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('Labor Cost This Week', App.fmtCurrency(wkCost))
-      + div
-      + item('Labor Hours', wkHours.toFixed(1))
-      + div
-      + item('Overtime Risk', String(p.over + p.approaching), (p.over + p.approaching) ? 'warn' : '')
+    // Labor % and RPLH read actual revenue for the week (sc_shifts), not a forecast,
+    // so they read "-" until the week's sales are imported rather than dressing a
+    // projection as actual.
+    const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
+      .filter(s => this.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+    const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
+    const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
+    return {
+      wkStart, wkEnd, wkHours, wkCost, weekRevenue, laborPct, rplh,
+      over: p.over, approaching: p.approaching, otRisk: p.over + p.approaching, otPremium: p.otPremium,
+      hasHours: wkActuals.length > 0
+    };
+  },
+
+  // ── Where You Stand (labor headline + three-stat read + Briefing) ────────────
+  whereYouStand(st) {
+    const target = App.laborTargetPct ? App.laborTargetPct() : 29;
+    const fmtRange = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const sub = st.hasHours
+      ? st.wkHours.toFixed(1) + ' hrs logged &middot; week of ' + fmtRange(st.wkStart)
+      : 'import this week\'s hours to fill this in';
+    const hero = '<div style="padding:2px 0;">'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + App.fmtCurrency(st.wkCost, 0) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">labor cost</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + sub + '</div></div>';
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    const mini = (label, val, col) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">What This Week\'s Crew Cost You</div>'
+      + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+      +   mini('Labor %', st.laborPct != null ? App.fmtPct(st.laborPct) : '-', (st.laborPct != null && st.laborPct > target) ? 'var(--amber)' : 'var(--t1)') + vdiv
+      +   mini('RPLH', st.rplh != null ? App.fmtCurrency(st.rplh) : '-') + vdiv
+      +   mini('Overtime Risk', String(st.otRisk), st.otRisk > 0 ? 'var(--amber)' : 'var(--t1)')
+      + '</div>'
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Build Schedule</button></div>'
       + '</div>';
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
+      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+      + hero + secondary + '</div>';
+  },
+
+  // ── Bar Cop Briefing: a written read of the labor week, cached a week per
+  //    section via DashUI so repeat opens do not spend on the API. ─────────────
+  showInsights() {
+    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
+    const st = this._wys();
+    if (!st.hasHours) { DashUI.insightsModal('Bar Cop Briefing', 'Log a week of hours and Bar Cop can read your labor week for you.'); return; }
+    const rec = DashUI._insRec('labor');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
+    const prompt = this._insPrompt(st);
+    const btn = this.container.querySelector('[data-insights]');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your labor right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        const text = data.content && data.content[0] && data.content[0].text;
+        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('labor', html));
+        restore();
+      })
+      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+  },
+
+  _insPrompt(st) {
+    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+    const target = App.laborTargetPct ? App.laborTargetPct() : 29;
+    const today = App.todayLocal();
+    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
+    const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
+    const uncovered = this.callouts().filter(c => this.inWeek(c.date) && !c.covered).length;
+    const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
+    const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
+    const nextBuilt = this.schedules().some(s => s.week_start === this.nextWeekStart());
+    const facts = [
+      'Labor cost this week: ' + m(st.wkCost),
+      'Labor hours this week: ' + st.wkHours.toFixed(1),
+      'This week revenue (actual, from sales import): ' + (st.weekRevenue > 0 ? m(st.weekRevenue) : 'not imported yet'),
+      'Labor percent of revenue: ' + (st.laborPct != null ? st.laborPct.toFixed(1) + '%' : 'n/a, week sales not imported') + ' (target ' + target + '%)',
+      'Revenue per labor hour: ' + (st.rplh != null ? m(st.rplh) : 'n/a, week sales not imported'),
+      'Staff projected over ' + App.OT_THRESHOLD + ' hours: ' + st.over,
+      'Staff approaching overtime: ' + st.approaching,
+      'Projected overtime premium this week: ' + m(st.otPremium),
+      'Uncovered call-outs this week: ' + uncovered,
+      'Certifications expired / expiring within 30 days: ' + expired + ' / ' + expiring,
+      'Next week\'s schedule built: ' + (nextBuilt ? 'yes' : 'no')
+    ].join('\n');
+    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the labor side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
+      + 'STAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers.\n- If a number is not set or the week\'s sales are not imported, say so plainly instead of guessing.\n\n'
+      + 'FACTS:\n' + facts
+      + '\n\nWrite two or three short paragraphs: first where labor stands (cost, hours, and labor percent against target if sales are in), then where it is leaking (overtime, uncovered shifts, expiring certifications), then the single move that matters most this week, usually getting next week\'s schedule built right. Use the exact numbers from the facts.';
   },
 
   outlierStrip() {
@@ -372,6 +465,7 @@ S.LaborDashboard = {
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const head = ev.target.closest('.lc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
