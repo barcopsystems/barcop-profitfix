@@ -899,12 +899,12 @@ S.HubBarCopAudit = {
           + '</table></div>'
         : '';
       const scoreBlock = isNA
-        ? '<div style="text-align:right;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
-        : '<div style="text-align:right;">'
+        ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
+        : '<div style="text-align:right;flex-shrink:0;">'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + col + ';line-height:1;">' + sc + '</div>'
-          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
+          + '<div style="background:var(--b2);height:5px;border-radius:3px;width:96px;margin-top:6px;margin-left:auto;overflow:hidden;"><div style="height:100%;width:' + sc + '%;background:' + col + ';border-radius:3px;"></div></div>'
           + '</div>';
-      return '<div class="card" style="margin-bottom:14px;">'
+      return '<div class="card" style="margin-bottom:14px;' + (isNA ? '' : 'border-left:3px solid ' + col + ';') + '">'
         + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
         +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
@@ -979,6 +979,7 @@ S.HubBarCopAudit = {
       + AuditUI.viewHero(audit, 'Bar Cop Audit', 'bca')
       + naNote
       + recoveryStrip
+      + AuditUI.sectionScoreboard(audit, this.SECTION_NAMES, sorted[idx + 1])
       + exposureCard
       + subCards
       + patternCard

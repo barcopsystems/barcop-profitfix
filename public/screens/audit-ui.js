@@ -207,12 +207,20 @@ const AuditUI = {
   // signals = risk-signal objects for the Risk Signals section (score null).
   // d = the audit raw, for the inline Findings.
   sectionBlock(num, name, score, items, signals, d) {
-    const bar   = Math.min(100, Math.max(0, score||0));
-    const color = App.scoreColor(score);
-    const rows  = (items||[]).filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
-      '<tr><td>' + label + '</td>'
-      + '<td style="color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--gold)':'var(--t1)') + ';">' + val + '</td></tr>'
+    const naScore = score == null;
+    const bar     = Math.min(100, Math.max(0, score||0));
+    const color   = naScore ? 'var(--t3)' : App.scoreColor(score);
+    // Metrics as a responsive label-over-value grid (the dashboard stat look),
+    // scales cleanly from 2 metrics to a dozen; warn=red, good=green, else neutral.
+    const cells = (items||[]).filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0').map(([label, val, highlight]) =>
+      '<div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
+      + '<div style="font-size:17px;font-weight:600;line-height:1.3;color:' + (highlight==='warn'?'var(--red)':highlight==='good'?'var(--green)':'var(--t1)') + ';">' + val + '</div>'
+      + '</div>'
     ).join('');
+    const metricsBlock = cells
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 22px;padding:2px 0;">' + cells + '</div>'
+      : '';
     const sigRows = (signals||[]).map(sig => {
       const sc = (sig.score||'').toUpperCase();
       const dot = sc==='HIGH'?'var(--red)':sc==='MEDIUM'?'var(--amber)':'var(--t3)';
@@ -228,44 +236,77 @@ const AuditUI = {
         + '</div>';
     }).join('');
     const isSignals = signals && signals.length;
-    const scoreBlock = score != null
-      ? '<div style="text-align:right;">'
+    const scoreBlock = !naScore
+      ? '<div style="text-align:right;flex-shrink:0;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:42px;font-weight:700;color:' + color + ';line-height:1;">' + score + '</div>'
-        + '<div style="background:var(--b2);height:5px;border-radius:3px;width:80px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
+        + '<div style="background:var(--b2);height:5px;border-radius:3px;width:96px;margin-top:6px;margin-left:auto;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + color + ';border-radius:3px;"></div></div>'
         + '</div>'
       : isSignals ? ''
-        : '<div style="text-align:right;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
-    return '<div class="card" style="margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
+        : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
+    return '<div class="card" style="margin-bottom:14px;' + (naScore ? '' : 'border-left:3px solid ' + color + ';') + '">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;' + ((metricsBlock || sigRows) ? 'margin-bottom:14px;' : '') + '">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
       + scoreBlock + '</div>'
-      + (rows ? '<div class="at-metrics"><table class="at-mtbl">' + rows + '</table></div>' : '')
+      + metricsBlock
       + sigRows
       + AuditUI.findings(d, num)
       + '</div>';
   },
 
-  // ── Full view: score hero (name/grade left, big score + scale bar right) ───
+  // ── Full view: section scoreboard — every section at a glance, as a mini-card
+  //    row (the Hub module-card look), so the operator sees their shape before
+  //    reading a word. prev (the previous audit) adds a delta when available. ──
+  sectionScoreboard(audit, sectionNames, prev) {
+    const sections = audit.sections || {};
+    const names = (sectionNames && sectionNames.length) ? sectionNames : Object.keys(sections);
+    if (names.filter(n => sections[n] != null).length < 2) return '';
+    const cards = names.map(name => {
+      const score = sections[name];
+      const na  = score == null;
+      const col = na ? 'var(--t3)' : App.scoreColor(score);
+      const bar = na ? 0 : Math.min(100, Math.max(0, score));
+      const ps  = prev && prev.sections ? prev.sections[name] : null;
+      const diff = (!na && ps != null) ? score - ps : null;
+      return '<div style="flex:1 1 150px;min-width:140px;background:#0D181E;border:1px solid var(--b-edge);border-radius:10px;padding:13px 15px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--t3);line-height:1.35;min-height:24px;margin-bottom:8px;">' + esc(name) + '</div>'
+        + '<div style="display:flex;align-items:baseline;gap:8px;">'
+        +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:700;color:' + col + ';line-height:1;">' + (na ? 'N/A' : score) + '</div>'
+        +   (diff != null && diff !== 0 ? '<div style="font-size:11px;font-weight:700;color:' + (diff>0?'var(--green)':'var(--red)') + ';">' + (diff>0?'+':'') + diff + '</div>' : '')
+        + '</div>'
+        + '<div style="background:var(--b2);height:5px;border-radius:3px;margin-top:9px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>'
+        + '</div>';
+    }).join('');
+    return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">' + cards + '</div>';
+  },
+
+  // ── Full view: score hero — the cockpit "Where You Stand" treatment: eyebrow
+  //    + Briefing top, the big score as the hero with its grade word and band,
+  //    bar name + period as the sub-line. ──────────────────────────────────────
   viewHero(audit, heroLabel, pfx) {
     const naO = audit.overall_score == null;
     const scoreColor = naO ? 'var(--t3)' : App.scoreColor(audit.overall_score||0);
+    const scoreLabel = naO ? '' : App.scoreLabel(audit.overall_score);
+    const sub = (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '');
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      +   '<span>' + esc(heroLabel) + '</span>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">' + esc(heroLabel) + '</div>'
       +   '<div id="' + (pfx || 'audit') + '-outlook-mount" style="flex-shrink:0;"></div>'
       + '</div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+      + '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;">'
       + '<div>'
-      + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '') + '</div>'
-      + (audit.grade ? '<div style="margin-top:8px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
+      + '<div style="font-size:20px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + sub + '</div>'
+      + (audit.grade ? '<div style="margin-top:10px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
       + '</div>'
       + (naO
           ? '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:4px;">Not enough data yet</div></div>'
           : '<div style="text-align:right;">'
-            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + audit.overall_score + '</div>'
-            + '<div style="width:200px;max-width:100%;margin-left:auto;text-align:left;">' + App.scoreBar(audit.overall_score) + '</div>'
+            + '<div style="display:flex;align-items:baseline;gap:10px;justify-content:flex-end;">'
+            +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:60px;font-weight:700;color:' + scoreColor + ';line-height:0.85;">' + audit.overall_score + '</div>'
+            +   (scoreLabel ? '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';">' + esc(scoreLabel) + '</div>' : '')
+            + '</div>'
+            + '<div style="width:240px;max-width:100%;margin-left:auto;margin-top:10px;text-align:left;">' + App.scoreBar(audit.overall_score) + '</div>'
             + '</div>')
       + '</div></div>';
   },

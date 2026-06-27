@@ -141,6 +141,7 @@ S.AuditTracker = {
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.viewHero(audit, 'Profit Recovery Audit', 'at')
       + AuditUI.recoverStrip(audit)
+      + AuditUI.sectionScoreboard(audit, NAMES, audits[idx + 1])
       + AuditUI.actionsArea(audit, 'profit', 'at')
       + sections
       + '</div>';
