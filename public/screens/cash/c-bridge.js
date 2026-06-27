@@ -27,14 +27,30 @@ S.CashBridge = {
   },
 
   records() { return CashEngine.cashOutflows(); },
-  periodBounds() {
+  periodBounds(period) {
+    period = period || this._period;
     const now = new Date();
     const ym = (y, m, d) => App.ymdLocal(new Date(y, m, d));
-    if (this._period === 'this-month') return { s: ym(now.getFullYear(), now.getMonth(), 1), e: App.todayLocal(), label: 'this month' };
-    if (this._period === 'this-quarter') { const q = Math.floor(now.getMonth() / 3); return { s: ym(now.getFullYear(), q * 3, 1), e: App.todayLocal(), label: 'this quarter' }; }
-    if (this._period === 'last-quarter') { let q = Math.floor(now.getMonth() / 3) - 1; const y = q < 0 ? now.getFullYear() - 1 : now.getFullYear(); q = (q + 4) % 4; return { s: ym(y, q * 3, 1), e: ym(y, q * 3 + 3, 0), label: 'last quarter' }; }
+    if (period === 'this-month') return { s: ym(now.getFullYear(), now.getMonth(), 1), e: App.todayLocal(), label: 'this month' };
+    if (period === 'this-quarter') { const q = Math.floor(now.getMonth() / 3); return { s: ym(now.getFullYear(), q * 3, 1), e: App.todayLocal(), label: 'this quarter' }; }
+    if (period === 'last-quarter') { let q = Math.floor(now.getMonth() / 3) - 1; const y = q < 0 ? now.getFullYear() - 1 : now.getFullYear(); q = (q + 4) % 4; return { s: ym(y, q * 3, 1), e: ym(y, q * 3 + 3, 0), label: 'last quarter' }; }
     let m = now.getMonth() - 1; const y = m < 0 ? now.getFullYear() - 1 : now.getFullYear(); m = (m + 12) % 12;
     return { s: ym(y, m, 1), e: ym(y, m + 1, 0), label: 'last month' };
+  },
+  // After a save, if the selected period would hide the saved outflow, switch to
+  // the period that shows it (the narrowest match) so the operator sees it land.
+  _periodForDate(ymd) {
+    for (let i = 0; i < this.PERIODS.length; i++) {
+      const b = this.periodBounds(this.PERIODS[i][0]);
+      if (ymd >= b.s && ymd <= b.e) return this.PERIODS[i][0];
+    }
+    return null;
+  },
+  _setPeriodFor(ymd) {
+    const cur = this.periodBounds();
+    if (ymd >= cur.s && ymd <= cur.e) return;   // current period already shows it
+    const p = this._periodForDate(ymd);
+    if (p) this._period = p;
   },
 
   render(container, actions) {
@@ -77,7 +93,7 @@ S.CashBridge = {
       + '</div>'
       + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-recur"/> Recurring monthly (same amount each month)</label></div>'
       + '<div id="cb-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for one with a fixed payoff, like a loan.</div></div></div></div>'
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-note" placeholder="e.g. SBA loan, March draw"></textarea></div></div>'
+      + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-note" placeholder="e.g. SBA loan, March draw"></textarea></div></div>'
       + '<div id="cb-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
     const buttons = '<div data-collapse-group="cb-add" style="margin:14px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
@@ -190,6 +206,7 @@ S.CashBridge = {
     const rec = { id: App.uid(), date, type, amount, notes: note, created_at: new Date().toISOString() };
     if (recur) { rec.recurring = true; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (term && term > 0) rec.term_months = term; }
     await App.putRecord('core', 'cash_outflow', rec);
+    if (!recur) this._setPeriodFor(date);
     this.draw();
   },
   clearAdd() {
@@ -244,6 +261,7 @@ S.CashBridge = {
       if (recChecked) { out.recurring = true; out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (termV && termV > 0) out.term_months = termV; else delete out.term_months; delete out.stopped_ym; }
       else { delete out.recurring; delete out.recur_day; delete out.term_months; delete out.stopped_ym; }
       await App.putRecord('core', 'cash_outflow', out);
+      if (!recChecked) this._setPeriodFor(date);
       App.closeModal(id);
       this.draw();
     });
