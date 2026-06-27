@@ -59,12 +59,12 @@ body{background:var(--bg);color:var(--w);font-family:'Barlow',-apple-system,sans
 /* ── Dark all inputs everywhere ── */
 input,select,textarea{color-scheme:dark;}
 .app input:not([type=file]),.app select,.app textarea{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;color-scheme:dark;
 }
 .app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--focus);outline:none;}
 .form-input{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
   padding:7px 9px;outline:none;appearance:none;-webkit-appearance:none;
   transition:border-color 0.12s;color-scheme:dark;width:100%;
@@ -391,7 +391,7 @@ input,select,textarea{color-scheme:dark;}
 .f{display:flex;flex-direction:column;gap:5px;}
 .f label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);white-space:nowrap;display:flex;align-items:center;gap:5px;}
 .f input,.f select,.f textarea{
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
   padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;
   transition:border-color 0.12s;color-scheme:dark;width:100%;
