@@ -100,6 +100,7 @@ S.InventoryReceiveDelivery = {
       + '<td><div class="fw"><span class="pre">$</span><input class="form-input pre rd-price" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;"/></div></td>'
       + '<td class="rd-ext val" style="white-space:nowrap;">$0.00</td>'
       + '<td><div class="row-actions">'
+        + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;white-space:nowrap;"></span>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>'
         + '<button type="button" class="btn btn-ghost btn-sm rd-disc-status" style="display:none;white-space:nowrap;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">Filed</button>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
@@ -196,17 +197,6 @@ S.InventoryReceiveDelivery = {
       }
       this.recalcLine(line);
       this.recalcTotal();
-      // When a finished qty / price edit first trips a price change or short
-      // count, offer to file the discrepancy right then: once per flag, on
-      // change/blur so it never pops mid-typing. The Flag button stays in the
-      // row for filing later if they pick Not Now.
-      if (ev.type === 'change' && (ev.target.classList.contains('rd-qty') || ev.target.classList.contains('rd-price'))) {
-        if (line.dataset.unfiledFlag === '1') {
-          if (line.dataset.flagOffered !== '1') { line.dataset.flagOffered = '1'; this.offerDiscrepancy(line); }
-        } else {
-          line.dataset.flagOffered = '';
-        }
-      }
     };
     lines.addEventListener('input', onInput);
     lines.addEventListener('change', onInput);
@@ -293,38 +283,37 @@ S.InventoryReceiveDelivery = {
     line.querySelector('.rd-ext').textContent = App.fmtCurrency(ext);
 
     const p = this.productById(line.querySelector('.rd-prod').value);
-    // For bottle beer with case_size, qty is in cases and unit_cost is
-    // cost-per-case.
-    const isCaseBeer = p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0;
 
+    const flag    = line.querySelector('.rd-flag-msg');
     const flagBtn = line.querySelector('.rd-flag-btn');
+    // Short gold flag notes (kept terse so they never widen the row): "$0.40 Over"
+    // for a price change, "Short QTY 2" for a short count. Joined with a middot
+    // when both trip.
     const messages = [];
     let hasPriceChange = false;
     if (p && p.unit_cost != null && !isNaN(price) && Math.abs(price - p.unit_cost) > 0.001) {
-      const up = price > p.unit_cost;
-      const priceLabel = isCaseBeer ? ' per case' : '';
-      messages.push('Price ' + (up ? 'up' : 'down') + ' from ' + App.fmtCurrency(p.unit_cost) + priceLabel + ' to ' + App.fmtCurrency(price) + priceLabel + '.');
+      messages.push(App.fmtCurrency(Math.abs(price - p.unit_cost)) + (price > p.unit_cost ? ' Over' : ' Under'));
       hasPriceChange = true;
     }
     const orderedQty = parseFloat(line.dataset.orderedQty);
     let hasShortCount = false;
     if (!isNaN(orderedQty) && orderedQty > 0 && qty >= 0 && qty < orderedQty) {
       const shortBy = orderedQty - qty;
-      messages.push('Short count: ordered ' + orderedQty + ', received ' + qty + ' (short ' + shortBy + ').');
+      messages.push('Short QTY ' + (Number.isInteger(shortBy) ? shortBy : shortBy.toFixed(2)));
       line.dataset.shortCount = '1';
       hasShortCount = true;
     } else {
       line.dataset.shortCount = '';
     }
-    // Once a discrepancy is filed, the Filed / Resolved status button replaces the
-    // Flag button. The reason is no longer shown inline on the row: when a line
-    // first trips a price change or short count a popup offers to file it (see
-    // offerDiscrepancy), so the reason + unfiled-flag state are stashed here for it.
+    // The short gold note sits to the left of the Flag button while unfiled; once
+    // a discrepancy is filed, the Filed / Resolved status button replaces both.
     const discId = line.dataset.discrepancyId;
     const alreadyLogged = !!discId;
     const statusBtn = line.querySelector('.rd-disc-status');
-    line.dataset.flagReason = messages.join(' ');
-    line.dataset.unfiledFlag = (!alreadyLogged && messages.length > 0) ? '1' : '';
+    if (flag) {
+      if (!alreadyLogged && messages.length > 0) { flag.style.display = ''; flag.textContent = messages.join(' · '); }
+      else { flag.style.display = 'none'; flag.textContent = ''; }
+    }
     line.classList.toggle('rd-flagged', messages.length > 0);
     if (flagBtn) flagBtn.style.display = (!alreadyLogged && (hasPriceChange || hasShortCount)) ? '' : 'none';
     if (statusBtn) {
@@ -491,21 +480,6 @@ S.InventoryReceiveDelivery = {
   // File the claim and chase it to credit/resolution in place (no page leave),
   // against the same vendor_discrepancies record Vendor Tracker reads. The line
   // stores the record id so it reads Filed / Resolved. [[two-doors-same-data]]
-  // A line just tripped a price change or short count. Explain why and offer to
-  // file a discrepancy now (File Now opens the discrepancy form) or later (Not
-  // Now closes it; the gold Flag button stays in the row to file it any time).
-  async offerDiscrepancy(line) {
-    if (!line || !line.isConnected) return;
-    const reason = line.dataset.flagReason || 'This line does not match the order.';
-    const ok = await App.confirm({
-      title: 'Discrepancy Flagged',
-      message: reason + ' Would you like to file a discrepancy now?',
-      confirmText: 'File Now',
-      cancelText: 'Not Now'
-    });
-    if (ok) this.openLineDiscrepancy(line);
-  },
-
   openLineDiscrepancy(line) {
     if (!line) return;
     const did = line.dataset.discrepancyId;
