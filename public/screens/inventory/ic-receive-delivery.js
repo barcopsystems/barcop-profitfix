@@ -148,7 +148,7 @@ S.InventoryReceiveDelivery = {
           + '<select id="rd-order"><option value="">No open orders for this vendor</option></select>'
         + '</div>'
       + '</div>'
-      + '<div style="margin:6px 0 12px;">'
+      + '<div class="rd-lines-wrap" style="margin:6px 0 12px;">'
       + '<table class="ing-tbl rd-pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:280px;">Product</th>'
       + '<th style="width:130px;">Qty Received</th>'
