@@ -76,6 +76,7 @@ S.CashForecast = {
       + '</div>'
       + '</div>';
     this.wire();
+    this.wireChart();
   },
 
   // ── Cash position: your bank balance in, the survival stats out, one card ─────
@@ -127,14 +128,52 @@ S.CashForecast = {
     const zeroY = y(0).toFixed(1);
     const low = fc.lowPoint, lowNeg = low.balance < 0;
     const GREEN = '#518A79', RED = '#C1544B', GOLD = '#DBAB46', T4 = '#5A6B77';
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto;">'
+    // Transparent oversized hit circles carry each week's figures for the hover
+    // tooltip (wired in wireChart), so the tiny visible dots are easy to land on.
+    const hit = fc.rows.map((r, i) =>
+      '<circle class="cf-dot" data-wk="' + esc(this.fmtWk(r.ws) + (i === 0 ? ' (now)' : (i === fc.lowIdx ? ' (low point)' : ''))) + '"'
+      + ' data-in="' + esc(App.fmtCurrency(r.inflow)) + '" data-out="' + esc(App.fmtCurrency(r.out)) + '"'
+      + ' data-net="' + esc(this.signed(r.net)) + '" data-netneg="' + (r.net < 0 ? '1' : '0') + '"'
+      + ' data-bal="' + esc(App.fmtCurrency(r.balance)) + '" data-balneg="' + (r.balance < 0 ? '1' : '0') + '"'
+      + ' cx="' + x(i).toFixed(1) + '" cy="' + y(r.balance).toFixed(1) + '" r="14" fill="transparent" style="cursor:pointer;"/>').join('');
+    return '<svg class="cf-curve" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto;">'
       + '<line x1="' + padL + '" y1="' + zeroY + '" x2="' + (W - padR) + '" y2="' + zeroY + '" stroke="' + RED + '" stroke-width="1" stroke-dasharray="5 5" opacity="0.45"/>'
       + '<polyline points="' + pts + '" fill="none" stroke="' + (fc.negativeWeeks ? RED : GREEN) + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
       + fc.rows.map((r, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(r.balance).toFixed(1) + '" r="3" fill="' + (r.balance < 0 ? RED : GREEN) + '"/>').join('')
       + '<circle cx="' + x(fc.lowIdx).toFixed(1) + '" cy="' + y(low.balance).toFixed(1) + '" r="5" fill="' + (lowNeg ? RED : GOLD) + '"/>'
       + '<text x="' + x(0).toFixed(1) + '" y="' + (H - 7) + '" font-size="12" fill="' + T4 + '" font-family="sans-serif">' + this.fmtWk(fc.rows[0].ws) + '</text>'
       + '<text x="' + (W - padR) + '" y="' + (H - 7) + '" font-size="12" fill="' + T4 + '" text-anchor="end" font-family="sans-serif">' + this.fmtWk(fc.rows[n - 1].ws) + '</text>'
+      + hit
       + '</svg>';
+  },
+
+  // Hover tooltip for the chart dots: a fixed-position box (so the card's
+  // overflow:hidden never clips it) showing that week's In, Out, Net, Balance.
+  wireChart() {
+    const svg = this.container.querySelector('.cf-curve');
+    if (!svg) return;
+    const tip = document.createElement('div');
+    tip.id = 'cf-tip';
+    tip.style.cssText = 'position:fixed;z-index:9999;display:none;pointer-events:none;background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,0.45);min-width:148px;';
+    this.container.appendChild(tip);
+    const line = (label, val, col) => '<div style="display:flex;justify-content:space-between;gap:16px;font-size:11px;padding:1px 0;"><span style="color:var(--t3);">' + label + '</span><span style="color:' + (col || 'var(--t1)') + ';font-weight:600;">' + val + '</span></div>';
+    const show = dot => {
+      const d = dot.dataset;
+      tip.innerHTML = '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t2);margin-bottom:7px;">' + d.wk + '</div>'
+        + line('In', d.in)
+        + line('Out', d.out)
+        + line('Net', d.net, d.netneg === '1' ? 'var(--red)' : 'var(--green)')
+        + line('Balance', d.bal, d.balneg === '1' ? 'var(--red)' : 'var(--t1)');
+      const rect = dot.getBoundingClientRect();
+      tip.style.display = 'block';
+      tip.style.left = (rect.left + rect.width / 2) + 'px';
+      if (rect.top < 130) { tip.style.top = rect.bottom + 'px'; tip.style.transform = 'translate(-50%, 8px)'; }
+      else { tip.style.top = rect.top + 'px'; tip.style.transform = 'translate(-50%, calc(-100% - 8px))'; }
+    };
+    svg.querySelectorAll('.cf-dot').forEach(dot => {
+      dot.addEventListener('mouseenter', () => show(dot));
+      dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    });
   },
 
   // One concise low-point read inside the forecast card (no floating callout).
