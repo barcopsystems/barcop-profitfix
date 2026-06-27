@@ -146,6 +146,53 @@ window.CashEngine = {
     }).filter(c => c.value > 0).sort((a, b) => b.excess - a.excess || b.value - a.value);
   },
 
+  // ── Buy vs Use: dollars purchased versus dollars used (cost of goods) over each
+  //    count period. When buys outrun usage the difference is cash moving onto the
+  //    shelf, the quiet way over-ordering traps capital. One row per count pair so
+  //    it traces the real buying behavior, not a single snapshot. ───────────────
+  buyVsUse(maxPeriods) {
+    const asc = this.countsAsc();
+    if (asc.length < 2) return { hasData: false, periods: [], latest: null };
+    const dels = this.deliveries();
+    const periods = [];
+    for (let i = 1; i < asc.length; i++) {
+      const prev = asc[i - 1], cur = asc[i];
+      const start = String(prev.date).slice(0, 10), end = String(cur.date).slice(0, 10);
+      if (!start || !end || end <= start) continue;
+      const base = App.computeUsagePair(prev, cur, dels);
+      const used = Object.values(base).reduce((s, b) => s + (b.unitCost != null ? Math.max(0, b.rawUsed) * b.unitCost : 0), 0);
+      let bought = 0;
+      dels.forEach(d => { const dt = String(d.date || '').slice(0, 10); if (dt && dt > start && dt <= end) bought += (parseFloat(d.total) || 0); });
+      periods.push({ start, end, bought, used, net: bought - used });
+    }
+    const trimmed = maxPeriods ? periods.slice(-maxPeriods) : periods;
+    return { hasData: trimmed.length > 0, periods: trimmed, latest: trimmed.length ? trimmed[trimmed.length - 1] : null };
+  },
+
+  // ── Vendor purchasing scorecard: how you actually buy, by vendor. Orders and
+  //    spend over a recent window, the average order, the terms on file, and what
+  //    it costs to bring that vendor's items to par this week. Pulls vendors with
+  //    recent deliveries and any sitting on this week's order-to-par list. ───────
+  vendorPurchasing(days) {
+    days = days || 90;
+    const cut = (() => { const d = new Date(); d.setDate(d.getDate() - days); return App.ymdLocal(d); })();
+    const map = {};
+    this.deliveries().forEach(d => {
+      const v = d.vendor; if (!v) return;
+      const dt = String(d.date || '').slice(0, 10); if (!dt || dt < cut) return;
+      const m = map[v] = map[v] || { vendor: v, orders: 0, spend: 0, lastOrder: null };
+      m.orders++; m.spend += (parseFloat(d.total) || 0);
+      if (!m.lastOrder || dt > m.lastOrder) m.lastOrder = dt;
+    });
+    const terms = {}; this.vendors().forEach(v => { if (v.name) terms[v.name] = v.payment_terms || ''; });
+    const toPar = {}; this.reorderToPar().vendors.forEach(v => { toPar[v.vendor] = v.cost; });
+    const names = new Set([...Object.keys(map), ...Object.keys(toPar)]);
+    return [...names].map(v => {
+      const m = map[v] || { vendor: v, orders: 0, spend: 0, lastOrder: null };
+      return { vendor: v, orders: m.orders, spend: m.spend, avg: m.orders ? m.spend / m.orders : 0, lastOrder: m.lastOrder, terms: terms[v] || '', toPar: toPar[v] || 0 };
+    }).sort((a, b) => b.spend - a.spend || b.toPar - a.toPar);
+  },
+
   // Bills + dated buys due in a window [startYmd, endYmd], inclusive.
   billsDue(startYmd, endYmd) {
     let total = 0; const list = [];
