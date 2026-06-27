@@ -3149,9 +3149,9 @@ const App = {
   // sub-headers, and tables — in document order, skipping no-print chrome.
   _collectPDFBlocks(root) {
     const blocks = [];
-    root.querySelectorAll('.card-title, .sh, .pdf-para, .calc-item, table.tbl, .empty-title, .empty-sub, .alert-text').forEach(node => {
+    root.querySelectorAll('.card-title, .sh, .pdf-para, .calc-item, table.tbl, table.row-list, table.pnl-list, .empty-title, .empty-sub, .alert-text').forEach(node => {
       if (node.closest('.no-print')) return;
-      if (node.matches('table.tbl')) {
+      if (node.matches('table.tbl, table.row-list, table.pnl-list')) {
         const t = this._pdfTableData(node);
         if (t) blocks.push({ type: 'table', head: t.head, body: t.body, cols: t.cols });
       } else if (node.matches('.calc-item')) {
@@ -3184,7 +3184,7 @@ const App = {
     let root = opts.root;
     if (!root) {
       const screens = Array.from(document.querySelectorAll('.screen'));
-      root = screens.reverse().find(s => s.querySelector('table.tbl, .rpt-panel, .calc, .tbl-wrap'))
+      root = screens.reverse().find(s => s.querySelector('table.tbl, table.row-list, table.pnl-list, .rpt-panel, .calc, .tbl-wrap'))
         || screens[0] || document.body;
     }
     if (!root) return;
