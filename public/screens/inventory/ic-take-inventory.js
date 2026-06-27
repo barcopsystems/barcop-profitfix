@@ -159,7 +159,7 @@ S.InventoryTakeInventory = {
     } else {
       const tiles = locs.map(l => {
         const productCount = this.products().filter(p => App.productLocations(p).includes(l.name)).length;
-        return '<button type="button" class="ti-loc-tile" data-loc="' + esc(l.name) + '" style="text-align:left;display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:8px;border:1px solid var(--b2);background:var(--input);cursor:pointer;transition:background .12s,border-color .12s;">'
+        return '<button type="button" class="ti-loc-tile" data-loc="' + esc(l.name) + '" style="text-align:left;display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:8px;border:1px solid var(--b2);background:#0D181E;cursor:pointer;transition:background .12s,border-color .12s;">'
           + '<span class="ti-loc-ck" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;border:1px solid var(--t3);display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;">&#10003;</span>'
           + '<span style="flex:1;min-width:0;">'
             + '<span style="display:block;font-size:13px;font-weight:700;color:var(--t1);">' + esc(l.name) + '</span>'
@@ -206,7 +206,7 @@ S.InventoryTakeInventory = {
   toggleLocTile(tile) {
     const on = !tile.classList.contains('selected');
     tile.classList.toggle('selected', on);
-    tile.style.background = on ? 'var(--gold-tint)' : 'var(--input)';
+    tile.style.background = on ? '#1E2B34' : '#0D181E';
     tile.style.borderColor = on ? 'var(--gold-tint-bord)' : 'var(--b2)';
     const ck = tile.querySelector('.ti-loc-ck');
     if (ck) {

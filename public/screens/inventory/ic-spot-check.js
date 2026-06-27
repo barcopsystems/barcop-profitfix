@@ -138,7 +138,7 @@ S.InventorySpotCheck = {
     App.showHelpModal('How the Spot Check Works', [
       { p: ['A spot check is a fast theft and overpour check on a few high-risk bar products for one shift. You count a product before and after the shift, tell Bar Cop what the register rang, and it shows whether what left the bar matches what was sold. It does not touch your inventory counts; it only borrows the product list.'] },
       { h: 'One Bar At A Time', p: ['A spot check is scoped to one service bar and its register. Pick the bar you are checking from the dropdown (the service bars you marked in Set Locations), and the product picker narrows to that bar\'s liquor, wine, bottle beer, and draft. The POS sold you enter or import must be THAT register\'s sales for the shift, not the whole venue. That single-register scope is the whole point: it is the only way the bottles that left can be matched to what was actually rung. Mark a bar as a service bar with the checkbox on Set Locations.'] },
-      { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top shelf and your fast movers. Load Last Targets brings back the products from your last check at that bar so you are not re-picking every shift.'] },
+      { h: 'Pick Your Targets', p: ['You do not check everything. Pick the bottles most likely to walk or get overpoured, usually your top shelf and your fast movers.'] },
       { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
       { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
       { h: 'Reading The Result', p: ['Bar Cop works out what physically left the bottle from your counts and compares it to what the register rang. Anything off by more than your Flag at % setting, in either direction, flags red. Over means more left the bar than was sold, the classic sign of overpouring, give-aways, or theft. Under means less left the bottle than was rung in, which points to short pours that skimp the guest. Set Flag at % up top to your own tolerance; it remembers what you set.'] },
@@ -226,13 +226,6 @@ S.InventorySpotCheck = {
     });
     return h;
   },
-  // Product ids from the most recent saved check (at this location if given).
-  lastTargets(location) {
-    const list = [...this.checks()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-    const last = location ? (list.find(c => c.location === location) || null) : (list[0] || null);
-    return last ? [...new Set((last.items || []).map(it => it.product_id).filter(Boolean))] : [];
-  },
-
   lineHTML(lid, p, ld) {
     ld = ld || {};
     return '<div class="card sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" style="margin-bottom:12px;">'
@@ -300,13 +293,8 @@ S.InventorySpotCheck = {
         + '</div></div>'
       : '';
 
-    const targets = this.lastTargets(dft.location);
-    const loadBtn = targets.length
-      ? '<button type="button" class="btn btn-ghost" id="sp-load-targets" style="height:44px;">Load Last Targets (' + targets.length + ')</button>'
-      : '';
-
     // Spot Check card: collapsible header, the four setup cells, a divider, then
-    // Add Products + Load Last. Save lives at the bottom of the page.
+    // Add Products. Save lives at the bottom of the page.
     const setup = '<div class="card form-card">'
       + App.collapsibleCardTitle('sp-setup', 'Spot Check')
       + '<div class="collapse-body">'
@@ -325,7 +313,6 @@ S.InventorySpotCheck = {
       + '<div class="divider"></div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:0;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:260px;flex-shrink:0;margin-bottom:0;"><label>Add Products</label><select id="sp-add" style="height:44px;">' + this.productOptions(dft.location) + '</select></div>'
-        + (loadBtn ? '<div class="f" style="flex-shrink:0;margin-bottom:0;">' + loadBtn + '</div>' : '')
       + '</div></div></div>';
 
     const lineHtmls = (dft.lines || []).map(ld => {
@@ -404,15 +391,6 @@ S.InventorySpotCheck = {
       if (!document.getElementById('sp-loc')?.value) this.requireSetup();
     });
     document.getElementById('sp-date')?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('field-missing'));
-    document.getElementById('sp-load-targets')?.addEventListener('click', () => {
-      if (!this.requireSetup()) return;
-      const have = new Set([...this.container.querySelectorAll('.sp-line')].map(l => l.dataset.pid));
-      this.lastTargets(document.getElementById('sp-loc')?.value || '').forEach(pid => {
-        if (have.has(pid)) return;
-        const p = this.productById(pid);
-        if (p) this.addLine(p);
-      });
-    });
     document.getElementById('sp-loc')?.addEventListener('change', () => { this.syncDraft(); this.renderMain(); });
     document.getElementById('sp-shift')?.addEventListener('change', () => this.syncDraft());
     document.getElementById('sp-by')?.addEventListener('change', () => this.syncDraft());
