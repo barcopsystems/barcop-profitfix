@@ -285,19 +285,19 @@ S.HubOperatingExpenses = {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const isRec = !!(r.recurring || r.recurring_parent);
-    const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button> ';
+    const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button>';
     const del  = '<button class="btn btn-danger btn-sm oex-del" data-id="' + esc(r.id) + '">Delete</button>';
     let actions = '';
     if (opts.minimal) {
       actions = edit + del;
     } else if (isRec) {
-      if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button> ';
-      actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button> ' + edit + del;
+      if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button>';
+      actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button>' + edit + del;
     } else {
-      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button> ' + edit + del;
+      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button>' + edit + del;
     }
     return '<tr>'
-      + '<td style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
+      + '<td data-label="Date" style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag() : '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
       + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
@@ -338,18 +338,18 @@ S.HubOperatingExpenses = {
 
     const emptyRow = (txt) => '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
     const expectedRow = (p) => '<tr style="opacity:0.6;">'
-      + '<td style="color:var(--t3);white-space:nowrap;">Expected</td>'
+      + '<td data-label="Date" style="color:var(--t3);white-space:nowrap;">Expected</td>'
       + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
       + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(p.id) + '">Stop</button></td></tr>';
     // The first column header carries the section name; the rest are the columns.
-    const sectionCard = (name, rowsHtml) => '<div class="card card-bleed data-card" style="margin-bottom:14px;">'
-      + '<div class="card-bleed-tbl"><table class="tbl">'
+    const sectionCard = (name, rowsHtml) => '<div class="card" style="margin-bottom:14px;overflow-x:auto;">'
+      + '<table class="row-list">'
       +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
       +   '<thead><tr><th>' + name + '</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + rowsHtml + '</tbody>'
-      + '</table></div></div>';
+      + '</table></div>';
 
     const recRows = (recurring.length || expected.length)
       ? recurring.map(r => this._logRowHtml(r)).join('') + expected.map(expectedRow).join('')
@@ -488,7 +488,7 @@ S.HubOperatingExpenses = {
     this.renderMain();
   },
 
-  // By Category data-card (current month, last month, YTD, YTD % of revenue).
+  // By Category row-list (current month, last month, YTD, YTD % of revenue).
   _byCatCardHtml() {
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
@@ -507,28 +507,28 @@ S.HubOperatingExpenses = {
         + '<td style="font-weight:700;color:var(--t1);">' + fmt$(tm) + '</td>'
         + '<td style="color:var(--t3);">' + fmt$(lm) + '</td>'
         + '<td style="color:var(--t2);">' + fmt$(ytd) + '</td>'
-        + '<td style="color:var(--t3);">' + fmtPct(ytdRevPct) + '</td>'
+        + '<td style="color:var(--t3);text-align:left;">' + fmtPct(ytdRevPct) + '</td>'
         + '</tr>';
     }).join('');
-    return '<div class="card card-bleed data-card">'
-      + '<div class="card-bleed-tbl"><table class="tbl">'
+    return '<div class="card" style="overflow-x:auto;">'
+      + '<table class="row-list">'
       +   '<colgroup><col style="width:22%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"></colgroup>'
       +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>YTD % of Revenue</th></tr></thead>'
       +   '<tbody>' + catRows + '</tbody>'
-      + '</table></div></div>';
+      + '</table></div>';
   },
 
-  // The log data-card for a given set of records (optional id).
+  // The log row-list for a given set of records (optional id).
   _logTableHtml(recs, id) {
     const logRows = recs.length === 0
       ? '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">No expenses in this range.</td></tr>'
       : recs.map(r => this._logRowHtml(r, { minimal: true })).join('');
-    return '<div class="card card-bleed data-card"' + (id ? ' id="' + id + '"' : '') + '>'
-      + '<div class="card-bleed-tbl"><table class="tbl">'
+    return '<div class="card"' + (id ? ' id="' + id + '"' : '') + ' style="overflow-x:auto;">'
+      + '<table class="row-list">'
       +   '<colgroup><col style="width:22%"><col style="width:26%"><col style="width:18%"><col style="width:18%"><col style="width:16%"></colgroup>'
       +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
-      + '</table></div></div>';
+      + '</table></div>';
   },
 
   // ── History tab: By Category + the filterable log (paged 50 at a time) ────
