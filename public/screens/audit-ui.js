@@ -262,19 +262,18 @@ const AuditUI = {
       + '</svg>';
   },
 
-  // ── Metric/check rows — the Hub card-row look: label left, value right, on a
-  //    #0D181E recessed strip with row dividers, full-bleed to the .card edges
-  //    (no bordered box). Shared by every audit section so all four read the
-  //    same. rows = [{ label, extra?, value, valColor? }]. ───────────────────────
+  // ── Metric/check rows — the Hub card-row look (.hd-step): each row is its own
+  //    rounded #0D181E pill, label left + value right, separated by a 6px gap (no
+  //    dividers, no bordered box). Shared by every audit section so all four read
+  //    the same. rows = [{ label, extra?, value, valColor? }]. ──────────────────
   metricRows(rows) {
     if (!rows || !rows.length) return '';
-    const body = rows.map((r, i) =>
-      '<div style="display:flex;align-items:flex-start;gap:14px;padding:11px 20px;background:#0D181E;' + (i ? 'border-top:1px solid var(--row-div);' : '') + '">'
-      + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);line-height:1.45;">' + esc(r.label) + (r.extra ? ' <span style="color:var(--t4);">(' + esc(r.extra) + ')</span>' : '') + '</div>'
+    return rows.map((r, i) =>
+      '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
+      + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);line-height:1.4;">' + esc(r.label) + (r.extra ? ' <span style="color:var(--t4);">(' + esc(r.extra) + ')</span>' : '') + '</div>'
       + '<div style="flex-shrink:0;font-size:13px;font-weight:600;text-align:right;white-space:nowrap;color:' + (r.valColor || 'var(--t1)') + ';">' + esc(r.value) + '</div>'
       + '</div>'
     ).join('');
-    return '<div style="margin:0 -20px;">' + body + '</div>';
   },
 
   // ── Full view: score hero — full-bleed divider header (title left, Briefing
