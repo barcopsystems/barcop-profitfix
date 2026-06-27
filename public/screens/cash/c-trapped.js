@@ -3,14 +3,15 @@
 /* ── Cash Recovery — Trapped Cash ─────────────────────────────────────────────
    The deep view behind the Close The Week "free up trapped cash" step. Working
    capital stuck on the shelf: dead stock that has not moved, and overstock above
-   par. Ranked by the dollars you can free. Built to the report standard (stats
-   card + .ch-tabs + .data-card). It diagnoses; the moves happen in Dynamic Pars
-   and the menu. Reads CashEngine, writes nothing. */
+   par. Ranked by the dollars you can free. One page, no tabs: a stats card up
+   top, then Dead Stock and Overstock listed below in matching tables (a shared
+   fixed colgroup so the columns line up card to card). It diagnoses; the moves
+   happen in Dynamic Pars and the menu. Reads CashEngine, writes nothing. */
 
 S.CashTrapped = {
-  tab: 'all',
-
-  TABS: [['all', 'All'], ['dead', 'Dead Stock'], ['over', 'Overstock']],
+  // Shared column layout, so Dead Stock and Overstock line up for easy reading.
+  COLS: '<colgroup><col style="width:24%"><col style="width:15%"><col style="width:18%"><col style="width:17%"><col style="width:13%"><col style="width:13%"></colgroup>',
+  HEADERS: '<th>Product</th><th>Category</th><th>Vendor</th><th>On Hand</th><th>Tied Up</th><th>To Free</th>',
 
   showHowTo() {
     App.showHelpModal('How Trapped Cash Works', [
@@ -27,14 +28,30 @@ S.CashTrapped = {
   statsCard(items) {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
-  dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+  dataCard(rowsHtml) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
+      + this.COLS + '<thead><tr>' + this.HEADERS + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
   },
-  tabBar() {
-    return '<div class="ch-tabs no-print">'
-      + this.TABS.map(([k, label]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">' + esc(label) + '</button>').join('')
-      + '</div>';
+
+  rowHtml(it) {
+    const unit = App.unitAbbr(App.productUnit(it.p));
+    const ohNum = Math.round(it.oh * 10) / 10;
+    const ohTxt = ohNum + (unit ? ' ' + esc(unit) : '')
+      + (it.kind === 'over' && it.par != null ? ' <span style="color:var(--t4);">/ par ' + it.par + '</span>' : '');
+    return '<tr>'
+      + '<td data-label="Product"><span style="color:var(--t1);">' + esc(it.name) + '</span></td>'
+      + '<td data-label="Category">' + esc(it.p.category || '-') + '</td>'
+      + '<td data-label="Vendor">' + esc(it.p.vendor || '-') + '</td>'
+      + '<td data-label="On Hand" class="val">' + ohTxt + '</td>'
+      + '<td data-label="Tied Up" class="val">' + App.fmtCurrency(it.tied) + '</td>'
+      + '<td data-label="To Free" class="num" style="color:var(--gold);font-weight:600;">' + App.fmtCurrency(it.free) + '</td>'
+      + '</tr>';
+  },
+  section(title, items, emptyMsg) {
+    const rows = items.length
+      ? items.map(it => this.rowHtml(it)).join('')
+      : '<tr><td colspan="6" style="color:var(--t3);">' + emptyMsg + '</td></tr>';
+    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>' + this.dataCard(rows);
   },
 
   render(container, actions) {
@@ -62,33 +79,28 @@ S.CashTrapped = {
       + this.statItem('Dead Stock', App.fmtCurrency(t.dead))
       + this.statItem('Above Par', App.fmtCurrency(t.overPar)));
 
-    const filterArea = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:24px 0 12px;">'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>'
+    const exportRow = '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 12px;">'
+      + '<button class="btn btn-ghost btn-sm" id="ct-export">Export PDF</button></div>';
+
+    const dead = t.items.filter(it => it.kind === 'dead');
+    const over = t.items.filter(it => it.kind === 'over');
+
+    const bottomRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;">'
       + '<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Dead Stock Report</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ct-export">Export PDF</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>'
       + '</div>';
 
-    const items = t.items.filter(it => this.tab === 'all' || it.kind === this.tab);
-    const headers = '<th>Product</th><th>On Hand</th><th>Tied Up</th><th>To Free</th>';
-    const rows = items.length
-      ? items.map(it => {
-          const tag = it.kind === 'dead'
-            ? '<span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--red);">NOT MOVING</span>'
-            : '<span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">OVER PAR</span>';
-          const oh = (Math.round(it.oh * 10) / 10) + (it.kind === 'over' && it.par != null ? ' <span style="color:var(--t4);">/ par ' + it.par + '</span>' : '');
-          return '<tr><td><div style="color:var(--t1);">' + esc(it.name) + '</div><div style="margin-top:2px;">' + tag + '</div></td>'
-            + '<td class="val">' + oh + '</td>'
-            + '<td class="val">' + App.fmtCurrency(it.tied) + '</td>'
-            + '<td class="num" style="color:var(--gold);font-weight:600;">' + App.fmtCurrency(it.free) + '</td></tr>';
-        }).join('')
-      : '<tr><td colspan="4" style="color:var(--t3);">Nothing in this group right now.</td></tr>';
-
-    this.container.innerHTML = '<div class="screen">' + this.tabBar() + stats + filterArea + this.dataCard(headers, rows) + '</div>';
+    this.container.innerHTML = '<div class="screen">'
+      + stats
+      + exportRow
+      + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.')
+      + '<div style="height:18px;"></div>'
+      + this.section('Overstock', over, 'Nothing above par right now.')
+      + bottomRow
+      + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#ct-export')) { App.exportPDF({ title: 'Trapped Cash', root: this.container }); return; }
-      const tab = ev.target.closest('.ch-tab');
-      if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
