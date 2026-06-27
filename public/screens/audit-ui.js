@@ -162,23 +162,25 @@ const AuditUI = {
   // (the Bar Cop Audit, which reads from logged data and has no upload tier).
   historyCard(audits, listKey, pfx, opts) {
     opts = opts || {};
-    // Each past audit as a Hub card-row pill: date left, then grade, change, and
-    // score with a View button on the right.
+    // Column layout kept (Date / Score / Change / Data Quality / View), but each
+    // row is a #0D181E pill via the .audit-htbl table styling.
     const rows = audits.slice(0, App.listLimit('core', listKey)).map((a,i) => {
       const p    = audits[i+1];
       const naA  = a.overall_score == null;
       const col  = naA ? 'var(--t3)' : App.scoreColor(a.overall_score);
       const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
-      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
-        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t2);">' + (a.date||'').slice(0,10) + '</div>'
-        + (opts.hideGrade ? '' : '<div style="flex-shrink:0;">' + AuditUI.tierChip(a.grade) + '</div>')
-        + '<div style="width:42px;text-align:right;flex-shrink:0;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</div>'
-        + '<div style="width:40px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</div>'
-        + '<button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '" style="flex-shrink:0;">View</button>'
-        + '</div>';
+      return '<tr>'
+        + '<td>' + (a.date||'').slice(0,10) + '</td>'
+        + '<td style="text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</td>'
+        + '<td style="text-align:right;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</td>'
+        + (opts.hideGrade ? '' : '<td>' + AuditUI.tierChip(a.grade) + '</td>')
+        + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '">View</button></td>'
+        + '</tr>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
-      + '<div class="card">' + rows + '</div>'
+      + '<div class="card" style="overflow-x:auto;"><table class="audit-htbl"><thead><tr>'
+      + '<th>Date</th><th style="text-align:right;">Score</th><th style="text-align:right;">Change</th>' + (opts.hideGrade ? '' : '<th>Data Quality</th>') + '<th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', listKey, audits, false);
   },
 
