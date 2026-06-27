@@ -484,6 +484,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .rpt-panel{background:var(--surface);border:1px solid var(--b1);border-top:none;border-radius:0 0 6px 6px;padding:18px;}
 /* Cash History tabs — clean underline switcher (no connected panel box). */
 .ch-tabs{display:flex;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--b-edge);margin-bottom:20px;}
+/* Help / FAQ: the Q&A list sits in a bordered wrapper filled with the page bg
+   (--bg = #070E15); the tabs keep their 20px gap above it. One rule covers every
+   section's Help page (they all share the #help-body id). */
+#help-body{border:1px solid var(--b-edge);background:var(--bg);border-radius:var(--r);padding:2px 20px;}
+#help-body > div:last-child{border-bottom:none;}
 .ch-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--t3);padding:10px 2px;margin-bottom:-1px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;}
 .ch-tab:hover{color:var(--t2);}
 .ch-tab.on{color:var(--t1);border-bottom-color:var(--focus);}
