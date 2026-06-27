@@ -1290,6 +1290,22 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child{display:block;text-align:left;padding:11px 16px 4px;}
   .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child::before{content:none;}
   .data-card .tbl[style*="table-layout:fixed"] tbody td:first-child .val{font-weight:700;}
+
+  /* Income Statement (.is-pnl): a month-vs-YTD P&L STAYS a real side-by-side
+     table on mobile. Stacking each line into repeated JUNE / YEAR-TO-DATE
+     sub-rows reads as choppy separated cards and loses the comparison that is
+     the whole point. Keep three tight columns at a smaller type size; the inline
+     section and sub-line indents survive the cascade. */
+  .data-card .tbl.is-pnl{table-layout:fixed !important;width:100% !important;min-width:0 !important;font-size:10.5px;}
+  .data-card .tbl.is-pnl col:first-child{width:48% !important;}
+  .data-card .tbl.is-pnl col:nth-child(2){width:26% !important;}
+  .data-card .tbl.is-pnl col:last-child{width:26% !important;}
+  .data-card .tbl.is-pnl thead{display:table-header-group !important;}
+  .data-card .tbl.is-pnl thead tr{display:table-row !important;}
+  .data-card .tbl.is-pnl thead th{display:table-cell !important;text-align:left !important;font-size:8px;letter-spacing:.5px;padding:9px 8px;white-space:normal;}
+  .data-card .tbl.is-pnl tbody tr{display:table-row !important;border-top:none !important;}
+  .data-card .tbl.is-pnl tbody td{display:table-cell !important;text-align:left !important;border-bottom:1px solid var(--b2);padding:7px 8px;}
+  .data-card .tbl.is-pnl tbody td::before{content:none !important;}
 }
 
 /* Events calendar — month grid (desktop) + agenda (mobile) */
