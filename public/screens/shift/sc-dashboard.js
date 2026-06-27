@@ -95,15 +95,16 @@ S.ShiftDashboard = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
+    const wys = this._wys();
 
     container.innerHTML = '<div class="screen">'
+      + (wys.hasSales ? this.whereYouStand(wys) : '')
       + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
-      + this.statusStrip()
       + this.outlierStrip()
       + '</div>';
 
@@ -262,22 +263,101 @@ S.ShiftDashboard = {
       + this.markBtn('review', 'Mark Reviewed') + '</div>';
   },
 
-  statusStrip() {
+  // ── Where You Stand state (the week's floor headline + reads) ────────────────
+  _wys() {
     const wkS = this.shifts().filter(s => this.inWeek(s.date));
-    const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
+    const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+    const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
+    const checkAvg = covers > 0 ? rev / covers : null;
     const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
     const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+    const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
     const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
-    const item = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
-      + '<div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const div = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 20px;"></div>';
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-top:22px;background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 22px;">'
-      + item('This Week Revenue', App.fmtCurrency(rev))
-      + div
-      + item('Voids', App.fmtCurrency(voidTot))
-      + div
-      + item('Cash Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
+    return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, days: wkS.length, hasSales: wkS.length > 0 };
+  },
+
+  // ── Where You Stand (floor headline + three-stat read + Briefing) ────────────
+  whereYouStand(st) {
+    const sub = st.hasSales
+      ? st.days + ' day' + (st.days === 1 ? '' : 's') + ' imported' + (st.checkAvg != null ? ' &middot; ' + App.fmtCurrency(st.checkAvg) + ' check average' : '')
+      : 'import this week\'s sales to fill this in';
+    const hero = '<div style="padding:2px 0;">'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + App.fmtCurrency(st.rev, 0) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">in sales</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + sub + '</div></div>';
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    const mini = (label, val, col) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    const vcTot = st.voidTot + st.compTot;
+    const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where The Money Walked</div>'
+      + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+      +   mini('Covers', String(st.covers)) + vdiv
+      +   mini('Cash Over / Short', (st.netVar > 0 ? '+' : '') + App.fmtCurrency(st.netVar, 0), st.netVar < 0 ? 'var(--red)' : 'var(--t1)') + vdiv
+      +   mini('Voids + Comps', App.fmtCurrency(vcTot, 0))
+      + '</div>'
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="theft-risk">Loss Prevention</button></div>'
       + '</div>';
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
+      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+      + hero + secondary + '</div>';
+  },
+
+  // ── Bar Cop Briefing: a written read of the floor week, cached a week per
+  //    section via DashUI so repeat opens do not spend on the API. ─────────────
+  showInsights() {
+    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
+    const st = this._wys();
+    if (!st.hasSales) { DashUI.insightsModal('Bar Cop Briefing', 'Import a week of sales and Bar Cop can read your floor week for you.'); return; }
+    const rec = DashUI._insRec('shift');
+    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
+    const prompt = this._insPrompt(st);
+    const btn = this.container.querySelector('[data-insights]');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
+    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
+    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => {
+        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your floor right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
+        const text = data.content && data.content[0] && data.content[0].text;
+        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
+        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const html = '<p style="margin:0;">' + safe + '</p>';
+        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('shift', html));
+        restore();
+      })
+      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+  },
+
+  _insPrompt(st) {
+    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+    const wkVar = this.variances().filter(v => this.inWeek(v.date));
+    const shorts = wkVar.filter(v => v.status === 'Short').length;
+    const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
+    const waste = this.waste().filter(r => this.inWeek(r.date)).length;
+    const walked = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
+    const facts = [
+      'Sales this week (actual, from sales import): ' + m(st.rev) + ' across ' + st.days + ' day' + (st.days === 1 ? '' : 's'),
+      'Covers this week: ' + st.covers,
+      'Check average: ' + (st.checkAvg != null ? m(st.checkAvg) : 'n/a, no covers entered'),
+      'Cash over/short this week (net): ' + (st.netVar > 0 ? '+' : '') + m(st.netVar),
+      'Cash shorts this week: ' + shorts,
+      'Drawers out of tolerance: ' + oot,
+      'Voids this week: ' + m(st.voidTot),
+      'Comps this week: ' + m(st.compTot),
+      'Waste/spill records logged: ' + waste,
+      'Walked tabs logged: ' + walked
+    ].join('\n');
+    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the floor and register side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
+      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
+      + 'STAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers.\n- If a number is not set or the week\'s sales are not imported, say so plainly instead of guessing.\n\n'
+      + 'FACTS:\n' + facts
+      + '\n\nWrite two or three short paragraphs: first where sales stand (revenue, covers, check average), then where money is walking (cash shorts, drawers out of tolerance, voids and comps), then the single move that matters most this week. Use the exact numbers from the facts.';
   },
 
   outlierStrip() {
@@ -416,6 +496,7 @@ S.ShiftDashboard = {
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
+      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const head = ev.target.closest('.sc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
