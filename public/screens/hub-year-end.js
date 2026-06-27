@@ -162,6 +162,7 @@ S.HubYearEnd = {
       XLSX.utils.book_append_sheet(wb, this._buildCashControlSummary(year),'Cash Control Summary');
       XLSX.utils.book_append_sheet(wb, this._buildAuditHistory(year),      'Audit History');
       XLSX.utils.book_append_sheet(wb, this._buildOperationalEvents(year), 'Operational Events');
+      XLSX.utils.book_append_sheet(wb, this._build1099Vendors(year),       '1099 Vendors');
 
       const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
       wb.Props = {
@@ -254,6 +255,43 @@ S.HubYearEnd = {
   },
   _finishSheet(ws, rowsLen, merges, colWidths) {
     return S.HubBooks._finishSheet(ws, rowsLen, merges, colWidths);
+  },
+
+  // ── 1099 Vendor Worksheet: vendors paid $600 or more this year, from the
+  //    Operating Expenses log, a starting point for 1099-NEC. ─────────────────
+  _build1099Vendors(year) {
+    const COL_COUNT = 3;
+    const rows = [], merges = [];
+    rows.push(this._lineRow(this._baseTitle('1099 Vendor Worksheet', year), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(this._blankRow(COL_COUNT));
+    rows.push(['Vendor', 'Total Paid', 'Payments']);
+
+    const byVendor = {};
+    (App.data?.operating_expenses || []).forEach(r => {
+      if (String(r.date || '').slice(0, 4) !== String(year)) return;
+      const v = (r.vendor || '').trim(); if (!v) return;
+      if (!byVendor[v]) byVendor[v] = { total: 0, count: 0 };
+      byVendor[v].total += parseFloat(r.amount) || 0;
+      byVendor[v].count++;
+    });
+    const list = Object.keys(byVendor).map(v => ({ vendor: v, total: byVendor[v].total, count: byVendor[v].count }))
+      .filter(x => x.total >= 600).sort((a, b) => b.total - a.total);
+    if (list.length) list.forEach(x => rows.push([x.vendor, x.total, x.count]));
+    else rows.push(['No vendor was paid $600 or more this year.', '', '']);
+    rows.push(this._blankRow(COL_COUNT));
+
+    this._pushFooter(rows, merges,
+      'Vendors paid $600 or more from your Operating Expenses log this year, a starting point for 1099-NEC. Not every vendor over $600 needs a 1099 (corporations and payments for goods are generally exempt), and a contractor under $600 in one log may still need one across all your records. Confirm each with your accountant before issuing.',
+      COL_COUNT);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      const cell = ws[XLSX.utils.encode_cell({ r: i, c: 1 })];
+      if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
+    });
+    return this._finishSheet(ws, rows.length, merges, [{ wch: 44 }, { wch: 18 }, { wch: 12 }]);
   },
 
   // ── Sheet 1 — Annual Summary ──────────────────────────────────────────────

@@ -53,6 +53,7 @@ S.HubBooks = {
           + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a CPA, tax preparer, or legal advisor. This is a worksheet, not your official financial statement. Your accountant should review and verify every figure before you file anything or close the books.</div>'
         + '</div>'
       + '</div>'
+      + '<div id="hb-is-wrap">' + this._incomeStatementCard(defaultMonth) + this._salesTaxCard(defaultMonth) + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
         + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
@@ -65,6 +66,123 @@ S.HubBooks = {
 
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
+    document.getElementById('hb-month')?.addEventListener('change', (e) => {
+      const w = document.getElementById('hb-is-wrap'); if (w) w.innerHTML = this._incomeStatementCard(e.target.value) + this._salesTaxCard(e.target.value);
+    });
+  },
+
+  // ── On-screen Income Statement (the same numbers as the export, readable
+  //    without opening Excel). Month and YTD side by side, off the shared
+  //    aggregators so it always agrees with the Month-End file. ───────────────
+  _incomeStatementCard(monthKey) {
+    const M = this._aggregateMonth(monthKey), YTD = this._aggregateYTD(monthKey);
+    const opexM = this._opExSums(monthKey, false), opexY = this._opExSums(monthKey, true);
+    const f = v => (v == null || isNaN(v)) ? '-' : (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
+    const opexSum = o => Object.values(o).reduce((s, v) => s + (v || 0), 0);
+    const totalOpExM = opexSum(opexM) + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
+    const totalOpExY = opexSum(opexY) + (YTD.maintenance || 0) + (YTD.platformFees || 0) + (YTD.compsPolicy || 0);
+    const netRevM = M.totalRev - (M.compsLoss || 0), netRevY = YTD.totalRev - (YTD.compsLoss || 0);
+    const grossM = netRevM - M.totalCogs, grossY = netRevY - YTD.totalCogs;
+    const opIncM = grossM - M.totalLabor - totalOpExM, opIncY = grossY - YTD.totalLabor - totalOpExY;
+
+    const sec = t => '<tr><td colspan="3" style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:16px 0 4px;">' + t + '</td></tr>';
+    const line = (label, m, y, o) => {
+      o = o || {};
+      const fmt = o.pct ? pct : f;
+      const wt = o.bold ? 'font-weight:700;' : '';
+      const bt = o.border ? 'border-top:1px solid var(--b2);' : '';
+      const lblCol = o.bold ? 'var(--t1)' : 'var(--t2)';
+      const valCol = o.col || (o.neg ? 'var(--red)' : (o.bold ? 'var(--t1)' : 'var(--t2)'));
+      return '<tr><td style="' + bt + wt + 'color:' + lblCol + ';' + (o.sub ? 'padding-left:18px;' : '') + '">' + label + '</td>'
+        + '<td style="' + bt + wt + 'text-align:right;color:' + valCol + ';">' + fmt(m) + '</td>'
+        + '<td style="' + bt + wt + 'text-align:right;color:' + valCol + ';">' + fmt(y) + '</td></tr>';
+    };
+    const opIncCol = opIncM >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const rows = sec('Revenue')
+      + line('Bar Revenue', M.barRev, YTD.barRev, { sub: 1 })
+      + line('Food Revenue', M.foodRev, YTD.foodRev, { sub: 1 })
+      + line('Catering Revenue', M.cateringRev, YTD.cateringRev, { sub: 1 })
+      + line('Other / Ancillary Revenue', M.otherRev, YTD.otherRev, { sub: 1 })
+      + line('Less: Comps', -(M.compsLoss || 0), -(YTD.compsLoss || 0), { sub: 1, neg: 1 })
+      + line('Total Revenue (net of comps)', netRevM, netRevY, { bold: 1, border: 1 })
+      + sec('Cost of Goods Sold')
+      + line('Bar COGS', M.barCogs, YTD.barCogs, { sub: 1 })
+      + line('Food COGS', M.foodCogs, YTD.foodCogs, { sub: 1 })
+      + line('Catering COGS', M.cateringCogs, YTD.cateringCogs, { sub: 1 })
+      + line('Other COGS', M.otherCogs, YTD.otherCogs, { sub: 1 })
+      + line('Total COGS', M.totalCogs, YTD.totalCogs, { bold: 1, border: 1 })
+      + line('Gross Profit', grossM, grossY, { bold: 1, border: 1 })
+      + sec('Labor')
+      + line('Bar Labor', M.barLabor, YTD.barLabor, { sub: 1 })
+      + line('Food Labor', M.foodLabor, YTD.foodLabor, { sub: 1 })
+      + line('Catering Labor', M.cateringLabor, YTD.cateringLabor, { sub: 1 })
+      + line('Total Labor', M.totalLabor, YTD.totalLabor, { bold: 1, border: 1 })
+      + line('Prime Cost (COGS + Labor)', M.totalCogs + M.totalLabor, YTD.totalCogs + YTD.totalLabor, { bold: 1, border: 1 })
+      + sec('Operating Expenses')
+      + line('Occupancy (rent, property tax)', opexM['Occupancy (Rent, Property Tax)'] || 0, opexY['Occupancy (Rent, Property Tax)'] || 0, { sub: 1 })
+      + line('Utilities', opexM['Utilities'] || 0, opexY['Utilities'] || 0, { sub: 1 })
+      + line('Insurance', opexM['Insurance'] || 0, opexY['Insurance'] || 0, { sub: 1 })
+      + line('Marketing and advertising', opexM['Marketing and Advertising'] || 0, opexY['Marketing and Advertising'] || 0, { sub: 1 })
+      + line('Repairs and maintenance', M.maintenance, YTD.maintenance, { sub: 1 })
+      + line('3rd-party platform fees', M.platformFees, YTD.platformFees, { sub: 1 })
+      + line('Staff meals and shift drinks', M.compsPolicy, YTD.compsPolicy, { sub: 1 })
+      + line('Professional fees', opexM['Professional Fees'] || 0, opexY['Professional Fees'] || 0, { sub: 1 })
+      + line('Bank and credit card fees', opexM['Bank and Credit Card Fees'] || 0, opexY['Bank and Credit Card Fees'] || 0, { sub: 1 })
+      + line('Licenses and permits', opexM['Licenses and Permits'] || 0, opexY['Licenses and Permits'] || 0, { sub: 1 })
+      + line('Software and subscriptions', opexM['Software and Subscriptions'] || 0, opexY['Software and Subscriptions'] || 0, { sub: 1 })
+      + line('Other operating expenses', opexM['Other'] || 0, opexY['Other'] || 0, { sub: 1 })
+      + line('Total Operating Expenses', totalOpExM, totalOpExY, { bold: 1, border: 1 })
+      + line('Operating Income (before taxes)', opIncM, opIncY, { bold: 1, border: 1, col: opIncCol })
+      + sec('Key Cost Ratios')
+      + line('Pour Cost %', M.barRev ? (M.barCogs / M.barRev) : null, YTD.barRev ? (YTD.barCogs / YTD.barRev) : null, { sub: 1, pct: 1 })
+      + line('Food Cost %', M.foodRev ? (M.foodCogs / M.foodRev) : null, YTD.foodRev ? (YTD.foodCogs / YTD.foodRev) : null, { sub: 1, pct: 1 })
+      + line('Labor % of Revenue', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null, { sub: 1, pct: 1 })
+      + line('Prime Cost %', M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null, YTD.totalRev ? ((YTD.totalCogs + YTD.totalLabor) / YTD.totalRev) : null, { sub: 1, pct: 1 });
+
+    return '<div class="sh" style="margin:24px 0 10px;">Income Statement</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
+      + '<colgroup><col style="width:50%"><col style="width:25%"><col style="width:25%"></colgroup>'
+      + '<thead><tr><th></th><th style="text-align:right;">' + esc(this._monthLabel(monthKey)) + '</th><th style="text-align:right;">Year to Date</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div></div>';
+  },
+
+  // ── Sales Tax Worksheet: the tax you collected this period off your taxable
+  //    sales, by your filing frequency. An estimate (rate x sales); confirm
+  //    against your POS tax report before filing. ─────────────────────────────
+  _salesTaxRate() { return (window.CashEngine && CashEngine.salesTaxRate) ? CashEngine.salesTaxRate() : 0; },
+  _salesTaxFreq() { return (window.CashEngine && CashEngine.taxFrequency) ? CashEngine.taxFrequency() : 'monthly'; },
+  _quarterToDate(monthKey) {
+    const year = monthKey.slice(0, 4), mNum = parseInt(monthKey.slice(5, 7), 10);
+    const qStart = Math.floor((mNum - 1) / 3) * 3 + 1;
+    let sales = 0;
+    for (let m = qStart; m <= mNum; m++) sales += this._aggregateMonth(year + '-' + String(m).padStart(2, '0')).totalRev;
+    return sales;
+  },
+  _salesTaxCard(monthKey) {
+    const rate = this._salesTaxRate(), freq = this._salesTaxFreq();
+    if (!rate) {
+      return '<div class="sh" style="margin:24px 0 10px;">Sales Tax</div>'
+        + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Set your sales tax rate in Cash Position and Bar Cop estimates the tax you collected, by month and quarter, off your taxable sales.</div></div>';
+    }
+    const f = v => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const rateTxt = rate.toLocaleString('en-US', { maximumFractionDigits: 3 }) + '%';
+    const monthSales = this._aggregateMonth(monthKey).totalRev, monthTax = monthSales * rate / 100;
+    const qSales = this._quarterToDate(monthKey), qTax = qSales * rate / 100;
+    const row = (period, sales, tax) => '<tr>'
+      + '<td style="color:var(--t1);">' + period + '</td>'
+      + '<td style="text-align:right;color:var(--t2);">' + f(sales) + '</td>'
+      + '<td style="text-align:right;color:var(--t2);">' + rateTxt + '</td>'
+      + '<td style="text-align:right;color:var(--t1);font-weight:700;">' + f(tax) + '</td></tr>';
+    const rows = row(esc(this._monthLabel(monthKey)), monthSales, monthTax)
+      + (freq === 'quarterly' ? row('Quarter to date', qSales, qTax) : '');
+    return '<div class="sh" style="margin:24px 0 10px;">Sales Tax</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
+      + '<colgroup><col style="width:34%"><col style="width:24%"><col style="width:18%"><col style="width:24%"></colgroup>'
+      + '<thead><tr><th>Period</th><th style="text-align:right;">Taxable Sales</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Tax Due</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div></div>'
+      + '<div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.5;">Estimated at your ' + rateTxt + ' rate on your taxable sales. The exact tax collected is on your POS tax report, confirm against it before you file. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.</div>';
   },
 
   // ── PDF executive summary — owner-readable, 1-page snapshot ──────────────
@@ -216,6 +334,7 @@ S.HubBooks = {
   _whatsInsideCard() {
     const rows = [
       ['Income Statement', 'Revenue, COGS, labor, prime cost. Month and year to date side by side.'],
+      ['Sales Tax Worksheet', 'Estimated sales tax on your taxable sales for the month, and the quarter if you file quarterly. Confirm against your POS tax report.'],
       ['Inventory Valuation', 'Dollar value of what is on the shelf at month end. Bottle by bottle. Ready for Schedule C.'],
       ['Cash Reconciliation', 'Every shift. POS revenue, expected cash, counted cash, variance, reason.'],
       ['Void and Comp Log', 'Every void and comp with the manager who signed off, the server, the amount, the reason.'],
@@ -309,6 +428,7 @@ S.HubBooks = {
       const wb = XLSX.utils.book_new();
 
       XLSX.utils.book_append_sheet(wb, this._buildIncomeStatement(monthKey),    'Income Statement');
+      if (this._salesTaxRate() > 0) XLSX.utils.book_append_sheet(wb, this._buildSalesTax(monthKey), 'Sales Tax');
       XLSX.utils.book_append_sheet(wb, this._buildInventoryValuation(monthKey), 'Inventory Valuation');
       XLSX.utils.book_append_sheet(wb, this._buildCashReconciliation(monthKey), 'Cash Reconciliation');
       XLSX.utils.book_append_sheet(wb, this._buildVoidCompLog(monthKey),        'Void and Comp Log');
@@ -475,6 +595,34 @@ S.HubBooks = {
     });
 
     return this._finishSheet(ws, rows.length, merges, [{ wch: 56 }, { wch: 20 }, { wch: 20 }]);
+  },
+
+  // ── Sheet — Sales Tax Worksheet (estimate; confirm against the POS) ──────────
+  _buildSalesTax(monthKey) {
+    const COL_COUNT = 4;
+    const rate = this._salesTaxRate(), freq = this._salesTaxFreq(), rateFrac = rate / 100;
+    const rows = [], merges = [];
+    rows.push(this._lineRow(this._baseTitle('Sales Tax Worksheet', monthKey), COL_COUNT));
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
+    rows.push(this._blankRow(COL_COUNT));
+    rows.push(['Period', 'Taxable Sales', 'Rate', 'Tax Due']);
+    const monthSales = this._aggregateMonth(monthKey).totalRev;
+    rows.push([this._monthLabel(monthKey), monthSales, rateFrac, monthSales * rateFrac]);
+    if (freq === 'quarterly') {
+      const qSales = this._quarterToDate(monthKey);
+      rows.push(['Quarter to date', qSales, rateFrac, qSales * rateFrac]);
+    }
+    rows.push(this._blankRow(COL_COUNT));
+    this._pushFooter(rows, merges,
+      'Estimated sales tax at your ' + rate + '% rate on your taxable sales (Shift Control revenue). The exact tax you collected is on your POS sales tax report; confirm against it before filing. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.',
+      COL_COUNT);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    rows.forEach((row, i) => {
+      [1, 3].forEach(c => { const cell = ws[XLSX.utils.encode_cell({ r: i, c })]; if (cell && typeof cell.v === 'number') cell.z = moneyFmt; });
+      const rc = ws[XLSX.utils.encode_cell({ r: i, c: 2 })]; if (rc && typeof rc.v === 'number') rc.z = '0.000%';
+    });
+    return this._finishSheet(ws, rows.length, merges, [{ wch: 28 }, { wch: 18 }, { wch: 12 }, { wch: 18 }]);
   },
 
   // ── Shared formatting helpers for cohesion across every sheet ────────────
