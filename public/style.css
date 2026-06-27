@@ -1060,6 +1060,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ing-tbl.rd-pill td{border-bottom:none;border-radius:0;}
 .ing-tbl.rd-pill td:first-child{border-radius:8px 0 0 8px;}
 .ing-tbl.rd-pill td:last-child{border-radius:0 8px 8px 0;}
+/* Small row buttons, matching the Count History .row-list pills, so the short
+   gold flag note (e.g. "$0.40 Over", "Short QTY 2") + Flag + Delete fit without
+   wrapping the row. */
+.ing-tbl.rd-pill tbody .btn{padding:4px 9px;font-size:9px;}
 /* rd-pill trial: stack to clean label/value cards as soon as the BUILDER itself
    gets too narrow for a flagged line (reason text + Flag + Delete), not at a
    viewport breakpoint — the sidebar makes viewport width a poor proxy. Mirrors
@@ -1077,6 +1081,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ing-tbl.rd-pill tbody td .form-input{width:100%;}
   .ing-tbl.rd-pill tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
   .ing-tbl.rd-pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
+  .ing-tbl.rd-pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
 }
 
 /* ══ PROG BAR ══ */
