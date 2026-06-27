@@ -587,15 +587,34 @@ window.CashEngine = {
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(o.amount) || 0, type: o.type || 'capital', label: o.notes || this._outflowLabel(o.type) });
     });
     recs.filter(o => o.recurring).forEach(p => {
-      const amt = parseFloat(p.amount) || 0; const base = new Date((p.date || startYmd) + 'T00:00:00'); if (isNaN(base.getTime())) return;
-      const day = parseInt(p.recur_day, 10) || base.getDate(); const term = parseInt(p.term_months, 10) || 12;
-      for (let m = 0; m < term; m++) {
-        const occ = new Date(base.getFullYear(), base.getMonth() + m, day); const ymd = App.ymdLocal(occ);
-        if (ymd < startYmd || ymd > endYmd) continue; const key = p.id + '@' + ymd.slice(0, 7); if (covered.has(key)) continue; covered.add(key);
-        out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true });
+      const amt = parseFloat(p.amount) || 0;
+      const base = new Date((p.date || startYmd) + 'T00:00:00'); if (isNaN(base.getTime())) return;
+      const day = parseInt(p.recur_day, 10) || base.getDate();
+      const term = parseInt(p.term_months, 10) || 0;        // 0 = ongoing until stopped
+      const stop = p.stopped_ym || null;                     // YYYY-MM; no occurrence in or after this month
+      const endD = new Date(endYmd + 'T00:00:00');
+      const monthsToEnd = (endD.getFullYear() - base.getFullYear()) * 12 + (endD.getMonth() - base.getMonth());
+      const lastM = term > 0 ? Math.min(term - 1, monthsToEnd) : monthsToEnd;
+      for (let m = 0; m <= lastM; m++) {
+        const occ = new Date(base.getFullYear(), base.getMonth() + m, day);
+        const ymd = App.ymdLocal(occ);
+        if (stop && ymd.slice(0, 7) >= stop) break;
+        if (ymd < startYmd || ymd > endYmd) continue;
+        const key = p.id + '@' + ymd.slice(0, 7); if (covered.has(key)) continue; covered.add(key);
+        out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true, recurring_parent: p.id });
       }
     });
     return out;
+  },
+  // Active recurring outflow series (the parents you can stop or edit).
+  recurringOutflows() { return this.cashOutflows().filter(o => o.recurring && o.id); },
+  // The last month a fixed-term recurring series pays out, or null if it is ongoing.
+  recurringEndYm(o) {
+    const term = parseInt(o.term_months, 10) || 0;
+    if (!term) return null;
+    const base = new Date((o.date || '') + 'T00:00:00'); if (isNaN(base.getTime())) return null;
+    const last = new Date(base.getFullYear(), base.getMonth() + term - 1, 1);
+    return App.ymdLocal(last).slice(0, 7);
   },
   outflowsInPeriod(s, e) {
     const r = { draw: 0, loan: 0, capital: 0, tax: 0, total: 0, list: [] };
