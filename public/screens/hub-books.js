@@ -53,13 +53,13 @@ S.HubBooks = {
           + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop assembles these numbers from what you log. It is a software tool, not a CPA, tax preparer, or legal advisor. This is a worksheet, not your official financial statement. Your accountant should review and verify every figure before you file anything or close the books.</div>'
         + '</div>'
       + '</div>'
-      + '<div id="hb-is-wrap">' + this._incomeStatementCard(defaultMonth) + this._salesTaxCard(defaultMonth) + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="hb-generate">Generate File</button>'
         + '<button class="btn btn-ghost" id="hb-pdf">Owner Summary (PDF)</button>'
         + '<span id="hb-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
+      + '<div id="hb-review-wrap">' + this._reviewBlock(defaultMonth) + '</div>'
       + '</div>';
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -67,7 +67,21 @@ S.HubBooks = {
     document.getElementById('hb-generate')?.addEventListener('click', () => this._generate());
     document.getElementById('hb-pdf')?.addEventListener('click', () => this._openPdfSummary());
     document.getElementById('hb-month')?.addEventListener('change', (e) => {
-      const w = document.getElementById('hb-is-wrap'); if (w) w.innerHTML = this._incomeStatementCard(e.target.value) + this._salesTaxCard(e.target.value);
+      const w = document.getElementById('hb-review-wrap'); if (w) { w.innerHTML = this._reviewBlock(e.target.value); this._wireExport(); }
+    });
+    this._wireExport();
+  },
+
+  // ── On-screen review block: Export PDF + the Income Statement and Sales Tax,
+  //    below the generate workflow. Rebuilt when the month changes. ───────────
+  _reviewBlock(monthKey) {
+    return '<div class="no-print" style="display:flex;justify-content:flex-end;margin:24px 0 10px;"><button class="btn btn-ghost btn-sm" id="hb-is-export">Export PDF</button></div>'
+      + '<div id="hb-is-content">' + this._incomeStatementCard(monthKey) + this._salesTaxCard(monthKey) + '</div>';
+  },
+  _wireExport() {
+    document.getElementById('hb-is-export')?.addEventListener('click', () => {
+      const el = document.getElementById('hb-is-content');
+      if (el) App.exportPDF({ title: 'Income Statement', root: el });
     });
   },
 
@@ -86,7 +100,7 @@ S.HubBooks = {
     const grossM = netRevM - M.totalCogs, grossY = netRevY - YTD.totalCogs;
     const opIncM = grossM - M.totalLabor - totalOpExM, opIncY = grossY - YTD.totalLabor - totalOpExY;
 
-    const sec = t => '<tr><td colspan="3" style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:16px 0 4px;">' + t + '</td></tr>';
+    const sec = t => '<tr><td colspan="3" style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:16px 0 4px 20px;">' + t + '</td></tr>';
     const line = (label, m, y, o) => {
       o = o || {};
       const fmt = o.pct ? pct : f;
@@ -94,9 +108,9 @@ S.HubBooks = {
       const bt = o.border ? 'border-top:1px solid var(--b2);' : '';
       const lblCol = o.bold ? 'var(--t1)' : 'var(--t2)';
       const valCol = o.col || (o.neg ? 'var(--red)' : (o.bold ? 'var(--t1)' : 'var(--t2)'));
-      return '<tr><td style="' + bt + wt + 'color:' + lblCol + ';' + (o.sub ? 'padding-left:18px;' : '') + '">' + label + '</td>'
-        + '<td style="' + bt + wt + 'text-align:right;color:' + valCol + ';">' + fmt(m) + '</td>'
-        + '<td style="' + bt + wt + 'text-align:right;color:' + valCol + ';">' + fmt(y) + '</td></tr>';
+      return '<tr><td style="' + bt + wt + 'color:' + lblCol + ';' + (o.sub ? 'padding-left:36px;' : '') + '">' + label + '</td>'
+        + '<td style="' + bt + wt + 'color:' + valCol + ';">' + fmt(m) + '</td>'
+        + '<td style="' + bt + wt + 'color:' + valCol + ';">' + fmt(y) + '</td></tr>';
     };
     const opIncCol = opIncM >= 0 ? 'var(--green)' : 'var(--red)';
 
@@ -141,10 +155,9 @@ S.HubBooks = {
       + line('Labor % of Revenue', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null, { sub: 1, pct: 1 })
       + line('Prime Cost %', M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null, YTD.totalRev ? ((YTD.totalCogs + YTD.totalLabor) / YTD.totalRev) : null, { sub: 1, pct: 1 });
 
-    return '<div class="sh" style="margin:24px 0 10px;">Income Statement</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
       + '<colgroup><col style="width:50%"><col style="width:25%"><col style="width:25%"></colgroup>'
-      + '<thead><tr><th></th><th style="text-align:right;">' + esc(this._monthLabel(monthKey)) + '</th><th style="text-align:right;">Year to Date</th></tr></thead>'
+      + '<thead><tr><th>Income Statement</th><th>' + esc(this._monthLabel(monthKey)) + '</th><th>Year to Date</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div></div>';
   },
 
@@ -172,15 +185,15 @@ S.HubBooks = {
     const qSales = this._quarterToDate(monthKey), qTax = qSales * rate / 100;
     const row = (period, sales, tax) => '<tr>'
       + '<td style="color:var(--t1);">' + period + '</td>'
-      + '<td style="text-align:right;color:var(--t2);">' + f(sales) + '</td>'
-      + '<td style="text-align:right;color:var(--t2);">' + rateTxt + '</td>'
-      + '<td style="text-align:right;color:var(--t1);font-weight:700;">' + f(tax) + '</td></tr>';
+      + '<td style="color:var(--t2);">' + f(sales) + '</td>'
+      + '<td style="color:var(--t2);">' + rateTxt + '</td>'
+      + '<td style="color:var(--t1);font-weight:700;">' + f(tax) + '</td></tr>';
     const rows = row(esc(this._monthLabel(monthKey)), monthSales, monthTax)
       + (freq === 'quarterly' ? row('Quarter to date', qSales, qTax) : '');
     return '<div class="sh" style="margin:24px 0 10px;">Sales Tax</div>'
       + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
       + '<colgroup><col style="width:34%"><col style="width:24%"><col style="width:18%"><col style="width:24%"></colgroup>'
-      + '<thead><tr><th>Period</th><th style="text-align:right;">Taxable Sales</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Tax Due</th></tr></thead>'
+      + '<thead><tr><th>Period</th><th>Taxable Sales</th><th>Rate</th><th>Tax Due</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div></div>'
       + '<div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.5;">Estimated at your ' + rateTxt + ' rate on your taxable sales. The exact tax collected is on your POS tax report, confirm against it before you file. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.</div>';
   },
