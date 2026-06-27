@@ -152,7 +152,8 @@ S.HubPermits = {
       + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the dates you enter. It does not verify them and is not legal advice. Confirm requirements and deadlines with your issuing agency.</div>'
       + '</div>';
     const addCard = '<div class="card form-card">'
-      + '<div class="card-title">Add Permit</div>'
+      + App.collapsibleCardTitle('hpa-add', 'Add Permit')
+      + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f" style="flex:1 1 120px;min-width:100px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
       +   '<div class="f" style="width:220px;"><label>Type</label><select id="hpa-type">' + typeOpts + '</select></div>'
@@ -164,8 +165,9 @@ S.HubPermits = {
       + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hpa-notes" placeholder="Issuing agency, account number, contact"></textarea></div></div>'
       + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + headsUpInside
+      + '</div>'
       + '</div>';
-    const addButtons = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+    const addButtons = '<div data-collapse-group="hpa-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="hpa-save">Add Permit</button>'
       + '<button class="btn btn-ghost" id="hpa-clear">Start Over</button>'
       + '</div>';
@@ -200,6 +202,8 @@ S.HubPermits = {
     // Export button rides the chips row inside the list region.
     document.getElementById('hpa-save')?.addEventListener('click', () => this._saveAdd());
     document.getElementById('hpa-clear')?.addEventListener('click', () => this._clearAdd());
+    this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
+    App.applyCollapsed(this.container);
     this.container.querySelectorAll('.hp-renew').forEach(btn => {
       btn.addEventListener('click', () => {
         const rec = this.records().find(r => r.id === btn.dataset.id);
