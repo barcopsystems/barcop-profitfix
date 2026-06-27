@@ -268,23 +268,24 @@ window.CashEngine = {
   },
 
   // Projected sales for a week: a saved revenue forecast if there is one, else
-  // Bar Cop's weighted same-weekday baseline off your shift sales.
+  // Bar Cop's weighted same-weekday baseline off your shift sales, else a cyclic
+  // replay of your recent actual weeks for the far weeks past the lookback window.
   revenueForWeek(ws) {
     if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total) return f.total; }
     if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
-    // Beyond the forecast's same-weekday lookback window, fall back to a trailing
-    // weekly sales run-rate so a far-out week reads a realistic number, not zero.
-    // (The same-weekday default returns 0 once a week is more than ~8 weeks past
-    // the last logged sales, which would otherwise crater the survival forecast.)
-    return this._trailingWeeklySales();
+    // Beyond the forecast's same-weekday lookback window (the default returns 0
+    // once a week is more than ~8 weeks past the last logged sales), replay the
+    // recent actual weeks forward so a far-out week reads a real recent week's
+    // number cycling on, not one flat average repeated to the cent.
+    return this._cyclicWeeklySales(ws);
   },
 
-  // Average weekly sales over the most recent COMPLETE weeks of actual shift
-  // revenue (bar + floor). The run-rate behind a forecast week with no nearer
-  // basis. Excludes the current in-progress week so a partial week never drags it.
-  _trailingWeeklySales() {
+  // Recent COMPLETE weeks of actual shift revenue (bar + floor), oldest to newest,
+  // excluding the current in-progress week so a partial week never drags it. The
+  // basis for both the trailing average and the cyclic replay.
+  _recentWeeklySales(n) {
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    if (!shifts.length) return 0;
+    if (!shifts.length) return [];
     const curMon = this._mondayOf(new Date());
     const byWeek = {};
     shifts.forEach(s => {
@@ -295,10 +296,26 @@ window.CashEngine = {
       if (wk >= curMon) return;
       byWeek[wk] = (byWeek[wk] || 0) + r;
     });
-    const weeks = Object.keys(byWeek).sort();
-    if (!weeks.length) return 0;
-    const recent = weeks.slice(-8);
-    return recent.reduce((s, w) => s + byWeek[w], 0) / recent.length;
+    return Object.keys(byWeek).sort().slice(-(n || 8)).map(w => ({ wk: w, total: byWeek[w] }));
+  },
+  // Average of the recent weeks, the steady fallback when there is only one week
+  // to replay (or for a non-projected week).
+  _trailingWeeklySales() {
+    const recent = this._recentWeeklySales(8);
+    if (!recent.length) return 0;
+    return recent.reduce((s, w) => s + w.total, 0) / recent.length;
+  },
+  // Far-out projection: replay the recent actual weekly totals forward, indexed by
+  // how many weeks out the target sits. Grounded in your own numbers, but it moves
+  // week to week like your business did instead of repeating a single average.
+  _cyclicWeeklySales(ws) {
+    const recent = this._recentWeeklySales(8);
+    if (!recent.length) return 0;
+    if (recent.length === 1) return recent[0].total;
+    const last = recent[recent.length - 1].wk;
+    const dist = Math.round((new Date(ws + 'T00:00:00').getTime() - new Date(last + 'T00:00:00').getTime()) / (7 * 86400000));
+    if (dist <= 0) return this._trailingWeeklySales();
+    return recent[(dist - 1) % recent.length].total;
   },
 
   // Labor cost for an upcoming week: the built schedule if one exists, otherwise
