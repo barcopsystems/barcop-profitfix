@@ -5,9 +5,9 @@
    shows exactly where the rest went: into more inventory, owner draws, loan
    principal, equipment, tax you remitted. Profit minus those is the cash you
    actually kept. Log a cash outflow up top, pick a period, and the bridge below
-   reads Cash You Kept and the line-item table of where every dollar went. Profit
-   and inventory change compute automatically; the outflows you log here feed the
-   Survival Forecast too. Reads CashEngine. */
+   reads Cash You Kept and where every dollar went. Profit and inventory change
+   compute automatically; the outflows you log here feed the Survival Forecast
+   too. Reads CashEngine. */
 
 S.CashBridge = {
   _period: 'last-month',
@@ -42,34 +42,30 @@ S.CashBridge = {
   },
 
   onSel(active) { return active ? 'background:var(--sel-active-bg);border-color:var(--b-edge);color:var(--t1);' : ''; },
-  sectionHead(title, right) {
-    return right
-      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + right + '</div>'
-      : '<div class="sh" style="margin:24px 0 10px;">' + title + '</div>';
-  },
 
   draw() {
     const b = this.periodBounds();
     const br = CashEngine.bridge(b.s, b.e);
     const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
-    const periodRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' + this.PERIODS.map(chip).join('') + '</div>';
-    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="cb-export">Export PDF</button>';
+    const periodRow = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:28px 0 16px;">' + this.PERIODS.map(chip).join('') + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.outflowForm()
       + periodRow
       + (br.hasData
-          ? this.headline(br, b) + this.sectionHead('Where Your Profit Went', exportBtn) + this.waterfallTable(br)
+          ? this.headline(br, b)
+            + '<div class="sh" style="margin:24px 0 10px;">Where Your Profit Went</div>'
+            + this.waterfall(br)
           : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you have weeks confirmed in This Week for ' + esc(b.label) + ', it fills in here.</div></div>')
       + this.loggedTable(b)
       + '</div>';
     this.wire();
   },
 
-  // ── Log a Cash Outflow (top of page, screen-only) ────────────────────────────
+  // ── Log a Cash Outflow (top of page) ─────────────────────────────────────────
   outflowForm() {
     const typeOpts = this.TYPES.map(([k, label]) => '<option value="' + k + '">' + label + '</option>').join('');
-    return '<div class="no-print"><div class="card form-card"><div class="card-title">Log a Cash Outflow</div>'
+    return '<div><div class="card form-card"><div class="card-title">Log a Cash Outflow</div>'
       + '<div class="form-row" style="margin-bottom:14px;">'
       +   '<div class="f" style="width:150px;"><label>Date</label><input type="date" id="cb-date" value="' + App.todayLocal() + '"/></div>'
       +   '<div class="f" style="width:180px;"><label>Type</label><select class="form-input" id="cb-type">' + typeOpts + '</select></div>'
@@ -86,11 +82,11 @@ S.CashBridge = {
       + '</div></div>';
   },
 
-  // ── Cash You Kept hero (screen-only; the bridge table carries the PDF) ────────
+  // ── Cash You Kept hero ───────────────────────────────────────────────────────
   headline(br, b) {
     const kept = br.cashKept, diff = br.profit - kept;
     const keptCol = kept < 0 ? 'var(--red)' : 'var(--w)';
-    return '<div class="card form-card no-print"><div class="card-title">Cash You Kept</div>'
+    return '<div class="card form-card"><div class="card-title">Cash You Kept</div>'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
       +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:' + keptCol + ';">' + App.fmtCurrency(kept, 0) + '</span>'
       +   '<span style="font-size:13px;color:var(--t2);">of ' + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '</span>'
@@ -102,28 +98,26 @@ S.CashBridge = {
       + '</div></div>';
   },
 
-  // ── The bridge as a line-item table (prints; aligns clean) ───────────────────
-  waterfallTable(br) {
+  waterfall(br) {
+    const row = (label, amount, sub, isResult) => {
+      const neg = amount < 0;
+      const color = isResult ? (amount < 0 ? 'var(--red)' : 'var(--green)') : (neg ? 'var(--red)' : 'var(--green)');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (isResult ? '' : 'border-bottom:1px solid var(--b2);') + '">'
+        + '<div><div style="font-size:13px;' + (isResult ? 'font-weight:700;' : '') + 'color:var(--t1);">' + label + '</div>' + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + sub + '</div>' : '') + '</div>'
+        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (isResult ? '22px' : '18px') + ';font-weight:600;color:' + color + ';white-space:nowrap;">' + (neg ? '-' : isResult ? '' : '+') + App.fmtCurrency(Math.abs(amount)) + '</div></div>';
+    };
     const invChange = br.inv.change, co = br.co;
-    const lines = [{ label: 'Profit you earned', amt: br.profit }];
-    if (br.inv.hasData && Math.abs(invChange) >= 1) lines.push({ label: invChange > 0 ? 'Into inventory' : 'Freed from inventory', amt: -invChange });
-    if (co.draw > 0) lines.push({ label: 'Owner draws', amt: -co.draw });
-    if (co.loan > 0) lines.push({ label: 'Loan payments', amt: -co.loan });
-    if (co.capital > 0) lines.push({ label: 'Capital and equipment', amt: -co.capital });
-    if (co.tax > 0) lines.push({ label: 'Tax remitted', amt: -co.tax });
-    const body = lines.map(l => {
-      const neg = l.amt < 0;
-      return '<tr><td data-label="Item">' + l.label + '</td>'
-        + '<td data-label="Amount" class="val" style="color:' + (neg ? 'var(--red)' : 'var(--green)') + ';font-weight:600;">' + (neg ? '-' : '+') + App.fmtCurrency(Math.abs(l.amt)) + '</td></tr>';
-    }).join('');
-    const keptNeg = br.cashKept < 0;
-    const result = '<tr><td data-label="Item" style="border-top:2px solid var(--row-div);font-weight:700;color:var(--t1);">Cash you actually kept</td>'
-      + '<td data-label="Amount" class="val" style="border-top:2px solid var(--row-div);font-weight:700;font-size:15px;color:' + (keptNeg ? 'var(--red)' : 'var(--green)') + ';">' + App.fmtCurrency(br.cashKept) + '</td></tr>';
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
-      + '<thead><tr><th>Item</th><th>Amount</th></tr></thead><tbody>' + body + result + '</tbody></table></div></div>';
+    let rows = row('Profit you earned', br.profit, 'Revenue minus cost of goods, labor, and overhead');
+    if (br.inv.hasData && Math.abs(invChange) >= 1) rows += row(invChange > 0 ? 'Into inventory' : 'Freed from inventory', -invChange, invChange > 0 ? 'You bought more than you used, cash onto the shelf' : 'You drew inventory down, cash came back');
+    if (co.draw > 0) rows += row('Owner draws', -co.draw, 'Cash out, not a business expense');
+    if (co.loan > 0) rows += row('Loan payments', -co.loan, 'Principal is a payment, not an expense');
+    if (co.capital > 0) rows += row('Capital and equipment', -co.capital, 'Paid in cash, written off slowly');
+    if (co.tax > 0) rows += row('Tax remitted', -co.tax, 'Money you collected and paid through');
+    rows += '<div style="height:1px;background:var(--row-div);margin:4px 0;"></div>';
+    rows += row('Cash you actually kept', br.cashKept, '', true);
+    return '<div class="card">' + rows + '</div>';
   },
 
-  // ── Logged outflows for the period (screen-only) ─────────────────────────────
   loggedTable(b) {
     const co = CashEngine.outflowsInPeriod(b.s, b.e);
     const rows = co.list.length
@@ -132,8 +126,8 @@ S.CashBridge = {
           + '<td data-label="Note">' + esc(o.label || '') + '</td><td data-label="Amount" class="val">' + App.fmtCurrency(o.amount) + '</td>'
           + '<td style="text-align:right;">' + (o.id ? '<button class="btn btn-ghost btn-sm cb-del" data-id="' + o.id + '">Delete</button>' : '') + '</td></tr>').join('')
       : '<tr><td colspan="5" style="color:var(--t3);">No cash outflows logged for ' + esc(b.label) + ' yet.</td></tr>';
-    return '<div class="no-print">' + this.sectionHead('Logged Outflows')
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+    return '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
+      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
   wire() {
@@ -158,7 +152,6 @@ S.CashBridge = {
     });
     this.container.onclick = async ev => {
       if (ev.target.closest('#cb-add') || ev.target.closest('#cb-reset')) return;
-      if (ev.target.closest('#cb-export')) { const pl = (this.PERIODS.find(x => x[0] === this._period) || [])[1] || ''; App.exportPDF({ title: 'Cash Bridge, ' + pl, root: this.container }); return; }
       const pc = ev.target.closest('.cb-period');
       if (pc) { this._period = pc.dataset.p; this.draw(); return; }
       const del = ev.target.closest('.cb-del');
