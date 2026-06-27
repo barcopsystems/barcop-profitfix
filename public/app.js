@@ -1437,13 +1437,13 @@ const App = {
     ] },
     'books': { title: 'How Month-End Books Works', sections: [
       { h: 'What this page is', p: ['Builds the month-end close: one Excel workbook plus a one-page owner summary PDF. It pulls every number together from what you already log, the accountant-grade deliverable behind the Books section.'] },
-      { h: 'How to use it', p: ['Pick the month to close and click Generate File. The workbook holds an income statement (month and year to date), inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, and labor cost. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
+      { h: 'How to use it', p: ['Pick the month to close. The income statement and a sales tax estimate read right on the page for that month and year to date, so you can look the numbers over before anything leaves. Click Generate File and the workbook adds inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, and labor cost. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
       { h: 'Before you file', p: ['Bar Cop pulls these from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before you file anything or close the books.'] }
     ] },
     'year-end': { title: 'How the Annual Review Works', sections: [
       { h: 'What this page is', p: ['The annual roll-up: your full year in one place for tax season and for your own read on how the year went. Run it for a closed year, or for the current year so far. It is built from the same logged data as your weekly and monthly numbers, so it ties out to the Month-End file.'] },
       { h: 'How to use it', p: ['Pick the year, then Generate File for the annual workbook or Executive Summary for the PDF. What is in the file is listed on the page.'] },
-      { h: 'What is in it', p: ['The workbook holds an annual summary, a P&L by month, inventory valuation, a labor cost trend, the Form 8027 tip worksheet, a cash control summary, your audit history, and operational events. The PDF is a few-page executive read of the same year.'] },
+      { h: 'What is in it', p: ['The workbook holds an annual summary, a P&L by month, inventory valuation, a labor cost trend, the Form 8027 tip worksheet, a cash control summary, your audit history, operational events, and a 1099 vendor worksheet (the vendors you paid $600 or more, a starting point for issuing 1099s). The PDF is a few-page executive read of the same year.'] },
       { h: 'Before you file', p: ['These numbers come from what you have logged. It is a worksheet, not a filed tax return or audited statement. Hand it to your accountant to verify before you file anything or make a material decision.'] }
     ] },
     'permits': { title: 'How Permits and Licenses Work', sections: [
