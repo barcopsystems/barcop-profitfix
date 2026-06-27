@@ -49,9 +49,9 @@ S.CashPosition = {
       +   '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="cp-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
       +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" class="suf" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
       +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" class="suf" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
+      +   '<button class="btn btn-primary btn-sm" id="cp-save" style="margin-bottom:1px;">Save</button>'
       + '</div>'
-      + '<div style="margin:16px 0 4px;display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" id="cp-save">Save</button>'
-      + (p.opening == null ? '<span style="font-size:12px;color:var(--t3);">Enter your cash on hand and tax rate to see what is really free to spend.</span>' : '') + '</div>'
+      + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand and tax rate to see what is really free to spend.</div>' : '')
       + '</div>';
   },
 
