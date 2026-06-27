@@ -402,7 +402,7 @@ S.HubOperatingExpenses = {
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring monthly bill (same cost each month)</label></div>'
         + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for a bill that ends after a fixed number of payments.</div></div></div></div>'
-        + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
+        + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
