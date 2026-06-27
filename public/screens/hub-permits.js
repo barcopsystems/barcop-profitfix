@@ -179,9 +179,10 @@ S.HubPermits = {
         .filter(x => x.s.key === 'expired' || x.s.key === 'critical' || x.s.key === 'warn');
       const rank = { expired: 0, critical: 1, warn: 2 };
       flagged.sort((a, b) => (rank[a.s.key] - rank[b.s.key]) || ((a.s.days ?? 99999) - (b.s.days ?? 99999)));
-      const alertRows = flagged.map(({ r, s }) => {
-        return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:flex-start;">'
-          + '<div style="width:8px;height:8px;border-radius:50%;background:' + s.color + ';flex-shrink:0;margin-top:6px;"></div>'
+      const alertRows = flagged.map(({ r, s }, i) => {
+        const bb = i === flagged.length - 1 ? '' : 'border-bottom:1px solid var(--b2);';
+        return '<div style="display:flex;gap:12px;padding:12px 0;' + bb + 'align-items:center;">'
+          + '<div style="width:8px;height:8px;border-radius:50%;background:' + s.color + ';flex-shrink:0;"></div>'
           + '<div style="flex:1;min-width:0;">'
           +   '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + esc(r.name || '(unnamed)') + '</div>'
           +   '<div style="font-size:11px;color:var(--t3);">' + esc(r.type || '') + (r.type ? ' · ' : '') + esc(s.label) + (r.cost ? ' · Last paid ' + fmt$(r.cost) : '') + '</div>'
