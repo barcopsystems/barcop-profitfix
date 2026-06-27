@@ -78,8 +78,10 @@ S.CashForecast = {
   // ── Cash position: your bank balance in, the survival stats out, one card ─────
   positionCard(fc, opening, noData) {
     const input = '<div class="form-row" style="margin-bottom:0;align-items:flex-end;">'
-      + '<div class="f" style="width:200px;"><label>Your bank balance now</label>'
+      + '<div class="f" style="width:190px;"><label>Your bank balance now</label>'
       + '<div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cf-cash" placeholder="0.00" value="' + (opening != null ? opening : '') + '"/></div></div>'
+      + '<div class="f" style="width:170px;"><label>Available credit</label>'
+      + '<div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cf-credit" placeholder="0" value="' + (CashEngine.availableCredit() || '') + '"/></div></div>'
       + '<button class="btn btn-primary btn-sm" id="cf-save" style="margin-bottom:1px;">Save</button>'
       + '</div>';
     let statsHtml = '';
@@ -175,12 +177,18 @@ S.CashForecast = {
   // One concise low-point read inside the forecast card (no floating callout).
   lowLine(fc, opening) {
     if (opening == null || !fc.lowPoint) return '';
-    const low = fc.lowPoint, black = low.balance >= 0 && fc.runway == null;
-    return '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">'
-      + (black
-          ? '<strong style="color:var(--green);">In the black all quarter.</strong> Tightest week is ' + this.fmtWk(low.ws) + ' at ' + App.fmtCurrency(low.balance) + '.'
-          : '<strong style="color:var(--red);">Tight at ' + this.fmtWk(low.ws) + '.</strong> Bottoms out at ' + App.fmtCurrency(low.balance) + (low.balance < 0 ? ', under zero' : '') + '.')
-      + '</div>';
+    const low = fc.lowPoint, credit = fc.credit || 0;
+    const wk = this.fmtWk(low.ws), bal = App.fmtCurrency(low.balance);
+    const wrap = (inner) => '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">' + inner + '</div>';
+    if (low.balance >= 0) {
+      return wrap('<strong style="color:var(--green);">In the black all quarter.</strong> Tightest week is ' + wk + ' at ' + bal + '.'
+        + (credit > 0 ? ' Plus ' + App.fmtCurrency(credit) + ' of credit in reserve if a slow stretch hits.' : ''));
+    }
+    if (fc.drawsCredit) {
+      return wrap('<strong style="color:var(--amber);">Tight at ' + wk + '.</strong> Your cash dips to ' + bal + ', under zero, but your ' + App.fmtCurrency(credit) + ' credit line covers it. Free trapped cash so you do not have to lean on it.');
+    }
+    const tail = credit > 0 ? ' Even with your ' + App.fmtCurrency(credit) + ' credit line you would be ' + App.fmtCurrency(Math.abs(low.balance) - credit) + ' short.' : '';
+    return wrap('<strong style="color:var(--red);">Tight at ' + wk + '.</strong> Bottoms out at ' + bal + ', under zero.' + tail + ' Free trapped cash and tighten terms now.');
   },
 
   tableInner(fc, opening) {
@@ -221,11 +229,17 @@ S.CashForecast = {
     if (this._scAmt) {
       const baseLow = base.lowPoint ? base.lowPoint.balance : 0;
       const newLow = fc.lowPoint ? fc.lowPoint.balance : 0;
-      const ok = newLow >= 0;
+      const credit = fc.credit || 0;
+      const ok = newLow >= 0, onCredit = !ok && newLow >= -credit;
+      const head = ok ? 'You can carry it.' : onCredit ? 'You can carry it, on credit.' : 'It breaks you.';
+      const headCol = ok ? 'var(--green)' : onCredit ? 'var(--amber)' : 'var(--red)';
+      const tail = ok ? '. The cushion holds.'
+        : onCredit ? ', under zero. Your ' + App.fmtCurrency(credit) + ' credit line covers it, but you would be borrowing to do it.'
+        : ', under zero. Even with your credit line you would be ' + App.fmtCurrency(Math.abs(newLow) - credit) + ' short. Free trapped cash or hold it until the runway is longer.';
       verdict = '<div style="margin-top:14px;padding:11px 13px;border-radius:var(--r);background:var(--gold-tint);border:1px solid var(--b-edge);font-size:12px;color:var(--t1);line-height:1.6;">'
-        + '<strong style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';">' + (ok ? 'You can carry it.' : 'It breaks you.') + '</strong> '
+        + '<strong style="color:' + headCol + ';">' + head + '</strong> '
         + 'Your low point ' + (this.cashOnHand() != null ? 'goes from ' + App.fmtCurrency(baseLow) + ' to ' + App.fmtCurrency(newLow) : 'drops by ' + App.fmtCurrency(baseLow - newLow))
-        + (ok ? '. The cushion holds.' : ', under zero. Free trapped cash or hold it until the runway is longer.') + '</div>';
+        + tail + '</div>';
     }
 
     return '<div class="no-print"><div class="sh" style="margin:24px 0 10px;">Stress Test</div>'
@@ -270,7 +284,7 @@ S.CashForecast = {
 
   wire() {
     const save = document.getElementById('cf-save');
-    if (save) save.addEventListener('click', () => { CashEngine.setOpeningCash(document.getElementById('cf-cash').value); this.draw(); });
+    if (save) save.addEventListener('click', () => { CashEngine.setOpeningCash(document.getElementById('cf-cash').value); CashEngine.setAvailableCredit(document.getElementById('cf-credit').value); this.draw(); });
     const run = document.getElementById('cf-sc-run');
     if (run) run.addEventListener('click', () => { const v = parseFloat(document.getElementById('cf-sc-amt').value); this._scAmt = isNaN(v) ? null : v; this.draw(); });
     this.container.onclick = ev => {

@@ -237,8 +237,11 @@ S.CashDashboard = {
         + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-position">Set Opening Balance</button></div>');
     }
     const low = sf.lowPoint;
+    const credit = sf.credit || 0;
     const runwayCol = sf.runway != null ? 'var(--red)' : 'var(--green)';
-    const lowCol = (low && low.balance < 0) ? 'var(--red)' : (low && pos.reserve > 0 && low.balance < pos.reserve ? 'var(--amber)' : 'var(--t1)');
+    const lowCol = (low && low.balance < -credit) ? 'var(--red)'
+      : (low && low.balance < 0) ? 'var(--amber)'
+      : (low && pos.reserve > 0 && low.balance < pos.reserve ? 'var(--amber)' : 'var(--t1)');
     const safeCol = (pos.safe != null && pos.safe < 0) ? 'var(--red)' : 'var(--t1)';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
     return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'

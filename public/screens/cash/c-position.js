@@ -49,6 +49,7 @@ S.CashPosition = {
       +   '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="cp-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
       +   '<div class="f" style="width:150px;"><label>Reserve target</label><div class="fw"><input type="number" class="suf" id="cp-reserve" placeholder="8" value="' + CashEngine.reserveWeeks() + '"/><span class="suf">wks</span></div></div>'
       +   '<div class="f" style="width:160px;"><label>Payroll tax (optional)</label><div class="fw"><input type="number" class="suf" id="cp-burden" placeholder="0" step="0.1" value="' + (CashEngine.payrollBurden() || '') + '"/><span class="suf">%</span></div></div>'
+      +   '<div class="f" style="width:180px;"><label>Gift cards outstanding</label><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cp-gift" placeholder="0" value="' + (CashEngine.giftCardLiability() || '') + '"/></div></div>'
       +   '<button class="btn btn-primary btn-sm" id="cp-save" style="margin-bottom:1px;">Save</button>'
       + '</div>'
       + (p.opening == null ? '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Enter your cash on hand and tax rate to see what is really free to spend.</div>' : '')
@@ -96,6 +97,7 @@ S.CashPosition = {
           : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Set your sales tax rate above and Bar Cop tracks the tax you have collected and owe since your last filing.</div>')
       + (CashEngine.payrollBurden() > 0 ? row('Payroll tax', sa.payrollTax, 'Estimated on ' + App.fmtCurrency(sa.wages) + ' in wages ' + sa.periodLabel, true) : '')
       + (sa.tipsOwed > 0 ? row('Tips held', sa.tipsOwed, 'Pooled tips not yet distributed', true) : '')
+      + (sa.giftCards > 0 ? row('Gift cards outstanding', sa.giftCards, 'Cash you collected, product still owed', true) : '')
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 2px;">'
       +   '<div style="font-size:13px;font-weight:700;color:var(--t1);">Total set aside</div>'
       +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);">' + App.fmtCurrency(sa.total) + '</div></div>'
@@ -129,6 +131,7 @@ S.CashPosition = {
       CashEngine.setTaxFrequency(document.getElementById('cp-freq').value);
       CashEngine.setReserveWeeks(document.getElementById('cp-reserve').value);
       CashEngine.setPayrollBurden(document.getElementById('cp-burden').value);
+      CashEngine.setGiftCardLiability(document.getElementById('cp-gift').value);
       this.draw();
     });
     this.container.onclick = ev => {
