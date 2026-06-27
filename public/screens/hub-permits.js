@@ -250,7 +250,7 @@ S.HubPermits = {
             + '<td style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
             + '<td>' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
             + '<td style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
-            + '<td class="no-print" style="text-align:right;white-space:nowrap;">'
+            + '<td class="no-print" style="white-space:nowrap;">'
             +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button> '
             +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button> '
             +   '<button class="btn btn-danger btn-sm hp-del" data-id="' + esc(r.id) + '">Delete</button>'
@@ -262,15 +262,17 @@ S.HubPermits = {
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + chips + '</div>'
       + '<button class="btn btn-ghost btn-sm" id="hp-export">Export PDF</button>'
       + '</div>';
-    const listCard = '<div class="card card-bleed data-card" id="hp-list">'
-      + '<div class="card-bleed-tbl"><table class="tbl">'
+    // EXPERIMENT: permit list as the audit-history pill-row table (all cells
+    // left-aligned). To revert, restore the .card-bleed data-card + .tbl version.
+    const listCard = '<div class="card" id="hp-list" style="overflow-x:auto;">'
+      + '<table class="audit-htbl">'
       +   '<thead><tr>'
       +     '<th>Name</th><th>Type</th><th>Renewal Date</th><th>Recurrence</th>'
       +     '<th>Last Cost</th>'
       +     '<th>Status</th><th class="no-print"></th>'
       +   '</tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
-      + '</table></div>'
+      + '</table>'
       + '</div>';
 
     region.innerHTML = chipsRow + listCard;
