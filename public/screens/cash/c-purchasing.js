@@ -167,7 +167,7 @@ S.CashPurchasing = {
 
   // ── Vendor purchasing scorecard (shares the colgroup with the category table) ─
   vendorCard(rows) {
-    const head = '<th>Vendor</th><th>Orders</th><th>Spend 90d</th><th>Avg Order</th><th>Terms</th><th>To Par</th>';
+    const head = '<th>Vendor</th><th>Orders</th><th>Spend 90d</th><th>Avg Order</th><th>Terms</th><th>To Par (now)</th>';
     const body = rows.length
       ? rows.map(r => {
           const last = r.lastOrder ? '<div style="font-size:10px;color:var(--t4);margin-top:2px;">Last order ' + this.fmtDay(r.lastOrder) + '</div>' : '';
@@ -178,10 +178,10 @@ S.CashPurchasing = {
             + '<td data-label="Spend 90d" class="val">' + (r.spend > 0 ? App.fmtCurrency(r.spend) : '-') + '</td>'
             + '<td data-label="Avg Order" class="val">' + (r.avg > 0 ? App.fmtCurrency(r.avg) : '-') + '</td>'
             + '<td data-label="Terms">' + terms + '</td>'
-            + '<td data-label="To Par" class="num"' + (r.toPar > 0 ? ' style="color:var(--gold);font-weight:600;"' : '') + '>' + (r.toPar > 0 ? App.fmtCurrency(r.toPar) : '-') + '</td>'
+            + '<td data-label="To Par (now)" class="num"' + (r.toPar > 0 ? ' style="color:var(--gold);font-weight:600;"' : '') + '>' + (r.toPar > 0 ? App.fmtCurrency(r.toPar) : '-') + '</td>'
             + '</tr>';
         }).join('')
-      : '<tr><td colspan="6" style="color:var(--t3);">No deliveries logged yet. Receive a delivery and your vendor purchasing fills in.</td></tr>';
+      : '<tr><td colspan="6" style="color:var(--t3);">No deliveries in the last 90 days. Receive a delivery and your vendor purchasing fills in.</td></tr>';
     return this.fixedTable(head, body);
   }
 };

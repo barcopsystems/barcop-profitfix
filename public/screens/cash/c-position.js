@@ -5,19 +5,19 @@
    in the account is actually free to spend RIGHT NOW. A point-in-time snapshot,
    not a forecast (that is the Forecast page). Your balance, minus the money that
    isn't yours (the sales tax you collected and owe since your last filing, plus
-   tips you are holding), minus the reserve you should keep. The Safe to Spend
-   card shows the whole subtraction so you can see where every dollar goes.
-   Reads CashEngine. The config (tax rate, filing frequency, reserve) is light and
-   kept on this device. */
+   any outstanding gift cards), minus the reserve you should keep. The Safe to
+   Spend card shows the whole subtraction so you can see where every dollar goes.
+   Reads CashEngine. Tax rate and filing frequency are set in Business Profile;
+   the reserve target and gift card balance are set here on this device. */
 
 S.CashPosition = {
   showHowTo() {
     App.showHelpModal('How Cash Position Works', [
       { p: ['The money in your account is not all yours to spend, and Cash Position is a snapshot of how much actually is, as of right now. Some of your balance is tax you collected and owe, and some should be a reserve so a slow stretch does not end you. This carves both out and shows what is truly free: your Safe to Spend.'] },
       { h: 'A Snapshot, Not A Forecast', p: ['Your cash on hand changes every day, so this is a point-in-time read: enter your balance now and it tells you what is safe to move on today. Check it again whenever you need the number. The thirteen-week look ahead lives on the Forecast page.'] },
-      { h: 'Money That Isn\'t Yours', p: ['When a guest pays, the sales tax in that check was never your money, it is the state\'s, and you hold it until you remit. How often you file matters: a quarterly filer is sitting on up to three months of collected tax at once, a much bigger pile than a monthly filer who just remitted. Set your rate and how you file, and Bar Cop tracks the tax you have collected since your last filing, plus any tips you are holding.'] },
+      { h: 'Money That Isn\'t Yours', p: ['When a guest pays, the sales tax in that check was never your money, it is the state\'s, and you hold it until you remit. How often you file matters: a quarterly filer is sitting on up to three months of collected tax at once, a much bigger pile than a monthly filer who just remitted. Your sales tax rate and how you file are set once in Business Profile; Cash Position reads them and tracks the tax you have collected since your last filing. Outstanding gift cards count too: that is cash you already took in with product still owed, so enter the balance here and Bar Cop carves it out alongside the tax.'] },
       { h: 'Your Reserve', p: ['A healthy bar keeps a cushion, enough to cover its fixed bills through a slow stretch with no sales. Set how many weeks you want to hold and Bar Cop sizes the target off your recurring overhead, shows where you stand, and what is left over as truly free cash.'] },
-      { h: 'Safe To Spend', p: ['Your balance, minus the tax and tips you owe, minus your reserve target. That is the money you can actually move on without putting the business at risk. If it is negative, you are spending money that is already spoken for.'] }
+      { h: 'Safe To Spend', p: ['Your balance, minus the tax and gift cards you owe, minus your reserve target. That is the money you can actually move on without putting the business at risk. If it is negative, you are spending money that is already spoken for.'] }
     ]);
   },
 
@@ -91,7 +91,7 @@ S.CashPosition = {
       +   eq('Safe to Spend', App.fmtCurrency(p.safe), { big: true, col: safeCol })
       + '</div>'
       + (p.safe < 0
-          ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--red);">You are spending spoken-for money.</strong> Your balance is already claimed by tax, tips, and your reserve. Free trapped cash or hold any spend until this is back above zero.</div>'
+          ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--red);">You are spending spoken-for money.</strong> Your balance is already claimed by tax, gift cards, and your reserve. Free trapped cash or hold any spend until this is back above zero.</div>'
           : '')
       + '</div>';
   },
@@ -108,7 +108,6 @@ S.CashPosition = {
           ? row('Sales tax collected', sa.salesTax, 'Tax on your ' + sa.periodLabel + ' sales (' + App.fmtCurrency(sa.sales) + '), owed at your next remittance', true)
           : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Set your sales tax rate above and Bar Cop tracks the tax you have collected and owe since your last filing.</div>')
       + (CashEngine.payrollBurden() > 0 ? row('Payroll tax', sa.payrollTax, 'Estimated on ' + App.fmtCurrency(sa.wages) + ' in wages ' + sa.periodLabel, true) : '')
-      + (sa.tipsOwed > 0 ? row('Tips held', sa.tipsOwed, 'Pooled tips not yet distributed', true) : '')
       + (sa.giftCards > 0 ? row('Gift cards outstanding', sa.giftCards, 'Cash you collected, product still owed', true) : '')
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 2px;">'
       +   '<div style="font-size:13px;font-weight:700;color:var(--t1);">Total set aside</div>'

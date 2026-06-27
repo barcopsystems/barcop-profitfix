@@ -24,11 +24,12 @@ S.CashForecast = {
   showHowTo() {
     App.showHelpModal('How the Survival Forecast Works', [
       { p: ['This is the thirteen-week cash forecast, a full quarter of money in against money out. It is the tool that keeps a profitable bar from running out of cash on the wrong week, and almost nobody runs it. Bar Cop runs it for you off data you already keep.'] },
-      { h: 'What Is In It', p: ['Cash in is your projected sales plus any event balances coming due. Cash out is your payroll from the schedule, your purchases, and every bill due that week, including the recurring ones projected forward. Enter your cash on hand and each week shows a running balance, so you see your real cushion and exactly which week runs thin.'] },
+      { h: 'What Is In It', p: ['Cash in is your projected sales plus any event balances coming due. Cash out is your payroll from the schedule, your purchases, and every bill due that week, including the recurring ones projected forward. Enter your cash on hand and each week shows a running balance, so you see your real cushion and exactly which week runs thin. Past the weeks Bar Cop has real numbers for, it repeats your recent actual weeks forward so the quarter stays filled in instead of going flat.'] },
+      { h: 'Your Credit Line As Backstop', p: ['If you keep a line of credit or a card you would lean on in a thin week, enter it next to your bank balance. Bar Cop counts it as your backstop, so a week that dips below zero reads as covered by credit, not a breach, as long as the line holds. The runway then means the weeks until you are truly out: your cash drained and the credit line maxed.'] },
       { h: 'Event Money Coming In', p: ['Booked events put real money on the calendar. The Event Money Coming In card lists each booked event by its date with its total, the deposit you already hold, and the balance still to collect, already counted in the cash-in above. Deposits in hand are money you owe service for, so they are never counted as cash to spend.'] },
-      { h: 'The Low Point And Runway', p: ['The low-point week is the tightest your account gets across the quarter, the one to plan around. Runway is how many weeks your cash covers before it would go negative. A long runway means you can absorb a slow stretch; a short one is your cue to free trapped cash and tighten terms now.'] },
-      { h: 'Stress Test And Can I Afford It', p: ['Slide sales down for a slow season and watch which week cracks. Or drop in a what-if, a second bartender, an equipment buy, an owner draw, and see the runway move and whether you can carry it. Small moves made early beat a scramble on a Friday.'] },
-      { h: 'Take It To The Bank', p: ['Export PDF gives you a clean thirteen-week cash flow to hand a lender for a line of credit. A bar that walks in with a real forecast gets a different conversation than one that does not.'] }
+      { h: 'The Low Point And Runway', p: ['The low-point week is the tightest your account gets across the quarter, the one to plan around. Runway is how many weeks your cash, plus any credit line, covers before you are truly out. A long runway means you can absorb a slow stretch; a short one is your cue to free trapped cash and tighten terms now.'] },
+      { h: 'Stress Test And Can I Afford It', p: ['Slide sales down for a slow season and watch which week cracks. Or drop in a what-if, a second bartender, an equipment buy, an owner draw, and see the runway move. The verdict reads three ways: you can carry it on cash, you can carry it but only by leaning on your credit line (amber, you would be borrowing to do it), or it breaks you even with the line. Small moves made early beat a scramble on a Friday.'] },
+      { h: 'Take It To The Bank', p: ['Export for Lender gives you a clean thirteen-week cash flow to hand a bank for a line of credit. A bar that walks in with a real forecast gets a different conversation than one that does not.'] }
     ]);
   },
 
@@ -290,7 +291,7 @@ S.CashForecast = {
     this.container.onclick = ev => {
       if (ev.target.closest('#cf-save') || ev.target.closest('#cf-sc-run')) return;
       if (ev.target.closest('#cf-sc-clear')) { this._scAmt = null; this.draw(); return; }
-      if (ev.target.closest('#cf-export')) { App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' }); return; }
+      if (ev.target.closest('#cf-export')) { this._exportLender(); return; }
       const adj = ev.target.closest('.cf-adj');
       if (adj) { this._salesAdj = parseInt(adj.dataset.adj, 10) || 0; this.draw(); return; }
       const mode = ev.target.closest('.cf-sc-mode');
@@ -298,5 +299,22 @@ S.CashForecast = {
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
+  },
+
+  // Export-acknowledgment gate (once per visit) before the lender forecast
+  // download. A 13-week pro-forma handed to a bank is high-stakes, so it routes
+  // through the same gate as Payroll and Books. See [[legal-protection]].
+  async _exportLender() {
+    if (!this._cfAckGiven) {
+      const ok = await App.confirmExport({
+        title: 'Before You Export for a Lender',
+        message: 'This is a thirteen-week cash flow projection built from the numbers you have logged in Bar Cop. It is a forecast, not a guarantee or an audited financial statement, and your actual results will vary. Look it over before you hand it to a lender.',
+        confirmText: 'I Understand, Continue',
+        cancelText: 'Cancel'
+      });
+      if (!ok) return;
+      this._cfAckGiven = true;
+    }
+    App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' });
   }
 };

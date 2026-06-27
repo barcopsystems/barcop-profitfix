@@ -37,7 +37,7 @@ S.CashTrapped = {
     const unit = App.unitAbbr(App.productUnit(it.p));
     const ohNum = Math.round(it.oh * 10) / 10;
     const ohTxt = ohNum + (unit ? ' ' + esc(unit) : '')
-      + (it.kind === 'over' && it.par != null ? ' <span style="color:var(--t4);">/ par ' + it.par + '</span>' : '');
+      + (it.kind === 'over' && it.par != null ? ' <span style="color:var(--t4);">/ par ' + (Math.round(it.par * 10) / 10) + '</span>' : '');
     return '<tr>'
       + '<td data-label="Product"><span style="color:var(--t1);">' + esc(it.name) + '</span></td>'
       + '<td data-label="Category">' + esc(it.p.category || '-') + '</td>'

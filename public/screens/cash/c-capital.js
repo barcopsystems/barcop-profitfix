@@ -14,7 +14,7 @@ S.CashCapital = {
     App.showHelpModal('How Capital Efficiency Works', [
       { p: ['Every dollar of inventory on your shelf is cash you spent that has not come back yet. Capital Efficiency shows how hard that cash is working, category by category, so you can tell what earns its shelf and what just sits there financing itself.'] },
       { h: 'Turns', p: ['Turns is how many times a year you cycle the cash in a category. If you hold $4,000 of liquor and sell through $32,000 of it a year, that capital turned eight times. High turns means the cash keeps coming back to work again; low turns means it is parked.'] },
-      { h: 'The Verdict', p: ['Bar Cop weighs each category\'s turns against your recent bar and food margins and calls it: earns its shelf, fair, or lazy capital. Lazy capital is a category that ties up cash and barely moves, money you could free by cutting the par and running it down.'] },
+      { h: 'The Verdict', p: ['Bar Cop weighs each category\'s turns against your recent bar and food margins and calls it: earns its shelf, fair, or lazy capital. That blend of how often the cash turns and the margin it earns each turn is the real return a dollar makes on its shelf. Lazy capital is a category that ties up cash and barely moves, money you could free by cutting the par and running it down.'] },
       { h: 'The Cash Conversion Cycle', p: ['How many days your cash is locked up: the days product sits on your shelf, minus the days you take to pay your vendors. The shorter it is, the less cash is trapped in the operating cycle. Order to par to cut the days product sits, and hold your vendor terms to stretch the days you pay, and the cycle, and the cash locked in it, shrinks.'] }
     ]);
   },

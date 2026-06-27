@@ -32,13 +32,15 @@ S.CashHelp = {
       { q: 'How does Bar Cop decide what is trapped?',
         a: 'Two ways, off your counts. Dead stock is product on the shelf that did not move at all between your last two counts, its full value is cash sitting still. Overstock is product you are holding well above its par, the cash tied up in the extra is money you did not need to spend yet. Bar Cop counts each product once so nothing double counts, and ranks them by the dollars you can free.' },
       { q: 'What do I actually do about it?',
-        a: 'Run the dogs down. Feature a dead bottle, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of what you use. The Free Up Cash step launches you straight into the dead stock list and Dynamic Pars where that work happens.' }
+        a: 'Run the dogs down. Feature a dead bottle, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of what you use. The Free up trapped cash step takes you straight to the dead stock list and your pars, where that work happens.' }
     ]},
     { t: 'Cash Flow', qa: [
       { q: 'How does the week-ahead read work?',
         a: 'Bar Cop lines up what is going out against what is coming in. Out is your bills due, the cash to reorder to par, and your scheduled labor. In is your projected sales. When a heavy day of cash out lands before the sales come in, that is a tight day, and seeing it on Sunday beats finding it on Friday when the delivery truck wants a check.' },
       { q: 'What is paying on terms about?',
-        a: 'If a vendor gives you net 30, paying on day 5 hands them your cash three weeks early for nothing. Hold it to the due date and that money stays in your account working for you. The flip side is an early-pay discount: if a vendor knocks two percent off for paying in ten days, that usually beats what the cash is worth sitting idle, so take it. Bar Cop flags both once your vendor terms are set.' }
+        a: 'If a vendor gives you net 30, paying on day 5 hands them your cash three weeks early for nothing. Hold it to the due date and that money stays in your account working for you. The flip side is an early-pay discount: if a vendor knocks two percent off for paying in ten days, that usually beats what the cash is worth sitting idle, so take it. Bar Cop flags both once your vendor terms are set.' },
+      { q: 'Why isn\'t my bank balance my spending money?',
+        a: 'Part of what is in your account was never yours. The sales tax you collected belongs to the state until you remit it, and outstanding gift cards are cash you already took in with product still owed. Cash Position carves both out, then subtracts the reserve you want to hold through a slow stretch, and what is left is your Safe to Spend, the money you can actually move on without putting the business at risk. Your sales tax rate and how often you file are set once in Business Profile; Cash Position reads them and tracks what you have collected since your last filing.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'How is Cash different from Books?',
