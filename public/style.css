@@ -596,9 +596,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    full-bleed) divider. */
 .audit-htbl{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
 .audit-htbl thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.audit-htbl thead th:first-child{padding-left:16px;}
+.audit-htbl thead th:last-child{padding-right:16px;}
 .audit-htbl tbody td{background:#0D181E;padding:9px 14px;color:var(--t2);vertical-align:middle;white-space:nowrap;}
-.audit-htbl tbody td:first-child{border-radius:6px 0 0 6px;}
-.audit-htbl tbody td:last-child{border-radius:0 6px 6px 0;}
+.audit-htbl tbody td:first-child{border-radius:6px 0 0 6px;padding-left:16px;}
+.audit-htbl tbody td:last-child{border-radius:0 6px 6px 0;padding-right:16px;}
+/* Slightly smaller action buttons inside the pill rows. */
+.audit-htbl tbody .btn{padding:4px 9px;font-size:9px;}
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
 /* Fix This buttons hover like ghost buttons (text to white). Inline base color/border need !important to lose to the hover. Shared across the Profit/Revenue/Cash audits. */
