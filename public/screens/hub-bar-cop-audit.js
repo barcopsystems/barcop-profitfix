@@ -48,6 +48,9 @@ S.HubBarCopAudit = {
   // S.Hub._enter to load the operator into the correct system sidebar.
   _navTo(screen) {
     if (!screen) return;
+    // Permits is a Hub-owned screen (no module prefix), so route it directly
+    // rather than letting the prefix fallback treat it as a Profit screen.
+    if (screen === 'permits' && window.S && S.HubPermits) { S.HubPermits.open(); return; }
     const mod = screen.startsWith('ic-') ? 'inventory'
               : screen.startsWith('lc-') ? 'labor'
               : screen.startsWith('sc-') ? 'shift'
@@ -494,7 +497,8 @@ S.HubBarCopAudit = {
       out.push({
         label:    (c.cert_type || c.cert_name || c.name || 'Certification') + (expired ? ' expired ' + n + ' day' + (n === 1 ? '' : 's') + ' ago' : ' expiring in ' + n + ' day' + (n === 1 ? '' : 's')),
         detail:   (c.staff_name ? 'For ' + c.staff_name + '. ' : '') + (expired ? 'Out of compliance now. Renew before this person works again.' : 'Renew before lapse to stay compliant.'),
-        severity: (expired || left <= 7) ? 'critical' : 'warn'
+        severity: (expired || left <= 7) ? 'critical' : 'warn',
+        screen:   'lc-staff-roster'
       });
     });
 
@@ -507,7 +511,8 @@ S.HubBarCopAudit = {
       out.push({
         label:    (p.name || 'Permit') + (expired ? ' expired ' + n + ' day' + (n === 1 ? '' : 's') + ' ago' : ' renewal in ' + n + ' day' + (n === 1 ? '' : 's')),
         detail:   (p.type ? p.type + '. ' : '') + (p.cost ? 'Last cost $' + p.cost + '. ' : '') + (expired ? 'Out of compliance. Renew now.' : 'Operation-level compliance item.'),
-        severity: (expired || left <= 14) ? 'critical' : 'warn'
+        severity: (expired || left <= 14) ? 'critical' : 'warn',
+        screen:   'permits'
       });
     });
 
@@ -893,16 +898,31 @@ S.HubBarCopAudit = {
         const naC = c.na || c.pct == null;
         return { label: c.label, extra: c.extra, value: naC ? 'N/A' : String(c.pct), valColor: naC ? 'var(--t3)' : App.scoreColor(c.pct) };
       }));
+      // One-line finding generated from the checks: how many are at full marks
+      // and the weakest ones, so each section reads like the recovery audits.
+      let finding = '';
+      if (!isNA) {
+        const scored = detail.filter(c => !(c.na || c.pct == null));
+        if (scored.length >= 2) {
+          const full = scored.filter(c => c.pct >= 100).length;
+          const weak = scored.filter(c => c.pct < 100).sort((a, b) => a.pct - b.pct).slice(0, 2);
+          const parts = [full + ' of ' + scored.length + ' checks at full marks.'];
+          if (weak.length) parts.push('Weakest: ' + weak.map(c => c.label.toLowerCase() + ' (' + c.pct + ')').join(' and ') + '.');
+          finding = parts.join(' ');
+        }
+      }
       const scoreBlock = isNA
         ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
         : AuditUI.scoreRing(sc);
+      const divider = '<div style="border-top:1px solid var(--b2);margin:14px 0;"></div>';
       return '<div class="card" style="margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
         +   scoreBlock
         + '</div>'
-        + (breakdown ? '<div style="border-top:1px solid var(--b2);margin:14px 0;"></div>' + breakdown : '')
+        + (breakdown ? divider + breakdown : '')
+        + (finding ? divider + AuditUI.findingsBlock([finding]) : '')
         + '</div>';
     };
 

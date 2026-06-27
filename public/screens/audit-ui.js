@@ -126,26 +126,20 @@ const AuditUI = {
     }
     const sections = latest.sections || {};
     const names = sectionNames || Object.keys(sections);
+    // Section breakdown as the Hub card-row pills: name left, bar + score + delta
+    // right, each its own rounded #0D181E pill with a 6px gap.
     const secRows = names.map((name, i) => {
-      const bb = i === names.length - 1 ? '' : 'border-bottom:1px solid var(--row-div);';
       const score = sections[name];
-      if (score == null) {
-        return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
-          + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
-          + '<div style="width:80px;flex-shrink:0;"></div>'
-          + '<div style="width:42px;text-align:right;flex-shrink:0;color:var(--t3);font-weight:700;">N/A</div>'
-          + '<div style="width:48px;flex-shrink:0;"></div>'
-          + '</div>';
-      }
+      const na   = score == null;
+      const col  = na ? 'var(--t3)' : App.scoreColor(score);
+      const bar  = na ? 0 : Math.min(100, Math.max(0, score));
       const ps   = prev && prev.sections ? prev.sections[name] : null;
-      const diff = ps != null ? score - ps : null;
-      const bar  = Math.min(100, Math.max(0, score));
-      const col  = App.scoreColor(score);
-      return '<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:#0D181E;' + bb + '">'
-        + '<div class="val" style="flex:1;min-width:0;">' + esc(name) + '</div>'
-        + '<div style="width:80px;flex-shrink:0;background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>'
-        + '<div style="width:42px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + score + '</div>'
-        + '<div style="width:48px;text-align:right;flex-shrink:0;color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null?(diff>=0?'+':'')+diff:'') + '</div>'
+      const diff = (!na && ps != null) ? score - ps : null;
+      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
+        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);">' + esc(name) + '</div>'
+        + (na ? '' : '<div style="width:70px;flex-shrink:0;background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>')
+        + '<div style="width:34px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (na ? 'N/A' : score) + '</div>'
+        + '<div style="width:32px;text-align:right;flex-shrink:0;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff:'') + '</div>'
         + '</div>';
     }).join('');
     return '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
@@ -159,7 +153,7 @@ const AuditUI = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (naO ? 'N/A' : latest.overall_score) + '</div>'
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
-      + '<div style="margin:16px -20px -20px;border-top:1px solid var(--row-div);">' + secRows + '</div>'
+      + '<div style="margin-top:16px;">' + secRows + '</div>'
       + '</div>';
   },
 
@@ -168,21 +162,23 @@ const AuditUI = {
   // (the Bar Cop Audit, which reads from logged data and has no upload tier).
   historyCard(audits, listKey, pfx, opts) {
     opts = opts || {};
+    // Each past audit as a Hub card-row pill: date left, then grade, change, and
+    // score with a View button on the right.
     const rows = audits.slice(0, App.listLimit('core', listKey)).map((a,i) => {
       const p    = audits[i+1];
       const naA  = a.overall_score == null;
+      const col  = naA ? 'var(--t3)' : App.scoreColor(a.overall_score);
       const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
-      return '<tr><td><div class="val">' + (a.date||'').slice(0,10) + '</div></td>'
-        + (naA
-            ? '<td style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--t3);">N/A</td>'
-            : '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + App.scoreColor(a.overall_score) + ';">' + a.overall_score + '</td>')
-        + '<td style="color:' + (diff==null?'var(--t3)':diff>=0?'var(--green)':'var(--red)') + ';">' + (diff!=null?(diff>=0?'+':'')+diff+' pts':'') + '</td>'
-        + (opts.hideGrade ? '' : '<td>' + AuditUI.tierChip(a.grade) + '</td>')
-        + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '">View</button></td></tr>';
+      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
+        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t2);">' + (a.date||'').slice(0,10) + '</div>'
+        + (opts.hideGrade ? '' : '<div style="flex-shrink:0;">' + AuditUI.tierChip(a.grade) + '</div>')
+        + '<div style="width:42px;text-align:right;flex-shrink:0;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</div>'
+        + '<div style="width:40px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</div>'
+        + '<button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '" style="flex-shrink:0;">View</button>'
+        + '</div>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Score</th><th>Change</th>' + (opts.hideGrade ? '' : '<th>Data Quality</th>') + '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<div class="card">' + rows + '</div>'
       + App.showOlderBar('core', listKey, audits, false);
   },
 
@@ -190,16 +186,21 @@ const AuditUI = {
     return '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);">No audits yet</div></div></div>';
   },
 
-  // ── Full view: findings text under a section ───────────────────────────────
-  findings(d, num) {
-    if (!d) return '';
-    const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
-    const texts = fields.map(f => d[f]).filter(v => v && String(v).trim());
+  // ── Full view: findings text under a section (the divider above provides the
+  //    spacing). Shared block so the recovery audits and the Bar Cop audit read
+  //    the same. ───────────────────────────────────────────────────────────────
+  findingsBlock(texts) {
+    texts = (texts || []).filter(v => v && String(v).trim());
     if (!texts.length) return '';
-    return '<div style="margin-top:14px;">'
+    return '<div>'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Findings</div>'
       + texts.map(t => '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
       + '</div>';
+  },
+  findings(d, num) {
+    if (!d) return '';
+    const fields = ['S'+num+'_EVIDENCE', 'S'+num+'_GAP', 'S'+num+'_TOOL', 'S'+num+'_NARRATIVE', 'S'+num+'_FINDING'];
+    return AuditUI.findingsBlock(fields.map(f => d[f]));
   },
 
   // ── Full view: one scored section (metric readout + signals + findings) ────
