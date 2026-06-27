@@ -5,11 +5,17 @@
    (and a demo visitor sees The Anchor's honest arc instead of a finished number
    with no story). Four phases (Diagnose day one, Build weeks 1-4, Measure around
    day 30, Live week 8+), a "you are here" read from the operator's own data, and
-   a cost-trend chart with the markers that show exactly when the number turns
-   on. Opened as a sub-view (pushView) from the Fix System landing. SVG uses
-   literal hex per the SVG-fill rule. */
+   a recovery-number chart that climbs from zero with the markers that show
+   exactly when the number turns on. Opened as a sub-view (pushView) from the Fix
+   System landing. SVG uses literal hex per the SVG-fill rule.
 
-const RT_GOLD = '#DBAB46';
+   Profit and Revenue read the shared Recovery engine + fix_log. Cash does not use
+   either: its recovered-dollars number is Cash Freed off count history
+   (CashEngine.trappedSeries/freed), so the cash branch builds its own data. Every
+   timeline wears a green accent: the recovered-dollars line is a win, and gold
+   stays reserved for the one money hero on the dashboards. */
+
+const RT_GREEN = '#518A79';   // = --green; the recovery/win line on every timeline
 const RT_RED  = '#C03828';
 const RT_GRID = '#16252E';
 const RT_STEEL = '#496477';
@@ -22,6 +28,11 @@ S.RecoveryTimeline = {
     { key: 'measure',  name: 'Measure',  when: 'Around day 30', desc: 'Enough data. Your first recovery number shows, up or down, and the Bar Cop Audit unlocks.' },
     { key: 'live',     name: 'Live',     when: 'Week 8 and on', desc: 'The number matures and tracks every week. A slip re-surfaces the system so you catch it.' }
   ],
+
+  // Accent per module: gold for the margin/top-line recoveries, green for cash
+  // (Cash Freed reads as a win, and gold stays reserved for the one money hero).
+  ACCENT_GOLD:  { bg: 'var(--gold-tint)', bord: 'var(--gold-tint-bord)', dot: 'var(--gold)',  when: 'var(--gold)',  line: RT_GOLD },
+  ACCENT_GREEN: { bg: 'var(--green-bg)',  bord: 'rgba(81,138,121,0.45)', dot: 'var(--green)', when: 'var(--green)', line: RT_GREEN },
 
   startDate(moduleKey) {
     const log = (App.data && Array.isArray(App.data.fix_log) ? App.data.fix_log : [])
@@ -41,28 +52,43 @@ S.RecoveryTimeline = {
   render(container, moduleKey) {
     moduleKey = moduleKey || 'profit';
     this.container = container;
+    const cash = moduleKey === 'cash';
+    const accent = cash ? this.ACCENT_GREEN : this.ACCENT_GOLD;
+    const info = cash ? this._cashInfo() : this._stdInfo(moduleKey);
+
+    const strip = this._strip(info.phase, accent);
+    const hereCard = '<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div class="card-title">You Are Here</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + info.here + '</div></div>';
+    const chart = this._chartCard(info, accent);
+
+    container.innerHTML = '<div class="screen">' + strip + hereCard + chart + '</div>';
+  },
+
+  // ── Phase strip — the active phase wears the accent (circle, tint, label) ────
+  _strip(phase, accent) {
+    return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">'
+      + this.PHASES.map((p, i) => {
+        const on = p.key === phase;
+        return '<div style="flex:1 1 150px;min-width:150px;background:' + (on ? accent.bg : 'var(--surface)') + ';border:1px solid ' + (on ? accent.bord : 'var(--b-edge)') + ';border-radius:10px;padding:13px 15px;">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><span style="width:20px;height:20px;border-radius:50%;background:' + (on ? accent.dot : 'var(--input)') + ';color:' + (on ? 'var(--bg)' : 'var(--t3)') + ';font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
+          + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + p.name + '</span></div>'
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + (on ? accent.when : 'var(--t3)') + ';margin-bottom:6px;">' + p.when + '</div>'
+          + '<div style="font-size:11px;color:var(--t2);line-height:1.5;">' + p.desc + '</div></div>';
+      }).join('') + '</div>';
+  },
+
+  // ── Profit / Revenue / Traffic: phase + here + series off the Recovery engine ─
+  _stdInfo(moduleKey) {
     const B = (window.Recovery && Recovery.BASELINE_WEEKS) || 3;
     const weeks = this.weeksData();
     const start = this.startDate(moduleKey);
     const opWeeks = start ? weeks.filter(w => w.period_end >= start).length : 0;
     const today = App.todayLocal();
 
-    // Current phase from the operator's own data.
     let phase = 'diagnose';
     if (start) phase = opWeeks < B + 1 ? 'build' : opWeeks < 8 ? 'measure' : 'live';
 
-    // ── Phase strip ──
-    const strip = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">'
-      + this.PHASES.map((p, i) => {
-        const on = p.key === phase;
-        return '<div style="flex:1 1 150px;min-width:150px;background:' + (on ? 'var(--gold-tint)' : 'var(--surface)') + ';border:1px solid ' + (on ? 'var(--gold-tint-bord)' : 'var(--b-edge)') + ';border-radius:10px;padding:13px 15px;">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><span style="width:20px;height:20px;border-radius:50%;background:' + (on ? 'var(--gold)' : 'var(--input)') + ';color:' + (on ? 'var(--bg)' : 'var(--t3)') + ';font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
-          + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + p.name + '</span></div>'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + (on ? 'var(--gold)' : 'var(--t3)') + ';margin-bottom:6px;">' + p.when + '</div>'
-          + '<div style="font-size:11px;color:var(--t2);line-height:1.5;">' + p.desc + '</div></div>';
-      }).join('') + '</div>';
-
-    // ── You are here ──
     let here;
     if (!start) {
       here = 'You have not started a system yet. Do your first tracked action, a count, a drawer count, a logged comp, and your timeline begins on that day.';
@@ -73,15 +99,40 @@ S.RecoveryTimeline = {
         : 'Your recovery number is live and tracked every week.';
       here = 'You are in the ' + this.PHASES.find(p => p.key === phase).name + ' phase, about ' + wks + ' week' + (wks === 1 ? '' : 's') + ' in. ' + next;
     }
-    const hereCard = '<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div class="card-title">You Are Here</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + here + '</div></div>';
 
-    // ── Recovery-number journey chart ──
-    const chart = this.chartCard(start, moduleKey);
+    return {
+      phase, here, start,
+      series: this.recoverySeries(moduleKey),
+      chartTitle: 'Your Recovery Number Over Time',
+      chartEmpty: 'No recovery number yet. You are building your baseline. Around day 30, once you have a few solid weeks of real data, your first number lands here, up or down, and it builds from there on your actual numbers.'
+    };
+  },
 
-    container.innerHTML = '<div class="screen">'
-      + strip + hereCard + chart + '</div>';
+  // ── Cash: phase + here + series off Cash Freed (count history) ────────────────
+  _cashInfo() {
+    const cs = this.cashSeries();
+    const measured = cs.measured;   // trapped points (= counts minus one)
+
+    let phase = 'diagnose';
+    if (measured >= 1) phase = measured < 2 ? 'build' : measured < 8 ? 'measure' : 'live';
+
+    let here;
+    if (measured === 0) {
+      here = 'You have not built a trapped-cash baseline yet. Take your first couple of inventory counts and your Cash Freed timeline begins.';
+    } else if (phase === 'build') {
+      here = 'Bar Cop is building your trapped-cash baseline from your first counts. Your Cash Freed number turns on once it has a couple of counts to measure against.';
+    } else if (phase === 'measure') {
+      here = 'Your Cash Freed number is landing now, the drop in trapped cash from your own first weeks. It firms up over the next few counts.';
+    } else {
+      here = 'Your Cash Freed number is live and tracks every count, the real reduction in cash tied up on your shelves.';
+    }
+
+    return {
+      phase, here, start: cs.start,
+      series: { points: cs.points, firstMeasure: cs.firstMeasure },
+      chartTitle: 'Your Cash Freed Over Time',
+      chartEmpty: 'No cash freed yet. You are building your baseline from your counts. Once Bar Cop has a couple of solid counts, your Cash Freed number lands here and climbs from zero as you run trapped cash down.'
+    };
   },
 
   // The cumulative recovery number, week by week, for a module: each measured
@@ -118,15 +169,33 @@ S.RecoveryTimeline = {
     return { points: points, firstMeasure: dates[0] || null };
   },
 
-  chartCard(start, moduleKey) {
-    const title = '<div class="sh" style="margin:6px 0 10px;">Your Recovery Number Over Time</div>';
-    const series = this.recoverySeries(moduleKey);
+  // Cash Freed over the count history: trapped cash falling from your own first
+  // weeks' baseline reads as freed dollars climbing from zero. Mirrors
+  // CashEngine.freed() exactly so the chart's "now" ties to the headline number.
+  cashSeries() {
+    if (!window.CashEngine || !CashEngine.trappedSeries) return { points: [], firstMeasure: null, start: null, measured: 0 };
+    const series = CashEngine.trappedSeries();   // [{ date, trapped }]
+    const measured = series.length;
+    if (measured < 2) return { points: [], firstMeasure: null, start: series[0] ? series[0].date : null, measured };
+    const baseN = Math.min(3, series.length - 1);
+    const baseline = series.slice(0, baseN).reduce((s, p) => s + p.trapped, 0) / baseN;
+    const points = [];
+    for (let i = baseN; i < series.length; i++) {
+      points.push({ d: series[i].date, v: Math.max(0, baseline - series[i].trapped) });
+    }
+    return { points: points, firstMeasure: series[baseN].date, start: series[0].date, measured };
+  },
+
+  _chartCard(info, accent) {
+    const title = '<div class="sh" style="margin:6px 0 10px;">' + info.chartTitle + '</div>';
+    const series = info.series;
     if (!series.points.length) {
-      return title + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No recovery number yet. You are building your baseline. Around day 30, once you have a few solid weeks of real data, your first number lands here, up or down, and it builds from there on your actual numbers.</div></div>';
+      return title + '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">' + info.chartEmpty + '</div></div>';
     }
     // $0 through setup and the baseline; the number turns on at the first measured
     // week. Anchor at the start so the climb reads from zero.
     const firstMeasure = series.firstMeasure;
+    const start = info.start;
     const pts = [{ d: start || firstMeasure, v: 0 }].concat(series.points);
     const now = pts[pts.length - 1];
 
@@ -152,8 +221,8 @@ S.RecoveryTimeline = {
     const zY = y(0).toFixed(1);
     const zeroLine = '<line x1="' + padL + '" y1="' + zY + '" x2="' + (W - padR) + '" y2="' + zY + '" stroke="' + RT_GRID + '" stroke-width="1"/>'
       + '<text x="' + (padL - 6) + '" y="' + (parseFloat(zY) + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + RT_DIM + '">$0</text>';
-    // Recovery line — gold when ending positive, red when net below the start.
-    const col = now.v >= 0 ? RT_GOLD : RT_RED;
+    // Recovery line — accent when ending positive, red when net below the start.
+    const col = now.v >= 0 ? accent.line : RT_RED;
     const path = pts.map((p, i) => (i ? 'L' : 'M') + x(p.d).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
     const line = '<path d="' + path + '" fill="none" stroke="' + col + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
     // Now point + value.
