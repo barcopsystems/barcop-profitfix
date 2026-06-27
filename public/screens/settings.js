@@ -12,7 +12,7 @@ S.HubSettings = {
   // ServicePeriods and saves the sections actually present, so a subset renders
   // safely.
   _GROUPS: {
-    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'service'] },
+    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'tax', 'service'] },
     'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue'] }
   },
 
@@ -26,6 +26,7 @@ S.HubSettings = {
   render(container, group) {
     const allSecs = [
       { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
+      { id:'tax',     title:'Taxes & Payroll',           body:this.secTaxes(),         save:true },
       { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
       { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true }
@@ -73,6 +74,22 @@ S.HubSettings = {
       + '<div class="f" style="width:130px;"><label>Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
       + '</div>';
+  },
+
+  // Taxes & Payroll — the cross-section financial settings (sales tax rate, how
+  // you file, payroll burden). Entered once here; Cash, Books, and Events all
+  // read the same CashEngine keys. Stored on this device via CashEngine.
+  secTaxes() {
+    const rate   = (window.CashEngine && CashEngine.salesTaxRate)  ? CashEngine.salesTaxRate()  : 0;
+    const freq   = (window.CashEngine && CashEngine.taxFrequency)  ? CashEngine.taxFrequency()  : 'monthly';
+    const burden = (window.CashEngine && CashEngine.payrollBurden) ? CashEngine.payrollBurden() : 0;
+    const opt = (v, label) => '<option value="' + v + '"' + (freq === v ? ' selected' : '') + '>' + label + '</option>';
+    return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;"><label>Sales tax rate</label><div class="fw"><input class="suf" type="number" id="hs-tax" value="' + (rate || '') + '" step="0.01" placeholder="0"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="hs-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
+      + '<div class="f" style="width:150px;"><label>Payroll tax</label><div class="fw"><input class="suf" type="number" id="hs-burden" value="' + (burden || '') + '" step="0.1" placeholder="0"/><span class="suf">%</span></div></div>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Set these once. Cash, Books, and Events all read them to track the tax and payroll you owe.</div>';
   },
 
   // Service Periods — which dayparts the operator runs. Mounts the shared
@@ -141,6 +158,14 @@ S.HubSettings = {
       keys.push('settings');
       // Filling the profile here (not just via onboarding) checks off the setup step.
       if (s.bar_name && App.markSetupDone) App.markSetupDone('gs_profile');
+    } else if (which === 'tax') {
+      // Cross-section financial settings live on this device via CashEngine,
+      // not in App.data, so there are no keys to push (Promise.all([]) flashes Saved).
+      if (window.CashEngine) {
+        CashEngine.setSalesTaxRate(document.getElementById('hs-tax')?.value || '');
+        CashEngine.setTaxFrequency(document.getElementById('hs-freq')?.value || 'monthly');
+        CashEngine.setPayrollBurden(document.getElementById('hs-burden')?.value || '');
+      }
     } else if (which === 'service') {
       const all = this._spCtrl ? this._spCtrl.value() : [];
       const errEl = document.getElementById('hs-sp-err');
