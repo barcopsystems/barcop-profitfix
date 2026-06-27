@@ -129,7 +129,7 @@ S.CashPurchasing = {
   buyTrend(periods) {
     if (!periods || periods.length < 2) return '';
     const max = Math.max(1, ...periods.flatMap(p => [p.bought, p.used]));
-    const H = 46, BOUGHT = 'var(--steel)', USED = 'var(--t3)';
+    const H = 46, BOUGHT = 'var(--sel-active-bg)', USED = 'var(--t3)';
     const bar = (v, col) => '<div style="width:14px;height:' + (v > 0 ? Math.max(3, Math.round(v / max * H)) : 0) + 'px;background:' + col + ';border-radius:2px 2px 0 0;"></div>';
     const cols = periods.map(p =>
       '<div style="flex:1;min-width:0;text-align:center;">'
