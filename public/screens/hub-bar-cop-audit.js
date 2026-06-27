@@ -902,12 +902,12 @@ S.HubBarCopAudit = {
         ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
         : AuditUI.scoreRing(sc);
       return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
         +   '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
         +     '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
         +   scoreBlock
         + '</div>'
-        + breakdown
+        + (breakdown ? '<div style="border-top:1px solid var(--b2);margin:14px 0;"></div>' + breakdown : '')
         + '</div>';
     };
 
