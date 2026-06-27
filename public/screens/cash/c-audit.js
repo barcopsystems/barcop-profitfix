@@ -190,7 +190,7 @@ S.CashAudit = {
       date: App.todayLocal(),
       bar_name: App.data.settings.bar_name,
       overall_score: overall,
-      grade: '',
+      grade: 'Complete Cash Analysis',
       audit_period: 'As of ' + App.todayLocal(),
       audit_id: 'CA-' + (this.audits().length + 1),
       sections, action_items, cash_to_free: cashToFree, raw,
@@ -317,6 +317,9 @@ S.CashAudit = {
   viewAudit(idx) {
     const audit = this.audits()[idx];
     if (!audit) return;
+    // Badge for cohesion with the Bar Cop audit. Default it for older seeded
+    // audits that predate the grade so the badge always shows.
+    if (!audit.grade) audit.grade = 'Complete Cash Analysis';
     this.actions.innerHTML = '';
     const back = document.createElement('button'); back.className = 'btn btn-ghost btn-sm'; back.textContent = '← Back'; back.style.marginRight = '8px'; back.onclick = () => this.renderMain(); this.actions.appendChild(back);
     const pr = document.createElement('button'); pr.className = 'btn btn-ghost btn-sm'; pr.textContent = 'Print / Save PDF'; pr.onclick = () => this.exportPDF(audit); this.actions.appendChild(pr);
@@ -356,7 +359,6 @@ S.CashAudit = {
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.viewHero(audit, 'Cash Recovery Audit', 'ca')
       + this.cashStrip(audit)
-      + AuditUI.sectionScoreboard(audit, this.SECTION_NAMES, this.audits()[idx + 1])
       + AuditUI.actionsArea(audit, 'cash', 'ca')
       + sections
       + this.riskSection(audit)
