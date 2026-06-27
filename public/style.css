@@ -1066,7 +1066,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    the .row-list container-query approach so it compresses then stacks, never
    horizontal-scrolls through that cramped middle zone. */
 .rd-lines-wrap{container-type:inline-size;}
-@container (max-width:600px){
+@container (max-width:800px){
   .ing-tbl.rd-pill{border-spacing:0;display:block;width:100%;}
   .ing-tbl.rd-pill thead{display:none;}
   .ing-tbl.rd-pill tbody{display:block;width:100%;}
