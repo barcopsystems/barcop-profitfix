@@ -1339,6 +1339,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .rd-line.rd-flagged,.rd-flag-row.rd-flagged{background:transparent;}
   .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
   .ing-tbl tbody td.rd-flag::before{content:none;}
+  /* rd-pill trial: stack the line's actions cell on mobile so the reason text +
+     Flag + Delete read top-to-bottom instead of cramming into one row. */
+  .ing-tbl.rd-pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
+  .ing-tbl.rd-pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
 
   /* Category-grouped tables (table-layout:fixed) on mobile: drop the desktop
      fixed layout + min-width so they stack FULL WIDTH like every other data
