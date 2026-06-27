@@ -1437,7 +1437,7 @@ const App = {
     ] },
     'books': { title: 'How Month-End Books Works', sections: [
       { h: 'What this page is', p: ['Builds the month-end close: one Excel workbook plus a one-page owner summary PDF. It pulls every number together from what you already log, the accountant-grade deliverable behind the Books section.'] },
-      { h: 'How to use it', p: ['Pick the month to close. The income statement and a sales tax estimate read right on the page for that month and year to date, so you can look the numbers over before anything leaves. Click Generate File and the workbook adds inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, and labor cost. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
+      { h: 'How to use it', p: ['Pick the month to close. On the page you get that month\'s Snapshot, the income statement for the month and year to date, plus a Sales Tax card with the estimated tax you collected. Those are a quick on-screen read to eyeball before anything leaves; the worksheet your accountant works from is the Generate File download. Generate File builds the workbook, which adds inventory valuation, a cash reconciliation trail, a void and comp log, the Form 8027 tip worksheet, variance and shrinkage, labor cost, and the sales tax sheet. A December close also adds a year-end tax helper. Owner Summary gives you the one-page PDF.'] },
       { h: 'Before you file', p: ['Bar Cop pulls these from what you have logged. It is a software tool, not a CPA or tax preparer. Your accountant should look it over before you file anything or close the books.'] }
     ] },
     'year-end': { title: 'How the Annual Review Works', sections: [
@@ -1460,11 +1460,13 @@ const App = {
       { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
     ] },
     'expense-history': { title: 'How Expense History Works', sections: [
-      { h: 'What this page is', p: ['The full record of every operating expense you have logged, beyond the current and next month that live on Operating Expenses. The by-category breakdown sits on top, the dated log below.'] },
-      { h: 'Filter and export', p: ['The range chips, This Month, Last Month, Year to Date, Last 12 Months, or All Time, scope both the log and the category totals. Export PDF saves the full filtered list. You can still edit or delete any past entry right from its row.'] }
+      { h: 'What this page is', p: ['The full record of every operating expense you have logged. Operating Expenses only shows this month and next so the close stays focused; the long view back across the year lives here. The by-category breakdown sits on top, the dated log below.'] },
+      { h: 'One shared ledger', p: ['This is the same record as Operating Expenses, just the back catalog. An expense you edit or delete here changes that one record everywhere it shows, including the Month-End income statement and your year-to-date totals, so you fix a miskeyed bill once and it is right everywhere.'] },
+      { h: 'Filter and export', p: ['The range chips, This Month, Last Month, Year to Date, Last 12 Months, or All Time, scope both the log and the category totals. Export PDF saves the full filtered list. You can edit or delete any past entry right from its row.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
-      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, and the service periods you run. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
+      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, your taxes, and the service periods you run. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
+      { h: 'Taxes and payroll', p: ['Set your sales tax rate, how often you file (monthly or quarterly), and your payroll tax percentage once here. Cash, Books, and Events all read them, so you enter them in one place: the Month-End Sales Tax worksheet uses your rate, and Cash Position uses them to size the money you have collected but already owe.'] },
       { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] }
     ] },
     'settings-targets': { title: 'How Recovery Targets Work', sections: [
