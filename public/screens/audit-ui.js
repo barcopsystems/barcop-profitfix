@@ -240,14 +240,16 @@ const AuditUI = {
       ? AuditUI.scoreRing(score)
       : isSignals ? ''
         : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
+    const divider = '<div style="border-top:1px solid var(--b2);margin:14px 0;"></div>';
+    const findingsHtml = AuditUI.findings(d, num);
+    const body = metricsBlock + sigRows;
     return '<div class="card" style="margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;' + ((metricsBlock || sigRows) ? 'margin-bottom:14px;' : '') + '">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section ' + num + '</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + name + '</div></div>'
       + scoreBlock + '</div>'
-      + metricsBlock
-      + sigRows
-      + AuditUI.findings(d, num)
+      + (body ? divider + body : '')
+      + (findingsHtml ? divider + findingsHtml : '')
       + '</div>';
   },
 
@@ -255,7 +257,7 @@ const AuditUI = {
   //    hex per the SVG-fill rule). Used in every section header across the four
   //    audits so they read identically. ─────────────────────────────────────────
   scoreRing(score, size) {
-    size = size || 54;
+    size = size || 44;
     const hex = score >= 70 ? '#518A79' : score >= 50 ? '#9A5D34' : '#C03828';
     const sw = 4, r = (size - sw) / 2, c = size / 2;
     const circ = 2 * Math.PI * r;
