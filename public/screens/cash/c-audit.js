@@ -33,7 +33,7 @@ S.CashAudit = {
     const daysSince = latest && latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 7;
     const daysLeft = canRun ? 0 : 7 - daysSince;
-    const desc = 'A weekly read on your cash health: how hard the cash on your shelves works, how many days your money stays locked, whether the weeks ahead run tight, and if you are holding your vendor terms. It reads straight off your counts, orders, schedule, and bills, nothing to type.';
+    const desc = 'Generate a new audit every 7 days. A weekly read on your cash health.';
     const hasOpening = !!(window.CashEngine && CashEngine.position && CashEngine.position().hasOpening);
     const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).length;
     const sales  = ((App.shiftData && App.shiftData.sc_shifts) || []).length;
