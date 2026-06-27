@@ -3213,14 +3213,13 @@ const App = {
 
     const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
     doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
-    doc.text(this._pdfSafe(opts.brand || 'Bar Cop'), margin, y);   // opts.brand: a customer-facing doc (an event agreement) brands as the venue, not Bar Cop
+    doc.text(this._pdfSafe(opts.brand || venue || 'Bar Cop'), margin, y);   // the operator's business is the prominent name; Bar Cop stays in the footer only
     doc.setFontSize(12);
     doc.text(this._pdfSafe(subtitle ? title + ' - ' + subtitle : title), pageW - margin, y, { align: 'right' });
     y += 16;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
     const dstr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    const subVenue = opts.brand ? '' : (venue ? venue + '   |   ' : '');   // brand already shows the venue up top
-    doc.text(this._pdfSafe(subVenue + dstr), margin, y);
+    doc.text(this._pdfSafe(dstr), margin, y);
     y += 8;
     doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
     y += 16;
@@ -3319,13 +3318,13 @@ const App = {
         o = o || {};
         const venue = (App.data && App.data.settings && App.data.settings.bar_name) || '';
         doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
-        doc.text('Bar Cop', margin, this.y);
+        doc.text(App._pdfSafe(o.brand || venue || 'Bar Cop'), margin, this.y);
         doc.setFontSize(12);
         doc.text(App._pdfSafe(o.right || title), this.pageW - margin, this.y, { align: 'right' });
         this.y += 16;
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
         const meta = o.meta != null ? o.meta : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        doc.text(App._pdfSafe((venue ? venue + '   |   ' : '') + meta), margin, this.y);
+        doc.text(App._pdfSafe(meta), margin, this.y);
         this.y += 8;
         doc.setDrawColor(205, 205, 205); doc.line(margin, this.y, this.pageW - margin, this.y);
         this.y += 16;
@@ -4675,13 +4674,13 @@ const App = {
 
     const venue = (this.data && this.data.settings && this.data.settings.bar_name) || '';
     doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
-    doc.text('Bar Cop', margin, y);
+    doc.text(this._pdfSafe(venue || 'Bar Cop'), margin, y);
     doc.setFontSize(12);
     doc.text(this._pdfSafe(title), pageW - margin, y, { align: 'right' });
     y += 16;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
     const dstr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    doc.text(this._pdfSafe((venue ? venue + '   |   ' : '') + dstr), margin, y);
+    doc.text(this._pdfSafe(dstr), margin, y);
     y += 14;
     if (subtitle) {
       doc.setFontSize(9); doc.setTextColor(90, 90, 90);
