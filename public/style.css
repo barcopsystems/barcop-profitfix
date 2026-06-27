@@ -590,6 +590,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .at-mtbl tr:last-child td{border-bottom:none;}
 .at-mtbl td:first-child{color:var(--t3);width:54%;}
 .at-mtbl td:last-child{color:var(--t1);font-weight:600;text-align:right;}
+
+/* Audit History — column layout kept, but each row is a #0D181E pill (rounded
+   ends, a 6px gap between rows via border-spacing). Headers carry an inset (not
+   full-bleed) divider. */
+.audit-htbl{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
+.audit-htbl thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.audit-htbl tbody td{background:#0D181E;padding:9px 14px;color:var(--t2);vertical-align:middle;white-space:nowrap;}
+.audit-htbl tbody td:first-child{border-radius:6px 0 0 6px;}
+.audit-htbl tbody td:last-child{border-radius:0 6px 6px 0;}
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
 /* Fix This buttons hover like ghost buttons (text to white). Inline base color/border need !important to lose to the hover. Shared across the Profit/Revenue/Cash audits. */
