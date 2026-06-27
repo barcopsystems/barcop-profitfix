@@ -250,9 +250,9 @@ S.HubPermits = {
             + '<td style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
             + '<td>' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
             + '<td style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
-            + '<td class="no-print" style="white-space:nowrap;">'
-            +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button> '
-            +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button> '
+            + '<td class="no-print">'
+            +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button>'
+            +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button>'
             +   '<button class="btn btn-danger btn-sm hp-del" data-id="' + esc(r.id) + '">Delete</button>'
             + '</td>'
           + '</tr>';
