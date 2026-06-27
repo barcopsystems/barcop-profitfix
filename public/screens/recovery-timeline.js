@@ -29,10 +29,9 @@ S.RecoveryTimeline = {
     { key: 'live',     name: 'Live',     when: 'Week 8 and on', desc: 'The number matures and tracks every week. A slip re-surfaces the system so you catch it.' }
   ],
 
-  // Accent per module: gold for the margin/top-line recoveries, green for cash
-  // (Cash Freed reads as a win, and gold stays reserved for the one money hero).
-  ACCENT_GOLD:  { bg: 'var(--gold-tint)', bord: 'var(--gold-tint-bord)', dot: 'var(--gold)',  when: 'var(--gold)',  line: RT_GOLD },
-  ACCENT_GREEN: { bg: 'var(--green-bg)',  bord: 'rgba(81,138,121,0.45)', dot: 'var(--green)', when: 'var(--green)', line: RT_GREEN },
+  // One accent for every recovery timeline: the recovered-dollars line is a win,
+  // so it reads green, and gold stays reserved for the one money hero elsewhere.
+  ACCENT: { bg: 'var(--green-bg)', bord: 'rgba(81,138,121,0.45)', dot: 'var(--green)', when: 'var(--green)', line: RT_GREEN },
 
   startDate(moduleKey) {
     const log = (App.data && Array.isArray(App.data.fix_log) ? App.data.fix_log : [])
@@ -52,9 +51,8 @@ S.RecoveryTimeline = {
   render(container, moduleKey) {
     moduleKey = moduleKey || 'profit';
     this.container = container;
-    const cash = moduleKey === 'cash';
-    const accent = cash ? this.ACCENT_GREEN : this.ACCENT_GOLD;
-    const info = cash ? this._cashInfo() : this._stdInfo(moduleKey);
+    const accent = this.ACCENT;
+    const info = moduleKey === 'cash' ? this._cashInfo() : this._stdInfo(moduleKey);
 
     const strip = this._strip(info.phase, accent);
     const hereCard = '<div class="card form-card" style="margin-bottom:18px;">'
