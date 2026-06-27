@@ -94,9 +94,7 @@ S.CashTrapped = {
 
     this.container.innerHTML = '<div class="screen">'
       + stats
-      + '<div style="height:24px;"></div>'
       + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.', exportBtn)
-      + '<div style="height:18px;"></div>'
       + this.section('Overstock', over, 'Nothing above par right now.')
       + bottomRow
       + '</div>';
