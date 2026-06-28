@@ -100,9 +100,9 @@ S.InventoryVendors = {
           + '</div></td></tr>';
       }).join('');
       listSection = '<div class="sh" style="margin-top:24px;">Your Vendors</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Vendor</th><th>Rep</th><th>Phone</th><th>Terms</th><th>Products</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + this.addFormCard() + this.pendingSectionHTML() + listSection + '</div>';
@@ -390,9 +390,9 @@ S.InventoryVendors = {
 
   renderProductsCard(prods) {
     if (prods.length === 0) {
-      return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Product</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
-        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div>';
     }
     const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
@@ -411,10 +411,10 @@ S.InventoryVendors = {
     });
     const tables = cats.map(c => {
       const catProds = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
+      return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + '<colgroup><col style="width:240px;"/><col/><col/><col/></colgroup>'
         + '<thead><tr><th>' + esc(c) + '</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
-        + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div></div>';
+        + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div>';
     }).join('');
     return '<div style="margin-top:24px;">' + tables + '</div>';
   },
@@ -452,11 +452,11 @@ S.InventoryVendors = {
 
     const heading = '<div class="sh" style="margin-top:24px;">Recent Price Changes</div>';
     if (recent.length === 0) {
-      return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No price changes recorded yet for this vendor. Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No price changes recorded yet for this vendor. Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</td></tr></tbody></table></div>';
     }
-    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
       + '</tr></thead><tbody>'
       + recent.map(r => '<tr>'
@@ -467,7 +467,7 @@ S.InventoryVendors = {
         + '<td>' + (r.new_cost != null ? App.fmtCurrency(r.new_cost) : '-') + '</td>'
         + '<td class="val">' + fmtDelta(r.old_cost, r.new_cost) + '</td>'
         + '</tr>').join('')
-      + '</tbody></table></div></div>';
+      + '</tbody></table></div>';
   },
 
   async saveVendor() {
