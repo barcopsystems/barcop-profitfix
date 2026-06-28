@@ -171,9 +171,9 @@ S.InventoryOrderHistory = {
       + '<button class="btn btn-ghost btn-sm oh-view" data-id="' + o.id + '">View</button>'
       + (App.canEdit('ic-order-history') ? '<button class="btn btn-danger btn-sm oh-del" data-id="' + o.id + '">Delete</button>' : '')
       + '</div></td></tr>').join('');
-    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No orders in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No orders in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div>'
       + App.showOlderBar('ic', 'order', filtered, this.filterPreset !== 'all');
 
     this.container.innerHTML = '<div class="screen">' + statsCard + this.filterRow() + listCard + '</div>';
@@ -327,9 +327,9 @@ S.InventoryOrderHistory = {
       body = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">' + esc(o.vendor || 'Order') + ' &middot; ' + this.fmtDate(o.date) + '</div>'
         + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="oh-export">Export PDF</button></div></div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Product</th><th>Qty</th><th>Unit Cost</th><th>Extended</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + (actionBtns ? '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">' + actionBtns + '</div>' : '');
     }
 
