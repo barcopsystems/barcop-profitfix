@@ -232,9 +232,9 @@ S.LaborTipLog = {
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on Close The Week in Labor. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
-      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode, where Edit reopens it in a pop-up to fix a number (Update writes back to the same record, no duplicate) and Delete removes one you logged in error. To review a pool\'s per-person split, open the Tip Pools tab in Tip History.'] },
+      { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. The stats up top total the pools in the range you pick with the chips, and Export PDF saves the list. Edit reopens a pool in a pop-up to fix a number (Update writes back to the same record, no duplicate) and Delete removes one you logged in error. To review a pool\'s per-person split, open the Tip Pools tab in Tip History.'] },
       { h: 'Where Tips Go', p: ['Tips and pool splits feed the tip-credit check on Pay Periods, which compares a tipped employee\'s wage plus tips against your state minimum, and the Form 8027 worksheet in Books. Logging accurately here keeps those honest.'] },
-      { h: 'Worksheet', p: ['On Log Tips, the Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close.'] }
+      { h: 'Worksheet', p: ['On Log Tips, the Worksheet button prints a clean grid to tally tips per server on the floor during the shift, then enter the rows here after close. On Tip Pool, it prints a blank pool sheet to tally each person\'s hours and split the pool by hand, then enter the result here.'] }
     ]);
   },
 
@@ -1086,7 +1086,7 @@ S.LaborTipLog = {
       + '<span id="tp-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + card + actionsRow + this.poolHistoryCard() + '</div>';
+    this.container.innerHTML = '<div class="screen">' + card + actionsRow + this.poolBelow() + '</div>';
 
     const rowsEl = document.getElementById('tp-rows');
     if (rowsEl) {
@@ -1127,6 +1127,19 @@ S.LaborTipLog = {
       if (ev.target.closest('.tp-wk-now')) { this.collectPool(); this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderPool(); return; }
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
+      if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Pool', root: this.container }); return; }
+      if (ev.target.closest('#tl-print-blank')) { this.printBlankPool(); return; }
+      const tpRange = ev.target.closest('.tl-range-chip');
+      if (tpRange) {
+        this.collectPool();
+        const v = tpRange.dataset.v;
+        if (v === 'custom') {
+          if (this.filterPreset === 'custom') { this.filterPreset = this._prevPreset || 'last-4'; this.filterFrom = ''; this.filterTo = ''; }
+          else { this._prevPreset = this.filterPreset; this.filterPreset = 'custom'; }
+        } else { this.filterPreset = v; this.filterFrom = ''; this.filterTo = ''; }
+        this.renderPool();
+        return;
+      }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderPool()); return; }
       const hedit = ev.target.closest('.tp-hedit');
       const hdel = ev.target.closest('.tp-hdel');
@@ -1134,6 +1147,8 @@ S.LaborTipLog = {
       else if (hedit) { ev.stopPropagation(); this.openPoolEditModal(hedit.dataset.id); }
     };
     App.applyCollapsed(this.container);
+    document.getElementById('tl-f-from')?.addEventListener('change', e => { this.collectPool(); this.filterFrom = e.target.value || ''; this.renderPool(); });
+    document.getElementById('tl-f-to')?.addEventListener('change',   e => { this.collectPool(); this.filterTo   = e.target.value || ''; this.renderPool(); });
     this.recalcPool();
   },
 
@@ -1384,11 +1399,29 @@ S.LaborTipLog = {
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
-  poolHistoryCard() {
-    const list = [...this.pools()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
-    if (list.length === 0) return '';
-    const rows = list.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr data-id="' + p.id + '">'
+  // Saved Tip Pools: a stats strip + range filter (the same chips/Export/Worksheet
+  // row Log Tips carries) sitting on top of the pool history list. Filter state is
+  // shared with Log Tips, so the range you pick holds across both modes.
+  poolBelow() {
+    const all = [...this.pools()].sort((a, b) =>
+      new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
+    const emptyList = msg => '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+      + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
+      + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">' + msg + '</td></tr></tbody></table></div>';
+    if (all.length === 0) return emptyList('No tip pools logged yet. Build one above and Save Tip Pool.');
+
+    const filtered = this.applyFilters(all);
+    const totalPooled = filtered.reduce((t, p) => t + (parseFloat(p.pool_amount) || 0), 0);
+    const avgPool = filtered.length ? totalPooled / filtered.length : 0;
+    const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div class="calc-item"><div class="calc-label">Pools</div><div class="calc-val lg">' + filtered.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Pooled</div><div class="calc-val lg">' + App.fmtCurrency(totalPooled) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Avg Pool</div><div class="calc-val lg">' + App.fmtCurrency(avgPool) + '</div></div>'
+      + '</div></div>';
+
+    if (filtered.length === 0) return statsCard + this.filterRow() + emptyList('No tip pools in this range. Pick a wider range above.');
+
+    const rows = filtered.slice(0, App.listLimit('lc', 'tip_pool')).map(p => '<tr data-id="' + p.id + '">'
       + '<td><div class="val">' + this.fmtDate(p.date) + '</div></td>'
       + '<td>' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</td>'
       + '<td class="val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</td>'
@@ -1397,10 +1430,27 @@ S.LaborTipLog = {
       + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+    const listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + App.showOlderBar('lc', 'tip_pool', list, false);
+      + App.showOlderBar('lc', 'tip_pool', filtered, this.filterPreset !== 'all');
+    return statsCard + this.filterRow() + listHtml;
+  },
+
+  // Blank pool worksheet (the Worksheet button in Tip Pool mode): tally hours per
+  // person and split the pool by hand, then enter the result into Bar Cop.
+  printBlankPool() {
+    App.printBlankSheet({
+      title: 'Tip Pool Worksheet',
+      subtitle: 'Tally each person\'s hours, then split the pool. Manager enters the result into Bar Cop after close.',
+      columns: [
+        { label: 'Staff Name', width: '34%' },
+        { label: 'Hours',      width: '16%' },
+        { label: 'Pool Share', width: '20%' },
+        { label: 'Notes',      width: '30%' }
+      ],
+      rows: 14
+    });
   },
 
 
