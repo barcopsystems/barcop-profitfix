@@ -155,9 +155,9 @@ S.ShiftMaintenance = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No maintenance issues logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No maintenance issues logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');
@@ -172,9 +172,9 @@ S.ShiftMaintenance = {
 
       let listHtml;
       if (!filtered.length) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No issues in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No issues in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'maintenance')).map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'
@@ -189,9 +189,9 @@ S.ShiftMaintenance = {
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-ghost btn-sm mt-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-danger btn-sm mt-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'maintenance', filtered, this.filterPreset !== 'all');
       }
       below = statsCard + this.filterRow() + listHtml;
