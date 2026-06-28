@@ -169,8 +169,7 @@ S.PrepBatches = {
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch</label>'
           + '<div class="f-display" id="pb-spb">-</div></div>'
       + '</div>'
-      + '<div class="sh" style="margin-top:4px;">Ingredients</div>'
-      + '<div id="pb-ings" style="margin-bottom:12px;"></div>'
+      + '<div id="pb-ings" style="margin-top:14px;margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" type="button" style="margin-bottom:14px;">+ Add Ingredient</button>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -379,7 +378,11 @@ S.PrepBatches = {
     const mode = this.modeForBatchCategory(currentCat);
     // Table goes full width; the ingredient dropdown is a fixed (less wide) column
     // and the empty last column absorbs the slack so Delete stays right-aligned.
-    area.innerHTML = '<div class="pill-wrap" style="margin-bottom:12px;">'
+    // On the page the builder uses .pill-wrap (container query stacks it in the
+    // tablet zone); inside the edit modal a plain overflow wrapper keeps it a table
+    // on desktop (a real phone still stacks it via the global .ing-tbl media query).
+    const inModal = !!area.closest('#pb-edit-modal');
+    area.innerHTML = (inModal ? '<div style="overflow-x:auto;margin-bottom:12px;">' : '<div class="pill-wrap" style="margin-bottom:12px;">')
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:320px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
       + '<th style="width:110px;">Unit Cost</th><th style="width:110px;">Line Cost</th><th></th>'
