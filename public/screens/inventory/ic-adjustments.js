@@ -402,7 +402,7 @@ S.InventoryAdjustments = {
     document.getElementById('adj-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
 
     // Hold the in-progress batch through leave/return.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       formRoot.querySelectorAll('.adj-line').forEach(line => this.refreshLineCalc(line));

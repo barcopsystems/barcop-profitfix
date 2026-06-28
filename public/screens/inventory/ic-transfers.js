@@ -285,7 +285,7 @@ S.InventoryTransfers = {
 
   // Snapshot the batch builder (header + every line) for leave/return persistence.
   _captureBatch() {
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (!formRoot) return;
     this._draft = App.captureDraft(formRoot);
     this._draftRows = [...formRoot.querySelectorAll('.tr-line')].map(line => ({
@@ -391,7 +391,7 @@ S.InventoryTransfers = {
 
     // Hold the in-progress batch through leave/return: restore the header, then
     // capture header + line rows on every input/change.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       formRoot.addEventListener('input', () => this._captureBatch());
