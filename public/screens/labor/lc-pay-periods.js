@@ -199,13 +199,13 @@ S.LaborPayPeriods = {
     };
     let openCard = '<div class="sh" style="margin:24px 0 10px;">Open Periods</div>';
     if (openWeeks.length === 0) {
-      openCard += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      openCard += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No open periods. Every week in range is closed and locked.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No open periods. Every week in range is closed and locked.</td></tr></tbody></table></div>';
     } else {
-      openCard += '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      openCard += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
-        + '</tr></thead><tbody>' + openWeeks.map(openRow).join('') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + openWeeks.map(openRow).join('') + '</tbody></table></div>';
     }
 
     // Closed periods drop to their own card below with the Reopen button, the way
@@ -231,9 +231,9 @@ S.LaborPayPeriods = {
           + '</tr>';
       };
       closedCard = '<div class="sh" style="margin:24px 0 10px;">Closed Periods</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Closed</th><th></th>'
-        + '</tr></thead><tbody>' + closedWeeks.slice(0, App.listLimit('lc', 'pay_period')).map(closedRow).join('') + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + closedWeeks.slice(0, App.listLimit('lc', 'pay_period')).map(closedRow).join('') + '</tbody></table></div>'
         + App.showOlderBar('lc', 'pay_period', closedWeeks, false);
     }
 
@@ -303,9 +303,9 @@ S.LaborPayPeriods = {
       + '<div class="sh" style="margin:0;">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="pp-export-pdf">Export PDF</button></div></div>';
 
-    const tableCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    const tableCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Staff</th><th>Reg Hours</th><th>OT Hours</th><th>Wage</th><th>Reg Cost</th><th>OT Pay</th><th>Gross</th><th>Tip Credit</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
     // Close & Lock (open) or Reopen (closed) lives bottom-left, under the breakdown.
     const actionRow = titleAction ? '<div class="no-print" style="margin:18px 0 24px;display:flex;gap:8px;">' + titleAction + '</div>' : '';
