@@ -214,14 +214,13 @@ S.InventoryTransfers = {
   },
 
   builderCard() {
+    const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tr-print-blank" type="button">Worksheet</button>';
     return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Log a Transfer</span>'
-        + '<button class="btn btn-ghost btn-sm" id="tr-print-blank" type="button">Worksheet</button>'
-      + '</div>'
+      + App.collapsibleCardTitle('ic-transfers', 'Log a Transfer', wsBtn)
+      + '<div class="collapse-body">'
       + this.builderInner(true)
-      + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '</div></div>'
+      + '<div data-collapse-group="ic-transfers" class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="trb-save">Save All</button>'
         + '<button class="btn btn-ghost" id="trb-startover">Start Over</button>'
         + '<span id="trb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'

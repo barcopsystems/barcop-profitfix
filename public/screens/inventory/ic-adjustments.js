@@ -233,14 +233,13 @@ S.InventoryAdjustments = {
   },
 
   builderCard() {
+    const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="adj-print-blank" type="button">Worksheet</button>';
     return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Log an Adjustment</span>'
-        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank" type="button">Worksheet</button>'
-      + '</div>'
+      + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment', wsBtn)
+      + '<div class="collapse-body">'
       + this.builderInner(true)
-      + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '</div></div>'
+      + '<div data-collapse-group="ic-adjustments" class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="ajb-save">Save All</button>'
         + '<button class="btn btn-ghost" id="ajb-startover">Start Over</button>'
         + '<span id="ajb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
