@@ -4414,6 +4414,22 @@ const App = {
     return oldest && oldest.prior_wage != null ? oldest.prior_wage : (staff.wage || 0);
   },
 
+  // Hourly wage for a staff member working a given POSITION on a date. The primary
+  // position uses the wage-history-aware rate; a configured SECONDARY position uses
+  // its own flat rate (no history), so a cross-trained employee's secondary-role
+  // hours cost at the right rate. Salaried = exempt, no hourly wage.
+  wageForStaffPosition(staffOrId, positionId, dateStr) {
+    const staff = (staffOrId && typeof staffOrId === 'object')
+      ? staffOrId
+      : (this.laborData?.lc_staff || []).find(x => x.id === staffOrId);
+    if (!staff) return 0;
+    if (this.isSalaried(staff)) return 0;
+    if (positionId && staff.secondary_position_id && positionId === staff.secondary_position_id) {
+      return parseFloat(staff.secondary_wage) || 0;
+    }
+    return this.wageForStaffOn ? this.wageForStaffOn(staff.id, dateStr) : (staff.wage || 0);
+  },
+
   // The ONE labor-cost target (% of revenue), read everywhere that needs a labor
   // target: Build Schedule's budget + all of Revenue Recovery. Single source of
   // truth = settings.targets.labor_cost_pct. Falls back to the old pre-2026-06-10
