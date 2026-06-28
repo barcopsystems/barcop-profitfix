@@ -120,8 +120,8 @@ S.LaborPositions = {
         + '</div></td></tr>').join('');
       bodyHtml = '<tbody>' + rows + '</tbody>';
     }
-    const below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl">'
-      + '<table class="tbl">' + headHtml + bodyHtml + '</table></div></div>';
+    const below = '<div class="card" style="overflow-x:auto;margin-top:24px;">'
+      + '<table class="row-list">' + headHtml + bodyHtml + '</table></div>';
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
     this.container.onclick = ev => {
