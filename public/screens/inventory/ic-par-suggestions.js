@@ -257,10 +257,10 @@ S.InventoryParSuggestions = {
     });
     const listCard = rows.length === 0
       ? '<div class="card"><div style="font-size:13px;color:var(--t3);padding:8px 0;">No pars need changing right now. Your pars match how you are actually selling.</div></div>'
-      : cats.map(c => '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:820px;">'
+      : cats.map(c => '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
           + '<colgroup><col style="width:200px;"/><col/><col/><col/><col/><col/><col style="width:180px;"/></colgroup>'
           + '<thead><tr><th>' + esc(c) + '</th><th>Current Par</th><th>Avg Weekly</th><th>Suggested Par</th><th>Status</th><th>Cash Impact</th><th></th></tr></thead>'
-          + '<tbody>' + byCat[c].map(rowHtml).join('') + '</tbody></table></div></div>').join('');
+          + '<tbody>' + byCat[c].map(rowHtml).join('') + '</tbody></table></div>').join('');
 
     this.container.innerHTML = '<div class="screen">' + settingsCard + statsCard + exportRow + listCard + '</div>';
     this.wire();
