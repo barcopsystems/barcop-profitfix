@@ -188,9 +188,9 @@ S.ShiftChecklists = {
       const filtered = this.applyFilters(allRuns);
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No runs in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No runs in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'checklist')).map(r => {
           const full = (r.done_count || 0) >= (r.total_count || 0) && (r.total_count || 0) > 0;
@@ -207,9 +207,9 @@ S.ShiftChecklists = {
             + '<button class="btn btn-danger btn-sm cl-hdel" data-id="' + r.id + '">Delete</button>'
             + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Template</th><th>Completed By</th><th>Status</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'checklist', filtered, this.filterPreset !== 'all');
       }
       histSection = this.filterRow() + listHtml;

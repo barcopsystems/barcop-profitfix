@@ -98,8 +98,8 @@ S.ShiftChecklistTemplates = {
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
     return '<div class="sh" style="margin:24px 0 10px;">' + type + ' Templates</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   renderList() {
@@ -107,9 +107,9 @@ S.ShiftChecklistTemplates = {
     const all = this.templates();
     const saved = all.length
       ? (this.savedSection('Opening') + this.savedSection('Closing'))
-      : '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      : '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Items</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {
