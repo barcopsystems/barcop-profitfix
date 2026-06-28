@@ -76,8 +76,8 @@ S.LaborTipHistory = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   noRow(cols, msg) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No tips in this range. Pick a wider range above.') + '</td></tr>';
@@ -286,8 +286,8 @@ S.LaborTipHistory = {
         + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + (p.total_hours || 0) + '</div></div>'
       + '</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '<div style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div class="card-actions no-print"><button class="btn btn-ghost" id="th-pview-close">Close</button></div></div>';
     App.openModal(html, { id: 'th-pview-modal', maxWidth: 520, noClose: true });
     document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: document.getElementById('th-pview-card') }));
