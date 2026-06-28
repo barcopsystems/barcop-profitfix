@@ -18,9 +18,10 @@ S.InventoryDashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week" and the full readout drops in below.'] },
+      { h: 'Where You Stand', p: ['The card up top reads your inventory value on hand and how many weeks of business that covers, then breaks down where your shelf cash sits: what is on the reorder, what you used this period, and shrinkage over the last 30 days. Hit Bar Cop Briefing for a written read of your week in plain language.'] },
       { h: 'The Steps', p: ['1. Take this week\'s count: count your inventory in Take Inventory. 2. Receive deliveries: log anything that came in since your last count, or mark it none. 3. Place your orders: everything below par, grouped by vendor, with the cost to refill, and create the orders in the Order Sheet. 4. Review the flags: shrinkage written off, spot-check flags, and dead stock worth chasing.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Take Inventory, Receive Delivery, and the Order Sheet open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] },
-      { h: 'The Readout', p: ['The strip shows Inventory Value, what is on the reorder, and what you used since the last count. Once the week is current, the readout below breaks your cash down by category, shows what is moving fast, slow, and not at all, the honest direction since your last count, and any leaks worth chasing. The As-needed row keeps Spot Check, Adjustments, Par Suggestions, and Count History one tap away.'] }
+      { h: 'The Readout', p: ['Once the week is current, the readout below breaks your cash down by category, shows what is moving fast, slow, and not at all, the honest direction since your last count, and any leaks worth chasing. The As-needed row keeps Spot Check and Par Suggestions one tap away.'] }
     ]);
   },
 

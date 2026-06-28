@@ -63,7 +63,7 @@ S.InventoryMoversReport = {
     App.showHelpModal('How the Movement Report Works', [
       { p: ['Movement tells you what is flying off the shelf and what is collecting dust. Everything ranks by dollars, not raw units, so a 240-a-week bun does not outrank your scotch. Money is the fair comparison.'] },
       { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top to choose which two counts to measure between, and the Latest button snaps back to your most recent. Everything on the page recomputes for what you pick.'] },
-      { h: 'Fast And Slow', p: ['Fast Movers are your top products by usage dollars: where your money goes, what to never run out of, and what to watch for theft. Slow Movers are the bottom: cash tied up, spoilage risk, candidates to stop over-ordering or cut. Both rank across every category so the comparison stays fair.'] },
+      { h: 'Fast And Slow', p: ['Fast Movers are your top products by usage dollars: where your money goes, what to never run out of, and what to watch for theft. Slow Movers are the bottom: cash tied up, spoilage risk, candidates to stop over-ordering or cut. Both rank across every category so the comparison stays fair, and each list shows your top ten.'] },
       { h: 'Trend And Vendor', p: ['Trend vs Prior shows how each product moved this period against the period before, grouped by category with the biggest swing first, so you catch an item taking off or falling off early. Vendor Spend groups your usage cost by vendor, which is your edge when you sit down to negotiate.'] }
     ]);
   },
