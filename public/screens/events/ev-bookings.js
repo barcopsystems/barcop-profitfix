@@ -285,7 +285,7 @@ S.EventsBookings = {
     // Inline New Booking form (persists in-progress via _addDraft). Buttons below
     // the card, bottom-left.
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('eb-new-booking', 'New Booking')
+      + App.collapsibleCardTitle('eb-new-booking', 'New Booking', '<button class="btn btn-ghost btn-sm no-print" id="eb-worksheet" type="button">Worksheet</button>')
       + '<div class="collapse-body"><div id="eb-add-form">' + this.fieldsHtml(this._addDraft, 'ebn', true) + '</div></div></div>'
       + '<div data-collapse-group="eb-new-booking" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="eb-add">Create Booking</button>'
@@ -299,8 +299,7 @@ S.EventsBookings = {
       const chipDefs = [{ v: '', label: 'All' }].concat(this.STAGES.map(s => ({ v: s, label: s })));
       const chips = App.filterChips(this.filterStage, chipDefs, 'eb-stage-chip');
       const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px;">'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
-        + '<button class="btn btn-ghost btn-sm" id="eb-worksheet">Worksheet</button></div>';
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div></div>';
 
       const list = (this.filterStage ? all.filter(b => b.stage === this.filterStage) : all)
         .slice().sort((a, b) => (b.date_received || b.event_date || '').localeCompare(a.date_received || a.event_date || ''));
