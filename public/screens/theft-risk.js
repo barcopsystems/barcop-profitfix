@@ -155,13 +155,12 @@ S.TheftRisk = {
       productOpts += '</optgroup>';
     });
 
-    let h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Variance Investigations</div>'
-      + '<button class="btn btn-ghost btn-sm no-print vi-print-blank">Worksheet</button>'
-      + '</div>'
+    let h = '<div class="sh" style="margin:22px 0 10px;">Variance Investigations</div>'
       + '<div class="card form-card">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Open an Investigation</span>'
+      +   '<button class="btn btn-ghost btn-sm no-print vi-print-blank">Worksheet</button></div>'
       + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="width:300px;"><label>Open an Investigation</label><select class="form-input vi-product-select">' + productOpts + '</select></div>'
+      + '<div class="f" style="width:300px;"><label>Product</label><select class="form-input vi-product-select">' + productOpts + '</select></div>'
       + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
       + '</div></div>';
 
