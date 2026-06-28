@@ -33,8 +33,8 @@ S.InventoryOrderHistory = {
   },
   statusText(s) {
     if (s === 'Received')  return '<span style="color:var(--green);font-weight:600;">Received</span>';
-    if (s === 'Submitted') return '<span style="color:var(--steel);font-weight:600;">Submitted</span>';
-    return '<span style="color:var(--gold);font-weight:700;">Open</span>';
+    if (s === 'Submitted') return '<span style="color:var(--t2);font-weight:600;">Submitted</span>';
+    return '<span style="color:var(--amber);font-weight:700;">Open</span>';
   },
 
   // Effective window from the active range chip; Custom reads From/To, All clears.
