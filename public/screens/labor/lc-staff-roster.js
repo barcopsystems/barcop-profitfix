@@ -123,24 +123,12 @@ S.LaborStaffRoster = {
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '</div>'
-      // Shift Lead lives OUTSIDE a .f wrapper on purpose: the global `.f input`
-      // rule forces appearance:none, which kills the native checkbox. A plain div
-      // keeps the checkbox rendering normally (gold via accent-color).
-      + '<div class="form-row" style="gap:12px;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Phone</label>'
-      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Email</label>'
-      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
-      + '<div style="flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
-      + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
-      + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
-      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly.</span></label></div>'
-      + '</div>'
-      // Secondary role + rate (optional): a cross-trained employee who works a
-      // second position at a different wage. Logging hours in that role costs at
-      // this rate (App.wageForStaffPosition); the wage auto-fills from the role's
-      // default. Salaried staff carry no hourly cost.
+      // One row: Secondary Role + Wage, then Phone, Email, Shift Lead. Secondary is
+      // a cross-trained employee who works a second position at a different wage;
+      // logging hours in that role costs at this rate (App.wageForStaffPosition),
+      // and the wage auto-fills from the role's default. Shift Lead lives OUTSIDE a
+      // .f wrapper on purpose: the global `.f input` rule forces appearance:none,
+      // which kills the native checkbox; a plain div keeps it rendering normally.
       + '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
       + '<select id="sr-pos2"><option value="">None</option>'
@@ -148,6 +136,15 @@ S.LaborStaffRoster = {
       + '</select></div>'
       + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Phone</label>'
+      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
+      + '<div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
+      + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly.</span></label></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
