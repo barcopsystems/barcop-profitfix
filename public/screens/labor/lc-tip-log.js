@@ -358,8 +358,9 @@ S.LaborTipLog = {
       + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
       + '</div>';
+    const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
+      + App.collapsibleCardTitle('lc-tip-log', 'Tips', wsBtn)
       + '<div class="collapse-body">'
       + this.modeToggle()
       + modeBody
@@ -835,8 +836,7 @@ S.LaborTipLog = {
     const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="tl-print-blank">Worksheet</button></div>'
+        + '<button class="btn btn-ghost btn-sm" id="tl-export">Export PDF</button></div>'
       + '</div>';
     const custom = this.filterPreset !== 'custom' ? '' :
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
@@ -1061,8 +1061,9 @@ S.LaborTipLog = {
     // Two inset divider lines (not full-bleed) separate the three parts: the
     // toggle, the day picker, and the entry below. No boxes around each part.
     const divLine = '<div style="border-top:1px solid var(--b2);margin:14px 0 16px;"></div>';
+    const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
     const card = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-tip-log', 'Tips')
+      + App.collapsibleCardTitle('lc-tip-log', 'Tips', wsBtn)
       + '<div class="collapse-body">'
       + this.modeToggle()
       + divLine
