@@ -628,7 +628,7 @@ S.LaborBuildSchedule = {
       + '<div class="form-row" style="margin-bottom:0;">'
       + this._timeSelectFields('bs-m-end', sh.end, 'End')
       + '</div>'
-      + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
+      + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:14px;min-height:14px;"></div>'
       + eventField
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button>'
