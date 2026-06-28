@@ -467,11 +467,10 @@ S.LaborBuildSchedule = {
 
     // Save card — name it to also save a reusable template (optional).
     const actionsCard = '<div class="card form-card"><div class="card-title">Save</div>'
-      + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div class="form-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:0;">'
       + '<div class="f" style="width:320px;max-width:100%;"><label>Template Name</label>'
       + '<input type="text" id="bs-tmpl-name" value="' + esc(d.from_template_name || '') + '" placeholder="Optional, name it to save as a template"/></div>'
       + '</div>'
-      + '<div class="f" style="margin-bottom:0;"><label>Notes</label><textarea id="bs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary btn-lg" id="bs-save">' + (this.editId ? 'Update Schedule' : 'Save Schedule') + '</button>'
@@ -586,7 +585,6 @@ S.LaborBuildSchedule = {
       if (!(await this.confirmLeaveUnsaved())) return;
       this.loadWeek(target); this.draw();
     });
-    document.getElementById('bs-notes')?.addEventListener('input', e => { this.draft.notes = e.target.value || ''; this.saveDraft(); });
     document.getElementById('bs-fc')?.addEventListener('click', () => this.openForecastModal());
     document.getElementById('bs-lt')?.addEventListener('click', () => this.openLaborTargetModal());
     document.getElementById('bs-save')?.addEventListener('click', () => this.save());
