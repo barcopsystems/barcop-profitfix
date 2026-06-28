@@ -119,6 +119,11 @@ S.LaborLogHours = {
       + '<input type="date" id="' + p + 'date" value="' + esc(a?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="flex:1 1 170px;min-width:0;"><label>Staff</label>'
       + '<select id="' + p + 'staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
+      // Role picker: only shown for a cross-trained staff member (one with a
+      // secondary role + rate), so single-role staff see no extra field. Picking
+      // the secondary role costs the hours at the secondary wage.
+      + '<div class="f" id="' + p + 'pos-wrap" style="flex:1 1 120px;min-width:0;' + (a && this._hasSecondary(a.staff_id) ? '' : 'display:none;') + '"><label>Role</label>'
+      + '<select id="' + p + 'pos">' + (a && this._hasSecondary(a.staff_id) ? this.roleOptionsFor(a.staff_id, a.position_id) : '') + '</select></div>'
       + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Shift</label>'
       + '<select id="' + p + 'shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1 1 90px;min-width:0;"><label>Hours</label>'
@@ -132,10 +137,43 @@ S.LaborLogHours = {
       + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div></div>';
   },
 
+  // True when a staff member has a usable secondary role (a second position with a
+  // positive wage), i.e. the Role picker should appear for them.
+  _hasSecondary(staffId) {
+    const s = this.staffById(staffId);
+    return !!(s && s.secondary_position_id && s.secondary_position_id !== s.position_id && (parseFloat(s.secondary_wage) || 0) > 0);
+  },
+  // <option>s for the Role picker: a staff member's primary position, then their
+  // secondary (if set). selectedPosId defaults to the primary.
+  roleOptionsFor(staffId, selectedPosId) {
+    const s = this.staffById(staffId);
+    if (!s) return '';
+    const positions = (App.laborData && App.laborData.lc_positions) || [];
+    const nameOf = id => { const p = positions.find(x => x.id === id); return p ? p.name : ''; };
+    const opts = [];
+    if (s.position_id) opts.push({ id: s.position_id, label: nameOf(s.position_id) || 'Primary' });
+    if (s.secondary_position_id && s.secondary_position_id !== s.position_id) opts.push({ id: s.secondary_position_id, label: nameOf(s.secondary_position_id) || 'Secondary' });
+    if (!opts.length) return '';
+    const sel = (selectedPosId != null && selectedPosId !== '') ? selectedPosId : s.position_id;
+    return opts.map(o => '<option value="' + esc(o.id) + '"' + (o.id === sel ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
+  },
+
   // Attach the live-calc listeners for whichever form is mounted (inline or edit).
   wireForm(p) {
     p = p || 'lo-';
-    document.getElementById(p + 'staff')?.addEventListener('change', () => this.calc(p));
+    document.getElementById(p + 'staff')?.addEventListener('change', () => {
+      // Show + populate the Role picker for a cross-trained staff member; hide it
+      // for single-role staff so their entry just uses the primary position.
+      const sid = document.getElementById(p + 'staff')?.value;
+      const wrap = document.getElementById(p + 'pos-wrap');
+      const posSel = document.getElementById(p + 'pos');
+      if (wrap && posSel) {
+        if (this._hasSecondary(sid)) { posSel.innerHTML = this.roleOptionsFor(sid, null); wrap.style.display = ''; }
+        else { posSel.innerHTML = ''; wrap.style.display = 'none'; }
+      }
+      this.calc(p);
+    });
+    document.getElementById(p + 'pos')?.addEventListener('change', () => this.calc(p));
     document.getElementById(p + 'date')?.addEventListener('change', () => this.calc(p));
     document.getElementById(p + 'hours')?.addEventListener('input', () => this.calc(p));
     this.calc(p);
@@ -384,9 +422,12 @@ S.LaborLogHours = {
       set('c-cost', 'Salaried');
       return;
     }
-    // Wage in effect on the entry's date — handles past-dated entries after
-    // a raise (uses the wage that was in effect on that day, not today's).
-    const wage  = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0)) : null;
+    // Wage in effect on the entry's date for the selected ROLE — handles past-dated
+    // entries after a raise (the wage in effect that day, not today's) and a
+    // cross-trained employee logging hours in their secondary role at its rate.
+    const posSel = document.getElementById(p + 'pos');
+    const posId  = (posSel && posSel.value) ? posSel.value : (staff ? staff.position_id : '');
+    const wage  = staff ? App.wageForStaffPosition(staff, posId, date) : null;
     const hours = parseFloat(document.getElementById(p + 'hours')?.value) || 0;
     set('c-wage', wage != null ? App.fmtCurrency(wage) + '/hr' : '-');
     set('c-cost', wage != null ? App.fmtCurrency(hours * wage) : '-');
@@ -424,13 +465,15 @@ S.LaborLogHours = {
     // Salaried (exempt) staff carry no hourly cost — pay is the fixed weekly
     // salary added elsewhere, so logged hours are coverage only (wage/cost 0).
     const sal = App.isSalaried(staff);
-    const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, date) : (staff.wage || 0));
+    const posSel = document.getElementById(p + 'pos');
+    const posId  = (posSel && posSel.value) ? posSel.value : (staff.position_id || '');
+    const wage = sal ? null : App.wageForStaffPosition(staff, posId, date);
     const rec = {
       id:          this.editId || App.uid(),
       date,
       staff_id:    staff.id,
       name:        staff.name,
-      position_id: staff.position_id || '',
+      position_id: posId,
       shift_type:  shiftType,
       hours,
       wage,
@@ -675,7 +718,7 @@ S.LaborLogHours = {
   showHowTo() {
     App.showHelpModal('How Logging Hours Works', [
       { p: ['This is where actual hours worked get recorded. Logged hours feed your weekly labor cost, prime cost, and revenue per labor hour across Profit and Revenue Recovery, so what you enter here drives the numbers everywhere else.'] },
-      { h: 'Logging An Entry', p: ['Pick Enter Manually, then fill the row: date, staff member, shift, and hours worked, and Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
+      { h: 'Logging An Entry', p: ['Pick Enter Manually, then fill the row: date, staff member, shift, and hours worked, and Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary. For a staff member set up with a second role on their roster, a Role picker appears so you can log the hours under the role they actually worked, costing them at that role\'s rate.'] },
       { h: 'Filling From The Schedule', p: ['Pick Fill from Schedule to pull a posted week in instead of typing each row. Use the week chips and arrows to choose the week, then Review and Log Week opens it. Everyone scheduled comes in checked with their hours pre-filled, and anyone with a no-show or sick call-out logged for that day is unchecked for you. Uncheck anyone else who did not work, fix any hours, then log the whole week at once. Shifts already logged are kept out of the list so nothing double-counts.'] },
       { h: 'Importing A Timeclock Export', p: ['Got a timeclock or POS export? Drop it on Close The Week in Labor, where Bar Cop matches each row to your roster by name and costs it at the wage in effect on the date worked. Anything that does not match, or is missing hours, is reported so you can fix it. The imported hours land in the list here to review and edit.'] },
       { h: 'Closed Pay Periods', p: ['Once a pay period is closed in Pay Periods, its entries lock so the payroll handoff stays clean. Reopen the period there if you need to correct a locked entry.'] }

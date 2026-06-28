@@ -123,6 +123,17 @@ S.LaborStaffRoster = {
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '</div>'
+      // Secondary role + rate (optional): a cross-trained employee who works a
+      // second position at a different wage. Logging hours in that role costs at
+      // this rate (App.wageForStaffPosition). Salaried staff carry no hourly cost.
+      + '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<select id="sr-pos2"><option value="">None</option>'
+      + positions.map(p => '<option value="' + p.id + '"' + (s && s.secondary_position_id === p.id ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
+      + '</div>'
       // Shift Lead lives OUTSIDE a .f wrapper on purpose: the global `.f input`
       // rule forces appearance:none, which kills the native checkbox. A plain div
       // keeps the checkbox rendering normally (gold via accent-color).
@@ -337,7 +348,7 @@ S.LaborStaffRoster = {
   showHowTo() {
     App.showHelpModal('How the Staff Roster Works', [
       { p: ['The roster is your team: every staff member, their position, wage, and status. It is the source for scheduling, hours, tips, and the Revenue Recovery server list, so getting it right here means it is right everywhere.'] },
-      { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default hourly wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it.'] },
+      { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default hourly wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it. If someone works a second role at a different rate, like a server who picks up bar shifts, set a Secondary Role and its wage; logging hours in that role then costs at the secondary rate, and a Role picker shows up on Log Hours for them.'] },
       { h: 'Fixing A Wage Change', p: ['Open a person and a Wage History table shows every raise and cut with the date it took effect. If a change landed on the wrong day, those shifts cost out at the wrong rate, so Edit the change to correct its effective date, or Delete one entered in error. To change the current wage, edit the profile up top; that records a fresh change here on its own.'] },
       { h: 'Regular Days Off', p: ['Tap the weekday chips to mark a standing day someone never works, like a server who is always off Sundays. Build Schedule blocks every one of those weekdays automatically, so you do not have to remember it each week. For a one-time request (a vacation week, a day off), use Time Off instead.'] },
       { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.'] },
@@ -789,7 +800,10 @@ S.LaborStaffRoster = {
       off_days:      [...document.querySelectorAll('.sr-off-chip')].filter(c => c.dataset.on === '1').map(c => c.dataset.day),
       phone:         document.getElementById('sr-phone')?.value.trim() || '',
       email:         document.getElementById('sr-email')?.value.trim() || '',
-      notes:         document.getElementById('sr-notes')?.value.trim() || ''
+      notes:         document.getElementById('sr-notes')?.value.trim() || '',
+      // Secondary role + rate (cleared together when no secondary role is set).
+      secondary_position_id: document.getElementById('sr-pos2')?.value || '',
+      secondary_wage:        (function () { const sp = document.getElementById('sr-pos2')?.value || ''; const w = parseFloat(document.getElementById('sr-wage2')?.value); return sp ? (isNaN(w) ? null : w) : null; })()
     };
     if (!staffId) rec.created_at = new Date().toISOString();
 

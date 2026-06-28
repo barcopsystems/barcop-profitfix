@@ -101,7 +101,11 @@ S.LaborPayPeriods = {
       }
       const regularHours = Math.min(r.hours, App.OT_THRESHOLD);
       const otHours      = Math.max(0, r.hours - App.OT_THRESHOLD);
-      const wage         = r.wage || 0;
+      // Effective (weighted-average) rate from the actual per-entry costs, so a
+      // cross-trained employee who worked two roles at two rates costs correctly
+      // and OT prices off the blended rate. For a single rate this equals that
+      // rate, so it is backward-compatible.
+      const wage         = r.hours > 0 ? (r.cost / r.hours) : (r.wage || 0);
       const regularCost  = regularHours * wage;
       const otCost       = otHours * wage * 1.5;
       return { ...r, regular_hours: regularHours, ot_hours: otHours, regular_cost: regularCost, ot_cost: otCost, gross: regularCost + otCost };
@@ -144,7 +148,7 @@ S.LaborPayPeriods = {
     App.showHelpModal('How Pay Periods Work', [
       { p: ['Pay Periods rolls each week, Monday through Sunday, into a payroll-ready summary: total hours, overtime, and gross pay for everyone who worked. The last 12 weeks are listed, newest first.'] },
       { h: 'Closing A Period', p: ['When a week is final, Close and Lock it. That locks every logged-hours entry in the week so Log Hours stops accepting edits, and saves a permanent record of what was paid. Reopen it any time you need to fix something, then close it again.'] },
-      { h: 'Overtime', p: ['Hours over ' + App.OT_THRESHOLD + ' in a week are treated as overtime and paid at time and a half in the gross figure. Salaried staff are exempt, so they carry a fixed weekly salary and never show overtime.'] },
+      { h: 'Overtime', p: ['Hours over ' + App.OT_THRESHOLD + ' in a week are treated as overtime and paid at time and a half in the gross figure. Salaried staff are exempt, so they carry a fixed weekly salary and never show overtime. If someone worked two roles at different rates that week, overtime prices off their average rate for the week.'] },
       { h: 'Tip Credit Check', p: ['For tipped positions, the View screen compares each person\'s effective hourly, their wages plus tip-pool share divided by hours, against your state minimum wage and flags anyone who came up short so you can make up the difference before payroll runs. Set your state minimum in App Settings, under Business Profile. This is a planning aid, not legal or payroll advice. Verify the wage and tip-credit rules for your jurisdiction.'] },
       { h: 'Payroll Export', p: ['Payroll Export turns any period into a formatted workbook or a clean import file for whoever runs your payroll. Open Payroll Export from the sidebar and pick the period there; it carries the same numbers you closed here.'] }
     ]);
