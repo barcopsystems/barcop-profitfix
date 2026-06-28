@@ -75,15 +75,16 @@ S.ShiftIncidents = {
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || '') + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:170px;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
+      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Main bar"/></div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Type</label><select id="' + p + 'type">' + typeOpts + '</select></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Severity</label><select id="' + p + 'severity">' + sevOpts + '</select></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Main bar"/></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>People Involved</label><input type="text" id="' + p + 'people" autocomplete="off" value="' + esc(r?.people_involved || '') + '" placeholder="Guests and / or staff"/></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>Confirmed By</label><select id="' + p + 'confirm">' + App.staffOptions(r?.confirmed_by_id || r?.confirmed_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+      + '<div class="f" style="flex:1;min-width:150px;"><label>People Involved</label><input type="text" id="' + p + 'people" autocomplete="off" value="' + esc(r?.people_involved || '') + '" placeholder="Guests and / or staff"/></div>'
       + '<div class="f" style="flex:1;min-width:140px;"><label>Witnesses <span style="color:var(--t4);font-weight:400;">(optional)</span></label><input type="text" id="' + p + 'witnesses" autocomplete="off" value="' + esc(r?.witnesses || '') + '" placeholder="Who saw it"/></div>'
       + '</div>'
 
@@ -161,8 +162,8 @@ S.ShiftIncidents = {
     let below;
     if (all.length === 0) {
       below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-        + '<th>Date</th><th>Type</th><th>Severity</th><th>Location</th><th>Involved</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No incidents logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
+        + '<th>Date</th><th>Type</th><th>Severity</th><th>Involved</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No incidents logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const high = open.filter(r => r.severity === 'High');
@@ -178,8 +179,8 @@ S.ShiftIncidents = {
       let listHtml;
       if (!filtered.length) {
         listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-          + '<th>Date</th><th>Type</th><th>Severity</th><th>Location</th><th>Involved</th><th>Status</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No incidents in this range. Pick a wider range above.</td></tr></tbody></table></div>';
+          + '<th>Date</th><th>Type</th><th>Severity</th><th>Involved</th><th>Status</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No incidents in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'incident')).map(r => '<tr class="in-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div>'
@@ -187,7 +188,6 @@ S.ShiftIncidents = {
           + '<td><div class="val">' + esc(r.type || '-') + '</div>'
           + (r.description ? '<div style="font-size:10px;color:var(--t3);">' + esc(r.description) + '</div>' : '') + '</td>'
           + '<td>' + this.severityText(r.severity) + '</td>'
-          + '<td>' + esc(r.location || '-') + '</td>'
           + '<td>' + esc(r.people_involved || '-') + '</td>'
           + '<td>' + this.statusText(r.status) + '</td>'
           + '<td><div class="row-actions">'
@@ -195,7 +195,7 @@ S.ShiftIncidents = {
           + (App.canEdit('sc-incidents') ? '<button class="btn btn-danger btn-sm in-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
         listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-          + '<th>Date</th><th>Type</th><th>Severity</th><th>Location</th><th>Involved</th><th>Status</th><th></th>'
+          + '<th>Date</th><th>Type</th><th>Severity</th><th>Involved</th><th>Status</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'incident', filtered, this.filterPreset !== 'all');
       }
@@ -304,6 +304,7 @@ S.ShiftIncidents = {
     if (status === 'Resolved' && !dateResolved) { fail('Resolved incidents need a resolution date. Set Date Resolved or change the status.'); return null; }
     const cost = parseFloat(document.getElementById(p + 'cost')?.value);
     const byId = document.getElementById(p + 'by')?.value || '';
+    const confirmId = document.getElementById(p + 'confirm')?.value || '';
     return {
       date,
       time:           document.getElementById(p + 'time')?.value || '',
@@ -313,6 +314,8 @@ S.ShiftIncidents = {
       location:       document.getElementById(p + 'loc')?.value.trim() || '',
       reported_by_id: byId,
       reported_by:    (App.staffById(byId) || {}).name || '',
+      confirmed_by_id: confirmId,
+      confirmed_by:   (App.staffById(confirmId) || {}).name || '',
       people_involved: document.getElementById(p + 'people')?.value.trim() || '',
       witnesses:      document.getElementById(p + 'witnesses')?.value.trim() || '',
       description,
