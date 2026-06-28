@@ -299,9 +299,9 @@ S.ShiftCashControl = {
     // ── 4. Cash Activity (bare list under the range chips) ──
     let activityBody;
     if (stream.length === 0) {
-      activityBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      activityBody = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:16px;">No cash activity in this range. Log a drop, deposit, or safe count above to get started.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:16px;">No cash activity in this range. Log a drop, deposit, or safe count above to get started.</td></tr></tbody></table></div>';
     } else {
       const rows = stream.slice(0, App.listLimit('sc', 'cash_activity')).map(s => {
         let amountCell, statusCell;
@@ -326,9 +326,9 @@ S.ShiftCashControl = {
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm cc-edit" data-cat="' + esc(s.editCat) + '" data-id="' + esc(s.editId || '') + '">Edit</button></div></td>'
         + '</tr>';
       }).join('');
-      activityBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      activityBody = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Reference</th><th>By</th><th>Amount</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
     this.container.innerHTML = '<div class="screen">' + safeCard + registersCard + statsCard
       + this.filterRow() + activityBody

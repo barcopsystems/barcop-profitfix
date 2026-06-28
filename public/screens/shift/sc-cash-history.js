@@ -128,8 +128,8 @@ S.ShiftCashHistory = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   noMatchRow(cols) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">No records in this range. Pick a wider range above.</td></tr>';
@@ -137,8 +137,8 @@ S.ShiftCashHistory = {
   emptyTab(line1, line2, headers, cols) {
     const msg = esc(line1) + ' ' + esc(line2)
       + ' <button class="btn btn-ghost btn-sm" id="ch-go-board" style="margin-left:8px;">Go to Cash Control</button>';
-    return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody><tr><td colspan="' + cols + '" style="color:var(--t3);">' + msg + '</td></tr></tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+      + headers + '</tr></thead><tbody><tr><td colspan="' + cols + '" style="color:var(--t3);">' + msg + '</td></tr></tbody></table></div>';
   },
 
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
