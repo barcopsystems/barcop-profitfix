@@ -197,13 +197,15 @@ S.LaborPayPeriods = {
         + '<td><div class="row-actions">' + actions + '</div></td>'
         + '</tr>';
     };
-    let openCard = '<div class="sh" style="margin:24px 0 10px;">Open Periods</div>';
+    let openCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Open Periods</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="pp-open-export">Export PDF</button></div></div>';
     if (openWeeks.length === 0) {
-      openCard += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No open periods. Every week in range is closed and locked.</td></tr></tbody></table></div>';
     } else {
-      openCard += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
         + '</tr></thead><tbody>' + openWeeks.map(openRow).join('') + '</tbody></table></div>';
     }
@@ -239,6 +241,7 @@ S.LaborPayPeriods = {
 
     this.container.innerHTML = '<div class="screen">' + topCard + openCard + closedCard + '</div>';
 
+    this.container.querySelector('#pp-open-export')?.addEventListener('click', () => App.exportPDF({ title: 'Open Pay Periods', root: this.container.querySelector('#pp-open-card') }));
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { const ws = b.dataset.ws; this.detailWeekStart = ws; App.pushView(() => this.renderDetail(ws)); }));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
