@@ -228,9 +228,9 @@ S.PrepBatches = {
 
     let listSection;
     if (!batches.length) {
-      listSection = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      listSection = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No prep batches yet. Build one above and it shows here.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No prep batches yet. Build one above and it shows here.</td></tr></tbody></table></div>';
     } else {
       const rows = batches.map(b =>
         '<tr>'
@@ -244,9 +244,9 @@ S.PrepBatches = {
           + '<button class="btn btn-ghost btn-sm pb-edit" data-id="' + b.id + '">Edit</button>'
           + '<button class="btn btn-danger btn-sm pb-del" data-id="' + b.id + '">Delete</button>'
         + '</div></td></tr>').join('');
-      listSection = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      listSection = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
           + '<th>Batch</th><th>Category</th><th>Yield</th><th>Servings</th><th>Total Cost</th><th>Cost / Serving</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + this.addFormCard() + listSection + '</div>';
@@ -379,8 +379,8 @@ S.PrepBatches = {
     const mode = this.modeForBatchCategory(currentCat);
     // Table goes full width; the ingredient dropdown is a fixed (less wide) column
     // and the empty last column absorbs the slack so Delete stays right-aligned.
-    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+    area.innerHTML = '<div class="pill-wrap" style="margin-bottom:12px;">'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:320px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
       + '<th style="width:110px;">Unit Cost</th><th style="width:110px;">Line Cost</th><th></th>'
       + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
