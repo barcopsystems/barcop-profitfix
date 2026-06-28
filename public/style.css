@@ -356,7 +356,7 @@ input,select,textarea{color-scheme:dark;}
 /* An external actions row (CSVMapper's Import/Cancel target) drops its margin while
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
    a sibling button (e.g. Add Products' Cancel) away from the card. */
-#ip-csv-actions:empty{margin:0;}
+#ip-csv-actions:empty{margin:0!important;}
 .card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);}
 .card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b2);align-items:center;}
 .tw-nav{display:flex;gap:12px;justify-content:space-between;margin-top:16px;align-items:center;}
