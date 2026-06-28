@@ -175,7 +175,7 @@ S.InventoryTakeInventory = {
     this.container.innerHTML = '<div class="screen">' + resumeBar
       + '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Start an Inventory Count</span>'
-      + (locs.length ? '<button class="btn btn-ghost btn-sm no-print" id="ti-print-blank">Print Blank Sheet</button>' : '')
+      + (locs.length ? '<button class="btn btn-ghost btn-sm no-print" id="ti-print-blank">Worksheet</button>' : '')
       + '</div>'
       + body
       + '</div>'

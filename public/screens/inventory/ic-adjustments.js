@@ -97,7 +97,6 @@ S.InventoryAdjustments = {
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
         + '<button class="btn btn-ghost btn-sm" id="adj-export">Export PDF</button>'
-        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank">Worksheet</button>'
       + '</div></div>';
     const custom = this.filterPreset !== 'custom' ? '' :
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
@@ -135,9 +134,9 @@ S.InventoryAdjustments = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const { from, to } = this.effectiveRange();
       const filtered = all.filter(r => {
@@ -162,9 +161,9 @@ S.InventoryAdjustments = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No adjustments in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('ic', 'adjustment')).map(r => {
           // Direction reads off the signed, colored Value (red loss / green
@@ -185,9 +184,9 @@ S.InventoryAdjustments = {
             + (App.canEdit('ic-adjustments') ? '<button class="btn btn-danger btn-sm adj-del" data-id="' + r.id + '">Delete</button>' : '')
             + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>When</th><th>Product</th><th>Quantity</th><th>Reason</th><th>Value</th><th>By</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('ic', 'adjustment', filtered, this.filterPreset !== 'all');
       }
       below = statsCard + this.filterRow() + listHtml;
@@ -224,8 +223,8 @@ S.InventoryAdjustments = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="ajb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-      + '<table class="ing-tbl"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:12px;">'
+      + '<table class="ing-tbl pill"><thead><tr>'
       + '<th style="min-width:170px;">Product</th><th style="width:80px;">Qty</th><th style="width:100px;">Unit</th>'
       + '<th style="min-width:130px;">Reason</th><th style="width:110px;">Direction</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
       + '</tr></thead><tbody id="ajb-rows">' + rowsHtml + '</tbody></table></div>'
@@ -235,11 +234,13 @@ S.InventoryAdjustments = {
 
   builderCard() {
     return '<div class="card form-card no-print">'
-      + App.collapsibleCardTitle('ic-adjustments', 'Log an Adjustment')
-      + '<div class="collapse-body">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<span>Log an Adjustment</span>'
+        + '<button class="btn btn-ghost btn-sm" id="adj-print-blank" type="button">Worksheet</button>'
+      + '</div>'
       + this.builderInner(true)
-      + '</div></div>'
-      + '<div class="no-print" data-collapse-group="ic-adjustments" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '</div>'
+      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="ajb-save">Save All</button>'
         + '<button class="btn btn-ghost" id="ajb-startover">Start Over</button>'
         + '<span id="ajb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
