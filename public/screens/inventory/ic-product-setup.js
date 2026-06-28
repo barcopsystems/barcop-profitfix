@@ -374,10 +374,10 @@ S.InventoryProducts = {
       const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
         const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
-        return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
-          + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:1000px;">' + colgroup + '<thead><tr>'
+        return '<div class="card" style="overflow-x:auto;margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
+          + '<table class="row-list" style="table-layout:fixed;width:100%;">' + colgroup + '<thead><tr>'
           + '<th></th><th>' + hdr + '</th>' + headerCols
-          + '</tr></thead><tbody>' + groupRows + '</tbody></table></div></div>';
+          + '</tr></thead><tbody>' + groupRows + '</tbody></table></div>';
       }).join('');
 
       body = alertBar + toolbar + tables;
@@ -478,6 +478,7 @@ S.InventoryProducts = {
           dropSub: 'Needs a product name column; cost, size, price and par are optional.',
           confirmLabel: 'Import',
           fields: this.importFieldsForCategory(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
+          onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
           onComplete: rows => { this._formCategory = cat; this.runImport(rows); }
         });
       }
@@ -671,7 +672,7 @@ S.InventoryProducts = {
       const initCps = sold ? this._resaleCps(p?.unit_cost, p?.servings_per_unit) : 0;
       resaleBlock = '<div class="form-row" style="margin-top:16px;">'
         + '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t1);cursor:pointer;">'
-          + '<input type="checkbox" id="ip-sold"' + (sold ? ' checked' : '') + ' style="appearance:auto;accent-color:var(--gold);width:15px;height:15px;margin:0;cursor:pointer;"/> Sold on the menu as-is (resale item)</label>'
+          + '<input type="checkbox" class="bc-check" id="ip-sold"' + (sold ? ' checked' : '') + '/> Sold on the menu as-is (resale item)</label>'
       + '</div>'
       + '<div id="ip-resale" style="' + (sold ? '' : 'display:none;') + 'margin-top:10px;">'
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
@@ -1342,13 +1343,11 @@ S.InventoryProducts = {
     const cat = this._import.cat;
     const spec = this.FORM_SPEC[cat] || {};
     return '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Upload ' + esc(spec.title || cat) + ' Product List</span>'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ip-imp-cancel">Cancel</button>'
-      + '</div>'
+      + '<div class="card-title">Upload ' + esc(spec.title || cat) + ' Product List</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
-      + '<div id="ip-csv-actions" class="no-print" style="margin:16px 0 24px;"></div>';
+      + '<div id="ip-csv-actions" class="no-print" style="margin:16px 0 24px;"></div>'
+      + '<div id="ip-imp-cancel-row" class="no-print" style="margin:0 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
   },
 
   // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
