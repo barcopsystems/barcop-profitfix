@@ -26,7 +26,7 @@ S.HubSettings = {
   render(container, group) {
     const allSecs = [
       { id:'profile', title:'Profile',                   body:this.secProfile(),       save:true },
-      { id:'tax',     title:'Taxes & Payroll',           body:this.secTaxes(),         save:true },
+      { id:'tax',     title:'Taxes, Payroll & Wage',     body:this.secTaxes(),         save:true },
       { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
       { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true }
@@ -76,20 +76,24 @@ S.HubSettings = {
       + '</div>';
   },
 
-  // Taxes & Payroll — the cross-section financial settings (sales tax rate, how
-  // you file, payroll burden). Entered once here; Cash, Books, and Events all
-  // read the same CashEngine keys. Stored on this device via CashEngine.
+  // Taxes, Payroll & Wage — the cross-section financial settings (sales tax rate,
+  // how you file, payroll burden, state minimum wage). Entered once here. Tax and
+  // payroll read the same CashEngine keys (stored on this device); the minimum
+  // wage lives in Labor's data store, where the Pay Periods tip-credit check,
+  // Payroll Export, and the Bar Cop Audit all read it.
   secTaxes() {
     const rate   = (window.CashEngine && CashEngine.salesTaxRate)  ? CashEngine.salesTaxRate()  : 0;
     const freq   = (window.CashEngine && CashEngine.taxFrequency)  ? CashEngine.taxFrequency()  : 'monthly';
     const burden = (window.CashEngine && CashEngine.payrollBurden) ? CashEngine.payrollBurden() : 0;
+    const mw     = (App.laborData && App.laborData.settings && App.laborData.settings.state_min_wage != null) ? App.laborData.settings.state_min_wage : '';
     const opt = (v, label) => '<option value="' + v + '"' + (freq === v ? ' selected' : '') + '>' + label + '</option>';
     return '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;"><label>Sales tax rate</label><div class="fw"><input class="suf" type="number" id="hs-tax" value="' + (rate || '') + '" step="0.01" placeholder="0"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="hs-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
       + '<div class="f" style="width:150px;"><label>Payroll tax</label><div class="fw"><input class="suf" type="number" id="hs-burden" value="' + (burden || '') + '" step="0.1" placeholder="0"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:160px;"><label>State minimum wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-minwage" min="0" step="0.01" value="' + (mw === '' ? '' : mw) + '" placeholder="0.00"/></div></div>'
       + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Set these once. Cash, Books, and Events all read them to track the tax and payroll you owe.</div>';
+      + '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Set these once. Cash, Books, and Events read the tax and payroll figures; Labor uses the minimum wage for the Pay Periods tip-credit check.</div>';
   },
 
   // Service Periods — which dayparts the operator runs. Mounts the shared
@@ -166,6 +170,14 @@ S.HubSettings = {
         CashEngine.setTaxFrequency(document.getElementById('hs-freq')?.value || 'monthly');
         CashEngine.setPayrollBurden(document.getElementById('hs-burden')?.value || '');
       }
+      // State minimum wage feeds the Labor tip-credit check; it lives in Labor's
+      // data store (loaded at boot, so this never clobbers it), so write it there
+      // and persist. The 'tax' branch pushes no App.data keys, so this is the save.
+      App.laborData = App.laborData || {};
+      App.laborData.settings = App.laborData.settings || {};
+      const mwRaw = document.getElementById('hs-minwage')?.value;
+      App.laborData.settings.state_min_wage = (mwRaw === '' || mwRaw == null) ? null : (parseFloat(mwRaw) || 0);
+      App.saveLabor();
     } else if (which === 'service') {
       const all = this._spCtrl ? this._spCtrl.value() : [];
       const errEl = document.getElementById('hs-sp-err');
@@ -2551,9 +2563,10 @@ S.HubSettings = {
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
 
-    // Wage Policy — Texas state minimum wage (matches the federal $7.25). Drives
-    // the tip-credit check on Pay Periods and the Bar Cop Audit's wage-policy
-    // component (which reads as "not configured" until this is set).
+    // State minimum wage — Texas (matches the federal $7.25). Set in App Settings
+    // under Business Profile (Taxes, Payroll & Wage). Drives the tip-credit check
+    // on Pay Periods and the Bar Cop Audit's wage-policy component (which reads as
+    // "not configured" until this is set).
     if (!App.laborData.settings) App.laborData.settings = {};
     App.laborData.settings.state_min_wage = 7.25;
 
