@@ -252,7 +252,6 @@ const DB = {
     'lc-schedule-history':'view-schedule',
     'lc-build-schedule':'manage-schedule',
     'lc-staff-roster':'manage-staff','lc-positions':'manage-staff',
-    'lc-wage-settings':'manage-staff',
     'lc-callout-log':'call-out-log','lc-time-off':'time-off',
     'lc-reports':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports','lc-payroll-export':'labor-reports',
     'lc-dashboard':'labor-dashboard','lc-help':'_always',

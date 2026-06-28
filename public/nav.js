@@ -325,13 +325,13 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Build Schedule</span>
       </div>
-      <div class="nav-item" data-screen="lc-overtime-watch" id="nav-lc-overtime-watch">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="9" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 6v3.2l2.2 1.3M6.5 2.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Overtime Watch</span>
-      </div>
       <div class="nav-item" data-screen="lc-schedule-history" id="nav-lc-schedule-history">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Schedule History</span>
+      </div>
+      <div class="nav-item" data-screen="lc-overtime-watch" id="nav-lc-overtime-watch">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="9" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 6v3.2l2.2 1.3M6.5 2.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Overtime Watch</span>
       </div>
       <div class="nav-item" data-screen="lc-time-off" id="nav-lc-time-off">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 11.5l4-2.5M6.5 9l4 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -375,10 +375,6 @@ const Labor = {
       <div class="nav-item" data-screen="lc-staff-roster" id="nav-lc-staff-roster">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Staff Roster</span>
-      </div>
-      <div class="nav-item" data-screen="lc-wage-settings" id="nav-lc-wage-settings">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5.5v6M6.5 7.5h3.5a1 1 0 0 1 0 2H7a1 1 0 0 0 0 2h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Wage Policy</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="lc-help" id="nav-lc-help">
