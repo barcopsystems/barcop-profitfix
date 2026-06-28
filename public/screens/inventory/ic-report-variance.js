@@ -842,7 +842,7 @@ S.InventoryVarianceReport = {
     }));
     this.container.querySelectorAll('.vr-review').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
-      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { onClose: () => this.draw() });
+      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { subtitle: b.dataset.reason, onClose: () => this.draw() });
     }));
   },
 
@@ -907,6 +907,18 @@ S.InventoryVarianceReport = {
     return Math.abs(pct || 0) > (parseFloat(t.flag) || 0)
       ? { label: 'Flag', color: 'var(--red)' } : { label: 'OK', color: 'var(--green)' };
   },
+  // Plain-English "why flagged" line shown as the investigation popup subtitle,
+  // e.g. "Aperol is running 3.5% over your 2% variance standard."
+  flagReason(key, pct, unitVar, name) {
+    const t = this.thresholds()[key] || { flag: 10 };
+    const who = name || 'This product';
+    if (t.bottles != null) {
+      const off = Math.abs(unitVar || 0);
+      const lim = parseFloat(t.bottles) || 1;
+      return who + ' is ' + this.n(off) + ' unit' + (off === 1 ? '' : 's') + ' off, past your ' + lim + '-unit variance standard.';
+    }
+    return who + ' is running ' + Math.abs(pct || 0).toFixed(1) + '% over your ' + (parseFloat(t.flag) || 0) + '% variance standard.';
+  },
   // A flagged row is an action: the status becomes a gold Flag button (cohesive
   // with the Receive Delivery flag) that opens a variance investigation for that
   // product in Profit Recovery. OK stays plain green text.
@@ -916,8 +928,9 @@ S.InventoryVarianceReport = {
       const list = (App.data.variance_investigations || []).filter(i => i.product_id === pid);
       const open = list.some(i => i.status !== 'resolved');
       const resolved = !open && list.some(i => i.status === 'resolved');
+      const reason = this.flagReason(key, pct, unitVar, name);
       const btn = (label, color) => '<button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
-        + '" style="' + (color || 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;">' + label + '</button>';
+        + '" data-reason="' + esc(reason) + '" style="' + (color || 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;">' + label + '</button>';
       if (open) return btn('Reviewing');
       if (resolved) return btn('Resolved', 'color:var(--green);');
       if (s.label === 'Flag') return btn('Review');
