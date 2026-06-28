@@ -261,6 +261,7 @@ const DB = {
     'sc-checklists':'checklists','sc-checklist-templates':'checklists',
     'sc-void-comp':'void-comp',
     'sc-maintenance':'maintenance',
+    'sc-incidents':'incident',
     'sc-waste':'waste',
     'sc-walked-tabs':'cash-mgmt',
     'sc-dashboard':'shift-dashboard','sc-help':'_always',
