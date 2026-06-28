@@ -81,10 +81,10 @@ S.InventoryMoversReport = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml, fixedColgroup) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"'
-      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:600px;"' : '') + '>'
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"'
+      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;"' : '') + '>'
       + (fixedColgroup || '') + '<thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   // Trend tables group by category, so they share a fixed colgroup (Product wide,
   // the four data columns equal) and line their columns up down the page.
@@ -210,7 +210,7 @@ S.InventoryMoversReport = {
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
         + '<td style="width:44%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div>'
+        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div>'
         + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + App.fmtCurrency(r.usageCost) + '</span></div></td>'
         + '<td>' + this.qtyU(r.product, r.used) + '</td></tr>';
     }).join('');
@@ -236,7 +236,7 @@ S.InventoryMoversReport = {
         + '<td>' + x.count + '</td>'
         + '<td style="width:34%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div></td>'
+        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div></div></td>'
         + '<td class="val">' + App.fmtCurrency(x.cost) + '</td>'
         + '<td>' + (total ? (x.cost / total * 100).toFixed(1) : '0.0') + '%</td></tr>';
     }).join('');
