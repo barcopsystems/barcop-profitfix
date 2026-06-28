@@ -145,10 +145,10 @@ S.LaborOvertimeWatch = {
 
     let projBody;
     if (rows.length === 0) {
-      projBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      projBody = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</td></tr></tbody></table></div></div>'
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No hours this week. Log hours or build a schedule for this week and Overtime Watch will project who is heading into overtime.</td></tr></tbody></table></div>'
         + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     } else {
       const trs = rows.map(r => {
@@ -180,10 +180,10 @@ S.LaborOvertimeWatch = {
           + '<td>' + badge + '</td>'
           + '<td>' + action + '</td></tr>';
       }).join('');
-      projBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      projBody = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Staff</th><th>Actual</th><th>Scheduled</th><th>Projected</th>'
         + '<th>Proj. OT Hrs</th><th>Extra OT Cost</th><th>Status</th><th>Suggested Action</th>'
-        + '</tr></thead><tbody>' + trs + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
         + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="ow-view-schedule">View Schedule for This Week</button></div>';
     }
 
