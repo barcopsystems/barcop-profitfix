@@ -181,7 +181,7 @@ S.ShiftVoidComp = {
     const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'vc-range-chip');
     const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="vc-print-blank">Worksheet</button></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="vc-export">Export PDF</button></div>'
       + '</div>';
     const custom = this.filterPreset !== 'custom' ? '' :
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
@@ -519,7 +519,7 @@ S.ShiftVoidComp = {
         + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '</div>';
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps')
+      + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', '<button class="btn btn-ghost btn-sm no-print" id="vc-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.modeToggleHtml(this.entryMode, 'vc-mode')
       + body

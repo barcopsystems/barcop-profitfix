@@ -138,7 +138,7 @@ S.ShiftWaste = {
 
   builderCard() {
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill')
+      + App.collapsibleCardTitle('sc-waste', 'Log Waste / Spill', '<button class="btn btn-ghost btn-sm no-print" id="wl-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.builderInner(null, true)
       + '</div></div>'
@@ -248,7 +248,7 @@ S.ShiftWaste = {
     const chips = App.filterChips(this.filterPreset, this.RANGE_CHIPS, 'wl-range-chip');
     const row = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button><button class="btn btn-ghost btn-sm" id="wl-print-blank">Worksheet</button></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" id="wl-export">Export PDF</button></div>'
       + '</div>';
     const custom = this.filterPreset !== 'custom' ? '' :
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
