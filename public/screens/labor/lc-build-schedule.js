@@ -829,9 +829,9 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-danger btn-sm bs-tmpl-del" data-id="' + esc(t.id) + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Template</th><th>Shifts</th><th>Hours</th><th>Est. Cost / wk</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   // Load a template's shifts onto the current week, in place. Confirms first if
