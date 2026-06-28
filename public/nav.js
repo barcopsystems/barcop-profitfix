@@ -421,7 +421,7 @@ const Shift = {
         <span class="nav-label">Maintenance</span>
       </div>
       <div class="nav-item" data-screen="sc-incidents" id="nav-sc-incidents">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L14 4.2v4.3c0 3.4-2.4 5.4-5.5 6.5C5.4 15.9 3 13.9 3 10.5V4.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 6v3M8.5 11v.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Incidents</span>
       </div>
       <div class="nav-section">Checklists</div>
