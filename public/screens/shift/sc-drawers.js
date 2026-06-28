@@ -73,9 +73,9 @@ S.ShiftDrawers = {
 
     let listHtml;
     if (all.length === 0) {
-      listHtml = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      listHtml = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Register Name</th><th>Default Opening Bank</th><th>Cash Tolerance</th><th>Notes</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No registers yet. Add your first one above.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No registers yet. Add your first one above.</td></tr></tbody></table></div>';
     } else {
       const row = d => '<tr>'
         + '<td><div class="val">' + esc(d.name) + '</div></td>'
@@ -87,16 +87,18 @@ S.ShiftDrawers = {
           + '<button class="btn btn-ghost btn-sm dr-archive" data-id="' + d.id + '" style="color:var(--red);">Archive</button>'
         + '</div></td></tr>';
 
-      listHtml = '<div class="card card-bleed data-card" style="margin-top:24px;">'
-        + '<div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      listHtml = '<div class="card" style="overflow-x:auto;margin-top:24px;">'
+        + '<table class="row-list"><thead><tr>'
         + '<th>Register Name</th><th>Default Opening Bank</th><th>Cash Tolerance</th><th>Notes</th><th></th>'
-        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + active.map(row).join('') + '</tbody></table></div>';
 
       if (archived.length) {
         listHtml += '<div class="sh" style="margin:24px 0 8px;">Archived</div>'
-          + '<div class="tbl-wrap"><table class="tbl"><tbody>'
+          + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+          + '<th>Register Name</th><th>Default Opening Bank</th><th>Cash Tolerance</th><th>Notes</th><th></th>'
+          + '</tr></thead><tbody>'
           + archived.map(d => '<tr style="opacity:0.55;">'
-              + '<td style="font-weight:700;color:var(--t2);">' + esc(d.name) + '</td>'
+              + '<td><div class="val">' + esc(d.name) + '</div></td>'
               + '<td>' + (d.default_opening_bank != null && d.default_opening_bank !== '' ? App.fmtCurrency(d.default_opening_bank) : '-') + '</td>'
               + '<td>&plusmn;' + App.fmtCurrency(App.drawerTolerance(d)) + '</td>'
               + '<td>' + esc(d.notes || '-') + '</td>'
