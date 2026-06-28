@@ -126,9 +126,9 @@ S.InventoryDeliveryHistory = {
         + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
-    const listCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th><th></th>'
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No deliveries in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div>'
       + App.showOlderBar('ic', 'delivery', filtered, this.filterPreset !== 'all');
 
     this.container.innerHTML = '<div class="screen">' + statsCard + this.filterRow() + listCard + '</div>';
@@ -252,9 +252,9 @@ S.InventoryDeliveryHistory = {
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">' + esc(d.vendor || 'Delivery') + ' &middot; ' + this.fmtDate(d.date) + '</div>'
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="dh-export">Export PDF</button></div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Product</th><th>Container</th><th>Qty</th><th>Unit Price</th><th>Price Change</th><th>Extended</th><th class="no-print"></th>'
-      + '</tr></thead><tbody>' + itemRows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + itemRows + '</tbody></table></div>'
       + '</div>';
 
     this.container.onclick = ev => {
