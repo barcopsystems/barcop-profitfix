@@ -1052,37 +1052,37 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ing-tbl td{padding:8px 10px;border-bottom:1px solid var(--row-div);vertical-align:middle;color:var(--t2);}
 .ing-tbl tr:last-child td{border-bottom:none;}
 
-/* TRIAL (revertible): .row-list pill rows on an EDITABLE ing-tbl line builder.
-   Opt-in via `.ing-tbl.rd-pill` so every other batch builder stays untouched.
-   The #0D181E row fill is already supplied by the .rd-line td rule; this only
-   separates the rows into rounded pills (6px gap) and rounds the pill ends.
-   Revert = drop ` rd-pill` from the table in ic-receive-delivery.js + this block. */
-.ing-tbl.rd-pill{border-collapse:separate;border-spacing:0 6px;}
-.ing-tbl.rd-pill td{border-bottom:none;border-radius:0;}
-.ing-tbl.rd-pill td:first-child{border-radius:8px 0 0 8px;}
-.ing-tbl.rd-pill td:last-child{border-radius:0 8px 8px 0;}
+/* STANDARD: pill rows for an EDITABLE ing-tbl line builder — the app-wide style
+   for forms with data rows (Receive Delivery, Order Sheet, etc.). Opt in by adding
+   `pill` to the table (`<table class="ing-tbl pill">`) and wrapping it in a
+   `.pill-wrap` div; every other batch builder stays untouched. The #0D181E row
+   fill comes from each builder's own `.xx-line td` rule; this just separates the
+   rows into rounded pills (6px gap) and rounds the pill ends. */
+.ing-tbl.pill{border-collapse:separate;border-spacing:0 6px;}
+.ing-tbl.pill td{border-bottom:none;border-radius:0;}
+.ing-tbl.pill td:first-child{border-radius:8px 0 0 8px;}
+.ing-tbl.pill td:last-child{border-radius:0 8px 8px 0;}
 /* Small row buttons, matching the Count History .row-list pills, so the short
    gold flag note (e.g. "$0.40 Over", "Short QTY 2") + Flag + Delete fit without
    wrapping the row. */
-.ing-tbl.rd-pill tbody .btn{padding:4px 9px;font-size:9px;}
-/* rd-pill trial: stack to clean label/value cards as soon as the BUILDER itself
-   gets too narrow for a flagged line (reason text + Flag + Delete), not at a
-   viewport breakpoint — the sidebar makes viewport width a poor proxy. Mirrors
-   the .row-list container-query approach so it compresses then stacks, never
-   horizontal-scrolls through that cramped middle zone. */
-.rd-lines-wrap{container-type:inline-size;}
-@container (max-width:800px){
-  .ing-tbl.rd-pill{border-spacing:0;display:block;width:100%;}
-  .ing-tbl.rd-pill thead{display:none;}
-  .ing-tbl.rd-pill tbody{display:block;width:100%;}
-  .ing-tbl.rd-pill tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
-  .ing-tbl.rd-pill tbody td{display:block;background:transparent;border:none;border-radius:0;padding:6px 0;}
-  .ing-tbl.rd-pill tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
-  .ing-tbl.rd-pill tbody td[data-label=""]::before{content:none;}
-  .ing-tbl.rd-pill tbody td .form-input{width:100%;}
-  .ing-tbl.rd-pill tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
-  .ing-tbl.rd-pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
-  .ing-tbl.rd-pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
+.ing-tbl.pill tbody .btn{padding:4px 9px;font-size:9px;}
+/* Stack to clean label/value cards as soon as the BUILDER itself gets too narrow,
+   not at a viewport breakpoint — the sidebar makes viewport width a poor proxy.
+   Mirrors the .row-list container-query approach so it compresses then stacks,
+   never horizontal-scrolls through the cramped middle zone. */
+.pill-wrap{container-type:inline-size;}
+@container (max-width:860px){
+  .ing-tbl.pill{border-spacing:0;display:block;width:100%;}
+  .ing-tbl.pill thead{display:none;}
+  .ing-tbl.pill tbody{display:block;width:100%;}
+  .ing-tbl.pill tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
+  .ing-tbl.pill tbody td{display:block;background:transparent;border:none;border-radius:0;padding:6px 0;}
+  .ing-tbl.pill tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .ing-tbl.pill tbody td[data-label=""]::before{content:none;}
+  .ing-tbl.pill tbody td .form-input{width:100%;}
+  .ing-tbl.pill tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
+  .ing-tbl.pill tbody td .row-actions{flex-direction:column;align-items:stretch;gap:8px;}
+  .ing-tbl.pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
 }
 
 /* ══ PROG BAR ══ */
