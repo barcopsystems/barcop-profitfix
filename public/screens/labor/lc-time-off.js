@@ -115,9 +115,9 @@ S.LaborTimeOff = {
 
     let below;
     if (ordered.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Staff</th><th>Dates</th><th>Type</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No time off logged yet. Use the form above to record requested days off, vacation, and sick leave.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No time off logged yet. Use the form above to record requested days off, vacation, and sick leave.</td></tr></tbody></table></div>';
     } else {
       const rows = ordered.slice(0, App.listLimit('lc', 'time_off')).map(r => {
         const days = this.dayCount(r.start_date, r.end_date);
@@ -131,9 +131,9 @@ S.LaborTimeOff = {
           + (App.canEdit('lc-time-off') ? '<button class="btn btn-danger btn-sm to-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Staff</th><th>Dates</th><th>Type</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('lc', 'time_off', ordered, false);
     }
 

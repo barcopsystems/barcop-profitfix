@@ -141,7 +141,7 @@ S.LaborCalloutLog = {
       + '</div>'
       + '<div id="' + p + 'sched-note" class="co-sched-line" style="font-size:11px;line-height:1.5;"></div>'
       + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Reason</label>'
-        + '<input type="text" id="' + p + 'reason" value="' + esc(c?.reason || '') + '" placeholder="Optional"/></div></div>';
+        + '<textarea id="' + p + 'reason" class="notes-ta" rows="2" placeholder="Optional">' + esc(c?.reason || '') + '</textarea></div></div>';
   },
 
   renderList() {
@@ -175,9 +175,9 @@ S.LaborCalloutLog = {
 
     let below;
     if (list.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No call-outs logged yet. Use the form above to log no-shows, sick calls, and late arrivals.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No call-outs logged yet. Use the form above to log no-shows, sick calls, and late arrivals.</td></tr></tbody></table></div>';
     } else {
       const rows = list.slice(0, App.listLimit('lc', 'callout')).map(c => {
         const reps = this.repeatCount(c.staff_id);
@@ -195,9 +195,9 @@ S.LaborCalloutLog = {
           + (App.canEdit('lc-callout-log') ? '<button class="btn btn-danger btn-sm co-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Type</th><th>Shift</th><th>Coverage</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('lc', 'callout', list, false);
     }
 
