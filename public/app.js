@@ -3338,19 +3338,21 @@ const App = {
         return this;
       },
       sectionTitle(text) {
-        this._need(26);
+        // Lead-in space ABOVE the title separates it from the section above; a
+        // tight gap BELOW the underline keeps it with the table it labels.
+        this.y += 10; this._need(26);
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(150, 140, 90);
         doc.text(App._pdfSafe(String(text).toUpperCase()), margin, this.y);
         this.y += 5;
         doc.setDrawColor(225, 225, 225); doc.line(margin, this.y, this.pageW - margin, this.y);
-        this.y += 13;
+        this.y += 8;
         return this;
       },
       heading(text, size) {
         size = size || 12;
-        this._need(size + 8);
+        this.y += 10; this._need(size + 8);
         doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.setTextColor(20, 20, 20);
-        doc.text(App._pdfSafe(text), margin, this.y); this.y += size + 6;
+        doc.text(App._pdfSafe(text), margin, this.y); this.y += 8;
         return this;
       },
       kv(label, value) {
