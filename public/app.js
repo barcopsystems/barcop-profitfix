@@ -3034,13 +3034,16 @@ const App = {
   // card body (wrapped in .collapse-body) plus any element tagged
   // data-collapse-group="<key>" — e.g. the drag/drop import card below the form.
   collapsibleCardTitle(key, titleText, rightHtml) {
+    // The caret TRAILS the title (never leads it) so the title text always starts
+    // at the same left edge whether or not the card collapses, keeping titles
+    // aligned page to page. Any top-card action (e.g. Worksheet) owns the far-right
+    // slot, so the caret and that action are never adjacent.
     return '<div class="card-title card-collapse-head" data-collapse-key="' + esc(key) + '" '
       + 'style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + esc(titleText) + '</span>'
-      + '<div style="display:flex;align-items:center;gap:10px;">'
-      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
-      + (rightHtml || '')
-      + '</div></div>';
+      + '<span style="display:inline-flex;align-items:center;gap:8px;">' + esc(titleText)
+      +   '<span class="card-chevron" aria-hidden="true">&#8250;</span></span>'
+      + (rightHtml ? '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' + rightHtml + '</div>' : '')
+      + '</div>';
   },
   _applyCollapseState(key, isCollapsed, root) {
     root = root || document;

@@ -992,8 +992,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    via CSS so the form stays mounted underneath (in-progress entries preserved). */
 .card-collapse-head{cursor:pointer;}
 .card-collapse-head:hover .card-chevron{color:var(--gold);}
-.card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:14px;line-height:1;transition:transform 0.18s,color 0.12s;}
-.card.collapsed .card-chevron{transform:rotate(-90deg);}
+.card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:18px;line-height:1;flex-shrink:0;transition:transform 0.18s,color 0.12s;transform:rotate(90deg);}
+.card.collapsed .card-chevron{transform:rotate(0deg);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 .collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
