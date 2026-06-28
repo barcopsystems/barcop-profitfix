@@ -1,10 +1,11 @@
 'use strict';
 
 /* ── Shift Control — Checklist Templates (writes sc_checklist_templates) ───────
-   Builds reusable Opening and Closing checklist templates. The Checklists
-   screen loads these; when none exist it falls back to the built-in defaults.
-   Inline new-template form on the landing, saved templates below, edit on its
-   own page. */
+   Builds reusable Opening and Closing checklist templates (the Checklists screen
+   loads these; when none exist it falls back to the built-in defaults), plus
+   free-named Print Only checklists for any station (Bar Close, Kitchen Open, ...)
+   that only export to a printable PDF for the clipboard and never run in the app.
+   Inline form on the landing, saved lists below, edit on its own page. */
 
 S.ShiftChecklistTemplates = {
   editId: null,
@@ -42,9 +43,10 @@ S.ShiftChecklistTemplates = {
 
   showHowTo() {
     App.showHelpModal('How Checklist Templates Work', [
-      { p: ['A template is a saved checklist: your standard opening or closing task list. Build one here and it loads on the Checklists screen so the manager just checks it off.'] },
-      { h: 'Build it', p: ['Name it, pick Opening or Closing, and add your items. Load the default to start from Bar Cop\'s built-in list, then add, remove, or drag the handle to reorder. The order here is the order it runs in.'] },
-      { h: 'Using it', p: ['Saved templates show up in the Template picker on the Checklists screen. With no template built, Checklists falls back to the built-in default list.'] }
+      { p: ['A template is a saved checklist. Opening and Closing templates load on the Checklists screen so the manager checks them off and the run is recorded. Print Only checklists are for the floor: build a list for any station and print it for a clipboard. They never run in the app.'] },
+      { h: 'Build it', p: ['Name it, pick Opening, Closing, or Print Only, and add your items. For Opening or Closing you can load the built-in default to start from, then add, remove, or drag the handle to reorder. The order here is the order it runs or prints in.'] },
+      { h: 'Opening and Closing', p: ['Saved Opening and Closing templates show up in the Template picker on the Checklists screen, where they are checked off and saved as a record. With none built, Checklists falls back to the built-in default list.'] },
+      { h: 'Print Checklists', p: ['Print Only checklists are named however you want, like Bar Close, Kitchen Open, or Floor Close, for the people working each station off paper. Each gets its own Export PDF that prints a clean sheet with empty checkboxes and blank Date and Completed By lines. They do not run in the app or save a record; the signed paper in your binder is the record.'] }
     ]);
   },
 
@@ -52,7 +54,8 @@ S.ShiftChecklistTemplates = {
   // One card: name + type, then a divided Checklist Items section. Primary
   // buttons live below the card.
   formBlock(isEdit) {
-    const typeOpts = this.TYPES.map(ty => '<option' + (this._type === ty ? ' selected' : '') + '>' + ty + '</option>').join('');
+    const typeOpts = [['Opening', 'Opening'], ['Closing', 'Closing'], ['Print', 'Print Only']]
+      .map(([v, l]) => '<option value="' + v + '"' + (this._type === v ? ' selected' : '') + '>' + l + '</option>').join('');
     const itemRows = this._items.map((it, idx) =>
       '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
       + DragReorder.handleDivHTML()
@@ -75,7 +78,7 @@ S.ShiftChecklistTemplates = {
       + '<div id="ct-items">' + itemsBlock + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">'
       + '<button class="btn btn-ghost btn-sm" id="ct-add-item">+ Add Item</button>'
-      + '<button class="btn btn-ghost btn-sm" id="ct-load-default">Load default ' + this._type + ' items</button>'
+      + (this._type !== 'Print' ? '<button class="btn btn-ghost btn-sm" id="ct-load-default">Load default ' + this._type + ' items</button>' : '')
       + '</div>'
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
@@ -87,17 +90,18 @@ S.ShiftChecklistTemplates = {
       + '</div>';
   },
 
-  savedSection(type) {
+  savedSection(type, heading, withExport) {
     const list = this.templates().filter(t => t.type === type);
     if (list.length === 0) return '';
     const rows = list.map(t => '<tr class="ct-row" data-id="' + t.id + '" style="cursor:pointer;">'
       + '<td><div class="val">' + esc(t.name) + '</div></td>'
       + '<td>' + (t.items ? t.items.length : 0) + ' items</td>'
       + '<td><div class="row-actions">'
+      + (withExport ? '<button class="btn btn-ghost btn-sm ct-export" data-id="' + t.id + '">Export PDF</button>' : '')
       + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="sh" style="margin:24px 0 10px;">' + type + ' Templates</div>'
+    return '<div class="sh" style="margin:24px 0 10px;">' + (heading || (type + ' Templates')) + '</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
@@ -106,13 +110,15 @@ S.ShiftChecklistTemplates = {
     if (this.actions) this.actions.innerHTML = '';
     const all = this.templates();
     const saved = all.length
-      ? (this.savedSection('Opening') + this.savedSection('Closing'))
+      ? (this.savedSection('Opening') + this.savedSection('Closing') + this.savedSection('Print', 'Print Checklists', true))
       : '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Items</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {
+      const exp = ev.target.closest('.ct-export');
+      if (exp) { ev.stopPropagation(); this.exportPrint(exp.dataset.id); return; }
       const row = ev.target.closest('.ct-row');
       const edit = ev.target.closest('.ct-edit');
       const del = ev.target.closest('.ct-del');
@@ -209,6 +215,28 @@ S.ShiftChecklistTemplates = {
       if (btn) { btn.disabled = false; btn.textContent = this.editId ? 'Update Template' : 'Save Template'; }
       fail('Save failed. Try again.');
     }
+  },
+
+  // Export a Print checklist as a blank printable sheet for the clipboard: empty
+  // checkboxes, blank Date / Completed By / Initials lines. Print-only, no record.
+  async exportPrint(id) {
+    const t = this.templates().find(x => x.id === id);
+    if (!t) return;
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const items = (t.items || []);
+    const b = App._pdfBuilder(t.name + ' Checklist');
+    b.header({ right: t.name, meta: 'Checklist' });
+    b.kv('Date', '________________');
+    b.kv('Completed By', '________________');
+    b.kv('Initials', '________________');
+    b.spacer(6);
+    b.sectionTitle('Check off each item as you complete it');
+    b.table(['Done', 'Item'], items.map(x => ['[   ]', x]), { columnStyles: { 0: { cellWidth: 55 } } });
+    b.spacer(8);
+    b.sectionTitle('Notes');
+    b.paragraph(' ');
+    await b.save('BarCop_' + App.fileSafe(t.name) + '_Checklist.pdf');
   },
 
   async confirmDel(id) {
