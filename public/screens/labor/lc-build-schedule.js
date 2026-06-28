@@ -285,26 +285,53 @@ S.LaborBuildSchedule = {
     return out;
   },
 
-  // Live overtime warning off the current draft: hourly staff scheduled at or near
-  // the 40-hour line. Re-runs on every grid change (draw() recomputes totals), so
-  // you catch OT while building, not after posting. Amber = the watch color.
-  overtimeWarning(T) {
+  // ONE box for every scheduling issue in the current draft: overtime, overlapping
+  // shifts, and shifts on a day off. Each is its own labelled section (amber for an
+  // overridable watch, red for a real conflict) separated by a faint divider, so
+  // the operator can scan everything before posting. Re-runs on every grid change
+  // (draw() recomputes), so fixing an issue drops it out; no issues = no box.
+  schedulingWarnings(T) {
     const OT = App.OT_THRESHOLD || 40;
-    const list = Object.keys(T.byStaff || {})
+    const sections = [];
+
+    // Overtime: hourly staff at or near 40 this week.
+    const ot = Object.keys(T.byStaff || {})
       .map(id => ({ id, hrs: T.byStaff[id] }))
-      .filter(x => x.hrs >= OT - 2)   // 38+ catches "approaching" as well as over
-      .sort((a, b) => b.hrs - a.hrs);
-    if (!list.length) return '';
-    const items = list.map(x => {
-      const st = this.staffById(x.id);
-      const nm = st ? (st.name || 'Staff') : 'Staff';
-      const tag = x.hrs > OT ? '(' + (x.hrs - OT).toFixed(1) + ' OT)' : '(near OT)';
-      return '<span style="color:var(--t1);font-weight:600;">' + esc(nm) + '</span> ' + x.hrs.toFixed(1) + ' hrs ' + tag;
+      .filter(x => x.hrs >= OT - 2)
+      .sort((a, b) => b.hrs - a.hrs)
+      .map(x => {
+        const st = this.staffById(x.id); const nm = st ? (st.name || 'Staff') : 'Staff';
+        const tag = x.hrs > OT ? '(' + (x.hrs - OT).toFixed(1) + ' OT)' : '(near OT)';
+        return '<span style="color:var(--t1);font-weight:600;">' + esc(nm) + '</span> ' + x.hrs.toFixed(1) + ' hrs ' + tag;
+      });
+    if (ot.length) sections.push({ label: 'Overtime Watch', color: 'var(--amber)', body: ot.join(' &middot; '),
+      note: 'Hours over ' + OT + ' in a week are paid at time and a half. Trim a shift to stay under, or schedule it on purpose.' });
+
+    // Overlapping shifts + shifts on a day off — distinct staff+day.
+    const seenOv = new Set(), ov = [], seenOff = new Set(), off = [];
+    this.draft.shifts.forEach((sh, i) => {
+      if (!sh.staff_id || !sh.day) return;
+      const st = this.staffById(sh.staff_id); const nm = st ? (st.name || 'Staff') : 'Staff';
+      const k = sh.staff_id + '|' + sh.day;
+      if (sh.start && sh.end && this.isConflict(sh, i) && !seenOv.has(k)) {
+        seenOv.add(k); ov.push('<span style="color:var(--t1);font-weight:600;">' + esc(nm) + '</span> ' + esc(sh.day));
+      }
+      const offReason = this.offReasonFor(sh.staff_id, sh.day);
+      if (offReason && !seenOff.has(k)) {
+        seenOff.add(k); off.push('<span style="color:var(--t1);font-weight:600;">' + esc(nm) + '</span> ' + esc(sh.day) + ' <span style="color:var(--t4);">(' + esc(offReason) + ')</span>');
+      }
     });
-    return '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:10px 14px;margin-top:10px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Overtime Watch</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;">' + items.join(' &middot; ')
-      + '<div style="color:var(--t4);font-size:10px;margin-top:4px;">Hours over ' + OT + ' in a week are paid at time and a half. Trim a shift to stay under, or schedule it on purpose.</div></div></div>';
+    if (ov.length) sections.push({ label: 'Overlapping Shifts', color: 'var(--red)', body: ov.join(' &middot; '),
+      note: 'The same person is booked twice on the same day. Fix the times or remove a shift.' });
+    if (off.length) sections.push({ label: 'Scheduled On A Day Off', color: 'var(--amber)', body: off.join(' &middot; '),
+      note: 'On a requested or regular day off. Move it, or post it on purpose.' });
+
+    if (!sections.length) return '';
+    const rows = sections.map((s, i) => '<div style="' + (i ? 'border-top:1px solid var(--b2);margin-top:11px;padding-top:11px;' : '') + '">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + s.color + ';margin-bottom:5px;">' + s.label + '</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.7;">' + s.body + '</div>'
+      + '<div style="color:var(--t4);font-size:10px;margin-top:3px;">' + s.note + '</div></div>').join('');
+    return '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:12px;">' + rows + '</div>';
   },
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -427,9 +454,7 @@ S.LaborBuildSchedule = {
       + '<thead><tr><th style="padding:8px;text-align:left;font-size:10px;letter-spacing:1px;color:var(--t3);">Staff</th>' + headCells + '</tr></thead>'
       + '<tbody>' + body + footer + '</tbody></table></div></div></div>'
       + this.dayViewHTML(d, T)
-      + (T.conflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:10px;">' + T.conflicts + ' overlapping shift' + (T.conflicts === 1 ? '' : 's') + ' on the same person and day. The red blocks need fixing.</div>' : '')
-      + (T.offConflicts > 0 ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin-top:6px;">' + T.offConflicts + ' shift' + (T.offConflicts === 1 ? '' : 's') + ' on a day someone is off (requested time off or a regular day off). The red blocks are the conflicts.</div>' : '')
-      + this.overtimeWarning(T);
+      + this.schedulingWarnings(T);
 
     // Totals strip
     const totalsCard = '<div class="card" style="margin-top:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -815,7 +840,7 @@ S.LaborBuildSchedule = {
       { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
       { h: 'Days Off', p: ['A cell reads Off when that person requested the day off (logged on Time Off and approved) or has it as a regular day off (set on their Staff Roster profile). Drop a shift on an Off day and the block turns red; you also get a warning before the schedule posts, so you never accidentally schedule someone you already gave the day off. You can still override and post it.'] },
       { h: 'The Labor Budget', p: ['Set the week\'s revenue forecast at the top. Bar Cop turns it into a labor budget (your target percent of the forecast), shows the Target Hours that forecast can support at your RPLH target, and shows live what you have scheduled and how much budget is left, green when you are under and red when you are over. No history yet? Type a number; Bar Cop starts suggesting one once you have a few weeks logged.'] },
-      { h: 'Overtime Watch', p: ['As you build, an Overtime Watch note under the grid lists anyone scheduled at or near 40 hours for the week, with how many hours are in overtime. Hours over 40 pay at time and a half, so catch it here: trim a shift to stay under, hand the hours to someone else, or schedule the overtime on purpose. Salaried staff never show, since they are exempt.'] },
+      { h: 'Scheduling Warnings', p: ['As you build, one warnings box under the grid gathers anything to look at before you post: anyone in or near overtime (hours over 40 pay at time and a half), anyone double-booked with overlapping shifts, and anyone scheduled on a requested or regular day off. Each is its own labelled note. Fix an issue and it drops out of the box; when there is nothing to flag, the box does not show at all. You can always post as is and override a warning on purpose. Salaried staff never show in overtime, since they are exempt.'] },
       { h: 'Templates', p: ['To start from a typical week, Load one of your Saved Templates listed at the bottom of this page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched. On an empty week that follows a posted one, a Start from last week button drops your most recent posted schedule onto the grid so you pencil in the changes instead of rebuilding a typical week shift by shift.'] },
       { h: 'Working an Event', p: ['When a booked event falls on a day, that day gets an EVENT tag in the header. Open anyone working it and check the "Working [event name]" box in the shift pop-up (a picker when more than one event lands that day) so only that person\'s logged hours flow to the booking\'s Event P&L. Leave it unchecked for staff covering the regular floor that night.'] },
