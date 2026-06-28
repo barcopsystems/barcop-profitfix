@@ -622,8 +622,10 @@ S.LaborBuildSchedule = {
       : '';
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
       + offBanner
-      + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">'
+      + '<div class="form-row" style="margin-bottom:14px;">'
       + this._timeSelectFields('bs-m-start', sh.start, 'Start')
+      + '</div>'
+      + '<div class="form-row" style="margin-bottom:0;">'
       + this._timeSelectFields('bs-m-end', sh.end, 'End')
       + '</div>'
       + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:6px;min-height:14px;"></div>'
@@ -813,9 +815,8 @@ S.LaborBuildSchedule = {
 
   templatesSection() {
     const list = this.templates();
-    const heading = '<div class="sh" style="margin:24px 0 10px;">Saved Templates</div>';
     if (!list.length) {
-      return heading + '<div style="font-size:13px;color:var(--t3);padding:4px 2px;">Name a schedule in the Save box above to save it as a reusable template. Your saved templates show up here to load any time.</div>';
+      return '<div style="font-size:13px;color:var(--t3);padding:4px 2px;margin-top:24px;">Name a schedule in the Save box above to save it as a reusable template. Your saved templates show up here to load any time.</div>';
     }
     const rows = list.map(t => {
       const st = this.templateStats(t);
@@ -829,8 +830,8 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-danger btn-sm bs-tmpl-del" data-id="' + esc(t.id) + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Template</th><th>Shifts</th><th>Hours</th><th>Est. Cost / wk</th><th></th>'
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+      + '<th>Saved Templates</th><th>Shifts</th><th>Hours</th><th>Est. Cost / wk</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
