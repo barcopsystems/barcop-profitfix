@@ -197,22 +197,22 @@ S.InventoryMoversReport = {
   },
 
   tabRank(rows, desc) {
-    const headers = '<th>Product</th><th>Usage Cost</th><th>Units Used</th>';
+    const headers = '<th>Product</th><th></th><th>Units Used</th><th>Usage Cost</th>';
     // Only products that actually moved (real dollar usage). Zero usage is dead
     // stock, not a slow mover — see the Stock Report.
     const ranked = [...rows].filter(r => r.usageCost != null && r.usageCost > 0)
       .sort((a, b) => desc ? b.usageCost - a.usageCost : a.usageCost - b.usageCost).slice(0, 10);
-    if (!ranked.length) return this.dataCard(headers, '<tr><td colspan="3" style="color:var(--t3);padding:12px 8px;">No products moved in this period and filter. Both counts must include the same products.</td></tr>');
+    if (!ranked.length) return this.dataCard(headers, '<tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products moved in this period and filter. Both counts must include the same products.</td></tr>');
     const max = Math.max(...ranked.map(r => Math.abs(r.usageCost)), 1);
     const body = ranked.map(r => {
       const pct = Math.min(100, Math.abs(r.usageCost) / max * 100);
       return '<tr><td><div class="val">' + esc(r.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
-        + '<td style="width:44%;padding-right:32px;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<td style="width:40%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div>'
-        + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + App.fmtCurrency(r.usageCost) + '</span></div></td>'
-        + '<td>' + this.qtyU(r.product, r.used) + '</td></tr>';
+        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div></div></td>'
+        + '<td>' + this.qtyU(r.product, r.used) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(r.usageCost) + '</td></tr>';
     }).join('');
     return this.dataCard(headers, body);
   },
