@@ -14,7 +14,7 @@ S.LaborStaffRoster = {
   detailId: null,
   certEditId: null,
   noteEditId: null,
-  entryMode: 'import',     // landing card: import a staff file (default) vs type a profile
+  entryMode: 'manual',     // landing card: type a profile (default) vs import a staff file. Roster is setup data, not a recurring POS export, so manual-first (matches Vendors).
   _draft: null,            // in-memory Add-Staff draft (survives leave/return)
 
   CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
@@ -228,7 +228,7 @@ S.LaborStaffRoster = {
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
@@ -240,9 +240,9 @@ S.LaborStaffRoster = {
 
     let below;
     if (list.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div>';
     } else {
       const rows = list.map(s => {
         const pos = this.positionById(s.position_id);
@@ -270,9 +270,9 @@ S.LaborStaffRoster = {
       below = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">Staff Roster</div>'
         + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
@@ -456,9 +456,9 @@ S.LaborStaffRoster = {
           + '</div></td></tr>';
       }).join('');
     return heading
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Effective</th><th>Was</th><th>New Wage</th><th>Change</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Past hours cost out at the wage in effect on the day worked. Fix an effective date here if a change was recorded on the wrong day. To change the current wage, edit the profile above; that records a new change here.</div>';
   },
 
@@ -541,9 +541,9 @@ S.LaborStaffRoster = {
       + '<div class="sh" style="margin:0;">Certifications &amp; Licenses</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div></div>';
     if (list.length === 0) {
-      return heading + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>';
     }
     const rows = list.map(c => {
       const status = this.certStatus(c);
@@ -563,9 +563,9 @@ S.LaborStaffRoster = {
         + '</div></td></tr>';
     }).join('');
     return heading
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   // Cert add/edit in a focused pop-up (own cert- ids; no collision with the
