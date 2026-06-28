@@ -13,7 +13,7 @@
 S.InventoryVendors = {
   editId: null,
   _pendingDelId: null,
-  entryMode: 'import',     // default to import (Import File first); 'manual' = type a vendor
+  entryMode: 'manual',     // default to manual entry (Enter Manually first); 'import' = bulk vendor-list upload
   TERMS: ['', 'COD', 'Net 7', 'Net 15', 'Net 30', 'Net 60'],
 
   vendors() {
@@ -99,8 +99,7 @@ S.InventoryVendors = {
           + '<button class="btn btn-ghost btn-sm iv-del" data-id="' + v.id + '" style="color:var(--red);">Delete</button>'
           + '</div></td></tr>';
       }).join('');
-      listSection = '<div class="sh" style="margin-top:24px;">Your Vendors</div>'
-        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      listSection = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Vendor</th><th>Rep</th><th>Phone</th><th>Terms</th><th>Products</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
@@ -170,7 +169,7 @@ S.InventoryVendors = {
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>'
+      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
