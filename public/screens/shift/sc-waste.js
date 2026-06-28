@@ -127,8 +127,8 @@ S.ShiftWaste = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="wlb-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Recorded By</label><select id="wlb-by">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-      + '<table class="ing-tbl"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:12px;">'
+      + '<table class="ing-tbl pill"><thead><tr>'
       + '<th style="min-width:200px;">Product</th><th style="width:90px;">Units</th><th style="width:70px;">Unit</th>'
       + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + rowsHtml + '</tbody></table></div>'
@@ -278,9 +278,9 @@ S.ShiftWaste = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const totalCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       // No "Total Units" tile — waste rows mix unit types (bottles, ounces, food
@@ -292,9 +292,9 @@ S.ShiftWaste = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No waste in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'waste')).map(r => {
           const p = this.productById(r.product_id);
@@ -312,9 +312,9 @@ S.ShiftWaste = {
             + (App.canEdit('sc-waste') ? '<button class="btn btn-danger btn-sm wl-del" data-id="' + r.id + '">Delete</button>' : '')
             + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Shift</th><th>Product</th><th>Units</th><th>Cost</th><th>Reason</th><th>Recorded By</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'waste', filtered, this.filterPreset !== 'all');
       }
       below = statsCard + this.filterRow() + listHtml;

@@ -211,9 +211,9 @@ S.ShiftVoidComp = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th><th>Authorized By</th><th>Reason</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No voids or comps logged yet. Use the form above to log the first one.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No voids or comps logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const voids = filtered.filter(r => r.type === 'Void');
       const comps = filtered.filter(r => r.type === 'Comp');
@@ -228,9 +228,9 @@ S.ShiftVoidComp = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th><th>Authorized By</th><th>Reason</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No voids or comps in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No voids or comps in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'void_comp')).map(r => '<tr class="vc-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
@@ -244,9 +244,9 @@ S.ShiftVoidComp = {
           + (App.canEdit('sc-void-comp') ? '<button class="btn btn-ghost btn-sm vc-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-void-comp') ? '<button class="btn btn-danger btn-sm vc-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Type</th><th>Item</th><th>Amount</th><th>Server</th><th>Authorized By</th><th>Reason</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'void_comp', filtered, this.filterPreset !== 'all');
       }
       below = statsCard + this.filterRow() + listHtml;
@@ -480,8 +480,8 @@ S.ShiftVoidComp = {
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="vcb-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Authorized By <span style="color:var(--t4);font-weight:400;">(comps)</span></label><select id="vcb-auth">' + App.staffOptions('', { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-      + '<table class="ing-tbl"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:12px;">'
+      + '<table class="ing-tbl pill"><thead><tr>'
       + '<th style="width:104px;">Type</th><th style="min-width:180px;">Item <span style="color:var(--t4);">(optional)</span></th>'
       + '<th style="width:108px;">Amount</th><th style="width:80px;">Units</th>'
       + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
