@@ -393,7 +393,7 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-ghost btn-sm" id="bs-from-last">Start from last week</button></div>'
       : '';
 
-    const gridCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 14px;flex-wrap:wrap;">'
+    const gridCard = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 14px;flex-wrap:wrap;">'
       + this.weekSelector()
       + '<div class="no-print" style="display:flex;gap:8px;">'
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button>'
