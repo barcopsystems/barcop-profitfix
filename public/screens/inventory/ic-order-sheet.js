@@ -235,7 +235,7 @@ S.InventoryOrderSheet = {
     const openOrders = hiddenVendors.map(v => this.openOrderForVendor(v)).filter(Boolean);
     const orderedSection = openOrders.length === 0 ? '' :
       '<div style="flex:1;min-width:280px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Already Ordered</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:8px;">Already Ordered</div>'
       + openOrders.map(o => '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--b2);">'
           + '<div style="font-size:12px;color:var(--t1);min-width:0;">' + esc(o.vendor) + ' <span style="color:var(--t3);white-space:nowrap;">&middot; ' + App.fmtCurrency(o.total || 0) + ' &middot; ' + esc(o.status || 'Open') + '</span></div>'
           + '<div style="display:flex;gap:8px;flex-shrink:0;position:relative;align-items:center;">'
@@ -604,7 +604,7 @@ S.InventoryOrderSheet = {
     const parOff = this.parIssueCount(products || []);
     const parNudge = parOff > 0
       ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
-        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--gold);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> ' + (parOff === 1 ? 'looks' : 'look') + ' off versus your real usage. Tuning ' + (parOff === 1 ? 'it' : 'them') + ' sharpens these reorder numbers.</span>'
+        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--amber);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> ' + (parOff === 1 ? 'looks' : 'look') + ' off versus your real usage. Tuning ' + (parOff === 1 ? 'it' : 'them') + ' sharpens these reorder numbers.</span>'
         + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
       : '';
     const title = isEdit
