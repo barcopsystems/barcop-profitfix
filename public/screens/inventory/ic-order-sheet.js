@@ -13,6 +13,7 @@ S.InventoryOrderSheet = {
   _editVendor: null,    // vendor whose placed order is pulled back for editing
   _pendingEditId: null, // one-shot: order id to edit, set by Order History deep-link
   _menuCloser: null,    // active outside-click closer for an open ⋯ menu
+  customOpen: false,    // is the Create Custom Order card open (toggled by the status-card link)
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
@@ -141,7 +142,7 @@ S.InventoryOrderSheet = {
         + '<div class="empty" style="margin:0;"><div class="empty-title">Everything is at par</div>'
         + '<div class="empty-sub">No products in the ' + this.fmtDate(data.latest.date)
         + ' count are below their par level. Nothing to order.</div></div>'
-        + this.countAgeNote(data.latest, false) + '</div>';
+        + this.customToggleRow(data.latest) + '</div>';
     } else {
       statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
       vendorHtml = editHtml + (visibleVendors.length
@@ -151,7 +152,7 @@ S.InventoryOrderSheet = {
     }
 
     // Custom Order card sits right below Order Status, above the suggested vendor cards.
-    this.container.innerHTML = '<div class="screen">' + statusHtml + this.customOrderPanelHTML() + vendorHtml + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statusHtml + (this.customOpen ? this.customOrderPanelHTML() : '') + vendorHtml + '</div>';
 
     // Per-card input handler for the quantity field on existing lines, plus the
     // in-row product picker on blank Add Item rows.
@@ -202,8 +203,14 @@ S.InventoryOrderSheet = {
         return;
       }
       if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
+      if (ev.target.closest('.os-co-toggle')) {
+        this.customOpen = !this.customOpen;
+        if (!this.customOpen) this.closeCustomOrder();
+        this.renderMain();
+        return;
+      }
       if (coCreate) { this.createCustomOrder(); return; }
-      if (coCancel) { this.closeCustomOrder(); return; }
+      if (coCancel) { this.customOpen = false; this.closeCustomOrder(); this.renderMain(); return; }
       if (create) this.createOrder(create.dataset.vendor);
     };
 
@@ -247,7 +254,7 @@ S.InventoryOrderSheet = {
     return '<div class="card form-card"><div class="card-title">'
       + '<span>Order Status</span></div>'
       + '<div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">' + stillSection + orderedSection + '</div>'
-      + this.countAgeNote(data.latest, false)
+      + this.customToggleRow(data.latest)
       + '</div>';
   },
 
@@ -259,10 +266,25 @@ S.InventoryOrderSheet = {
     const inner = 'Suggestions are based on your ' + this.fmtDate(latest.date) + ' count'
       + (days > 0 ? ' (' + days + ' day' + (days === 1 ? '' : 's') + ' ago)' : ' (today)') + '.'
       + (stale ? ' <span class="os-take" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Take a fresh count</span> for accurate numbers.' : '');
+    // 'inline' = just the text (no border/margin); the caller supplies the row
+    // that pairs it with the Create Custom Order link.
+    if (standalone === 'inline') {
+      return '<div style="font-size:11px;color:' + (stale ? 'var(--amber)' : 'var(--t3)') + ';">' + inner + '</div>';
+    }
     if (standalone) {
       return '<div style="font-size:11px;color:' + (stale ? 'var(--amber)' : 'var(--t3)') + ';margin-top:14px;">' + inner + '</div>';
     }
     return '<div style="font-size:11px;color:' + (stale ? 'var(--amber)' : 'var(--t3)') + ';margin-top:14px;border-top:1px solid var(--b2);padding-top:10px;">' + inner + '</div>';
+  },
+
+  // The Order Status card's bottom row: the count-age note on the left, the gold
+  // Create / Cancel Custom Order toggle link on the right.
+  customToggleRow(latest) {
+    const label = this.customOpen ? '+ Cancel Custom Order' : '+ Create Custom Order';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:14px;border-top:1px solid var(--b2);padding-top:10px;">'
+      + '<div style="flex:1;min-width:200px;">' + this.countAgeNote(latest, 'inline') + '</div>'
+      + '<span class="os-co-toggle" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">' + label + '</span>'
+      + '</div>';
   },
 
   // ── Email an already-placed order to the vendor (reuses Order History's body) ─
@@ -445,6 +467,7 @@ S.InventoryOrderSheet = {
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
+      this.customOpen = false;
       this.closeCustomOrder();
       this.renderMain();
       this.scrollContentTop();
@@ -594,7 +617,7 @@ S.InventoryOrderSheet = {
 
     return '<div class="card form-card os-vcard" data-vendor="' + this.cssEsc(vendor) + '"' + (isEdit ? ' data-order-id="' + esc(opts.orderId) + '"' : '') + '>'
       + '<div class="card-title">' + title + '</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
       + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
       + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
@@ -617,14 +640,14 @@ S.InventoryOrderSheet = {
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const opts = '<option value="">Select vendor...</option>'
       + vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('');
-    return '<div class="sh" style="margin:24px 0 10px;">New Custom Order</div>'
+    return '<div class="sh" style="margin:24px 0 10px;">Create Custom Order</div>'
       + '<div class="card form-card os-vcard os-custom" data-vendor="">'
       + '<div class="form-row" style="margin-bottom:0;">'
         + '<div class="f" style="width:280px;margin-bottom:0;"><label>Vendor</label>'
           + '<select class="os-co-vendor">' + opts + '</select></div>'
       + '</div>'
       + '<div class="os-co-body" style="display:none;margin-top:12px;">'
-        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl"><thead><tr>'
+        + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
           + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
         + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
