@@ -3041,7 +3041,7 @@ const App = {
     return '<div class="card-title card-collapse-head" data-collapse-key="' + esc(key) + '" '
       + 'style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span style="display:inline-flex;align-items:center;gap:8px;">' + esc(titleText)
-      +   '<span class="card-chevron" aria-hidden="true">&#8250;</span></span>'
+      +   '<span class="card-chevron" aria-hidden="true">&#9662;</span></span>'
       + (rightHtml ? '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' + rightHtml + '</div>' : '')
       + '</div>';
   },
