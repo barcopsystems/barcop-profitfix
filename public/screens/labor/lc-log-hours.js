@@ -115,21 +115,21 @@ S.LaborLogHours = {
     const shiftOpts = this.SHIFTS.map(s =>
       '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || 'Select shift...') + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
+      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Date</label>'
       + '<input type="date" id="' + p + 'date" value="' + esc(a?.date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1 1 200px;min-width:0;"><label>Staff</label>'
+      + '<div class="f" style="flex:1 1 170px;min-width:0;"><label>Staff</label>'
       + '<select id="' + p + 'staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
-      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Shift</label>'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Shift</label>'
       + '<select id="' + p + 'shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Hours</label>'
+      + '<div class="f" style="flex:1 1 90px;min-width:0;"><label>Hours</label>'
       + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Wage</label>'
+      + '<div class="f-display" style="color:var(--w);" id="' + p + 'c-wage">-</div></div>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Labor Cost</label>'
+      + '<div class="f-display" style="color:var(--w);" id="' + p + 'c-cost">-</div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div></div>'
-      + '<div class="calc" style="margin-bottom:0;">'
-      + '<div class="calc-item"><div class="calc-label">Wage</div><div class="calc-val" id="' + p + 'c-wage">-</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Labor Cost</div><div class="calc-val" id="' + p + 'c-cost">-</div></div>'
-      + '</div>';
+      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div></div>';
   },
 
   // Attach the live-calc listeners for whichever form is mounted (inline or edit).
@@ -241,9 +241,9 @@ S.LaborLogHours = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged yet. Fill them from your posted schedule or enter them by hand above.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged yet. Fill them from your posted schedule or enter them by hand above.</td></tr></tbody></table></div>';
     } else {
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
@@ -253,9 +253,9 @@ S.LaborLogHours = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No hours logged in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('lc', 'actual')).map(a => {
           const lockedBadge = a.locked ? ' <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);">LOCKED</span>' : '';
@@ -274,9 +274,9 @@ S.LaborLogHours = {
             + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
             + '<td><div class="row-actions">' + actions + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('lc', 'actual', filtered, this.filterPreset !== 'all');
       }
 
@@ -381,7 +381,7 @@ S.LaborLogHours = {
     // coverage only and carry no hourly cost.
     if (staff && App.isSalaried(staff)) {
       set('c-wage', 'Salary');
-      set('c-cost', 'Salaried (no hourly cost)');
+      set('c-cost', 'Salaried');
       return;
     }
     // Wage in effect on the entry's date — handles past-dated entries after
@@ -515,7 +515,7 @@ S.LaborLogHours = {
     const nextBtn = isCur
       ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
       : '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
-    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 14px;">'
       + '<button type="button" class="btn btn-ghost btn-sm" id="lo-fill-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
       + pill
       + nextBtn
@@ -544,8 +544,8 @@ S.LaborLogHours = {
       return picker + '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Every scheduled shift this week is already logged. Pick another week to fill.</div>';
     }
     const loggedNote = logged ? ' <span style="color:var(--t3);">(' + logged + ' already logged)</span>' : '';
-    const readout = '<div style="font-size:13px;color:var(--t2);margin:14px 0 2px;">'
-      + '<span style="color:var(--t1);font-weight:600;">' + toReview + ' shift' + (toReview === 1 ? '' : 's') + '</span> ready to log from the schedule, hours pre-filled.' + loggedNote + '</div>';
+    const readout = '<div style="font-size:13px;color:var(--t2);margin:18px 0 2px;">'
+      + '<span style="color:var(--gold);font-weight:700;">' + toReview + ' shift' + (toReview === 1 ? '' : 's') + '</span> ready to log from the schedule, hours pre-filled.' + loggedNote + '</div>';
     return picker + readout;
   },
 
@@ -612,7 +612,7 @@ S.LaborLogHours = {
           + '</tr>';
       }).join('');
       return '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:14px 0 6px;">' + esc(lbl) + '</div>'
-        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;"><table class="ing-tbl" style="table-layout:fixed;"><tbody>' + trs + '</tbody></table></div>';
+        + '<div style="overflow-x:auto;margin-bottom:6px;"><table class="ing-tbl pill" style="table-layout:fixed;"><tbody>' + trs + '</tbody></table></div>';
     }).join('');
   },
 
@@ -677,7 +677,7 @@ S.LaborLogHours = {
       { p: ['This is where actual hours worked get recorded. Logged hours feed your weekly labor cost, prime cost, and revenue per labor hour across Profit and Revenue Recovery, so what you enter here drives the numbers everywhere else.'] },
       { h: 'Logging An Entry', p: ['Pick Enter Manually, then fill the row: date, staff member, shift, and hours worked, and Save Hours. Bar Cop costs it out at the wage in effect on that date, so a past-dated entry after a raise still uses the old wage, not today\'s. Salaried staff can be logged for coverage, but their hours carry no hourly cost because they are paid a fixed salary.'] },
       { h: 'Filling From The Schedule', p: ['Pick Fill from Schedule to pull a posted week in instead of typing each row. Use the week chips and arrows to choose the week, then Review and Log Week opens it. Everyone scheduled comes in checked with their hours pre-filled, and anyone with a no-show or sick call-out logged for that day is unchecked for you. Uncheck anyone else who did not work, fix any hours, then log the whole week at once. Shifts already logged are kept out of the list so nothing double-counts.'] },
-      { h: 'Importing A Timeclock Export', p: ['Got a timeclock or POS export? Drop it on the Labor cockpit, where Bar Cop matches each row to your roster by name and costs it at the wage in effect on the date worked. Anything that does not match, or is missing hours, is reported so you can fix it. The imported hours land in the list here to review and edit.'] },
+      { h: 'Importing A Timeclock Export', p: ['Got a timeclock or POS export? Drop it on Close The Week in Labor, where Bar Cop matches each row to your roster by name and costs it at the wage in effect on the date worked. Anything that does not match, or is missing hours, is reported so you can fix it. The imported hours land in the list here to review and edit.'] },
       { h: 'Closed Pay Periods', p: ['Once a pay period is closed in Pay Periods, its entries lock so the payroll handoff stays clean. Reopen the period there if you need to correct a locked entry.'] }
     ]);
   },
