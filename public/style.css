@@ -674,7 +674,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
 .dr-dragging td:last-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset -1px 0 0 0 var(--gold-tint-bord);}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
-.vc-line td,.wl-line td,.tp-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td{background:#0D181E;}
+.vc-line td,.wl-line td,.tp-row td,.tpe-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td{background:#0D181E;}
 /* A flagged delivery line keeps the standard data-row fill; the gold reason text + Flag button carry the flag, not a tinted row. */
 .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
