@@ -512,8 +512,8 @@ S.InventoryLocations = {
         + (assigned.length ? '<span style="font-size:10px;color:var(--t3);">Drag the handle to set the order Take Inventory counts these in.</span>' : '')
         + '</div>';
       const arrangeCard = assigned.length
-        ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-            + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
+        ? '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
+            + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
             + '</tr></thead><tbody id="il-arrange-body">'
             + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
                 + DragReorder.handleCellHTML()
@@ -524,10 +524,10 @@ S.InventoryLocations = {
                 + '<td>' + esc(p.vendor || '-') + '</td>'
                 + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
                 + '</tr>').join('')
-            + '</tbody></table></div></div>'
-        : '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-          + '<th style="width:32px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div></div>';
+            + '</tbody></table></div>'
+        : '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
+          + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div>';
       middle = arrangeHeading + arrangeCard;
     }
 
@@ -594,7 +594,7 @@ S.InventoryLocations = {
     document.getElementById('il-name')?.addEventListener('input', e => { this._nameDraft = e.target.value; });
     document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.updateLocation(l.id); });
     const ab = document.getElementById('il-arrange-body');
-    if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'dr-dragging', onCommit: ids => this._persistProductOrder(l.name, ids) });
+    if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'il-drag', onCommit: ids => this._persistProductOrder(l.name, ids) });
   },
 
   _toggleEdit(id, on) {
