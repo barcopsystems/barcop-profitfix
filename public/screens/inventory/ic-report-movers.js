@@ -210,7 +210,7 @@ S.InventoryMoversReport = {
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
         + '<td style="width:40%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div></div></td>'
+        + '<div style="height:100%;width:' + pct + '%;background:var(--sel-active-bg);"></div></div></div></td>'
         + '<td>' + this.qtyU(r.product, r.used) + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.usageCost) + '</td></tr>';
     }).join('');
@@ -236,7 +236,7 @@ S.InventoryMoversReport = {
         + '<td>' + x.count + '</td>'
         + '<td style="width:34%;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div></div></td>'
+        + '<div style="height:100%;width:' + pct + '%;background:var(--sel-active-bg);"></div></div></div></td>'
         + '<td class="val">' + App.fmtCurrency(x.cost) + '</td>'
         + '<td>' + (total ? (x.cost / total * 100).toFixed(1) : '0.0') + '%</td></tr>';
     }).join('');
