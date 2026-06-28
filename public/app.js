@@ -3230,11 +3230,15 @@ const App = {
     const ensure = h => { if (y > pageH - 60 - h) { doc.addPage(); y = margin; } };
     blocks.forEach(b => {
       if (b.type === 'heading') {
-        ensure(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
-        doc.text(b.text, margin, y); y += 16;
+        // Lead-in space ABOVE the title (separates it from the section above) and
+        // a small gap BELOW so the title sits with the table it labels, not the one
+        // before it. Text draws at its baseline, so most of the visible space lands
+        // below; shifting it above fixes the "title hugs the wrong section" gap.
+        y += 12; ensure(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
+        doc.text(b.text, margin, y); y += 7;
       } else if (b.type === 'subheading') {
-        ensure(16); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
-        doc.text(b.text.toUpperCase(), margin, y); y += 13;
+        y += 10; ensure(16); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
+        doc.text(b.text.toUpperCase(), margin, y); y += 6;
       } else if (b.type === 'kv' || b.type === 'note') {
         ensure(15); doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
         doc.text(b.text, margin, y); y += 14;
