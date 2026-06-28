@@ -15,7 +15,8 @@ S.ShiftChecklists = {
   TYPES: ['Opening', 'Closing'],
   TYPE: 'Opening',
   _typePicked: false,
-  _run: null,
+  _runs: {},     // in-progress run per type, so switching the Opening/Closing toggle never wipes the other list
+  _run: null,    // active reference = _runs[this.TYPE]
   filterPreset: 'last-4',  // active range chip
   _prevPreset: 'last-4',
   filterFrom: '',          // custom range only
@@ -95,8 +96,9 @@ S.ShiftChecklists = {
     if (actions) actions.innerHTML = '';
     // Default the toggle to the checklist that fits the time of day, once.
     if (!this._typePicked) { this.TYPE = new Date().getHours() < 15 ? 'Opening' : 'Closing'; this._typePicked = true; }
-    // Keep an in-progress checklist across navigation; only Start Over or Save resets it.
-    if (!this._run) this.startRun();
+    // Keep an in-progress checklist across navigation; only Start Over or Save
+    // resets it. ensureRun points at THIS type's run without touching the other.
+    this.ensureRun();
     this.renderMain();
   },
 
@@ -118,6 +120,14 @@ S.ShiftChecklists = {
       notes: '',
       items: this.itemsFor(tid)
     };
+    this._runs[this.TYPE] = this._run;
+  },
+
+  // Point _run at the current type's in-progress run, creating it only if this
+  // type has none yet. Switching the toggle keeps each list's checks intact.
+  ensureRun() {
+    if (this._runs[this.TYPE]) this._run = this._runs[this.TYPE];
+    else this.startRun();
   },
 
   showHowTo() {
@@ -177,7 +187,7 @@ S.ShiftChecklists = {
       + '</div>'
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="cl-save">Save Completed Checklist</button>'
+      + '<button class="btn btn-primary" id="cl-save">Save Checklist</button>'
       + '<button class="btn btn-ghost" id="cl-startover">Start Over</button>'
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
@@ -222,7 +232,7 @@ S.ShiftChecklists = {
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       const tog = ev.target.closest('.cl-toggle');
-      if (tog) { this.TYPE = tog.dataset.type; this.startRun(); this.renderMain(); return; }
+      if (tog) { this._syncRun(); this.TYPE = tog.dataset.type; this.ensureRun(); this.renderMain(); return; }
       const chip = ev.target.closest('.cl-range-chip');
       if (chip) {
         this._syncRun();
@@ -292,7 +302,7 @@ S.ShiftChecklists = {
     if (ok) { this.startRun(this._run.templateId); this.renderMain(); }
     else {
       this.runs().pop();
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Completed Checklist'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Checklist'; }
       fail('Save failed. Try again.');
     }
   },
