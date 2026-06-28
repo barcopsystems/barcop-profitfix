@@ -119,8 +119,8 @@ S.InventoryStockReport = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   note(text, color) {
     return '<div class="card"><div style="font-size:12px;color:' + (color || 'var(--t3)') + ';padding:8px 0;">' + esc(text) + '</div></div>';

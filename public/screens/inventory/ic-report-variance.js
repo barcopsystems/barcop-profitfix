@@ -260,8 +260,8 @@ S.InventoryVarianceReport = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml, fixedColgroup) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"' + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:560px;"' : '') + '>'
-      + (fixedColgroup || '') + '<thead><tr>' + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"' + (fixedColgroup ? ' style="table-layout:fixed;width:100%;"' : '') + '>'
+      + (fixedColgroup || '') + '<thead><tr>' + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   scrollTop() {
     const s = this.container && (this.container.closest('.content') || document.querySelector('.content'));

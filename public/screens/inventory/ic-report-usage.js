@@ -94,10 +94,10 @@ S.InventoryUsageReport = {
       + '</div></div>';
   },
   dataCard(headers, rowsHtml, fixedColgroup) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"'
-      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;min-width:760px;"' : '') + '>'
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list"'
+      + (fixedColgroup ? ' style="table-layout:fixed;width:100%;"' : '') + '>'
       + (fixedColgroup || '') + '<thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   // Product column fixed-wide; the nine data columns share the rest equally, so
   // every category table lines its columns up with the ones above and below it.
