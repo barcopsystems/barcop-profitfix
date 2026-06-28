@@ -371,9 +371,9 @@ S.LaborTipLog = {
 
     let below;
     if (all.length === 0) {
-      below = '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged yet. Tap a day above and the crew auto-fills, or import a POS tips export on Close The Week in Labor.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged yet. Tap a day above and the crew auto-fills, or import a POS tips export on Close The Week in Labor.</td></tr></tbody></table></div>';
     } else {
       const cash = filtered.reduce((t, x) => t + (x.cash_tips || 0), 0);
       const card = filtered.reduce((t, x) => t + (x.card_tips || 0), 0);
@@ -386,9 +386,9 @@ S.LaborTipLog = {
 
       let listHtml;
       if (filtered.length === 0) {
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>Total</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged in this range. Pick a wider range above.</td></tr></tbody></table></div></div>';
+          + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No tips logged in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const hasTipOut = filtered.some(x => (x.tip_out_paid || 0) > 0 || (x.tip_out_received || 0) > 0);
         const rows = filtered.slice(0, App.listLimit('lc', 'tip')).map(x => {
@@ -410,11 +410,11 @@ S.LaborTipLog = {
           + (App.canEdit('lc-tip-log') ? '<button class="btn btn-danger btn-sm tl-del" data-id="' + x.id + '">Delete</button>' : '')
           + '</div></td></tr>';
         }).join('');
-        listHtml = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
           + '<th>Date</th><th>Staff</th><th>Cash</th><th>Card</th><th>' + (hasTipOut ? 'Gross' : 'Total') + '</th>'
           + (hasTipOut ? '<th>Tip-Out</th><th>Net</th>' : '')
           + '<th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('lc', 'tip', filtered, this.filterPreset !== 'all');
       }
 
@@ -482,7 +482,7 @@ S.LaborTipLog = {
             ? 'No tipped staff scheduled for this day still need tips entered. Add staff below.'
             : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
-    const tbl = (head, body) => '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+    const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
     if (!on) {
@@ -501,10 +501,10 @@ S.LaborTipLog = {
     const eBody = earners.map((r, i) => this.batchEarnerRow(r, i)).join('');
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
       || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No staff on schedule. Add staff below if one worked.</td></tr>';
-    const grid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
-    const sGrid = '<th style="width:150px;">Staff</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
-    const eTable = '<div class="sh" style="margin:0 0 8px;">Pays / Receives Tip-Out</div>' + tbl(grid, eBody);
-    const sTable = '<div class="sh" style="margin:14px 0 8px;">Receives Tip-Out</div>' + tbl(sGrid, sBody);
+    const grid = '<th style="width:150px;">Pays / Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
+    const sGrid = '<th style="width:150px;">Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
+    const eTable = tbl(grid, eBody);
+    const sTable = tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
     const recon = this.tipOutRecon(this._addRows);
     const gapCls = Math.abs(recon.gap) > 0.01 ? 'warn' : 'good';
@@ -1040,8 +1040,8 @@ S.LaborTipLog = {
     const rows = this._poolRows || [];
     const rowHtml = rows.map((r, i) => this.poolRowHtml(r, i, equal)).join('');
     const rowsBlock = rows.length
-      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'
-        + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      ? '<div class="pill-wrap" style="margin-bottom:12px;">'
+        + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
         + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
@@ -1284,7 +1284,7 @@ S.LaborTipLog = {
           + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
       + '</div>'
       + '<div style="max-height:38vh;overflow-y:auto;padding-right:8px;">'
-        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;"><table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<div style="overflow-x:auto;margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
         + '<th>Staff</th><th style="width:80px;">Hours</th><th style="width:100px;">Tip Share</th><th style="width:96px;"></th>'
         + '</tr></thead><tbody id="tpe-rows">' + rowHtml + '</tbody></table></div></div>'
       + '<button class="btn btn-ghost btn-sm" id="tpe-add">+ Add Participant</button>'
@@ -1397,9 +1397,9 @@ S.LaborTipLog = {
       + '<button class="btn btn-ghost btn-sm tp-hedit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm tp-hdel" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="card card-bleed data-card" style="margin-top:24px;"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Method</th><th>Pool</th><th>Participants</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('lc', 'tip_pool', list, false);
   },
 
