@@ -208,7 +208,7 @@ S.InventoryMoversReport = {
       const pct = Math.min(100, Math.abs(r.usageCost) / max * 100);
       return '<tr><td><div class="val">' + esc(r.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
-        + '<td style="width:44%;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<td style="width:44%;padding-right:32px;"><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
         + '<div style="height:100%;width:' + pct + '%;background:var(--t3);"></div></div>'
         + '<span style="font-size:11px;color:var(--t2);white-space:nowrap;">' + App.fmtCurrency(r.usageCost) + '</span></div></td>'
