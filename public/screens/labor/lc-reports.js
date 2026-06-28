@@ -127,8 +127,8 @@ S.LaborReports = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(headers, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
-      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
+      + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
   noRow(cols, msg) {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">' + esc(msg || 'No hours match the filter.') + '</td></tr>';
@@ -239,15 +239,19 @@ S.LaborReports = {
     const hoursVar = schedHours != null ? actHours - schedHours : null;
 
     const isToday = this.date === App.todayLocal();
-    // Bare picker row where the "Logged Hours" heading was: date box + arrows +
-    // Today on the left, Export on the right. align-items:center keeps the native
-    // date box aligned with the chip-style buttons (a native date field can't be a
-    // pixel match for a button, but height-matched and centered it reads clean).
+    // Day selector styled like the Week lens pill: prev / DAY pill (TODAY badge) /
+    // next + Today snap on the left, Export on the right. Step by day with the
+    // arrows; next is capped at today.
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const dayNow = isToday ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">TODAY</span>' : '';
+    const dayPill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + this.fmtDay(this.date).toUpperCase() + dayNow + '</span>';
+    const nextDayBtn = isToday
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
     const pickerRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-      + '<input type="date" id="dv-date" value="' + esc(this.date) + '" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--w);font-family:\'Barlow\',sans-serif;font-size:11px;padding:5px 10px;color-scheme:dark;outline:none;"/>'
-      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day">&lsaquo;</button>'
-      + '<button class="btn btn-ghost btn-sm" id="dv-next" title="Next day" aria-label="Next day">&rsaquo;</button>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-ghost btn-sm" id="dv-prev" title="Previous day" aria-label="Previous day" style="margin:0;padding:3px 9px;">&lsaquo;</button>'
+      + dayPill + nextDayBtn
       + (isToday ? '' : '<button class="btn btn-ghost btn-sm" id="dv-today">Today</button>')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
@@ -264,9 +268,9 @@ S.LaborReports = {
 
     let actualsCard;
     if (dayActuals.length === 0) {
-      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      actualsCard = '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:28%;">Staff</th><th style="width:15%;">Shift</th><th style="width:14%;">Hours</th><th style="width:15%;">Wage</th><th style="width:14%;">Cost</th><th style="width:14%;"></th>'
-        + '</tr></thead><tbody>' + this.noRow(6, 'No hours logged for this day. Log them in Log Hours.') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + this.noRow(6, 'No hours logged for this day. Log them in Log Hours.') + '</tbody></table></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = [...dayActuals].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(a => {
@@ -284,9 +288,9 @@ S.LaborReports = {
           + '<td class="val">' + costCell + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      actualsCard = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      actualsCard = '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:28%;">Staff</th><th style="width:15%;">Shift</th><th style="width:14%;">Hours</th><th style="width:15%;">Wage</th><th style="width:14%;">Cost</th><th style="width:14%;"></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     let schedCard = '';
@@ -314,9 +318,9 @@ S.LaborReports = {
         : '';
       schedCard = '<div class="sh" style="margin:24px 0 10px;">Scheduled This Day</div>'
         + nudge
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:28%;">Staff</th><th style="width:15%;">Start</th><th style="width:14%;">End</th><th style="width:15%;">Hours</th><th style="width:14%;">Cost</th><th style="width:14%;">Status</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     return summaryCard + pickerRow + actualsCard + schedCard;
@@ -408,9 +412,9 @@ S.LaborReports = {
     let staffBody;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {
-      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      staffBody = '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:34%;">Staff</th><th style="width:16%;">Days</th><th style="width:16%;">Hours</th><th style="width:18%;">Cost</th><th style="width:16%;"></th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No hours logged for this week.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);">No hours logged for this week.</td></tr></tbody></table></div>';
     } else {
       const canEdit = App.canEdit && App.canEdit('lc-log-hours');
       const rows = staffKeys.sort((a, b) => byStaff[b].cost - byStaff[a].cost).map(k => {
@@ -426,9 +430,9 @@ S.LaborReports = {
           + '<td class="val">' + App.fmtCurrency(s.cost) + '</td>'
           + '<td><div class="row-actions">' + editBtn + '</div></td></tr>';
       }).join('');
-      staffBody = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      staffBody = '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:34%;">Staff</th><th style="width:16%;">Days</th><th style="width:16%;">Hours</th><th style="width:18%;">Cost</th><th style="width:16%;"></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     // By day
@@ -444,9 +448,9 @@ S.LaborReports = {
         + '<td class="val">' + App.fmtCurrency(c) + '</td><td></td></tr>');
     }
     const dayCard = '<div class="sh" style="margin:24px 0 10px;">By Day</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:34%;">Day</th><th style="width:16%;">Headcount</th><th style="width:16%;">Hours</th><th style="width:18%;">Hourly Cost</th><th style="width:16%;"></th>'
-      + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + dayRows.join('') + '</tbody></table></div>';
 
     // Scheduled-but-not-logged nudge
     let notLoggedNames = [];
@@ -476,16 +480,17 @@ S.LaborReports = {
     const recs = weekActuals.filter(a => (a.staff_id || a.name) === key && !a.locked);
     if (!recs.length) return;
     const sorted = recs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const bodyRows = sorted.map(r =>
-      '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:10px;" data-id="' + r.id + '">'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Date</label>'
-          + '<div style="font-size:12px;color:var(--t2);padding:8px 0;">' + esc(this.fmtDay(r.date)) + '</div></div>'
-        + '<div class="f" style="width:100px;flex-shrink:0;"><label>Hours</label>'
-          + '<input type="number" class="ws-em-hours" min="0" step="0.25" value="' + (r.hours != null ? r.hours : '') + '"/></div>'
-        + '<div class="f" style="flex:1;min-width:160px;"><label>Notes</label>'
-          + '<input type="text" class="ws-em-notes" value="' + esc(r.notes || '') + '" placeholder="Optional"/></div>'
-      + '</div>'
-    ).join('');
+    const bodyRows = '<div style="overflow-x:auto;margin-bottom:2px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      + '<th>Date</th><th style="width:110px;">Hours</th><th>Notes</th>'
+      + '</tr></thead><tbody>'
+      + sorted.map(r =>
+          '<tr class="wsem-line" data-id="' + r.id + '">'
+            + '<td><div class="val">' + esc(this.fmtDay(r.date)) + '</div></td>'
+            + '<td><input type="number" class="ws-em-hours form-input" min="0" step="0.25" value="' + (r.hours != null ? r.hours : '') + '" style="width:100%;"/></td>'
+            + '<td><input type="text" class="ws-em-notes form-input" value="' + esc(r.notes || '') + '" placeholder="Optional" style="width:100%;"/></td>'
+          + '</tr>'
+        ).join('')
+      + '</tbody></table></div>';
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Edit Hours' + (recs[0].name ? ' &middot; ' + esc(recs[0].name) : '') + '</div>'
       + bodyRows
@@ -497,7 +502,7 @@ S.LaborReports = {
     document.getElementById('ws-em-cancel')?.addEventListener('click', () => App.closeModal('ws-edit-modal'));
     document.getElementById('ws-em-save')?.addEventListener('click', async () => {
       const edits = [];
-      document.querySelectorAll('#ws-edit-modal .form-row[data-id]').forEach(row => {
+      document.querySelectorAll('#ws-edit-modal .wsem-line[data-id]').forEach(row => {
         const rec = this.actuals().find(a => a.id === row.dataset.id);
         if (rec) edits.push({ rec, hours: parseFloat(row.querySelector('.ws-em-hours')?.value), notes: row.querySelector('.ws-em-notes')?.value || '' });
       });
