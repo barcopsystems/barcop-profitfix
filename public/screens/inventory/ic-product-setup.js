@@ -1346,8 +1346,8 @@ S.InventoryProducts = {
       + '<div class="card-title">Upload ' + esc(spec.title || cat) + ' Product List</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
-      + '<div id="ip-csv-actions" class="no-print" style="margin:16px 0 24px;"></div>'
-      + '<div id="ip-imp-cancel-row" class="no-print" style="margin:0 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>';
+      + '<div id="ip-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
+      + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
   },
 
   // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
