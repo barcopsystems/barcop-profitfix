@@ -123,17 +123,6 @@ S.LaborStaffRoster = {
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '</div>'
-      // Secondary role + rate (optional): a cross-trained employee who works a
-      // second position at a different wage. Logging hours in that role costs at
-      // this rate (App.wageForStaffPosition). Salaried staff carry no hourly cost.
-      + '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
-      + '<select id="sr-pos2"><option value="">None</option>'
-      + positions.map(p => '<option value="' + p.id + '"' + (s && s.secondary_position_id === p.id ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('')
-      + '</select></div>'
-      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
-      + '</div>'
       // Shift Lead lives OUTSIDE a .f wrapper on purpose: the global `.f input`
       // rule forces appearance:none, which kills the native checkbox. A plain div
       // keeps the checkbox rendering normally (gold via accent-color).
@@ -146,7 +135,19 @@ S.LaborStaffRoster = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
-      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly. Management is always a supervisor.</span></label></div>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly.</span></label></div>'
+      + '</div>'
+      // Secondary role + rate (optional): a cross-trained employee who works a
+      // second position at a different wage. Logging hours in that role costs at
+      // this rate (App.wageForStaffPosition); the wage auto-fills from the role's
+      // default. Salaried staff carry no hourly cost.
+      + '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<select id="sr-pos2"><option value="">None</option>'
+      + positions.map(p => '<option value="' + p.id + '"' + (s && s.secondary_position_id === p.id ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
@@ -194,6 +195,22 @@ S.LaborStaffRoster = {
       chip.style.color = on ? 'var(--t2)' : 'var(--t1)';
       chip.style.fontWeight = on ? '' : '700';
     }));
+    // Secondary wage auto-fills from the secondary role's default wage, mirroring
+    // the primary. Touched-detection seeds off any wage already on file so an
+    // existing custom secondary wage is not overwritten when the role changes;
+    // clearing the role (None) empties the wage and re-arms the auto-fill.
+    const pos2El = document.getElementById('sr-pos2');
+    const wage2El = document.getElementById('sr-wage2');
+    if (pos2El && wage2El) {
+      let wage2Touched = !!(wage2El.value && parseFloat(wage2El.value) > 0);
+      wage2El.addEventListener('input', () => { wage2Touched = true; });
+      pos2El.addEventListener('change', e => {
+        if (!e.target.value) { wage2El.value = ''; wage2Touched = false; return; }
+        if (wage2Touched) return;
+        const p = this.positionById(e.target.value);
+        wage2El.value = (p && p.default_wage != null) ? p.default_wage : '';
+      });
+    }
   },
 
   renderList() {
