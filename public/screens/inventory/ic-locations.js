@@ -242,15 +242,15 @@ S.InventoryLocations = {
 
       const listHeading = '';
       const listCard = active.length
-        ? '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        ? '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
-            + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div></div>'
-        : '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+            + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div>'
+        : '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
-            + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No active locations. Restore one from Archived below, or add a new one above.</td></tr></tbody></table></div></div>';
+            + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No active locations. Restore one from Archived below, or add a new one above.</td></tr></tbody></table></div>';
       const archivedSection = archived.length
         ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
-          + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+          + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
             + '</tr></thead><tbody>'
             + archived.map(l => { const n = this.productCount(l.name); return '<tr data-id="' + esc(l.id) + '">'
@@ -260,7 +260,7 @@ S.InventoryLocations = {
                 + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm il-unarchive" data-id="' + esc(l.id) + '">Restore</button>'
                 + '<button class="btn btn-danger btn-sm il-delperm" data-id="' + esc(l.id) + '">Delete Permanently</button></div></td>'
               + '</tr>'; }).join('')
-            + '</tbody></table></div></div>'
+            + '</tbody></table></div>'
         : '';
       listSection = listHeading + listCard + archivedSection;
     }
@@ -326,9 +326,9 @@ S.InventoryLocations = {
     cbClass = cbClass || 'il-cb';
     rowClass = rowClass || 'il-prow';
     if (!prods.length) {
-      return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      return '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th></th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No matching products yet. Add products on the Products screen first, then assign them here.</td></tr></tbody></table></div></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No matching products yet. Add products on the Products screen first, then assign them here.</td></tr></tbody></table></div>';
     }
     const rowHtml = p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
       + '<td><input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/></td>'
@@ -340,10 +340,10 @@ S.InventoryLocations = {
     const colgroup = '<colgroup><col style="width:40px;"/><col style="width:220px;"/><col/><col/><col/></colgroup>';
     return App.subcatGroups(prods, cat).map((g, gi) => {
       const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
-      return '<div class="card card-bleed data-card" style="margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
-        + '<div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:640px;">' + colgroup + '<thead><tr>'
+      return '<div class="card" style="overflow-x:auto;margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
+        + '<table class="row-list" style="table-layout:fixed;width:100%;">' + colgroup + '<thead><tr>'
         + '<th></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
-        + '</tr></thead><tbody>' + g.items.map(rowHtml).join('') + '</tbody></table></div></div>';
+        + '</tr></thead><tbody>' + g.items.map(rowHtml).join('') + '</tbody></table></div>';
     }).join('');
   },
 
