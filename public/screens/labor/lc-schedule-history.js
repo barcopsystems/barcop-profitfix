@@ -77,10 +77,10 @@ S.LaborScheduleHistory = {
         + '</div></div>';
       html = statsCard
         + '<div class="sh" style="margin:24px 0 10px;">Schedule History</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Week Starting</th><th>Shifts</th><th>Hours</th><th>Labor Cost</th>'
         + '<th>Labor %</th><th>RPLH</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('lc', 'schedule', list, false);
     }
 
@@ -148,9 +148,9 @@ S.LaborScheduleHistory = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Shift Schedule &middot; Week of ' + this.fmtDate(s.week_start) + '</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="lh-export">Export PDF</button></div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Staff</th><th>Day</th><th>Start</th><th>End</th><th>Hours</th><th>Wage</th><th>Cost</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + (s.notes ? '<div style="font-size:12px;color:var(--t3);margin-top:14px;">Notes: ' + esc(s.notes) + '</div>' : '')
       + '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">'
       + '<button class="btn btn-primary" id="lh-edit-detail">Edit in Build Schedule</button>'
