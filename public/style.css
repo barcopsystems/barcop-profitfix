@@ -641,6 +641,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .row-list tbody td[data-label=""]::before{content:none;}
   .row-list tbody td[data-label=""]{justify-content:flex-end;}
 }
+/* Set Locations "Products In This Location" arrange list: a .row-list whose drag
+   grip sits OUTSIDE the pill (first cell transparent, the pill starts at the 2nd
+   cell), like the checklist template. The row being dragged just fills #0F1A21 —
+   no border, no box-shadow (its own drag class, not the gold-tint .dr-dragging). */
+.row-list.il-arrange tbody td.dr-handle{background:transparent;border-radius:0;padding-left:0;}
+.row-list.il-arrange tbody td:nth-child(2){border-radius:6px 0 0 6px;}
+.row-list.il-arrange tbody tr.il-drag td{background:#0F1A21;}
+.row-list.il-arrange tbody tr.il-drag td.dr-handle{background:transparent;}
 /* Financial-statement pill rows (.pnl-list) — the on-screen Income Statement and
    Sales Tax snapshots (the real export is the spreadsheet). Like .row-list pills
    but KEEPS its columns on mobile (a statement loses meaning stacked) and supports
