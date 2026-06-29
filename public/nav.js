@@ -376,6 +376,10 @@ const Labor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Staff Roster</span>
       </div>
+      <div class="nav-item" data-screen="lc-training" id="nav-lc-training">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.5l6 2.7-6 2.7-6-2.7 6-2.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 7v3.5c0 1.1 1.8 2 4 2s4-0.9 4-2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 5.2v3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Training</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="lc-help" id="nav-lc-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
