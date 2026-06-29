@@ -348,9 +348,6 @@ S.ThisWeek = {
       + '<div class="divider"></div>'
       + subhead('Operating Costs')
       + '<div class="form-row" style="align-items:flex-end;gap:18px;">' + moneyField('tw-pf', '3rd-Party Platform Fees', d.platform_fees) + '</div>'
-      + '<div class="divider"></div>'
-      + '<div class="f" style="margin:0;"><label>Notes</label>'
-      + '<textarea id="tw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
   },
 
