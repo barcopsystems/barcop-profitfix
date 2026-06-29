@@ -1,158 +1,327 @@
 'use strict';
+
+/* ── Profit Recovery — Close The Week (landing screen) ────────────────────────
+   The weekly profit close, modeled on the Control closes (Inventory / Labor /
+   Shift): the Recovery Scoreboard up top, then "Close Out Your Week" with a
+   week-stepper and the week's profit steps top to bottom, the open step expanding
+   as a live workspace. The steps are the real last-night profit routine: log the
+   week, see where margin slipped, work the biggest leak, and run the deep audit
+   when it comes due. Reuses FixPanel (the Scoreboard + leak board) and S.ThisWeek
+   for the week math (App.data.weeks, period_end). */
+
 S.Dashboard = {
+  _weekEnd: null,    // Sunday (period_end) of the selected week
+  _openStep: null,   // which step is expanded ('' = all collapsed; null = auto-open first undone)
+  _flash: null,
+
   showHowTo() {
-    App.showHelpModal('How the Profit Dashboard Works', [
-      { p: ['The Profit Recovery landing runs the whole loop on one page: how much you have recovered up top, where the operation is leaking right now and your costs against target just under it, your profit forecast and your audit below that, and the jobs you run most at the bottom. Every number is computed from your own logged data, never an industry average. Before you have run an audit or logged a week, a Get Started strip points you at your first audit and the Control sections that feed Recovery.'] },
-      { h: 'Recovery Scoreboard', p: ['The headline is what Bar Cop has measured you put back in the register since you marked each fix implemented. Realized to date, not a projection. A figure appears once two weeks of after-data exist and firms up over the next six. An on-pace-for-the-year number, when shown, is a clearly labeled secondary line, never banked cash.'] },
-      { h: 'Where You\'re Leaking Now', p: ['Your cost gaps as plain text, biggest dollar leak first. Pour Cost and Food Cost carry a live dollar a year at this week\'s pace because Bar Cop has a weekly metric for them. Theft and Loss and Vendor Control do not dollarize into a clean weekly leak, so they read as a Review row you tap to work on their own screen. Tap any row to open its fix process. Labor is part of prime cost but is worked in Revenue Recovery, so it lives on that dashboard, not here.'] },
-      { h: 'Cost vs Target', p: ['Your bar pour cost, food cost, and prime cost from your latest confirmed week, each against its own target. Green is at or under target, red is over. Tap Bar Cop Briefing for a written read on where the numbers are heading.'] },
-      { h: 'Profit Forecast and Profit Audit', p: ['Profit Forecast projects your profit forward at your recent pace, plus what hitting your cost targets is worth. The panel here reads twelve months; open the full screen to switch the horizon between a month, a quarter, six months, or a year. Profit Audit shows your latest score and when the next one can run. Both open their full screen with a tap.'] },
-      { h: 'Quick Actions', p: ['The four jobs you run most from here: enter this week\'s numbers, run a Profit Audit, open the Profit Forecast, and open Recipe Summary.'] }
+    App.showHelpModal('How the Weekly Close Works', [
+      { p: ['This is your weekly close-out for Profit. Profit Recovery is about margin: where the cost of your pours, plates, and the rest is eating money you already earned. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
+      { h: 'Where You Stand', p: ['Up top is the Recovery Scoreboard: what Bar Cop has measured you put back in the register since you marked each fix in. It is realized to date, not a projection, and a figure shows once two weeks of after-data land. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
+      { h: 'The Steps', p: ['1. Enter this week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board, about monthly, flagged here when it is due.'] },
+      { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
   },
 
+  // ── Data ──────────────────────────────────────────────────────────────────
+  weeks()  { return ((App.data && App.data.weeks)  || []); },
+  audits() { return ((App.data && App.data.audits) || []); },
+  savedWeek(pe) { return this.weeks().find(w => w.period_end === pe) || null; },
+  targets() { return (App.data && App.data.settings && App.data.settings.targets) || {}; },
+
+  // ── Week math (Sunday period_end, same as This Week and the Control closes) ──
+  weekEnd()   { return this._weekEnd || (App.nextSunday ? App.nextSunday() : App.todayLocal()); },
+  weekStart() { return App.weekStartFor ? App.weekStartFor(this.weekEnd()) : this.weekEnd(); },
+  fmtWk(ymd)  { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
+  addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  atCurrentWeek() { const cur = App.nextSunday ? App.nextSunday() : App.todayLocal(); return this.weekEnd() >= cur; },
+  _stepWeek(n) {
+    const next = this.addDays(this.weekEnd(), n);
+    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    if (n > 0 && next > cur) return;   // never walk into the future
+    this._weekEnd = next; this._openStep = null; this._flash = null;
+    this.render(this.container, this.actions);
+  },
+
+  // ── Per-week step-done stamps (operator-controlled, local to the device) ────
+  _doneKey() { return 'pf_cockpit_done_' + this.weekEnd(); },
+  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
+  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
+
+  ORDER: ['week', 'costs', 'leaks', 'audit'],
+  _META: {
+    week:  { n: 1, title: 'Enter this week',                 sub: 'Log this week\'s bar and food sales and costs' },
+    costs: { n: 2, title: 'Check your costs against target', sub: 'Pour, food, and prime cost vs target' },
+    leaks: { n: 3, title: 'Work your biggest leak',          sub: 'Open Profit Fix on the biggest dollar leak' },
+    audit: { n: 4, title: 'Run your Profit audit',           sub: 'Score the operation and refresh your leaks' }
+  },
+
+  // Enter-this-week and run-the-audit complete off data; check-costs and work-leaks
+  // are operator-acknowledged (you cannot infer "I worked it" from a number). An
+  // explicit stamp (true/false) always wins so any step can be unmarked.
+  stepDone() {
+    const dm = this.doneMap();
+    const ws = this.weekStart(), we = this.weekEnd();
+    const entered = !!this.savedWeek(we);
+    const auditRan = this.audits().some(a => { const d = ('' + ((a && (a.date || a.generated_at)) || '')).slice(0, 10); return d && d >= ws && d <= we; });
+    const derive = { week: entered, costs: false, leaks: false, audit: auditRan };
+    const r = {};
+    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    return r;
+  },
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   render(container, actions) {
+    this.container = container; this.actions = actions;
     if (actions) actions.innerHTML = '';
-    this.container = container;
-    const weeks  = (App.data && App.data.weeks)  || [];
-    const audits = (App.data && App.data.audits) || [];
-    if (weeks.length === 0 && audits.length === 0) this.renderDayOne(container);
-    else this.renderFull(container);
-  },
+    if (!this._weekEnd) this._weekEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
 
-  // Populated dashboard: Recovery Scoreboard hero, a diagnosis row (Where You're
-  // Leaking Now as text + Cost vs Target), a standard row (Profit Forecast +
-  // Profit Audit), then Quick Actions. Layout via the shared DashUI.
-  renderFull(container) {
-    // weeks load newest-first from the event store, so sort a copy ascending by
-    // period_end before any positional slice/last-element read (event-store gotcha).
-    const weeks   = ((App.data && App.data.weeks) || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
-    const targets = (App.data && App.data.settings && App.data.settings.targets) || {};
-    const leak = FixPanel.leakRowsText('profit');
-    const leakBody = leak || '<div style="font-size:12px;color:var(--t3);line-height:1.6;">Run a Profit Audit and log a week, and your leaks rank here, biggest first.</div>';
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="db-insights-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
+    const done = this.stepDone();
+    const doneCount = this.ORDER.filter(k => done[k]).length;
+    if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
+    const flash = this._flash; this._flash = null;
+    const hasData = this.weeks().length || this.audits().length;
+    const insightsBtn = '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
+
     container.innerHTML = '<div class="screen">'
-      + FixPanel._scoreboardCard('profit', insightsBtn)
-      + DashUI.row(
-          DashUI.shPanel('Where You\'re Leaking Now', leakBody),
-          DashUI.shPanel('Cost vs Target', this.costPanel(weeks.slice(-8), targets)))
-      + DashUI.row(
-          DashUI.shPanel('Profit Forecast', this.forecastPanel()),
-          DashUI.shPanel('Profit Audit', DashUI.auditPanel({
-            audits: App.data.audits,
-            screen: 'audit-tracker',
-            runText: 'Run Profit Audit',
-            emptyText: 'Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.'
-          })))
-      + DashUI.quickActions([
-          { go: 'this-week', label: 'Enter This Week' },
-          { go: 'audit-tracker', label: 'Run Profit Audit' },
-          { go: 'profit-forecast', label: 'Profit Forecast' },
-          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
-        ])
+      + (hasData && window.FixPanel ? FixPanel._scoreboardCard('profit', insightsBtn) : '')
+      + this.getStartedBox()
+      + this.banner(doneCount, this.ORDER.length)
+      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
+      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
+      +   this.ORDER.map(k => this.stepRow(k, done)).join('')
+      + '</div>'
+      + this.outlierStrip()
       + '</div>';
-    FixPanel.wireFixAreas(container);
-    document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
-    DashUI.wireQuick(container);
+
+    if (window.FixPanel) FixPanel.wireFixAreas(container);   // scoreboard loop steps + leak-board rows
+    this.wire();
   },
 
-  // Profit Forecast panel — profit projected forward twelve months, plus what
-  // hitting your cost targets is worth. Reuses the Profit Forecast engine so the
-  // dashboard and the full screen never disagree. Forward-looking complement to
-  // the backward Scoreboard and the Audit score beside it.
-  forecastPanel() {
-    const PF = S.ProfitForecast;
-    const placeholder = '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">Confirm a few weeks in This Week and Bar Cop projects your profit forward, at your recent pace and at your cost targets.</div>'
-      + '<button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button>';
-    if (!PF) return placeholder;
-    const rr = PF.runRates();
-    if (rr.nW < PF.MIN_WEEKS) return placeholder;
-    const targetP = (PF.targets().prime_cost_pct ?? 60) / 100;
-    const sales     = rr.avgWeeklyRev * 52;
-    const opexTot   = (rr.avgWeeklyOpex + rr.avgWeeklyPF) * 52;
-    const profitCur = sales - sales * rr.primePctCurrent - opexTot;
-    const profitTgt = sales - sales * targetP - opexTot;
-    const swing     = Math.max(0, profitTgt - profitCur);
-    const label = rr.opexLogged ? 'Projected Operating Profit, next 12 months' : 'Profit Before Operating Costs, next 12 months';
-    const money = n => App.fmtCurrency(n, 0);
-    return '<div style="font-size:11px;color:var(--t3);margin-bottom:5px;">' + label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:40px;font-weight:700;line-height:1;color:' + (profitCur < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + money(profitCur) + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:6px;">at your recent pace</div>'
-      + (swing > 0
-          ? '<div style="font-size:13px;font-weight:600;color:var(--gold);margin-top:12px;">+' + money(swing) + ' if you hit your cost targets</div>'
-          : '<div style="font-size:13px;font-weight:600;color:var(--green);margin-top:12px;">You are at or above your cost targets</div>')
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm db-qa" data-go="profit-forecast">Open Profit Forecast</button></div>';
-  },
-
-  // Day one (no weeks, no audits): guided steps + placeholders, like Control.
-  renderDayOne(container) {
-    const hasAudit = ((App.data && App.data.audits) || []).length > 0;
+  // ── Get Started: run your first audit + the Control sections that feed Recovery.
+  // Drops off once all four are in place (App.controlGetStarted returns '').
+  getStartedBox() {
+    const hasAudit = this.audits().length > 0;
     const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
-    const ph = DashUI.ph;
+    return App.controlGetStarted('Profit', [
+      { num: 1, label: 'Run your first Profit Audit', screen: 'audit-tracker', done: hasAudit },
+      { num: 2, label: 'Set up Inventory Control',    screen: 'ic-dashboard',  done: hasInv },
+      { num: 3, label: 'Set up Shift Control',        screen: 'sc-dashboard',  done: hasShift },
+      { num: 4, label: 'Set up Labor Control',        screen: 'lc-dashboard',  done: hasLabor }
+    ]);
+  },
 
-    container.innerHTML = '<div class="screen">'
-      + DashUI.dayOneStrip(
-          'Four steps and this dashboard fills in with your recovered dollars, where you are leaking, and your costs against target.',
-          [
-            { done: hasAudit, num: 1, label: 'Run your first Profit Audit', go: 'audit-tracker' },
-            { done: hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
-            { done: hasShift, num: 3, label: 'Set up Shift Control', go: 'sc-dashboard', cross: true },
-            { done: hasLabor, num: 4, label: 'Set up Labor Control', go: 'lc-dashboard', cross: true }
-          ])
-      + '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Recovery Scoreboard</div>'
-        + ph('Your recovered dollars show here once you log your first fix. Bar Cop measures the metric before and after the fix and reports only what is real.') + '</div>'
-      + DashUI.row(
-          DashUI.shPanel('Where You\'re Leaking Now', ph('Your cost gaps rank here once a week of data lands, biggest dollar first, each one a tap into the fix process.')),
-          DashUI.shPanel('Cost vs Target', ph('Your bar pour, food, and prime cost against target show here once you confirm a week.')))
-      + DashUI.row(
-          DashUI.shPanel('Profit Forecast', ph('Your profit projected forward shows here once you have a few weeks confirmed in This Week.')),
-          DashUI.shPanel('Profit Audit', ph('Your latest Profit Audit score lands here once you run one.')))
-      + DashUI.quickActions([
-          { go: 'this-week', label: 'Enter This Week' },
-          { go: 'audit-tracker', label: 'Run Profit Audit' },
-          { go: 'profit-forecast', label: 'Profit Forecast' },
-          { go: 'recipe-cost-analysis', label: 'Recipe Summary' }
-        ])
+  weekSelector() {
+    const isCur = this.atCurrentWeek();
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(this.weekStart()) + ' - ' + fmt(this.weekEnd());
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm pf-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm pf-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm pf-wk-now" style="margin-left:4px;">This Week</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
+  },
+
+  banner(doneCount, total) {
+    const allDone = doneCount === total;
+    const pct = Math.round(doneCount / total * 100);
+    const doneLine = allDone
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
+      + '</div>'
+      + '<div style="padding:18px 22px;">'
+      +   this.weekSelector()
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
+      +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
+      +     '<div style="font-size:12px;">' + doneLine + '</div>'
+      +   '</div>'
+      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">A quick weekly pass: log the week, see where you slipped, and take down the worst leak.</div>')
+      + '</div>'
       + '</div>';
-    DashUI.wireQuick(container);
   },
 
-  // Cost vs Target — your latest confirmed week's bar pour cost, food cost, and
-  // prime cost, each as a plain percentage colored by over/under its own target
-  // (red over, green at or under). No chart; the written read lives behind the
-  // Insights button. Returns the metricsPanel card body (shPanel wraps it).
-  costPanel(weeks, targets) {
-    const metrics = [
-      { label: 'Bar Pour Cost', vals: weeks.map(w => (w && w.bar)  ? (w.bar.cost_pct  != null ? w.bar.cost_pct  : null) : null), tgt: targets.bar_pour_cost_pct || 22 },
-      { label: 'Food Cost',     vals: weeks.map(w => (w && w.food) ? (w.food.cost_pct != null ? w.food.cost_pct : null) : null), tgt: targets.food_cost_pct || 32 },
-      { label: 'Prime Cost',    vals: weeks.map(w => (w && w.prime_cost_pct != null) ? w.prime_cost_pct : null),                   tgt: targets.prime_cost_pct || 60 }
-    ];
-    if (!metrics.some(m => m.vals.some(v => v != null))) {
-      return DashUI.metricsPanel([], 'Confirm a week to see your costs');
+  // ── Step status (the one-line read under each step title) ────────────────────
+  stepStatus(k, isDone) {
+    const w = this.savedWeek(this.weekEnd());
+    if (k === 'week') {
+      if (!w) return this._META.week.sub;
+      const sales = ((w.bar && w.bar.revenue) || 0) + ((w.food && w.food.revenue) || 0);
+      return sales > 0 ? App.fmtCurrency(sales, 0) + ' in sales logged' : 'Logged';
     }
-    const rows = metrics.map(m => {
-      let li = m.vals.length - 1; while (li >= 0 && m.vals[li] == null) li--;
-      const lastV = li >= 0 ? m.vals[li] : null;
-      const col = (lastV != null && lastV > m.tgt) ? 'var(--red)' : (lastV != null ? 'var(--green)' : 'var(--t3)');
-      return { label: m.label, sub: 'target ' + m.tgt + '%', value: lastV != null ? lastV.toFixed(1) + '%' : 'n/a', color: col };
-    });
-    return DashUI.metricsPanel(rows, 'Confirm a week to see your costs');
+    if (k === 'costs') {
+      if (!w) return this._META.costs.sub;
+      const over = this._costRows(w).filter(r => r.over).length;
+      return over > 0 ? over + ' of 3 over target' : 'All three at or under target';
+    }
+    if (k === 'leaks') {
+      const top = window.Recovery ? this._topLeak() : null;
+      if (top && top.dollars > 0) return App.fmtCurrency(top.dollars, 0) + '/yr on ' + top.name;
+      return this._META.leaks.sub;
+    }
+    if (k === 'audit') {
+      const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
+      if (latest && latest.overall_score != null) {
+        const ds = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : null;
+        return 'Last scored ' + latest.overall_score + (ds != null ? (ds <= 0 ? ', today' : ', ' + ds + 'd ago') : '');
+      }
+      return this._META.audit.sub;
+    }
+    return '';
   },
 
+  // The pour/food/prime cost rows for a saved week, each vs its own target.
+  _costRows(w) {
+    const t = this.targets();
+    const mk = (label, val, tgt) => ({ label, val, tgt, over: (val != null && val > tgt) });
+    return [
+      mk('Bar Pour Cost', (w.bar && w.bar.cost_pct != null) ? w.bar.cost_pct : null, t.bar_pour_cost_pct || 22),
+      mk('Food Cost',     (w.food && w.food.cost_pct != null) ? w.food.cost_pct : null, t.food_cost_pct || 32),
+      mk('Prime Cost',    (w.prime_cost_pct != null) ? w.prime_cost_pct : null,         t.prime_cost_pct || 60)
+    ];
+  },
+
+  // The single biggest dollar leak (for the leaks step status). Mirrors the
+  // leak-board ranking, composites excluded.
+  _topLeak() {
+    if (!window.Recovery || !window.FIX || !Array.isArray(FIX.profit)) return null;
+    const composite = (Recovery.COMPOSITE_GAPS) || [];
+    let best = null;
+    FIX.profit.filter(g => composite.indexOf(g.id) === -1).forEach(g => {
+      const imp = Recovery.gapImpact(g.id);
+      if (imp && imp.dollars > 0 && (!best || imp.dollars > best.dollars)) best = { name: g.name, dollars: imp.dollars };
+    });
+    return best;
+  },
+
+  stepRow(k, done) {
+    const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+    const circle = isDone
+      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
+      + '<div class="pf-step-head" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
+      +   '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);">' + m.title + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + this.stepStatus(k, isDone) + '</div></div>'
+      +   '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (isOpen ? '&#9652;' : '&#9662;') + '</span>'
+      + '</div>';
+    if (isOpen) html += '<div style="padding:2px 16px 18px;">' + this.workspace(k, isDone) + '</div>';
+    return html + '</div>';
+  },
+
+  markBtn(k, label) {
+    return this._isDone
+      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
+      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
+  },
+
+  workspace(k, isDone) {
+    this._isDone = isDone;
+    const w = this.savedWeek(this.weekEnd());
+    const explain = txt => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
+    const btnRow = inner => '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + inner + '</div>';
+
+    if (k === 'week') {
+      if (w) {
+        const bar = (w.bar && w.bar.revenue) || 0, food = (w.food && w.food.revenue) || 0;
+        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(food, 0) + '</strong> food. Open This Week to adjust the numbers or confirm the rollup.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Open This Week</button>' + this.markBtn('week', 'Mark Done'));
+      }
+      return explain('Log this week\'s numbers in This Week. Revenue rolls up from your imported POS sales, COGS from your Inventory counts, and labor from Labor Control; you confirm it. Nothing below scores until the week is in.')
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Enter This Week</button>' + this.markBtn('week', 'Mark Done'));
+    }
+
+    if (k === 'costs') {
+      if (!w) {
+        return explain('Enter this week first and your bar pour cost, food cost, and prime cost land here against target, so you see exactly where margin slipped.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Enter This Week</button>' + this.markBtn('costs', 'Mark Reviewed'));
+      }
+      const rows = this._costRows(w).map(r => {
+        const col = r.val == null ? 'var(--t3)' : (r.over ? 'var(--red)' : 'var(--green)');
+        const val = r.val != null ? r.val.toFixed(1) + '%' : 'n/a';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;">'
+          + '<span style="color:var(--t2);">' + r.label + ' <span style="color:var(--t4);">target ' + r.tgt + '%</span></span>'
+          + '<span style="font-weight:700;color:' + col + ';">' + val + '</span></div>';
+      }).join('');
+      const over = this._costRows(w).filter(r => r.over);
+      const lead = over.length
+        ? '<strong style="color:var(--red);">' + over.length + ' of 3</strong> are over target this week' + (over.length ? ': ' + over.map(r => r.label.toLowerCase()).join(', ') : '') + '. Work the leak below.'
+        : 'All three are at or under target this week. Hold the line.';
+      return explain(lead) + rows
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="profit-fix">Work Your Leaks</button>' + this.markBtn('costs', 'Mark Reviewed'));
+    }
+
+    if (k === 'leaks') {
+      const leak = window.FixPanel ? FixPanel.leakRowsText('profit') : '';
+      if (!leak) {
+        return explain('Run a Profit audit and log a week, and your leaks rank here, the biggest dollar first, each one a tap into its fix process.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="profit-fix">Open Profit Fix</button>' + this.markBtn('leaks', 'Mark Done'));
+      }
+      return explain('Your leaks, ranked by what they cost you a year at this week\'s pace. Tap the biggest one to open its fix process, or open Profit Fix to work the whole board.')
+        + leak
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="profit-fix">Open Profit Fix</button>' + this.markBtn('leaks', 'Mark Done'));
+    }
+
+    // audit
+    const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
+    const lead = latest && latest.overall_score != null
+      ? 'Your last Profit audit scored <strong style="color:' + App.scoreColor(latest.overall_score) + ';">' + latest.overall_score + '</strong>. Run a fresh one to rescore the operation and refresh the leak board, then mark it done.'
+      : 'Run your first Profit audit. It scores the whole operation and lists every leak with the dollars a year it costs you, which is what feeds the steps above.';
+    return explain(lead)
+      + btnRow('<button class="btn btn-ghost btn-sm" data-go="audit-tracker">Run Profit Audit</button><button class="btn btn-ghost btn-sm" data-go="profit-fix">Profit Fix</button>' + this.markBtn('audit', 'Mark Done'));
+  },
+
+  // ── As needed: the deeper reads, off the weekly flow ─────────────────────────
+  outlierStrip() {
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
+      + '<button class="btn btn-ghost btn-sm" data-go="profit-forecast">Profit Forecast</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="recipe-cost-analysis">Recipe Summary</button>'
+      + '</div>';
+  },
+
+  // ── Wiring ───────────────────────────────────────────────────────────────────
+  wire() {
+    this.container.onclick = ev => {
+      const head = ev.target.closest('.pf-step-head');
+      if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
+      const dn = ev.target.closest('[data-done]');
+      if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
+      const un = ev.target.closest('[data-undone]');
+      if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
+      // Leak-board rows (.fp-fixarea) are wired by FixPanel.wireFixAreas; skip them
+      // here so a tap routes into the fix process, not a no-op.
+      if (ev.target.closest('.fp-fixarea') || ev.target.closest('.fp-step')) return;
+      const go = ev.target.closest('[data-go]');
+      if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
+      if (ev.target.closest('.pf-wk-prev')) { this._stepWeek(-7); return; }
+      if (ev.target.closest('.pf-wk-next')) { this._stepWeek(7); return; }
+      if (ev.target.closest('.pf-wk-now'))  { this._weekEnd = null; this._openStep = null; this.render(this.container, this.actions); return; }
+    };
+  },
+
+  // ── Bar Cop Briefing: a written read of the profit week, cached a week per
+  //    section via DashUI so repeat opens do not spend on the API. ─────────────
   showInsights() {
     if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
-    const btn = document.getElementById('db-insights-btn');
-    const weeks = (App.data.weeks || []).slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
+    const weeks = this.weeks().slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
 
-    // Once-a-week cache (shared with Revenue and Cash): re-open the stored
-    // read for free, regenerate only when it is a week old. No manual refresh.
     const rec = DashUI._insRec('profit');
     if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
 
-    const t = App.data.settings.targets || {};
+    const t = this.targets();
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
     const r1 = n => (Math.round(n * 10) / 10).toFixed(1);
     const direction = v => {
@@ -170,10 +339,10 @@ S.Dashboard = {
         + 'Last ' + v.length + ' weeks ran ' + r1(lo) + '% to ' + r1(hi) + '%, averaging ' + r1(avg) + '%, '
         + v.filter(x => x > tgt).length + ' of ' + v.length + ' weeks over target. Direction: ' + direction(v) + '.';
     };
-    const bP = weeks.map(w => w.bar?.cost_pct);
-    const fP = weeks.map(w => w.food?.cost_pct);
+    const bP = weeks.map(w => w.bar && w.bar.cost_pct);
+    const fP = weeks.map(w => w.food && w.food.cost_pct);
     const pP = weeks.map(w => w.prime_cost_pct);
-    const bR = weeks.map(w => w.bar?.revenue).filter(v => v != null);
+    const bR = weeks.map(w => w.bar && w.bar.revenue).filter(v => v != null);
     const aR = bR.length ? bR.reduce((s, x) => s + x, 0) / bR.length : 0;
     const curB = bP.filter(v => v != null).slice(-1)[0];
     const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
@@ -190,12 +359,13 @@ S.Dashboard = {
       + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
       + 'STAY TRUE TO THE FACTS:\n'
       + '- Use only the facts below. Do not invent numbers, streaks, or week counts.\n'
-      + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it. If current bar pour cost is 22.8%, do not say it is above 23% or stuck high.\n'
+      + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it.\n'
       + '- Respect the stated direction. If a metric is falling and improving, do not call it stuck or rising. If it is on or under target, say so plainly.\n'
       + '- State over or under target exactly as given.\n\n'
       + 'FACTS:\n' + facts.join('\n')
       + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
 
+    const btn = this.container.querySelector('[data-insights]');
     const orig = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
     const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
@@ -204,11 +374,10 @@ S.Dashboard = {
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
         if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content?.[0]?.text;
+        const text = data.content && data.content[0] && data.content[0].text;
         if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
         const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
         const html = '<p style="margin:0;">' + safe + '</p>';
         DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('profit', html));
         restore();
