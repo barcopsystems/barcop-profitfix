@@ -34,7 +34,7 @@ S.HubUserAccounts = {
     // Shift Control
     { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
     { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
-    { module: 'Shift Control',     key: 'checklists',       label: 'Opening / Closing Checklists' },
+    { module: 'Shift Control',     key: 'checklists',       label: 'Checklists' },
     { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log' },
     { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log' },
     { module: 'Shift Control',     key: 'waste',            label: 'Waste / Spill Log' },
