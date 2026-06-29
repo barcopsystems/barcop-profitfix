@@ -16,9 +16,9 @@ const InitiativeTracker = {
       weeks: () => (App.data && App.data.weeks) || [],
       types: ['Pour Spec', 'Vendor Change', 'Portion Control', 'Operational Change', 'Other'],
       metrics: [
-        { key: 'pour_pct',  label: 'Bar Pour Cost % (lower is better)', fmt: 'pct', lowerBetter: true },
-        { key: 'food_pct',  label: 'Food Cost % (lower is better)',     fmt: 'pct', lowerBetter: true },
-        { key: 'prime_pct', label: 'Prime Cost % (lower is better)',    fmt: 'pct', lowerBetter: true }
+        { key: 'pour_pct',  label: 'Bar Pour Cost %', fmt: 'pct', lowerBetter: true },
+        { key: 'food_pct',  label: 'Food Cost %',     fmt: 'pct', lowerBetter: true },
+        { key: 'prime_pct', label: 'Prime Cost %',    fmt: 'pct', lowerBetter: true }
       ],
       metricFor: (w, key) => {
         if (key === 'pour_pct')  return (w && w.bar  && w.bar.cost_pct  != null) ? Number(w.bar.cost_pct)  : null;
@@ -38,7 +38,7 @@ const InitiativeTracker = {
         { key: 'revenue',   label: 'Total Revenue (weekly)',    fmt: 'currency' },
         { key: 'covers',    label: 'Covers (weekly)',           fmt: 'int' },
         { key: 'check_avg', label: 'Check Average',             fmt: 'currency' },
-        { key: 'labor_pct', label: 'Labor % (lower is better)', fmt: 'pct', lowerBetter: true }
+        { key: 'labor_pct', label: 'Labor %', fmt: 'pct', lowerBetter: true }
       ],
       metricFor: (w, key) => {
         if (key === 'revenue')   return (parseFloat(w.bar_revenue) || 0) + (parseFloat(w.floor_revenue) || 0);
@@ -60,9 +60,9 @@ const InitiativeTracker = {
         .map(a => ({ raw: a.raw || {}, period_end: a.period_end || a.date })),
       types: ['Payment Terms', 'Par / Ordering', 'Dead Stock', 'Operational Change', 'Other'],
       metrics: [
-        { key: 'trapped', label: 'Trapped Cash $ (lower is better)',     fmt: 'currency', lowerBetter: true },
-        { key: 'cycle',   label: 'Cash Cycle Days (lower is better)',    fmt: 'days',     lowerBetter: true },
-        { key: 'runway',  label: 'Runway in weeks (higher is better)',   fmt: 'weeks' }
+        { key: 'trapped', label: 'Trapped Cash $',     fmt: 'currency', lowerBetter: true },
+        { key: 'cycle',   label: 'Cash Cycle Days',    fmt: 'days',     lowerBetter: true },
+        { key: 'runway',  label: 'Runway (weeks)',   fmt: 'weeks' }
       ],
       metricFor: (w, key) => {
         const r = (w && w.raw) || {};
@@ -153,7 +153,8 @@ const InitiativeTracker = {
     const c = this.cfg(module);
     const all = this.list(module);
     const fmtDate = d => { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-    const active = all.filter(i => i.status === 'Active');
+    const active = all.filter(i => i.status === 'Active')
+      .sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''));   // newest change on top
     const closed = all.filter(i => i.status !== 'Active');
 
     const activeRows = active.length ? active.map((i, idx) => {
@@ -169,10 +170,11 @@ const InitiativeTracker = {
         + (i.hypothesis ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + esc(i.hypothesis) + '</div>' : '')
         + '<div style="display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;align-items:baseline;">'
         + '<div style="font-size:11px;color:var(--t3);">Watching: <span style="color:var(--t1);">' + esc(metricLabel) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">Before: <span style="color:var(--t1);">' + this._fmtVal(metric, m.before) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">After: <span style="color:var(--t1);">' + this._fmtVal(metric, m.after) + '</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);">Baseline: <span style="color:var(--t1);">' + this._fmtVal(metric, m.before) + '</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);">So far: <span style="color:var(--t1);">' + this._fmtVal(metric, m.after) + '</span></div>'
         + '<div style="font-size:11px;color:var(--t3);">Lift: ' + this._fmtLift(metric, m.lift) + '</div>'
         + '<div style="margin-left:auto;display:flex;gap:6px;">'
+        + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Edit</button>'
         + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Mark Complete</button>'
         + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Delete</button>'
         + '</div></div></div>';
@@ -189,15 +191,18 @@ const InitiativeTracker = {
     // Completed Experiments — its own titled card, only when there are any.
     let completedCard = '';
     if (closed.length) {
-      const closedRows = closed.slice().reverse().slice(0, 5).map((i, idx) => {
+      const closedRows = closed.slice().reverse().map((i, idx) => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
-        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;gap:10px;font-size:11px;">'
-          + '<span style="color:var(--t2);flex:1;">' + esc(i.name) + '</span>'
+        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;">'
+          + '<span style="color:var(--t2);flex:1;min-width:120px;">' + esc(i.name) + '</span>'
           + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
           + '<span>' + this._fmtLift(metric, m.lift) + '</span>'
-          + '<button class="btn btn-ghost btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
-          + '</div>';
+          + '<div style="display:flex;gap:6px;">'
+          + '<button class="btn btn-ghost btn-sm init-again" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Run Again</button>'
+          + '<button class="btn btn-ghost btn-sm init-reopen" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Reopen</button>'
+          + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
+          + '</div></div>';
       }).join('');
       completedCard = '<div class="card" style="padding:0;overflow:hidden;">'
         + '<div class="card-title" style="padding:13px 20px;margin:0;">Completed Experiments</div>'
@@ -210,6 +215,26 @@ const InitiativeTracker = {
   wire(module, container, rerender) {
     const save = this.cfg(module).dataKey;
     container.querySelector('.init-add')?.addEventListener('click', () => this._showForm(module, rerender));
+    // Edit an active experiment (fix the name, the start date that drives the
+    // measurement, the metric, or the note) in the same modal, prefilled.
+    container.querySelectorAll('.init-edit').forEach(btn => {
+      btn.addEventListener('click', () => this._showForm(module, rerender, { editId: btn.dataset.id }));
+    });
+    // Run Again: start a fresh experiment prefilled from a completed one.
+    container.querySelectorAll('.init-again').forEach(btn => {
+      btn.addEventListener('click', () => this._showForm(module, rerender, { seed: this.list(module).find(x => x.id === btn.dataset.id) }));
+    });
+    // Reopen: send a completed experiment back to Active to keep measuring.
+    container.querySelectorAll('.init-reopen').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const i = this.list(module).find(x => x.id === btn.dataset.id);
+        if (!i) return;
+        i.status = 'Active';
+        delete i.completed_at;
+        await App.saveKey(save);
+        rerender();
+      });
+    });
     container.querySelectorAll('.init-complete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const i = this.list(module).find(x => x.id === btn.dataset.id);
@@ -231,25 +256,40 @@ const InitiativeTracker = {
     });
   },
 
-  _showForm(module, rerender) {
+  // opts: { editId } edits an existing record in place; { seed } prefills a NEW
+  // experiment from a completed one (Run Again); neither = a blank new one.
+  _showForm(module, rerender, opts) {
+    opts = opts || {};
     const c = this.cfg(module);
     const save = c.dataKey;
-    const typeOpts = c.types.map(t => '<option>' + esc(t) + '</option>').join('');
-    const metricOpts = c.metrics.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + '</option>').join('');
+    const editId = opts.editId || null;
+    const src = editId ? this.list(module).find(x => x.id === editId) : (opts.seed || null);
     const today = App.todayLocal();
+    // Edit keeps the record's own start date; new and Run Again default to today.
+    const v = {
+      name: src ? (src.name || '') : '',
+      start_date: editId ? ((src && src.start_date) || today) : today,
+      type: src ? (src.type || '') : '',
+      metric: src ? (src.metric || '') : '',
+      hypothesis: src ? (src.hypothesis || '') : ''
+    };
+    const typeOpts = c.types.map(t => '<option' + (v.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const metricOpts = c.metrics.map(m => '<option value="' + esc(m.key) + '"' + (v.metric === m.key ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('');
+    const title = editId ? 'Edit Experiment' : 'Start Experiment';
+    const saveLabel = editId ? 'Save Changes' : 'Start Experiment';
     const body = '<div class="card form-card narrow-form" style="margin:0;">'
-      + '<div class="card-title">Start Experiment</div>'
+      + '<div class="card-title">' + title + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f" style="flex:1;min-width:200px;"><label>Name</label><input type="text" id="init-name" placeholder="' + esc(c.namePh) + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Start Date</label><input type="date" id="init-date" value="' + today + '"/></div>'
+        + '<div class="f" style="flex:1;min-width:200px;"><label>Name</label><input type="text" id="init-name" value="' + esc(v.name) + '" placeholder="' + esc(c.namePh) + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Start Date</label><input type="date" id="init-date" value="' + esc(v.start_date) + '"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f" style="width:180px;"><label>Type</label><select id="init-type">' + typeOpts + '</select></div>'
         + '<div class="f" style="flex:1;min-width:200px;"><label>Watch Metric</label><select id="init-metric">' + metricOpts + '</select></div>'
       + '</div>'
-      + '<div class="f" style="width:100%;"><label>What you changed (optional)</label><textarea class="notes-ta" id="init-hyp" rows="2" placeholder="' + esc(c.hypPh) + '"></textarea></div>'
+      + '<div class="f" style="width:100%;"><label>What you changed (optional)</label><textarea class="notes-ta" id="init-hyp" rows="2" placeholder="' + esc(c.hypPh) + '">' + esc(v.hypothesis) + '</textarea></div>'
       + '<div class="card-actions">'
-        + '<button type="button" id="init-save" class="btn btn-primary">Start Experiment</button>'
+        + '<button type="button" id="init-save" class="btn btn-primary">' + saveLabel + '</button>'
         + '<button type="button" id="init-cancel" class="btn btn-ghost">Cancel</button>'
         + '<span id="init-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
@@ -262,19 +302,64 @@ const InitiativeTracker = {
       const fail = msg => { if (err) { err.textContent = msg; err.style.display = 'inline'; } };
       if (!name) { fail('Name is required.'); return; }
       if (!date) { fail('Start date is required.'); return; }
-      this.list(module).push({
-        id: App.uid(),
+      const fields = {
         name,
         start_date: date,
         type: document.getElementById('init-type')?.value || 'Other',
         metric: document.getElementById('init-metric')?.value || c.metrics[0].key,
-        hypothesis: document.getElementById('init-hyp')?.value.trim() || '',
-        status: 'Active',
-        created_at: new Date().toISOString()
-      });
+        hypothesis: document.getElementById('init-hyp')?.value.trim() || ''
+      };
+      if (editId) {
+        const list = this.list(module);
+        const i = list.findIndex(x => x.id === editId);
+        if (i > -1) list[i] = Object.assign({}, list[i], fields, { updated_at: new Date().toISOString() });
+      } else {
+        this.list(module).push(Object.assign({ id: App.uid() }, fields, { status: 'Active', created_at: new Date().toISOString() }));
+      }
       await App.saveKey(save);
       App.closeModal('init-modal');
       rerender();
     });
+  },
+
+  // Plain-text lift for the PDF (the on-screen _fmtLift returns colored HTML).
+  _liftPlain(metric, lift) {
+    if (lift == null) return 'no data yet';
+    const f = metric ? metric.fmt : null;
+    const sign = lift > 0 ? '+' : '';
+    if (f === 'currency') return App.fmtCurrency(lift);
+    if (f === 'days')     return sign + Math.round(lift) + ' days';
+    if (f === 'weeks')    return sign + Math.round(lift) + ' wks';
+    if (f === 'int')      return sign + Math.round(lift).toLocaleString('en-US');
+    return sign + lift.toFixed(1) + '%';
+  },
+
+  // Export the section's experiment log (active + completed) as a PDF table.
+  async exportPDF(module) {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const all = this.list(module);
+    const section = module === 'revenue' ? 'Revenue' : module === 'cash' ? 'Cash' : 'Profit';
+    const metricLabel = key => { const m = this.metric(module, key); return m ? m.label : key; };
+    const fmtD = d => { if (!d) return '-'; const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+    const active = all.filter(i => i.status === 'Active')
+      .sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''));
+    const closed = all.filter(i => i.status !== 'Active').slice().reverse();
+    const b = App._pdfBuilder(section + ' Experiments');
+    b.header({ right: section + ' Experiments', meta: 'Experiment Log' });
+    b.sectionTitle('Active Experiments');
+    if (active.length) {
+      b.table(['Name', 'Type', 'Watching', 'Started', 'Baseline', 'So Far', 'Lift'],
+        active.map(i => { const m = this._measure(module, i), mt = this.metric(module, i.metric);
+          return [i.name, i.type || '', metricLabel(i.metric), fmtD(i.start_date), this._fmtVal(mt, m.before), this._fmtVal(mt, m.after), this._liftPlain(mt, m.lift)]; }));
+    } else { b.paragraph('None active.'); }
+    b.spacer(6);
+    b.sectionTitle('Completed Experiments');
+    if (closed.length) {
+      b.table(['Name', 'Type', 'Watching', 'Lift'],
+        closed.map(i => { const m = this._measure(module, i), mt = this.metric(module, i.metric);
+          return [i.name, i.type || '', metricLabel(i.metric), this._liftPlain(mt, m.lift)]; }));
+    } else { b.paragraph('None completed.'); }
+    await b.save('BarCop_' + section + 'Experiments.pdf');
   }
 };
