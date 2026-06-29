@@ -114,6 +114,11 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Server Check</span>
       </div>
+      <div class="nav-section">Experiments</div>
+      <div class="nav-item" data-screen="r-experiments" id="nav-r-experiments">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Experiments</span>
+      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="r-help" id="nav-r-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
@@ -170,6 +175,11 @@ const Cash = {
       <div class="nav-item" data-screen="c-bridge" id="nav-c-bridge">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11c2-5 11-5 13 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2 11v2.5M15 11v2.5M6.5 9v4.5M10.5 9v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span class="nav-label">Cash Bridge</span>
+      </div>
+      <div class="nav-section">Experiments</div>
+      <div class="nav-item" data-screen="c-experiments" id="nav-c-experiments">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Experiments</span>
       </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="c-help" id="nav-c-help">

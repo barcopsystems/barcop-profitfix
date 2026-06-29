@@ -277,10 +277,10 @@ const DB = {
     'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
     'r-menu-engineering':'revenue-recovery','r-price-calc':'revenue-recovery',
-    'r-dog-test':'revenue-recovery',
+    'r-dog-test':'revenue-recovery','r-experiments':'revenue-recovery',
     'r-help':'_always',
     // Cash Recovery
-    'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-capital':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-bridge':'cash-recovery','c-help':'_always',
+    'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-capital':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-bridge':'cash-recovery','c-experiments':'cash-recovery','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'

@@ -1147,7 +1147,7 @@ const App = {
         dleaf.className = 'nav-item nav-leaf';
         dleaf.id = 'nav-' + dashScreen;
         dleaf.dataset.screen = dashScreen;
-        const dleafLabel = (['inventory', 'labor', 'shift', 'cash'].indexOf(module) !== -1) ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
+        const dleafLabel = (['inventory', 'labor', 'shift', 'cash', 'profit', 'revenue'].indexOf(module) !== -1) ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
         dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-label">' + dleafLabel + '</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
@@ -1527,7 +1527,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -3977,7 +3977,8 @@ const App = {
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
         'r-playbook':         ['Revenue Playbook', 'The Strategy Behind the Fix'],
         'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
-        'r-dashboard':            ['Dashboard', 'Revenue Recovery'],
+        'r-dashboard':            ['Close The Week', 'Revenue Recovery'],
+        'r-experiments':          ['Experiments', ''],
         'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'r-this-week':            ['This Week', 'Weekly Entry'],
         'r-server-check':         ['Server Check', ''],
@@ -3992,6 +3993,7 @@ const App = {
         'r-playbook':         S.RecoveryPlaybook,
         'r-fix':              S.RevenueFix,
         'r-dashboard':        S.RevenueDashboard,
+        'r-experiments':      S.RecoveryExperiments,
         'r-forecast':         S.RevenueForecast,
         'r-this-week':        S.RevenueThisWeek,
         'r-server-check':     S.RevenueServerCheck,
@@ -4016,6 +4018,7 @@ const App = {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
         'c-dashboard':   ['Close The Week', 'Cash Recovery'],
+        'c-experiments': ['Experiments', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
         'c-fix':         ['Cash Fix', 'Fix Process and Guidance'],
@@ -4029,6 +4032,7 @@ const App = {
       };
       const cashScreens = {
         'c-dashboard':   S.CashDashboard,
+        'c-experiments': S.RecoveryExperiments,
         'c-audit':       S.CashAudit,
         'c-playbook':    S.RecoveryPlaybook,
         'c-fix':         S.CashFix,
@@ -4193,7 +4197,7 @@ const App = {
 
     const titles = {
       'hub':           ['Recovery Hub', ''],
-      'dashboard':     ['Dashboard', 'Profit Recovery'],
+      'dashboard':     ['Close The Week', 'Profit Recovery'],
       'this-week':     ['This Week', 'Weekly Entry'],
       'profit-forecast':['Profit Forecast', ''],
       'recipe-cost-analysis':['Recipe Summary', ''],
