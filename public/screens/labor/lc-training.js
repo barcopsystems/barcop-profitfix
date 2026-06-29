@@ -54,6 +54,11 @@ S.LaborTraining = {
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
+  // Shared column widths so the Saved Templates and Team Training Status tables
+  // line up column-for-column down the page (Position under Position, the middle
+  // column and actions aligned), for easier reading. Both tables run fixed layout.
+  _COLGROUP: '<colgroup><col style="width:30%"/><col style="width:22%"/><col style="width:23%"/><col style="width:25%"/></colgroup>',
+
   // A record's checklist progress and whether it counts as complete. An item-based
   // record completes when every item is checked; a no-item record (a plain "they
   // were trained, signed off" attestation) completes once it has a sign-off.
@@ -139,11 +144,11 @@ S.LaborTraining = {
 
   savedTemplatesSection() {
     const list = this.templates();
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._COLGROUP
+      + '<thead><tr><th>Saved Templates</th><th>Position</th><th>Steps</th><th></th></tr></thead>';
     if (list.length === 0) {
-      return '<div class="sh" style="margin:24px 0 10px;">Saved Templates</div>'
-        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-        + '<th>Name</th><th>Position</th><th>Steps</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);">No templates yet. Build one above to assign to your team.</td></tr></tbody></table></div>';
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="4" style="color:var(--t3);">No templates yet. Build one above to assign to your team.</td></tr></tbody></table></div>';
     }
     const rows = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(t =>
       '<tr class="tr-tpl-row" data-id="' + t.id + '" style="cursor:pointer;">'
@@ -155,19 +160,19 @@ S.LaborTraining = {
       + (App.canEdit('lc-training') ? '<button class="btn btn-ghost btn-sm tr-tpl-edit" data-id="' + t.id + '">Edit</button>' : '')
       + (App.canEdit('lc-training') ? '<button class="btn btn-danger btn-sm tr-tpl-del" data-id="' + t.id + '">Delete</button>' : '')
       + '</div></td></tr>').join('');
-    return '<div class="sh" style="margin:24px 0 10px;">Saved Templates</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Name</th><th>Position</th><th>Steps</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   teamStatusSection() {
     const list = [...this.staff()].filter(s => s.status !== 'Inactive')
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const heading = '<div class="sh" style="margin:24px 0 10px;">Team Training Status</div>';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._COLGROUP
+      + '<thead><tr><th>Name</th><th>Position</th><th>Status</th><th></th></tr></thead>';
     if (list.length === 0) {
-      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-        + '<th>Name</th><th>Position</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);">No active staff yet. Build your roster first.</td></tr></tbody></table></div>';
+      return heading + '<div class="card" style="overflow-x:auto;">' + head
+        + '<tbody><tr><td colspan="4" style="color:var(--t3);">No active staff yet. Build your roster first.</td></tr></tbody></table></div>';
     }
     const rows = list.map(s => {
       const st = this.trainingStatusFor(s.id);
@@ -183,9 +188,8 @@ S.LaborTraining = {
         + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm tr-team-view" data-id="' + s.id + '">View</button></div></td>'
         + '</tr>';
     }).join('');
-    return heading
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Name</th><th>Position</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return heading + '<div class="card" style="overflow-x:auto;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   renderMain() {

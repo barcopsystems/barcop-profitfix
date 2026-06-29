@@ -263,9 +263,12 @@ S.LaborStaffRoster = {
       return (a.name || '').localeCompare(b.name || '');
     });
 
+    // Fixed column widths so the roster columns space evenly instead of bunching
+    // to the left around the longest cell.
+    const rosterCols = '<colgroup><col style="width:17%"/><col style="width:14%"/><col style="width:16%"/><col style="width:13%"/><col style="width:11%"/><col style="width:11%"/><col style="width:18%"/></colgroup>';
     let below;
     if (list.length === 0) {
-      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div>';
     } else {
@@ -295,7 +298,7 @@ S.LaborStaffRoster = {
       below = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">Staff Roster</div>'
         + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
-        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
