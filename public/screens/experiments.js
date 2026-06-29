@@ -43,15 +43,10 @@ S.RecoveryExperiments = {
         + '</div></div>';
     }
 
-    const exportRow = all.length
-      ? '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" id="exp-export">Export PDF</button></div>'
-      : '';
-
-    this.container.innerHTML = '<div class="screen">' + exportRow + stats
+    this.container.innerHTML = '<div class="screen">' + stats
       + '<div class="exp-area">' + (IT ? IT.card(mod) : '') + '</div></div>';
     const el = this.container.querySelector('.exp-area');
     if (el && IT) IT.wire(mod, el, () => this.draw());
-    this.container.querySelector('#exp-export')?.addEventListener('click', () => { if (IT) IT.exportPDF(mod); });
   },
 
   showHowTo() {
