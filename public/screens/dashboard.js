@@ -61,13 +61,27 @@ S.Dashboard = {
   // explicit stamp (true/false) always wins so any step can be unmarked.
   stepDone() {
     const dm = this.doneMap();
-    const ws = this.weekStart(), we = this.weekEnd();
-    const entered = !!this.savedWeek(we);
-    const auditRan = this.audits().some(a => { const d = ('' + ((a && (a.date || a.generated_at)) || '')).slice(0, 10); return d && d >= ws && d <= we; });
-    const derive = { week: entered, costs: false, leaks: false, audit: auditRan };
+    const entered = !!this.savedWeek(this.weekEnd());
+    // The audit runs on a 7-day cadence (audit-tracker canRun = daysSince >= 7),
+    // so the step is "done" while the audit is current (not due) and only flips
+    // to action-needed the week it comes due. That keeps a real operator from
+    // re-running it every week, and reads true on the seeded demo (the recent
+    // audit is current, which is exactly why it can't be re-run).
+    const as = this._auditState();
+    const derive = { week: entered, costs: false, leaks: false, audit: !as.due };
     const r = {};
     this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
     return r;
+  },
+
+  // Latest audit + where it sits in the weekly cadence. due = no audit yet, or the
+  // last one is 7+ days old (the audit-tracker run gate).
+  _auditState() {
+    const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
+    if (!latest) return { latest: null, daysSince: null, due: true, score: null };
+    const d = ('' + (latest.date || latest.generated_at || '')).slice(0, 10);
+    const daysSince = d ? Math.floor((Date.now() - new Date(d + 'T00:00:00').getTime()) / 86400000) : null;
+    return { latest, daysSince, due: (daysSince == null || daysSince >= 7), score: latest.overall_score };
   },
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -168,12 +182,10 @@ S.Dashboard = {
       return this._META.leaks.sub;
     }
     if (k === 'audit') {
-      const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
-      if (latest && latest.overall_score != null) {
-        const ds = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : null;
-        return 'Last scored ' + latest.overall_score + (ds != null ? (ds <= 0 ? ', today' : ', ' + ds + 'd ago') : '');
-      }
-      return this._META.audit.sub;
+      const as = this._auditState();
+      if (!as.latest || as.score == null) return this._META.audit.sub;
+      if (as.due) return 'Due now &middot; last scored ' + as.score + (as.daysSince != null ? ', ' + as.daysSince + 'd ago' : '');
+      return 'Current &middot; scored ' + as.score + ' &middot; next due in ' + (7 - as.daysSince) + 'd';
     }
     return '';
   },
@@ -273,12 +285,18 @@ S.Dashboard = {
     }
 
     // audit
-    const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
-    const lead = latest && latest.overall_score != null
-      ? 'Your last Profit audit scored <strong style="color:' + App.scoreColor(latest.overall_score) + ';">' + latest.overall_score + '</strong>. Run a fresh one to rescore the operation and refresh the leak board, then mark it done.'
-      : 'Run your first Profit audit. It scores the whole operation and lists every leak with the dollars a year it costs you, which is what feeds the steps above.';
+    const as = this._auditState();
+    const scored = (as.latest && as.score != null) ? '<strong style="color:' + App.scoreColor(as.score) + ';">' + as.score + '</strong>' : '';
+    let lead;
+    if (!as.latest || as.score == null) {
+      lead = 'Run your first Profit audit. It scores the whole operation and lists every leak with the dollars a year it costs you, which is what feeds the steps above.';
+    } else if (as.due) {
+      lead = 'It has been ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' since your last Profit audit (scored ' + scored + '). Run a fresh one to rescore the operation and refresh the leak board.';
+    } else {
+      lead = 'Your Profit audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. The next one can run in ' + (7 - as.daysSince) + ' day' + ((7 - as.daysSince) === 1 ? '' : 's') + ', so there is nothing to run this week. You are good here.';
+    }
     return explain(lead)
-      + btnRow('<button class="btn btn-ghost btn-sm" data-go="audit-tracker">Run Profit Audit</button><button class="btn btn-ghost btn-sm" data-go="profit-fix">Profit Fix</button>' + this.markBtn('audit', 'Mark Done'));
+      + btnRow('<button class="btn btn-ghost btn-sm" data-go="audit-tracker">' + (as.due ? 'Run Profit Audit' : 'View Profit Audit') + '</button><button class="btn btn-ghost btn-sm" data-go="profit-fix">Profit Fix</button>' + this.markBtn('audit', 'Mark Done'));
   },
 
   // ── As needed: the deeper reads, off the weekly flow ─────────────────────────
