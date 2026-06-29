@@ -339,31 +339,41 @@ S.ProfitFix = {
     return watchedHtml + guideBlock + watchOut;
   },
 
+  // The title is the link itself (no separate Open button). A watched step that is
+  // current collapses to one scannable line; one that needs work expands to show
+  // its sub-status and how-to. Guidance steps always show their description.
   stepRow(g, s, i) {
     const st = this.stepStatus(g.id, i);
     const kind = s.kind || 'action';
-    const label = esc(s.targetLabel || '');
-    let action = '';
-    if (kind === 'reference' && s.target) {
-      action = '<a class="btn btn-ghost btn-sm" href="' + this.docPath(s.target) + '" download style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">' + this.stepIcon('reference') + 'Download' + (label ? ': ' + label : '') + '</a>';
+    const isGuide = st.kind === 'guide';
+    const expanded = isGuide || !st.good;   // collapse only the watched steps that are current
+
+    const titleInner = '<span style="color:var(--t3);display:inline-flex;flex-shrink:0;">' + this.stepIcon(kind) + '</span>'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
+      + (s.target ? '<span style="color:var(--t3);font-size:14px;flex-shrink:0;">&rsaquo;</span>' : '');
+    let titleEl;
+    if (s.target && kind === 'reference') {
+      titleEl = '<a class="pf-steplink" href="' + this.docPath(s.target) + '" download style="text-decoration:none;display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;">' + titleInner + '</a>';
     } else if (s.target) {
-      const verb = kind === 'result' ? 'View' : 'Open';
-      action = '<button class="btn btn-ghost btn-sm pf-go" data-target="' + esc(s.target) + '" style="display:inline-flex;align-items:center;gap:6px;">' + this.stepIcon(kind) + verb + (label ? ': ' + label : '') + '</button>';
+      titleEl = '<div class="pf-steplink pf-go" data-target="' + esc(s.target) + '" style="display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;">' + titleInner + '</div>';
+    } else {
+      titleEl = '<div style="display:flex;align-items:center;gap:9px;min-width:0;">' + titleInner + '</div>';
     }
 
-    // Guidance rows sit in their own card, so no per-row label; watched rows lead
-    // with their live status as colored text (no badge, no colored border).
-    const statusHtml = (st.kind === 'guide') ? ''
-      : '<div style="margin-bottom:5px;font-size:12px;font-weight:700;color:' + st.color + ';">' + st.label
-        + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
+    // Status as colored text on the right (never a badge), short when collapsed.
+    const statusEl = isGuide ? ''
+      : '<span style="flex-shrink:0;font-size:12px;font-weight:700;color:' + st.color + ';white-space:nowrap;">' + esc(st.label) + '</span>';
+    const headRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' + titleEl + statusEl + '</div>';
 
-    return '<div style="background:#0D181E;border-radius:8px;padding:14px 16px;margin-bottom:10px;">'
-      + statusHtml
-      + '<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--t3);">' + this.stepIcon(kind) + '</span>'
-      + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span></div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:6px 0 0;">' + esc(s.detail || '') + '</div>'
-      + (action ? '<div style="margin-top:11px;">' + action + '</div>' : '')
-      + '</div>';
+    let body = '';
+    if (expanded) {
+      const subLine = (!isGuide && st.sub) ? '<div style="font-size:11px;color:var(--t3);margin-top:5px;">' + esc(st.sub) + '</div>' : '';
+      const detail  = s.detail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:6px;">' + esc(s.detail) + '</div>' : '';
+      body = subLine + detail;
+    }
+
+    return '<div style="background:#0D181E;border-radius:8px;padding:' + (expanded ? '13px 16px' : '11px 16px') + ';margin-bottom:8px;">'
+      + headRow + body + '</div>';
   },
 
   // The selected system's recovery readout, shown as one line under the campaign
