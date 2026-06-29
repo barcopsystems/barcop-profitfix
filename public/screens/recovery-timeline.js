@@ -68,10 +68,10 @@ S.RecoveryTimeline = {
     return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">'
       + this.PHASES.map((p, i) => {
         const on = p.key === phase;
-        return '<div style="flex:1 1 150px;min-width:150px;background:' + (on ? accent.bg : 'var(--surface)') + ';border:1px solid ' + (on ? accent.bord : 'var(--b-edge)') + ';border-radius:10px;padding:13px 15px;">'
+        return '<div style="flex:1 1 150px;min-width:150px;background:' + (on ? 'var(--sel-active-bg)' : 'var(--surface)') + ';border:1px solid var(--b-edge);border-radius:10px;padding:13px 15px;">'
           + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><span style="width:20px;height:20px;border-radius:50%;background:' + (on ? accent.dot : 'var(--input)') + ';color:' + (on ? 'var(--bg)' : 'var(--t3)') + ';font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
           + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + p.name + '</span></div>'
-          + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + (on ? accent.when : 'var(--t3)') + ';margin-bottom:6px;">' + p.when + '</div>'
+          + '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">' + p.when + '</div>'
           + '<div style="font-size:11px;color:var(--t2);line-height:1.5;">' + p.desc + '</div></div>';
       }).join('') + '</div>';
   },
