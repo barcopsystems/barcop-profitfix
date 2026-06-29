@@ -2098,8 +2098,9 @@ S.HubSettings = {
     // ── Vendor Discrepancies ─────────────────────────────────────────────
     // A disciplined operator catches overcharges and chases most of them down.
     // Three caught and recovered, one still in Credit Requested (the filed-but-
-    // uncollected credit the Profit Audit surfaces under Vendor Control). All
-    // recent, none aging past 60 days. Feeds Inventory Execution + the BCA.
+    // uncollected credit the Profit Audit surfaces under Vendor Control) that has
+    // sat 9 days since the request with no response, so it reads as Follow Up Due.
+    // All recent, none aging past 60 days. Feeds Inventory Execution + the BCA.
     App.data.vendor_discrepancies = [
       { id:uid(), date:dateStr(52), vendor:'Republic National', reference:'RN-54880', type:'Overcharge',
         product_id:icProducts[0].id, sku:icProducts[0].name, units:24, agreed_price:21.40, invoiced_price:22.65,
@@ -2116,7 +2117,7 @@ S.HubSettings = {
       { id:uid(), date:dateStr(11), vendor:"Glazer's Beer & Bev", reference:'GLZ-3402', type:'Overcharge',
         product_id:icProducts[6].id, sku:icProducts[6].name, units:48, agreed_price:1.35, invoiced_price:1.50,
         overcharge:72, notes:'Unagreed price increase, credit requested', status:'Credit Requested', source:'manual',
-        filed_at:daysAgoISO(11), resolved_at:null },
+        filed_at:daysAgoISO(11), credit_requested_at:daysAgoISO(9), resolved_at:null },
     ];
 
     // ── Inventory Adjustment Log ─────────────────────────────────────────
