@@ -1373,16 +1373,16 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['events','Events'],['books','Books']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['experiments','Experiments'],['events','Events'],['books','Books']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap', 'experiments': 'experiments' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none', 'experiments': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1402,6 +1402,12 @@ const App = {
     'flowmap': { title: 'Blueprint', sections: [
       { h: 'What this is', p: ['The Blueprint shows how your data moves through Bar Cop, left to right: your Control sections capture it, This Week rolls it into a P&L, Recovery and the Bar Cop Audit diagnose where money is leaking, the Fix Process closes the gaps, and the Hub and Books report it.'] },
       { h: 'How to use it', p: ['Tap any box to see exactly what feeds it and what it feeds, with a button to open that screen. Use it to trace where a number you logged ends up, or how one part of Bar Cop connects to another.'] }
+    ] },
+    'experiments': { title: 'How Experiments Work', sections: [
+      { h: 'What this is', p: ['Experiments is your own before-and-after log. When you make a change you chose, like re-speccing a pour, launching a new menu item, or moving a vendor onto net-30, start an experiment here. Bar Cop averages the eight weeks before the start date against the eight weeks after on the metric you are watching and shows the lift, so you know whether the change actually moved the number.'] },
+      { h: 'Three areas', p: ['Experiments are grouped by where the change lands: Profit watches cost percentages, Revenue watches sales, covers, and check average, and Cash watches trapped cash, the cash cycle, and your runway. Start one in the area it affects and pick the metric to watch.'] },
+      { h: 'It measures, it does not double-count', p: ['An experiment reports a metric lift only, never recovered dollars, so it never overlaps the Recovery Scoreboard. It is also separate from the Fix System: the Fix System tracks the fixes your audits prescribed, while an experiment is a change you decided to make on your own.'] },
+      { h: 'Reading it', p: ['Each active experiment shows the metric before, after, and the lift, plus how many weeks of data it has so far. Give it a couple of weeks before you read too much into the number. When you have your answer, Mark Complete to file it, or Delete one started by mistake.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
@@ -1533,6 +1539,7 @@ const App = {
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
+    if (g === 'experiments') return (window.S && S.Experiments) ? S.Experiments.open() : null;
     if (g === 'events') return this.jumpToSection('events');
   },
   _renderProtoTopnav(context) {
