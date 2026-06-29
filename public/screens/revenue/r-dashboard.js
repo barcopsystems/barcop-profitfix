@@ -53,8 +53,6 @@ S.RevenueDashboard = {
             runText: 'Run Revenue Audit',
             emptyText: 'Run your first Revenue Audit for a baseline across check average, menu mix, server performance, and labor efficiency.'
           })))
-      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
-      + InitiativeTracker.card('revenue')
       + DashUI.quickActions([
           { go: 'r-this-week', label: 'Enter This Week' },
           { go: 'r-audit', label: 'Run Revenue Audit' },
@@ -66,7 +64,6 @@ S.RevenueDashboard = {
     FixPanel.wireFixAreas(container);
     DashUI.wireQuick(container);
     document.getElementById('r-insights-btn')?.addEventListener('click', () => this.showInsights());
-    InitiativeTracker.wire('revenue', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
   },
 
   // This Week vs Target — latest confirmed week's check average, labor cost, and
