@@ -1,12 +1,13 @@
 'use strict';
-/* Shared, module-aware Initiative Tracker. Renders on the Profit and Revenue
-   Recovery dashboards in the same slot (under the forecast/audit row,
-   above Quick Actions). An initiative is the operator's OWN experiment, a change
-   they chose to make, kept separate from the Fix System (audit-prescribed fixes)
-   and the Recovery Scoreboard (recovered dollars). Bar Cop averages the eight
-   weeks before the start date against the eight weeks after on the watched
+/* Shared, module-aware experiment tracker. Renders on the Experiments page
+   (top-nav), one card per area (Profit / Revenue / Cash). An experiment is the
+   operator's OWN change, kept separate from the Fix System (audit-prescribed
+   fixes) and the Recovery Scoreboard (recovered dollars). Bar Cop averages the
+   eight weeks before the start date against the eight weeks after on the watched
    metric and shows the lift. It reports a metric lift only, never recovered
-   dollars, so it never double-counts the Scoreboard. */
+   dollars, so it never double-counts the Scoreboard. The card is multi-instance
+   safe: wire(module, container, rerender) scopes to the passed container, so all
+   three areas can live on one page. Data keys stay *_initiatives for back-compat. */
 const InitiativeTracker = {
 
   CONFIG: {
@@ -27,7 +28,7 @@ const InitiativeTracker = {
       },
       namePh: 'Re-spec well pours',
       hypPh: 'Dropped well pours to 1.25oz Aug 1, expecting pour cost to fall',
-      empty: 'No active initiatives. Start one when you re-spec a pour, switch a vendor, or tighten portions and want to measure the cost change.'
+      empty: 'No active experiments. Start one when you re-spec a pour, switch a vendor, or tighten portions and want to measure the cost change.'
     },
     revenue: {
       dataKey: 'initiatives',
@@ -48,7 +49,31 @@ const InitiativeTracker = {
       },
       namePh: 'New Cocktail Menu',
       hypPh: 'Launched 6 new cocktails Aug 1, expecting a check average lift',
-      empty: 'No active initiatives. Start one when you launch a new menu item, run a promotion, or make a service change you want to measure.'
+      empty: 'No active experiments. Start one when you launch a new menu item, run a promotion, or make a service change you want to measure.'
+    },
+    cash: {
+      dataKey: 'cash_initiatives',
+      // Cash has no raw weekly operational array; its weekly time series is the
+      // interpolated cash_audits (each carries a rich `raw` block). Map date ->
+      // period_end so the before/after engine slices it like the others.
+      weeks: () => ((App.data && App.data.cash_audits) || [])
+        .map(a => ({ raw: a.raw || {}, period_end: a.period_end || a.date })),
+      types: ['Payment Terms', 'Par / Ordering', 'Dead Stock', 'Operational Change', 'Other'],
+      metrics: [
+        { key: 'trapped', label: 'Trapped Cash $ (lower is better)',     fmt: 'currency', lowerBetter: true },
+        { key: 'cycle',   label: 'Cash Cycle Days (lower is better)',    fmt: 'days',     lowerBetter: true },
+        { key: 'runway',  label: 'Runway in weeks (higher is better)',   fmt: 'weeks' }
+      ],
+      metricFor: (w, key) => {
+        const r = (w && w.raw) || {};
+        if (key === 'trapped') return r.TRAPPED_CASH != null ? Number(r.TRAPPED_CASH) : null;
+        if (key === 'cycle')   return r.CYCLE_DAYS   != null ? Number(r.CYCLE_DAYS)   : null;
+        if (key === 'runway')  return r.RUNWAY       != null ? Number(r.RUNWAY)       : null;
+        return null;
+      },
+      namePh: 'Move top vendors to net-30',
+      hypPh: 'Negotiated net-30 with the top vendors to hold cash longer and shorten the cash cycle',
+      empty: 'No active experiments. Start one when you negotiate vendor terms, cut par levels, or clear dead stock and want to measure the cash change.'
     }
   },
 
@@ -91,6 +116,8 @@ const InitiativeTracker = {
     if (f === 'currency') return App.fmtCurrency(v);
     if (f === 'rating')   return v.toFixed(1) + '★';
     if (f === 'int')      return Math.round(v).toLocaleString('en-US');
+    if (f === 'days')     return Math.round(v) + ' days';
+    if (f === 'weeks')    return Math.round(v) + ' wk' + (Math.round(v) === 1 ? '' : 's');
     return v.toFixed(1) + '%';
   },
 
@@ -105,6 +132,8 @@ const InitiativeTracker = {
     if (f === 'currency')    body = App.fmtCurrency(lift);
     else if (f === 'rating') body = lift.toFixed(1) + '★';
     else if (f === 'int')    body = Math.round(lift).toLocaleString('en-US');
+    else if (f === 'days')   body = Math.round(lift) + ' days';
+    else if (f === 'weeks')  body = Math.round(lift) + ' wks';
     else                     body = lift.toFixed(1) + '%';
     return '<span style="color:' + color + ';font-weight:700;">' + sign + body + '</span>';
   },
@@ -152,14 +181,14 @@ const InitiativeTracker = {
 
     return '<div class="card" style="padding:0;overflow:hidden;">'
       + '<div style="padding:14px 20px;display:flex;align-items:center;justify-content:flex-end;">'
-      + '<button class="btn btn-ghost btn-sm" id="init-add">+ Start Initiative</button>'
+      + '<button class="btn btn-ghost btn-sm init-add">+ Start Experiment</button>'
       + '</div>'
       + activeRows + closedRows + '</div>';
   },
 
   wire(module, container, rerender) {
     const save = this.cfg(module).dataKey;
-    document.getElementById('init-add')?.addEventListener('click', () => this._showForm(module, rerender));
+    container.querySelector('.init-add')?.addEventListener('click', () => this._showForm(module, rerender));
     container.querySelectorAll('.init-complete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const i = this.list(module).find(x => x.id === btn.dataset.id);
@@ -188,7 +217,7 @@ const InitiativeTracker = {
     const metricOpts = c.metrics.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + '</option>').join('');
     const today = App.todayLocal();
     const body = '<div class="card form-card narrow-form" style="margin:0;">'
-      + '<div class="card-title">Start Initiative</div>'
+      + '<div class="card-title">Start Experiment</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f" style="flex:1;min-width:200px;"><label>Name</label><input type="text" id="init-name" placeholder="' + esc(c.namePh) + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Start Date</label><input type="date" id="init-date" value="' + today + '"/></div>'
@@ -199,7 +228,7 @@ const InitiativeTracker = {
       + '</div>'
       + '<div class="f" style="width:100%;"><label>What you changed (optional)</label><textarea class="notes-ta" id="init-hyp" rows="2" placeholder="' + esc(c.hypPh) + '"></textarea></div>'
       + '<div class="card-actions">'
-        + '<button type="button" id="init-save" class="btn btn-primary">Start Initiative</button>'
+        + '<button type="button" id="init-save" class="btn btn-primary">Start Experiment</button>'
         + '<button type="button" id="init-cancel" class="btn btn-ghost">Cancel</button>'
         + '<span id="init-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
