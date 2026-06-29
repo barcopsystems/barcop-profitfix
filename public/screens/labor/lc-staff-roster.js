@@ -144,7 +144,7 @@ S.LaborStaffRoster = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
-      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager, even if hourly.</span></label></div>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager.</span></label></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
@@ -295,8 +295,7 @@ S.LaborStaffRoster = {
           + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-        + '<div class="sh" style="margin:0;">Staff Roster</div>'
+      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:24px 0 10px;">'
         + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
         + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
@@ -676,37 +675,37 @@ S.LaborStaffRoster = {
   },
 
   // ── Coaching Log section ─────────────────────────────────────────────
-  // Heading-outside + ONE card with the notes as divider-separated rows (no
-  // per-note bordered box, which read as a card inside a card).
+  // Same row-list style as Certifications and Training: columns Date, Type,
+  // Manager, Note. Type keeps its category color (the meaning-bearing signal).
   renderNotesCard(staffId) {
     const list = this.notesForStaff(staffId);
+    const cols = '<colgroup><col style="width:13%"/><col style="width:13%"/><col style="width:15%"/><col style="width:41%"/><col style="width:18%"/></colgroup>';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + cols
+      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th>Note</th><th></th></tr></thead>';
     const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Coaching Log</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div></div>';
     if (list.length === 0) {
-      return heading + '<div class="card" style="padding:14px 20px;"><div style="font-size:13px;color:var(--t3);line-height:1.5;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</div></div>';
+      return heading + '<div class="card" style="overflow-x:auto;">' + head
+        + '<tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>';
     }
-    const rows = list.map((n, i) => {
+    const rows = list.map(n => {
       const catColor = n.category === 'Praise' ? 'var(--green)'
                      : n.category === 'Coaching' ? 'var(--steel)'
                      : n.category === 'Concern' ? 'var(--amber)'
                      : 'var(--red)';
-      return '<div style="padding:14px 0;' + (i ? 'border-top:1px solid var(--b2);' : '') + '">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;">'
-          + '<div style="display:flex;align-items:center;gap:10px;">'
-            + '<span style="font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:' + catColor + ';">' + esc(n.category || 'Note') + '</span>'
-            + '<span style="font-size:12px;color:var(--t2);">' + this.fmtDate(n.date) + '</span>'
-            + (n.manager_name ? '<span style="font-size:11px;color:var(--t3);">by ' + esc(n.manager_name) + '</span>' : '')
-          + '</div>'
-          + '<div class="row-actions">'
-            + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
-            + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
-          + '</div>'
-        + '</div>'
-        + '<div style="font-size:13px;color:var(--t1);line-height:1.6;white-space:pre-wrap;">' + esc(n.text || '') + '</div>'
-        + '</div>';
+      return '<tr>'
+        + '<td><div class="val">' + this.fmtDate(n.date) + '</div></td>'
+        + '<td><span style="color:' + catColor + ';font-weight:700;">' + esc(n.category || 'Note') + '</span></td>'
+        + '<td>' + esc(n.manager_name || '-') + '</td>'
+        + '<td><div style="line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div></td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
+        + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
+        + '</div></td></tr>';
     }).join('');
-    return heading + '<div class="card" style="padding:6px 20px;">' + rows + '</div>';
+    return heading + '<div class="card" style="overflow-x:auto;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   // Note add/edit in a focused pop-up (own note- ids; no collision with the
