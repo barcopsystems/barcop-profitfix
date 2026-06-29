@@ -124,14 +124,14 @@ S.ProfitForecast = {
         + '<td' + (o.bold ? ' style="font-weight:600;"' : '') + (o.curCls ? ' class="' + o.curCls + '"' : '') + '>' + cur + '</td>'
         + '<td' + (o.bold ? ' style="font-weight:600;"' : '') + (o.tgtCls ? ' class="' + o.tgtCls + '"' : '') + '>' + tgt + '</td></tr>';
     };
-    const breakdown = '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:480px;">'
+    const breakdown = '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:40%"/><col style="width:30%"/><col style="width:30%"/></colgroup>'
       + '<thead><tr><th>Line</th><th>At Current Pace</th><th>At Your Targets</th></tr></thead><tbody>'
       + bRow('Projected Sales', money(sales), money(sales))
       + bRow('Prime Cost (COGS + Labor)', money(primeCur) + '<span style="color:var(--t3);margin-left:12px;">' + pctTxt(rr.primePctCurrent) + '</span>', money(primeTgt) + '<span style="color:var(--t3);margin-left:12px;">' + pctTxt(targetP) + '</span>')
       + bRow('Operating Costs', money(opexTot), money(opexTot))
       + bRow(profitLabel, money(profitCur), money(profitTgt), { bold: true, curCls: profitCur < 0 ? 'neg' : '', tgtCls: profitTgt < 0 ? 'neg' : '' })
-      + '</tbody></table></div></div>';
+      + '</tbody></table></div>';
 
     // ── Heads Up: assumptions + disclaimer (standard opaque gold-tint box) ──
     const opexNote = rr.opexLogged ? ''
