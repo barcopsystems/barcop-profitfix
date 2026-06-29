@@ -3221,6 +3221,53 @@ S.HubSettings = {
       coachNote('Hector M.',   6, 'Warning',  'Worked a shift on a lapsed Food Handler card. Pulled him off the line until it is renewed and documented per health code.'),
     ].filter(Boolean);
 
+    // ── Training — reusable onboarding templates + per-person records. Two
+    // templates the Anchor runs, then a few staff records: tenured staff signed
+    // off and complete, recent hires still working through theirs. Records carry
+    // their own copy of the steps so editing a template never rewrites history.
+    const TR_BAR_ITEMS = [
+      'Review the employee handbook and sign the acknowledgment',
+      'TABC alcohol certification on file',
+      'Shadow two closing shifts with a senior bartender',
+      'Pass the well-pour and signature cocktail test',
+      'POS walkthrough: open a tab, transfer, comp, and void',
+      'Walk the cash drawer count and tip-out procedure',
+      'Review the draft line and keg-change procedure',
+    ];
+    const TR_SRV_ITEMS = [
+      'Review the employee handbook and sign the acknowledgment',
+      'Food handler certification on file',
+      'Shadow two dinner shifts with a senior server',
+      'Pass the menu, wine, and allergen test',
+      'POS walkthrough: fire a course, split a check, comp, and void',
+      'Review steps of service and the table-touch standard',
+      'Walk the closing side-work checklist',
+    ];
+    const trBarTplId = uid(), trSrvTplId = uid();
+    App.laborData.lc_training_templates = [
+      { id:trBarTplId, name:'Bartender Onboarding', position_id:lcPos('Bartender'), items:TR_BAR_ITEMS.slice(), created_at:daysAgoISO(330) },
+      { id:trSrvTplId, name:'Server Onboarding',    position_id:lcPos('Server'),    items:TR_SRV_ITEMS.slice(), created_at:daysAgoISO(330) },
+    ];
+    // doneCount steps checked off; done items dated near the createdDaysAgo mark.
+    const trItems = (src, doneCount, doneDaysAgo) => src.map((text, i) =>
+      ({ text, done: i < doneCount, done_date: i < doneCount ? dateStr(doneDaysAgo) : '' }));
+    const trainRec = (nm, tplId, tplName, items, signerName, createdDaysAgo, completedDaysAgo) => {
+      const st = stByName(nm); if (!st) return null;
+      const allDone = items.length > 0 && items.every(it => it.done);
+      const signer = signerName ? stByName(signerName) : null;
+      return { id:uid(), staff_id:st.id, name:tplName, template_id:tplId, items:items,
+        signed_off_by_id: allDone && signer ? signer.id : '',
+        signed_off_by:    allDone && signer ? signer.name : '',
+        completed_date:   allDone ? dateStr(completedDaysAgo) : '',
+        notes:'', created_at:daysAgoISO(createdDaysAgo), updated_at:new Date().toISOString() };
+    };
+    App.laborData.lc_training = [
+      trainRec('Maria G.',   trBarTplId, 'Bartender Onboarding', trItems(TR_BAR_ITEMS, 7, 300), 'Carlos P.', 315, 300),
+      trainRec('Jessica M.', trSrvTplId, 'Server Onboarding',    trItems(TR_SRV_ITEMS, 7, 340), 'Carlos P.', 355, 340),
+      trainRec('Priya N.',   trSrvTplId, 'Server Onboarding',    trItems(TR_SRV_ITEMS, 4, 95),  '',          105, 0),
+      trainRec('Ashley B.',  trBarTplId, 'Bartender Onboarding', trItems(TR_BAR_ITEMS, 3, 140), '',          145, 0),
+    ].filter(Boolean);
+
     // ── Pay periods — two older weeks closed + locked, recent weeks left open
     // so both states are visible. Stamps locked + pay_period_id on the actuals
     // in range, mirroring lc-pay-periods closePeriod().
