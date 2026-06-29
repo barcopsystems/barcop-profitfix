@@ -946,7 +946,7 @@ const App = {
     // Shift Control
     { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
     { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
-    { group:'checklists',          label:'Manager Checklists',           module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
+    { group:'checklists',          label:'Run Checklists',               module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
     { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
     { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
     { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
@@ -4119,7 +4119,7 @@ const App = {
         'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
         'sc-incidents':          ['Incidents', 'Shift Control'],
         'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
-        'sc-checklists':         ['Manager Checklists', 'Shift Control'],        'sc-checklist-templates':['Create Checklists', 'Shift Control'],
+        'sc-checklists':         ['Run Checklists', 'Shift Control'],        'sc-checklist-templates':['Build Checklists', 'Shift Control'],
         'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
         'sc-help':               ['Help and FAQ', 'Shift Control'],
       };
