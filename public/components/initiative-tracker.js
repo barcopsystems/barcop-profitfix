@@ -174,8 +174,8 @@ const InitiativeTracker = {
         + '<div style="font-size:11px;color:var(--t3);">So far: <span style="color:var(--t1);">' + this._fmtVal(metric, m.after) + '</span></div>'
         + '<div style="font-size:11px;color:var(--t3);">Lift: ' + this._fmtLift(metric, m.lift) + '</div>'
         + '<div style="margin-left:auto;display:flex;gap:6px;">'
-        + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Edit</button>'
         + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Mark Complete</button>'
+        + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Edit</button>'
         + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Delete</button>'
         + '</div></div></div>';
     }).join('') : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">' + c.empty + '</div>';
@@ -198,14 +198,13 @@ const InitiativeTracker = {
           + '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;min-width:0;">'
           + '<span style="color:var(--t2);">' + esc(i.name) + '</span>'
           + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
-          + '</div>'
-          + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
           + '<span>' + this._fmtLift(metric, m.lift) + '</span>'
+          + '</div>'
           + '<div style="display:flex;gap:6px;">'
           + '<button class="btn btn-ghost btn-sm init-again" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Run Again</button>'
           + '<button class="btn btn-ghost btn-sm init-reopen" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Reopen</button>'
           + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
-          + '</div></div></div>';
+          + '</div></div>';
       }).join('');
       completedCard = '<div class="card" style="padding:0;overflow:hidden;">'
         + '<div class="card-title" style="padding:13px 20px;margin:0;">Completed Experiments</div>'
