@@ -240,13 +240,18 @@ S.ProfitFix = {
     this._autoStart();
     const gaps = this.gaps();
     if (focus && this.gap(focus)) this._workGap = focus;
-    else if (!this._workGap || !this.gap(this._workGap)) this._workGap = gaps.length ? gaps[0].id : null;
+    else {
+      // Auto-open the first system that is not On track (the one that needs
+      // work); if every system is On track, open the first one.
+      const needs = gaps.find(g => this.health(g).state !== 'running');
+      this._workGap = needs ? needs.id : (gaps.length ? gaps[0].id : null);
+    }
     this.renderPage();
   },
 
-  // ── One master-detail page: the campaign header full width, a left rail of
-  //    systems, and the selected system's fix detail on the right. Selecting a
-  //    system swaps the detail in place; the page is never left. ───────────────
+  // ── One single-column page: the systems overview card on top, then each profit
+  //    system as a Close-The-Week-style accordion step (its health ring is the
+  //    circle). Opening one expands its fix in place; the page is never left. ───
   renderPage() {
     const gaps = this.gaps();
     const total = gaps.length;
@@ -272,15 +277,12 @@ S.ProfitFix = {
 
     const timelineLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm pf-timeline">See Your Recovery Timeline</button><button class="btn btn-ghost btn-sm pf-playbook">Read the Recovery Playbook</button></div>';
 
-    const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
-    const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
+    const systems = gaps.map((g, gi) => this.systemRow(g, healths[gi])).join('');
 
-    this.container.innerHTML = '<div class="screen">' + header + timelineLink
-      + '<div class="pf-2pane"><div class="pf-rail">' + rail + '</div>'
-      + '<div class="pf-detail">' + detail + '</div></div></div>';
+    this.container.innerHTML = '<div class="screen">' + header + timelineLink + systems + '</div>';
 
-    this.container.querySelectorAll('.pf-tile').forEach(t =>
-      t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
+    this.container.querySelectorAll('.pf-sys-head').forEach(t =>
+      t.addEventListener('click', () => { this._workGap = (this._workGap === t.dataset.gap) ? null : t.dataset.gap; this.renderPage(); }));
     this.container.querySelector('.pf-timeline')?.addEventListener('click', () =>
       App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'profit'); }));
     this.container.querySelector('.pf-playbook')?.addEventListener('click', () =>
@@ -288,20 +290,25 @@ S.ProfitFix = {
     this.wireWorkspace();
   },
 
-  // One system button in the left rail. The selected one is highlighted gold.
-  railTile(g, h) {
+  // One profit system as a Close-The-Week-style accordion step. The circle is the
+  // system's health ring (steps-done count, or a green check when On track). Open
+  // = gold-tint, On track when collapsed = the done look (--input), else --surface.
+  systemRow(g, h) {
+    const open = g.id === this._workGap;
     const logged = !!this.loggedDate(g.id);
     const rec = logged ? this.recoveredFor(g.id) : 0;
-    const sel = g.id === this._workGap;
-    const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>'
+    const bg = open ? 'var(--gold-tint)' : (h.state === 'running' ? 'var(--input)' : 'var(--surface)');
+    const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + esc(h.label) + '</span>'
       + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
-    return '<div class="pf-tile' + (sel ? ' sel' : '') + '" data-gap="' + esc(g.id) + '">'
-      + '<div style="display:flex;align-items:center;gap:12px;">'
-      + this.ring(h.good, h.watched, 40, h.state === 'running')
-      + '<div style="min-width:0;flex:1;">'
-      + '<div style="font-size:14px;font-weight:600;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
-      + '<div style="font-size:12px;margin-top:4px;line-height:1.4;">' + statusLine + '</div>'
-      + '</div></div></div>';
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
+      + '<div class="pf-sys-head" data-gap="' + esc(g.id) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      + this.ring(h.good, h.watched, 30, h.state === 'running')
+      + '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
+      + '<div style="font-size:12px;margin-top:3px;line-height:1.4;">' + statusLine + '</div></div>'
+      + '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (open ? '&#9652;' : '&#9662;') + '</span>'
+      + '</div>';
+    if (open) html += '<div style="padding:2px 16px 18px;">' + this.detailHtml(g) + '</div>';
+    return html + '</div>';
   },
 
   // ── Detail pane: the selected system's fix. The rail button carries the name,
@@ -314,25 +321,22 @@ S.ProfitFix = {
     const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
     const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
 
-    // Each section is one card; every step sits in its own #0D181E block, no
-    // divider lines between them.
-    const systemCard = watchedHtml
-      ? '<div class="card" style="margin-bottom:18px;">' + watchedHtml + '</div>'
-      : '';
-    const guideCard = guideHtml
-      ? '<div class="sh" style="margin:0 0 12px;">Guidance</div>'
-        + '<div class="card" style="margin-bottom:18px;">' + guideHtml + '</div>'
+    // Steps sit directly in the open accordion body as #0D181E blocks (no nested
+    // cards), with the Guidance and Watch Out For sections under their headings.
+    const guideBlock = guideHtml
+      ? '<div class="sh" style="margin:16px 0 10px;">Guidance</div>' + guideHtml
       : '';
 
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
-      ? '<div class="sh" style="margin:0 0 12px;">Watch Out For</div><div class="card">'
+      ? '<div class="sh" style="margin:16px 0 10px;">Watch Out For</div>'
+        + '<div style="background:#0D181E;border-radius:8px;padding:14px 16px;">'
         + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
             + '<span style="flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
         + '</div>'
       : '';
 
-    return systemCard + guideCard + watchOut;
+    return watchedHtml + guideBlock + watchOut;
   },
 
   stepRow(g, s, i) {
