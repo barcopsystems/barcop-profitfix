@@ -194,15 +194,18 @@ const InitiativeTracker = {
       const closedRows = closed.slice().reverse().map((i, idx) => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
-        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;">'
-          + '<span style="color:var(--t2);flex:1;min-width:120px;">' + esc(i.name) + '</span>'
+        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:11px;">'
+          + '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;min-width:0;">'
+          + '<span style="color:var(--t2);">' + esc(i.name) + '</span>'
           + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
           + '<span>' + this._fmtLift(metric, m.lift) + '</span>'
           + '<div style="display:flex;gap:6px;">'
           + '<button class="btn btn-ghost btn-sm init-again" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Run Again</button>'
           + '<button class="btn btn-ghost btn-sm init-reopen" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Reopen</button>'
           + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
-          + '</div></div>';
+          + '</div></div></div>';
       }).join('');
       completedCard = '<div class="card" style="padding:0;overflow:hidden;">'
         + '<div class="card-title" style="padding:13px 20px;margin:0;">Completed Experiments</div>'
