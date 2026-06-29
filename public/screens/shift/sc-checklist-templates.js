@@ -105,9 +105,12 @@ S.ShiftChecklistTemplates = {
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
     const headingHtml = heading ? '<div class="sh" style="margin:24px 0 10px;">' + heading + '</div>' : '';
-    const cardStyle = 'overflow-x:auto;' + (heading ? '' : 'margin-top:24px;');
+    // No-heading card (Closing) tucks right under the Opening card with a small gap.
+    const cardStyle = 'overflow-x:auto;' + (heading ? '' : 'margin-top:10px;');
+    // Shared column widths so the Items column lines up down all three cards.
+    const cg = '<colgroup><col style="width:52%"/><col style="width:20%"/><col style="width:28%"/></colgroup>';
     return headingHtml
-      + '<div class="card" style="' + cardStyle + '"><table class="row-list"><thead><tr>'
+      + '<div class="card" style="' + cardStyle + '"><table class="row-list" style="table-layout:fixed;width:100%;">' + cg + '<thead><tr>'
       + '<th>' + (colHeader || 'Name') + '</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
@@ -117,7 +120,7 @@ S.ShiftChecklistTemplates = {
     const saved = all.length
       ? (this.savedSection('Opening', 'Manager Checklists', 'Opening Checklists')
          + this.savedSection('Closing', '', 'Closing Checklists')
-         + this.savedSection('Print', 'Staff Checklists', 'Name'))
+         + this.savedSection('Print', 'Staff Checklists', 'Print Checklists'))
       : '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Items</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No checklists yet. Build one above. Until you do, the Manager Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
