@@ -175,8 +175,8 @@ S.RecoveryPlaybook = {
     const head = '<thead><tr>' + b.head.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>';
     const rows = b.rows.map(r => '<tr>' + r.map((c, i) =>
       '<td data-label="' + esc(b.head[i] || '') + '">' + esc(c) + '</td>').join('') + '</tr>').join('');
-    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl' + (b.nowrap1 ? ' pb-tbl-nowrap1' : '') + '">'
-      + head + '<tbody>' + rows + '</tbody></table></div></div>'
+    return '<div class="card pb-tbl-card" style="overflow-x:auto;"><table class="row-list' + (b.nowrap1 ? ' pb-tbl-nowrap1' : '') + '">'
+      + head + '<tbody>' + rows + '</tbody></table></div>'
       + (b.note ? '<p class="pb-note">' + esc(b.note) + '</p>' : '');
   },
 
@@ -249,9 +249,10 @@ S.RecoveryPlaybook = {
       + '<td data-label="Where Bar Cop shows it">' + esc(r.show) + '</td>'
       + '<td data-label="Where you fix it">' + this.goBtn({ label: r.fixLabel, screen: r.screen, focus: r.focus }) + '</td>'
       + '</tr>').join('');
-    return '<div class="card card-bleed data-card pb-tbl-card"><div class="card-bleed-tbl"><table class="tbl">'
+    return '<div class="card pb-tbl-card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:18%"/><col style="width:30%"/><col style="width:24%"/><col style="width:28%"/></colgroup>'
       + '<thead><tr><th>The leak</th><th>Where you capture it</th><th>Where Bar Cop shows it</th><th>Where you fix it</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div></div>';
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   partsHtml(b) {
