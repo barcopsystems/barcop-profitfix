@@ -2239,6 +2239,32 @@ S.HubSettings = {
     App.shiftData.sc_checklist_templates = [
       { id:scOpenTplId,  name:'Standard Open',  type:'Opening', items:scOpenItems.slice(),  created_at:new Date().toISOString() },
       { id:scCloseTplId, name:'Standard Close', type:'Closing', items:scCloseItems.slice(), created_at:new Date().toISOString() },
+      // Print Only station checklists — printed blank for the clipboard, never run
+      // in the app. Realistic Anchor bar-close and kitchen-open routines.
+      { id:uid(), name:'Bar Close', type:'Print', created_at:new Date().toISOString(), items:[
+        'Break down and wash all bar mats',
+        'Empty, clean, and dry the speed wells',
+        'Cap and date all open juices and syrups in the rail',
+        'Wipe down bottles and restock the well',
+        'Run the last rack of glassware',
+        'Wipe down and sanitize the bar top and stations',
+        'Empty the drains and run hot water through them',
+        'Squeegee the floor mats behind the bar',
+        'Lock the liquor room and the reach-in coolers',
+        'Take out the bar trash and recycling',
+      ] },
+      { id:uid(), name:'Kitchen Open', type:'Print', created_at:new Date().toISOString(), items:[
+        'Fire the line, flat top, and fryers and bring to temp',
+        'Check the walk-in and reach-in temps and log them',
+        'Pull and date the day\'s prep off the par sheet',
+        'Stock the line: proteins, sauces, and garnishes',
+        'Fill and label all squeeze bottles',
+        'Check the fryer oil and filter it if needed',
+        'Set up the dish pit and fill the sanitizer buckets',
+        'Confirm every cooler is holding 40F or below',
+        'Stock paper, gloves, and to-go containers',
+        'Initial the temperature log',
+      ] },
     ];
     const mkChkItems = (arr, doneN) => arr.map((text, idx) => ({ text:text, done:idx < doneN }));
     const scChecklists = [];
