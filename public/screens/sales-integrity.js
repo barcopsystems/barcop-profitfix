@@ -355,16 +355,16 @@ S.SalesIntegrity = {
     let footerInner = '';
     if (flagged.length && cleanTxt) footerInner += '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + cleanTxt + '</div>';
     if (skipTxt) footerInner += '<div style="font-size:12px;color:var(--t4);line-height:1.6;' + (footerInner ? 'margin-top:4px;' : '') + '">' + skipTxt + '</div>';
-    const footer = footerInner ? '<div style="padding:14px 18px;border-top:1px solid var(--b2);">' + footerInner + '</div>' : '';
+    const footer = footerInner ? '<div style="border-top:1px solid var(--b2);margin-top:4px;padding-top:14px;">' + footerInner + '</div>' : '';
 
     let inner;
     if (!flagged.length) {
-      inner = '<div style="padding:16px 18px;"><div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every server\'s numbers track the floor. Run this each shift or week and the outliers surface on their own.</div></div>';
+      inner = '<div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every server\'s numbers track the floor. Run this each shift or week and the outliers surface on their own.</div>';
     } else {
-      inner = flagged.map((x, i) => this.serverCard(x, i === 0)).join('');
+      inner = flagged.map(x => this.serverCard(x)).join('');
     }
-    const reviewCard = '<div class="card" style="padding:0;">' + inner + footer + '</div>';
+    const reviewCard = '<div class="card">' + inner + footer + '</div>';
 
     const note = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:18px 0 6px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
@@ -374,7 +374,7 @@ S.SalesIntegrity = {
     return statStrip + head + reviewCard + note;
   },
 
-  serverCard(x, first) {
+  serverCard(x) {
     const sevColor = x.severity === 'high' ? 'var(--red)' : 'var(--amber)';
     const sevLabel = x.severity === 'high' ? 'High Risk' : 'Watch';
     const byCat = {};
@@ -386,7 +386,7 @@ S.SalesIntegrity = {
       return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
     }).join('');
 
-    return '<div style="padding:16px 18px;' + (first ? '' : 'border-top:1px solid var(--b2);') + '">'
+    return '<div style="background:#0D181E;border-radius:8px;padding:16px 18px;margin-bottom:10px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:12px;">'
