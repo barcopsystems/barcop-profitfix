@@ -1373,16 +1373,16 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['experiments','Experiments'],['events','Events'],['books','Books']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap', 'experiments': 'experiments' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none', 'experiments': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1402,12 +1402,6 @@ const App = {
     'flowmap': { title: 'Blueprint', sections: [
       { h: 'What this is', p: ['The Blueprint shows how your data moves through Bar Cop, left to right: your Control sections capture it, This Week rolls it into a P&L, Recovery and the Bar Cop Audit diagnose where money is leaking, the Fix Process closes the gaps, and the Hub and Books report it.'] },
       { h: 'How to use it', p: ['Tap any box to see exactly what feeds it and what it feeds, with a button to open that screen. Use it to trace where a number you logged ends up, or how one part of Bar Cop connects to another.'] }
-    ] },
-    'experiments': { title: 'How Experiments Work', sections: [
-      { h: 'What this is', p: ['Experiments is your own before-and-after log. When you make a change you chose, like re-speccing a pour, launching a new menu item, or moving a vendor onto net-30, start an experiment here. Bar Cop averages the eight weeks before the start date against the eight weeks after on the metric you are watching and shows the lift, so you know whether the change actually moved the number.'] },
-      { h: 'Three areas', p: ['Experiments are grouped by where the change lands: Profit watches cost percentages, Revenue watches sales, covers, and check average, and Cash watches trapped cash, the cash cycle, and your runway. Start one in the area it affects and pick the metric to watch.'] },
-      { h: 'It measures, it does not double-count', p: ['An experiment reports a metric lift only, never recovered dollars, so it never overlaps the Recovery Scoreboard. It is also separate from the Fix System: the Fix System tracks the fixes your audits prescribed, while an experiment is a change you decided to make on your own.'] },
-      { h: 'Reading it', p: ['Each active experiment shows the metric before, after, and the lift, plus how many weeks of data it has so far. Give it a couple of weeks before you read too much into the number. When you have your answer, Mark Complete to file it, or Delete one started by mistake.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
@@ -1533,13 +1527,12 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-checklists', 'sc-checklist-templates', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-report-movers', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
-    if (g === 'experiments') return (window.S && S.Experiments) ? S.Experiments.open() : null;
     if (g === 'events') return this.jumpToSection('events');
   },
   _renderProtoTopnav(context) {
@@ -4204,6 +4197,7 @@ const App = {
       'this-week':     ['This Week', 'Weekly Entry'],
       'profit-forecast':['Profit Forecast', ''],
       'recipe-cost-analysis':['Recipe Summary', ''],
+      'profit-experiments':['Experiments', ''],
       'vendor-tracker': ['Vendor Tracker', ''],
       'vendor-watch':  ['Vendor Tracker', ''],
       'vendor-scorecard': ['Vendor Tracker', ''],
@@ -4223,6 +4217,7 @@ const App = {
       'this-week':     S.ThisWeek,
       'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
+      'profit-experiments':S.RecoveryExperiments,
       'vendor-tracker': S.VendorTracker,
       'vendor-watch':  S.VendorTracker,
       'vendor-scorecard': S.VendorTracker,
