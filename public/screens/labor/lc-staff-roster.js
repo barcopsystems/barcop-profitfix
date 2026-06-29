@@ -368,6 +368,7 @@ S.LaborStaffRoster = {
       { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.'] },
       { h: 'Hourly or Salaried', p: ['Set Pay Type to Salary for an exempt manager or any fixed-salary role, then enter the annual salary. Bar Cop spreads that salary evenly across the year (salary divided by 52 each week) as a fixed labor cost, and salaried staff never show overtime. You can still log their hours so they count toward coverage and revenue per labor hour, but those hours never add an hourly cost. If a salaried employee is overtime eligible (non-exempt), set them to Hourly instead. How you classify staff under wage and hour law is your call. Bar Cop is a tool, not legal or payroll advice.'] },
       { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
+      { h: 'Training', p: ['Each person\'s page also has a Training section. Use Assign Training to load an onboarding template onto them, check the steps off as they finish, and pick who signed off. Build the templates themselves on the Training screen, which also shows where every staff member stands at a glance.'] },
       { h: 'Active or Inactive', p: ['Set a staff member Inactive when they leave instead of deleting them, so their past hours, tips, and records stay intact. Inactive staff drop off the schedule and tip pickers but keep their history.'] }
     ]);
   },
@@ -433,6 +434,7 @@ S.LaborStaffRoster = {
       + this.renderWageHistoryCard(s)
       + this.renderCertsCard(staffId)
       + this.renderNotesCard(staffId)
+      + (S.LaborTraining ? S.LaborTraining.rosterSectionHTML(staffId) : '')
       + '</div>';
     this.wireUnified(staffId);
   },
@@ -557,6 +559,9 @@ S.LaborStaffRoster = {
     document.getElementById('note-add')?.addEventListener('click', () => { this.noteEditId = null; this.openNoteModal(staffId); });
     this.container.querySelectorAll('.note-edit').forEach(b => b.addEventListener('click', () => { this.noteEditId = b.dataset.id; this.openNoteModal(staffId); }));
     this.container.querySelectorAll('.note-del').forEach(b => b.addEventListener('click', () => this.confirmDelNote(b.dataset.id, staffId)));
+    // Training (assign + check off) — rendered and wired by S.LaborTraining so the
+    // template store and assignment records have one home (two doors, one store).
+    if (S.LaborTraining) S.LaborTraining.wireRosterSection(this.container, staffId, () => this.renderUnified(staffId));
   },
 
   // ── Certifications section ───────────────────────────────────────────
