@@ -169,7 +169,7 @@ S.ShiftChecklists = {
 
     const runner = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      +   '<span>Checklists</span>'
+      +   '<span>Manager Checklists</span>'
       +   '<button class="btn btn-ghost btn-sm no-print" id="cl-worksheet">Worksheet</button>'
       + '</div>'
       + '<div>'
@@ -177,7 +177,7 @@ S.ShiftChecklists = {
       + '<div class="form-row" style="gap:16px;">'
       + tplField
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="cl-date" value="' + esc(this._run.date) + '"/></div>'
-      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label><select id="cl-by">' + App.staffOptions(this._run.completed_by_id || this._run.completed_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="width:220px;flex-shrink:0;"><label>Completed By</label><select id="cl-by">' + App.staffOptions(this._run.completed_by_id || this._run.completed_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
       + '<div style="margin:8px 0 14px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:6px;"><span>' + done + ' of ' + items.length + ' complete</span><span>' + pct + '%</span></div>'

@@ -54,7 +54,7 @@ S.ShiftChecklistTemplates = {
   // One card: name + type, then a divided Checklist Items section. Primary
   // buttons live below the card.
   formBlock(isEdit) {
-    const typeOpts = [['Opening', 'Opening'], ['Closing', 'Closing'], ['Print', 'Print Only']]
+    const typeOpts = [['Opening', 'Manager Opening'], ['Closing', 'Manager Closing'], ['Print', 'Staff Print Only']]
       .map(([v, l]) => '<option value="' + v + '"' + (this._type === v ? ' selected' : '') + '>' + l + '</option>').join('');
     const itemRows = this._items.map((it, idx) =>
       '<div class="ct-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
@@ -67,9 +67,9 @@ S.ShiftChecklistTemplates = {
       : itemRows;
 
     return '<div class="card form-card">'
-      + '<div class="card-title">' + (isEdit ? 'Edit' : 'New') + ' Checklist Template</div>'
+      + '<div class="card-title">' + (isEdit ? 'Edit Checklist' : 'Add New Checklist') + '</div>'
       + '<div class="form-row" style="gap:16px;">'
-      + '<div class="f" style="width:260px;flex-shrink:0;"><label>Template Name</label>'
+      + '<div class="f" style="width:260px;flex-shrink:0;"><label>Checklist Name</label>'
       + '<input type="text" id="ct-name" value="' + esc(this._name) + '" placeholder="e.g. Weekend Bar Open"/></div>'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Type</label><select id="ct-type">' + typeOpts + '</select></div>'
       + '</div>'
@@ -82,7 +82,7 @@ S.ShiftChecklistTemplates = {
       + '</div>'
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="ct-save">' + (isEdit ? 'Update Template' : 'Save Template') + '</button>'
+      + '<button class="btn btn-primary" id="ct-save">' + (isEdit ? 'Update Checklist' : 'Save Checklist') + '</button>'
       + (isEdit
           ? '<button class="btn btn-ghost" id="ct-cancel">Cancel</button>'
           : '<button class="btn btn-ghost" id="ct-startover">Start Over</button>')
@@ -90,30 +90,37 @@ S.ShiftChecklistTemplates = {
       + '</div>';
   },
 
-  savedSection(type, heading, withExport) {
+  // heading '' renders no heading (the card then sits under the previous section's
+  // heading, e.g. Closing under Manager Checklists). Every checklist gets an Export
+  // PDF that prints a blank sheet for the clipboard. colHeader names the first column.
+  savedSection(type, heading, colHeader) {
     const list = this.templates().filter(t => t.type === type);
     if (list.length === 0) return '';
     const rows = list.map(t => '<tr class="ct-row" data-id="' + t.id + '" style="cursor:pointer;">'
       + '<td><div class="val">' + esc(t.name) + '</div></td>'
       + '<td>' + (t.items ? t.items.length : 0) + ' items</td>'
       + '<td><div class="row-actions">'
-      + (withExport ? '<button class="btn btn-ghost btn-sm ct-export" data-id="' + t.id + '">Export PDF</button>' : '')
+      + '<button class="btn btn-ghost btn-sm ct-export" data-id="' + t.id + '">Export PDF</button>'
       + '<button class="btn btn-ghost btn-sm ct-edit" data-id="' + t.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm ct-del" data-id="' + t.id + '">Delete</button>'
       + '</div></td></tr>').join('');
-    return '<div class="sh" style="margin:24px 0 10px;">' + (heading || (type + ' Templates')) + '</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Name</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    const headingHtml = heading ? '<div class="sh" style="margin:24px 0 10px;">' + heading + '</div>' : '';
+    const cardStyle = 'overflow-x:auto;' + (heading ? '' : 'margin-top:24px;');
+    return headingHtml
+      + '<div class="card" style="' + cardStyle + '"><table class="row-list"><thead><tr>'
+      + '<th>' + (colHeader || 'Name') + '</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   },
 
   renderList() {
     if (this.actions) this.actions.innerHTML = '';
     const all = this.templates();
     const saved = all.length
-      ? (this.savedSection('Opening') + this.savedSection('Closing') + this.savedSection('Print', 'Print Checklists', true))
+      ? (this.savedSection('Opening', 'Manager Checklists', 'Opening Checklists')
+         + this.savedSection('Closing', '', 'Closing Checklists')
+         + this.savedSection('Print', 'Staff Checklists', 'Name'))
       : '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Items</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No saved templates yet. Build one above. Until you do, the Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
+        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No checklists yet. Build one above. Until you do, the Manager Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {
@@ -212,7 +219,7 @@ S.ShiftChecklistTemplates = {
       this._resetForm();
       this.renderList();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = this.editId ? 'Update Template' : 'Save Template'; }
+      if (btn) { btn.disabled = false; btn.textContent = this.editId ? 'Update Checklist' : 'Save Checklist'; }
       fail('Save failed. Try again.');
     }
   },
