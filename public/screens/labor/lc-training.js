@@ -182,7 +182,7 @@ S.LaborTraining = {
       const statusCell = st.state === 'complete'
           ? '<span style="color:var(--t2);">Complete' + (st.completed_date ? ' ' + this.fmtDate(st.completed_date) : '') + '</span>'
         : st.state === 'progress'
-          ? '<span style="color:var(--amber);font-weight:700;">In Progress ' + st.done + ' of ' + st.total + '</span>'
+          ? '<span style="color:var(--amber);font-weight:700;">In Progress' + (st.total > 0 ? ' ' + st.done + ' of ' + st.total : '') + '</span>'
           : '<span style="color:var(--t3);">Not Started</span>';
       return '<tr class="tr-team-row" data-id="' + s.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(s.name || '-') + '</div></td>'
