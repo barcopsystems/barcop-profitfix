@@ -316,10 +316,11 @@ S.ProfitFix = {
   //    watched system steps, the guidance steps, and the recovery readout. ──────
   detailHtml(g) {
     if (!g) return '';
+    const sysAtRisk = this.health(g).state === 'atrisk';
     const steps = this.steps(g);
     const rows = steps.map((s, i) => ({ s, i, guide: this.stepStatus(g.id, i).kind === 'guide' }));
-    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
-    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i, sysAtRisk)).join('');
+    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i, sysAtRisk)).join('');
 
     // Steps sit directly in the open accordion body as #0D181E blocks (no nested
     // cards), with the Guidance and Watch Out For sections under their headings.
@@ -340,36 +341,36 @@ S.ProfitFix = {
   },
 
   // A bordered card per step (clear separation, like the Close The Week steps).
-  // The title is the link itself; the status is a colored subline tied right under
-  // it. A watched step that is current shows only its status line; one that needs
-  // work also shows the how-to. Guidance steps always show their description.
-  stepRow(g, s, i) {
+  // The WHOLE card is the link into the feature; the status is a colored subline
+  // tied right under the title. A watched step that is current shows only its
+  // status line; one that needs work also shows the how-to. Guidance steps always
+  // show their description. A not-started step turns red when it is what is
+  // dragging the system behind, so the red system warning points to the exact step.
+  stepRow(g, s, i, sysAtRisk) {
     const st = this.stepStatus(g.id, i);
     const kind = s.kind || 'action';
     const isGuide = st.kind === 'guide';
     const expanded = isGuide || !st.good;   // the watched step's how-to shows only when it needs work
 
-    const titleInner = '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
-      + (s.target ? '<span style="color:var(--t3);font-size:14px;flex-shrink:0;">&rsaquo;</span>' : '');
-    let titleEl;
-    if (s.target && kind === 'reference') {
-      titleEl = '<a class="pf-steplink" href="' + this.docPath(s.target) + '" download style="text-decoration:none;display:inline-flex;align-items:center;gap:7px;cursor:pointer;">' + titleInner + '</a>';
-    } else if (s.target) {
-      titleEl = '<div class="pf-steplink pf-go" data-target="' + esc(s.target) + '" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;">' + titleInner + '</div>';
-    } else {
-      titleEl = '<div style="display:inline-flex;align-items:center;gap:7px;">' + titleInner + '</div>';
-    }
-
+    const statusColor = (st.never && sysAtRisk) ? 'var(--red)' : st.color;
     const statusLine = isGuide ? ''
-      : '<div style="font-size:11px;font-weight:700;color:' + st.color + ';margin-top:4px;">' + esc(st.label)
+      : '<div style="font-size:11px;font-weight:700;color:' + statusColor + ';margin-top:4px;">' + esc(st.label)
         + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
     const detail = (expanded && s.detail)
       ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:8px;">' + esc(s.detail) + '</div>' : '';
 
-    return '<div style="display:flex;gap:11px;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'
-      + '<span style="color:var(--t3);flex-shrink:0;margin-top:1px;">' + this.stepIcon(kind) + '</span>'
-      + '<div style="min-width:0;flex:1;">' + titleEl + statusLine + detail + '</div>'
-      + '</div>';
+    const inner = '<span style="color:var(--t3);flex-shrink:0;margin-top:1px;">' + this.stepIcon(kind) + '</span>'
+      + '<div style="min-width:0;flex:1;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
+      + statusLine + detail + '</div>';
+
+    if (s.target && kind === 'reference') {
+      return '<a class="pf-step pf-stepcard" href="' + this.docPath(s.target) + '" download style="text-decoration:none;">' + inner + '</a>';
+    }
+    if (s.target) {
+      return '<div class="pf-step pf-stepcard pf-go" data-target="' + esc(s.target) + '">' + inner + '</div>';
+    }
+    return '<div class="pf-step">' + inner + '</div>';
   },
 
   // The selected system's recovery readout, shown as one line under the campaign
