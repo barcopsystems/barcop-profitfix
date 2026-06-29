@@ -131,11 +131,11 @@ S.ShiftChecklists = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Checklists Work', [
-      { p: ['One screen for your opening and closing routines. Flip between Opening and Closing up top (it starts on the one that fits the time of day), check the items off as you go, and Save when you are done. The Save is your record that the checklist got run. Your progress is kept if you step away and come back; Start Over clears it and begins fresh.'] },
+    App.showHelpModal('How Manager Checklists Work', [
+      { p: ['This is where a manager runs the opening and closing routine each shift. Flip between Opening and Closing up top (it starts on the one that fits the time of day), check the items off as you go, pick the manager who completed it, and Save. The Save is your record that the checklist got run. Your progress is kept if you step away and come back; Start Over clears it and begins fresh.'] },
       { h: 'Run it on paper', p: ['Tap Worksheet to print the list blank for a clipboard at the bar. Mark it off by hand during the shift, then enter it here after, or just keep the paper.'] },
-      { h: 'Templates', p: ['The items come from your saved Opening and Closing templates (set them up on Checklist Templates). Until you build one, Bar Cop uses a sensible built-in default list.'] },
-      { h: 'Past runs', p: ['Every saved checklist drops into the list below, filtered to the type you are on. Narrow the range with the chips (This Week, Last Week, This Month, Last 4 Weeks, All, or Custom for your own dates). Tap a row or View to open one run and see exactly which items got checked and who signed off; Export PDF on that detail prints it for the binder. Delete pulls a run off the record if it was logged by mistake.'] }
+      { h: 'Where the lists come from', p: ['The items come from the Manager Opening and Closing checklists you set up on Build Checklists. Until you build one, Bar Cop uses a sensible built-in default list. Staff print-only checklists, like bar close or kitchen open, also live on Build Checklists and are printed for the clipboard, not run here.'] },
+      { h: 'Past runs', p: ['Every saved checklist drops into the list below, filtered to the type you are on. Narrow the range with the chips (This Week, Last Week, This Month, Last 4 Weeks, All, or Custom for your own dates). Tap a row or View to open one run and see exactly which items got checked and which manager completed it; Export PDF on that detail prints it for the binder. Delete pulls a run off the record if it was logged by mistake.'] }
     ]);
   },
 

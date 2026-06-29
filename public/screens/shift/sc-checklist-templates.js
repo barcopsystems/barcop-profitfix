@@ -42,11 +42,11 @@ S.ShiftChecklistTemplates = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Checklist Templates Work', [
-      { p: ['A template is a saved checklist. Opening and Closing templates load on the Checklists screen so the manager checks them off and the run is recorded. Print Only checklists are for the floor: build a list for any station and print it for a clipboard. They never run in the app.'] },
-      { h: 'Build it', p: ['Name it, pick Opening, Closing, or Print Only, and add your items. For Opening or Closing you can load the built-in default to start from, then add, remove, or drag the handle to reorder. The order here is the order it runs or prints in.'] },
-      { h: 'Opening and Closing', p: ['Saved Opening and Closing templates show up in the Template picker on the Checklists screen, where they are checked off and saved as a record. With none built, Checklists falls back to the built-in default list.'] },
-      { h: 'Print Checklists', p: ['Print Only checklists are named however you want, like Bar Close, Kitchen Open, or Floor Close, for the people working each station off paper. Each gets its own Export PDF that prints a clean sheet with empty checkboxes and blank Date and Completed By lines. They do not run in the app or save a record; the signed paper in your binder is the record.'] }
+    App.showHelpModal('How to Build Checklists', [
+      { p: ['Build Checklists is where you create every checklist Bar Cop uses. There are two kinds. Manager Opening and Manager Closing checklists load on the Run Checklists screen, where a manager checks them off and the run is recorded. Staff Print Only checklists are for the floor: a list for any station that prints blank for a clipboard and never runs in the app.'] },
+      { h: 'Build it', p: ['Name it, pick Manager Opening, Manager Closing, or Staff Print Only, and add your steps. For a manager checklist you can load the built-in default to start from, then add, remove, or drag the handle to reorder. The order here is the order it runs or prints in. Save Checklist to keep it.'] },
+      { h: 'Manager Checklists', p: ['Saved Manager Opening and Closing checklists show up in the picker on Run Checklists, where they are checked off and saved as a record. With none built, Run Checklists falls back to a built-in default list. Each one also has an Export PDF that prints a blank sheet for the clipboard.'] },
+      { h: 'Staff Checklists', p: ['Staff Print Only checklists are named however you want, like Bar Close, Kitchen Open, or Floor Close, for the people working each station off paper. Each gets its own Export PDF that prints a clean sheet with empty checkboxes and blank Date and Completed By lines. They do not run in the app or save a record; the signed paper in your binder is the record.'] }
     ]);
   },
 
@@ -125,7 +125,7 @@ S.ShiftChecklistTemplates = {
          + this.savedSection('Print', 'Staff Checklists', 'Print Checklists'))
       : '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Name</th><th>Items</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No checklists yet. Build one above. Until you do, the Manager Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
+        + '</tr></thead><tbody><tr><td colspan="3" style="color:var(--t3);">No checklists yet. Build one above. Until you do, the Run Checklists screen uses a built-in default list.</td></tr></tbody></table></div>';
 
     this.container.innerHTML = '<div class="screen">' + this.formBlock(false) + saved + '</div>';
     this.container.onclick = ev => {
