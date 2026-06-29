@@ -343,13 +343,11 @@ S.LaborTraining = {
   // ════════════════════════════════════════════════════════════════════════
   rosterSectionHTML(staffId) {
     const list = this.recordsForStaff(staffId);
-    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Training</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="tr-assign">+ Assign Training</button></div></div>';
+    const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="tr-assign">+ Assign Training</button></div>';
     if (list.length === 0) {
-      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Training</th><th>Progress</th><th>Status</th><th>Signed Off By</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No training on file yet. Assign an onboarding template and check the steps off as they finish.</td></tr></tbody></table></div>';
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No training on file yet. Assign an onboarding template and check the steps off as they finish.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(r => {
       const { done, total } = this.recProgress(r);
@@ -369,10 +367,9 @@ S.LaborTraining = {
         + '<button class="btn btn-danger btn-sm tr-rec-del" data-id="' + r.id + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return heading
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
       + '<th>Training</th><th>Progress</th><th>Status</th><th>Signed Off By</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + addBtn;
   },
 
   // Bind the roster Training section's buttons. reRender re-renders the staff page.

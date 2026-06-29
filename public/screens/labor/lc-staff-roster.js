@@ -435,8 +435,8 @@ S.LaborStaffRoster = {
       + this.renderProfileEditCard(s)
       + this.renderWageHistoryCard(s)
       + this.renderCertsCard(staffId)
-      + this.renderNotesCard(staffId)
       + (S.LaborTraining ? S.LaborTraining.rosterSectionHTML(staffId) : '')
+      + this.renderNotesCard(staffId)
       + '</div>';
     this.wireUnified(staffId);
   },
@@ -569,13 +569,11 @@ S.LaborStaffRoster = {
   // ── Certifications section ───────────────────────────────────────────
   renderCertsCard(staffId) {
     const list = this.certsForStaff(staffId);
-    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Certifications &amp; Licenses</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div></div>';
+    const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div>';
     if (list.length === 0) {
-      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
         + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>';
+        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(c => {
       const status = this.certStatus(c);
@@ -594,10 +592,9 @@ S.LaborStaffRoster = {
         + '<button class="btn btn-danger btn-sm cert-del" data-id="' + c.id + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return heading
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
       + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + addBtn;
   },
 
   // Cert add/edit in a focused pop-up (own cert- ids; no collision with the
@@ -681,13 +678,11 @@ S.LaborStaffRoster = {
     const list = this.notesForStaff(staffId);
     const cols = '<colgroup><col style="width:13%"/><col style="width:13%"/><col style="width:15%"/><col style="width:41%"/><col style="width:18%"/></colgroup>';
     const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + cols
-      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th>Note</th><th></th></tr></thead>';
-    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Coaching Log</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Note</button></div></div>';
+      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th>Coaching Note</th><th></th></tr></thead>';
+    const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Coaching Note</button></div>';
     if (list.length === 0) {
-      return heading + '<div class="card" style="overflow-x:auto;">' + head
-        + '<tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>';
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(n => {
       const catColor = n.category === 'Praise' ? 'var(--green)'
@@ -704,8 +699,8 @@ S.LaborStaffRoster = {
         + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return heading + '<div class="card" style="overflow-x:auto;">' + head
-      + '<tbody>' + rows + '</tbody></table></div>';
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>' + addBtn;
   },
 
   // Note add/edit in a focused pop-up (own note- ids; no collision with the
