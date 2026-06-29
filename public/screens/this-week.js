@@ -275,32 +275,31 @@ S.ThisWeek = {
       + '</div></div>';
   },
 
-  // ── Week-chip selector row (chips left, page actions right) ─────────────────
+  // ── Week selector row — the exact Close The Week pill stepper (one pill, arrows
+  // outside, gold NOW, This Week snap), plus the lifecycle pill + Refresh. ──────
   selectorRow() {
     const now = this.currentWeekEnd();
     const sel = this._weekEnd;
-    const older = this.addDays(sel, -7);
-    const fwdDisabled = sel >= now;   // never step past the in-progress current week
+    const isCur = sel >= now;
     // Lifecycle marker so it reads as a week-in-progress, not a static form:
     // "Building from your logs" until the week is saved (closed out), then "Saved."
     const saved = !!this.savedWeek(sel);
     const statePill = '<span style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;color:' + (saved ? 'var(--green)' : 'var(--t3)') + ';">'
       + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (saved ? 'var(--green)' : 'var(--t4)') + ';"></span>'
       + (saved ? 'Saved' : 'Building from your logs') + '</span>';
-    const chip = (end, active) =>
-      '<button class="tw-wk-chip btn btn-sm" data-end="' + end + '" style="'
-        + (active ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekRangeLabel(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    const fmt = ymd => { const dt = new Date(ymd + 'T00:00:00'); return isNaN(dt.getTime()) ? ymd : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(App.weekStartFor(sel)) + ' - ' + fmt(sel);
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm tw-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm tw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
-      + chip(older, false) + chip(sel, true)
-      + '<button class="btn btn-ghost btn-sm tw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
-      + (sel !== now ? '<button class="btn btn-ghost btn-sm tw-wk-now" style="margin-left:4px;">This Week</button>' : '')
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
-      + statePill
+      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' + statePill
       + '<button class="btn btn-ghost btn-sm" id="tw-pull">Refresh This Week</button>'
       + '</div></div>';
   },
@@ -321,50 +320,38 @@ S.ThisWeek = {
       + '<td>' + c(p + 'l', data.labor) + '</td>'
       + '<td>' + c(p + 'c', data.cogs) + '</td>'
       + '<td id="tw-' + p + 'pct">-</td>'
-      + '<td id="tw-' + p + 'vd" style="text-align:right;">-</td>'
+      + '<td id="tw-' + p + 'vd">-</td>'
       + '</tr>';
   },
-  gridCard(d) {
+  // ── The week form — one card, sections split by dividers so it all reads as one
+  // form: the confirm grid, then Other Revenue, Operating Costs, and Notes last
+  // (notes at the bottom, like every other form). Other Revenue and Operating
+  // Costs are below-the-line, so they do NOT move the prime-cost grid above. ────
+  formCard(d) {
+    const o = d.other || { revenue: '', cogs: '' };
+    const subhead = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 12px;">' + t + '</div>';
+    const moneyField = (id, label, val) => '<div class="f" style="width:200px;flex-shrink:0;"><label>' + label + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" value="' + esc(String(val || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>';
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Confirm the Week</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
-      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:14px;">'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:92px;">Section</th><th>Revenue</th><th>Labor</th><th>COGS</th><th style="width:80px;">Cost %</th><th style="width:112px;">vs Target</th>'
       + '</tr></thead><tbody>'
       + this.lineRow('Bar', 'b', d.bar)
       + this.lineRow('Food', 'f', d.food)
       + this.lineRow('Events', 'c', d.catering || { revenue: '', cogs: '', labor: '' }, true)
       + '</tbody></table></div>'
+      + '<div class="divider"></div>'
+      + subhead('Other / Ancillary Revenue')
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;">' + moneyField('tw-or', 'Revenue', o.revenue) + moneyField('tw-oc', 'Cost of Goods', o.cogs) + '</div>'
+      + '<div class="divider"></div>'
+      + subhead('Operating Costs')
+      + '<div class="form-row" style="align-items:flex-end;gap:18px;">' + moneyField('tw-pf', '3rd-Party Platform Fees', d.platform_fees) + '</div>'
+      + '<div class="divider"></div>'
       + '<div class="f" style="margin:0;"><label>Notes</label>'
       + '<textarea id="tw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.ThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
       + '</div>';
-  },
-
-  // Other / ancillary revenue (merch, vending, ticketed events, and the like).
-  // A separate income stream that Books rolls into the income statement; it is
-  // NOT part of the bar/food prime-cost grid above, so it does not move prime cost.
-  otherRevCard(d) {
-    const o = d.other || { revenue: '', cogs: '' };
-    return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Other / Ancillary Revenue</div>'
-      + '<div class="form-row" style="align-items:flex-end;gap:18px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Revenue</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-or" value="' + esc(String(o.revenue || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>Cost of Goods</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-oc" value="' + esc(String(o.cogs || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '</div></div>';
-  },
-
-  // Operating costs are below-the-line (not COGS or labor), so they sit in their
-  // own card and do NOT move the prime-cost numbers above. Captured weekly here
-  // because Books reads the per-week figure.
-  opexCard(d) {
-    return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Operating Costs</div>'
-      + '<div class="form-row" style="align-items:flex-end;gap:18px;">'
-      + '<div class="f" style="width:200px;flex-shrink:0;"><label>3rd-Party Platform Fees</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="tw-pf" value="' + esc(String(d.platform_fees || '')) + '" step="0.01" oninput="S.ThisWeek.onInput()"/></div></div>'
-      + '</div></div>';
   },
 
   // ── Weekly history (filter chips + data-card table) ─────────────────────────
@@ -414,9 +401,9 @@ S.ThisWeek = {
       + '<button class="btn btn-ghost btn-sm" id="tw-export">Export PDF</button>'
       + '</div>'
       + customRow
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Bar %</th><th>Food Rev</th><th>Food %</th><th>Prime %</th><th>Cost vs Tgt $</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'week', all, this.filterPreset !== 'all');
   },
 
@@ -426,9 +413,7 @@ S.ThisWeek = {
     this.container.innerHTML = '<div class="screen">'
       + this.heroStrip()
       + this.selectorRow()
-      + this.gridCard(d)
-      + this.otherRevCard(d)
-      + this.opexCard(d)
+      + this.formCard(d)
       + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="tw-save">' + (editing ? 'Update Week' : 'Save Week') + '</button>'
       + '<button class="btn btn-ghost" id="tw-start-over">Start Over</button>'
