@@ -93,8 +93,8 @@ S.VendorTracker = {
     return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">' + itemsHtml + '</div></div>';
   },
   dataCard(theadHtml, rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
-      + theadHtml + '<tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list">'
+      + theadHtml + '<tbody>' + rowsHtml + '</tbody></table></div>';
   },
 
   // Shared day-based range chips (the Scorecard's set) + an Export button, used
@@ -340,8 +340,8 @@ S.VendorTracker = {
           + '<td>' + esc(r.sku || '-') + '</td>'
           + '<td class="' + ((r.overcharge || 0) > 0 ? 'neg' : '') + '">' + App.fmtCurrency(r.overcharge || 0) + '</td>'
           + '<td>' + this.discStatusText(r.status) + '</td>'
-          + '<td style="white-space:nowrap;text-align:right;">' + act
-          + ' <button class="btn btn-danger btn-sm vt-del" data-id="' + esc(r.id) + '">Delete</button></td>'
+          + '<td class="no-print"><div class="row-actions">' + act
+          + '<button class="btn btn-danger btn-sm vt-del" data-id="' + esc(r.id) + '">Delete</button></div></td>'
           + '</tr>';
       }).join('');
       const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th><th></th></tr></thead>';
