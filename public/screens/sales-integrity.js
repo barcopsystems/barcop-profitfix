@@ -289,7 +289,7 @@ S.SalesIntegrity = {
     this._viewing = null;
     const latest = this.latestReview();
     const importCard = '<div class="card form-card">'
-      + '<div class="card-title">Shift Sales Integrity Review</div>'
+      + '<div class="card-title">Sales Integrity Review</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div>'
       + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
@@ -345,28 +345,36 @@ S.SalesIntegrity = {
       + '</div></div>';
 
     const flagged = (review.servers || []).filter(x => x.severity !== 'clean');
-    let cards;
+    const cleanN = (review.servers || []).filter(x => x.severity === 'clean').length;
+    const cleanTxt = cleanN ? (cleanN + ' other server' + (cleanN === 1 ? '' : 's') + ' reviewed, no patterns flagged.') : '';
+    const skipTxt = (review.skipped && review.skipped.length)
+      ? ('Not enough data to score: ' + review.skipped.map(esc).join(', ') + '.') : '';
+
+    // The clean-and-skipped summary lives INSIDE the review card, divided from the
+    // servers to investigate, never as loose text on the page background.
+    let footerInner = '';
+    if (flagged.length && cleanTxt) footerInner += '<div style="font-size:12px;color:var(--t3);line-height:1.6;">' + cleanTxt + '</div>';
+    if (skipTxt) footerInner += '<div style="font-size:12px;color:var(--t4);line-height:1.6;' + (footerInner ? 'margin-top:4px;' : '') + '">' + skipTxt + '</div>';
+    const footer = footerInner ? '<div style="padding:14px 18px;border-top:1px solid var(--b2);">' + footerInner + '</div>' : '';
+
+    let inner;
     if (!flagged.length) {
-      cards = '<div class="card" style="padding:20px;"><div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
+      inner = '<div style="padding:16px 18px;"><div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every server\'s numbers track the floor. Run this each shift or week and the outliers surface on their own.</div></div>';
     } else {
-      cards = flagged.map(x => this.serverCard(x)).join('');
+      inner = flagged.map((x, i) => this.serverCard(x, i === 0)).join('');
     }
-
-    const cleanN = (review.servers || []).filter(x => x.severity === 'clean').length;
-    const cleanLine = cleanN ? '<div style="font-size:12px;color:var(--t3);margin:6px 2px 0;">' + cleanN + ' other server' + (cleanN === 1 ? '' : 's') + ' reviewed, no patterns flagged.</div>' : '';
-    const skipLine = (review.skipped && review.skipped.length)
-      ? '<div style="font-size:12px;color:var(--t4);margin:4px 2px 0;">Not enough data to score: ' + review.skipped.map(esc).join(', ') + '.</div>' : '';
+    const reviewCard = '<div class="card" style="padding:0;">' + inner + footer + '</div>';
 
     const note = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:18px 0 6px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
       + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">These are patterns to investigate, not proof. A flag means a server\'s numbers are an outlier worth a closer look. Product theft (overpouring, free pours, bottle loss) does not show in a sales report; pour cost, inventory variance, and spot checks catch that. Bar Cop is a software tool, not an investigator; confirm before acting on anyone.</div>'
       + '</div>';
 
-    return statStrip + head + cards + cleanLine + skipLine + note;
+    return statStrip + head + reviewCard + note;
   },
 
-  serverCard(x) {
+  serverCard(x, first) {
     const sevColor = x.severity === 'high' ? 'var(--red)' : 'var(--amber)';
     const sevLabel = x.severity === 'high' ? 'High Risk' : 'Watch';
     const byCat = {};
@@ -378,7 +386,7 @@ S.SalesIntegrity = {
       return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
     }).join('');
 
-    return '<div class="card" style="padding:16px 18px;margin-bottom:12px;">'
+    return '<div style="padding:16px 18px;' + (first ? '' : 'border-top:1px solid var(--b2);') + '">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:12px;">'
@@ -405,9 +413,9 @@ S.SalesIntegrity = {
       + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm si-view" data-id="' + esc(r.id) + '">View</button>'
       + '<button class="btn btn-danger btn-sm si-del" data-id="' + esc(r.id) + '">Delete</button></div></td></tr>').join('');
     return '<div class="sh" style="margin:24px 0 10px;">Past Reviews</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Review</th><th>Date</th><th>Reviewed</th><th>Flagged</th><th>Exposure</th><th></th></tr></thead><tbody>'
-      + rows + '</tbody></table></div></div>'
+      + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'sales_review', past, false);
   },
 
