@@ -1252,6 +1252,19 @@ S.HubSettings = {
         hypothesis:'Tightened prep pars so the kitchen stopped over-producing and dumping at close.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
     ];
 
+    // ── Cash Experiments — liquidity changes, each watching a cash metric that
+    // improved across the recovery arc (trapped cash and the cash cycle both fell,
+    // runway grew), so the 8-week before/after lift reads as a real win. Measured
+    // off the weekly cash_audits series.
+    App.data.cash_initiatives = [
+      { id:uid(), name:'Moved Top Vendors to Net-30', start_date:dateStr(45), type:'Payment Terms', metric:'cycle',
+        hypothesis:'Negotiated net-30 with the three biggest vendors to hold cash longer and shorten the cash cycle.', status:'Active', created_at:daysAgoISO(45) },
+      { id:uid(), name:'Ran Down Dead Stock', start_date:dateStr(52), type:'Dead Stock', metric:'trapped',
+        hypothesis:'Cleared slow-moving premium bottles and overstock to pull cash off the shelf.', status:'Active', created_at:daysAgoISO(52) },
+      { id:uid(), name:'Cut Liquor Par Levels', start_date:dateStr(70), type:'Par / Ordering', metric:'runway',
+        hypothesis:'Lowered pars on slow movers and moved to weekly ordering, freeing cash and extending the runway.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
+    ];
+
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote

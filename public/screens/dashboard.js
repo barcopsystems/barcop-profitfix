@@ -44,8 +44,6 @@ S.Dashboard = {
             runText: 'Run Profit Audit',
             emptyText: 'Run your first Profit Audit for a baseline across pour cost, theft and loss, food cost, vendors, and prime cost.'
           })))
-      + '<div class="sh" style="margin:24px 0 10px;">Initiative Tracker</div>'
-      + InitiativeTracker.card('profit')
       + DashUI.quickActions([
           { go: 'this-week', label: 'Enter This Week' },
           { go: 'audit-tracker', label: 'Run Profit Audit' },
@@ -56,7 +54,6 @@ S.Dashboard = {
     FixPanel.wireFixAreas(container);
     document.getElementById('db-insights-btn')?.addEventListener('click', () => this.showInsights());
     DashUI.wireQuick(container);
-    InitiativeTracker.wire('profit', container, () => this.render(this.container, document.getElementById('topbar-actions') || document.createElement('div')));
   },
 
   // Profit Forecast panel — profit projected forward twelve months, plus what
