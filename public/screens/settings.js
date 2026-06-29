@@ -3255,7 +3255,7 @@ S.HubSettings = {
       const st = stByName(nm); if (!st) return null;
       const allDone = items.length > 0 && items.every(it => it.done);
       const signer = signerName ? stByName(signerName) : null;
-      return { id:uid(), staff_id:st.id, name:tplName, template_id:tplId, items:items,
+      return { id:uid(), staff_id:st.id, name:tplName, template_id:tplId, start_date:dateStr(createdDaysAgo), items:items,
         signed_off_by_id: allDone && signer ? signer.id : '',
         signed_off_by:    allDone && signer ? signer.name : '',
         completed_date:   allDone ? dateStr(completedDaysAgo) : '',
