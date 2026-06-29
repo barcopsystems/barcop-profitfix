@@ -156,12 +156,12 @@ const InitiativeTracker = {
     const active = all.filter(i => i.status === 'Active');
     const closed = all.filter(i => i.status !== 'Active');
 
-    const activeRows = active.length ? active.map(i => {
+    const activeRows = active.length ? active.map((i, idx) => {
       const m = this._measure(module, i);
       const metric = this.metric(module, i.metric);
       const metricLabel = metric ? metric.label : i.metric;
       const windowMsg = m.weeksAfter < 2 ? 'Measuring (week ' + m.weeksAfter + ' of 8)' : m.weeksAfter + ' weeks in';
-      return '<div style="border-top:1px solid var(--b2);padding:12px 20px;">'
+      return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:12px 20px;">'
         + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
         + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(i.name) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);">' + esc(i.type || '') + ' &middot; started ' + esc(fmtDate(i.start_date)) + ' &middot; ' + esc(windowMsg) + '</div>'
@@ -178,23 +178,33 @@ const InitiativeTracker = {
         + '</div></div></div>';
     }).join('') : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">' + c.empty + '</div>';
 
-    const closedRows = closed.length ? '<div style="padding:8px 20px 4px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);border-top:1px solid var(--b2);">Completed</div>'
-      + closed.slice().reverse().slice(0, 5).map(i => {
+    // Active Experiments card — titled header, rows below.
+    const activeCard = '<div class="card" style="padding:0;overflow:hidden;">'
+      + '<div class="card-title" style="padding:13px 20px;margin:0;">Active Experiments</div>'
+      + activeRows + '</div>';
+
+    // Start button lives BELOW the card, bottom-left, in gold.
+    const startBtn = '<div style="margin:16px 0 24px;"><button class="btn btn-primary init-add">Start Experiment</button></div>';
+
+    // Completed Experiments — its own titled card, only when there are any.
+    let completedCard = '';
+    if (closed.length) {
+      const closedRows = closed.slice().reverse().slice(0, 5).map((i, idx) => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
-        return '<div style="padding:8px 20px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--b2);font-size:11px;">'
+        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;gap:10px;font-size:11px;">'
           + '<span style="color:var(--t2);flex:1;">' + esc(i.name) + '</span>'
           + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
           + '<span>' + this._fmtLift(metric, m.lift) + '</span>'
           + '<button class="btn btn-ghost btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
           + '</div>';
-      }).join('') : '';
+      }).join('');
+      completedCard = '<div class="card" style="padding:0;overflow:hidden;">'
+        + '<div class="card-title" style="padding:13px 20px;margin:0;">Completed Experiments</div>'
+        + closedRows + '</div>';
+    }
 
-    return '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<div style="padding:14px 20px;display:flex;align-items:center;justify-content:flex-end;">'
-      + '<button class="btn btn-ghost btn-sm init-add">+ Start Experiment</button>'
-      + '</div>'
-      + activeRows + closedRows + '</div>';
+    return activeCard + startBtn + completedCard;
   },
 
   wire(module, container, rerender) {
