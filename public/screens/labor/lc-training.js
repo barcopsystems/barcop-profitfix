@@ -77,7 +77,10 @@ S.LaborTraining = {
     let done = 0, total = 0;
     recs.forEach(r => { const p = this.recProgress(r); done += p.done; total += p.total; });
     const allComplete = recs.every(r => this.recComplete(r));
-    if (allComplete) return { state: 'complete', done, total };
+    if (allComplete) {
+      const dates = recs.map(r => r.completed_date).filter(Boolean).sort();
+      return { state: 'complete', done, total, completed_date: dates.length ? dates[dates.length - 1] : '' };
+    }
     return { state: 'progress', done, total };
   },
 
@@ -169,7 +172,7 @@ S.LaborTraining = {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const heading = '<div class="sh" style="margin:24px 0 10px;">Team Training Status</div>';
     const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._COLGROUP
-      + '<thead><tr><th>Name</th><th>Position</th><th>Status</th><th></th></tr></thead>';
+      + '<thead><tr><th>Staff Name</th><th>Position</th><th>Status</th><th></th></tr></thead>';
     if (list.length === 0) {
       return heading + '<div class="card" style="overflow-x:auto;">' + head
         + '<tbody><tr><td colspan="4" style="color:var(--t3);">No active staff yet. Build your roster first.</td></tr></tbody></table></div>';
@@ -177,7 +180,7 @@ S.LaborTraining = {
     const rows = list.map(s => {
       const st = this.trainingStatusFor(s.id);
       const statusCell = st.state === 'complete'
-          ? '<span style="color:var(--t2);font-weight:700;">Complete</span>'
+          ? '<span style="color:var(--t2);">Complete' + (st.completed_date ? ' ' + this.fmtDate(st.completed_date) : '') + '</span>'
         : st.state === 'progress'
           ? '<span style="color:var(--amber);font-weight:700;">In Progress ' + st.done + ' of ' + st.total + '</span>'
           : '<span style="color:var(--t3);">Not Started</span>';
@@ -357,7 +360,7 @@ S.LaborTraining = {
       const { done, total } = this.recProgress(r);
       const complete = this.recComplete(r);
       const statusCell = complete
-          ? '<span style="color:var(--t2);font-weight:700;">Complete' + (r.completed_date ? ' ' + this.fmtDate(r.completed_date) : '') + '</span>'
+          ? '<span style="color:var(--t2);">Complete' + (r.completed_date ? ' ' + this.fmtDate(r.completed_date) : '') + '</span>'
         : done > 0
           ? '<span style="color:var(--amber);font-weight:700;">In Progress</span>'
           : '<span style="color:var(--t3);">Not Started</span>';

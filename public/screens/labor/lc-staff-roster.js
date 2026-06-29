@@ -274,7 +274,7 @@ S.LaborStaffRoster = {
     let below;
     if (list.length === 0) {
       below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
-        + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
+        + '<th>Staff Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div>';
     } else {
       const rows = list.map(s => {
@@ -300,10 +300,10 @@ S.LaborStaffRoster = {
           + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
-      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:24px 0 10px;">'
+      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:4px 0 10px;">'
         + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
-        + '<th>Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
+        + '<th>Staff Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
