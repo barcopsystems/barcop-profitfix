@@ -98,7 +98,7 @@ S.LaborTraining = {
     App.showHelpModal('How Training Works', [
       { p: ['Training tracks that each person actually completed their onboarding, with a record you can show. It is for tracking, not teaching: a checklist you sign off and date, not videos or quizzes. Build a template once, assign it to a person, check the items off as they finish, and sign it.'] },
       { h: 'Build a template', p: ['Name it (Bartender Onboarding, Server Onboarding, New POS Rollout), set a Position if it is role specific, and add the steps in the order they should happen. Drag the handle to reorder. Templates are reusable, so you build each one once and assign it to every new hire in that role.'] },
-      { h: 'Assign and sign off', p: ['Go to a person on the Staff Roster and use Assign Training in their Training section. Pick a template, and the steps load onto their own record. As they finish each step you check it off; when every step is done the record stamps its completion date. Pick who signed off so there is a name on the record.'] },
+      { h: 'Assign and sign off', p: ['Go to a person on the Staff Roster and use Assign Training in their Training section. Pick a template and a start date (so you can see who has been onboarding too long), and the steps load onto their own record. As they finish each step you check it off; when every step is done the record stamps its completion date. Pick who signed off so there is a name on the record.'] },
       { h: 'Print a blank sheet', p: ['Each template has an Export PDF that prints a clean onboarding sheet with empty checkboxes and blank date and sign-off lines, for a trainer to mark up by hand and drop in the binder.'] },
       { h: 'Team Training Status', p: ['The status list shows every active staff member and where they stand: Not Started, In Progress with a count, or Complete. Tap a row to jump to that person and pick up where their training left off. This is a record-keeping aid, not legal or HR advice.'] }
     ]);
@@ -344,10 +344,14 @@ S.LaborTraining = {
   rosterSectionHTML(staffId) {
     const list = this.recordsForStaff(staffId);
     const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="tr-assign">+ Assign Training</button></div>';
+    // Shares the roster's DETAIL_COLGROUP so Training lines up with Certifications
+    // and Coaching Log down the page.
+    const cg = (S.LaborStaffRoster && S.LaborStaffRoster.DETAIL_COLGROUP) || '';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + cg
+      + '<thead><tr><th>Training</th><th>Start Date</th><th>Progress</th><th>Status</th><th>Signed Off By</th><th></th></tr></thead>';
     if (list.length === 0) {
-      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-        + '<th>Training</th><th>Progress</th><th>Status</th><th>Signed Off By</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No training on file yet. Assign an onboarding template and check the steps off as they finish.</td></tr></tbody></table></div>' + addBtn;
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No training on file yet. Assign an onboarding template and check the steps off as they finish.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(r => {
       const { done, total } = this.recProgress(r);
@@ -359,6 +363,7 @@ S.LaborTraining = {
           : '<span style="color:var(--t3);">Not Started</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(r.name || '-') + '</div></td>'
+        + '<td>' + (r.start_date ? this.fmtDate(r.start_date) : '<span style="color:var(--t3);">-</span>') + '</td>'
         + '<td>' + (total > 0 ? done + ' of ' + total : '<span style="color:var(--t3);">-</span>') + '</td>'
         + '<td>' + statusCell + '</td>'
         + '<td>' + (r.signed_off_by ? esc(r.signed_off_by) : '<span style="color:var(--t3);">-</span>') + '</td>'
@@ -367,9 +372,8 @@ S.LaborTraining = {
         + '<button class="btn btn-danger btn-sm tr-rec-del" data-id="' + r.id + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-      + '<th>Training</th><th>Progress</th><th>Status</th><th>Signed Off By</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + addBtn;
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>' + addBtn;
   },
 
   // Bind the roster Training section's buttons. reRender re-renders the staff page.
@@ -398,6 +402,8 @@ S.LaborTraining = {
           + '<select id="tr-a-tpl">' + tplOpts + '</select></div>'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Name</label>'
           + '<input type="text" id="tr-a-name" value="' + esc(defName) + '" placeholder="e.g. Bartender Onboarding"/></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Start Date</label>'
+          + '<input type="date" id="tr-a-start" value="' + esc(App.todayLocal()) + '"/></div>'
       + '</div>'
       + '<div id="tr-a-info" style="font-size:12px;color:var(--t3);margin-top:2px;"></div>'
       + '<div class="card-actions">'
@@ -440,6 +446,7 @@ S.LaborTraining = {
       staff_id: staffId,
       name,
       template_id: tplId,
+      start_date: document.getElementById('tr-a-start')?.value || App.todayLocal(),
       items,
       signed_off_by_id: '',
       signed_off_by: '',
@@ -465,8 +472,12 @@ S.LaborTraining = {
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + esc(rec.name || 'Training') + '</div>'
       + '<div id="tr-rec-body">' + this._recBodyHTML() + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-top:14px;"><div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Signed Off By</label>'
-        + '<select id="tr-rec-by">' + App.staffOptions(rec.signed_off_by_id || rec.signed_off_by, { placeholder: 'Select supervisor...', audience: 'supervisor' }) + '</select></div></div>'
+      + '<div class="form-row" style="gap:16px;margin-top:14px;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Start Date</label>'
+          + '<input type="date" id="tr-rec-start" value="' + esc(rec.start_date || '') + '"/></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Signed Off By</label>'
+          + '<select id="tr-rec-by">' + App.staffOptions(rec.signed_off_by_id || rec.signed_off_by, { placeholder: 'Select supervisor...', audience: 'supervisor' }) + '</select></div>'
+      + '</div>'
       + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
         + '<textarea id="tr-rec-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(rec.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
@@ -523,6 +534,7 @@ S.LaborTraining = {
     const byId = document.getElementById('tr-rec-by')?.value || '';
     const byName = (this.staffById(byId) || {}).name || '';
     const notes = (document.getElementById('tr-rec-notes')?.value || '').trim();
+    const start_date = document.getElementById('tr-rec-start')?.value || '';
 
     const total = items.length;
     const allDone = total > 0 && items.every(it => it.done);
@@ -530,7 +542,7 @@ S.LaborTraining = {
     const prev = list[i];
     const completed_date = complete ? (prev.completed_date || App.todayLocal()) : '';
 
-    list[i] = { ...prev, items, signed_off_by_id: byId, signed_off_by: byName, notes, completed_date, updated_at: new Date().toISOString() };
+    list[i] = { ...prev, items, start_date, signed_off_by_id: byId, signed_off_by: byName, notes, completed_date, updated_at: new Date().toISOString() };
     const ok = await App.saveLabor();
     if (ok) { App.closeModal('tr-rec-modal'); if (onSaved) onSaved(); }
     else {

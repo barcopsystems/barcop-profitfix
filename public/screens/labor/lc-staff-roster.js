@@ -22,6 +22,11 @@ S.LaborStaffRoster = {
     'ABC On-Premise', 'Health Card', 'Other'],
   NOTE_CATEGORIES: ['Praise', 'Coaching', 'Concern', 'Warning'],
 
+  // Shared column widths for the three detail-page tables (Certifications,
+  // Training, Coaching Log) so their columns line up down the page. Six columns;
+  // the Coaching Note cell spans columns 4-5 from there. S.LaborTraining reads it.
+  DETAIL_COLGROUP: '<colgroup><col style="width:20%"/><col style="width:15%"/><col style="width:14%"/><col style="width:14%"/><col style="width:16%"/><col style="width:21%"/></colgroup>',
+
   staff() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_staff)) App.laborData.lc_staff = [];
@@ -570,10 +575,11 @@ S.LaborStaffRoster = {
   renderCertsCard(staffId) {
     const list = this.certsForStaff(staffId);
     const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div>';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this.DETAIL_COLGROUP
+      + '<thead><tr><th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>';
     if (list.length === 0) {
-      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-        + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>' + addBtn;
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(c => {
       const status = this.certStatus(c);
@@ -592,9 +598,8 @@ S.LaborStaffRoster = {
         + '<button class="btn btn-danger btn-sm cert-del" data-id="' + c.id + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
-    return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-      + '<th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + addBtn;
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>' + addBtn;
   },
 
   // Cert add/edit in a focused pop-up (own cert- ids; no collision with the
@@ -672,17 +677,17 @@ S.LaborStaffRoster = {
   },
 
   // ── Coaching Log section ─────────────────────────────────────────────
-  // Same row-list style as Certifications and Training: columns Date, Type,
-  // Manager, Note. Type keeps its category color (the meaning-bearing signal).
+  // Same row-list style as Certifications and Training, sharing DETAIL_COLGROUP so
+  // the columns line up down the page: Date, Type, Manager, then the Coaching Note
+  // spanning the 4th-5th columns. Type keeps its category color.
   renderNotesCard(staffId) {
     const list = this.notesForStaff(staffId);
-    const cols = '<colgroup><col style="width:13%"/><col style="width:13%"/><col style="width:15%"/><col style="width:41%"/><col style="width:18%"/></colgroup>';
-    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + cols
-      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th>Coaching Note</th><th></th></tr></thead>';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this.DETAIL_COLGROUP
+      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th colspan="2">Coaching Note</th><th></th></tr></thead>';
     const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Coaching Note</button></div>';
     if (list.length === 0) {
       return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
-        + '<tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>' + addBtn;
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(n => {
       const catColor = n.category === 'Praise' ? 'var(--green)'
@@ -693,7 +698,7 @@ S.LaborStaffRoster = {
         + '<td><div class="val">' + this.fmtDate(n.date) + '</div></td>'
         + '<td><span style="color:' + catColor + ';font-weight:700;">' + esc(n.category || 'Note') + '</span></td>'
         + '<td>' + esc(n.manager_name || '-') + '</td>'
-        + '<td><div style="line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div></td>'
+        + '<td colspan="2"><div style="line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div></td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
         + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
