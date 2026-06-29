@@ -297,8 +297,31 @@ S.VendorTracker = {
   // ════════════════════════════════════════════════════════════════════
   //  DISCREPANCIES TAB  (the working log)
   // ════════════════════════════════════════════════════════════════════
-  discStatusText(st) {
-    if (st === 'Resolved') return '<span style="color:var(--green);font-weight:700;">Resolved</span>';
+  // ── Follow-up + aging. A credit sits in Credit Requested until the vendor
+  //    responds. Bar Cop cannot see their inbox, so it tracks YOUR side: when you
+  //    asked, every follow-up you sent, and how long it has waited, and it nudges
+  //    once a claim has gone quiet too long. ─────────────────────────────────────
+  FOLLOWUP_DAYS: 7,
+  _daysSinceISO(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const today = new Date(App.todayLocal() + 'T00:00:00').getTime();
+    const then = new Date(App.ymdLocal(d) + 'T00:00:00').getTime();
+    return Math.max(0, Math.floor((today - then) / 86400000));
+  },
+  // Days a Credit Requested claim has waited since its last move (request or follow-up).
+  waitDays(r) {
+    if (!r || r.status !== 'Credit Requested') return null;
+    const fu = (r.followups && r.followups.length) ? r.followups[r.followups.length - 1] : null;
+    return this._daysSinceISO(fu || r.credit_requested_at);
+  },
+  isOverdue(r) { const w = this.waitDays(r); return w != null && w >= this.FOLLOWUP_DAYS; },
+
+  discStatusText(st, r) {
+    if (st === 'Resolved') return (r && r.no_credit)
+      ? '<span style="color:var(--t3);font-weight:700;">Closed, no credit</span>'
+      : '<span style="color:var(--green);font-weight:700;">Resolved</span>';
     if (st === 'Credit Requested') return '<span style="color:var(--t2);font-weight:700;">Credit Requested</span>';
     return '<span style="color:var(--amber);font-weight:700;">Open</span>';
   },
@@ -310,10 +333,12 @@ S.VendorTracker = {
     const open = rows.filter(r => r.status !== 'Resolved');
     const openTotal = open.reduce((s, r) => s + (r.overcharge || 0), 0);
     const recovered = rows.filter(r => r.status === 'Resolved').reduce((s, r) => s + ((r.recovered_amount != null ? r.recovered_amount : r.overcharge) || 0), 0);
+    const followUpDue = rows.filter(r => this.isOverdue(r)).length;
 
     const stats = this.statsCard(
       this.statItem('Open Discrepancies', String(open.length), open.length ? 'warn' : 'good')
       + this.statItem('Open Overcharge', App.fmtCurrency(openTotal), openTotal > 0 ? 'warn' : '')
+      + this.statItem('Follow Up Due', String(followUpDue), followUpDue ? 'warn' : '')
       + this.statItem('Recovered', App.fmtCurrency(recovered), 'good')
     );
 
@@ -328,19 +353,24 @@ S.VendorTracker = {
           + '<div class="empty-sub">When a delivery is short or a price is wrong, file it here. Every discrepancy you document is a credit you can request. Contact the rep within 24 hours; they age out fast.</div></div></div>';
     } else {
       const trs = rows.slice(0, App.listLimit('core', 'vendor_discrepancy')).map(r => {
-        const act = r.status === 'Open'
+        const overdue = this.isOverdue(r), wd = this.waitDays(r);
+        const statusCell = this.discStatusText(r.status, r)
+          + ((r.status === 'Credit Requested' && wd != null)
+              ? '<div style="font-size:10px;color:' + (overdue ? 'var(--amber)' : 'var(--t3)') + ';margin-top:2px;">Waiting ' + wd + 'd' + (overdue ? ', follow up' : '') + '</div>'
+              : '');
+        const quick = r.status === 'Open'
           ? '<button class="btn btn-ghost btn-sm vt-credit" data-id="' + esc(r.id) + '">Request Credit</button>'
           : r.status === 'Credit Requested'
-            ? '<button class="btn btn-ghost btn-sm vt-resolve" data-id="' + esc(r.id) + '">Mark Resolved</button>'
+            ? '<button class="btn btn-ghost btn-sm vt-followup" data-id="' + esc(r.id) + '">Follow Up</button>'
             : '';
-        return '<tr>'
+        return '<tr class="vt-disc-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
           + '<td>' + this.fmtDate(r.date) + '</td>'
           + '<td class="val">' + esc(r.vendor || '-') + '</td>'
           + '<td>' + esc(r.type || '-') + '</td>'
           + '<td>' + esc(r.sku || '-') + '</td>'
           + '<td class="' + ((r.overcharge || 0) > 0 ? 'neg' : '') + '">' + App.fmtCurrency(r.overcharge || 0) + '</td>'
-          + '<td>' + this.discStatusText(r.status) + '</td>'
-          + '<td class="no-print"><div class="row-actions">' + act
+          + '<td>' + statusCell + '</td>'
+          + '<td class="no-print"><div class="row-actions">' + quick
           + '<button class="btn btn-danger btn-sm vt-del" data-id="' + esc(r.id) + '">Delete</button></div></td>'
           + '</tr>';
       }).join('');
@@ -356,9 +386,11 @@ S.VendorTracker = {
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
-    this.container.querySelectorAll('.vt-credit').forEach(b => b.addEventListener('click', () => this.requestCredit(b.dataset.id)));
-    this.container.querySelectorAll('.vt-resolve').forEach(b => b.addEventListener('click', () => this.markResolved(b.dataset.id)));
-    this.container.querySelectorAll('.vt-del').forEach(b => b.addEventListener('click', () => this.removeDiscrepancy(b.dataset.id)));
+    this.container.querySelectorAll('.vt-credit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.requestCredit(b.dataset.id); }));
+    this.container.querySelectorAll('.vt-followup').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.followUp(b.dataset.id); }));
+    this.container.querySelectorAll('.vt-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.removeDiscrepancy(b.dataset.id); }));
+    this.container.querySelectorAll('.vt-disc-row').forEach(row => row.addEventListener('click', () =>
+      this.openDiscrepancyModal({ discrepancyId: row.dataset.id, onClose: () => this.draw() })));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 
@@ -372,12 +404,25 @@ S.VendorTracker = {
     App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
   },
 
-  // Credit-request email draft (shared by the Discrepancies tab + the modal).
-  _creditMailtoHref(r) {
+  // Follow up on a sitting credit request: log the date, re-draft a reminder email.
+  followUp(id) {
+    const r = this.discRecords().find(x => x.id === id);
+    if (!r) return;
+    if (!Array.isArray(r.followups)) r.followups = [];
+    r.followups.push(new Date().toISOString());
+    window.location.href = this._creditMailtoHref(r, true);
+    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
+  },
+
+  // Credit-request email draft (shared by the Discrepancies tab + the modal). When
+  // isFollowUp, it frames as a reminder on a request you already sent.
+  _creditMailtoHref(r, isFollowUp) {
     const v = this.vendors().find(x => x.name === r.vendor) || null;
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop User';
     const lines = [];
-    lines.push('Hi' + (v?.rep ? ' ' + v.rep : '') + ',', '', 'I am writing to request a credit on a delivery discrepancy.', '');
+    lines.push('Hi' + (v?.rep ? ' ' + v.rep : '') + ',', '',
+      isFollowUp ? 'I am following up on a credit I requested earlier on a delivery discrepancy. I have not heard back and wanted to check where it stands.'
+                 : 'I am writing to request a credit on a delivery discrepancy.', '');
     if (v?.account_number) lines.push('Account: ' + v.account_number);
     lines.push('Delivery date: ' + (r.date || ''));
     if (r.reference) lines.push('Invoice / Reference: ' + r.reference);
@@ -389,38 +434,42 @@ S.VendorTracker = {
     lines.push('Credit amount requested: $' + parseFloat(r.overcharge || 0).toFixed(2));
     if (r.notes) lines.push('', 'Notes: ' + r.notes);
     lines.push('', 'Please confirm the credit and let me know when it will be applied.', '', 'Thanks,', barName);
-    const subj = 'Credit request: ' + (r.vendor || 'vendor') + ' discrepancy from ' + (r.date || '');
+    const subj = (isFollowUp ? 'Following up on credit request: ' : 'Credit request: ') + (r.vendor || 'vendor') + ' discrepancy from ' + (r.date || '');
     return 'mailto:' + encodeURIComponent(v?.email || '')
       + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(lines.join('\n'));
   },
 
-  // ── Mark Resolved (popup asking what was actually recovered) ──────────
-  markResolved(id) {
-    const r = this.discRecords().find(x => x.id === id);
-    if (!r) return;
-    const claimed = parseFloat(r.overcharge) || 0;
-    const html = '<div class="card form-card narrow-form" style="margin:0;">'
-      + '<div class="card-title">Mark Resolved</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px;">How much credit did the vendor actually give you? Claimed was <strong style="color:var(--t1);">' + App.fmtCurrency(claimed) + '</strong>. Vendors sometimes credit only part of a claim, and the Recovered total counts what you actually got back.</div>'
-      + '<div class="f" style="width:200px;margin-bottom:0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="vd-resolve-amt" step="0.01" value="' + claimed.toFixed(2) + '"/></div></div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="vd-resolve-save">Save</button>'
-        + '<button class="btn btn-ghost" id="vd-resolve-cancel">Cancel</button>'
-        + '<span id="vd-resolve-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-    App.openModal(html, { id: 'vd-resolve-modal', maxWidth: 480, noClose: true });
-    setTimeout(() => document.getElementById('vd-resolve-amt')?.select(), 50);
-    document.getElementById('vd-resolve-cancel')?.addEventListener('click', () => App.closeModal('vd-resolve-modal'));
-    document.getElementById('vd-resolve-save')?.addEventListener('click', () => {
-      const inp = document.getElementById('vd-resolve-amt');
-      const errEl = document.getElementById('vd-resolve-err');
-      const recovered = parseFloat(inp?.value);
-      if (isNaN(recovered) || recovered < 0) { if (errEl) { errEl.textContent = 'Enter a valid dollar amount.'; errEl.style.display = 'inline'; } return; }
-      r.status = 'Resolved';
-      r.resolved_at = new Date().toISOString();
-      r.recovered_amount = recovered;
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => { App.closeModal('vd-resolve-modal'); this.draw(); });
-    });
+  // The 3-stage progress rail (Filed -> Credit Requested -> Resolved). The current
+  // stage carries a gold ring, reached stages a green check, the rest stay grey.
+  _vdRail(r) {
+    const st = r.status || 'Open';
+    const reached = { filed: true, requested: (st === 'Credit Requested' || st === 'Resolved'), resolved: (st === 'Resolved') };
+    const currentKey = reached.resolved ? 'resolved' : reached.requested ? 'requested' : 'filed';
+    const fuN = (r.followups && r.followups.length) || 0;
+    const meta = {
+      filed: { label: 'Filed', sub: this.fmtDate(r.date) },
+      requested: { label: 'Credit Requested', sub: reached.requested
+          ? (this.fmtDate((r.credit_requested_at || '').slice(0, 10)) + (fuN ? ' &middot; ' + fuN + ' follow-up' + (fuN === 1 ? '' : 's') : ''))
+          : '&ndash;' },
+      resolved: { label: (st === 'Resolved' && r.no_credit) ? 'Closed' : 'Resolved', sub: reached.resolved
+          ? (r.no_credit ? 'No credit' : App.fmtCurrency(r.recovered_amount || 0))
+          : '&ndash;' }
+    };
+    const dot = (state) => state === 'current'
+      ? '<span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gold-tint);border:1.5px solid var(--gold);box-sizing:border-box;"><span style="width:8px;height:8px;border-radius:50%;background:var(--gold);"></span></span>'
+      : state === 'done'
+        ? '<span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:12px;font-weight:800;">&#10003;</span>'
+        : '<span style="width:24px;height:24px;border-radius:50%;border:1.5px solid var(--b1);box-sizing:border-box;display:block;"></span>';
+    const col = (k) => {
+      const state = (k === currentKey) ? 'current' : (reached[k] ? 'done' : 'pending');
+      return '<div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'
+        + dot(state)
+        + '<div style="font-size:11px;font-weight:700;color:' + (state === 'pending' ? 'var(--t4)' : 'var(--t1)') + ';line-height:1.25;">' + meta[k].label + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);line-height:1.3;">' + meta[k].sub + '</div></div>';
+    };
+    const conn = (filled) => '<span style="flex:0 0 auto;width:24px;height:2px;margin-top:11px;background:' + (filled ? 'var(--green)' : 'var(--b1)') + ';"></span>';
+    return '<div style="display:flex;align-items:flex-start;justify-content:center;margin:14px 0 16px;">'
+      + col('filed') + conn(reached.requested) + col('requested') + conn(reached.resolved) + col('resolved') + '</div>';
   },
 
   async removeDiscrepancy(id) {
@@ -494,25 +543,35 @@ S.VendorTracker = {
     const st = r.status || 'Open';
     const iSt = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
 
-    let statusBlock = '', primary = '';
+    let statusBlock = '', actions = '';
     if (st === 'Open') {
       statusBlock = '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Open claim. Request the credit from your rep within 24 hours; they age out fast. Requesting drafts the email and flips this to Credit Requested.</div>';
-      primary = '<button class="btn btn-primary" id="vdm-credit">Request Credit</button>';
+      actions = '<button class="btn btn-primary" id="vdm-credit">Request Credit</button>';
     } else if (st === 'Credit Requested') {
-      statusBlock = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Credit requested ' + esc((r.credit_requested_at || '').slice(0, 10)) + '. When the vendor credits you, record what you actually got back.</div>'
-        + '<div class="f" style="width:200px;margin-bottom:0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-recovered" step="0.01" value="' + (parseFloat(r.overcharge) || 0).toFixed(2) + '"/></div></div>';
-      primary = '<button class="btn btn-primary" id="vdm-resolve">Mark Resolved</button>';
+      const wd = this.waitDays(r), overdue = this.isOverdue(r), fuN = (r.followups && r.followups.length) || 0;
+      const ageText = overdue
+        ? 'Waiting ' + wd + ' days on ' + esc(r.vendor || 'this vendor') + ' with no response. Time to follow up.'
+        : 'Credit requested ' + this.fmtDate((r.credit_requested_at || '').slice(0, 10)) + (wd != null ? ', waiting ' + wd + ' day' + (wd === 1 ? '' : 's') + ' so far.' : '.');
+      const fuLine = fuN ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Followed up ' + fuN + ' time' + (fuN === 1 ? '' : 's') + ', last ' + this.fmtDate((r.followups[fuN - 1] || '').slice(0, 10)) + '.</div>' : '';
+      statusBlock = '<div style="font-size:12px;line-height:1.6;color:' + (overdue ? 'var(--amber)' : 'var(--t2)') + ';' + (overdue ? 'font-weight:700;' : '') + '">' + ageText + '</div>' + fuLine
+        + '<div class="f" style="width:200px;margin:12px 0 0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-recovered" step="0.01" value="' + (parseFloat(r.overcharge) || 0).toFixed(2) + '"/></div></div>';
+      actions = '<button class="btn btn-primary" id="vdm-resolve">Mark Resolved</button>'
+        + '<button class="btn btn-ghost" id="vdm-followup">Follow Up</button>'
+        + '<button class="btn btn-ghost" id="vdm-closenc">Close, no credit</button>';
     } else {
       const rec = r.recovered_amount != null ? r.recovered_amount : r.overcharge;
-      statusBlock = '<div style="font-size:12px;color:var(--green);font-weight:700;">Resolved ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; Recovered ' + App.fmtCurrency(parseFloat(rec) || 0) + '</div>';
-      primary = '<button class="btn btn-primary" id="vdm-reopen">Reopen</button>';
+      statusBlock = r.no_credit
+        ? '<div style="font-size:12px;color:var(--t3);font-weight:700;">Closed ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; No credit recovered</div>'
+        : '<div style="font-size:12px;color:var(--green);font-weight:700;">Resolved ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; Recovered ' + App.fmtCurrency(parseFloat(rec) || 0) + '</div>';
+      actions = '<button class="btn btn-ghost" id="vdm-reopen">Reopen</button>';
     }
 
     card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Vendor Discrepancy</span>'
       + '<span id="vdm-view" style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:none;color:var(--gold);cursor:pointer;white-space:nowrap;">View in Vendor Tracker &rsaquo;</span></div>'
       + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(r.sku || '(unrecorded)') + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + esc(r.vendor || '-') + ' &middot; ' + esc(r.type || 'Other') + ' &middot; ' + this.discStatusText(st) + '</div>'
-      + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0;background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:12px 16px;">'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + esc(r.vendor || '-') + ' &middot; ' + esc(r.type || 'Other') + '</div>'
+      + this._vdRail(r)
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:0 0 14px;background:var(--input);border:1px solid var(--b-edge);border-radius:6px;padding:12px 16px;">'
         + this._vdRow('Units', r.units != null ? esc(String(r.units)) : '-')
         + this._vdRow('Agreed', r.agreed_price != null ? App.fmtCurrency(r.agreed_price) : '-')
         + this._vdRow('Invoiced', r.invoiced_price != null ? App.fmtCurrency(r.invoiced_price) : '-')
@@ -521,7 +580,7 @@ S.VendorTracker = {
       + statusBlock
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Notes</label>'
       + '<textarea id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(r.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">' + primary
+      + '<div class="card-actions">' + actions
       + '<button class="btn btn-ghost" id="vdm-close">Close</button>'
       + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
 
@@ -540,8 +599,26 @@ S.VendorTracker = {
       r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = amt;
       App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
     });
+    card.querySelector('#vdm-followup')?.addEventListener('click', () => {
+      flushNotes();
+      if (!Array.isArray(r.followups)) r.followups = [];
+      r.followups.push(new Date().toISOString());
+      window.location.href = this._creditMailtoHref(r, true);
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+    });
+    card.querySelector('#vdm-closenc')?.addEventListener('click', async () => {
+      flushNotes();
+      const ok = await App.confirm({
+        title: 'Close with no credit?',
+        message: 'This closes the ' + (r.vendor || 'vendor') + ' claim' + ((r.overcharge || 0) > 0 ? ' for ' + App.fmtCurrency(r.overcharge) : '') + ' as recovered nothing. It stays on record but stops showing as open, and you can reopen it later.',
+        confirmText: 'Close, no credit'
+      });
+      if (!ok) return;
+      r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = 0; r.no_credit = true;
+      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+    });
     card.querySelector('#vdm-reopen')?.addEventListener('click', () => {
-      r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount;
+      r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount; delete r.no_credit;
       App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
     });
     card.querySelector('#vdm-view')?.addEventListener('click', () => {
@@ -587,7 +664,7 @@ S.VendorTracker = {
       { p: ['One place to keep your vendors honest. Three tabs read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log where you chase credits.'] },
       { h: 'Scorecard', p: ['Each vendor rolled up over the range you pick: total spend, net price drift, short counts, open and recovered credits, and average days to a credit. Vendors causing the most pain sort to the top, with a status read of High, Watch, or Clean. Take this into your quarterly vendor review and ask for a price match on every line that drifted up. Export PDF saves the rollup.'] },
       { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory Control, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
-      { h: 'Discrepancies', p: ['Every credit claim you are owed, open and resolved. Claims get FILED over in Inventory: flag the line at the dock in Receive Delivery, or open a saved delivery in Delivery History and flag it there if the problem turned up later. This tab is where you WORK them: Request Credit drafts an email to your rep and flips the status, Mark Resolved records what you actually got back, and Export PDF saves the list for a claim.'] }
+      { h: 'Discrepancies', p: ['Every credit claim you are owed, each with a progress rail showing exactly where it stands: Filed, Credit Requested, then Resolved. Claims get filed over in Inventory: flag the line at the dock in Receive Delivery, or open a saved delivery in Delivery History and flag it there if the problem turned up later. Click any claim here to work it: Request Credit drafts the email to your rep, Follow Up re-drafts a reminder and logs the date when they have gone quiet, Mark Resolved records what you actually got back, and Close, no credit ends a claim the vendor will not pay. Anything sitting in Credit Requested too long shows under Follow Up Due so a credit you are owed never slips your mind.'] }
     ]);
   }
 };
