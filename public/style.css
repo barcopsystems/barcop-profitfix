@@ -588,8 +588,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* Profit Fix step cards (open-system accordion body). .pf-step = the bordered
    card; .pf-stepcard = the clickable variant (whole wrapper opens the feature). */
 .pf-step{display:flex;gap:11px;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
-.pf-stepcard{cursor:pointer;transition:border-color .12s,background .12s;}
-.pf-stepcard:hover{border-color:var(--b1);background:#0F1A21;}
+.pf-stepcard{cursor:pointer;transition:background .12s;}
+.pf-stepcard:hover{background:#0F1A21;}
+/* The system accordion header reuses the form-card collapse chevron exactly
+   (size, hover-gold, and the -90deg rotation when collapsed). */
+.pf-sys-head:hover .card-chevron{color:var(--gold);}
+.pf-sys-head.collapsed .card-chevron{transform:rotate(-90deg);}
 .pf-progbar{height:6px;background:#0D181E;border-radius:4px;overflow:hidden;}
 .pf-progbar>span{display:block;height:100%;background:var(--green);border-radius:4px;transition:width .4s ease;}
 .pf-step{border:1px solid var(--b-edge);border-radius:9px;margin-bottom:10px;background:var(--surface);transition:border-color .15s,background .15s;}
