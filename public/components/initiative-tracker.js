@@ -157,58 +157,58 @@ const InitiativeTracker = {
       .sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''));   // newest change on top
     const closed = all.filter(i => i.status !== 'Active');
 
-    const activeRows = active.length ? active.map((i, idx) => {
+    // Active Experiments — a row-list pill table inside the titled card.
+    const activeCols = '<colgroup><col style="width:28%"/><col style="width:18%"/><col style="width:11%"/><col style="width:11%"/><col style="width:12%"/><col style="width:20%"/></colgroup>';
+    const activeHead = '<thead><tr><th>Experiment</th><th>Watching</th><th>Baseline</th><th>So Far</th><th>Lift</th><th></th></tr></thead>';
+    const activeBody = active.length ? active.map(i => {
       const m = this._measure(module, i);
       const metric = this.metric(module, i.metric);
       const metricLabel = metric ? metric.label : i.metric;
       const windowMsg = m.weeksAfter < 2 ? 'Measuring (week ' + m.weeksAfter + ' of 8)' : m.weeksAfter + ' weeks in';
-      return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:12px 20px;">'
-        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(i.name) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);">' + esc(i.type || '') + ' &middot; started ' + esc(fmtDate(i.start_date)) + ' &middot; ' + esc(windowMsg) + '</div>'
-        + '</div>'
-        + (i.hypothesis ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5;">' + esc(i.hypothesis) + '</div>' : '')
-        + '<div style="display:flex;gap:18px;margin-top:8px;flex-wrap:wrap;align-items:baseline;">'
-        + '<div style="font-size:11px;color:var(--t3);">Watching: <span style="color:var(--t1);">' + esc(metricLabel) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">Baseline: <span style="color:var(--t1);">' + this._fmtVal(metric, m.before) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">So far: <span style="color:var(--t1);">' + this._fmtVal(metric, m.after) + '</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);">Lift: ' + this._fmtLift(metric, m.lift) + '</div>'
-        + '<div style="margin-left:auto;display:flex;gap:6px;">'
-        + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Mark Complete</button>'
-        + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Edit</button>'
-        + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:3px 8px;">Delete</button>'
-        + '</div></div></div>';
-    }).join('') : '<div style="padding:18px 20px;font-size:12px;color:var(--t3);line-height:1.65;">' + c.empty + '</div>';
-
-    // Active Experiments card — titled header, rows below.
-    const activeCard = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<div class="card-title" style="padding:13px 20px;margin:0;">Active Experiments</div>'
-      + activeRows + '</div>';
+      const sub = esc(i.type || '') + ' &middot; started ' + esc(fmtDate(i.start_date)) + ' &middot; ' + esc(windowMsg);
+      return '<tr>'
+        + '<td><div class="val">' + esc(i.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px;">' + sub + '</div>'
+        + (i.hypothesis ? '<div style="font-size:10px;color:var(--t3);margin-top:2px;line-height:1.45;">' + esc(i.hypothesis) + '</div>' : '')
+        + '</td>'
+        + '<td>' + esc(metricLabel) + '</td>'
+        + '<td class="val">' + this._fmtVal(metric, m.before) + '</td>'
+        + '<td class="val">' + this._fmtVal(metric, m.after) + '</td>'
+        + '<td>' + this._fmtLift(metric, m.lift) + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '">Mark Complete</button>'
+        + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '">Edit</button>'
+        + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('') : '<tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">' + c.empty + '</td></tr>';
+    const activeCard = '<div class="card" style="overflow-x:auto;">'
+      + '<div class="card-title">Active Experiments</div>'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;">' + activeCols + activeHead + '<tbody>' + activeBody + '</tbody></table></div>';
 
     // Start button lives BELOW the card, bottom-left, in gold.
     const startBtn = '<div style="margin:16px 0 24px;"><button class="btn btn-primary init-add">Start Experiment</button></div>';
 
-    // Completed Experiments — its own titled card, only when there are any.
+    // Completed Experiments — its own titled card with a row-list pill table.
     let completedCard = '';
     if (closed.length) {
-      const closedRows = closed.slice().reverse().map((i, idx) => {
+      const compCols = '<colgroup><col style="width:40%"/><col style="width:22%"/><col style="width:16%"/><col style="width:22%"/></colgroup>';
+      const compBody = closed.slice().reverse().map(i => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
-        return '<div style="' + (idx === 0 ? '' : 'border-top:1px solid var(--b2);') + 'padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:11px;">'
-          + '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;min-width:0;">'
-          + '<span style="color:var(--t2);">' + esc(i.name) + '</span>'
-          + '<span style="color:var(--t3);">' + esc(i.type || '') + '</span>'
-          + '<span>' + this._fmtLift(metric, m.lift) + '</span>'
-          + '</div>'
-          + '<div style="display:flex;gap:6px;">'
-          + '<button class="btn btn-ghost btn-sm init-again" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Run Again</button>'
-          + '<button class="btn btn-ghost btn-sm init-reopen" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Reopen</button>'
-          + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '" style="font-size:10px;padding:2px 6px;">Remove</button>'
-          + '</div></div>';
+        return '<tr>'
+          + '<td><div class="val">' + esc(i.name) + '</div></td>'
+          + '<td>' + esc(i.type || '') + '</td>'
+          + '<td>' + this._fmtLift(metric, m.lift) + '</td>'
+          + '<td><div class="row-actions">'
+          + '<button class="btn btn-ghost btn-sm init-again" data-id="' + esc(i.id) + '">Run Again</button>'
+          + '<button class="btn btn-ghost btn-sm init-reopen" data-id="' + esc(i.id) + '">Reopen</button>'
+          + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '">Remove</button>'
+          + '</div></td></tr>';
       }).join('');
-      completedCard = '<div class="card" style="padding:0;overflow:hidden;">'
-        + '<div class="card-title" style="padding:13px 20px;margin:0;">Completed Experiments</div>'
-        + closedRows + '</div>';
+      completedCard = '<div class="card" style="overflow-x:auto;">'
+        + '<div class="card-title">Completed Experiments</div>'
+        + '<table class="row-list" style="table-layout:fixed;width:100%;">' + compCols
+        + '<thead><tr><th>Experiment</th><th>Type</th><th>Lift</th><th></th></tr></thead><tbody>' + compBody + '</tbody></table></div>';
     }
 
     return activeCard + startBtn + completedCard;
@@ -324,44 +324,4 @@ const InitiativeTracker = {
     });
   },
 
-  // Plain-text lift for the PDF (the on-screen _fmtLift returns colored HTML).
-  _liftPlain(metric, lift) {
-    if (lift == null) return 'no data yet';
-    const f = metric ? metric.fmt : null;
-    const sign = lift > 0 ? '+' : '';
-    if (f === 'currency') return App.fmtCurrency(lift);
-    if (f === 'days')     return sign + Math.round(lift) + ' days';
-    if (f === 'weeks')    return sign + Math.round(lift) + ' wks';
-    if (f === 'int')      return sign + Math.round(lift).toLocaleString('en-US');
-    return sign + lift.toFixed(1) + '%';
-  },
-
-  // Export the section's experiment log (active + completed) as a PDF table.
-  async exportPDF(module) {
-    try { await App._ensurePDFLib(); }
-    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
-    const all = this.list(module);
-    const section = module === 'revenue' ? 'Revenue' : module === 'cash' ? 'Cash' : 'Profit';
-    const metricLabel = key => { const m = this.metric(module, key); return m ? m.label : key; };
-    const fmtD = d => { if (!d) return '-'; const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
-    const active = all.filter(i => i.status === 'Active')
-      .sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''));
-    const closed = all.filter(i => i.status !== 'Active').slice().reverse();
-    const b = App._pdfBuilder(section + ' Experiments');
-    b.header({ right: section + ' Experiments', meta: 'Experiment Log' });
-    b.sectionTitle('Active Experiments');
-    if (active.length) {
-      b.table(['Name', 'Type', 'Watching', 'Started', 'Baseline', 'So Far', 'Lift'],
-        active.map(i => { const m = this._measure(module, i), mt = this.metric(module, i.metric);
-          return [i.name, i.type || '', metricLabel(i.metric), fmtD(i.start_date), this._fmtVal(mt, m.before), this._fmtVal(mt, m.after), this._liftPlain(mt, m.lift)]; }));
-    } else { b.paragraph('None active.'); }
-    b.spacer(6);
-    b.sectionTitle('Completed Experiments');
-    if (closed.length) {
-      b.table(['Name', 'Type', 'Watching', 'Lift'],
-        closed.map(i => { const m = this._measure(module, i), mt = this.metric(module, i.metric);
-          return [i.name, i.type || '', metricLabel(i.metric), this._liftPlain(mt, m.lift)]; }));
-    } else { b.paragraph('None completed.'); }
-    await b.save('BarCop_' + section + 'Experiments.pdf');
-  }
 };
