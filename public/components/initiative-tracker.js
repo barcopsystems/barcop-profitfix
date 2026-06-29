@@ -158,7 +158,7 @@ const InitiativeTracker = {
     const closed = all.filter(i => i.status !== 'Active');
 
     // Active Experiments — a row-list pill table inside the titled card.
-    const activeCols = '<colgroup><col style="width:28%"/><col style="width:18%"/><col style="width:11%"/><col style="width:11%"/><col style="width:12%"/><col style="width:20%"/></colgroup>';
+    const activeCols = '<colgroup><col style="width:32%"/><col style="width:12%"/><col style="width:12%"/><col style="width:12%"/><col style="width:12%"/><col style="width:20%"/></colgroup>';
     const activeHead = '<thead><tr><th>Active Experiment</th><th>Watching</th><th>Baseline</th><th>So Far</th><th>Lift</th><th></th></tr></thead>';
     const activeBody = active.length ? active.map(i => {
       const m = this._measure(module, i);
@@ -190,7 +190,7 @@ const InitiativeTracker = {
     // Completed Experiments — its own titled card with a row-list pill table.
     let completedCard = '';
     if (closed.length) {
-      const compCols = '<colgroup><col style="width:40%"/><col style="width:22%"/><col style="width:16%"/><col style="width:22%"/></colgroup>';
+      const compCols = '<colgroup><col style="width:32%"/><col style="width:12%"/><col style="width:12%"/><col style="width:44%"/></colgroup>';
       const compBody = closed.slice().reverse().map(i => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
