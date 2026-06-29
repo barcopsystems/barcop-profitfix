@@ -170,10 +170,18 @@ S.CashFix = {
     App._fixFocus = null;
     const gaps = this.gaps();
     if (focus && this.gap(focus)) this._workGap = focus;
-    else if (!this._workGap || !this.gap(this._workGap)) this._workGap = gaps.length ? gaps[0].id : null;
+    else {
+      // Auto-open the first system that is not On track (the one that needs
+      // work); if every system is On track, open the first one.
+      const needs = gaps.find(g => this.health(g).state !== 'running');
+      this._workGap = needs ? needs.id : (gaps.length ? gaps[0].id : null);
+    }
     this.renderPage();
   },
 
+  // ── One single-column page: the systems overview card on top, then each cash
+  //    system as a Close-The-Week-style accordion step (its health ring is the
+  //    circle). Opening one expands its fix in place; the page is never left. ────
   renderPage() {
     const gaps = this.gaps();
     const total = gaps.length;
@@ -201,76 +209,89 @@ S.CashFix = {
       + '</div><div class="pf-progbar"><span style="width:' + pct + '%;"></span></div>'
       + this.measureLine(this.gap(this._workGap)) + '</div>';
 
-    const rail = gaps.map((g, gi) => this.railTile(g, healths[gi])).join('');
-    const detail = this._workGap ? this.detailHtml(this.gap(this._workGap)) : '';
+    const systems = gaps.map((g, gi) => this.systemRow(g, healths[gi])).join('');
 
     const playbookLink = '<div style="margin:-4px 0 16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm cf-timeline">See Your Recovery Timeline</button><button class="btn btn-ghost btn-sm cf-playbook">Read the Cash Playbook</button></div>';
-    this.container.innerHTML = '<div class="screen">' + header + playbookLink
-      + '<div class="pf-2pane"><div class="pf-rail">' + rail + '</div>'
-      + '<div class="pf-detail">' + detail + '</div></div></div>';
+    this.container.innerHTML = '<div class="screen">' + header + playbookLink + systems + '</div>';
 
-    this.container.querySelectorAll('.pf-tile').forEach(t =>
-      t.addEventListener('click', () => { this._workGap = t.dataset.gap; this.renderPage(); }));
+    this.container.querySelectorAll('.pf-sys-head').forEach(t =>
+      t.addEventListener('click', () => { this._workGap = (this._workGap === t.dataset.gap) ? null : t.dataset.gap; this.renderPage(); }));
     this.container.querySelector('.cf-timeline')?.addEventListener('click', () =>
       App.pushView(() => { if (window.S && S.RecoveryTimeline) S.RecoveryTimeline.render(this.container, 'cash'); }));
     this.container.querySelector('.cf-playbook')?.addEventListener('click', () => { if (window.S && S.RecoveryPlaybook) S.RecoveryPlaybook.open('cash'); });
     this.wireWorkspace();
   },
 
-  railTile(g, h) {
-    const sel = g.id === this._workGap;
-    const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + h.label + '</span>';
-    return '<div class="pf-tile' + (sel ? ' sel' : '') + '" data-gap="' + esc(g.id) + '">'
-      + '<div style="display:flex;align-items:center;gap:12px;">'
-      + this.ring(h.good, h.watched, 40, h.watched > 0 && h.state === 'running')
-      + '<div style="min-width:0;flex:1;">'
-      + '<div style="font-size:14px;font-weight:600;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
-      + '<div style="font-size:12px;margin-top:4px;line-height:1.4;">' + statusLine + '</div>'
-      + '</div></div></div>';
+  // One cash system as a Close-The-Week-style accordion step. The circle is the
+  // system's health ring (steps-done count, or a green check when On track). Open
+  // = gold-tint, On track when collapsed = the done look (--input), else --surface.
+  systemRow(g, h) {
+    const open = g.id === this._workGap;
+    const bg = open ? 'var(--gold-tint)' : (h.state === 'running' ? 'var(--input)' : 'var(--surface)');
+    const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + esc(h.label) + '</span>';
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
+      + '<div class="pf-sys-head' + (open ? '' : ' collapsed') + '" data-gap="' + esc(g.id) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      + this.ring(h.good, h.watched, 30, h.watched > 0 && h.state === 'running')
+      + '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
+      + '<div style="font-size:12px;margin-top:3px;line-height:1.4;">' + statusLine + '</div></div>'
+      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + '</div>';
+    if (open) html += '<div style="padding:2px 16px 18px;">' + this.detailHtml(g) + '</div>';
+    return html + '</div>';
   },
 
   detailHtml(g) {
     if (!g) return '';
+    const sysAtRisk = this.health(g).state === 'atrisk';
     const steps = this.steps(g);
     const rows = steps.map((s, i) => ({ s, i, guide: this.stepStatus(g.id, i).kind === 'guide' }));
-    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
-    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
+    const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i, sysAtRisk)).join('');
+    const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i, sysAtRisk)).join('');
 
-    const systemCard = watchedHtml
-      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + watchedHtml + '</div>' : '';
-    const guideCard = guideHtml
-      ? '<div class="sh" style="margin:0 0 12px;">Guidance</div><div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + guideHtml + '</div>' : '';
+    // Steps sit directly in the open accordion body as #0D181E blocks (no nested
+    // cards), with the Guidance and Watch Out For sections under their headings.
+    const guideBlock = guideHtml
+      ? '<div class="sh" style="margin:16px 0 10px;">Guidance</div>' + guideHtml : '';
 
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
-      ? '<div class="sh" style="margin:0 0 12px;">Watch Out For</div><div class="card">'
+      ? '<div class="sh" style="margin:16px 0 10px;">Watch Out For</div>'
+        + '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px;">'
         + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
             + '<span style="flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
         + '</div>' : '';
 
-    return systemCard + guideCard + watchOut;
+    return watchedHtml + guideBlock + watchOut;
   },
 
-  stepRow(g, s, i) {
+  // A bordered card per step (clear separation, like the Close The Week steps).
+  // The WHOLE card is the link into the feature; the status is a colored subline
+  // tied right under the title. A watched step that is current shows only its
+  // status line; one that needs work also shows the how-to. Guidance steps always
+  // show their description. A not-started step turns red when it is what is
+  // dragging the system behind, so the red system warning points to the exact step.
+  stepRow(g, s, i, sysAtRisk) {
     const st = this.stepStatus(g.id, i);
     const kind = s.kind || 'action';
-    const label = esc(s.targetLabel || '');
-    let action = '';
-    if (s.target) {
-      const verb = kind === 'result' ? 'View' : 'Open';
-      action = '<button class="btn btn-ghost btn-sm cf-go" data-target="' + esc(s.target) + '" style="display:inline-flex;align-items:center;gap:6px;">' + this.stepIcon(kind) + verb + (label ? ': ' + label : '') + '</button>';
-    }
-    const statusHtml = (st.kind === 'guide') ? ''
-      : '<div style="margin-bottom:5px;font-size:12px;font-weight:700;color:' + st.color + ';">' + st.label
-        + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
+    const isGuide = st.kind === 'guide';
+    const expanded = isGuide || !st.good;
 
-    return '<div class="pf-line">'
-      + statusHtml
-      + '<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--t3);">' + this.stepIcon(kind) + '</span>'
-      + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span></div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:6px 0 0;">' + esc(s.detail || '') + '</div>'
-      + (action ? '<div style="margin-top:11px;">' + action + '</div>' : '')
-      + '</div>';
+    const statusColor = (st.never && sysAtRisk) ? 'var(--red)' : st.color;
+    const statusLine = isGuide ? ''
+      : '<div style="font-size:11px;font-weight:700;color:' + statusColor + ';margin-top:4px;">' + esc(st.label)
+        + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
+    const detail = (expanded && s.detail)
+      ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:8px;">' + esc(s.detail) + '</div>' : '';
+
+    const inner = '<span style="color:var(--t3);flex-shrink:0;margin-top:1px;">' + this.stepIcon(kind) + '</span>'
+      + '<div style="min-width:0;flex:1;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
+      + statusLine + detail + '</div>';
+
+    if (s.target) {
+      return '<div class="pf-step pf-stepcard cf-go" data-target="' + esc(s.target) + '">' + inner + '</div>';
+    }
+    return '<div class="pf-step">' + inner + '</div>';
   },
 
   measureLine(g) {
@@ -290,7 +311,7 @@ S.CashFix = {
   showHowTo() {
     App.showHelpModal('How the Cash Fix System Works', [
       { p: ['A fix is not a checklist you finish, it is a system you keep running. So Bar Cop does not ask you to tick boxes. For the work it can see, it reads your real data and shows whether it is happening.'] },
-      { h: 'Your Cash Systems', p: ['Each system in the left list is one cash lever. The ring and status read off live data. Select one and its fix opens on the right, so you move between systems without leaving the page. A system reads On track only while its watched work is current; the moment one lapses it tells you exactly what is slipping or behind.'] },
+      { h: 'Your Cash Systems', p: ['Each system below is one cash lever. The ring and status read off live data. Open one and its fix expands in place, so you move between systems without leaving the page. A system reads On track only while its watched work is current; the moment one lapses it tells you exactly what is slipping or behind.'] },
       { h: 'Watched Steps', p: ['The work Bar Cop can verify shows a live status: your weekly count, the orders you place, a tight week sitting in your forecast, whether your vendor terms are set. You cannot fake a logged count. Steps it genuinely cannot see, holding a bill to its due date, asking a rep for better terms, are marked Guidance and never counted as proof.'] },
       { h: 'Cash Freed', p: ['The figure up top is what you have actually freed: how far your trapped cash has come down from your own first weeks, read off your count history. It is the real reduction in capital tied up on the shelf, not a projection, and it builds as you count.'] },
       { h: 'See Your Recovery Timeline', p: ['The See Your Recovery Timeline button above the systems opens a chart of your Cash Freed building from zero to now, count by count, so you can see the climb instead of just one running total. It also shows which phase you are in, building your baseline, measuring, or live and tracked.'] }
