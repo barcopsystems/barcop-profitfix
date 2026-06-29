@@ -168,7 +168,7 @@ S.RecoveryPlaybook = {
   goBtn(b) {
     return '<button class="btn btn-ghost btn-sm pb-go" data-screen="' + esc(b.screen) + '"'
       + (b.focus ? ' data-focus="' + esc(b.focus) + '"' : '') + '>'
-      + this._icon('action') + 'Open: ' + esc(b.label || '') + '</button>';
+      + this._icon('action') + esc(b.label || '') + '</button>';
   },
 
   tableHtml(b) {
