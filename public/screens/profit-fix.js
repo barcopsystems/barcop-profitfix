@@ -314,13 +314,14 @@ S.ProfitFix = {
     const watchedHtml = rows.filter(x => !x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
     const guideHtml = rows.filter(x => x.guide).map(x => this.stepRow(g, x.s, x.i)).join('');
 
-    // Each section is ONE card of rows (divider-separated), not a card per step.
+    // Each section is one card; every step sits in its own #0D181E block, no
+    // divider lines between them.
     const systemCard = watchedHtml
-      ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + watchedHtml + '</div>'
+      ? '<div class="card" style="margin-bottom:18px;">' + watchedHtml + '</div>'
       : '';
     const guideCard = guideHtml
       ? '<div class="sh" style="margin:0 0 12px;">Guidance</div>'
-        + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">' + guideHtml + '</div>'
+        + '<div class="card" style="margin-bottom:18px;">' + guideHtml + '</div>'
       : '';
 
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
@@ -352,7 +353,7 @@ S.ProfitFix = {
       : '<div style="margin-bottom:5px;font-size:12px;font-weight:700;color:' + st.color + ';">' + st.label
         + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
 
-    return '<div class="pf-line">'
+    return '<div style="background:#0D181E;border-radius:8px;padding:14px 16px;margin-bottom:10px;">'
       + statusHtml
       + '<div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--t3);">' + this.stepIcon(kind) + '</span>'
       + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(s.title) + '</span></div>'
