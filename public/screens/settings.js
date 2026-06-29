@@ -2552,27 +2552,32 @@ S.HubSettings = {
     // planted bad actor is Brianna K. (the same server the comp pattern
     // concentrates on); her numbers escalate over the last two weekends, caught
     // building: two clean weekends, then a cash-mix Watch, then a High (heavy
-    // no-sales, a high void rate, refunds). The rest track the floor. True by
-    // construction (same analyze() the upload uses), so re-running yields the
-    // same flags.
+    // no-sales, a high void rate, refunds). On the current weekend a second
+    // server, Marcus T., also flags (Watch, under-ringing) on heavy comps and a
+    // run of low-dollar checks well off the floor, so the current review shows
+    // two flagged. The rest track the floor. True by construction (same
+    // analyze() the upload uses), so re-running yields the same flags.
     if (window.S && S.SalesIntegrity) {
-      const siRows = (date, bad) => [
+      const siRows = (date, s) => [
         { server:'Jessica M.', date, net_sales:2050, checks:41, cash_sales:380, card_sales:1670, voids:25, void_count:2, comps:24, no_sales:1, refunds:0, hours:8   },
-        { server:'Marcus T.',  date, net_sales:1820, checks:36, cash_sales:365, card_sales:1455, voids:20, void_count:2, comps:18, no_sales:0, refunds:0, hours:7.5 },
+        s.bad2
+          ? Object.assign({ server:'Marcus T.', date, checks:62, hours:8 }, s.bad2)
+          : { server:'Marcus T.', date, net_sales:1820, checks:36, cash_sales:365, card_sales:1455, voids:20, void_count:2, comps:18, no_sales:0, refunds:0, hours:7.5 },
         { server:'Priya N.',   date, net_sales:1680, checks:34, cash_sales:300, card_sales:1380, voids:24, void_count:2, comps:22, no_sales:2, refunds:0, hours:7.5 },
         { server:'Devin R.',   date, net_sales:1540, checks:31, cash_sales:340, card_sales:1200, voids:17, void_count:1, comps:16, no_sales:1, refunds:0, hours:7   },
         { server:'Carlos P.',  date, net_sales:1960, checks:39, cash_sales:410, card_sales:1550, voids:26, void_count:3, comps:20, no_sales:1, refunds:0, hours:8   },
-        Object.assign({ server:'Brianna K.', date, checks:30, comps:20, hours:8 }, bad)
+        Object.assign({ server:'Brianna K.', date, checks:30, comps:20, hours:8 }, s.bad)
       ];
       const siShifts = [
-        { ago:2,  bad:{ net_sales:1500, cash_sales:705, card_sales:795,  voids:90, void_count:7, no_sales:9, refunds:40 } }, // High
+        { ago:2,  bad:{ net_sales:1500, cash_sales:705, card_sales:795,  voids:90, void_count:7, no_sales:9, refunds:40 },
+                  bad2:{ net_sales:1480, cash_sales:330, card_sales:1170, voids:18, void_count:1, comps:185, no_sales:1, refunds:0 } }, // High + Watch
         { ago:9,  bad:{ net_sales:1620, cash_sales:680, card_sales:940,  voids:24, void_count:2, no_sales:2, refunds:0  } }, // Watch (cash mix)
         { ago:16, bad:{ net_sales:1700, cash_sales:360, card_sales:1340, voids:22, void_count:2, no_sales:1, refunds:0  } }, // clean
         { ago:23, bad:{ net_sales:1580, cash_sales:330, card_sales:1250, voids:20, void_count:2, no_sales:1, refunds:0  } }  // clean
       ];
       App.data.sales_reviews = siShifts.map(s => {
         const d = dateStr(s.ago);
-        return S.SalesIntegrity.analyze(siRows(d, s.bad), { id:uid(), date:d, created_at:new Date(d + 'T20:00:00').toISOString(), source:'sample' });
+        return S.SalesIntegrity.analyze(siRows(d, s), { id:uid(), date:d, created_at:new Date(d + 'T20:00:00').toISOString(), source:'sample' });
       });
     } else {
       App.data.sales_reviews = [];
