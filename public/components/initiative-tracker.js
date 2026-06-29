@@ -89,6 +89,17 @@ const InitiativeTracker = {
     return this.cfg(module).metrics.find(m => m.key === key) || null;
   },
 
+  // Whether an experiment's measured lift counts as a win for its metric.
+  // 'pending' = not enough data yet. Used by the section stat strip.
+  outcome(module, init) {
+    const m = this._measure(module, init);
+    if (m.lift == null) return 'pending';
+    if (m.lift === 0) return 'flat';
+    const metric = this.metric(module, init.metric);
+    const lower = metric && metric.lowerBetter;
+    return (lower ? m.lift < 0 : m.lift > 0) ? 'win' : 'loss';
+  },
+
   // 8-week-before vs 8-week-after average of the watched metric. The weeks array
   // loads newest-first from the event store, so sort a copy ascending by
   // period_end before the positional slices (event-store ordering gotcha).
