@@ -301,11 +301,11 @@ S.ProfitFix = {
     const statusLine = '<span style="color:' + this.healthColor(h.state) + ';font-weight:700;">' + esc(h.label) + '</span>'
       + (logged && rec > 0 ? '<span style="color:var(--t3);"> &middot; ' + App.fmtCurrency(rec, 0) + ' recovered</span>' : '');
     let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
-      + '<div class="pf-sys-head" data-gap="' + esc(g.id) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      + '<div class="pf-sys-head' + (open ? '' : ' collapsed') + '" data-gap="' + esc(g.id) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       + this.ring(h.good, h.watched, 30, h.state === 'running')
       + '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(g.name) + '</div>'
       + '<div style="font-size:12px;margin-top:3px;line-height:1.4;">' + statusLine + '</div></div>'
-      + '<span style="color:var(--t3);font-size:13px;flex-shrink:0;">' + (open ? '&#9652;' : '&#9662;') + '</span>'
+      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
       + '</div>';
     if (open) html += '<div style="padding:2px 16px 18px;">' + this.detailHtml(g) + '</div>';
     return html + '</div>';
