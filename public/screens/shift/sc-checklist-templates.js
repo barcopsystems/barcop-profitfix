@@ -107,8 +107,10 @@ S.ShiftChecklistTemplates = {
     const headingHtml = heading ? '<div class="sh" style="margin:24px 0 10px;">' + heading + '</div>' : '';
     // No-heading card (Closing) tucks right under the Opening card with a small gap.
     const cardStyle = 'overflow-x:auto;' + (heading ? '' : 'margin-top:10px;');
-    // Shared column widths so the Items column lines up down all three cards.
-    const cg = '<colgroup><col style="width:52%"/><col style="width:20%"/><col style="width:28%"/></colgroup>';
+    // Shared column widths so the Items column lines up down all three cards, and
+    // sits close to the name (fixed name column ~35px past the text) instead of
+    // floating far right. Actions take the remaining width, right-aligned.
+    const cg = '<colgroup><col style="width:140px"/><col style="width:110px"/><col/></colgroup>';
     return headingHtml
       + '<div class="card" style="' + cardStyle + '"><table class="row-list" style="table-layout:fixed;width:100%;">' + cg + '<thead><tr>'
       + '<th>' + (colHeader || 'Name') + '</th><th>Items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
