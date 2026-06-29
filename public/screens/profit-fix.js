@@ -330,7 +330,7 @@ S.ProfitFix = {
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
       ? '<div class="sh" style="margin:16px 0 10px;">Watch Out For</div>'
-        + '<div style="background:#0D181E;border-radius:8px;padding:14px 16px;">'
+        + '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px;">'
         + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
             + '<span style="flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
         + '</div>'
@@ -339,41 +339,37 @@ S.ProfitFix = {
     return watchedHtml + guideBlock + watchOut;
   },
 
-  // The title is the link itself (no separate Open button). A watched step that is
-  // current collapses to one scannable line; one that needs work expands to show
-  // its sub-status and how-to. Guidance steps always show their description.
+  // A bordered card per step (clear separation, like the Close The Week steps).
+  // The title is the link itself; the status is a colored subline tied right under
+  // it. A watched step that is current shows only its status line; one that needs
+  // work also shows the how-to. Guidance steps always show their description.
   stepRow(g, s, i) {
     const st = this.stepStatus(g.id, i);
     const kind = s.kind || 'action';
     const isGuide = st.kind === 'guide';
-    const expanded = isGuide || !st.good;   // collapse only the watched steps that are current
+    const expanded = isGuide || !st.good;   // the watched step's how-to shows only when it needs work
 
-    const titleInner = '<span style="color:var(--t3);display:inline-flex;flex-shrink:0;">' + this.stepIcon(kind) + '</span>'
-      + '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
+    const titleInner = '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
       + (s.target ? '<span style="color:var(--t3);font-size:14px;flex-shrink:0;">&rsaquo;</span>' : '');
     let titleEl;
     if (s.target && kind === 'reference') {
-      titleEl = '<a class="pf-steplink" href="' + this.docPath(s.target) + '" download style="text-decoration:none;display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;">' + titleInner + '</a>';
+      titleEl = '<a class="pf-steplink" href="' + this.docPath(s.target) + '" download style="text-decoration:none;display:inline-flex;align-items:center;gap:7px;cursor:pointer;">' + titleInner + '</a>';
     } else if (s.target) {
-      titleEl = '<div class="pf-steplink pf-go" data-target="' + esc(s.target) + '" style="display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;">' + titleInner + '</div>';
+      titleEl = '<div class="pf-steplink pf-go" data-target="' + esc(s.target) + '" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;">' + titleInner + '</div>';
     } else {
-      titleEl = '<div style="display:flex;align-items:center;gap:9px;min-width:0;">' + titleInner + '</div>';
+      titleEl = '<div style="display:inline-flex;align-items:center;gap:7px;">' + titleInner + '</div>';
     }
 
-    // Status as colored text on the right (never a badge), short when collapsed.
-    const statusEl = isGuide ? ''
-      : '<span style="flex-shrink:0;font-size:12px;font-weight:700;color:' + st.color + ';white-space:nowrap;">' + esc(st.label) + '</span>';
-    const headRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' + titleEl + statusEl + '</div>';
+    const statusLine = isGuide ? ''
+      : '<div style="font-size:11px;font-weight:700;color:' + st.color + ';margin-top:4px;">' + esc(st.label)
+        + (st.sub ? '<span style="color:var(--t3);font-weight:400;"> &middot; ' + esc(st.sub) + '</span>' : '') + '</div>';
+    const detail = (expanded && s.detail)
+      ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:8px;">' + esc(s.detail) + '</div>' : '';
 
-    let body = '';
-    if (expanded) {
-      const subLine = (!isGuide && st.sub) ? '<div style="font-size:11px;color:var(--t3);margin-top:5px;">' + esc(st.sub) + '</div>' : '';
-      const detail  = s.detail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:6px;">' + esc(s.detail) + '</div>' : '';
-      body = subLine + detail;
-    }
-
-    return '<div style="background:#0D181E;border-radius:8px;padding:' + (expanded ? '13px 16px' : '11px 16px') + ';margin-bottom:8px;">'
-      + headRow + body + '</div>';
+    return '<div style="display:flex;gap:11px;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'
+      + '<span style="color:var(--t3);flex-shrink:0;margin-top:1px;">' + this.stepIcon(kind) + '</span>'
+      + '<div style="min-width:0;flex:1;">' + titleEl + statusLine + detail + '</div>'
+      + '</div>';
   },
 
   // The selected system's recovery readout, shown as one line under the campaign
