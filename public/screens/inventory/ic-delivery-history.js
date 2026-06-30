@@ -54,6 +54,16 @@ S.InventoryDeliveryHistory = {
     this.container = container;
     this.actions = actions;
     this.renderList();
+    // Work-jump from Vendor Discrepancies: open that delivery's detail + the modal.
+    const pd = App._pendingDiscrepancy;
+    if (pd) {
+      App._pendingDiscrepancy = null;
+      const d = this.deliveries().find(x => x.id === pd.deliveryId);
+      if (d) {
+        App.pushView(() => this.renderDetail(d.id));
+        S.VendorTracker.openDiscrepancyModal({ discrepancyId: pd.discrepancyId, onClose: () => this.renderDetail(d.id) });
+      }
+    }
   },
 
   showHowTo() {
