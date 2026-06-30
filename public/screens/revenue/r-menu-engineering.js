@@ -1,15 +1,19 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Engineering ──────────────────────────────────────
-   Pure diagnosis: a stat box + a margin x popularity classification (Stars /
-   Plowhorses / Puzzles / Dogs) that NAMES THE MOVE for each group. Every item
-   has a Reprice link that jumps to the Price Calculator with the item
-   preselected. (The price calculator + pricing log moved to their own page,
-   r-price-calc; the old SVG scatter matrix + "vs Last Update" column are gone.) */
+/* ── Revenue Recovery — Menu Engineering (the pricing engine) ──────────────────
+   Per category it (1) DIAGNOSES every priced item into Stars / Plowhorses /
+   Puzzles / Dogs by margin and popularity against its OWN category, and (2)
+   PRESCRIBES the move with a number: a suggested price that brings the item back
+   to its margin target (cost / target cost %), the weekly dollars that move with
+   it if volume holds, and a quad-appropriate action.
+
+   Repricing saves a PLANNED price first, because changing a number here is not
+   the same as changing the real menu (a whole overhaul gets planned in the app,
+   then printed and rolled out weeks later). Mark Live is the honest rollout
+   moment: it updates the price and logs the change, so Recovery only ever tracks
+   the real menu, never a plan on paper. Dogs route to the 90-day Dog Test. */
 
 S.RevenueMenuEngineering = {
-  // The four groups + the one-line move for each. The diagnosis is text now
-  // (no color cue — the move spells out what to do).
   QUAD: [
     { key: 'STAR',      label: 'Stars',      move: 'Feature & push' },
     { key: 'PLOWHORSE', label: 'Plowhorses', move: 'Raise the price' },
@@ -23,13 +27,32 @@ S.RevenueMenuEngineering = {
   // Menu order for the per-category sections (same order Menu Items uses).
   CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
+  // The item's margin target: its own override, else the category default. Null
+  // for beverages / inventory items with no set target, so no price is suggested.
+  targetPctFor(item) {
+    if (item.target_cost_pct) return item.target_cost_pct;
+    if (item.category === 'Cocktails') return App.MENU_TARGET_COST_PCT.cocktail;
+    if ((App.MENU_PLATE_CATEGORIES || []).indexOf(item.category) !== -1) return App.MENU_TARGET_COST_PCT.plate;
+    return null;
+  },
+
+  // Suggested price = the price that hits the target cost %. Only ever a RAISE
+  // (Bar Cop never tells you to cut a price); null when at/under target or no target.
+  suggested(item, cost) {
+    const tgt = this.targetPctFor(item);
+    if (!tgt || !(cost > 0) || !(item.price > 0)) return null;
+    const sp = Math.round((cost / (tgt / 100)) * 100) / 100;
+    return sp > item.price + 0.01 ? sp : null;
+  },
+
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
-      { p: ['Menu Engineering sorts every priced item that has a cost and weekly covers into four groups by margin and popularity, so you know exactly what to push, reprice, promote, or cut. It needs at least four complete items in a category; finish any Incomplete ones in Menu Items.'] },
-      { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank until you add more.'] },
-      { h: 'The Numbers', p: ['The box up top reads your whole menu at a glance: how many items were analyzed, your average cost percent and average margin across them, and how many Plowhorses across every category are sitting underpriced and waiting on a price bump.'] },
-      { h: 'The Four Groups', p: ['Stars are high margin and high volume for their category, your winners, so feature them and brief servers to push them. Plowhorses sell well but earn little, so raise the price. Puzzles earn well but sell slowly, so promote them and give them server attention. Dogs are low on both, candidates to rework or cut.'] },
-      { h: 'Repricing', p: ['Reprice on any row opens the Price Calculator with that item ready, so you can model the new margin and weekly dollar impact before you commit, then log the change.'] }
+      { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Items.'] },
+      { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
+      { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
+      { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
+      { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
+      { h: 'Repricing', p: ['The Reprice step models the new margin, cost percent, and weekly impact, and shows how far volume can fall before the raise stops paying off. Save it as planned or mark it live on the spot.'] }
     ]);
   },
 
@@ -41,13 +64,15 @@ S.RevenueMenuEngineering = {
 
   draw() {
     this.container.innerHTML = '<div class="screen">' + this.classificationHtml() + '</div>';
-    // Reprice → Price Calculator with the item preselected (same-module navigate
-    // + a one-shot handoff flag the calculator consumes on render).
-    this.container.querySelectorAll('.me-reprice').forEach(b =>
-      b.addEventListener('click', () => { App._pricePreselect = b.dataset.id; App.navigate('r-price-calc'); }));
+    const c = this.container;
+    c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));
+    c.querySelectorAll('.me-marklive').forEach(b => b.addEventListener('click', () => this.markLive(b.dataset.id)));
+    c.querySelectorAll('.me-cancelplan').forEach(b => b.addEventListener('click', () => this.cancelPlanned(b.dataset.id)));
+    c.querySelectorAll('.me-dogtest').forEach(b => b.addEventListener('click', () => { App._dogTestPreselect = b.dataset.id; App.navigate('r-dog-test'); }));
+    document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
   },
 
-  // ── Classification (Stars / Plowhorses / Puzzles / Dogs), per category ───────
+  // ── The page: diagnosis (quadrant) + prescription (suggested price + action) ─
   classificationHtml() {
     // Inject the effective cost (auto-computed from recipe when attached, else
     // the manually-entered cost) so the math always sees a current number.
@@ -61,15 +86,10 @@ S.RevenueMenuEngineering = {
         + '</div></div>';
     }
 
-    // Classify each item WITHIN its own category: it is measured against the
-    // average margin and average covers of its OWN category, not the whole menu.
-    // Comparing a soda to a steak is apples to oranges, so a Dog means the weakest
-    // performer among its peers, the read you can actually act on. A category needs
-    // at least MIN_PER_CAT priced items to form a fair group; smaller ones are
-    // listed unranked.
     const SINGULAR = { STAR: 'Star', PLOWHORSE: 'Plowhorse', PUZZLE: 'Puzzle', DOG: 'Dog' };
     const MOVE = {}; this.QUAD.forEach(q => { MOVE[q.key] = q.move; });
     const ORDER = this.QUAD.map(q => q.key);
+    const f = v => App.fmtCurrency(v);
 
     const byCat = {};
     items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
@@ -78,8 +98,50 @@ S.RevenueMenuEngineering = {
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
     };
 
-    let totalPlow = 0;
+    let upside = 0, repriceCount = 0;
     const unranked = [];
+
+    // Build the prescription cells (Suggested, Delta/wk, Action) for one item.
+    // quad may be null for an unranked item (no category group), which just means
+    // no Dog routing and no quadrant move text.
+    const cellsFor = (i, quad) => {
+      const sugg = this.suggested(i, i.cost);
+      const planned = (i.planned_price > 0) ? i.planned_price : null;
+      const eff = planned || sugg;
+      const isDog = quad === 'DOG';
+      if (sugg && !isDog && !planned) { upside += (sugg - i.price) * i.weekly_covers; repriceCount++; }
+
+      let suggCell;
+      if (planned) suggCell = '<span style="color:var(--gold);font-weight:600;">Planned ' + f(planned) + '</span>';
+      else if (sugg) suggCell = f(sugg);
+      else suggCell = '<span style="color:var(--t3);">' + (this.targetPctFor(i) ? 'On target' : '-') + '</span>';
+
+      const dwk = eff ? (eff - i.price) * i.weekly_covers : null;
+      const dwkCell = dwk != null
+        ? '<span style="color:' + (dwk >= 0 ? 'var(--gold)' : 'var(--t2)') + ';">' + (dwk >= 0 ? '+' : '') + f(dwk) + '</span>'
+        : '<span style="color:var(--t3);">-</span>';
+
+      let action;
+      if (planned) action = '<div class="row-actions"><button class="btn btn-primary btn-sm me-marklive" data-id="' + esc(i.id) + '">Mark Live</button><button class="btn btn-ghost btn-sm me-cancelplan" data-id="' + esc(i.id) + '">Cancel</button></div>';
+      else if (isDog) action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(i.id) + '">Dog Test</button></div>';
+      else if (sugg) action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div>';
+      else action = '';
+
+      return { suggCell, dwkCell, action };
+    };
+
+    // First section heading carries the Export button (covers every section).
+    let exportPlaced = false;
+    const heading = label => {
+      const btn = exportPlaced ? '' : '<button class="btn btn-ghost btn-sm no-print" id="me-export">Export PDF</button>';
+      exportPlaced = true;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
+        + '<div class="sh" style="margin:0;">' + esc(label) + '</div>' + btn + '</div>';
+    };
+
+    const colgroup = '<colgroup><col style="width:190px;"/><col style="width:140px;"/><col/><col/><col/><col style="width:170px;"/></colgroup>';
+
+    // ── Ranked category cards ──────────────────────────────────────────────────
     const cards = Object.keys(byCat).sort(catSort).map(cat => {
       const list = byCat[cat];
       if (list.length < this.MIN_PER_CAT) { unranked.push(...list); return ''; }
@@ -88,56 +150,196 @@ S.RevenueMenuEngineering = {
       const classed = list.map(i => {
         const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCovers;
         const quad = (hiM && hiV) ? 'STAR' : (!hiM && hiV) ? 'PLOWHORSE' : (hiM && !hiV) ? 'PUZZLE' : 'DOG';
-        return { ...i, quad, cm: i.price - i.cost, pct: (i.cost / i.price * 100).toFixed(1) };
+        return { ...i, quad, pct: (i.cost / i.price * 100).toFixed(1) };
       });
-      totalPlow += classed.filter(i => i.quad === 'PLOWHORSE').length;
       classed.sort((a, b) => ORDER.indexOf(a.quad) - ORDER.indexOf(b.quad) || b.weekly_covers - a.weekly_covers);
-      const rows = classed.map(i =>
-        '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
-        + '<td><div class="val">' + SINGULAR[i.quad] + '</div><div style="font-size:10px;color:var(--t3);">' + esc(MOVE[i.quad]) + '</div></td>'
-        + '<td>' + App.fmtCurrency(i.price) + '</td>'
-        + '<td>' + i.pct + '%</td>'
-        + '<td>' + App.fmtCurrency(i.cm) + '</td>'
-        + '<td>' + i.weekly_covers + '</td>'
-        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div></td></tr>').join('');
-      return '<div class="sh" style="margin:22px 0 10px;">' + esc(cat) + ' (' + list.length + ')</div>'
+      const rows = classed.map(i => {
+        const x = cellsFor(i, i.quad);
+        return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
+          + '<td><div class="val">' + SINGULAR[i.quad] + '</div><div style="font-size:10px;color:var(--t3);">' + esc(MOVE[i.quad]) + '</div></td>'
+          + '<td>' + f(i.price) + '</td>'
+          + '<td>' + x.suggCell + '</td>'
+          + '<td>' + x.dwkCell + '</td>'
+          + '<td>' + x.action + '</td></tr>';
+      }).join('');
+      return heading(cat + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup><col style="width:200px;"/><col style="width:150px;"/><col/><col/><col/><col/><col style="width:120px;"/></colgroup>'
-        + '<thead><tr><th>Item</th><th>Class</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th></tr></thead>'
+        + colgroup
+        + '<thead><tr><th>Item</th><th>Class</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
-    // ── Stat box — menu-wide rollups + the reprice-candidate count ────────────
+    // ── Categories too small to rank fairly (still get the pricing engine) ─────
+    let unrankedCard = '';
+    if (unranked.length) {
+      unranked.sort((a, b) => catSort(a.category || 'Uncategorized', b.category || 'Uncategorized') || b.weekly_covers - a.weekly_covers);
+      const urows = unranked.map(i => {
+        const x = cellsFor(i, null);
+        return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
+          + '<td>' + esc(i.category || '') + '</td>'
+          + '<td>' + f(i.price) + '</td>'
+          + '<td>' + x.suggCell + '</td>'
+          + '<td>' + x.dwkCell + '</td>'
+          + '<td>' + x.action + '</td></tr>';
+      }).join('');
+      unrankedCard = heading('Too Few to Rank')
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + colgroup
+        + '<thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<tbody>' + urows + '</tbody></table></div>';
+    }
+
+    // ── Stat box — menu-wide rollups + the reprice headline ────────────────────
     const avgCMall = items.reduce((s, i) => s + (i.price - i.cost), 0) / items.length;
     const avgCostPct = items.reduce((s, i) => s + (i.cost / i.price * 100), 0) / items.length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calcItem('Items Analyzed', items.length)
       + calcItem('Avg Cost %', avgCostPct.toFixed(1) + '%')
-      + calcItem('Avg Margin', App.fmtCurrency(avgCMall))
-      + calcItem('Plowhorses to Reprice', totalPlow)
+      + calcItem('To Reprice', repriceCount)
+      + calcItem('Weekly Upside', '<span style="color:var(--gold);">+' + f(upside) + '</span>')
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:12px;">Weekly Upside is what repricing every over-target item to its margin target would add each week, if volume holds. Work it item by item, or plan the whole menu and mark it live when the new prices roll out.</div>'
+      + '</div>';
+
+    return '<div id="me-export-root">' + statBox + cards + unrankedCard + '</div>';
+  },
+
+  // ── Reprice step (the focused pricing modal) ─────────────────────────────────
+  openReprice(itemId) {
+    const item = (App.data.menu_items || []).find(i => i.id === itemId);
+    if (!item) return;
+    const cost = App.menuItemCost(item) || 0;
+    const tgt = this.targetPctFor(item);
+    const sugg = this.suggested(item, cost);
+    this._reId = item.id; this._reCost = cost;
+    const f = v => App.fmtCurrency(v);
+    const curPct = item.price > 0 ? (cost / item.price * 100) : 0;
+    const start = item.planned_price || sugg || item.price || 0;
+    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
+
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Reprice ' + esc(item.name) + '</div>'
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;">'
+      +   stat('Current Price', f(item.price))
+      +   stat('Cost', f(cost))
+      +   stat('Current Cost %', curPct.toFixed(1) + '%')
+      +   (tgt ? stat('Target Cost %', tgt + '%') : '')
+      + '</div>'
+      + '<div class="form-row" style="align-items:flex-end;">'
+      +   '<div class="f" style="width:150px;flex-shrink:0;"><label>New Price</label><div class="fw"><span class="pre">$</span>'
+      +     '<input class="form-input pre" type="number" id="re-price" value="' + (Math.round(start * 100) / 100) + '" step="0.01" oninput="S.RevenueMenuEngineering.reCalc()"/></div></div>'
+      +   (sugg ? '<button class="btn btn-ghost btn-sm" id="re-use-sugg">Use suggested ' + f(sugg) + '</button>' : '')
+      + '</div>'
+      + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;margin-top:6px;">'
+      +   '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
+      +     '<div class="calc-item"><div class="calc-label">New Cost %</div><div class="calc-val" id="re-pct">-</div></div>'
+      +     '<div class="calc-item"><div class="calc-label">New Margin</div><div class="calc-val" id="re-margin">-</div></div>'
+      +     '<div class="calc-item"><div class="calc-label">Weekly Impact</div><div class="calc-val" id="re-impact">-</div></div>'
+      +   '</div>'
+      +   '<div id="re-be" style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:10px;"></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+      +   '<button class="btn btn-primary" id="re-plan">Save as Planned</button>'
+      +   '<button class="btn btn-ghost" id="re-live">Mark Live Now</button>'
       + '</div></div>';
 
-    // ── Categories too small to rank fairly against themselves ─────────────────
-    let unrankedCard = '';
-    if (unranked.length) {
-      unranked.sort((a, b) => catSort(a.category || 'Uncategorized', b.category || 'Uncategorized') || b.weekly_covers - a.weekly_covers);
-      const urows = unranked.map(i =>
-        '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
-        + '<td>' + esc(i.category || '') + '</td>'
-        + '<td>' + App.fmtCurrency(i.price) + '</td>'
-        + '<td>' + (i.cost / i.price * 100).toFixed(1) + '%</td>'
-        + '<td>' + App.fmtCurrency(i.price - i.cost) + '</td>'
-        + '<td>' + i.weekly_covers + '</td>'
-        + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div></td></tr>').join('');
-      unrankedCard = '<div class="sh" style="margin:22px 0 10px;">Too Few to Rank</div>'
-        + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin:0 0 10px;">These categories have fewer than ' + this.MIN_PER_CAT + ' priced items, so there is no fair group to rank them against yet. Add more items in the category and they sort into Stars, Plowhorses, Puzzles, and Dogs.</div>'
-        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup><col style="width:200px;"/><col/><col/><col/><col/><col/><col style="width:120px;"/></colgroup>'
-        + '<thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th></tr></thead>'
-        + '<tbody>' + urows + '</tbody></table></div>';
-    }
+    App.openModal(html, { id: 're-modal', maxWidth: 560, onClose: () => App.closeModal('re-modal') });
+    document.getElementById('re-use-sugg')?.addEventListener('click', () => { const el = document.getElementById('re-price'); if (el) { el.value = sugg; this.reCalc(); } });
+    document.getElementById('re-plan')?.addEventListener('click', () => this.savePlanned(item.id, this._reNewPrice()));
+    document.getElementById('re-live')?.addEventListener('click', () => this.saveLive(item.id, this._reNewPrice()));
+    this.reCalc();
+  },
 
-    return statBox + cards + unrankedCard;
+  _reNewPrice() { return parseFloat(document.getElementById('re-price')?.value) || 0; },
+
+  reCalc() {
+    const item = (App.data.menu_items || []).find(i => i.id === this._reId);
+    if (!item) return;
+    const cost = this._reCost || 0;
+    const np = this._reNewPrice();
+    const covers = item.weekly_covers || 0;
+    const tgt = this.targetPctFor(item);
+    const pct = np > 0 ? (cost / np * 100) : null;
+    const margin = np - cost;
+    const impact = (np - (item.price || 0)) * covers;
+    const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
+    set('re-pct', pct != null ? pct.toFixed(1) + '%' : '-', tgt ? (pct > tgt ? 'warn' : 'good') : '');
+    set('re-margin', App.fmtCurrency(margin));
+    set('re-impact', (impact >= 0 ? '+' : '') + App.fmtCurrency(impact));
+    const oldMargin = (item.price || 0) - cost;
+    const be = document.getElementById('re-be');
+    if (be) {
+      if (np > (item.price || 0) && margin > 0 && oldMargin > 0) {
+        const drop = (1 - oldMargin / margin) * 100;
+        be.textContent = 'Weekly Impact assumes volume holds. Covers can fall up to ' + Math.max(0, drop).toFixed(0) + '% at the new price before you would have been better off leaving it alone.';
+      } else if (np > (item.price || 0)) {
+        be.textContent = 'Weekly Impact assumes volume holds.';
+      } else {
+        be.textContent = '';
+      }
+    }
+  },
+
+  // Plan it: set a pending price, no log. The menu math (cost %, engineering)
+  // reads it, but Recovery does not see it until it is marked live.
+  savePlanned(itemId, newPrice) {
+    const item = (App.data.menu_items || []).find(i => i.id === itemId);
+    if (!item || !(newPrice > 0)) return;
+    item.planned_price = Math.round(newPrice * 100) / 100;
+    item.planned_at = new Date().toISOString();
+    App.saveKey('menu_items').then(() => { App.closeModal('re-modal'); this.draw(); });
+  },
+
+  // Roll it out now: set the live price + log the change at this moment.
+  async saveLive(itemId, newPrice) {
+    const item = (App.data.menu_items || []).find(i => i.id === itemId);
+    if (!item || !(newPrice > 0)) return;
+    const np = Math.round(newPrice * 100) / 100;
+    const old = item.price;
+    item.price = np;
+    item.planned_price = null; item.planned_at = null;
+    await App.saveKey('menu_items');
+    if (old != null && old !== np) await this._logPriceChange(item, old, np);
+    App.closeModal('re-modal');
+    this.draw();
+  },
+
+  // Promote a planned price to live (the honest rollout moment).
+  async markLive(itemId) {
+    const item = (App.data.menu_items || []).find(i => i.id === itemId);
+    if (!item || !(item.planned_price > 0)) return;
+    const old = item.price, np = item.planned_price;
+    item.price = np; item.planned_price = null; item.planned_at = null;
+    await App.saveKey('menu_items');
+    if (old != null && old !== np) await this._logPriceChange(item, old, np);
+    this.draw();
+  },
+
+  cancelPlanned(itemId) {
+    const item = (App.data.menu_items || []).find(i => i.id === itemId);
+    if (!item) return;
+    item.planned_price = null; item.planned_at = null;
+    App.saveKey('menu_items').then(() => this.draw());
+  },
+
+  // Write the price-log + the pricing fix event, dated NOW (the real rollout).
+  // Mirrors the direct-edit path in Menu Items so the Pricing Review Log and the
+  // Recovery Scoreboard both pick it up. Pricing is a no-dollar metric, so this
+  // logs the change and its date, never an invented recovered figure.
+  async _logPriceChange(item, oldPrice, newPrice) {
+    const cost = App.menuItemCost(item) || 0;
+    await App.putRecord('core', 'revenue_price_log', {
+      id: App.uid(), date: App.todayLocal(), item_id: item.id, item_name: item.name,
+      old_price: oldPrice, new_price: newPrice, cost,
+      reason: 'Reprice from Menu Engineering', margin_impact: newPrice - oldPrice,
+      covers_at_change: item.weekly_covers || 0, predicted_vol_pct: null,
+      predicted_weekly_impact: (newPrice - oldPrice) * (item.weekly_covers || 0),
+      source: 'menu-engineering', saved_at: new Date().toISOString()
+    });
+    await App.putRecord('core', 'fix_log', {
+      id: App.uid(), module: 'revenue', gap_id: 'pricing', gap_name: 'Pricing',
+      date: App.todayLocal(), source: 'price-change',
+      note: 'Price change on ' + item.name + ': ' + App.fmtCurrency(oldPrice) + ' to ' + App.fmtCurrency(newPrice)
+    });
   }
 };

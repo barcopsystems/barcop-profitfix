@@ -151,6 +151,13 @@ S.RevenueDogTest = {
 
     this.container.innerHTML = '<div class="screen">' + form + active + history + emptyMsg + '</div>';
     this.wire();
+    // One-shot preselect from Menu Engineering's "Dog Test" action: drop the item
+    // into the form and fire the baseline auto-fill.
+    if (App._dogTestPreselect) {
+      const sel = document.getElementById('dt-item');
+      if (sel) { sel.value = App._dogTestPreselect; sel.dispatchEvent(new Event('change')); }
+      App._dogTestPreselect = null;
+    }
   },
 
   wire() {
