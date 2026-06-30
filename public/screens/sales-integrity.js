@@ -391,6 +391,12 @@ S.SalesIntegrity = {
       return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
     }).join('');
 
+    const invList = (App.data.variance_investigations || []).filter(i => i.sku === x.name + ' (sales)');
+    const invOpen = invList.some(i => i.status !== 'resolved');
+    const invResolved = !invOpen && invList.some(i => i.status === 'resolved');
+    const invLabel = invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Open Investigation';
+    const invStyle = invResolved ? 'color:var(--green);' : (invOpen ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : '');
+
     return '<div style="background:#0D181E;border-radius:8px;padding:16px 18px;margin-bottom:10px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
@@ -400,7 +406,7 @@ S.SalesIntegrity = {
       +   '</div>'
       + '</div>'
       + cats
-      + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm si-investigate" data-name="' + esc(x.name) + '" data-staff="' + esc(x.staff_id || '') + '">Open Investigation</button></div>'
+      + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm si-investigate" data-name="' + esc(x.name) + '" data-staff="' + esc(x.staff_id || '') + '" style="' + invStyle + '">' + invLabel + '</button></div>'
       + '</div>';
   },
 
