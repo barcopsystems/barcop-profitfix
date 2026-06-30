@@ -462,18 +462,7 @@ S.RevenueMenuEngineering = {
     const vp = parseFloat(volPct) || 0;
     const oldCM = oldPrice - cost, newCM = newPrice - cost;
     const predWk = (newCM * (covers * (1 + vp / 100))) - (oldCM * covers);
-    await App.putRecord('core', 'revenue_price_log', {
-      id: App.uid(), date: App.todayLocal(), item_id: item.id, item_name: item.name,
-      old_price: oldPrice, new_price: newPrice, cost,
-      reason: 'Reprice from Menu Engineering', margin_impact: newPrice - oldPrice,
-      covers_at_change: covers, predicted_vol_pct: vp, predicted_weekly_impact: predWk,
-      source: 'menu-engineering', saved_at: new Date().toISOString()
-    });
-    await App.putRecord('core', 'fix_log', {
-      id: App.uid(), module: 'revenue', gap_id: 'pricing', gap_name: 'Pricing',
-      date: App.todayLocal(), source: 'price-change',
-      note: 'Price change on ' + item.name + ': ' + App.fmtCurrency(oldPrice) + ' to ' + App.fmtCurrency(newPrice)
-    });
+    await App.logPriceChange(item, oldPrice, newPrice, { volPct: vp, predictedWeekly: predWk, reason: 'Reprice from Menu Engineering', source: 'menu-engineering' });
   },
 
   // ── Pricing Review Log — every logged price change, verified against the

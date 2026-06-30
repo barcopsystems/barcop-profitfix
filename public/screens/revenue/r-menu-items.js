@@ -824,6 +824,10 @@ S.RevenueMenuItems = {
       coversUpdatedAt = new Date().toISOString();
     }
 
+    // Setting the price directly here is a LIVE change, so a pending Menu
+    // Engineering plan for this item is cleared (the new live price supersedes
+    // it). A non-price edit carries the plan forward so it is not silently lost.
+    const priceChanged = existing && existing.price != null && existing.price !== price;
     const entry = {
       id:                 existing?.id || App.uid(),
       name,
@@ -838,51 +842,22 @@ S.RevenueMenuItems = {
       linked_product_id:  linkedProductId,
       pour_size_oz:       pourSizeOz,
       target_cost_pct:    targetPct,
+      planned_price:      priceChanged ? null : (existing && existing.planned_price != null ? existing.planned_price : null),
+      planned_vol_pct:    priceChanged ? null : (existing && existing.planned_vol_pct != null ? existing.planned_vol_pct : null),
+      planned_at:         priceChanged ? null : (existing && existing.planned_at ? existing.planned_at : null),
       created_at:         existing?.created_at || new Date().toISOString(),
       updated_at:         new Date().toISOString()
     };
-
-    // If this is an edit and the price changed, auto-write a revenue_price_log
-    // entry + a fix_log entry so Menu Engineering's Pricing Review Log and the
-    // Recovery Scoreboard both pick it up. Closes the orphan where direct
-    // menu-items price edits used to bypass the log.
-    const priceChanged = existing && existing.price != null && existing.price !== price;
-    let priceLogRec = null, fixLogRec = null;
-    if (priceChanged) {
-      priceLogRec = {
-        id: App.uid(),
-        date: App.todayLocal(),
-        item_id: entry.id,
-        item_name: entry.name,
-        old_price: existing.price,
-        new_price: price,
-        cost: computedCost,
-        reason: 'Direct edit on Menu Items',
-        margin_impact: price - existing.price,
-        covers_at_change: existing.weekly_covers || 0,
-        predicted_vol_pct: null,
-        predicted_weekly_impact: null,
-        source: 'menu-items-edit',
-        saved_at: new Date().toISOString()
-      };
-      fixLogRec = {
-        id: App.uid(),
-        module: 'revenue',
-        gap_id: 'pricing',
-        gap_name: 'Pricing',
-        date: App.todayLocal(),
-        source: 'price-change',
-        note: 'Price change on ' + entry.name + ': ' + App.fmtCurrency(existing.price) + ' to ' + App.fmtCurrency(price)
-      };
-    }
 
     if (this.editIdx !== null) this.items()[this.editIdx] = entry;
     else this.items().push(entry);
 
     await App.saveKey('menu_items');
+    // A direct price edit on an existing item is a real reprice: log it through
+    // the one canonical pricing logger (no prediction — that is a Menu
+    // Engineering reprice thing) so the Pricing Review Log and Recovery pick it up.
     if (priceChanged) {
-      await App.putRecord('core', 'revenue_price_log', priceLogRec);
-      await App.putRecord('core', 'fix_log', fixLogRec);
+      await App.logPriceChange(entry, existing.price, price, { reason: 'Direct edit on Menu Items', source: 'menu-items-edit' });
     }
     App.markSetupDone('gs_r_menu');
     if (recipe) App.markSetupDone('gs_p_recipes');
