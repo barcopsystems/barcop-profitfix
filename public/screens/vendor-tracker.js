@@ -471,7 +471,6 @@ S.VendorTracker = {
       const pf = (this._vd && this._vd.prefill) || {};
       const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === (pf.type || 'Price Overcharge') ? ' selected' : '') + '>' + t + '</option>').join('');
       card.innerHTML = '<div class="card-title">File Discrepancy</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Files a credit claim you can chase to resolution right here. Adjust if needed.</div>'
         + '<div class="form-row" style="gap:12px;">'
           + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="vdm-date" value="' + esc(pf.date || App.todayLocal()) + '"/></div>'
           + '<div class="f" style="flex:1;min-width:160px;"><label>Vendor</label><input type="text" id="vdm-vendor" value="' + esc(pf.vendor || '') + '"' + (pf.vendor ? ' readonly' : '') + '/></div>'
