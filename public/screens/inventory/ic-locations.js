@@ -438,6 +438,7 @@ S.InventoryLocations = {
   // click needed. Closes the picker and shows the "X products saved" feedback, then
   // resets the box for the next location. Empty name flags the Name box red.
   async commitNewProducts() {
+    if (this._savingProducts) return;
     const name = (document.getElementById('il-new-name')?.value || '').trim();
     this._newName = name;
     const err = document.getElementById('il-new-err');
@@ -448,10 +449,14 @@ S.InventoryLocations = {
       return;
     }
     const id = App.uid();
+    this._savingProducts = true;
+    const link = this.container.querySelector('.il-addprod-link');
+    if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
     this.locations().push({ id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked });
     this._reconcileProducts(name, this.newChecked);
     const savedCount = this.newChecked.size;
     await App.saveInventory();
+    this._savingProducts = false;
     App.markSetupDone('gs_ic_locations');
     // Reset the box for the next location; show the saved feedback until they start one.
     this.pickerOpen = false;
@@ -624,10 +629,15 @@ S.InventoryLocations = {
   // the arrange view. Product changes persist even if the operator never clicks
   // Update Location.
   async saveProducts(id) {
+    if (this._savingProducts) return;
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
+    this._savingProducts = true;
+    const link = this.container.querySelector('.il-editprod-link');
+    if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
     this._reconcileProducts(l.name, this.editChecked);
     await App.saveInventory();
+    this._savingProducts = false;
     App.markSetupDone('gs_ic_locations');
     this.editMode = 'arrange';
     this.editChecked = new Set();
