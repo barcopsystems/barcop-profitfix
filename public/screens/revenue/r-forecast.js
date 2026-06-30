@@ -286,7 +286,7 @@ S.RevenueForecast = {
       + '<div class="calc-item"><div class="calc-label">Matched Weeks</div><div class="calc-val lg">' + recent.length + '</div></div>'
       + '</div></div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Week Ending</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th>'
+      + '<th>Last 12 Weeks</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   },
