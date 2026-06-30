@@ -388,7 +388,7 @@ S.InventoryTakeInventory = {
         + '<span style="font-size:11px;color:var(--t3);margin-left:8px;">' + esc(p.category || 'Uncategorized') + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</span></div>'
         + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
         + this.pstateHtml(p.id, isCounted)
-        + '<button type="button" class="ti-note-toggle" data-pid="' + p.id + '" style="background:none;border:none;color:' + (hasNote ? 'var(--gold)' : 'var(--t3)') + ';font-size:11px;cursor:pointer;white-space:nowrap;">' + (hasNote ? 'Note' : '+ Add Note') + '</button>'
+        + '<button type="button" class="ti-note-toggle" data-pid="' + p.id + '" style="background:none;border:none;color:' + (hasNote ? 'var(--t1)' : 'var(--t3)') + ';font-size:11px;cursor:pointer;white-space:nowrap;">' + (hasNote ? 'Note' : '+ Add Note') + '</button>'
         + '</div>'
         + '</div>'
         + countInput
