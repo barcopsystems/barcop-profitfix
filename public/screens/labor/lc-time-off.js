@@ -170,13 +170,11 @@ S.LaborTimeOff = {
       + this.formCells(r, 'toe-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="toe-save">Update</button>'
-      + '<button class="btn btn-ghost" id="toe-cancel">Cancel</button>'
       + '<span id="toe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="toe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'to-edit-modal', maxWidth: 560, noClose: true });
     document.getElementById('toe-save')?.addEventListener('click', () => this.save('toe-'));
-    document.getElementById('toe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('to-edit-modal'); });
     document.getElementById('toe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('to-edit-modal'); this.confirmDel(id); });
   },
 

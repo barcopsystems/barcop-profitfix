@@ -680,7 +680,6 @@ S.LaborBuildSchedule = {
       + eventField
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button>'
-      + '<button class="btn btn-ghost" id="bs-m-cancel">Cancel</button>'
       + '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (editing ? '<button class="btn btn-danger" id="bs-m-remove" style="margin-left:auto;">Remove</button>' : '')
       + '</div></div>';
@@ -697,7 +696,6 @@ S.LaborBuildSchedule = {
     };
     updateCalc();
     document.querySelectorAll('#bs-shift-modal select').forEach(el => el.addEventListener('change', updateCalc));
-    document.getElementById('bs-m-cancel')?.addEventListener('click', () => App.closeModal('bs-shift-modal'));
     document.getElementById('bs-m-remove')?.addEventListener('click', () => {
       if (editing) { this.draft.shifts.splice(idx, 1); this.saveDraft(); }
       App.closeModal('bs-shift-modal'); this.draw();
@@ -762,11 +760,9 @@ S.LaborBuildSchedule = {
       + '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Adjust all your targets in <span id="bs-lt-settings" style="color:var(--gold);cursor:pointer;text-decoration:underline;">App Settings</span>.</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-lt-save">Save</button>'
-      + '<button class="btn btn-ghost" id="bs-lt-cancel">Cancel</button>'
       + '<span id="bs-lt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'bs-lt-modal', maxWidth: 460, noClose: true });
-    document.getElementById('bs-lt-cancel')?.addEventListener('click', () => App.closeModal('bs-lt-modal'));
     document.getElementById('bs-lt-settings')?.addEventListener('click', () => { App.closeModal('bs-lt-modal'); if (window.S && S.HubSettings) S.HubSettings.open('recovery-targets'); });
     document.getElementById('bs-lt-save')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('bs-lt-val')?.value);
@@ -800,12 +796,10 @@ S.LaborBuildSchedule = {
       + (hasDetail ? '<div style="font-size:11px;color:var(--amber);margin-top:6px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-fc-save">Save Forecast</button>'
-      + '<button class="btn btn-ghost" id="bs-fc-cancel">Cancel</button>'
       + '<span id="bs-fc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, noClose: true });
     document.getElementById('bs-fc-use')?.addEventListener('click', () => { const i = document.getElementById('bs-fc-val'); if (i) i.value = sug; });
-    document.getElementById('bs-fc-cancel')?.addEventListener('click', () => App.closeModal('bs-fc-modal'));
     document.getElementById('bs-fc-save')?.addEventListener('click', () => this.saveForecast(hasDetail));
   },
 

@@ -399,12 +399,10 @@ S.LaborLogHours = {
       + this.logFormCells(a, 'loe-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="loe-save">Update</button>'
-      + '<button class="btn btn-ghost" id="loe-cancel">Cancel</button>'
       + '<span id="loe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="loe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'lo-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('loe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lo-edit-modal'); });
     document.getElementById('loe-save')?.addEventListener('click', () => this.save('loe-'));
     document.getElementById('loe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lo-edit-modal'); this.confirmDel(id); });
     this.wireForm('loe-');
@@ -617,7 +615,6 @@ S.LaborLogHours = {
       + '<div id="lo-fmodal-list" style="max-height:52vh;overflow-y:auto;margin:0 -2px;padding:0 2px;">' + this.fillModalListHtml(active) + '</div>'
       + '<div class="card-actions" style="margin-top:16px;">'
       + '<button class="btn btn-primary" id="lo-fmodal-log"' + (n ? '' : ' disabled') + '>Log ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') + '</button>'
-      + '<button class="btn btn-ghost" id="lo-fmodal-cancel">Cancel</button>'
       + '<span id="lo-fmodal-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'lo-fill-modal', maxWidth: 620, noClose: true });
@@ -626,7 +623,6 @@ S.LaborLogHours = {
       listEl.addEventListener('change', () => this.updateFillModalCount());
       listEl.addEventListener('input', () => this.updateFillModalCount());
     }
-    document.getElementById('lo-fmodal-cancel')?.addEventListener('click', () => App.closeModal('lo-fill-modal'));
     document.getElementById('lo-fmodal-log')?.addEventListener('click', () => this.commitFillFromModal());
   },
 

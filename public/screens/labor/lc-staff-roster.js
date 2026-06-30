@@ -513,11 +513,9 @@ S.LaborStaffRoster = {
       + '</div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="wh-save">Save</button>'
-        + '<button class="btn btn-ghost" id="wh-cancel">Cancel</button>'
         + '<span id="wh-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'wh-modal', maxWidth: 460, noClose: true });
-    document.getElementById('wh-cancel')?.addEventListener('click', () => App.closeModal('wh-modal'));
     document.getElementById('wh-save')?.addEventListener('click', async () => {
       const v = document.getElementById('wh-date')?.value;
       const err = document.getElementById('wh-err');
@@ -626,11 +624,9 @@ S.LaborStaffRoster = {
         + '<textarea id="cert-notes" class="notes-ta" rows="2" placeholder="Optional context">' + esc(c?.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="cert-save">' + (this.certEditId ? 'Update' : 'Save Certification') + '</button>'
-        + '<button class="btn btn-ghost" id="cert-cancel">Cancel</button>'
         + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'cert-modal', maxWidth: 540, noClose: true });
-    document.getElementById('cert-cancel')?.addEventListener('click', () => { this.certEditId = null; App.closeModal('cert-modal'); });
     document.getElementById('cert-save')?.addEventListener('click', () => this.saveCert(staffId));
   },
 
@@ -733,11 +729,9 @@ S.LaborStaffRoster = {
         + '<textarea id="note-text" rows="5" placeholder="What happened, when, who was around, what was said. Specifics matter if this becomes a personnel matter later.">' + esc(n?.text || '') + '</textarea></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="note-save">' + (this.noteEditId ? 'Update Note' : 'Save Note') + '</button>'
-        + '<button class="btn btn-ghost" id="note-cancel">Cancel</button>'
         + '<span id="note-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'note-modal', maxWidth: 540, noClose: true });
-    document.getElementById('note-cancel')?.addEventListener('click', () => { this.noteEditId = null; this._noteOnSaved = null; App.closeModal('note-modal'); });
     document.getElementById('note-save')?.addEventListener('click', () => this.saveNote(staffId));
   },
 

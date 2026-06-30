@@ -159,14 +159,12 @@ S.LaborPositions = {
       + this.formBody(item, 'lpe-', true)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="lpe-save">Update</button>'
-      + '<button class="btn btn-ghost" id="lpe-cancel">Cancel</button>'
       + '<span id="lpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="lpe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'lp-edit-modal', maxWidth: 540, noClose: true });
     this.wireTipFields('lpe-');
     document.getElementById('lpe-save')?.addEventListener('click', () => this.save('lpe-'));
-    document.getElementById('lpe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); });
     document.getElementById('lpe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); this.confirmDel(id); });
   },
 

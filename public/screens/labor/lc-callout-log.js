@@ -240,13 +240,11 @@ S.LaborCalloutLog = {
       + this.formCells(c, 'coe-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="coe-save">Update</button>'
-      + '<button class="btn btn-ghost" id="coe-cancel">Cancel</button>'
       + '<span id="coe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="coe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'co-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('coe-save')?.addEventListener('click', () => this.save('coe-'));
-    document.getElementById('coe-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); });
     document.getElementById('coe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('co-edit-modal'); this.confirmDel(id); });
     ['coe-staff', 'coe-date', 'coe-coveredby'].forEach(eid =>
       document.getElementById(eid)?.addEventListener('change', () => this.updateSchedNote('coe-')));

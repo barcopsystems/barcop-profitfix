@@ -858,14 +858,12 @@ S.LaborTipLog = {
       + this.formBody(x, 'tle-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tle-save">Update</button>'
-        + '<button class="btn btn-ghost" id="tle-cancel">Cancel</button>'
         + '<span id="tle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
     this.wireForm(x, 'tle-');
     document.getElementById('tle-save')?.addEventListener('click', () => this.save('tle-'));
-    document.getElementById('tle-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); });
     document.getElementById('tle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); this.confirmDel(id); });
   },
 
@@ -1310,7 +1308,6 @@ S.LaborTipLog = {
       + '</div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tpe-save">Update</button>'
-        + '<button class="btn btn-ghost" id="tpe-cancel">Cancel</button>'
         + '<span id="tpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tpe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
@@ -1340,7 +1337,6 @@ S.LaborTipLog = {
     document.getElementById('tpe-pool')?.addEventListener('input', () => { this._peAmount = document.getElementById('tpe-pool')?.value || ''; this.recalcPoolEdit(); });
     document.getElementById('tpe-date')?.addEventListener('change', e => { this._peDate = e.target.value || this._peDate; });
     document.getElementById('tpe-save')?.addEventListener('click', () => this.savePoolEdit());
-    document.getElementById('tpe-cancel')?.addEventListener('click', () => { this._peEditId = null; App.closeModal('tp-edit-modal'); });
     document.getElementById('tpe-del')?.addEventListener('click', () => { const id = this._peEditId; this._peEditId = null; App.closeModal('tp-edit-modal'); this.confirmDelPool(id); });
     this.recalcPoolEdit();
   },

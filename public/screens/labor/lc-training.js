@@ -411,7 +411,6 @@ S.LaborTraining = {
       + '<div id="tr-a-info" style="font-size:12px;color:var(--t3);margin-top:2px;"></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tr-a-save">Assign</button>'
-        + '<button class="btn btn-ghost" id="tr-a-cancel">Cancel</button>'
         + '<span id="tr-a-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'tr-assign-modal', maxWidth: 540, noClose: true });
@@ -432,7 +431,6 @@ S.LaborTraining = {
       syncInfo();
     });
     syncInfo();
-    document.getElementById('tr-a-cancel')?.addEventListener('click', () => App.closeModal('tr-assign-modal'));
     document.getElementById('tr-a-save')?.addEventListener('click', () => this.saveAssign(staffId, onSaved));
   },
 
@@ -485,7 +483,6 @@ S.LaborTraining = {
         + '<textarea id="tr-rec-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(rec.notes || '') + '</textarea></div></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tr-rec-save">Save</button>'
-        + '<button class="btn btn-ghost" id="tr-rec-cancel">Cancel</button>'
         + '<span id="tr-rec-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tr-rec-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
@@ -524,7 +521,6 @@ S.LaborTraining = {
       it.done_date = it.done ? App.todayLocal() : '';
       body.innerHTML = this._recBodyHTML();
     });
-    document.getElementById('tr-rec-cancel')?.addEventListener('click', () => App.closeModal('tr-rec-modal'));
     document.getElementById('tr-rec-save')?.addEventListener('click', () => this.saveRecord(staffId, recId, onSaved));
     document.getElementById('tr-rec-del')?.addEventListener('click', () => this.confirmDelRecord(recId, staffId, onSaved, true));
   },

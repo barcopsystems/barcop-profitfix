@@ -288,9 +288,8 @@ S.LaborTipHistory = {
       + '</div>'
       + '<div style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + '<div class="card-actions no-print"><button class="btn btn-ghost" id="th-pview-close">Close</button></div></div>';
+      + '</div>';
     App.openModal(html, { id: 'th-pview-modal', maxWidth: 520, noClose: true });
     document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: document.getElementById('th-pview-card') }));
-    document.getElementById('th-pview-close')?.addEventListener('click', () => App.closeModal('th-pview-modal'));
   }
 };

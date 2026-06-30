@@ -341,7 +341,6 @@ S.LaborReports = {
       + '<div id="dv-em-cost" style="font-size:11px;color:var(--t3);margin-top:8px;"></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="dv-em-save">Save</button>'
-        + '<button class="btn btn-ghost" id="dv-em-cancel">Cancel</button>'
         + '<span id="dv-em-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'dv-edit-modal', maxWidth: 540, noClose: true });
@@ -354,7 +353,6 @@ S.LaborReports = {
     };
     updateCost();
     hoursInp?.addEventListener('input', updateCost);
-    document.getElementById('dv-em-cancel')?.addEventListener('click', () => App.closeModal('dv-edit-modal'));
     document.getElementById('dv-em-save')?.addEventListener('click', async () => {
       const newHours = parseFloat(hoursInp?.value);
       const err = document.getElementById('dv-em-err');
@@ -496,10 +494,8 @@ S.LaborReports = {
       + bodyRows
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
-        + '<button class="btn btn-ghost" id="ws-em-cancel">Cancel</button>'
       + '</div></div>';
     App.openModal(html, { id: 'ws-edit-modal', maxWidth: 600, noClose: true });
-    document.getElementById('ws-em-cancel')?.addEventListener('click', () => App.closeModal('ws-edit-modal'));
     document.getElementById('ws-em-save')?.addEventListener('click', async () => {
       const edits = [];
       document.querySelectorAll('#ws-edit-modal .wsem-line[data-id]').forEach(row => {
