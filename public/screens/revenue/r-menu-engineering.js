@@ -41,8 +41,9 @@ S.RevenueMenuEngineering = {
   suggested(item, cost) {
     const tgt = this.targetPctFor(item);
     if (!tgt || !(cost > 0) || !(item.price > 0)) return null;
-    const sp = Math.round((cost / (tgt / 100)) * 100) / 100;
-    return sp > item.price + 0.01 ? sp : null;
+    const exact = cost / (tgt / 100);                 // the precise to-target price
+    if (exact <= item.price + 0.01) return null;      // at/under target → no raise
+    return Math.ceil(exact * 4) / 4;                  // round UP to the nearest quarter (a real menu price)
   },
 
   showHowTo() {
@@ -100,7 +101,9 @@ S.RevenueMenuEngineering = {
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
     };
 
-    let upside = 0, repriceCount = 0;
+    const cands = this.batchCandidates();
+    const repriceCount = cands.length;
+    const upside = cands.reduce((s, c) => s + (c.dwk || 0), 0);
     const unranked = [];
 
     // Build the prescription cells (Suggested, Delta/wk, Action) for one item.
@@ -111,7 +114,6 @@ S.RevenueMenuEngineering = {
       const planned = (i.planned_price > 0) ? i.planned_price : null;
       const eff = planned || sugg;
       const isDog = quad === 'DOG';
-      if (sugg && !isDog && !planned) { upside += (sugg - i.price) * i.weekly_covers; repriceCount++; }
 
       let suggCell;
       if (planned) suggCell = '<span style="color:var(--gold);font-weight:600;">Planned ' + f(planned) + '</span>';
@@ -132,13 +134,19 @@ S.RevenueMenuEngineering = {
       return { suggCell, dwkCell, action };
     };
 
-    // First section heading carries the Export button (covers every section).
-    let exportPlaced = false;
+    // First section heading carries the bulk actions: Reprice to Target then
+    // Export PDF (both cover every section).
+    let actionsPlaced = false;
     const heading = label => {
-      const btn = exportPlaced ? '' : '<button class="btn btn-ghost btn-sm no-print" id="me-export">Export PDF</button>';
-      exportPlaced = true;
+      let btns = '';
+      if (!actionsPlaced) {
+        btns = (repriceCount > 0 ? '<button class="btn btn-primary btn-sm no-print" id="me-batch" style="margin-right:8px;">Reprice to Target (' + repriceCount + ')</button>' : '')
+          + '<button class="btn btn-ghost btn-sm no-print" id="me-export">Export PDF</button>';
+        actionsPlaced = true;
+      }
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
-        + '<div class="sh" style="margin:0;">' + esc(label) + '</div>' + btn + '</div>';
+        + '<div class="sh" style="margin:0;">' + esc(label) + '</div>'
+        + '<div style="display:flex;align-items:center;flex-shrink:0;">' + btns + '</div></div>';
     };
 
     const colgroup = '<colgroup><col style="width:190px;"/><col style="width:140px;"/><col/><col/><col/><col style="width:170px;"/></colgroup>';
@@ -196,11 +204,8 @@ S.RevenueMenuEngineering = {
     const avgCostPct = items.reduce((s, i) => s + (i.cost / i.price * 100), 0) / items.length;
     const plannedCount = items.filter(i => i.planned_price > 0).length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    const actionsRow = (repriceCount > 0 || plannedCount > 0)
-      ? '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-        + (repriceCount > 0 ? '<button class="btn btn-primary btn-sm" id="me-batch">Reprice to Target (' + repriceCount + ')</button>' : '')
-        + (plannedCount > 0 ? '<button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button>' : '')
-        + '</div>'
+    const actionsRow = (plannedCount > 0)
+      ? '<div class="no-print" style="margin-top:14px;"><button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button></div>'
       : '';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calcItem('Items Analyzed', items.length)
