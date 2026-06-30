@@ -359,7 +359,7 @@ S.Dashboard = {
   outlierStrip() {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
-      + '<button class="btn btn-ghost btn-sm" data-go="profit-forecast">Profit Forecast</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="sales-integrity">Sales Integrity</button>'
       + '<button class="btn btn-ghost btn-sm" data-go="recipe-cost-analysis">Recipe Summary</button>'
       + '</div>';
   },
