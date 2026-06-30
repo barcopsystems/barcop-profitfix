@@ -162,7 +162,7 @@ S.HubPermits = {
       +   '<div class="f" style="width:150px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
       +   '<div class="f" style="width:110px;"><label>Last Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hpa-cost" step="0.01" min="0" placeholder="0.00"/></div></div>'
       + '</div>'
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hpa-notes" placeholder="Issuing agency, account number, contact"></textarea></div></div>'
+      + App.noteField({ id: 'hpa-notes', placeholder: 'Issuing agency, account number, contact' })
       + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + headsUpInside
       + '</div>'
@@ -358,18 +358,16 @@ S.HubPermits = {
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
       +   '<div class="f"><label>Last Renewed</label><input type="date" id="hp-f-last" value="' + esc(rec.last_renewed || '') + '"/></div>'
       +   '<div class="f"><label>Last Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hp-f-cost" step="0.01" min="0" value="' + esc(rec.cost === '' ? '' : String(rec.cost || '')) + '" placeholder="0.00"/></div></div>'
-      +   '<div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="hp-f-notes" placeholder="Issuing agency, account number, contact">' + esc(rec.notes || '') + '</textarea></div>'
       + '</div>'
+      + App.noteField({ id: 'hp-f-notes', value: rec.notes, placeholder: 'Issuing agency, account number, contact' })
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="hp-save">' + (isEdit ? 'Save Changes' : 'Add Permit') + '</button>'
-      +   '<button class="btn btn-ghost" id="hp-cancel">Cancel</button>'
       +   '<span id="hp-f-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
       +   (isEdit ? '<button class="btn btn-danger" id="hp-modal-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
     const showErr = (m) => { const e = document.getElementById('hp-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
-    document.getElementById('hp-cancel')?.addEventListener('click', () => App.closeModal(id));
     if (isEdit) document.getElementById('hp-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
     document.getElementById('hp-save')?.addEventListener('click', async () => {
       const name         = (document.getElementById('hp-f-name')?.value || '').trim();
@@ -418,13 +416,11 @@ S.HubPermits = {
       + '</div>'
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="hp-r-go">Log Renewal</button>'
-      +   '<button class="btn btn-ghost" id="hp-r-cancel">Cancel</button>'
       +   '<span id="hp-r-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
     const showErr = (m) => { const e = document.getElementById('hp-r-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
-    document.getElementById('hp-r-cancel')?.addEventListener('click', () => App.closeModal(id));
     document.getElementById('hp-r-go')?.addEventListener('click', async () => {
       const renewedOn = document.getElementById('hp-r-renewed')?.value || '';
       const nextRen   = document.getElementById('hp-r-next')?.value || '';

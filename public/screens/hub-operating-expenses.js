@@ -402,7 +402,7 @@ S.HubOperatingExpenses = {
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring monthly bill (same cost each month)</label></div>'
         + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for a bill that ends after a fixed number of payments.</div></div></div></div>'
-        + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oexa-notes" placeholder="Optional context for the bookkeeper"></textarea></div></div>'
+        + App.noteField({ id: 'oexa-notes', placeholder: 'Optional context for the bookkeeper' })
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
@@ -655,17 +655,15 @@ S.HubOperatingExpenses = {
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + recurHtml
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea class="notes-ta" rows="2" id="oex-f-notes" placeholder="Optional context for the bookkeeper">' + esc(rec.notes || '') + '</textarea></div></div>'
+      + App.noteField({ id: 'oex-f-notes', value: rec.notes, placeholder: 'Optional context for the bookkeeper' })
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="oex-save">' + (isEdit ? 'Save Changes' : 'Add Expense') + '</button>'
-      +   '<button class="btn btn-ghost" id="oex-cancel">Cancel</button>'
       +   '<span id="oex-f-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
       +   (isEdit ? '<button class="btn btn-danger" id="oex-modal-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
     const showErr = (m) => { const e = document.getElementById('oex-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
-    document.getElementById('oex-cancel')?.addEventListener('click', () => App.closeModal(id));
     if (isEdit) document.getElementById('oex-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
     document.getElementById('oex-f-recurring')?.addEventListener('change', (e) => {
       const w = document.getElementById('oex-f-term-wrap');
