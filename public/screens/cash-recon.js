@@ -92,10 +92,10 @@ S.CashRecon = {
     }).join('') || '<tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No drawer counts in this range. Pick a wider range above.</td></tr>';
 
     return (heading ? '<div class="sh" style="margin:22px 0 10px;">' + heading + '</div>' : '')
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:560px;">'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + this.COLGROUP
       + '<thead><tr><th>' + firstLabel + '</th><th>Counts</th><th>Short</th><th>Net Over / Short</th><th>Short Rate</th><th>Status</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div></div>';
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   render(container, actions) {
