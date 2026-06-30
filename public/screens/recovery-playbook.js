@@ -1204,7 +1204,7 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Here is the map. Every gap, where you capture it, where Bar Cop shows it to you, and where you fix it. Tap any Fix button to jump straight there.' },
             { t: 'cross', rows: [
               { leak: 'Menu mix', capture: 'Menu Items recipes and costs', show: 'Menu Engineering + Dog Test Tracker', fixLabel: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
-              { leak: 'Pricing', capture: 'Menu Items costs by ingredient', show: 'Price Calculator + Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
+              { leak: 'Pricing', capture: 'Menu Items costs by ingredient', show: 'Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
               { leak: 'Labor cost', capture: 'Build Schedule + Revenue Forecast', show: 'Labor History + Overtime Watch', fixLabel: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
               { leak: 'Labor productivity', capture: 'Build Schedule hours against the week', show: 'This Week revenue per labor hour', fixLabel: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
               { leak: 'Check average', capture: 'Server Check covers and sales', show: 'Server Check scorecard', fixLabel: 'Check Average system', screen: 'r-fix', focus: 'check-average' },
@@ -1299,13 +1299,13 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Most operators do not have a pricing strategy, they have a pricing history. Prices were set at opening, nudged when costs got painful, and otherwise left alone because raising feels risky. Reactive pricing always lags the cost curve. The fix is a quarterly review on a fixed calendar that catches the increase in April instead of finding it on the May statement.' },
             { t: 'p', text: 'Do not price off the bar down the street. Their supplier discount, their lease, their prep cook are not yours. Their 16 dollar burger hits 28 percent food cost; yours at 16 might hit 34. Price to your own cost floor: ingredient cost divided by your target food-cost percent. And guest resistance is wildly overestimated. A surgical 1 to 2 dollar bump on a mid-menu item during a normal reprint almost never gets noticed. The 1.50 you are afraid to add is real money every year you do not.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'Menu Items holds your real ingredient costs and shows the price floor for every item. The Price Calculator runs a proposed change and shows the break-even before you print. Menu Engineering hands you the plowhorse list that should go through pricing first.' },
-            { t: 'go', label: 'Price Calculator', screen: 'r-price-calc' },
+            { t: 'p', text: 'Menu Items holds your real ingredient costs and shows the price floor for every item. Menu Engineering hands you the plowhorse list that should go through pricing first, and its Reprice step runs a proposed change and shows the break-even before you print.' },
+            { t: 'go', label: 'Menu Engineering', screen: 'r-menu-engineering' },
             { t: 'go', label: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [
               'Run the price floor on every item where ingredient costs moved since the last review. Flag anything below floor.',
-              'Run each plowhorse through the Price Calculator at a 1.50 to 3 dollar increase before you decide.',
+              'Run each plowhorse through Menu Engineering Reprice at a 1.50 to 3 dollar increase before you decide.',
               'Review quarterly on a fixed calendar, and any time a supplier raises a high-volume item more than 8 percent.',
               'Price spirits, wine, draft, and food on their own math. They are not the same category.',
               'Close the review with a written list and a target print date. An intention to reprice the salmon is not a review.'
