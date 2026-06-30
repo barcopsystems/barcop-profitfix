@@ -450,7 +450,7 @@ S.VendorTracker = {
   openDiscrepancyModal(opts) {
     opts = opts || {};
     this._vd = { prefill: opts.prefill || {}, onClose: opts.onClose || null, onFiled: opts.onFiled || null };
-    App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 640, noClose: true });
+    App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 700, noClose: true });
     this._renderVdBody(opts.discrepancyId || null);
   },
   _vdClose() {
@@ -550,7 +550,7 @@ S.VendorTracker = {
       + statusBlock
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Notes</label>'
       + '<textarea id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(r.notes || '') + '</textarea></div>'
-      + '<div class="card-actions">' + actions
+      + '<div class="card-actions" style="flex-wrap:wrap;">' + actions
       + '<button class="btn btn-ghost" id="vdm-close">Close</button>'
       + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
 
