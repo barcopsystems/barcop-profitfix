@@ -365,13 +365,17 @@ S.Hub = {
       const due = [];
       if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'this-week',   mod: 'profit'  });
       if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'r-this-week', mod: 'revenue' });
-      const dueRows = due.length
+      const importRow = '<div onclick="S.ImportWeek.open()" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
+            + '<span style="width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;"></span>'
+            + '<span style="flex:1;min-width:0;">Import this week\'s POS reports</span>'
+            + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>';
+      const dueRows = importRow + (due.length
         ? due.slice(0, 3).map(it =>
             '<div onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
             + '<span style="width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0;"></span>'
             + '<span style="flex:1;min-width:0;">' + esc(it.text) + '</span>'
             + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>').join('')
-        : '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t3);"><span style="color:var(--green);font-weight:800;">&#10003;</span> You are current this week</div>';
+        : '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t3);"><span style="color:var(--green);font-weight:800;">&#10003;</span> You are current this week</div>');
       whatsDueRight = '<div style="flex:1 1 16px;min-width:0;"></div>' + statDiv
         + '<div style="flex:0 0 230px;min-width:190px;">'
         +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">What\'s Due</div>'
