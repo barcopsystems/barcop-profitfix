@@ -17,7 +17,7 @@ S.Dashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Profit. Profit Recovery is about margin: where the cost of your pours, plates, and the rest is eating money you already earned. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
-      { h: 'Where You Stand', p: ['Up top is the Recovery Scoreboard: what Bar Cop has measured you put back in the register since you marked each fix in. It is realized to date, not a projection, and a figure shows once two weeks of after-data land. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
+      { h: 'Where You Stand', p: ['Up top is Where You Stand: the recoverable profit your latest audit found, what you have put back so far once your fixes are measured, and your pour, food, and prime cost for the week against target. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
       { h: 'The Steps', p: ['1. Enter this week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board, about monthly, flagged here when it is due.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
@@ -98,7 +98,7 @@ S.Dashboard = {
     const insightsBtn = '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
-      + (hasData && window.FixPanel ? FixPanel._scoreboardCard('profit', insightsBtn) : '')
+      + (hasData ? this.whereYouStand(insightsBtn) : '')
       + this.getStartedBox()
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
@@ -110,6 +110,62 @@ S.Dashboard = {
 
     if (window.FixPanel) FixPanel.wireFixAreas(container);   // scoreboard loop steps + leak-board rows
     this.wire();
+  },
+
+  // ── Where You Stand (the profit money card, modeled on Cash Recovery) ─────────
+  // Hero = the recoverable-profit opportunity from the latest audit; a recovered-
+  // so-far line; then a cost-health strip (pour / food / prime vs target) plus the
+  // Profit Forecast, the profit parallel of Cash's runway read. Color = meaning.
+  whereYouStand(insightsBtn) {
+    const s = (window.Recovery && Recovery.moduleSummary) ? Recovery.moduleSummary('profit') : { recovered: 0, withFigure: 0, logged: 0 };
+    const latestAudit = App.latestEvent ? App.latestEvent(this.audits()) : null;
+    const monthly = latestAudit ? (latestAudit.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
+    const annual = monthly * 12;
+
+    let heroBody;
+    if (!latestAudit) {
+      heroBody = '<div style="font-size:13px;color:var(--t2);line-height:1.6;padding:2px 0;">Run your first Profit audit and Bar Cop reads the margin you can win back, where pours, plates, and labor are eating profit you already earned.</div>';
+    } else if (annual > 0) {
+      heroBody = '<div style="padding:2px 0;"><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--gold);">' + App.fmtCurrency(annual, 0) + '</span>'
+        + '<span style="font-size:13px;color:var(--t2);">in recoverable profit a year</span></div></div>';
+    } else {
+      heroBody = '<div style="padding:2px 0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--t1);">All clear</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Your latest audit found no dollar leaks worth chasing right now. Margins are holding.</div></div>';
+    }
+
+    const recoveredLine = s.withFigure > 0
+      ? '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(s.recovered, 0) + '</span> recovered so far, across ' + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es') + '.</span>'
+      : '<span style="color:var(--t3);">Recovered profit builds here as you work fixes and log your weeks.</span>';
+
+    return '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>' + insightsBtn + '</div>'
+      + heroBody
+      + '<div style="font-size:12px;color:var(--t3);margin-top:10px;padding-bottom:2px;">' + recoveredLine + '</div>'
+      + this.costStrip()
+      + '</div>';
+  },
+
+  // The profit parallel of Cash's survival strip: pour, food, and prime cost for
+  // the latest logged week, each against its target. Color = meaning only.
+  costStrip() {
+    const latest = App.latestEvent ? App.latestEvent(this.weeks()) : null;
+    const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Costs Stand</div>'
+      + inner + '</div>';
+    if (!latest) {
+      return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Log a week of sales and costs and Bar Cop shows your pour, food, and prime cost against target right here.</div>');
+    }
+    const rows = this._costRows(latest);
+    const mini = (label, r) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (r.val == null ? 'var(--t3)' : r.over ? 'var(--red)' : 'var(--green)') + ';">' + (r.val == null ? '-' : App.fmtPct(r.val)) + '</div>'
+      + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">target ' + App.fmtPct(r.tgt) + '</div></div>';
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+      + mini('Bar Pour Cost', rows[0]) + vdiv + mini('Food Cost', rows[1]) + vdiv + mini('Prime Cost', rows[2])
+      + '</div>'
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="profit-forecast">Profit Forecast</button></div>');
   },
 
   // ── Get Started: run your first audit + the Control sections that feed Recovery.
