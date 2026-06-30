@@ -94,26 +94,16 @@ const DashUI = {
     }));
   },
 
-  // Shared Insights modal shell (Bar Cop Briefing style): title left, Close
-  // top-right, overlay + Esc to close. Opens only when the text is ready.
+  // Shared briefing modal for the Control + Recovery cockpits, routed through the
+  // standard App.openModal (navy backdrop, corner X, inset header, 18px padding).
   insightsModal(label, bodyHtml, generated_at) {
     const dateStr = generated_at ? this._insDate(generated_at) : '';
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:var(--r);padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
-    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + (label || 'Bar Cop Briefing') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
-      + '<button class="btn btn-ghost btn-sm db-ins-close">Close</button></div>'
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">' + (label || 'Bar Cop Briefing') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
-      + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. A weekly read, refreshes once a week. Not financial or business advice.</div>' : '');
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.db-ins-close')?.addEventListener('click', close);
-    const onKey = e => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
+      + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. A weekly read, refreshes once a week. Not financial or business advice.</div>' : '')
+      + '</div>';
+    App.openModal(html, { id: 'db-insights-modal', maxWidth: 620 });
   },
 
   // ── Weekly Insights cache (once a week per recovery section) ──────────────
