@@ -4849,7 +4849,7 @@ const App = {
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
-      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
+      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
         + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
         + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
