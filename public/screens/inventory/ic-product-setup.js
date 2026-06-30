@@ -568,7 +568,7 @@ S.InventoryProducts = {
             + '</select></div>';
         })();
 
-    const row1 = '<div class="form-grid" style="align-items:start;">'
+    const row1 = '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:start;">'
       + '<div class="f"><label>Product Name</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Brand</label>'
@@ -685,7 +685,7 @@ S.InventoryProducts = {
         + '</div></div>';
     }
 
-    const formCard = '<div class="card form-card">'
+    const formCard = '<div class="card form-card narrow-form">'
       + header
       + row1
       + row2
@@ -700,7 +700,7 @@ S.InventoryProducts = {
     + '</div>';
     // Popup over the products list (which stays mounted behind), instead of
     // swapping the whole page out. The corner X closes it (and re-renders the landing).
-    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 540, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
 
     this._wireForm();
   },
