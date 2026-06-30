@@ -186,13 +186,13 @@ S.EventsPricing = {
     const perHeadPrice = (g('rpc-food') > 0 && tgt > 0) ? g('rpc-food') / (tgt / 100) : 0;
     const totalRev = perHeadPrice * guests;
     const margin = totalRev - totalCost;
-    const box = (label, val, gold) => '<div style="background:var(--input);border-radius:6px;padding:10px 12px;' + (gold ? 'border:1px solid var(--gold-tint-bord);' : '') + '"><div style="font-size:10px;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:' + (gold ? '20px' : '16px') + ';font-weight:' + (gold ? '800' : '700') + ';color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
-    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;">'
-      + box('Total Cost', App.fmtCurrency(totalCost))
-      + box('Cost Per Head', App.fmtCurrency(perHeadCost))
-      + box('Suggested Per Head', App.fmtCurrency(perHeadPrice), true)
-      + box('Total Event Revenue', App.fmtCurrency(totalRev))
-      + box('Gross Margin', App.fmtCurrency(margin))
+    const item = (label, val, gold) => '<div style="min-width:0;"><div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;color:' + (gold ? 'var(--gold)' : 'var(--t3)') + ';">' + label + '</div><div style="font-size:14px;font-weight:700;color:' + (gold ? 'var(--gold)' : 'var(--t1)') + ';">' + val + '</div></div>';
+    el.innerHTML = '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:12px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;">'
+      + item('Total Cost', App.fmtCurrency(totalCost))
+      + item('Cost / Head', App.fmtCurrency(perHeadCost))
+      + item('Suggested / Head', App.fmtCurrency(perHeadPrice), true)
+      + item('Event Revenue', App.fmtCurrency(totalRev))
+      + item('Gross Margin', App.fmtCurrency(margin))
       + '</div>';
   },
 
