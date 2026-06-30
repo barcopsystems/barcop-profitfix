@@ -83,7 +83,7 @@ window.Recovery = {
       fmt: v => v.toFixed(1) + '%'
     },
     'rplh': {
-      series: 'revenue_weeks', label: 'RPLH', lowerBetter: false,
+      series: 'revenue_weeks', label: 'RPLH', lowerBetter: false, noDollar: true,
       value: w => w.rplh_blended,
       base:  w => w.total_hours, baseKind: 'unit',
       target: () => { const t = Recovery._rtargets();
@@ -147,12 +147,12 @@ window.Recovery = {
       dollars += (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
       counted++;
     });
-    if (!counted) dollars = null;
+    if (m.noDollar || !counted) dollars = null;   // ratio metrics track as score-moved, not dollars
 
     // Forward run-rate from the CURRENT sustained rate, a labeled "on pace for".
     const improvement = m.lowerBetter ? (bAvg - cAvg) : (cAvg - bAvg);
     const recentBase = this._avg(recentMeasure.map(m.base));
-    const perWeek = (recentBase != null) ? ((m.baseKind === 'pts') ? (improvement / 100) * recentBase : improvement * recentBase) : null;
+    const perWeek = (!m.noDollar && recentBase != null) ? ((m.baseKind === 'pts') ? (improvement / 100) * recentBase : improvement * recentBase) : null;
     const dollarsAnnual = (perWeek != null) ? perWeek * 52 : null;
 
     return {
@@ -253,7 +253,9 @@ window.Recovery = {
       // Watch within 10% past target, Over beyond it — the same target
       // logic the Audit grades this metric by.
       band = (delta / tgt) <= 0.10 ? 'watch' : 'over';
-      dollars = (m.baseKind === 'pts')
+      // noDollar metrics (e.g. RPLH, a productivity ratio) render as a Review row,
+      // never a dollar: dollarizing a ratio overstates and double-counts labor.
+      if (!m.noDollar) dollars = (m.baseKind === 'pts')
         ? Math.abs(App.dollarize(cur, tgt, base * 52).annual)
         : delta * base * 52;
     }
