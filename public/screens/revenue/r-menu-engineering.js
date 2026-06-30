@@ -69,6 +69,8 @@ S.RevenueMenuEngineering = {
     c.querySelectorAll('.me-marklive').forEach(b => b.addEventListener('click', () => this.markLive(b.dataset.id)));
     c.querySelectorAll('.me-cancelplan').forEach(b => b.addEventListener('click', () => this.cancelPlanned(b.dataset.id)));
     c.querySelectorAll('.me-dogtest').forEach(b => b.addEventListener('click', () => { App._dogTestPreselect = b.dataset.id; App.navigate('r-dog-test'); }));
+    document.getElementById('me-batch')?.addEventListener('click', () => this.openBatch());
+    document.getElementById('me-marklive-all')?.addEventListener('click', () => this.markAllLive());
     document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
   },
 
@@ -189,10 +191,17 @@ S.RevenueMenuEngineering = {
         + '<tbody>' + urows + '</tbody></table></div>';
     }
 
-    // ── Stat box — menu-wide rollups + the reprice headline ────────────────────
+    // ── Stat box — menu-wide rollups + the reprice headline + bulk actions ─────
     const avgCMall = items.reduce((s, i) => s + (i.price - i.cost), 0) / items.length;
     const avgCostPct = items.reduce((s, i) => s + (i.cost / i.price * 100), 0) / items.length;
+    const plannedCount = items.filter(i => i.planned_price > 0).length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
+    const actionsRow = (repriceCount > 0 || plannedCount > 0)
+      ? '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
+        + (repriceCount > 0 ? '<button class="btn btn-primary btn-sm" id="me-batch">Reprice to Target (' + repriceCount + ')</button>' : '')
+        + (plannedCount > 0 ? '<button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button>' : '')
+        + '</div>'
+      : '';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calcItem('Items Analyzed', items.length)
       + calcItem('Avg Cost %', avgCostPct.toFixed(1) + '%')
@@ -200,6 +209,7 @@ S.RevenueMenuEngineering = {
       + calcItem('Weekly Upside', '<span style="color:var(--gold);">+' + f(upside) + '</span>')
       + '</div>'
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:12px;">Weekly Upside is what repricing every over-target item to its margin target would add each week, if volume holds. Work it item by item, or plan the whole menu and mark it live when the new prices roll out.</div>'
+      + actionsRow
       + '</div>';
 
     return '<div id="me-export-root">' + statBox + cards + unrankedCard + '</div>';
@@ -320,6 +330,121 @@ S.RevenueMenuEngineering = {
     if (!item) return;
     item.planned_price = null; item.planned_at = null;
     App.saveKey('menu_items').then(() => this.draw());
+  },
+
+  // ── Reprice to Target — the batch "engineer the whole menu" pass ─────────────
+  // Item ids classified as Dog in their own category, excluded from bulk reprice
+  // (Dogs go to the Dog Test, not a blind price bump).
+  _dogIds() {
+    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers);
+    const byCat = {}; items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
+    const dogs = new Set();
+    Object.values(byCat).forEach(list => {
+      if (list.length < this.MIN_PER_CAT) return;
+      const avgCM = list.reduce((s, i) => s + (i.price - i.cost), 0) / list.length;
+      const avgCovers = list.reduce((s, i) => s + i.weekly_covers, 0) / list.length;
+      list.forEach(i => { if ((i.price - i.cost) < avgCM && i.weekly_covers < avgCovers) dogs.add(i.id); });
+    });
+    return dogs;
+  },
+
+  // Over-target, not-yet-planned, non-Dog items (the suggestions). References the
+  // live stored items so apply can mutate them in place.
+  batchCandidates() {
+    const dogs = this._dogIds();
+    const out = [];
+    (App.data.menu_items || []).forEach(item => {
+      if (!(item.price > 0 && item.weekly_covers > 0)) return;
+      if (item.planned_price > 0) return;
+      if (dogs.has(item.id)) return;
+      const cost = App.menuItemCost(item) || 0;
+      const sugg = this.suggested(item, cost);
+      if (!sugg) return;
+      out.push({ item, cost, sugg, dwk: (sugg - item.price) * item.weekly_covers });
+    });
+    return out;
+  },
+
+  openBatch() {
+    const cands = this.batchCandidates();
+    if (!cands.length) return;
+    const f = v => App.fmtCurrency(v);
+    const byCat = {}; cands.forEach(c => { const k = c.item.category || 'Uncategorized'; (byCat[k] = byCat[k] || []).push(c); });
+    const catSort = (a, b) => { const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); };
+    let listHtml = '';
+    Object.keys(byCat).sort(catSort).forEach(cat => {
+      listHtml += '<div class="sh" style="margin:14px 0 4px;">' + esc(cat) + '</div>';
+      byCat[cat].forEach(c => {
+        listHtml += '<label style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--row-div);cursor:pointer;">'
+          + '<input type="checkbox" class="bc-check batch-chk" data-id="' + esc(c.item.id) + '" data-dwk="' + c.dwk + '" checked/>'
+          + '<span style="flex:1;min-width:0;font-size:13px;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.item.name) + '</span>'
+          + '<span style="font-size:12px;color:var(--t3);white-space:nowrap;">' + f(c.item.price) + ' &rarr; <span style="color:var(--t1);font-weight:600;">' + f(c.sugg) + '</span></span>'
+          + '<span style="font-size:12px;color:var(--gold);white-space:nowrap;min-width:78px;text-align:right;">+' + f(c.dwk) + '/wk</span>'
+          + '</label>';
+      });
+    });
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Reprice to Target</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Every item over its margin target, with the price that brings it back. Uncheck any you want to hold, then save them as your planned menu or roll them out live. Weekly numbers assume volume holds.</div>'
+      + '<div style="max-height:46vh;overflow:auto;margin-bottom:4px;">' + listHtml + '</div>'
+      + '<div id="batch-sum" style="font-size:13px;font-weight:700;color:var(--t1);padding-top:12px;border-top:1px solid var(--b2);"></div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="batch-plan">Save Checked as Planned</button>'
+      + '<button class="btn btn-ghost" id="batch-live">Mark Checked Live</button></div></div>';
+    App.openModal(html, { id: 'batch-modal', maxWidth: 640, onClose: () => App.closeModal('batch-modal') });
+    document.querySelectorAll('.batch-chk').forEach(c => c.addEventListener('change', () => this.batchSum()));
+    document.getElementById('batch-plan')?.addEventListener('click', () => this.applyBatch(false));
+    document.getElementById('batch-live')?.addEventListener('click', () => this.applyBatch(true));
+    this.batchSum();
+  },
+
+  batchSum() {
+    const checked = [...document.querySelectorAll('.batch-chk')].filter(c => c.checked);
+    const total = checked.reduce((s, c) => s + (parseFloat(c.dataset.dwk) || 0), 0);
+    const el = document.getElementById('batch-sum');
+    if (el) el.textContent = checked.length + ' item' + (checked.length === 1 ? '' : 's') + ' selected, +' + App.fmtCurrency(total) + '/wk if volume holds';
+    const live = document.getElementById('batch-live'), plan = document.getElementById('batch-plan');
+    if (live) live.disabled = !checked.length;
+    if (plan) plan.disabled = !checked.length;
+  },
+
+  async applyBatch(live) {
+    const ids = [...document.querySelectorAll('.batch-chk')].filter(c => c.checked).map(c => c.dataset.id);
+    if (!ids.length) { App.closeModal('batch-modal'); return; }
+    const logs = [];
+    ids.forEach(id => {
+      const item = (App.data.menu_items || []).find(x => x.id === id);
+      if (!item) return;
+      const cost = App.menuItemCost(item) || 0;
+      const sugg = this.suggested(item, cost);
+      if (!sugg) return;
+      if (live) {
+        const old = item.price;
+        item.price = sugg; item.planned_price = null; item.planned_at = null;
+        if (old != null && old !== sugg) logs.push([item, old, sugg]);
+      } else {
+        item.planned_price = sugg; item.planned_at = new Date().toISOString();
+      }
+    });
+    await App.saveKey('menu_items');
+    for (const [item, old, np] of logs) await this._logPriceChange(item, old, np);
+    App.closeModal('batch-modal');
+    this.draw();
+  },
+
+  // Roll out every planned price at once (the new menu goes into service).
+  async markAllLive() {
+    const planned = (App.data.menu_items || []).filter(i => i.planned_price > 0);
+    if (!planned.length) return;
+    const ok = await App.confirm({ title: 'Mark all planned prices live?', message: planned.length + ' planned price' + (planned.length === 1 ? '' : 's') + ' will become your live menu prices now, and Bar Cop will log the change to Recovery. Do this the day the new menu actually goes into service.', confirmText: 'Mark All Live', cancelText: 'Not Yet' });
+    if (!ok) return;
+    const logs = [];
+    planned.forEach(item => {
+      const old = item.price, np = item.planned_price;
+      item.price = np; item.planned_price = null; item.planned_at = null;
+      if (old != null && old !== np) logs.push([item, old, np]);
+    });
+    await App.saveKey('menu_items');
+    for (const [item, old, np] of logs) await this._logPriceChange(item, old, np);
+    this.draw();
   },
 
   // Write the price-log + the pricing fix event, dated NOW (the real rollout).
