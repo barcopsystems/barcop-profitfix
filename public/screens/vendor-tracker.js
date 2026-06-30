@@ -498,7 +498,6 @@ S.VendorTracker = {
     const r = this.discRecords().find(x => x.id === discId);
     if (!r) { this._vdClose(); return; }
     const st = r.status || 'Open';
-    const iSt = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
 
     let statusBlock = '', actions = '';
     if (st === 'Open') {
@@ -546,8 +545,8 @@ S.VendorTracker = {
         + this._vdRow('Overcharge', App.fmtCurrency(r.overcharge || 0))
       + '</div>'
       + statusBlock
-      + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Notes</label>'
-      + '<textarea id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(r.notes || '') + '</textarea></div>'
+      + '<div class="f" style="margin-top:14px;margin-bottom:0;"><label>Notes</label>'
+      + '<textarea class="notes-ta" id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted">' + esc(r.notes || '') + '</textarea></div>'
       + '<div class="card-actions" style="flex-wrap:wrap;">' + actions
       + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
 
