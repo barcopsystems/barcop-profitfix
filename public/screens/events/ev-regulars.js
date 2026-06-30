@@ -39,7 +39,7 @@ S.EventsRegulars = {
     };
     const vipRow = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin:4px 0 14px;"><input type="checkbox" class="bc-check" id="' + p + '-vip"' + (r?.vip ? ' checked' : '') + '/> This customer is a VIP regular</label>';
     const prefs = '<div class="f" style="width:100%;margin-bottom:14px;"><label>Drink Preferences</label><input type="text" id="' + p + '-prefs" value="' + esc(r?.drink_prefs || '') + '" placeholder="Negroni, Tito\'s soda, no IPAs"/></div>';
-    const notes = '<div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + '-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
+    const notes = App.noteField({ id: p + '-notes', value: r?.notes });
     const rowClass = compact ? 'form-row eb-crow' : 'form-row';
     return '<div class="' + rowClass + '" style="gap:' + (compact ? '12' : '14') + 'px;flex-wrap:wrap;">' + C.name + C.phone + C.email + C.bday + C.anniv + C.visit + '</div>'
       + vipRow + prefs + notes;
@@ -158,9 +158,8 @@ S.EventsRegulars = {
   showEdit(id) {
     const r = this.regulars().find(x => x.id === id); if (!r) return;
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Regular</div>' + this.formCells(r, 'rge')
-      + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button><button class="btn btn-ghost" id="rge-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button></div></div>';
     App.openModal(html, { id: 'rg-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('rge-cancel')?.addEventListener('click', () => App.closeModal('rg-edit-modal'));
     document.getElementById('rge-save')?.addEventListener('click', async () => {
       const rec = this.collect('rge'); if (!rec.name) return;
       const list = this.regulars(); const i = list.findIndex(x => x.id === id);

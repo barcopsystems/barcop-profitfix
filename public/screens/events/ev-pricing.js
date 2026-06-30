@@ -106,12 +106,11 @@ S.EventsPricing = {
         + fld('Target Food Cost %', 'rpc-tgt', tgt, null, '%')
       + '</div>'
       + '<div id="rpc-result" style="margin-top:14px;"></div>'
-      + '<div class="card-actions"><button class="btn btn-ghost" id="rpc-close">Close</button></div></div>';
+      + '</div>';
     App.openModal(html, { id: 'rp-calc-modal', maxWidth: 680, noClose: true });
     ['rpc-guests', 'rpc-food', 'rpc-bar', 'rpc-hrs', 'rpc-wage', 'rpc-other', 'rpc-tgt'].forEach(id =>
       document.getElementById(id)?.addEventListener('input', () => this.calc()));
     this.calc();
-    document.getElementById('rpc-close')?.addEventListener('click', () => App.closeModal('rp-calc-modal'));
   },
 
   async addPackage() {
@@ -146,10 +145,8 @@ S.EventsPricing = {
         + '<div class="f" style="flex:1 1 110px;"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-room" value="' + v(r.room_fee) + '"/></div></div>'
         + '<div class="f" style="flex:1 1 110px;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-ph" step="0.01" value="' + v(r.per_head) + '"/></div></div>'
       + '</div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button>'
-      +   '<button class="btn btn-ghost" id="rpe-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button></div></div>';
     App.openModal(html, { id: 'rp-edit-modal', maxWidth: 680, noClose: true });
-    document.getElementById('rpe-cancel')?.addEventListener('click', () => App.closeModal('rp-edit-modal'));
     document.getElementById('rpe-save')?.addEventListener('click', () => this.saveEdit(id));
   },
 

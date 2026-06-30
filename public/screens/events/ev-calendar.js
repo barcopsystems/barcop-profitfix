@@ -192,14 +192,12 @@ S.EventsCalendar = {
       + '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:8px;">'
         + chk('menu', 'Menu locked') + chk('promo', 'Promo created') + chk('staffing', 'Staffing scheduled') + chk('reservations', 'Reservations open')
       + '</div>'
-      + '<div class="f" style="width:100%;"><label>Notes</label><textarea id="evcf-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>'
+      + App.noteField({ id: 'evcf-notes', value: e?.notes })
       + '<div class="card-actions"><button class="btn btn-primary" id="evcf-save">' + (id ? 'Save' : 'Add New Date') + '</button>'
-      +   '<button class="btn btn-ghost" id="evcf-cancel">Cancel</button>'
       +   (id ? '<button class="btn btn-danger" id="evcf-del" style="margin-left:auto;">Delete</button>' : '')
       +   '<span id="evcf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
     App.openModal(html, { id: 'evc-form', maxWidth: 560, noClose: true });
-    document.getElementById('evcf-cancel')?.addEventListener('click', () => App.closeModal('evc-form'));
     document.getElementById('evcf-save')?.addEventListener('click', () => this.save(id));
     document.getElementById('evcf-del')?.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;

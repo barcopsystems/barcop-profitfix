@@ -695,10 +695,8 @@ S.EventsBookings = {
   markLost(id) {
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Mark This Booking Lost</div>'
       + '<div class="f" style="width:100%;"><label>Reason (optional)</label><input type="text" id="eb-lost-reason" placeholder="Booked elsewhere, date conflict, over budget"/></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="eb-lost-save">Mark Lost</button>'
-      +   '<button class="btn btn-ghost" id="eb-lost-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="eb-lost-save">Mark Lost</button></div></div>';
     App.openModal(html, { id: 'eb-lost-modal', maxWidth: 520, noClose: true });
-    document.getElementById('eb-lost-cancel')?.addEventListener('click', () => App.closeModal('eb-lost-modal'));
     document.getElementById('eb-lost-save')?.addEventListener('click', async () => {
       const reason = document.getElementById('eb-lost-reason')?.value.trim() || '';
       App.closeModal('eb-lost-modal');
@@ -770,8 +768,7 @@ S.EventsBookings = {
         + fld('Target Food Cost %', 'qc-tgt', tgt, null, '%')
       + '</div>'
       + '<div id="qc-result" style="margin-top:14px;"></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="qc-apply">Apply to Quote</button>'
-      +   '<button class="btn btn-ghost" id="qc-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="qc-apply">Apply to Quote</button></div></div>';
     App.openModal(html, { id: 'eb-calc-modal', maxWidth: 680, noClose: true });
     const recompute = () => {
       const g = x => parseFloat(document.getElementById(x)?.value) || 0;
@@ -799,7 +796,6 @@ S.EventsBookings = {
     ['qc-guests', 'qc-food', 'qc-bar', 'qc-hrs', 'qc-wage', 'qc-other', 'qc-tgt'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', recompute));
     recompute();
-    document.getElementById('qc-cancel')?.addEventListener('click', () => App.closeModal('eb-calc-modal'));
     document.getElementById('qc-apply')?.addEventListener('click', () => {
       const r = recompute();
       App.closeModal('eb-calc-modal');
@@ -817,11 +813,9 @@ S.EventsBookings = {
       + '<div class="card-title">' + (id ? 'Edit Booking' : 'New Booking') + '</div>'
       + this.fieldsHtml(b, 'ebf')
       + '<div class="card-actions"><button class="btn btn-primary" id="ebf-save">' + (id ? 'Save Booking' : 'Create Booking') + '</button>'
-      +   '<button class="btn btn-ghost" id="ebf-cancel">Cancel</button>'
       +   '<span id="ebf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
     App.openModal(html, { id: 'eb-form', maxWidth: 540, noClose: true });
-    document.getElementById('ebf-cancel')?.addEventListener('click', () => App.closeModal('eb-form'));
     document.getElementById('ebf-save')?.addEventListener('click', () => this.saveForm(id));
   },
 
@@ -921,10 +915,8 @@ S.EventsBookings = {
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(this.title(b)) + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin:2px 0 14px;">' + sub + '</div>'
       + this.runSheetFields(b)
-      + '<div class="card-actions"><button class="btn btn-primary" id="rs-save">Save Run Sheet</button>'
-      +   '<button class="btn btn-ghost" id="rs-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rs-save">Save Run Sheet</button></div></div>';
     App.openModal(html, { id: 'eb-runsheet-modal', maxWidth: 700, noClose: true });
-    document.getElementById('rs-cancel')?.addEventListener('click', () => App.closeModal('eb-runsheet-modal'));
     document.getElementById('rs-save')?.addEventListener('click', async () => {
       await this.patch(id, this.collectRunSheet());
       App.closeModal('eb-runsheet-modal');
@@ -993,10 +985,8 @@ S.EventsBookings = {
       + '<div style="background:var(--input);border-radius:6px;padding:10px 12px;margin-bottom:14px;">' + moneyHtml + '</div>'
       + '<div class="f" style="width:100%;"><label>Terms</label><textarea id="ag-terms" class="notes-ta" rows="10">' + esc(this.agreementTerms()) + '</textarea></div>'
       + '<div style="font-size:11px;color:var(--t4);line-height:1.6;margin-top:8px;">These terms are a starting point. Set them to your own policy and have your attorney review the agreement before you rely on it. Bar Cop is a software tool, not legal advice.</div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ag-print">Save and Print</button>'
-      +   '<button class="btn btn-ghost" id="ag-cancel">Cancel</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="ag-print">Save and Print</button></div></div>';
     App.openModal(html, { id: 'eb-agreement-modal', maxWidth: 680, noClose: true });
-    document.getElementById('ag-cancel')?.addEventListener('click', () => App.closeModal('eb-agreement-modal'));
     document.getElementById('ag-print')?.addEventListener('click', () => {
       const terms = document.getElementById('ag-terms')?.value || '';
       try { localStorage.setItem('event_agreement_terms', terms); } catch (e) {}
