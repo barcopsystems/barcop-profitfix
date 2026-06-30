@@ -70,6 +70,9 @@ input,select,textarea{color-scheme:dark;}
   color:var(--w);font-family:'Barlow',sans-serif;color-scheme:dark;
 }
 .app input:not([type=file]):focus,.app select:focus,.app textarea:focus{border-color:var(--focus-cell);outline:none;}
+/* Modals render in #app-modal-host (outside .app), so mirror the steel focus there
+   too — otherwise a hand-styled modal input falls through to the browser white ring. */
+#app-modal-host input:not([type=file]):focus,#app-modal-host select:focus,#app-modal-host textarea:focus{border-color:var(--focus-cell);outline:none;}
 .form-input{
   background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
   color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;
