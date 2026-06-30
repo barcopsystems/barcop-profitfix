@@ -176,7 +176,10 @@ S.TheftRisk = {
   // ones in Sales Integrity. The target consumes App._pendingInvestigation.
   _workInvestigation(id) {
     const inv = this._inv(id); if (!inv) return;
-    if (inv.product_id) {
+    if (inv.source === 'spot-check' && inv.spot_check_id) {
+      App._pendingInvestigation = { productId: inv.product_id, sku: inv.sku, spotCheckId: inv.spot_check_id };
+      App.openScreen('ic-spot-check');
+    } else if (inv.product_id) {
       App._pendingInvestigation = { productId: inv.product_id, sku: inv.sku, vrTab: inv.vr_tab || null, vrRunId: inv.vr_run_id || null };
       App.openScreen('ic-report-variance');
     } else {
@@ -191,7 +194,7 @@ S.TheftRisk = {
   // reads — no page leave. opts: { subtitle, onClose }. [[two-doors-same-data]]
   openInvestigationModal(productId, productName, opts) {
     opts = opts || {};
-    this._vim = { productId: productId || null, sku: productName || '', subtitle: opts.subtitle || '', stepsDef: opts.stepsDef || this.VARIANCE_STEPS, vrTab: opts.vrTab || null, vrRunId: opts.vrRunId || null, onClose: opts.onClose || null };
+    this._vim = { productId: productId || null, sku: productName || '', subtitle: opts.subtitle || '', stepsDef: opts.stepsDef || this.VARIANCE_STEPS, source: opts.source || null, spotCheckId: opts.spotCheckId || null, vrTab: opts.vrTab || null, vrRunId: opts.vrRunId || null, onClose: opts.onClose || null };
     const match = i => productId ? i.product_id === productId : i.sku === productName;
     const list = (App.data.variance_investigations || []).filter(match);
     const inv = list.find(i => i.status !== 'resolved') || list.find(i => i.status === 'resolved') || null;
@@ -210,8 +213,10 @@ S.TheftRisk = {
       created_at: new Date().toISOString(), status: 'open',
       steps: stepsDef.map(() => ({ done: false, finding: '' })), resolution: '' };
     if (!v.productId) inv.steps_def = stepsDef;   // non-product (sales) carries its own step text
-    if (v.vrTab) inv.vr_tab = v.vrTab;            // remember the report + run it flagged on
-    if (v.vrRunId) inv.vr_run_id = v.vrRunId;     // so Work returns to the exact place
+    if (v.source) inv.source = v.source;          // remember where it flagged so Work routes back
+    if (v.spotCheckId) inv.spot_check_id = v.spotCheckId;
+    if (v.vrTab) inv.vr_tab = v.vrTab;            // variance: the report + run it flagged on
+    if (v.vrRunId) inv.vr_run_id = v.vrRunId;
     App.putRecord('core', 'variance_investigation', inv);
     this._renderVimBody(inv.id);
   },
