@@ -358,6 +358,9 @@ S.VendorTracker = {
           + ((r.status === 'Credit Requested' && wd != null)
               ? '<div style="font-size:10px;color:' + (overdue ? 'var(--amber)' : 'var(--t3)') + ';margin-top:2px;">Waiting ' + wd + 'd' + (overdue ? ', follow up' : '') + '</div>'
               : '');
+        const workCell = (r.status !== 'Resolved' && r.delivery_id)
+          ? '<button class="btn btn-ghost btn-sm vt-disc-work" data-del="' + esc(r.delivery_id) + '" data-disc="' + esc(r.id) + '">Work</button>'
+          : '';
         return '<tr>'
           + '<td>' + this.fmtDate(r.date) + '</td>'
           + '<td class="val">' + esc(r.vendor || '-') + '</td>'
@@ -365,9 +368,10 @@ S.VendorTracker = {
           + '<td>' + esc(r.sku || '-') + '</td>'
           + '<td class="' + ((r.overcharge || 0) > 0 ? 'neg' : '') + '">' + App.fmtCurrency(r.overcharge || 0) + '</td>'
           + '<td>' + statusCell + '</td>'
+          + '<td class="no-print">' + workCell + '</td>'
           + '</tr>';
       }).join('');
-      const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th></tr></thead>';
+      const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th><th class="no-print"></th></tr></thead>';
       body = this.dataCard(thead, trs) + App.showOlderBar('core', 'vendor_discrepancy', rows, false);
     }
 
@@ -382,6 +386,12 @@ S.VendorTracker = {
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
+    // Work jumps to that order's Delivery History page and opens the discrepancy
+    // modal, where discrepancies are worked (cohesive with Loss Prevention).
+    this.container.querySelectorAll('.vt-disc-work').forEach(b => b.addEventListener('click', () => {
+      App._pendingDiscrepancy = { deliveryId: b.dataset.del, discrepancyId: b.dataset.disc };
+      App.openScreen('ic-delivery-history');
+    }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 

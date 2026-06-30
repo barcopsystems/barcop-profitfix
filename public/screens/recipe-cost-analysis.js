@@ -58,7 +58,7 @@ S.RecipeCostAnalysis = {
       + '<td class="' + (over ? 'neg' : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
       + '<td>' + (tgt != null ? tgt.toFixed(1) + '%' : '-') + '</td>'
       + '<td>' + statusS + '</td>'
-      + '<td class="no-print"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Edit</button></td>'
+      + '<td class="no-print"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Work</button></td>'
       + '</tr>';
   },
 
@@ -153,12 +153,12 @@ S.RecipeCostAnalysis = {
 
     // Edit opens the canonical Menu Items editor as a modal IN PLACE, then
     // re-renders this page on close — no cross-section jump ([[two-doors-same-data]]).
+    // Work takes you to Menu Items and opens that item's editor there (its
+    // canonical home), cohesive with Loss Prevention / Vendor Discrepancies.
     this.container.querySelectorAll('.rca-edit').forEach(btn => {
       btn.addEventListener('click', () => {
-        const item = App.menuItems().find(i => i.id === btn.dataset.id);
-        if (item && S.RevenueMenuItems && S.RevenueMenuItems.openEditor) {
-          S.RevenueMenuItems.openEditor(item, { onDone: () => this.draw() });
-        }
+        App._menuItemFocus = btn.dataset.id;
+        App.openScreen('r-menu-items');
       });
     });
   },
@@ -170,7 +170,7 @@ S.RecipeCostAnalysis = {
       { h: 'Items With Recipes', p: ['Cost per serving computes automatically from current product prices, so when a vendor raises a price these update on their own. Cost percent is the cost against the menu price, and over-target items are flagged and sorted to the top. Export PDF saves the full analysis.'] },
       { h: 'Missing a Recipe', p: ['These items carry a hand-entered cost. Edit one and add an ingredient recipe to switch it to live, ingredient-based costing that tracks your real prices.'] },
       { h: 'Linked Inventory Items', p: ['Direct-pour beer, wine, and NA beverages. Cost flows straight from the linked inventory product, no recipe needed, and it updates whenever that product price changes.'] },
-      { h: 'Edit', p: ['Edit opens the menu item editor right here as a popup, the same one used on the Menu Items screen. Change the recipe or price, save, and this page updates in place.'] }
+      { h: 'Work', p: ['Work takes you to Menu Items and opens that item\'s editor, where menu items are built and changed. Update the recipe or price there, then come back to Recipe Summary to see the new cost percent.'] }
     ]);
   }
 };
