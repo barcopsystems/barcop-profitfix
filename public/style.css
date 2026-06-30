@@ -594,6 +594,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    do NOT get this class (they need the room). */
 .narrow-form .form-row{flex-wrap:wrap!important;}   /* let the half-width cells wrap into 2 columns instead of cramming one line */
 .narrow-form .form-row > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
+/* Menu Items' adaptive cells live one level deeper in #mi-adaptive (display:contents),
+   so the two-column override must reach them too when the inventory form is narrow. */
+.narrow-form .form-row > #mi-adaptive > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
 
 /* Data table: title lives on the background as a .sh heading; the column-header row
    is the card's first row (table flush to the card border top and bottom, header
