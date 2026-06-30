@@ -20,6 +20,9 @@ S.RevenueMenuEngineering = {
   // A category needs at least this many priced items to rank fairly against itself.
   MIN_PER_CAT: 4,
 
+  // Menu order for the per-category sections (same order Menu Items uses).
+  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
+
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering sorts every priced item that has a cost and weekly covers into four groups by margin and popularity, so you know exactly what to push, reprice, promote, or cut. It needs at least four complete items in a category; finish any Incomplete ones in Menu Items.'] },
