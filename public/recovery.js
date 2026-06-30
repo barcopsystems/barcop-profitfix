@@ -61,8 +61,13 @@ window.Recovery = {
       target: () => Recovery._ptargets().prime_cost_pct ?? 60,
       fmt: v => v.toFixed(1) + '%'
     },
+    // Pricing's only live weekly signal is check average, which is the SAME
+    // metric the 'check-average' gap dollarizes. Dollarizing both would show the
+    // identical leak twice and double-count it in recovered totals, so Pricing is
+    // noDollar (a Review row): its real lever is menu margin %, which Bar Cop does
+    // not track as a weekly dollar. Check Average carries the one honest figure.
     'pricing': {
-      series: 'revenue_weeks', label: 'Check Average', lowerBetter: false,
+      series: 'revenue_weeks', label: 'Check Average', lowerBetter: false, noDollar: true,
       value: w => w.check_avg,
       base:  w => w.covers, baseKind: 'unit',
       target: () => Recovery._rtargets().check_avg ?? 35,
@@ -172,7 +177,7 @@ window.Recovery = {
   // composite of pour + food, so it is EXCLUDED from totals to avoid counting
   // the same dollars twice.
   COST_GAPS:      ['pour-cost', 'food-cost', 'labor-scheduling'],
-  REVENUE_GAPS:   ['pricing', 'check-average', 'rplh', 'website', 'email-loyalty', 'delivery'],
+  REVENUE_GAPS:   ['pricing', 'check-average', 'rplh'],
   COMPOSITE_GAPS: ['prime-cost'],
 
   /* Roll a module's logged fixes into a slice for its dashboard. Returns
