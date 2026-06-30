@@ -2164,12 +2164,16 @@ const App = {
     if (old) old.remove();
     const overlay = document.createElement('div');
     overlay.id = id;
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(0,0,0,0.7);'
+    // Near-opaque navy scrim (the --bg family) so the popup reads as nested in the
+    // app's darkest canvas — navy-on-navy, like the on-page forms — not a navy card
+    // stranded on a translucent black wash.
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(6,11,17,0.92);'
       + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
-    // Always-visible corner X so the popup closes without scrolling to a button.
-    const closeX = opts.noClose ? '' : '<button type="button" class="app-modal-x" aria-label="Close" '
-      + 'style="position:absolute;top:-4px;right:0;width:32px;height:32px;border:1px solid var(--b1);border-radius:6px;'
-      + 'background:var(--surface);color:var(--t2);font-size:20px;line-height:1;cursor:pointer;z-index:2;">&times;</button>';
+    // Always-visible corner X (thin icon, inside the card's top-right) so the popup
+    // closes without scrolling to a button. Styled in style.css (.app-modal-x).
+    const closeX = opts.noClose ? '' : '<button type="button" class="app-modal-x" aria-label="Close">'
+      + '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.5 3.5l8 8M11.5 3.5l-8 8"/></svg>'
+      + '</button>';
     overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;position:relative;">' + closeX + html + '</div>';
     host.appendChild(overlay);
     const x = overlay.querySelector('.app-modal-x');
