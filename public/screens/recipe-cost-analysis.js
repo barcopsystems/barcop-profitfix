@@ -23,7 +23,7 @@ S.RecipeCostAnalysis = {
     + '</colgroup>',
   THEAD:
     '<thead><tr><th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th>'
-    + '<th>Margin</th><th>Cost %</th><th>Target</th><th>Status</th><th></th></tr></thead>',
+    + '<th>Margin</th><th>Cost %</th><th>Target</th><th>Status</th><th class="no-print"></th></tr></thead>',
 
   render(container, actions) {
     this.container = container;
@@ -58,14 +58,14 @@ S.RecipeCostAnalysis = {
       + '<td class="' + (over ? 'neg' : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
       + '<td>' + (tgt != null ? tgt.toFixed(1) + '%' : '-') + '</td>'
       + '<td>' + statusS + '</td>'
-      + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Edit</button></td>'
+      + '<td class="no-print"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Edit</button></td>'
       + '</tr>';
   },
 
   dataCard(rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl">'
-      + '<table class="tbl" style="table-layout:fixed;width:100%;min-width:1040px;">'
-      + this.COLGROUP + this.THEAD + '<tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;">'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLGROUP + this.THEAD + '<tbody>' + rowsHtml + '</tbody></table></div>';
   },
 
   draw() {
