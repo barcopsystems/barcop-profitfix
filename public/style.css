@@ -370,6 +370,13 @@ input,select,textarea{color-scheme:dark;}
 #app-modal-host .form-card{padding:18px;}
 #app-modal-host .form-card > .card-title{margin:0 0 16px;padding:0 0 14px;}
 #app-modal-host .form-card .card-actions{margin:16px 0 0;padding:14px 0 0;}
+/* On phones a multi-action modal footer stacks full-width (clean tap targets)
+   instead of ragged wrapping. Chips/filters/segmented toggles are not .card-actions,
+   so they keep flowing as a chip set should. */
+@media(max-width:560px){
+  #app-modal-host .card-actions{flex-direction:column;align-items:stretch;}
+  #app-modal-host .card-actions .btn{width:100%;margin-left:0!important;}
+}
 .tw-nav{display:flex;gap:12px;justify-content:space-between;margin-top:16px;align-items:center;}
 
 /* ══ FORM SYSTEM ══ */
