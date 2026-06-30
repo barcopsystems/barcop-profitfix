@@ -471,37 +471,18 @@ S.RevenueMenuEngineering = {
       dropTitle: 'Drop your POS sales mix export here',
       dropSub: 'A product mix (PMIX) report for the week: one row per item with units sold. Bar Cop matches each row to a menu item by name and refreshes its weekly covers. Nothing else on the item changes.',
       actionsEl: '#me-cov-actions',
-      fields: [
-        { key: 'name', label: 'Item Name', required: true, match: ['name', 'item', 'item name', 'menu item', 'menu item name', 'product', 'description'] },
-        { key: 'covers', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'count', 'sales count'] }
-      ],
+      fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Update Covers',
       onComplete: rows => this.applyCoversImport(rows)
     });
   },
 
   async applyCoversImport(rows) {
-    const items = App.data.menu_items || [];
-    const byName = {};
-    items.forEach(it => { if (it && it.name) byName[it.name.trim().toLowerCase()] = it; });
-    const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; };
-    let updated = 0; const unmatched = [];
-    rows.forEach(r => {
-      const nm = (r.name || '').trim().toLowerCase();
-      const cov = num(r.covers);
-      if (!nm || cov == null) return;
-      const it = byName[nm];
-      if (!it) { if (r.name) unmatched.push(r.name); return; }
-      const rounded = Math.round(cov);
-      // Snapshot the prior covers (for the Menu Mix Delta) only when it changes.
-      if (it.weekly_covers != null && rounded !== it.weekly_covers) {
-        it.prev_weekly_covers = it.weekly_covers;
-        it.weekly_covers_updated_at = new Date().toISOString();
-      }
-      it.weekly_covers = rounded;
-      updated++;
-    });
-    await App.saveKey('menu_items');
+    // One ingest path: PosIngest matches by name + upserts weekly_covers.
+    const { toAdd, skipped } = PosIngest.build('pmix', rows);
+    let updated = 0;
+    if (toAdd.length) { await PosIngest.commit('pmix', toAdd); updated = toAdd.length; }
+    const unmatched = skipped.filter(s => s && s !== '(blank)');
     const result = document.getElementById('me-cov-result');
     if (result) {
       result.innerHTML = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (updated ? 'var(--gold)' : 'var(--red)') + ';">'
