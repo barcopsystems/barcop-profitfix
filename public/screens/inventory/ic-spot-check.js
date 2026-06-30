@@ -198,6 +198,12 @@ S.InventorySpotCheck = {
     this.draft = this.loadDraft();
     this.posMode = 'manual';
     this.renderMain();
+    const pend = App._pendingInvestigation;
+    if (pend && pend.spotCheckId) {
+      App._pendingInvestigation = null;
+      App.pushView(() => this.renderDetail(pend.spotCheckId));
+      S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { source: 'spot-check', spotCheckId: pend.spotCheckId, onClose: () => this.renderDetail(pend.spotCheckId) });
+    }
   },
 
   // The service bars (a register is there), marked in Set Locations. A spot check
@@ -819,7 +825,7 @@ S.InventorySpotCheck = {
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
       const inv = ev.target.closest('.sp-review');
-      if (inv) { ev.stopPropagation(); S.TheftRisk.openInvestigationModal(inv.dataset.pid, inv.dataset.name, { onClose: () => this.renderDetail(id) }); }
+      if (inv) { ev.stopPropagation(); S.TheftRisk.openInvestigationModal(inv.dataset.pid, inv.dataset.name, { source: 'spot-check', spotCheckId: id, onClose: () => this.renderDetail(id) }); }
     };
   },
 

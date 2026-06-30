@@ -335,13 +335,12 @@ S.InventoryVarianceReport = {
     this._unmatchedCollapsed = null;
     this.draw();
     const pend = App._pendingInvestigation;
-    if (pend && pend.productId) {
+    if (pend && pend.productId && !pend.spotCheckId) {
       App._pendingInvestigation = null;
-      // Land on the exact report + saved run the flag came from, then open the modal.
-      if (pend.vrRunId) {
-        const run = this.runs().find(r => r.id === pend.vrRunId);
-        if (run) { this.loadRun(run); if (pend.vrTab && pend.vrTab !== 'history') this.tab = pend.vrTab; this.draw(); }
-      }
+      // Land on the report + run the flag came from (or the latest run), then open the modal.
+      let run = pend.vrRunId ? this.runs().find(r => r.id === pend.vrRunId) : null;
+      if (!run) run = this.runsSorted()[0] || null;
+      if (run) { this.loadRun(run); this.tab = (pend.vrTab && pend.vrTab !== 'history') ? pend.vrTab : 'sales'; this.draw(); }
       S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { onClose: () => this.draw() });
     }
   },
