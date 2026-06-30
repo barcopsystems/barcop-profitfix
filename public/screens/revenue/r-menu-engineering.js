@@ -53,7 +53,8 @@ S.RevenueMenuEngineering = {
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
       { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
       { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
-      { h: 'Repricing', p: ['The Reprice step models the new margin, cost percent, and weekly impact, and shows how far volume can fall before the raise stops paying off. Save it as planned or mark it live on the spot.'] }
+      { h: 'Repricing', p: ['The Reprice step models the new margin, cost percent, and weekly impact, and shows how far volume can fall before the raise stops paying off. Add an expected volume change if you want Bar Cop to hold you to a prediction. Save it as planned or mark it live on the spot.'] },
+      { h: 'Pricing Review Log', p: ['Every change you make lands in the Pricing Review Log at the bottom, the one record of every price move. Once three weeks of covers come in, Bar Cop checks the real weekly swing against what you predicted, so your pricing instincts sharpen over time and the Recovery Scoreboard can measure whether a change actually moved the number.'] }
     ]);
   },
 
@@ -73,6 +74,8 @@ S.RevenueMenuEngineering = {
     document.getElementById('me-batch')?.addEventListener('click', () => this.openBatch());
     document.getElementById('me-marklive-all')?.addEventListener('click', () => this.markAllLive());
     document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
+    document.getElementById('me-log-export')?.addEventListener('click', () => App.exportPDF({ title: 'Pricing Review Log', root: document.getElementById('me-log-export-root') || this.container }));
+    this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 
   // ── The page: diagnosis (quadrant) + prescription (suggested price + action) ─
@@ -216,7 +219,7 @@ S.RevenueMenuEngineering = {
       + actionsRow
       + '</div>';
 
-    return '<div id="me-export-root">' + statBox + cards + unrankedCard + '</div>';
+    return '<div id="me-export-root">' + statBox + cards + unrankedCard + '</div>' + this.reviewLogHtml();
   },
 
   // ── Reprice step (the focused pricing modal) ─────────────────────────────────
@@ -240,8 +243,9 @@ S.RevenueMenuEngineering = {
       +   (tgt ? stat('Target Cost %', tgt + '%') : '')
       + '</div>'
       + '<div class="form-row" style="align-items:flex-end;">'
-      +   '<div class="f" style="width:150px;flex-shrink:0;"><label>New Price</label><div class="fw"><span class="pre">$</span>'
+      +   '<div class="f" style="width:140px;flex-shrink:0;"><label>New Price</label><div class="fw"><span class="pre">$</span>'
       +     '<input class="form-input pre" type="number" id="re-price" value="' + (Math.round(start * 100) / 100) + '" step="0.01" oninput="S.RevenueMenuEngineering.reCalc()"/></div></div>'
+      +   '<div class="f" style="width:160px;flex-shrink:0;"><label>Expected Volume Change</label><div class="fw"><input class="form-input suf" type="number" id="re-vol" value="' + (item.planned_vol_pct != null ? item.planned_vol_pct : '') + '" step="1" placeholder="0" oninput="S.RevenueMenuEngineering.reCalc()"/><span class="suf">%</span></div></div>'
       +   (sugg ? '<button class="btn btn-ghost btn-sm" id="re-use-sugg">Use suggested ' + f(sugg) + '</button>' : '')
       + '</div>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;margin-top:6px;">'
@@ -259,12 +263,13 @@ S.RevenueMenuEngineering = {
 
     App.openModal(html, { id: 're-modal', maxWidth: 560, onClose: () => App.closeModal('re-modal') });
     document.getElementById('re-use-sugg')?.addEventListener('click', () => { const el = document.getElementById('re-price'); if (el) { el.value = sugg; this.reCalc(); } });
-    document.getElementById('re-plan')?.addEventListener('click', () => this.savePlanned(item.id, this._reNewPrice()));
-    document.getElementById('re-live')?.addEventListener('click', () => this.saveLive(item.id, this._reNewPrice()));
+    document.getElementById('re-plan')?.addEventListener('click', () => this.savePlanned(item.id, this._reNewPrice(), this._reVolPct()));
+    document.getElementById('re-live')?.addEventListener('click', () => this.saveLive(item.id, this._reNewPrice(), this._reVolPct()));
     this.reCalc();
   },
 
   _reNewPrice() { return parseFloat(document.getElementById('re-price')?.value) || 0; },
+  _reVolPct() { return parseFloat(document.getElementById('re-vol')?.value) || 0; },
 
   reCalc() {
     const item = (App.data.menu_items || []).find(i => i.id === this._reId);
@@ -275,7 +280,9 @@ S.RevenueMenuEngineering = {
     const tgt = this.targetPctFor(item);
     const pct = np > 0 ? (cost / np * 100) : null;
     const margin = np - cost;
-    const impact = (np - (item.price || 0)) * covers;
+    const vol = parseFloat(document.getElementById('re-vol')?.value) || 0;
+    const oldCM0 = (item.price || 0) - cost;
+    const impact = (margin * (covers * (1 + vol / 100))) - (oldCM0 * covers);
     const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
     set('re-pct', pct != null ? pct.toFixed(1) + '%' : '-', tgt ? (pct > tgt ? 'warn' : 'good') : '');
     set('re-margin', App.fmtCurrency(margin));
@@ -290,24 +297,25 @@ S.RevenueMenuEngineering = {
 
   // Plan it: set a pending price, no log. The menu math (cost %, engineering)
   // reads it, but Recovery does not see it until it is marked live.
-  savePlanned(itemId, newPrice) {
+  savePlanned(itemId, newPrice, volPct) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item || !(newPrice > 0)) return;
     item.planned_price = Math.round(newPrice * 100) / 100;
+    item.planned_vol_pct = parseFloat(volPct) || 0;
     item.planned_at = new Date().toISOString();
     App.saveKey('menu_items').then(() => { App.closeModal('re-modal'); this.draw(); });
   },
 
   // Roll it out now: set the live price + log the change at this moment.
-  async saveLive(itemId, newPrice) {
+  async saveLive(itemId, newPrice, volPct) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item || !(newPrice > 0)) return;
     const np = Math.round(newPrice * 100) / 100;
     const old = item.price;
     item.price = np;
-    item.planned_price = null; item.planned_at = null;
+    item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
     await App.saveKey('menu_items');
-    if (old != null && old !== np) await this._logPriceChange(item, old, np);
+    if (old != null && old !== np) await this._logPriceChange(item, old, np, volPct);
     App.closeModal('re-modal');
     this.draw();
   },
@@ -316,17 +324,17 @@ S.RevenueMenuEngineering = {
   async markLive(itemId) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item || !(item.planned_price > 0)) return;
-    const old = item.price, np = item.planned_price;
-    item.price = np; item.planned_price = null; item.planned_at = null;
+    const old = item.price, np = item.planned_price, vol = item.planned_vol_pct;
+    item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
     await App.saveKey('menu_items');
-    if (old != null && old !== np) await this._logPriceChange(item, old, np);
+    if (old != null && old !== np) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },
 
   cancelPlanned(itemId) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item) return;
-    item.planned_price = null; item.planned_at = null;
+    item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
     App.saveKey('menu_items').then(() => this.draw());
   },
 
@@ -415,14 +423,14 @@ S.RevenueMenuEngineering = {
       if (!sugg) return;
       if (live) {
         const old = item.price;
-        item.price = sugg; item.planned_price = null; item.planned_at = null;
-        if (old != null && old !== sugg) logs.push([item, old, sugg]);
+        item.price = sugg; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
+        if (old != null && old !== sugg) logs.push([item, old, sugg, 0]);
       } else {
-        item.planned_price = sugg; item.planned_at = new Date().toISOString();
+        item.planned_price = sugg; item.planned_vol_pct = 0; item.planned_at = new Date().toISOString();
       }
     });
     await App.saveKey('menu_items');
-    for (const [item, old, np] of logs) await this._logPriceChange(item, old, np);
+    for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     App.closeModal('batch-modal');
     this.draw();
   },
@@ -435,12 +443,12 @@ S.RevenueMenuEngineering = {
     if (!ok) return;
     const logs = [];
     planned.forEach(item => {
-      const old = item.price, np = item.planned_price;
-      item.price = np; item.planned_price = null; item.planned_at = null;
-      if (old != null && old !== np) logs.push([item, old, np]);
+      const old = item.price, np = item.planned_price, vol = item.planned_vol_pct;
+      item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
+      if (old != null && old !== np) logs.push([item, old, np, vol]);
     });
     await App.saveKey('menu_items');
-    for (const [item, old, np] of logs) await this._logPriceChange(item, old, np);
+    for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },
 
@@ -448,14 +456,17 @@ S.RevenueMenuEngineering = {
   // Mirrors the direct-edit path in Menu Items so the Pricing Review Log and the
   // Recovery Scoreboard both pick it up. Pricing is a no-dollar metric, so this
   // logs the change and its date, never an invented recovered figure.
-  async _logPriceChange(item, oldPrice, newPrice) {
+  async _logPriceChange(item, oldPrice, newPrice, volPct) {
     const cost = App.menuItemCost(item) || 0;
+    const covers = item.weekly_covers || 0;
+    const vp = parseFloat(volPct) || 0;
+    const oldCM = oldPrice - cost, newCM = newPrice - cost;
+    const predWk = (newCM * (covers * (1 + vp / 100))) - (oldCM * covers);
     await App.putRecord('core', 'revenue_price_log', {
       id: App.uid(), date: App.todayLocal(), item_id: item.id, item_name: item.name,
       old_price: oldPrice, new_price: newPrice, cost,
       reason: 'Reprice from Menu Engineering', margin_impact: newPrice - oldPrice,
-      covers_at_change: item.weekly_covers || 0, predicted_vol_pct: null,
-      predicted_weekly_impact: (newPrice - oldPrice) * (item.weekly_covers || 0),
+      covers_at_change: covers, predicted_vol_pct: vp, predicted_weekly_impact: predWk,
       source: 'menu-engineering', saved_at: new Date().toISOString()
     });
     await App.putRecord('core', 'fix_log', {
@@ -463,5 +474,66 @@ S.RevenueMenuEngineering = {
       date: App.todayLocal(), source: 'price-change',
       note: 'Price change on ' + item.name + ': ' + App.fmtCurrency(oldPrice) + ' to ' + App.fmtCurrency(newPrice)
     });
+  },
+
+  // ── Pricing Review Log — every logged price change, verified against the
+  // prediction once three weeks of covers land (folded in from the retired Price
+  // Calculator so there is one pricing door). Honest by construction: a result
+  // shows only when the captured baseline and current covers both exist. ────────
+  verify(entry) {
+    if (!entry || !entry.date || entry.covers_at_change == null || entry.cost == null) return { status: 'old-format' };
+    const t = new Date(entry.date + 'T00:00:00').getTime();
+    if (isNaN(t)) return { status: 'old-format' };
+    const weeks = Math.floor((Date.now() - t) / (7 * 86400000));
+    if (weeks < 3) return { status: 'pending', weeks: Math.max(weeks, 0) };
+    const baseItem = (App.data.menu_items || []).find(i => i.id === entry.item_id);
+    const item = baseItem ? { ...baseItem, cost: App.menuItemCost(baseItem) || baseItem.cost } : null;
+    if (!item || item.weekly_covers == null) return { status: 'no-item' };
+    const coversThen = entry.covers_at_change, coversNow = item.weekly_covers;
+    if (!coversThen) return { status: 'no-baseline' };
+    const oldCM = entry.old_price - entry.cost, newCM = entry.new_price - entry.cost;
+    return {
+      status: 'ok', weeks: weeks, coversThen: coversThen, coversNow: coversNow,
+      volPct: (coversNow - coversThen) / coversThen * 100,
+      actualWeekly: newCM * coversNow - oldCM * coversThen,
+      predicted: entry.predicted_weekly_impact != null ? entry.predicted_weekly_impact : null
+    };
+  },
+
+  logRow(entry) {
+    const v = this.verify(entry);
+    let vCell;
+    if (v.status === 'ok') {
+      const tone = v.actualWeekly >= 0 ? 'var(--gold)' : 'var(--red)';
+      const pred = v.predicted != null
+        ? 'predicted ' + (v.predicted > 0 ? '+' : '') + App.fmtCurrency(v.predicted) + '/wk'
+        : 'no prediction on file';
+      vCell = '<div style="font-weight:700;color:' + tone + ';">'
+        + (v.actualWeekly > 0 ? '+' : '') + App.fmtCurrency(v.actualWeekly) + '/wk actual</div>'
+        + '<div style="font-size:10px;color:var(--t3);">covers ' + v.coversThen + ' to ' + v.coversNow + ', ' + pred + '</div>';
+    } else if (v.status === 'pending') {
+      vCell = '<span style="color:var(--t3);">Measuring, week ' + v.weeks + ' of 3</span>';
+    } else {
+      vCell = '<span style="color:var(--t4);">Not verifiable</span>';
+    }
+    return '<tr><td>' + (entry.date || '').slice(0, 10) + '</td>'
+      + '<td><div class="val">' + esc(entry.item_name || '') + '</div></td>'
+      + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
+      + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
+      + '<td style="font-size:11px;">' + vCell + '</td>'
+      + '<td style="font-size:11px;color:var(--t2);">' + esc(entry.reason || '') + '</td></tr>';
+  },
+
+  reviewLogHtml() {
+    const log = (App.data.revenue_price_log || []).slice().reverse();
+    const rows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
+      || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
+    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Pricing Review Log</div>'
+      + '<button class="btn btn-ghost btn-sm" id="me-log-export">Export PDF</button></div>'
+      + '<div id="me-log-export-root"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th>Reason</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('core', 'revenue_price_log', log, false);
   }
 };
