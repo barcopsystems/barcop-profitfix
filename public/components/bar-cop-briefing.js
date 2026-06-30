@@ -100,37 +100,16 @@ window.BarCopBriefing = {
 
   _showModal(bodyHtml, generated_at) {
     const dateStr = generated_at ? this._fmtDate(generated_at) : '';
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:var(--r);padding:28px;max-width:640px;width:100%;max-height:82vh;overflow-y:auto;';
-    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Briefing' + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
-      +   '<button class="btn btn-ghost btn-sm bcb-close">Close</button>'
-      + '</div>'
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Bar Cop Briefing' + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
-      + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged Bar Cop data. A weekly read, not real-time and not financial or business advice. Refreshes once a week.</div>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.bcb-close')?.addEventListener('click', close);
-    const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
+      + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged Bar Cop data. A weekly read, not real-time and not financial or business advice. Refreshes once a week.</div>'
+      + '</div>';
+    App.openModal(html, { id: 'bcb-modal', maxWidth: 640 });
   },
 
   _showError(message) {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:var(--r);padding:24px 28px;max-width:440px;width:100%;';
-    box.innerHTML = '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + message + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-ghost btn-sm bcb-close">OK</button></div>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.bcb-close')?.addEventListener('click', close);
+    App.openModal('<div class="card form-card" style="margin:0;"><div style="font-size:13px;color:var(--t2);line-height:1.6;">' + message + '</div></div>', { id: 'bcb-error', maxWidth: 440 });
   },
 
   _buildPrompt() {

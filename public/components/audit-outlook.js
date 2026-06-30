@@ -135,36 +135,15 @@ window.AuditOutlook = {
   _showModal(auditType, audit, bodyHtml) {
     const typeLabel = this._typeLabel(auditType);
     const period = (audit.date || '').slice(0, 10);
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:620px;width:100%;max-height:80vh;overflow-y:auto;';
-    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Bar Cop Briefing: ' + esc(typeLabel) + (period ? ' · ' + esc(period) : '') + '</div>'
-      +   '<button class="btn btn-ghost btn-sm ao-close">Close</button>'
-      + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.ao-close')?.addEventListener('click', close);
-    const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
-    document.addEventListener('keydown', onKey);
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Bar Cop Briefing: ' + esc(typeLabel) + (period ? ' &middot; ' + esc(period) : '') + '</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
+      + '</div>';
+    App.openModal(html, { id: 'ao-modal', maxWidth: 620 });
   },
 
   _showError(message) {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;';
-    box.innerHTML = '<div style="font-size:13px;color:var(--red);line-height:1.6;margin-bottom:18px;">' + message + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-ghost btn-sm ao-close">OK</button></div>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    box.querySelector('.ao-close')?.addEventListener('click', close);
+    App.openModal('<div class="card form-card" style="margin:0;"><div style="font-size:13px;color:var(--red);line-height:1.6;">' + message + '</div></div>', { id: 'ao-error', maxWidth: 420 });
   },
 
   _typeLabel(auditType) {
