@@ -276,7 +276,7 @@ const DB = {
     'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
     'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
     'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
-    'r-menu-engineering':'revenue-recovery','r-price-calc':'revenue-recovery',
+    'r-menu-engineering':'revenue-recovery',
     'r-dog-test':'revenue-recovery','r-experiments':'revenue-recovery',
     'r-help':'_always',
     // Cash Recovery

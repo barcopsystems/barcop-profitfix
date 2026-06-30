@@ -4022,7 +4022,6 @@ const App = {
         'r-server-check':         ['Server Check', ''],
         'r-menu-items':           ['Menu Items', ''],
         'r-menu-engineering':     ['Menu Engineering', ''],
-        'r-price-calc':           ['Price Calculator', ''],
         'r-dog-test':             ['Dog Test Tracker', ''],
         'r-help':                 ['Help and FAQ', ''],
       };
@@ -4037,7 +4036,6 @@ const App = {
         'r-server-check':     S.RevenueServerCheck,
         'r-menu-items':       S.RevenueMenuItems,
         'r-menu-engineering': S.RevenueMenuEngineering,
-        'r-price-calc':       S.RevenuePriceCalc,
         'r-dog-test':         S.RevenueDogTest,
         'r-help':             S.RevenueHelp,
       };
