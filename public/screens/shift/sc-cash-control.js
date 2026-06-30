@@ -473,13 +473,11 @@ S.ShiftCashControl = {
     const typeOpts = S.ShiftSafeLog.TYPES.map(t => '<option' + (t.name === curType ? ' selected' : '') + '>' + t.name + '</option>').join('');
     const titleMap = { 'Bank Deposit': 'Make a Deposit', 'Bank Issued': 'Issue a Bank' };
     const title = editing ? 'Edit Safe Activity' : (titleMap[presetType] || 'Safe Activity');
-    const hint = (!editing && presetType === 'Bank Deposit')
-      ? '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Safe balance available: ' + App.fmtCurrency(this.currentSafeBalance()) + '</div>' : '';
     const v = x => (x != null && x !== '') ? x : '';
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
     const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + title + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '"/></div>'
