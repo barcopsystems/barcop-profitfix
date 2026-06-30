@@ -577,6 +577,17 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .form-card > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b2);}
 .form-card .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b2);}
 .f textarea.notes-ta{min-height:0;}   /* 2-row notes-style textarea */
+
+/* Collapsed "+ Add Note" box (App.noteField) + the Take Inventory note box. The
+   revealed box lives OUTSIDE a .f, so it carries the standard data-cell styling
+   here (padding + height) instead of opening as a cramped, paddingless input.
+   The "+ Add Note" link itself is styled inline (matches the Take Inventory
+   toggle) so it never falls back to a raw browser button if this rule is stale. */
+.note-box textarea,textarea.ti-note,input.ti-note{
+  width:100%;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);
+  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;padding:8px 10px;
+  outline:none;resize:vertical;color-scheme:dark;}
+.note-box textarea:focus,textarea.ti-note:focus,input.ti-note:focus{border-color:var(--focus-cell);}
 /* Narrow edit pop-up: reflow data cells into a no-grow half-width 2-column grid
    so a lone cell stays left-aligned at half width. Full-width cells (notes,
    anything carrying "100%" in its inline style) are left alone. Builders/tables

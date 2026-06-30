@@ -2986,7 +2986,7 @@ const App = {
     const ph = opts.placeholder || 'Optional note';
     const mt = opts.mt != null ? opts.mt : 14;
     return '<div class="note-field" style="margin-top:' + mt + 'px;">'
-      + '<button type="button" class="note-toggle' + (has ? ' has' : '') + '" data-target="' + esc(id) + '">' + (has ? 'Note' : '+ Note') + '</button>'
+      + '<button type="button" class="note-toggle" data-target="' + esc(id) + '" style="background:none;border:none;padding:0;cursor:pointer;font-size:11px;white-space:nowrap;color:' + (has ? 'var(--gold)' : 'var(--t3)') + ';">' + (has ? 'Note' : '+ Add Note') + '</button>'
       + '<div class="note-box" id="' + esc(id) + '-box" style="margin-top:8px;' + (has ? '' : 'display:none;') + '">'
       + '<textarea id="' + esc(id) + '" class="notes-ta" rows="2" placeholder="' + esc(ph) + '">' + esc(val) + '</textarea>'
       + '</div></div>';
