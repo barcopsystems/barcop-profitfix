@@ -35,8 +35,8 @@ window.CashCounter = {
 
   _stepBtn(dir, key) {
     return '<button type="button" class="ccd-step" data-step="' + dir + '" data-key="' + key + '" '
-      + 'style="width:42px;height:44px;flex-shrink:0;border:1px solid var(--b1);border-radius:6px;'
-      + 'background:var(--surface);color:var(--t1);font-size:20px;line-height:1;cursor:pointer;font-weight:700;">'
+      + 'style="width:30px;height:34px;flex-shrink:0;border:1px solid var(--b1);border-radius:6px;'
+      + 'background:var(--surface);color:var(--t1);font-size:16px;line-height:1;cursor:pointer;font-weight:700;">'
       + (dir > 0 ? '+' : '&minus;') + '</button>';
   },
 
@@ -47,28 +47,28 @@ window.CashCounter = {
     const v = x => (x != null && x !== '') ? x : '';
 
     const row = dn =>
-      '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;">'
-      + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">' + dn.label + '</div>'
+      '<div class="ccd-row" style="display:flex;align-items:center;gap:6px;">'
+      + '<div style="width:38px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--t1);">' + dn.label + '</div>'
       + this._stepBtn(-1, dn.key)
       + '<input type="number" class="ccd-cnt" id="' + p + '-' + dn.key + '" data-key="' + dn.key + '" data-val="' + dn.val + '" '
       + 'min="0" step="1" inputmode="numeric" value="' + v(vals[dn.key]) + '" '
-      + 'style="width:62px;flex-shrink:0;height:44px;text-align:center;font-size:16px;'
+      + 'style="width:48px;flex-shrink:0;height:34px;text-align:center;font-size:14px;'
       + 'background:var(--input);border:1px solid var(--b1);border-radius:6px;color:var(--w);"/>'
       + this._stepBtn(1, dn.key)
-      + '<div class="ccd-sub" data-key="' + dn.key + '" style="flex:1;text-align:right;font-size:14px;color:var(--t2);min-width:0;">$0</div>'
+      + '<div class="ccd-sub" data-key="' + dn.key + '" style="flex:1;text-align:right;font-size:13px;color:var(--t2);min-width:0;">$0</div>'
       + '</div>';
 
     const coins =
       '<div class="ccd-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;">'
-      + '<div style="width:52px;flex-shrink:0;font-size:15px;font-weight:700;color:var(--t1);">Coins</div>'
+      + '<div style="width:38px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--t1);">Coins</div>'
       + '<div class="fw" style="flex:0 0 150px;width:150px;"><span class="pre">$</span>'
       + '<input class="pre ccd-coins" id="' + p + '-coins" type="number" min="0" step="0.01" inputmode="decimal" '
-      + 'value="' + v(vals.coins) + '" style="height:44px;font-size:16px;'
+      + 'value="' + v(vals.coins) + '" style="height:34px;font-size:14px;'
       + 'background:var(--input);border:1px solid var(--b1);border-radius:6px;color:var(--w);"/></div>'
       + '</div>';
 
     return '<div class="cash-counter" data-prefix="' + p + '">'
-      + '<div style="display:grid;grid-template-columns:1fr;gap:10px 18px;">'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;">'
       +   this.DENOMS.map(row).join('')
       + '</div>'
       + coins
