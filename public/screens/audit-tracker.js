@@ -119,8 +119,8 @@ S.AuditTracker = {
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S4_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
         ['Credits Recovered',       d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
         ['Credit Recovery Rate',    d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : '', (d.S4_CREDIT_RECOVERY_PCT != null && d.S4_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
-        ['Monthly Exposure',        cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
-        ['Annual Exposure',         cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
+        ['Est. Monthly Exposure',   cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
+        ['Est. Annual Exposure',    cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(5, NAMES[4], d.S5_SCORE, [
         ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
@@ -264,8 +264,8 @@ S.AuditTracker = {
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : ''],
         ['Credits Recovered',      d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
         ['Credit Recovery Rate',   d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : ''],
-        ['Monthly Exposure',       cur(d.S4_EXPOSURE_MONTHLY)],
-        ['Annual Exposure',        cur(d.S4_EXPOSURE_ANNUAL)]
+        ['Est. Monthly Exposure',  cur(d.S4_EXPOSURE_MONTHLY)],
+        ['Est. Annual Exposure',   cur(d.S4_EXPOSURE_ANNUAL)]
       ]],
       [5, NAMES[4], d.S5_SCORE, [
         ['Total Revenue Period',   cur(d.S5_TOTAL_REV_PERIOD)],
@@ -576,7 +576,11 @@ S.AuditTracker = {
     // have no honest dollar without an investigation).
     if (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) items.push({ action: 'Tighten discount control. Discounts are ' + d.S2_DISCOUNT_PCT + '% of sales vs an under-' + d.S2_DISCOUNT_BENCHMARK_PCT + '% benchmark. Require manager authorization on every discount.', monthly_impact: 0, gap_id: 'theft-loss' });
     if (d.S2_NO_SALE_COUNT >= 10) items.push({ action: 'Review no-sale drawer opens. ' + d.S2_NO_SALE_COUNT + ' no-sale register opens this period. Set a no-sale policy and log a reason for every one, it is the simplest cover for pocketing cash.', monthly_impact: 0, gap_id: 'theft-loss' });
-    if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Improve vendor verification. $' + Math.round(d.S4_EXPOSURE_MONTHLY) + '/month exposure.', monthly_impact: d.S4_EXPOSURE_MONTHLY, gap_id: 'vendor-control' });
+    // Vendor exposure is an ESTIMATE (a few percent of spend), not a measured
+    // leak like pour or food, so it stays out of the recoverable headline
+    // (monthly_impact 0) and is surfaced qualitatively. The real vendor dollars
+    // are the filed-but-uncollected credits below.
+    if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Tighten vendor verification. Match every invoice to its PO and price sheet. On unverified invoices a few percent of spend routinely slips through in overcharges and short counts, roughly $' + Math.round(d.S4_EXPOSURE_MONTHLY) + ' a month of exposure to catch.', monthly_impact: 0, gap_id: 'vendor-control' });
     // Uncollected vendor credits are real filed overcharges. Surfaced with the
     // actual dollar in text; monthly_impact 0 (a one-time recovery, not monthly,
     // and kept out of the headline so it never double-counts vendor exposure).
