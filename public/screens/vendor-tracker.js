@@ -350,7 +350,7 @@ S.VendorTracker = {
         ? '<div class="card"><div class="empty"><div class="empty-title">No discrepancies in this range</div>'
           + '<div class="empty-sub">Pick a wider range above, or All Time, to see every claim.</div></div></div>'
         : '<div class="card"><div class="empty"><div class="empty-title">No discrepancies filed</div>'
-          + '<div class="empty-sub">When a delivery is short or a price is wrong, file it here. Every discrepancy you document is a credit you can request. Contact the rep within 24 hours; they age out fast.</div></div></div>';
+          + '<div class="empty-sub">When a delivery comes up short or a price is wrong, flag the line in Inventory when you receive it. Every discrepancy you document shows here with its status and what you have recovered. You work and chase them in Receive Delivery under Credits to Chase.</div></div></div>';
     } else {
       const trs = rows.slice(0, App.listLimit('core', 'vendor_discrepancy')).map(r => {
         const overdue = this.isOverdue(r), wd = this.waitDays(r);
@@ -358,63 +358,34 @@ S.VendorTracker = {
           + ((r.status === 'Credit Requested' && wd != null)
               ? '<div style="font-size:10px;color:' + (overdue ? 'var(--amber)' : 'var(--t3)') + ';margin-top:2px;">Waiting ' + wd + 'd' + (overdue ? ', follow up' : '') + '</div>'
               : '');
-        const quick = r.status === 'Open'
-          ? '<button class="btn btn-ghost btn-sm vt-credit" data-id="' + esc(r.id) + '">Request Credit</button>'
-          : r.status === 'Credit Requested'
-            ? '<button class="btn btn-ghost btn-sm vt-followup" data-id="' + esc(r.id) + '">Follow Up</button>'
-            : '';
-        return '<tr class="vt-disc-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
+        return '<tr>'
           + '<td>' + this.fmtDate(r.date) + '</td>'
           + '<td class="val">' + esc(r.vendor || '-') + '</td>'
           + '<td>' + esc(r.type || '-') + '</td>'
           + '<td>' + esc(r.sku || '-') + '</td>'
           + '<td class="' + ((r.overcharge || 0) > 0 ? 'neg' : '') + '">' + App.fmtCurrency(r.overcharge || 0) + '</td>'
           + '<td>' + statusCell + '</td>'
-          + '<td class="no-print"><div class="row-actions">' + quick
-          + '<button class="btn btn-danger btn-sm vt-del" data-id="' + esc(r.id) + '">Delete</button></div></td>'
           + '</tr>';
       }).join('');
-      const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th><th></th></tr></thead>';
+      const thead = '<thead><tr><th>Date</th><th>Vendor</th><th>Type</th><th>Product</th><th>Overcharge</th><th>Status</th></tr></thead>';
       body = this.dataCard(thead, trs) + App.showOlderBar('core', 'vendor_discrepancy', rows, false);
     }
 
     return stats + filterRow + body;
   },
 
+  // View-only, like the Scorecard and Price Changes tabs. Discrepancies are filed
+  // and worked in Inventory (Receive Delivery / Delivery History); this tab is the
+  // read-only rollup for diagnostics and the recovery math.
   wireDiscrepancies() {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
       () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
-    this.container.querySelectorAll('.vt-credit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.requestCredit(b.dataset.id); }));
-    this.container.querySelectorAll('.vt-followup').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.followUp(b.dataset.id); }));
-    this.container.querySelectorAll('.vt-del').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); this.removeDiscrepancy(b.dataset.id); }));
-    this.container.querySelectorAll('.vt-disc-row').forEach(row => row.addEventListener('click', () =>
-      this.openDiscrepancyModal({ discrepancyId: row.dataset.id, onClose: () => this.draw() })));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 
-  // ── Request Credit (mailto to the rep, then flip to Credit Requested) ─
-  requestCredit(id) {
-    const r = this.discRecords().find(x => x.id === id);
-    if (!r) return;
-    window.location.href = this._creditMailtoHref(r);
-    r.status = 'Credit Requested';
-    r.credit_requested_at = new Date().toISOString();
-    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
-  },
-
-  // Follow up on a sitting credit request: log the date, re-draft a reminder email.
-  followUp(id) {
-    const r = this.discRecords().find(x => x.id === id);
-    if (!r) return;
-    if (!Array.isArray(r.followups)) r.followups = [];
-    r.followups.push(new Date().toISOString());
-    window.location.href = this._creditMailtoHref(r, true);
-    App.putRecord('core', 'vendor_discrepancy', r).then(() => this.draw());
-  },
-
-  // Credit-request email draft (shared by the Discrepancies tab + the modal). When
+  // Credit-request email draft (shared by the modal + Inventory). When
   // isFollowUp, it frames as a reminder on a request you already sent.
   _creditMailtoHref(r, isFollowUp) {
     const v = this.vendors().find(x => x.name === r.vendor) || null;
@@ -470,18 +441,6 @@ S.VendorTracker = {
     const conn = (filled) => '<span style="flex:0 0 auto;width:24px;height:2px;margin-top:11px;background:' + (filled ? 'var(--green)' : 'var(--b1)') + ';"></span>';
     return '<div style="display:flex;align-items:flex-start;justify-content:center;margin:14px 0 16px;">'
       + col('filed') + conn(reached.requested) + col('requested') + conn(reached.resolved) + col('resolved') + '</div>';
-  },
-
-  async removeDiscrepancy(id) {
-    const r = this.discRecords().find(x => x.id === id);
-    const ok = await App.confirm({
-      title: 'Delete this discrepancy?',
-      message: (r ? 'The ' + (r.vendor || 'vendor') + ' discrepancy' + ((r.overcharge || 0) > 0 ? ' for ' + App.fmtCurrency(r.overcharge) : '') + ' will be removed. ' : '')
-        + 'It feeds your Scorecard open and recovered totals. This cannot be undone.',
-      confirmText: 'Delete', danger: true
-    });
-    if (!ok) return;
-    App.removeRecord('core', 'vendor_discrepancy', id).then(() => this.draw());
   },
 
   // ── Shared discrepancy modal (Receive Delivery + Delivery History) ─────────
@@ -553,10 +512,22 @@ S.VendorTracker = {
         ? 'Waiting ' + wd + ' days on ' + esc(r.vendor || 'this vendor') + ' with no response. Time to follow up.'
         : 'Credit requested ' + this.fmtDate((r.credit_requested_at || '').slice(0, 10)) + (wd != null ? ', waiting ' + wd + ' day' + (wd === 1 ? '' : 's') + ' so far.' : '.');
       const fuLine = fuN ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Followed up ' + fuN + ' time' + (fuN === 1 ? '' : 's') + ', last ' + this.fmtDate((r.followups[fuN - 1] || '').slice(0, 10)) + '.</div>' : '';
-      statusBlock = '<div style="font-size:12px;line-height:1.6;color:' + (overdue ? 'var(--amber)' : 'var(--t2)') + ';' + (overdue ? 'font-weight:700;' : '') + '">' + ageText + '</div>' + fuLine
-        + '<div class="f" style="width:200px;margin:12px 0 0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-recovered" step="0.01" value="' + (parseFloat(r.overcharge) || 0).toFixed(2) + '"/></div></div>';
+      // Vendor contact, right in the step, so a follow-up can be a call or an email
+      // without hunting the rep down. Email reminder drafts the message; logging the
+      // follow-up is the separate button (a call counts the same).
+      const v = this.vendors().find(x => x.name === r.vendor) || null;
+      const cbits = [];
+      if (v && v.rep) cbits.push('<span style="color:var(--t1);font-weight:600;">' + esc(v.rep) + '</span>');
+      if (v && v.phone) cbits.push('<a href="tel:' + esc(String(v.phone).replace(/[^0-9+]/g, '')) + '" style="color:var(--gold);text-decoration:none;">' + esc(v.phone) + '</a>');
+      if (v && v.email) cbits.push('<a href="' + this._creditMailtoHref(r, true) + '" style="color:var(--gold);text-decoration:none;">Email reminder</a>');
+      if (v && v.account_number) cbits.push('<span style="color:var(--t3);">Acct ' + esc(v.account_number) + '</span>');
+      const contactBlock = cbits.length
+        ? '<div style="margin-top:12px;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;"><span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Reach the vendor</span>' + cbits.join('<span style="color:var(--t4);">&middot;</span>') + '</div>'
+        : '<div style="margin-top:12px;font-size:11px;color:var(--t3);">No contact saved for ' + esc(r.vendor || 'this vendor') + '. Add a rep, phone, and email in Inventory under Vendors.</div>';
+      statusBlock = '<div style="font-size:12px;line-height:1.6;color:' + (overdue ? 'var(--amber)' : 'var(--t2)') + ';' + (overdue ? 'font-weight:700;' : '') + '">' + ageText + '</div>' + fuLine + contactBlock
+        + '<div class="f" style="width:200px;margin:14px 0 0;"><label>Recovered Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-recovered" step="0.01" value="' + (parseFloat(r.overcharge) || 0).toFixed(2) + '"/></div></div>';
       actions = '<button class="btn btn-primary" id="vdm-resolve">Mark Resolved</button>'
-        + '<button class="btn btn-ghost" id="vdm-followup">Follow Up</button>'
+        + '<button class="btn btn-ghost" id="vdm-followup">Log Follow-Up</button>'
         + '<button class="btn btn-ghost" id="vdm-closenc">Close, no credit</button>';
     } else {
       const rec = r.recovered_amount != null ? r.recovered_amount : r.overcharge;
@@ -566,8 +537,7 @@ S.VendorTracker = {
       actions = '<button class="btn btn-ghost" id="vdm-reopen">Reopen</button>';
     }
 
-    card.innerHTML = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Vendor Discrepancy</span>'
-      + '<span id="vdm-view" style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:none;color:var(--gold);cursor:pointer;white-space:nowrap;">View in Vendor Tracker &rsaquo;</span></div>'
+    card.innerHTML = '<div class="card-title">Vendor Discrepancy</div>'
       + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(r.sku || '(unrecorded)') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + esc(r.vendor || '-') + ' &middot; ' + esc(r.type || 'Other') + '</div>'
       + this._vdRail(r)
@@ -603,7 +573,6 @@ S.VendorTracker = {
       flushNotes();
       if (!Array.isArray(r.followups)) r.followups = [];
       r.followups.push(new Date().toISOString());
-      window.location.href = this._creditMailtoHref(r, true);
       App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
     });
     card.querySelector('#vdm-closenc')?.addEventListener('click', async () => {
@@ -620,10 +589,6 @@ S.VendorTracker = {
     card.querySelector('#vdm-reopen')?.addEventListener('click', () => {
       r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount; delete r.no_credit;
       App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
-    });
-    card.querySelector('#vdm-view')?.addEventListener('click', () => {
-      flushNotes();
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => { this._vdClose(); this.tab = 'discrepancies'; App.showApp('profit'); App.navigate('vendor-tracker'); });
     });
     card.querySelector('#vdm-close')?.addEventListener('click', () => { flushNotes(); App.putRecord('core', 'vendor_discrepancy', r).then(() => this._vdClose()); });
     card.querySelector('#vdm-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'vendor_discrepancy', r.id); this._vdClose(); });
@@ -664,7 +629,7 @@ S.VendorTracker = {
       { p: ['One place to keep your vendors honest. Three tabs read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log where you chase credits.'] },
       { h: 'Scorecard', p: ['Each vendor rolled up over the range you pick: total spend, net price drift, short counts, open and recovered credits, and average days to a credit. Vendors causing the most pain sort to the top, with a status read of High, Watch, or Clean. Take this into your quarterly vendor review and ask for a price match on every line that drifted up. Export PDF saves the rollup.'] },
       { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory Control, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
-      { h: 'Discrepancies', p: ['Every credit claim you are owed, each with a progress rail showing exactly where it stands: Filed, Credit Requested, then Resolved. Claims get filed over in Inventory: flag the line at the dock in Receive Delivery, or open a saved delivery in Delivery History and flag it there if the problem turned up later. Click any claim here to work it: Request Credit drafts the email to your rep, Follow Up re-drafts a reminder and logs the date when they have gone quiet, Mark Resolved records what you actually got back, and Close, no credit ends a claim the vendor will not pay. Anything sitting in Credit Requested too long shows under Follow Up Due so a credit you are owed never slips your mind.'] }
+      { h: 'Discrepancies', p: ['A read-only rollup of every credit claim you are owed, open and resolved, with its status, how long it has waited, and what you have recovered, for the recovery math. You do not work claims here. They are filed and chased over in Inventory: flag the line when you receive a delivery in Receive Delivery (or open a saved one in Delivery History), then work the Credits to Chase list under the Receive Delivery form to request the credit, log a follow-up, and mark it resolved. This tab is just the picture of where all your vendor credits stand.'] }
     ]);
   }
 };

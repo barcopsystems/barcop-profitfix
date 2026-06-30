@@ -1955,26 +1955,27 @@ S.HubSettings = {
       price_change_count:lines.filter(l => l.price_changed).length,
       has_discrepancy:lines.some(l => l.price_changed), created_at:daysAgoISO(daysAgo)
     });
-    App.inventoryData.ic_deliveries = [
-      mkDelivery(31, 'Republic National', 'RN-55021', [
-        icDLine(icProducts[0], 24, 21.40, 21.40),
-        icDLine(icProducts[1], 18, 23.60, 23.60),
-        icDLine(icProducts[2], 12, 27.90, 27.90),
-      ]),
-      mkDelivery(24, "Glazer's Beer & Bev", 'GLZ-3318', [
-        icDLine(icProducts[6], 20, 32.40, 30.72),
-        icDLine(icProducts[7], 15, 22.80, 22.80),
-      ]),
-      mkDelivery(17, 'Sysco Foods', 'SY-90455', [
-        icDLine(icProducts[9],  200, 4.20, 3.95),
-        icDLine(icProducts[10], 160, 2.95, 2.95),
-        icDLine(icProducts[11], 80,  4.60, 4.60),
-      ]),
-      mkDelivery(10, 'Republic National', 'RN-55190', [
-        icDLine(icProducts[0], 24, 22.40, 21.40),
-        icDLine(icProducts[3], 12, 31.00, 31.00),
-      ]),
-    ];
+    // The four most recent invoices are captured so the seeded vendor
+    // discrepancies below can tie to the delivery they were flagged on.
+    const delRN1 = mkDelivery(31, 'Republic National', 'RN-55021', [
+      icDLine(icProducts[0], 24, 21.40, 21.40),
+      icDLine(icProducts[1], 18, 23.60, 23.60),
+      icDLine(icProducts[2], 12, 27.90, 27.90),
+    ]);
+    const delGLZ = mkDelivery(24, "Glazer's Beer & Bev", 'GLZ-3318', [
+      icDLine(icProducts[6], 20, 32.40, 30.72),
+      icDLine(icProducts[7], 15, 22.80, 22.80),
+    ]);
+    const delSY = mkDelivery(17, 'Sysco Foods', 'SY-90455', [
+      icDLine(icProducts[9],  200, 4.20, 3.95),
+      icDLine(icProducts[10], 160, 2.95, 2.95),
+      icDLine(icProducts[11], 80,  4.60, 4.60),
+    ]);
+    const delRN2 = mkDelivery(10, 'Republic National', 'RN-55190', [
+      icDLine(icProducts[0], 24, 22.40, 21.40),
+      icDLine(icProducts[3], 12, 31.00, 31.00),
+    ]);
+    App.inventoryData.ic_deliveries = [delRN1, delGLZ, delSY, delRN2];
 
     // ── Full quarter of delivery history (ties to COGS) ───────────────────────
     // Each SKU is reordered on its own cadence based on how fast it moves in
@@ -2100,25 +2101,37 @@ S.HubSettings = {
     // Three caught and recovered, one still in Credit Requested (the filed-but-
     // uncollected credit the Profit Audit surfaces under Vendor Control) that has
     // sat 9 days since the request with no response, so it reads as Follow Up Due.
-    // All recent, none aging past 60 days. Feeds Inventory Execution + the BCA.
+    // Each is tied to the delivery it was flagged on (so it shows in Delivery
+    // History and the Credits to Chase list). All recent, none aging past 60 days.
+    // Feeds Inventory Execution + the BCA.
     App.data.vendor_discrepancies = [
-      { id:uid(), date:dateStr(52), vendor:'Republic National', reference:'RN-54880', type:'Overcharge',
+      { id:uid(), date:dateStr(31), vendor:'Republic National', reference:'RN-55021', type:'Overcharge',
         product_id:icProducts[0].id, sku:icProducts[0].name, units:24, agreed_price:21.40, invoiced_price:22.65,
-        overcharge:30, notes:'Billed above agreed case price', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(52), resolved_at:daysAgoISO(40), recovered_amount:30 },
-      { id:uid(), date:dateStr(33), vendor:'Sysco Foods', reference:'SY-90201', type:'Short Delivery',
+        overcharge:30, notes:'Billed above agreed case price', status:'Resolved', source:'inventory', delivery_id:delRN1.id,
+        filed_at:daysAgoISO(31), resolved_at:daysAgoISO(24), recovered_amount:30 },
+      { id:uid(), date:dateStr(17), vendor:'Sysco Foods', reference:'SY-90455', type:'Short Delivery',
         product_id:icProducts[9].id, sku:icProducts[9].name, units:8, agreed_price:4.20, invoiced_price:4.20,
-        overcharge:34, notes:'Two cases short, caught at receiving', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(33), resolved_at:daysAgoISO(22), recovered_amount:34 },
-      { id:uid(), date:dateStr(21), vendor:'Republic National', reference:'RN-55021', type:'Overcharge',
+        overcharge:34, notes:'Two cases short, caught at receiving', status:'Resolved', source:'inventory', delivery_id:delSY.id,
+        filed_at:daysAgoISO(17), resolved_at:daysAgoISO(10), recovered_amount:34 },
+      { id:uid(), date:dateStr(31), vendor:'Republic National', reference:'RN-55021', type:'Overcharge',
         product_id:icProducts[2].id, sku:icProducts[2].name, units:12, agreed_price:27.90, invoiced_price:28.90,
-        overcharge:12, notes:'Price drift on a single line', status:'Resolved', source:'manual',
-        filed_at:daysAgoISO(21), resolved_at:daysAgoISO(12), recovered_amount:12 },
-      { id:uid(), date:dateStr(11), vendor:"Glazer's Beer & Bev", reference:'GLZ-3402', type:'Overcharge',
+        overcharge:12, notes:'Price drift on a single line', status:'Resolved', source:'inventory', delivery_id:delRN1.id,
+        filed_at:daysAgoISO(31), resolved_at:daysAgoISO(22), recovered_amount:12 },
+      { id:uid(), date:dateStr(24), vendor:"Glazer's Beer & Bev", reference:'GLZ-3318', type:'Overcharge',
         product_id:icProducts[6].id, sku:icProducts[6].name, units:48, agreed_price:1.35, invoiced_price:1.50,
-        overcharge:72, notes:'Unagreed price increase, credit requested', status:'Credit Requested', source:'manual',
-        filed_at:daysAgoISO(11), credit_requested_at:daysAgoISO(9), resolved_at:null },
+        overcharge:72, notes:'Unagreed price increase, credit requested', status:'Credit Requested', source:'inventory', delivery_id:delGLZ.id,
+        filed_at:daysAgoISO(24), credit_requested_at:daysAgoISO(9), resolved_at:null },
     ];
+    // Stamp the flagged delivery line so Delivery History reads File / Filed / Resolved.
+    (function stampDiscLines() {
+      const vd = App.data.vendor_discrepancies;
+      const mark = (del, rec) => {
+        const li = (del.line_items || []).find(l => l.product_id === rec.product_id);
+        if (li) li.discrepancy_id = rec.id;
+        del.has_discrepancy = true;
+      };
+      mark(delRN1, vd[0]); mark(delSY, vd[1]); mark(delRN1, vd[2]); mark(delGLZ, vd[3]);
+    })();
 
     // ── Inventory Adjustment Log ─────────────────────────────────────────
     // A few documented adjustments across the trailing 8 weeks: a couple of
