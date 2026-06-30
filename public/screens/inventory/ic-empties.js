@@ -420,13 +420,11 @@ S.InventoryEmpties = {
       + this.formRows(e, 'eme-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="eme-save">Update Entry</button>'
-        + '<button class="btn btn-ghost" id="eme-cancel">Cancel</button>'
         + '<span id="eme-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="eme-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'em-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('eme-save')?.addEventListener('click', () => this.saveEdit('eme-', 'em-edit-modal'));
-    document.getElementById('eme-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('em-edit-modal'); });
     document.getElementById('eme-del')?.addEventListener('click', async () => {
       if (!(await App.confirmDelete())) return;
       await App.removeRecord('ic', 'empty', id);

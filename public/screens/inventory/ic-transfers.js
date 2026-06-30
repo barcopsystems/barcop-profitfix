@@ -467,13 +467,11 @@ S.InventoryTransfers = {
       + this.formRows(t, 'tre-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tre-save">Update Transfer</button>'
-        + '<button class="btn btn-ghost" id="tre-cancel">Cancel</button>'
         + '<span id="tre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="tre-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'tr-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('tre-save')?.addEventListener('click', () => this.saveEdit('tre-', 'tr-edit-modal'));
-    document.getElementById('tre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('tr-edit-modal'); });
     document.getElementById('tre-del')?.addEventListener('click', async () => {
       if (!(await App.confirmDelete())) return;
       await App.removeRecord('ic', 'transfer', id);

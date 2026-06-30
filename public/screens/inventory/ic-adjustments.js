@@ -514,13 +514,11 @@ S.InventoryAdjustments = {
       + this.formRows(r, 'adje-')
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="adje-save">Update Adjustment</button>'
-        + '<button class="btn btn-ghost" id="adje-cancel">Cancel</button>'
         + '<span id="adje-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
         + '<button class="btn btn-danger" id="adje-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'adj-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('adje-save')?.addEventListener('click', () => this.saveEdit('adje-', 'adj-edit-modal'));
-    document.getElementById('adje-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('adj-edit-modal'); });
     document.getElementById('adje-del')?.addEventListener('click', async () => {
       if (!(await App.confirmDelete())) return;
       await App.removeRecord('ic', 'adjustment', id);

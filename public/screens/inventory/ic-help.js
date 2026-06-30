@@ -49,7 +49,7 @@ S.InventoryHelp = {
       { q: 'How does Bar Cop help me get pars right over time?',
         a: 'Dynamic Pars builds a recommendation from your real usage instead of gut feel: average weekly usage over a recent window times your delivery cycle, plus a safety buffer. It pulls the delivery cycle from the vendor when it can, shows each suggestion with the cash it frees up or ties up, and flags each product to Increase, Reduce, or leave alone. You apply the ones you agree with and keep the rest as they are. Run it monthly or quarterly to keep pars honest as the bar changes.' },
       { q: 'What happens when a delivery comes up short or the price moved?',
-        a: 'When you receive the delivery, Bar Cop flags any line where the quantity is short of what you ordered or the price has moved off the product master, and a Flag button opens a pre-filled claim right there without leaving the screen. File it and the item lands in Vendor Tracker under Discrepancies as an open credit you can chase, and the price change itself feeds Vendor Tracker, so a vendor quietly creeping prices up shows up before it eats your margin.' }
+        a: 'When you receive the delivery, Bar Cop flags any line where the quantity is short of what you ordered or the price has moved off the product master, and a Flag button opens a pre-filled claim right there without leaving the screen. File it and the claim lands in the Credits to Chase list under the Receive Delivery form, where you request the credit, log a follow-up, and mark it resolved. The price change itself feeds Vendor Tracker, so a vendor quietly creeping prices up shows up before it eats your margin.' }
     ]},
     { t: 'Operations', qa: [
       { q: 'When should I use the Adjustment Log instead of editing a count?',
@@ -63,7 +63,7 @@ S.InventoryHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Inventory Control to Profit Recovery?',
-        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list Profit Recovery reads. Counts feed Profit This Week COGS and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines feed Vendor Discrepancies. Spot Checks and confirmed-theft adjustments feed Loss Prevention. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
+        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list Profit Recovery reads. Counts feed Profit This Week COGS and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines become the vendor credit claims you chase in Receive Delivery, with the rollup in Vendor Tracker. Spot Checks and confirmed-theft adjustments feed Loss Prevention. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
       { q: 'What feeds Loss Prevention from Inventory?',
         a: 'Three signals. Spot Check variance flags, where physical pours sold do not match what the POS rang. Adjustment Log entries marked Theft within the last 90 days. And variance investigations you open from a flagged line on the Variance Report or a Spot Check, worked right where you flag them. The more honestly those get logged, the sharper Loss Prevention reads, because it is only as good as the data underneath it.' },
       { q: 'What flows from Inventory Control into Accounting?',

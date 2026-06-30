@@ -695,13 +695,12 @@ S.InventoryProducts = {
       + notes
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
-        + '<button class="btn btn-ghost" id="ip-cancel">Cancel</button>'
         + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
     + '</div>';
     // Popup over the products list (which stays mounted behind), instead of
-    // swapping the whole page out. noClose drops the corner X; Cancel closes it.
-    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920, noClose: true });
+    // swapping the whole page out. The corner X closes it (and re-renders the landing).
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 920, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
 
     this._wireForm();
   },
@@ -763,7 +762,6 @@ S.InventoryProducts = {
   },
 
   _wireForm() {
-    document.getElementById('ip-cancel')?.addEventListener('click', () => { App.closeModal('ip-form-modal'); this.renderLanding(); });
     document.getElementById('ip-save')?.addEventListener('click', () => this.save());
     document.getElementById('ip-name')?.focus();
 
@@ -1173,7 +1171,6 @@ S.InventoryProducts = {
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 18px;">' + fieldsHTML + '</div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="be-apply-btn">Apply to ' + n + ' Product' + (n === 1 ? '' : 's') + '</button>'
-        + '<button class="btn btn-ghost" id="be-cancel">Cancel</button>'
         + '<span id="be-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
     + '</div>';
@@ -1182,7 +1179,6 @@ S.InventoryProducts = {
   },
 
   _wireBulk(cat, spec, ids) {
-    document.getElementById('be-cancel')?.addEventListener('click', () => App.closeModal('ip-bulk-modal'));
     document.getElementById('be-apply-btn')?.addEventListener('click', () => this.applyBulk(ids));
     document.getElementById('be-size')?.addEventListener('change', e => {
       const cw = document.getElementById('be-cw'); if (cw) cw.style.display = e.target.value === 'custom' ? '' : 'none';

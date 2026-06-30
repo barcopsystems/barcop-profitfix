@@ -892,7 +892,7 @@ S.InventoryReceiveDelivery = {
         + '<button type="button" id="rdp-confirm" class="btn btn-primary">Save Delivery</button>'
         + '<button type="button" id="rdp-cancel" class="btn btn-ghost">Back to Edit</button>'
         + '</div></div>';
-      App.openModal(html, { id: 'rdp-modal', maxWidth: 560, noClose: true });
+      App.openModal(html, { id: 'rdp-modal', maxWidth: 560, noX: true });
       const collect = cls => new Set([...document.querySelectorAll('.' + cls + ':checked')].map(c => parseInt(c.dataset.idx, 10)));
       document.getElementById('rdp-cancel')?.addEventListener('click', () => { App.closeModal('rdp-modal'); resolve(null); });
       document.getElementById('rdp-confirm')?.addEventListener('click', () => {

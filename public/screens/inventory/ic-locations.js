@@ -691,7 +691,7 @@ S.InventoryLocations = {
     this.triageChecked = new Set();
     const firstLoc = this.locations().find(l => !l.archived);
     this._triageDest = firstLoc ? firstLoc.name : '';
-    App.openModal(this.triageModalHTML(), { id: 'il-triage', maxWidth: 600, noClose: true });
+    App.openModal(this.triageModalHTML(), { id: 'il-triage', maxWidth: 600, onClose: () => { App.closeModal('il-triage'); this.renderList(); } });
     this.wireTriage();
   },
 
@@ -707,7 +707,6 @@ S.InventoryLocations = {
       + '<div id="il-triage-filter">' + this.triageFilterHTML() + '</div>'
       + '<div class="card-actions" style="align-items:center;">'
         + '<button class="btn btn-primary" id="il-triage-assign">Assign to Location</button>'
-        + '<button class="btn btn-ghost" id="il-triage-close">Cancel</button>'
         + '<span id="il-triage-count" style="font-size:12px;color:var(--t3);margin-left:4px;">0 products selected</span>'
       + '</div></div>';
   },
@@ -737,7 +736,6 @@ S.InventoryLocations = {
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx('triage'); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx('triage'); return; }
       if (ev.target.closest('#il-triage-assign')) { this.assignTriage(); return; }
-      if (ev.target.closest('#il-triage-close'))  { App.closeModal('il-triage'); this.renderList(); return; }
     };
     m.onchange = ev => {
       if (ev.target.id === 'il-triage-dest') { this._triageDest = ev.target.value; return; }
