@@ -450,7 +450,7 @@ S.VendorTracker = {
   openDiscrepancyModal(opts) {
     opts = opts || {};
     this._vd = { prefill: opts.prefill || {}, onClose: opts.onClose || null, onFiled: opts.onFiled || null };
-    App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 700, noClose: true });
+    App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 700, onClose: () => this._vdClose() });
     this._renderVdBody(opts.discrepancyId || null);
   },
   _vdClose() {
@@ -489,9 +489,7 @@ S.VendorTracker = {
         + '</div>'
         + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><input type="text" id="vdm-notes" value="' + esc(pf.notes || '') + '" placeholder="What was wrong, and who you contacted"/></div></div>'
         + '<div id="vdm-err" style="color:var(--red);font-size:12px;margin-bottom:6px;display:none;"></div>'
-        + '<div class="card-actions"><button class="btn btn-primary" id="vdm-file">File Discrepancy</button>'
-        + '<button class="btn btn-ghost" id="vdm-cancel">Cancel</button></div>';
-      card.querySelector('#vdm-cancel').addEventListener('click', () => this._vdClose());
+        + '<div class="card-actions"><button class="btn btn-primary" id="vdm-file">File Discrepancy</button></div>';
       card.querySelector('#vdm-file').addEventListener('click', () => this._vdFile());
       return;
     }
@@ -551,7 +549,6 @@ S.VendorTracker = {
       + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Notes</label>'
       + '<textarea id="vdm-notes-w" rows="2" placeholder="What was wrong, and who you contacted" style="' + iSt + 'width:100%;margin-top:5px;resize:vertical;">' + esc(r.notes || '') + '</textarea></div>'
       + '<div class="card-actions" style="flex-wrap:wrap;">' + actions
-      + '<button class="btn btn-ghost" id="vdm-close">Close</button>'
       + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
 
     const flushNotes = () => { const ta = card.querySelector('#vdm-notes-w'); if (ta) r.notes = ta.value; };
@@ -590,7 +587,6 @@ S.VendorTracker = {
       r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount; delete r.no_credit;
       App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
     });
-    card.querySelector('#vdm-close')?.addEventListener('click', () => { flushNotes(); App.putRecord('core', 'vendor_discrepancy', r).then(() => this._vdClose()); });
     card.querySelector('#vdm-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'vendor_discrepancy', r.id); this._vdClose(); });
   },
   _vdFile() {
