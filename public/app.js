@@ -229,6 +229,18 @@ document.addEventListener('click', ev => {
 });
 document.addEventListener('scroll', () => TT.hide(), true);
 
+// Delegated "+ Note" toggle (App.noteField). Reveals/hides the collapsed note
+// box and focuses it on open. One handler covers every form, current and future.
+document.addEventListener('click', ev => {
+  const tg = ev.target.closest('.note-toggle');
+  if (!tg) return;
+  const box = document.getElementById(tg.dataset.target + '-box');
+  if (!box) return;
+  const showing = box.style.display !== 'none';
+  box.style.display = showing ? 'none' : 'block';
+  if (!showing) { const ta = box.querySelector('textarea'); if (ta) ta.focus(); }
+});
+
 /* ── App ── */
 const App = {
   data: null,
@@ -2957,6 +2969,27 @@ const App = {
   // want an obvious target, not a faint link.
   helpButton(id, label) {
     return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
+  },
+
+  // Collapsed "+ Note" field. Replaces an always-open notes textarea on a form
+  // with a small "+ Note" link that reveals a standard 2-row note box on click
+  // (so an empty notes box stops eating vertical space on every form). Auto-opens
+  // and shows a gold "Note" label when a note already exists, so an edit never
+  // hides a saved note. The toggle is handled by one delegated listener (below
+  // the TT click handler) so no per-form wiring is needed; collection reads the
+  // textarea by its id exactly as before. Matches the Take Inventory pattern.
+  noteField(opts) {
+    opts = opts || {};
+    const id = opts.id;
+    const val = opts.value != null ? String(opts.value) : '';
+    const has = !!val.trim();
+    const ph = opts.placeholder || 'Optional note';
+    const mt = opts.mt != null ? opts.mt : 14;
+    return '<div class="note-field" style="margin-top:' + mt + 'px;">'
+      + '<button type="button" class="note-toggle' + (has ? ' has' : '') + '" data-target="' + esc(id) + '">' + (has ? 'Note' : '+ Note') + '</button>'
+      + '<div class="note-box" id="' + esc(id) + '-box" style="margin-top:8px;' + (has ? '' : 'display:none;') + '">'
+      + '<textarea id="' + esc(id) + '" class="notes-ta" rows="2" placeholder="' + esc(ph) + '">' + esc(val) + '</textarea>'
+      + '</div></div>';
   },
 
   // ── Filter UI helpers: date presets + single-select chips ───────────────────
