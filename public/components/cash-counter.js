@@ -68,7 +68,7 @@ window.CashCounter = {
       + '</div>';
 
     return '<div class="cash-counter" data-prefix="' + p + '">'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px 18px;">'
+      + '<div style="display:grid;grid-template-columns:1fr;gap:10px 18px;">'
       +   this.DENOMS.map(row).join('')
       + '</div>'
       + coins
