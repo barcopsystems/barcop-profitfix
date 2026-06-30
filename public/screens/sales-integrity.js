@@ -283,6 +283,11 @@ S.SalesIntegrity = {
     this.container = container;
     if (actions) actions.innerHTML = '';
     this.draw();
+    const pend = App._pendingInvestigation;
+    if (pend && pend.sku && !pend.productId) {
+      App._pendingInvestigation = null;
+      S.TheftRisk.openInvestigationModal(null, pend.sku, { stepsDef: this.INVESTIGATION_STEPS, onClose: () => this.draw() });
+    }
   },
 
   draw() {
@@ -456,15 +461,7 @@ S.SalesIntegrity = {
   // A flag opens a six-step investigation that lives in Loss Prevention, server
   // and cash focused (steps_def carries the text so Loss Prevention renders it).
   openInvestigation(name, staffId) {
-    const existing = (App.data.variance_investigations || []).find(i => i.status !== 'resolved' && i.sku === name + ' (sales)');
-    if (existing) { App.navigate('theft-risk'); return; }
-    const inv = {
-      id: App.uid(), product_id: '', sku: name + ' (sales)', source: 'sales-integrity',
-      opened_date: App.todayLocal(), created_at: new Date().toISOString(),
-      status: 'open', steps_def: this.INVESTIGATION_STEPS,
-      steps: this.INVESTIGATION_STEPS.map(() => ({ done: false, finding: '' })), resolution: ''
-    };
-    App.putRecord('core', 'variance_investigation', inv).then(() => App.navigate('theft-risk'));
+    S.TheftRisk.openInvestigationModal(null, name + ' (sales)', { stepsDef: this.INVESTIGATION_STEPS, onClose: () => this.draw() });
   },
 
   // ── PDF ─────────────────────────────────────────────────────────────────────

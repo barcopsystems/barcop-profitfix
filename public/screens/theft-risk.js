@@ -76,7 +76,7 @@ S.TheftRisk = {
 
     // Banner: the act-now cue when there are flags in the last 7 days.
     const banner = flagsWeek > 0
-      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);"><strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Review below and open an investigation on anything that does not add up.</div>'
+      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);"><strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Open an investigation where it flagged: product variances in the Variance Report, server patterns in Sales Integrity.</div>'
       : '';
 
     // Stat strip (no score — counts + dollars that drive action).
@@ -113,71 +113,52 @@ S.TheftRisk = {
 
     // Wiring
     document.getElementById('tr-brief')?.addEventListener('click', () => this.printBrief());
-
-    this.container.querySelector('.vi-open-btn')?.addEventListener('click', () => {
-      const sel = this.container.querySelector('.vi-product-select');
-      const productId = sel && sel.value;
-      if (!productId) { if (sel) sel.style.borderColor = 'var(--red)'; return; }
-      const p = this.productById(productId);
-      const existing = (App.data.variance_investigations || []).find(i => i.product_id === productId && i.status !== 'resolved');
-      if (existing) { App.pushView(() => this.renderInvestigation(existing.id)); return; }
-      const inv = {
-        id: App.uid(), product_id: productId, sku: (p && p.name) || productId,
-        opened_date: App.todayLocal(), created_at: new Date().toISOString(),
-        status: 'open', steps: this.VARIANCE_STEPS.map(() => ({ done: false, finding: '' })), resolution: ''
-      };
-      App.putRecord('core', 'variance_investigation', inv);
-      App.pushView(() => this.renderInvestigation(inv.id));
-    });
     this.container.querySelector('.vi-print-blank')?.addEventListener('click', () => this.printBlankInvestigation());
-    this.container.querySelectorAll('.vi-open-detail').forEach(b => b.addEventListener('click', () => App.pushView(() => this.renderInvestigation(b.dataset.inv))));
+    this.container.querySelectorAll('.vi-work').forEach(b => b.addEventListener('click', () => this._workInvestigation(b.dataset.inv)));
     this.container.querySelectorAll('.vi-remove').forEach(b => b.addEventListener('click', () => {
       App.removeRecord('core', 'variance_investigation', b.dataset.inv).then(() => this.renderMain());
     }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderMain())));
   },
 
-  // ── Variance Investigations — compact list (drill into one) ───────────────
+  INV_FOLLOWUP_DAYS: 7,
+
+  // ── Investigations — read-only rollup; Work jumps to the source ─────────────
+  // Loss Prevention is the cross-source overview (variance, spot-check, sales).
+  // Investigations only ever START from a real flag and are worked in place at
+  // the source via the shared modal; here you see them all and Work jumps you to
+  // the right place with that modal open. [[two-doors-same-data]]
   investigationsSection() {
     const invs = App.data.variance_investigations || [];
     const open = invs.filter(i => i.status !== 'resolved');
     const resolved = invs.filter(i => i.status === 'resolved');
 
-    const prods = this.products();
-    const catOrder = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
-    const cats = [...new Set(prods.map(p => p.category || 'Other'))]
-      .sort((a, b) => { const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-    let productOpts = '<option value="">Pick a product to investigate...</option>';
-    cats.forEach(cat => {
-      productOpts += '<optgroup label="' + esc(cat) + '">';
-      prods.filter(p => (p.category || 'Other') === cat).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        .forEach(p => { productOpts += '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; });
-      productOpts += '</optgroup>';
-    });
-
-    let h = '<div class="sh" style="margin:22px 0 10px;">Variance Investigations</div>'
-      + '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Open an Investigation</span>'
-      +   '<button class="btn btn-ghost btn-sm no-print vi-print-blank">Worksheet</button></div>'
-      + '<div class="form-row" style="gap:12px;align-items:flex-end;margin-bottom:0;">'
-      + '<div class="f" style="width:300px;"><label>Product</label><select class="form-input vi-product-select">' + productOpts + '</select></div>'
-      + '<button class="btn btn-primary vi-open-btn">Open Investigation</button>'
-      + '</div></div>';
+    let h = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
+      + '<div class="sh" style="margin:0;">Investigations</div>'
+      + '<button class="btn btn-ghost btn-sm vi-print-blank">Worksheet</button></div>';
 
     if (open.length) {
       const rows = open.slice(0, App.listLimit('core', 'variance_investigation')).map(inv => {
+        const total = inv.steps.length || 6;
         const doneN = inv.steps.filter(s => s.done).length;
+        const age = inv.opened_date ? Math.floor((Date.now() - new Date(inv.opened_date + 'T00:00:00').getTime()) / 86400000) : null;
+        const aged = age != null && age >= this.INV_FOLLOWUP_DAYS;
+        const ageHtml = age == null ? '-'
+          : (aged ? '<span style="color:var(--amber);font-weight:700;">Open ' + age + 'd, follow up</span>' : 'Open ' + age + 'd');
         return '<tr>'
           + '<td><div class="val">' + esc(inv.sku) + '</div></td>'
           + '<td>' + esc(inv.opened_date) + '</td>'
-          + '<td class="' + (doneN === 6 ? 'pos' : '') + '">' + doneN + ' of 6 steps</td>'
-          + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm vi-open-detail" data-inv="' + esc(inv.id) + '">Open</button></td>'
+          + '<td>' + ageHtml + '</td>'
+          + '<td class="' + (doneN === total ? 'pos' : '') + '">' + doneN + ' of ' + total + ' steps</td>'
+          + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm vi-work" data-inv="' + esc(inv.id) + '">Work</button></td>'
           + '</tr>';
       }).join('');
       h += '<div class="sh" style="margin:18px 0 10px;">Open</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Opened</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '<th>Investigation</th><th>Opened</th><th>Age</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         + App.showOlderBar('core', 'variance_investigation', open, false);
+    } else {
+      h += '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No open investigations. They start from a flag in the Variance Report or Sales Integrity and show here while you work them.</div></div>';
     }
 
     if (resolved.length) {
@@ -191,91 +172,24 @@ S.TheftRisk = {
         + '</tr>').join('');
       h += '<div class="sh" style="margin:18px 0 10px;">Resolved</div>'
         + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Product</th><th>Resolved</th><th>Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '<th>Investigation</th><th>Resolved</th><th>Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         + App.showOlderBar('core', 'variance_investigation', newest, false);
     }
     return h;
   },
 
-  // ── One investigation, drilled into (floating back returns to the landing) ──
-  renderInvestigation(id) {
-    const inv = this._inv(id);
-    if (!inv) { App.navigate('theft-risk'); return; }
-    const doneN = inv.steps.filter(s => s.done).length;
-    // A Sales Integrity flag opens a server-focused investigation carrying its own
-    // step text (steps_def) and no product, so skip the product-pour live data.
-    const stepDefs = inv.steps_def || this.VARIANCE_STEPS;
-    const liveData = inv.product_id ? this.investigationLiveData(inv.product_id) : { step2: '', step3: '' };
-    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:3px;color:var(--t1);font-size:13px;padding:7px 10px;color-scheme:dark;';
-
-    let steps = '';
-    inv.steps.forEach((s, idx) => {
-      const st = stepDefs[idx] || { title: '', detail: '' };
-      let extra = '';
-      if (idx === 1 && liveData.step2) extra = liveData.step2;
-      if (idx === 2 && liveData.step3) extra = liveData.step3;
-      steps += '<div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--b2);">'
-        + '<input type="checkbox" class="vi-step-check" data-step="' + idx + '"' + (s.done ? ' checked' : '')
-        + ' style="margin-top:3px;flex-shrink:0;width:16px;height:16px;accent-color:var(--gold);"/>'
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:13px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + (idx + 1) + '. ' + esc(st.title) + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);line-height:1.55;margin:3px 0 8px;">' + esc(st.detail) + '</div>'
-        + extra
-        + '<input type="text" class="vi-finding" data-step="' + idx + '" value="' + esc(s.finding) + '" placeholder="What you found" style="' + inputStyle + 'width:100%;"/>'
-        + '</div></div>';
-    });
-
-    this.container.innerHTML = '<div class="screen">'
-      + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Investigating</div><div class="calc-val lg">' + esc(inv.sku) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Opened</div><div class="calc-val lg">' + esc(inv.opened_date) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Progress</div><div class="calc-val lg' + (doneN === 6 ? ' good' : '') + '">' + doneN + ' / 6</div></div>'
-      + '</div></div>'
-      + '<div class="sh" style="margin:22px 0 10px;">The Six Steps</div>'
-      + '<div class="card form-card">' + steps
-      + '<div style="margin-top:14px;"><label style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Resolution</label>'
-      + '<textarea class="vi-resolution" rows="2" placeholder="The conclusion, even if inconclusive" style="' + inputStyle + 'width:100%;margin-top:5px;resize:vertical;">' + esc(inv.resolution || '') + '</textarea></div>'
-      + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary vi-save-btn">Save &amp; Close</button>'
-      + '<button class="btn btn-ghost vi-resolve-btn">Resolve &amp; Close</button>'
-      + '<button class="btn btn-danger vi-remove-detail" style="margin-left:auto;">Delete Investigation</button>'
-      + '</div>'
-      + '</div>';
-
-    this.container.querySelectorAll('.vi-step-check').forEach(c => c.addEventListener('change', () => {
-      inv.steps[+c.dataset.step].done = c.checked;
-      App.putRecord('core', 'variance_investigation', inv).then(() => this.renderInvestigation(id));
-    }));
-    this.container.querySelectorAll('.vi-finding').forEach(i => i.addEventListener('change', () => {
-      inv.steps[+i.dataset.step].finding = i.value;
-      App.putRecord('core', 'variance_investigation', inv);
-    }));
-    this.container.querySelector('.vi-resolution')?.addEventListener('change', e => {
-      inv.resolution = e.target.value;
-      App.putRecord('core', 'variance_investigation', inv);
-    });
-    // Save & Close — flush the latest entries and return to the list with the
-    // investigation still Open. The page already auto-saves; this is the explicit
-    // "step away, come back later" exit users expect.
-    this.container.querySelector('.vi-save-btn')?.addEventListener('click', () => {
-      this.container.querySelectorAll('.vi-finding').forEach(i => { inv.steps[+i.dataset.step].finding = i.value; });
-      const ta = this.container.querySelector('.vi-resolution');
-      if (ta) inv.resolution = ta.value;
-      App.putRecord('core', 'variance_investigation', inv).then(() => App.goBack());
-    });
-    this.container.querySelector('.vi-resolve-btn')?.addEventListener('click', () => {
-      this.container.querySelectorAll('.vi-finding').forEach(i => { inv.steps[+i.dataset.step].finding = i.value; });
-      const ta = this.container.querySelector('.vi-resolution');
-      if (ta) inv.resolution = ta.value;
-      inv.status = 'resolved';
-      inv.resolved_date = App.todayLocal();
-      App.putRecord('core', 'variance_investigation', inv).then(() => App.goBack());
-    });
-    this.container.querySelector('.vi-remove-detail')?.addEventListener('click', async () => {
-      if (!(await App.confirmDelete())) return;
-      App.removeRecord('core', 'variance_investigation', id).then(() => App.goBack());
-    });
+  // Work an open investigation: jump to where it flagged with the modal open.
+  // Product investigations live in the Inventory Variance Report; server/sales
+  // ones in Sales Integrity. The target consumes App._pendingInvestigation.
+  _workInvestigation(id) {
+    const inv = this._inv(id); if (!inv) return;
+    if (inv.product_id) {
+      App._pendingInvestigation = { productId: inv.product_id, sku: inv.sku };
+      App.openScreen('ic-report-variance');
+    } else {
+      App._pendingInvestigation = { sku: inv.sku };
+      App.navigate('sales-integrity');
+    }
   },
 
   // ── Shared investigation modal (Variance Report + Spot Check) ──────────────
