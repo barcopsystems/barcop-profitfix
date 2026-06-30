@@ -518,8 +518,8 @@ S.InventoryProducts = {
     const v = (val) => val != null && val !== '' ? val : '';
     const isActive = p ? p.active !== false : true;
 
-    // ── Header: standard form-card title; the Active toggle sits across from
-    // the title on the right (edit mode only). ─────────────────────────────────
+    // ── Header: standard form-card title; the Active toggle sits right after the
+    // title (edit mode only), leaving the top-right for the corner X. ───────────
     const titleText = this.editId ? 'Editing ' + esc(cat) + ' Product' : 'New ' + esc(spec.title) + ' Product';
 
     const statusHTML = this.editId
@@ -537,7 +537,7 @@ S.InventoryProducts = {
       + '</div>'
       : '';
 
-    const header = '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
+    const header = '<div class="card-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-right:30px;">'
       + '<span>' + titleText + '</span>'
       + statusHTML
     + '</div>';
