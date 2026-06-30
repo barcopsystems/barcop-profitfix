@@ -903,10 +903,10 @@ S.RevenueMenuItems = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your menu items file here',
-      dropSub: 'Needs a column for item name. Category, price, cost, and weekly covers come in too if your file has them. Items import without recipes; edit an item afterward to build its recipe or link an inventory product.',
+      dropSub: 'Needs a column for menu name. Category, price, cost, and weekly covers come in too if your file has them. Items import without recipes; edit an item afterward to build its recipe or link an inventory product.',
       actionsEl: '#mi-imp-actions',
       fields: [
-        { key: 'name',     label: 'Item Name',    required: true,  match: ['name', 'item', 'item name', 'product', 'description', 'menu item'] },
+        { key: 'name',     label: 'Menu Name',    required: true,  match: ['name', 'item', 'item name', 'menu name', 'product', 'description', 'menu item'] },
         { key: 'category', label: 'Category',     required: false, match: ['category', 'type', 'group', 'section'] },
         { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail'] },
         { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost'] },
