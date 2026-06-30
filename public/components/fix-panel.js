@@ -305,42 +305,6 @@ window.FixPanel = {
       + body + '</div>';
   },
 
-  // ── "How this works" modal for the Recovery Scoreboard (dashboard helper) ──
-  showRecoveryHelp() {
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;max-width:600px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">How the Recovery Scoreboard Works</div>'
-      + '<button class="btn btn-ghost btn-sm fp-rec-close">Close</button>'
-      + '</div>';
-    const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
-    const p  = t => '<p style="margin:0 0 10px;">' + t + '</p>';
-    const body = '<div style="padding:20px 22px 24px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;">'
-      + p('Two pieces work together: the Scoreboard up top tracks what you have already recovered, and the Fix Areas list below shows where the operation is still leaking. Same workflow, opposite ends.')
-      + sh('The Scoreboard')
-      + p('Tracks what Bar Cop has actually put back in your register since each fix went in. This is realized to date, not a projection: your measured per-week improvement times the weeks that have passed since the fix. An "on pace for $X per year" run-rate may appear as a clearly labeled secondary line, never as money already earned. Your own weekly numbers, measured before and after each fix. No industry averages.')
-      + sh('Fix Areas')
-      + p('The current weekly status of each gap. The band (On Target, Watch, Over) and dollar figure read from the latest week of your data, scored against your target. The dollar is the annualized cost of being off target at this week\'s pace.')
-      + p('Once you check steps in a fix process for a gap, the row also shows your step progress. Once you mark the fix implemented, the progress hides and the Scoreboard up top is where to watch.')
-      + sh('The Loop')
-      + p('1. Run the audit. It scores your operation and lists every gap with a dollar figure on what it costs you per year.')
-      + p('2. Pick a gap and open the fix process. Every step is a link into the part of Bar Cop that does the work.')
-      + p('3. When the fix is in place, click Mark Implemented and lock in the date.')
-      + sh('What Happens Next')
-      + p('Bar Cop watches the metric for that gap. It averages the 8 weeks before the date and the 8 weeks after and multiplies the improvement by your revenue base to get your per-week recovery. The Scoreboard shows that recovery realized to date, the weekly figure times the weeks since the fix, with the annual pace as a clearly labeled secondary line.')
-      + p('You see a preliminary figure once 2 weeks of after-data exist. It firms up over the next 6 weeks and settles at 8.')
-      + sh('The Honest Rule')
-      + p('A dollar figure only shows when the math comes from real data Bar Cop already holds. If a fix cannot be dollarized honestly, it still gets logged. Recovery for that fix shows as the score moving, not the dollars.')
-      + '</div>';
-    box.innerHTML = head + body;
-    m.appendChild(box);
-    document.body.appendChild(m);
-    m.onclick = ev => { if (ev.target === m) m.remove(); };
-    box.querySelector('.fp-rec-close')?.addEventListener('click', () => m.remove());
-  },
-
   // Vertical fix-event markers for an annotated trend chart. xFn maps a week
   // index to an x coordinate; top/bottom are the plot edges.
   markerSvg(markers, xFn, top, bottom) {
@@ -645,9 +609,6 @@ window.FixPanel = {
     });
     container.querySelectorAll('.fp-step').forEach(step => {
       step.addEventListener('click', () => App.openScreen(step.dataset.screen));
-    });
-    container.querySelectorAll('.fp-rec-help').forEach(btn => {
-      btn.addEventListener('click', ev => { ev.stopPropagation(); this.showRecoveryHelp(); });
     });
   },
 
