@@ -236,7 +236,7 @@ S.RevenueMenuEngineering = {
     const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val">' + val + '</div></div>';
 
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Reprice ' + esc(item.name) + '</div>'
-      + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;">'
+      + '<div style="display:flex;gap:24px;flex-wrap:wrap;border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;margin-bottom:16px;">'
       +   stat('Current Price', f(item.price))
       +   stat('Cost', f(cost))
       +   stat('Current Cost %', curPct.toFixed(1) + '%')
@@ -509,19 +509,18 @@ S.RevenueMenuEngineering = {
       + '<td><div class="val">' + esc(entry.item_name || '') + '</div></td>'
       + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
       + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
-      + '<td style="font-size:11px;">' + vCell + '</td>'
-      + '<td style="font-size:11px;color:var(--t2);">' + esc(entry.reason || '') + '</td></tr>';
+      + '<td style="font-size:11px;">' + vCell + '</td></tr>';
   },
 
   reviewLogHtml() {
     const log = (App.data.revenue_price_log || []).slice().reverse();
     const rows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
-      || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
+      || '<tr><td colspan="5" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Pricing Review Log</div>'
       + '<button class="btn btn-ghost btn-sm" id="me-log-export">Export PDF</button></div>'
       + '<div id="me-log-export-root"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th>Reason</th>'
+      + '<th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
       + App.showOlderBar('core', 'revenue_price_log', log, false);
   }
