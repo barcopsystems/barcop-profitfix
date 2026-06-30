@@ -568,8 +568,10 @@ S.InventoryProducts = {
             + '</select></div>';
         })();
 
-    const row1 = '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:start;">'
-      + '<div class="f"><label>Product Name</label>'
+    // All identity + spec cells flow in ONE form-row (assembled below) so they
+    // pair into clean two columns and the single lone cell falls on the LAST row,
+    // not stranded mid-form. row1 + row2 are just cell strings now.
+    const row1 = '<div class="f"><label>Product Name</label>'
       + '<input type="text" id="ip-name" value="' + esc(p?.name || '') + '" placeholder="' + esc(this._namePlaceholder(cat)) + '"/></div>'
       + '<div class="f"><label>Brand</label>'
       + '<input type="text" id="ip-brand" value="' + esc(p?.brand || '') + '" placeholder="' + esc(this._brandPlaceholder(cat)) + '"/></div>'
@@ -577,8 +579,7 @@ S.InventoryProducts = {
       + '<div class="f"><label>Primary Vendor</label>'
       + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
       + '<div class="f"><label>Primary Location</label>'
-      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>'
-    + '</div>';
+      + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>';
 
     // ── Row 2: category-specific size/cost/par fields ─────────────────────
     let row2 = '';
@@ -586,7 +587,7 @@ S.InventoryProducts = {
       // Liquor / Wine / Draft Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
-      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = ''
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
@@ -600,13 +601,12 @@ S.InventoryProducts = {
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
-        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
-      + '</div>';
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
     } else if (spec.showCaseSize) {
       // Bottle Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
       const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
-      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = ''
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
         + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
@@ -620,13 +620,12 @@ S.InventoryProducts = {
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
-        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
-      + '</div>';
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
     } else if (spec.showUnitType) {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
-      row2 = '<div class="form-row ip-row2" style="gap:14px;margin-top:14px;flex-wrap:wrap;">'
+      row2 = ''
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
         + '<div class="f" id="ip-uw" style="width:140px;flex-shrink:0;' + (isCustomUnit ? '' : 'display:none;') + '"><label>Custom Unit</label>'
@@ -636,8 +635,7 @@ S.InventoryProducts = {
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
-        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>'
-      + '</div>';
+        + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
     }
 
     // ── Calc strip (pourable + bottle beer) ───────────────────────────────
@@ -687,8 +685,10 @@ S.InventoryProducts = {
 
     const formCard = '<div class="card form-card narrow-form">'
       + header
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:start;">'
       + row1
       + row2
+      + '</div>'
       + calcStrip
       + resaleBlock
       + servingBlock
