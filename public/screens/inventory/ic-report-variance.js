@@ -337,6 +337,11 @@ S.InventoryVarianceReport = {
     const pend = App._pendingInvestigation;
     if (pend && pend.productId) {
       App._pendingInvestigation = null;
+      // Land on the exact report + saved run the flag came from, then open the modal.
+      if (pend.vrRunId) {
+        const run = this.runs().find(r => r.id === pend.vrRunId);
+        if (run) { this.loadRun(run); if (pend.vrTab && pend.vrTab !== 'history') this.tab = pend.vrTab; this.draw(); }
+      }
       S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { onClose: () => this.draw() });
     }
   },
@@ -847,7 +852,7 @@ S.InventoryVarianceReport = {
     }));
     this.container.querySelectorAll('.vr-review').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
-      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { subtitle: b.dataset.reason, onClose: () => this.draw() });
+      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { subtitle: b.dataset.reason, vrTab: this.tab, vrRunId: this._viewRunId, onClose: () => this.draw() });
     }));
   },
 
