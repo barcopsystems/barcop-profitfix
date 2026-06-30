@@ -653,10 +653,7 @@ S.InventoryProducts = {
     }
 
     // ── Notes ─────────────────────────────────────────────────────────────
-    const notes = '<div class="form-row" style="gap:14px;margin-top:14px;">'
-      + '<div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="ip-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(p?.notes || '') + '</textarea></div>'
-    + '</div>';
+    const notes = App.noteField({ id: 'ip-notes', value: p?.notes });
 
     const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
 

@@ -229,7 +229,7 @@ S.InventoryAdjustments = {
       + '<th style="min-width:130px;">Reason</th><th style="width:110px;">Direction</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
       + '</tr></thead><tbody id="ajb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="ajb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ajb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      + App.noteField({ id: 'ajb-notes' });
   },
 
   builderCard() {
@@ -458,8 +458,7 @@ S.InventoryAdjustments = {
         + '<div class="calc-item"><div class="calc-label">Estimated Value</div><div class="calc-val" id="' + idp + 'c-value">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Unit Cost</div><div class="calc-val dim" id="' + idp + 'c-unitcost">-</div></div>'
       + '</div>'
-      + '<div class="f" style="margin-top:10px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div>';
+      + App.noteField({ id: idp + 'notes', value: r?.notes, mt: 10 });
   },
 
   // Reason → default direction, product → unit options, and live value recalc,

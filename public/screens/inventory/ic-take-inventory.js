@@ -394,7 +394,7 @@ S.InventoryTakeInventory = {
         + countInput
         + '<div style="display:flex;justify-content:center;margin-top:8px;"><button type="button" class="ti-oos btn btn-ghost btn-sm" data-pid="' + p.id + '">Out of Stock</button></div>'
         + '<div class="ti-note-wrap" data-pid="' + p.id + '" style="margin-top:10px;' + (hasNote ? '' : 'display:none;') + '">'
-        + '<input type="text" class="ti-note" data-pid="' + p.id + '" value="' + esc(c.notes || '') + '" placeholder="Optional note"/></div>'
+        + '<textarea class="ti-note" data-pid="' + p.id + '" rows="2" placeholder="Optional note">' + esc(c.notes || '') + '</textarea></div>'
         + '</div>';
     }).join('');
 

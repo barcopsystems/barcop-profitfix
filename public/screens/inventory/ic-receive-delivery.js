@@ -165,8 +165,7 @@ S.InventoryReceiveDelivery = {
       + '<div class="calc-item"><div class="calc-label">Short Counts</div><div class="calc-val lg" id="rd-shorts">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Delivery Total</div><div class="calc-val lg" id="rd-total">$0.00</div></div>'
       + '</div></div>'
-      + '<div class="form-row" style="gap:16px;margin-top:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="rd-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>'
+      + App.noteField({ id: 'rd-notes', mt: 16 })
       + '</div>';
 
     // Save actions sit below the card, like the other working screens.

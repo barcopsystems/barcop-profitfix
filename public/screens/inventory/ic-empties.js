@@ -197,7 +197,7 @@ S.InventoryEmpties = {
       + '<th style="width:90px;">Deposit</th><th style="min-width:150px;">Disposition</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
       + '</tr></thead><tbody id="emb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="emb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="emb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      + App.noteField({ id: 'emb-notes' });
   },
 
   builderCard() {
@@ -398,8 +398,7 @@ S.InventoryEmpties = {
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Performed By</label>'
           + '<select id="' + idp + 'by">' + App.staffOptions(e?.performed_by_id || defaultMgrId, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(e?.notes || '') + '</textarea></div>';
+      + App.noteField({ id: idp + 'notes', value: e?.notes, mt: 6 });
   },
 
   // Product change in the edit popup updates the Qty unit suffix.

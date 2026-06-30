@@ -210,7 +210,7 @@ S.InventoryTransfers = {
       + '<th style="min-width:150px;">From</th><th style="min-width:150px;">To</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="trb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="trb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="trb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      + App.noteField({ id: 'trb-notes' });
   },
 
   builderCard() {
@@ -435,8 +435,7 @@ S.InventoryTransfers = {
         + '<div class="f" style="flex:1;min-width:160px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="' + idp + 'witness">' + App.staffOptions(t?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
-      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Notes</label>'
-        + '<textarea id="' + idp + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(t?.notes || '') + '</textarea></div>';
+      + App.noteField({ id: idp + 'notes', value: t?.notes, mt: 6 });
   },
 
   // Product change in the edit popup: re-pop unit, scope + re-default From, and

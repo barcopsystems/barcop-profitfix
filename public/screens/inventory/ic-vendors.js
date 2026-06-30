@@ -69,8 +69,7 @@ S.InventoryVendors = {
       + '<div class="f" style="flex:0.7 1 78px;"><label>Terms</label><select id="iv-terms">' + termOpts + '</select></div>'
       + '<div class="f" style="flex:1 1 100px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
-      + '<div class="form-row" style="margin-top:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="iv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(v?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: 'iv-notes', value: v?.notes, mt: 12 });
   },
 
   // ── Landing: add form on top, vendor list below ────────────────────────────
