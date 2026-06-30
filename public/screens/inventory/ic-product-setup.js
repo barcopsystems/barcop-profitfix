@@ -647,7 +647,7 @@ S.InventoryProducts = {
     if (spec.showCalcStrip) {
       const slot1Label = spec.calc1Label || (spec.showCaseSize ? 'Btls / Case' : 'Pours / Container');
       const slot2Label = spec.calc2Label || (spec.showCaseSize ? 'Cost / Btl' : 'Cost / Pour');
-      calcStrip = '<div class="card" style="margin-top:18px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      calcStrip = '<div style="margin-top:18px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">' + esc(slot1Label) + '</div><div class="calc-val" id="ip-pours">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">' + esc(slot2Label) + '</div><div class="calc-val" id="ip-cpp">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pour Cost %</div><div class="calc-val" id="ip-pct">-</div></div>'
@@ -916,7 +916,7 @@ S.InventoryProducts = {
   servingSizesBlockHTML(p, spec) {
     const sizes = Array.isArray(p?.serving_sizes) ? p.serving_sizes : [];
     const rows = sizes.map((s, i) => this.servingRowHTML(s, i)).join('');
-    return '<div style="margin-top:18px;border-top:1px solid var(--b2);padding-top:14px;">'
+    return '<div style="margin-top:18px;">'
       + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">'
         + '<label style="margin:0;">Other Sizes Sold</label>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="vss-add">+ Add a size</button>'
