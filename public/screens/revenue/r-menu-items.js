@@ -303,13 +303,13 @@ S.RevenueMenuItems = {
         // column header. The Export PDF button rides a title-less row above the
         // first card.
         return (ci === 0
-            ? '<div class="no-print" style="display:flex;justify-content:flex-end;margin:16px 0 10px;"><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
+            ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">Menu Items</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
             : '')
-          + '<div class="card card-bleed data-card" style="margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:780px;">'
+          + '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
           + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
           + '<thead><tr>'
           + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
       }).join('');
       body = '<div id="mi-list-export">' + warn + sections + '</div>';
     }
@@ -390,14 +390,12 @@ S.RevenueMenuItems = {
       + this.formBodyHtml(item)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ri-save">' + (item ? 'Update Item' : 'Save Item') + '</button>'
-      + '<button class="btn btn-ghost" id="ri-cancel">Cancel</button>'
       + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    App.openModal(html, { id: 'mi-editor', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'mi-editor', maxWidth: 680, onClose: () => this.cancelEditor() });
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
-    document.getElementById('ri-cancel')?.addEventListener('click', () => this.cancelEditor());
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     this.renderAdaptive(item);
     if (item) this.applyMissingFieldHighlights(item, this.formType);
@@ -487,7 +485,7 @@ S.RevenueMenuItems = {
       + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + '<div id="ri-recipe-section" style="flex:0 0 100%;border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
-      + '<div class="f" style="flex:0 0 100%;margin-top:16px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
+      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 16 }) + '</div>';
   },
 
   // The inventory-product picker — rendered into the top-row slot (right of
@@ -520,7 +518,7 @@ S.RevenueMenuItems = {
       + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + pourField
-      + '<div class="f" style="flex:0 0 100%;margin-top:8px;margin-bottom:0;"><label>Notes</label><input class="form-input" type="text" id="ri-notes" value="' + esc(item?.notes || '') + '" placeholder="Optional"/></div>';
+      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 8 }) + '</div>';
   },
   // Pour Size applies only to products sold by a pour: draft beer and wine by the
   // glass. Bottle beer sells whole, so it carries no pour size.
@@ -583,7 +581,6 @@ S.RevenueMenuItems = {
 
     sec.innerHTML = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
         + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe</div>'
-        + '<div style="font-size:11px;color:var(--t3);">Add ingredients and cost computes automatically. Leave empty to enter cost by hand.</div>'
       + '</div>'
       + '<div class="form-row" style="margin-bottom:12px;">'
         + '<div class="f" style="width:130px;"><label>Target Cost %</label>'
@@ -610,8 +607,13 @@ S.RevenueMenuItems = {
   renderRows() {
     const area = document.getElementById('ri-ings');
     if (!area) return;
-    area.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-      + '<table class="ing-tbl"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
+    // In the edit modal the builder stays a plain overflow table (a pill-wrap
+    // would re-flow it on desktop); on the inline add form it gets the pill style.
+    const inModal = !!area.closest('#app-modal-host');
+    const wrapOpen = inModal ? '<div class="card" style="padding:0;overflow-x:auto;">' : '<div class="pill-wrap">';
+    const tblClass = inModal ? 'ing-tbl' : 'ing-tbl pill';
+    area.innerHTML = wrapOpen
+      + '<table class="' + tblClass + '"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
       + '<tbody>' + this.rows.map((r, idx) => {
         const selKey = r.id ? (r.source === 'batch' ? 'b:' : 'p:') + r.id : '';
         const basis = this.ingredientCostBasis(r, this.mode);
@@ -620,12 +622,12 @@ S.RevenueMenuItems = {
         const costD = basis.costPerUnit > 0 ? App.fmtCurrency(basis.costPerUnit) : (r.id ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = lineCost > 0 ? App.fmtCurrency(lineCost) : '-';
         return '<tr class="mi-ing-line">'
-          + '<td style="min-width:200px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
-          + '<td style="width:90px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
-          + '<td style="width:70px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
-          + '<td style="width:90px;font-size:12px;">' + costD + '</td>'
-          + '<td style="width:90px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
-          + '<td style="width:80px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '">Delete</button></td>'
+          + '<td data-label="Ingredient" style="min-width:200px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
+          + '<td data-label="Qty" style="width:90px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
+          + '<td data-label="Unit" style="width:70px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
+          + '<td data-label="Unit Cost" style="width:90px;font-size:12px;">' + costD + '</td>'
+          + '<td data-label="Line Cost" style="width:90px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
+          + '<td data-label="" style="width:80px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '">Delete</button></td>'
           + '</tr>';
       }).join('') + '</tbody></table></div>';
 
