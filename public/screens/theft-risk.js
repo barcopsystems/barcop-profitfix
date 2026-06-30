@@ -74,11 +74,6 @@ S.TheftRisk = {
     const flagsWeek = this._totalFlags(wkd);
     const flagsToday = this._totalFlags(td);
 
-    // Banner: the act-now cue when there are flags in the last 7 days.
-    const banner = flagsWeek > 0
-      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:var(--t1);"><strong>' + flagsWeek + ' flag' + (flagsWeek === 1 ? '' : 's') + ' in the last 7 days.</strong> Open an investigation where it flagged: product variances in the Variance Report, server patterns in Sales Integrity.</div>'
-      : '';
-
     // Stat strip (no score — counts + dollars that drive action).
     const stat = (label, valHtml, cls) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div>'
@@ -99,16 +94,16 @@ S.TheftRisk = {
       + '</tr>';
     const flagsTable = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 10px;">'
       + '<div class="sh" style="margin:0;">What Flagged</div>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="tr-brief">Theft and Loss Brief</button>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="tr-brief">Loss Prevention Brief</button>'
       + '</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th></tr></thead><tbody>'
       + fRow('Cash drawer shorts', td.shorts.count, wkd.shorts.count, wkd.shorts.amount)
       + fRow('Flagged spot checks', td.spots.count, wkd.spots.count, wkd.spots.amount)
       + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
-      + '</tbody></table></div></div>';
+      + '</tbody></table></div>';
 
-    this.container.innerHTML = '<div class="screen">' + banner + statStrip + flagsTable
+    this.container.innerHTML = '<div class="screen">' + statStrip + flagsTable
       + this.investigationsSection() + '</div>';
 
     // Wiring
@@ -150,12 +145,11 @@ S.TheftRisk = {
           + '<td>' + esc(inv.opened_date) + '</td>'
           + '<td>' + ageHtml + '</td>'
           + '<td class="' + (doneN === total ? 'pos' : '') + '">' + doneN + ' of ' + total + ' steps</td>'
-          + '<td class="no-print" style="text-align:right;"><button class="btn btn-ghost btn-sm vi-work" data-inv="' + esc(inv.id) + '">Work</button></td>'
+          + '<td class="no-print"><button class="btn btn-ghost btn-sm vi-work" data-inv="' + esc(inv.id) + '">Work</button></td>'
           + '</tr>';
       }).join('');
-      h += '<div class="sh" style="margin:18px 0 10px;">Open</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Investigation</th><th>Opened</th><th>Age</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      h += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+        + '<th>Currently Open</th><th>Opened</th><th>Age</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'variance_investigation', open, false);
     } else {
       h += '<div class="card"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No open investigations. They start from a flag in the Variance Report or Sales Integrity and show here while you work them.</div></div>';
@@ -168,11 +162,10 @@ S.TheftRisk = {
         + '<td><div class="val">' + esc(inv.sku) + '</div></td>'
         + '<td>' + esc(inv.resolved_date || '-') + '</td>'
         + '<td style="color:var(--t2);">' + esc(inv.resolution || '-') + '</td>'
-        + '<td class="no-print" style="text-align:right;"><button class="btn btn-danger btn-sm vi-remove" data-inv="' + esc(inv.id) + '">Delete</button></td>'
+        + '<td class="no-print"><button class="btn btn-danger btn-sm vi-remove" data-inv="' + esc(inv.id) + '">Delete</button></td>'
         + '</tr>').join('');
-      h += '<div class="sh" style="margin:18px 0 10px;">Resolved</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-        + '<th>Investigation</th><th>Resolved</th><th>Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      h += '<div class="card" style="overflow-x:auto;margin-top:16px;"><table class="row-list"><thead><tr>'
+        + '<th>Resolved</th><th>Resolved On</th><th>Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'variance_investigation', newest, false);
     }
     return h;
