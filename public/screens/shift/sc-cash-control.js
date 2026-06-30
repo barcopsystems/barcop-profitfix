@@ -479,7 +479,7 @@ S.ShiftCashControl = {
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
     const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
@@ -496,7 +496,7 @@ S.ShiftCashControl = {
       + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button>'
       +   '<span id="ccs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
-    App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
+    App.openModal(html, { id: 'cc-modal', maxWidth: 540, noClose: true });
     const updateDir = () => {
       const dir = S.ShiftSafeLog.dirOf(document.getElementById('ccs-type')?.value);
       const el = document.getElementById('ccs-dir');
@@ -644,13 +644,11 @@ S.ShiftCashControl = {
       + S.ShiftVarianceLog.REASONS.map(r => '<option' + (rec && rec.reason === r ? ' selected' : '') + '>' + r + '</option>').join('');
     const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '" style="height:44px;"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Reason</label><select id="ccv-reason" style="height:44px;">' + reasonOpts + '</select></div>'
@@ -664,7 +662,7 @@ S.ShiftCashControl = {
       + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button>'
       +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
-    App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
+    App.openModal(html, { id: 'cc-modal', maxWidth: 540, noClose: true });
     const calc = () => {
       const drawerId = document.getElementById('ccv-drawer')?.value || '';
       const tolEl = document.getElementById('ccv-c-tol');
