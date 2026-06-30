@@ -94,10 +94,10 @@ S.RevenueMenuEngineering = {
       return '<div class="sh" style="margin:22px 0 10px;">'
         + esc(q.label) + ' (' + qItems.length + ')'
         + '<span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0;">&nbsp;&mdash; ' + esc(q.move) + '</span></div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;width:100%;min-width:680px;">'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:120px;"/></colgroup>'
         + '<thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div></div>';
+        + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
     return statBox + groups;
