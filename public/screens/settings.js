@@ -1139,7 +1139,7 @@ S.HubSettings = {
       ['Calamari',             'Appetizers', 14, 4.60,  66],
       ['Street Corn Ribs',     'Appetizers', 10, 2.30,  54],
       ['Tuna Poke',            'Appetizers', 16, 6.40,  44],
-      ['Truffle Fries',        'Appetizers',  8, 1.90, 120],
+      ['Truffle Fries',        'Appetizers',  8, 2.95, 120],
       ['House Salad',          'Appetizers',  7, 1.60,  70],
       ['Mac and Cheese',       'Appetizers',  9, 2.40,  64],
       ['Avocado Toast',        'Appetizers', 12, 3.00,  78],
@@ -1708,9 +1708,9 @@ S.HubSettings = {
     attachRecipe('Steak Frites', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Beef Brisket (lb)', 0.50), ing('Russet Potato (lb)', 0.45) ] });
     attachRecipe('Shrimp Tacos', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Gulf Shrimp (lb)', 0.30), ing('Flour Tortilla (case)', 0.02), ing('Hass Avocado (each)', 0.5) ] });
+      ing('Gulf Shrimp (lb)', 0.42), ing('Flour Tortilla (case)', 0.02), ing('Hass Avocado (each)', 0.5) ] });
     attachRecipe('Pan-Seared Salmon', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Salmon Fillet (lb)', 0.40), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 0.03) ] });
+      ing('Salmon Fillet (lb)', 0.58), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 0.03) ] });
     attachRecipe('Grilled Pork Chop', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Pork Chop (each)', 1), ing('Russet Potato (lb)', 0.40) ] });
     attachRecipe('Mushroom Risotto', { mode: 'food', plate_yield: 1, ingredients: [
@@ -1734,9 +1734,9 @@ S.HubSettings = {
     // flow. Five simple/prepared items stay manual-cost by design (Fried
     // Pickles, Pretzel Bites, Truffle Fries, Skillet Cookie, Key Lime Pie).
     attachRecipe('Loaded Nachos', { mode:'food', plate_yield:1, ingredients:[
-      ing('Tortilla Chips (bag)', 0.5), ing('Cheddar Cheese (lb)', 0.15), ing('Ground Beef 80/20 (lb)', 0.20) ] });
+      ing('Tortilla Chips (bag)', 0.5), ing('Cheddar Cheese (lb)', 0.30), ing('Ground Beef 80/20 (lb)', 0.30) ] });
     attachRecipe('Smoked Wings', { mode:'food', plate_yield:1, ingredients:[
-      ing('Chicken Wings (lb)', 1.2) ] });
+      ing('Chicken Wings (lb)', 1.8) ] });
     attachRecipe('Deviled Eggs', { mode:'food', plate_yield:1, ingredients:[
       ing('Large Eggs (dozen)', 0.5), ing('Mayonnaise (qt)', 0.05) ] });
     attachRecipe('Charcuterie Board', { mode:'food', plate_yield:1, ingredients:[
@@ -1746,7 +1746,7 @@ S.HubSettings = {
     attachRecipe('Hummus and Flatbread', { mode:'food', plate_yield:1, ingredients:[
       ing('Chickpeas (lb)', 0.5), ing('Flatbread (each)', 2) ] });
     attachRecipe('Calamari', { mode:'food', plate_yield:1, ingredients:[
-      ing('Calamari (lb)', 0.5), ing('Lime Juice (qt)', 0.02) ] });
+      ing('Calamari (lb)', 0.80), ing('Lime Juice (qt)', 0.02) ] });
     attachRecipe('Street Corn Ribs', { mode:'food', plate_yield:1, ingredients:[
       ing('Sweet Corn (each)', 3), ing('Parmesan (lb)', 0.05) ] });
     attachRecipe('Tuna Poke', { mode:'food', plate_yield:1, ingredients:[
