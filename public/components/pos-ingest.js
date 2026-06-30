@@ -57,6 +57,24 @@ const PosIngest = {
       { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due'] },
       { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count'] },
       { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-'] }
+    ],
+    // A POS per-server sales report: one row per server (per day). Covers + sales
+    // give the check average (Server Check). Matches the server to the roster by
+    // name; writes revenue_server_check records. Comps/tips already auto-join from
+    // the Void/Comp log and Tip Tracking, so they are not needed here.
+    server: [
+      { key: 'name',   label: 'Server',      required: true,  match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender'] },
+      { key: 'date',   label: 'Date',        required: true,  match: ['date', 'business date', 'shift date', 'service date'] },
+      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers', 'count'] },
+      { key: 'sales',  label: 'Total Sales', required: true,  match: ['sales', 'net sales', 'total sales', 'gross sales', 'revenue', 'amount'] },
+      { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart'] }
+    ],
+    // A POS product-mix (PMIX) report: one row per menu item with units sold for
+    // the week. Matches the item to the menu by name and UPDATES weekly_covers in
+    // place (no new records), so it has a custom commit (_commitPmix).
+    pmix: [
+      { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description'] },
+      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'count', 'sales count'] }
     ]
   },
 
@@ -65,7 +83,9 @@ const PosIngest = {
     tips:  { label: 'Tips',          module: 'lc', kind: 'tip'       },
     voids: { label: 'Voids & Comps', module: 'sc', kind: 'void_comp' },
     sales: { label: 'Daily Sales',   module: 'sc', kind: 'shift'     },
-    cash:  { label: 'Cash Variances', module: 'sc', kind: 'variance' }
+    cash:  { label: 'Cash Variances', module: 'sc', kind: 'variance' },
+    server:{ label: 'Server Sales',  module: 'core', kind: 'revenue_server_check' },
+    pmix:  { label: 'Menu Sales Mix', module: 'core', kind: 'menu_item' }
   },
 
   normDate(raw) {
@@ -89,6 +109,8 @@ const PosIngest = {
     if (type === 'voids') return this.buildVoids(rows);
     if (type === 'sales') return this.buildSales(rows);
     if (type === 'cash')  return this.buildCash(rows);
+    if (type === 'server') return this.buildServer(rows);
+    if (type === 'pmix')  return this.buildPmix(rows);
     return { toAdd: [], skipped: [], dupCount: 0 };
   },
 
@@ -254,14 +276,77 @@ const PosIngest = {
     return { toAdd, skipped, dupCount };
   },
 
+  // A POS per-server sales report: one row per server (per day) with covers +
+  // sales. Matches the server to the roster by name; writes revenue_server_check
+  // records so Server Check reads it the same as a hand-entered check. Dedup on
+  // staff + date + covers + sales so re-dropping the report never double-logs.
+  buildServer(rows) {
+    const staffByName = this._staffByName();
+    const existing = (App.data && App.data.revenue_server_checks) || [];
+    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    const toAdd = []; const skipped = []; let dupCount = 0;
+    (rows || []).forEach(r => {
+      const staff = staffByName[(r.name || '').trim().toLowerCase()];
+      const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
+      const sales = num(r.sales);
+      if (!staff || !covers || isNaN(sales) || sales <= 0) { skipped.push(r.name || '(blank)'); return; }
+      const recDate = this.normDate(r.date);
+      if (existing.some(x => x.staff_id === staff.id && x.date === recDate
+            && (x.covers || 0) === covers && Math.abs((x.sales || 0) - sales) < 0.001)) { dupCount++; return; }
+      toAdd.push({
+        id: App.uid(), date: recDate, shift: (r.shift || '').trim(), shift_id: '',
+        staff_id: staff.id, server_name: staff.name, covers, sales,
+        imported: true, saved_at: new Date().toISOString()
+      });
+    });
+    return { toAdd, skipped, dupCount };
+  },
+
+  // A POS product-mix report: one row per item with units sold. Matches the item
+  // to the menu by name; toAdd carries { item_id, covers } updates (not records),
+  // applied in _commitPmix. Unmatched item names are skipped and surfaced.
+  buildPmix(rows) {
+    const items = (App.data && App.data.menu_items) || [];
+    const byName = {};
+    items.forEach(it => { if (it && it.name) byName[it.name.trim().toLowerCase()] = it; });
+    const toAdd = []; const skipped = []; let dupCount = 0;
+    (rows || []).forEach(r => {
+      const nm = (r.name || '').trim().toLowerCase();
+      const units = parseInt(String(r.units == null ? '' : r.units).replace(/[^0-9]/g, ''), 10);
+      if (!nm || isNaN(units)) { skipped.push(r.name || '(blank)'); return; }
+      const it = byName[nm];
+      if (!it) { skipped.push(r.name); return; }
+      toAdd.push({ item_id: it.id, covers: units });
+    });
+    return { toAdd, skipped, dupCount };
+  },
+
   // ── Persist ──────────────────────────────────────────────────────────────
   async commit(type, toAdd) {
     if (type === 'sales') return this._commitSales(toAdd);
+    if (type === 'pmix')  return this._commitPmix(toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
     for (const rec of (toAdd || [])) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
     return ok;
+  },
+
+  // PMIX upserts weekly_covers on the matched menu items in place (no new
+  // records), snapshotting the prior covers for the mix-delta when it changes.
+  async _commitPmix(toAdd) {
+    const items = (App.data && App.data.menu_items) || [];
+    const byId = {};
+    items.forEach(it => { if (it) byId[it.id] = it; });
+    (toAdd || []).forEach(u => {
+      const it = byId[u.item_id]; if (!it) return;
+      if (it.weekly_covers != null && u.covers !== it.weekly_covers) {
+        it.prev_weekly_covers = it.weekly_covers;
+        it.weekly_covers_updated_at = new Date().toISOString();
+      }
+      it.weekly_covers = u.covers;
+    });
+    return App.saveKey('menu_items');
   },
 
   // Sales upserts by DATE: a re-import of the same week replaces those days'
