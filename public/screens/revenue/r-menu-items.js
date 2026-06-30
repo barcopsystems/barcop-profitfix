@@ -385,7 +385,11 @@ S.RevenueMenuItems = {
     // via renderLanding() when the modal closes.
     document.getElementById('mi-add-wrap')?.remove();
 
-    const html = '<div class="card form-card" style="margin:0;">'
+    // An inventory-linked item is a few fields, so it gets the standard narrow
+    // two-column form (540); a recipe item carries the ingredient builder, so it
+    // runs at the prep-batch width (900). Kept in step on category change below.
+    const isInv = this.formType === 'inventory';
+    const html = '<div class="card form-card' + (isInv ? ' narrow-form' : '') + '" id="mi-editor-card" style="margin:0;">'
       + '<div class="card-title">' + (item ? 'Edit Menu Item' : 'Add Menu Item') + '</div>'
       + this.formBodyHtml(item)
       + '<div class="card-actions">'
@@ -393,7 +397,7 @@ S.RevenueMenuItems = {
       + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    App.openModal(html, { id: 'mi-editor', maxWidth: 680, onClose: () => this.cancelEditor() });
+    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 900, onClose: () => this.cancelEditor() });
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
@@ -452,8 +456,21 @@ S.RevenueMenuItems = {
       this.mode = this.formType === 'cocktail' ? 'single' : 'food';
       if (!this.rows.length) this.rows = [{ source: 'product', id: '', quantity: '' }];
     } else { this.mode = null; this.rows = []; }
+    this.syncEditorWidth();
     this.renderAdaptive(this._editItem);
     this.refreshFieldMissing();
+  },
+
+  // When the edit modal is open, keep its width + layout matched to the category:
+  // the narrow two-column form for an inventory product, the wider recipe-builder
+  // form (prep-batch width) for cocktails and plates. No-op on the inline add form.
+  syncEditorWidth() {
+    const overlay = document.getElementById('mi-editor');
+    if (!overlay) return;
+    const isInv = this.formType === 'inventory';
+    document.getElementById('mi-editor-card')?.classList.toggle('narrow-form', isInv);
+    const box = overlay.firstElementChild;
+    if (box) box.style.maxWidth = (isInv ? 540 : 900) + 'px';
   },
 
   renderAdaptive(item) {
@@ -607,13 +624,13 @@ S.RevenueMenuItems = {
   renderRows() {
     const area = document.getElementById('ri-ings');
     if (!area) return;
-    // In the edit modal the builder stays a plain overflow table (a pill-wrap
-    // would re-flow it on desktop); on the inline add form it gets the pill style.
+    // Pill rows everywhere (matches the prep-batch builder); only the wrapper
+    // differs so the modal keeps it a table on desktop while the inline add form
+    // stacks it through the .pill-wrap container query.
     const inModal = !!area.closest('#app-modal-host');
-    const wrapOpen = inModal ? '<div class="card" style="padding:0;overflow-x:auto;">' : '<div class="pill-wrap">';
-    const tblClass = inModal ? 'ing-tbl' : 'ing-tbl pill';
+    const wrapOpen = inModal ? '<div style="overflow-x:auto;">' : '<div class="pill-wrap">';
     area.innerHTML = wrapOpen
-      + '<table class="' + tblClass + '"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
+      + '<table class="ing-tbl pill"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
       + '<tbody>' + this.rows.map((r, idx) => {
         const selKey = r.id ? (r.source === 'batch' ? 'b:' : 'p:') + r.id : '';
         const basis = this.ingredientCostBasis(r, this.mode);
