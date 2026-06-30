@@ -397,27 +397,27 @@ S.ShiftCashControl = {
     const witId     = editing ? (rec.witness_id || rec.witness) : '';
     const v = x => (x != null && x !== '') ? x : '';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Cash Drop' : 'Log a Cash Drop') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccd-time" value="' + esc(v(rec && rec.drop_time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccd-date" value="' + esc(v(rec && rec.date) || this._today()) + '"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccd-time" value="' + esc(v(rec && rec.drop_time) || this._nowHHMM()) + '"/></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>From Register <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="ccd-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'No specific register' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccd-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccd-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>From Register <span style="color:var(--t4);font-weight:400;">(optional)</span></label><select id="ccd-drawer">' + App.drawerOptions(dId, { placeholder: 'No specific register' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccd-by">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccd-witness">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + '<div class="sh" style="margin:16px 0 10px;">Count the Drop</div>'
       + '<div id="ccd-counter">' + CashCounter.html({ prefix: 'ccdrop', values: (rec && rec.denominations) || {} }) + '</div>'
       + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-top:14px;">'
-      +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:48px;font-size:20px;"/></div></div>'
+      +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:12px;">Counts auto-fill here. Edit directly if you are not counting by bill.</div></div>'
       + '</div>'
       + App.noteField({ id: 'ccd-notes', value: rec?.notes })
       + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">' + (editing ? 'Update' : 'Save Drop') + '</button>'
       +   '<span id="ccd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
-    App.openModal(html, { id: 'cc-modal', maxWidth: 640, onClose: () => { this._dropOnDone = null; App.closeModal('cc-modal'); } });
+    App.openModal(html, { id: 'cc-modal', maxWidth: 540, onClose: () => { this._dropOnDone = null; App.closeModal('cc-modal'); } });
     const counter = CashCounter.mount(document.getElementById('ccd-counter'), {
       onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
     });
@@ -481,16 +481,16 @@ S.ShiftCashControl = {
 
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + title + '</div>' + hint
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Type</label><select id="ccs-type" style="height:44px;">' + typeOpts + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Direction</label><div class="f-display" id="ccs-dir" style="height:44px;display:flex;align-items:center;">-</div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccs-date" value="' + esc(v(rec && rec.date) || this._today()) + '"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Time</label><input type="time" id="ccs-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Type</label><select id="ccs-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Direction</label><div class="f-display" id="ccs-dir">-</div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccs-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:44px;"/></div></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Reference</label><input type="text" id="ccs-ref" value="' + esc((rec && rec.reference) || '') + '" placeholder="e.g. Deposit #, Bar 1" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccs-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccs-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccs-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '"/></div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Reference</label><input type="text" id="ccs-ref" value="' + esc((rec && rec.reference) || '') + '" placeholder="e.g. Deposit #, Bar 1"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccs-by">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccs-witness">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + App.noteField({ id: 'ccs-notes', value: rec?.notes })
       + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button>'
@@ -555,10 +555,10 @@ S.ShiftCashControl = {
     const byId  = editing ? (rec.performed_by_id || rec.performed_by) : this._mgr();
     const witId = editing ? (rec.witness_id || rec.witness) : '';
 
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Safe Count' : 'Count the Safe') + '</div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Safe Count' : 'Count the Safe') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
-      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccc-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccc-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '" style="height:44px;"/></div>'
+      +   '<div class="f" style="width:150px;min-width:0;"><label>Date</label><input type="date" id="ccc-date" value="' + esc(v(rec && rec.date) || this._today()) + '"/></div>'
+      +   '<div class="f" style="width:130px;min-width:0;"><label>Time</label><input type="time" id="ccc-time" value="' + esc(v(rec && rec.time) || this._nowHHMM()) + '"/></div>'
       + '</div>'
       + '<div class="sh" style="margin:8px 0 10px;">Count the Safe</div>'
       + '<div id="ccc-counter">' + CashCounter.html({ prefix: 'ccsafe', values: (rec && rec.denominations) || {} }) + '</div>'
@@ -569,14 +569,14 @@ S.ShiftCashControl = {
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccc-status">-</div></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;margin-top:6px;">'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
-      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
+      +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + App.noteField({ id: 'ccc-notes', value: rec?.notes })
       + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">' + (editing ? 'Update' : 'Save Count') + '</button>'
       +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
-    App.openModal(html, { id: 'cc-modal', maxWidth: 620, noClose: true });
+    App.openModal(html, { id: 'cc-modal', maxWidth: 540, noClose: true });
     const update = total => {
       const cEl = document.getElementById('ccc-counted');
       const varEl = document.getElementById('ccc-variance');
@@ -646,12 +646,12 @@ S.ShiftCashControl = {
 
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">' + (editing ? 'Edit Drawer Reconcile' : 'Reconcile Drawer') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:nowrap;">'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '" style="height:44px;"/></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer" style="height:44px;">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier" style="height:44px;">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '" style="height:44px;"/></div></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '" style="height:44px;"/></div></div>'
-      +   '<div class="f" style="flex:1;min-width:0;"><label>Reason</label><select id="ccv-reason" style="height:44px;">' + reasonOpts + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Date</label><input type="date" id="ccv-date" value="' + esc(v(rec && rec.date) || this._today()) + '"/></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Register</label><select id="ccv-drawer">' + App.drawerOptions(dId, { placeholder: 'Select register...' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Cashier</label><select id="ccv-cashier">' + App.staffOptions(cashId, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Expected Cash (POS)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-expected" min="0" step="0.01" value="' + esc(v(rec && rec.expected_cash)) + '"/></div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Counted Cash</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccv-counted" min="0" step="0.01" value="' + esc(v(rec && rec.counted_cash)) + '"/></div></div>'
+      +   '<div class="f" style="flex:1;min-width:0;"><label>Reason</label><select id="ccv-reason">' + reasonOpts + '</select></div>'
       + '</div>'
       + '<div class="calc">'
       +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
