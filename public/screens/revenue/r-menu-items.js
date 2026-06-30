@@ -131,9 +131,7 @@ S.RevenueMenuItems = {
     if (formType === 'inventory') {
       if (!item.linked_product_id) out.add('ri-linked-prod');
       if (!(parseFloat(item.price) > 0)) out.add('ri-price');
-      // Name is auto-derived from linked product but operator can edit;
-      // empty is still a problem if they cleared it.
-      if (!item.name) out.add('ri-name');
+      // Name comes from the linked product, so it is never a missing field.
       return out;
     }
     // Plate + Cocktail
@@ -405,22 +403,24 @@ S.RevenueMenuItems = {
     if (item) this.applyMissingFieldHighlights(item, this.formType);
   },
 
-  // Shared form body (Name + Category + the adaptive section) injected by BOTH
-  // the inline add form on the landing AND the edit modal, so the two never
-  // drift. The ri-* / mi-adaptive ids are identical, so only ONE of the two
-  // forms is ever in the DOM at once (openEditor removes the inline form first).
+  // Shared form body (Category + the adaptive section) injected by BOTH the inline
+  // add form on the landing AND the edit modal, so the two never drift. The ri-* /
+  // mi-adaptive ids are identical, so only ONE of the two forms is ever in the DOM
+  // at once (openEditor removes the inline form first).
   formBodyHtml(item) {
     const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
     const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
     const catOpts = '<option value="">Select category...</option>'
       + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    // One flex-wrap row holds every field: name + category + inventory product +
-    // the adaptive price/cost/covers/pour cells (injected into mi-adaptive, which
-    // is display:contents so its cells flow in the same row). The recipe builder
-    // and notes carry flex:0 0 100% so they break to their own full-width lines.
+    // Category LEADS the form. What loads next depends on it: a recipe category
+    // shows the typed Item Name (mi-name-slot); an inventory category shows the
+    // Inventory Product picker (mi-linked-slot) and takes the item's name from the
+    // product, so no name is typed. Then the adaptive price/cost/covers/pour cells
+    // flow into mi-adaptive (display:contents). The recipe builder and notes carry
+    // flex:0 0 100% so they break to their own full-width lines.
     return '<div class="form-row">'
-      + '<div class="f" style="width:185px;flex-shrink:0;"><label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/></div>'
       + '<div class="f" style="width:145px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
+      + '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
       + '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
       + '<div id="mi-adaptive" style="display:contents;"></div>'
       + '</div>';
@@ -475,26 +475,39 @@ S.RevenueMenuItems = {
 
   renderAdaptive(item) {
     const host = document.getElementById('mi-adaptive');
+    const nameSlot = document.getElementById('mi-name-slot');
     const slot = document.getElementById('mi-linked-slot');
-    if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }   // the inventory-product field rides the top row; reset it
+    if (nameSlot) { nameSlot.innerHTML = ''; nameSlot.style.display = 'none'; }
+    if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }
     if (!host) return;
     if (!this.formType) {
       host.innerHTML = '<div style="flex:0 0 100%;font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
       return;
     }
     if (this.formType === 'inventory') {
-      // Inventory Product loads to the RIGHT of Category in the top row; price/
-      // cost/covers/pour/notes go in the adaptive section below.
+      // Inventory items take their name from the chosen product, so there is no
+      // Item Name field: the Inventory Product picker loads right after Category,
+      // and price/cost/covers/pour/notes fill the adaptive section below.
       if (slot) { slot.innerHTML = this.linkedFieldHtml(item); slot.style.display = ''; }
       host.innerHTML = this.inventoryRestHtml(item);
       this.wireInventoryFields();
       return;
     }
+    // Recipe types carry a real typed name, so the Item Name field loads right
+    // after Category.
+    if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
     host.innerHTML = this.recipeFields(item);
+    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     const target = item?.target_cost_pct || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
     this.renderRecipeSection(item, target);
     document.getElementById('ri-price')?.addEventListener('input', () => { this.refreshFieldMissing(); this.calcRecipe(); });
     document.getElementById('ri-cost')?.addEventListener('input', () => this.refreshFieldMissing());
+  },
+
+  // The Item Name field (recipe types only), loaded into #mi-name-slot after
+  // Category. Inventory items skip this and take their name from the product.
+  nameFieldHtml(item) {
+    return '<label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/>';
   },
 
   recipeFields(item) {
@@ -574,12 +587,9 @@ S.RevenueMenuItems = {
       // Inventory; the operator can still override it here. Leave it editable.
       const priceInp = document.getElementById('ri-price');
       if (priceInp && p && p.menu_price > 0) priceInp.value = (+p.menu_price).toFixed(2);
-      const nameInp = document.getElementById('ri-name');
-      if (nameInp && p) nameInp.value = p.name;
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
-    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
   },
 
@@ -604,7 +614,6 @@ S.RevenueMenuItems = {
           + '<div class="fw"><input class="form-input suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5"/><span class="suf">%</span></div></div>'
         + plateYieldField
       + '</div>'
-      + '<div class="sh" style="margin-top:4px;">' + (this.mode === 'food' ? 'Kitchen' : 'Bar') + ' Ingredients</div>'
       + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
@@ -728,12 +737,13 @@ S.RevenueMenuItems = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } this._saving = false; };
 
     const type = this.formType;
-    const name = document.getElementById('ri-name')?.value.trim();
+    // Recipe types carry a typed name; inventory items take the product's name
+    // (set in the inventory branch below), so the name check waits until after.
+    let name = document.getElementById('ri-name')?.value.trim() || '';
     const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
     const covers = parseFloat(document.getElementById('ri-cov')?.value) || 0;
     const notes = document.getElementById('ri-notes')?.value || '';
 
-    if (!name) { fail('Item name required.'); return; }
     if (!this.formType) { fail('Pick a category first.'); return; }
     if (!(price > 0)) { fail('Menu price required.'); return; }
 
@@ -779,12 +789,15 @@ S.RevenueMenuItems = {
       if (!linkedProductId) { fail('Pick an inventory product.'); return; }
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
+      name = p.name;   // an inventory item takes the product's name, no name field
       category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
       // Include the pour override so the stored cost is the per-pour cost too.
       const pv = parseFloat(document.getElementById('ri-pour')?.value);
       const tmp = { linked_product_id: linkedProductId, pour_size_oz: (!isNaN(pv) && pv > 0) ? pv : null };
       computedCost = App.menuItemCost(tmp) || 0;
     }
+
+    if (!name) { fail('Item name required.'); return; }
 
     // Phase 7: capture optional pour_size_oz override on direct-pour items
     // (Inventory form only). Drives Variance Report multi-size math.
