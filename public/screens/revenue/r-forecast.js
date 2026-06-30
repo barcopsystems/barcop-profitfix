@@ -164,24 +164,24 @@ S.RevenueForecast = {
       + '</div></div>';
   },
 
-  // ── Week-chip selector row (chips left, page action right) ───────────────────
+  // ── Week selector row — the Close The Week / Profit This Week pill stepper (one
+  // pill, arrows outside, gold NOW, This Week snap). Forward is always live here
+  // since this plans ahead. The "Use Suggested" action stays on the right. ───────
   selectorRow() {
     const now = this.currentWeekMon();
     const sel = this.weekStart;
-    const older = this.addDays(sel, -7);
+    const isCur = sel === now;
     const sugTotal = this.defaults.total || 0;
-    const chip = (ws, active) =>
-      '<button class="rf-wk-chip btn btn-sm" data-ws="' + ws + '" style="'
-        + (active ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekRangeLabel(ws) + (ws === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    const fmt = ymd => { const dt = new Date(ymd + 'T00:00:00'); return isNaN(dt.getTime()) ? ymd : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(sel) + ' - ' + fmt(App.periodEndFor(sel));
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm rf-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = '<button class="btn btn-ghost btn-sm rf-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm rf-wk-now" style="margin-left:4px;">This Week</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-ghost btn-sm rf-wk-prev" aria-label="Previous week">&lsaquo;</button>'
-      + chip(older, false) + chip(sel, true)
-      + '<button class="btn btn-ghost btn-sm rf-wk-next" aria-label="Next week">&rsaquo;</button>'
-      + (sel !== now ? '<button class="btn btn-ghost btn-sm rf-wk-now" style="margin-left:4px;">This Week</button>' : '')
-      + '</div>'
+      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + '<div style="display:flex;gap:8px;">'
       + (sugTotal > 0 ? '<button class="btn btn-ghost btn-sm" id="rf-reset">Use Suggested for All Days</button>' : '')
       + '</div></div>';
@@ -200,12 +200,12 @@ S.RevenueForecast = {
       const sug = this.defaults.per_day[d] || 0;
       const csug = this.cover_defaults.per_day[d] || 0;
       return '<tr class="rf-row" data-day="' + d + '">'
-        + '<td><div class="val">' + esc(this.dayLabel(i)) + '</div></td>'
-        + '<td><div style="display:flex;align-items:center;gap:10px;">'
+        + '<td data-label=""><div class="val">' + esc(this.dayLabel(i)) + '</div></td>'
+        + '<td data-label="Forecast Revenue"><div style="display:flex;align-items:center;gap:10px;">'
         +   '<div class="fw" style="flex:1;max-width:200px;"><span class="pre">$</span><input class="form-input pre rf-val" type="number" min="0" step="0.01" inputmode="decimal" value="' + v + '" style="width:100%;"/></div>'
         +   useBtn('rf-apply', d, sug, '+ Use ' + this.fmt(sug))
         + '</div></td>'
-        + '<td><div style="display:flex;align-items:center;gap:10px;">'
+        + '<td data-label="Cover Goal"><div style="display:flex;align-items:center;gap:10px;">'
         +   '<input class="form-input rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '" style="flex:1;max-width:120px;"/>'
         +   useBtn('rf-capply', d, csug, '+ Use ' + csug)
         + '</div></td>'
@@ -215,12 +215,11 @@ S.RevenueForecast = {
   gridCard() {
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Daily Forecast</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
-      + '<table class="ing-tbl" style="table-layout:fixed;"><colgroup><col style="width:160px;"/><col/><col/></colgroup>'
+      + '<div class="pill-wrap" style="margin-bottom:6px;">'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><colgroup><col style="width:160px;"/><col/><col/></colgroup>'
       + '<thead><tr><th>Day</th><th>Forecast Revenue</th><th>Cover Goal</th></tr></thead>'
       + '<tbody id="rf-rows">' + this.rowsHtml() + '</tbody></table></div>'
-      + '<div class="f" style="margin:0;"><label>Notes</label>'
-      + '<textarea id="rf-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(this.notes) + '</textarea></div>'
+      + App.noteField({ id: 'rf-notes', value: this.notes, placeholder: 'Optional', mt: 10 })
       + '</div>';
   },
 
@@ -286,9 +285,9 @@ S.RevenueForecast = {
       + '<div class="calc-item"><div class="calc-label">Average Error</div><div class="calc-val lg">' + avgErr.toFixed(1) + '%</div></div>'
       + '<div class="calc-item"><div class="calc-label">Matched Weeks</div><div class="calc-val lg">' + recent.length + '</div></div>'
       + '</div></div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Week Ending</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   },
 
@@ -310,7 +309,6 @@ S.RevenueForecast = {
         this.recalc();
       }
     });
-    this.container.querySelectorAll('.rf-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeekStart(b.dataset.ws)));
     this.container.querySelector('.rf-wk-prev')?.addEventListener('click', () => this.gotoWeekStart(this.addDays(this.weekStart, -7)));
     this.container.querySelector('.rf-wk-next')?.addEventListener('click', () => this.gotoWeekStart(this.addDays(this.weekStart, 7)));
     this.container.querySelector('.rf-wk-now')?.addEventListener('click', () => this.gotoWeekStart(this.currentWeekMon()));
