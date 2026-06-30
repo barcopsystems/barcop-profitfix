@@ -290,11 +290,9 @@ const InitiativeTracker = {
       + '<div class="f" style="width:100%;"><label>What you changed (optional)</label><textarea class="notes-ta" id="init-hyp" rows="2" placeholder="' + esc(c.hypPh) + '">' + esc(v.hypothesis) + '</textarea></div>'
       + '<div class="card-actions">'
         + '<button type="button" id="init-save" class="btn btn-primary">' + saveLabel + '</button>'
-        + '<button type="button" id="init-cancel" class="btn btn-ghost">Cancel</button>'
         + '<span id="init-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(body, { id: 'init-modal', maxWidth: 540, noClose: true });
-    document.getElementById('init-cancel').addEventListener('click', () => App.closeModal('init-modal'));
+    App.openModal(body, { id: 'init-modal', maxWidth: 540 });
     document.getElementById('init-save').addEventListener('click', async () => {
       const name = document.getElementById('init-name')?.value.trim();
       const date = document.getElementById('init-date')?.value;
