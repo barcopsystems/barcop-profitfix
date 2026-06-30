@@ -131,7 +131,7 @@ S.RevenueMenuItems = {
     if (formType === 'inventory') {
       if (!item.linked_product_id) out.add('ri-linked-prod');
       if (!(parseFloat(item.price) > 0)) out.add('ri-price');
-      // Name comes from the linked product, so it is never a missing field.
+      if (!item.name) out.add('ri-name');   // auto-fills from the product, but required
       return out;
     }
     // Plate + Cocktail
@@ -413,15 +413,16 @@ S.RevenueMenuItems = {
     const catOpts = '<option value="">Select category...</option>'
       + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     // Category LEADS the form. What loads next depends on it: a recipe category
-    // shows the typed Item Name (mi-name-slot); an inventory category shows the
-    // Inventory Product picker (mi-linked-slot) and takes the item's name from the
-    // product, so no name is typed. Then the adaptive price/cost/covers/pour cells
-    // flow into mi-adaptive (display:contents). The recipe builder and notes carry
-    // flex:0 0 100% so they break to their own full-width lines.
+    // shows the typed Menu Name (mi-name-slot); an inventory category shows the
+    // Inventory Product picker (mi-linked-slot) first, then a Menu Name that
+    // auto-fills from the product (still editable). The picker comes before the
+    // name slot in the DOM so inventory reads Category, Product, Menu Name. Then
+    // the adaptive price/cost/covers/pour cells flow into mi-adaptive
+    // (display:contents); the recipe builder and notes carry flex:0 0 100%.
     return '<div class="form-row">'
       + '<div class="f" style="width:145px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
-      + '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
       + '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
+      + '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
       + '<div id="mi-adaptive" style="display:contents;"></div>'
       + '</div>';
   },
@@ -485,15 +486,16 @@ S.RevenueMenuItems = {
       return;
     }
     if (this.formType === 'inventory') {
-      // Inventory items take their name from the chosen product, so there is no
-      // Item Name field: the Inventory Product picker loads right after Category,
-      // and price/cost/covers/pour/notes fill the adaptive section below.
+      // Inventory: the Inventory Product picker loads right after Category, then a
+      // Menu Name that auto-fills from the product (still editable), then
+      // price/cost/covers/pour/notes fill the adaptive section below.
       if (slot) { slot.innerHTML = this.linkedFieldHtml(item); slot.style.display = ''; }
+      if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
       host.innerHTML = this.inventoryRestHtml(item);
       this.wireInventoryFields();
       return;
     }
-    // Recipe types carry a real typed name, so the Item Name field loads right
+    // Recipe types carry a real typed name, so the Menu Name field loads right
     // after Category.
     if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
     host.innerHTML = this.recipeFields(item);
@@ -504,10 +506,10 @@ S.RevenueMenuItems = {
     document.getElementById('ri-cost')?.addEventListener('input', () => this.refreshFieldMissing());
   },
 
-  // The Item Name field (recipe types only), loaded into #mi-name-slot after
-  // Category. Inventory items skip this and take their name from the product.
+  // The Menu Name field, loaded into #mi-name-slot. Typed for recipe items; for
+  // inventory items it auto-fills from the chosen product (still editable).
   nameFieldHtml(item) {
-    return '<label>Item Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/>';
+    return '<label>Menu Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/>';
   },
 
   recipeFields(item) {
@@ -587,9 +589,13 @@ S.RevenueMenuItems = {
       // Inventory; the operator can still override it here. Leave it editable.
       const priceInp = document.getElementById('ri-price');
       if (priceInp && p && p.menu_price > 0) priceInp.value = (+p.menu_price).toFixed(2);
+      // Auto-fill the Menu Name from the product; the operator can still edit it.
+      const nameInp = document.getElementById('ri-name');
+      if (nameInp && p) nameInp.value = p.name;
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
+    document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
   },
 
@@ -789,7 +795,7 @@ S.RevenueMenuItems = {
       if (!linkedProductId) { fail('Pick an inventory product.'); return; }
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
-      name = p.name;   // an inventory item takes the product's name, no name field
+      if (!name) name = p.name;   // Menu Name auto-fills from the product; fall back if cleared
       category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
       // Include the pour override so the stored cost is the per-pour cost too.
       const pv = parseFloat(document.getElementById('ri-pour')?.value);
