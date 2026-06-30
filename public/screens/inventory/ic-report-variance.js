@@ -334,6 +334,11 @@ S.InventoryVarianceReport = {
     this.posRows = null;
     this._unmatchedCollapsed = null;
     this.draw();
+    const pend = App._pendingInvestigation;
+    if (pend && pend.productId) {
+      App._pendingInvestigation = null;
+      S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { onClose: () => this.draw() });
+    }
   },
 
   draw() {
