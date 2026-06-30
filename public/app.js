@@ -3546,6 +3546,33 @@ const App = {
     return parseFloat(item.cost) || 0;
   },
 
+  // Canonical menu price-change logger. Every door that changes a menu item's
+  // live price (the Menu Items edit form, Menu Engineering's reprice) routes
+  // through here, so there is ONE price-change record + ONE Pricing fix event,
+  // never duplicated logic. opts: { reason, source, volPct, predictedWeekly }.
+  // volPct/predictedWeekly are set only for a modeled reprice (Menu Engineering);
+  // a direct edit leaves them null (no prediction to verify). Pricing is a
+  // no-dollar metric, so the fix event records the change and its date, never an
+  // invented recovered figure.
+  async logPriceChange(item, oldPrice, newPrice, opts) {
+    opts = opts || {};
+    const cost = this.menuItemCost(item) || 0;
+    await this.putRecord('core', 'revenue_price_log', {
+      id: this.uid(), date: this.todayLocal(), item_id: item.id, item_name: item.name,
+      old_price: oldPrice, new_price: newPrice, cost,
+      reason: opts.reason || 'Price change', margin_impact: newPrice - oldPrice,
+      covers_at_change: item.weekly_covers || 0,
+      predicted_vol_pct: opts.volPct != null ? (parseFloat(opts.volPct) || 0) : null,
+      predicted_weekly_impact: opts.predictedWeekly != null ? opts.predictedWeekly : null,
+      source: opts.source || 'menu', saved_at: new Date().toISOString()
+    });
+    await this.putRecord('core', 'fix_log', {
+      id: this.uid(), module: 'revenue', gap_id: 'pricing', gap_name: 'Pricing',
+      date: this.todayLocal(), source: 'price-change',
+      note: 'Price change on ' + (item.name || '') + ': ' + this.fmtCurrency(oldPrice) + ' to ' + this.fmtCurrency(newPrice)
+    });
+  },
+
   // ── Menu cost vs target + cost-creep attribution ───────────────────────────
   // Per-item cost target: the item's own override, else the default for its kind
   // (food plate vs cocktail).
