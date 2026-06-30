@@ -74,7 +74,6 @@ S.RevenueMenuEngineering = {
     document.getElementById('me-batch')?.addEventListener('click', () => this.openBatch());
     document.getElementById('me-marklive-all')?.addEventListener('click', () => this.markAllLive());
     document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
-    document.getElementById('me-log-export')?.addEventListener('click', () => App.exportPDF({ title: 'Pricing Review Log', root: document.getElementById('me-log-export-root') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
 
@@ -219,7 +218,7 @@ S.RevenueMenuEngineering = {
       + actionsRow
       + '</div>';
 
-    return '<div id="me-export-root">' + statBox + cards + unrankedCard + '</div>' + this.reviewLogHtml();
+    return '<div id="me-export-root">' + statBox + cards + unrankedCard + this.reviewLogHtml() + '</div>';
   },
 
   // ── Reprice step (the focused pricing modal) ─────────────────────────────────
@@ -509,19 +508,18 @@ S.RevenueMenuEngineering = {
       + '<td><div class="val">' + esc(entry.item_name || '') + '</div></td>'
       + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
       + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
-      + '<td style="font-size:11px;">' + vCell + '</td></tr>';
+      + '<td style="font-size:11px;">' + vCell + '</td><td></td></tr>';
   },
 
   reviewLogHtml() {
     const log = (App.data.revenue_price_log || []).slice().reverse();
     const rows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
-      || '<tr><td colspan="5" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
-    return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Pricing Review Log</div>'
-      + '<button class="btn btn-ghost btn-sm" id="me-log-export">Export PDF</button></div>'
-      + '<div id="me-log-export-root"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
+    return '<div class="sh" style="margin:24px 0 10px;">Pricing Review Log</div>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:190px;"/><col style="width:140px;"/><col/><col/><col/><col style="width:170px;"/></colgroup>'
+      + '<thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th></th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'revenue_price_log', log, false);
   }
 };
