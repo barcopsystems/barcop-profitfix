@@ -208,7 +208,6 @@ S.RevenueMenuEngineering = {
       + calcItem('To Reprice', repriceCount)
       + calcItem('Weekly Upside', '<span style="color:var(--gold);">+' + f(upside) + '</span>')
       + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:12px;">Weekly Upside is what repricing every over-target item to its margin target would add each week, if volume holds. Work it item by item, or plan the whole menu and mark it live when the new prices roll out.</div>'
       + actionsRow
       + '</div>';
 
@@ -245,8 +244,8 @@ S.RevenueMenuEngineering = {
       +     '<div class="calc-item"><div class="calc-label">New Cost %</div><div class="calc-val" id="re-pct">-</div></div>'
       +     '<div class="calc-item"><div class="calc-label">New Margin</div><div class="calc-val" id="re-margin">-</div></div>'
       +     '<div class="calc-item"><div class="calc-label">Weekly Impact</div><div class="calc-val" id="re-impact">-</div></div>'
+      +     '<div class="calc-item"><div class="calc-label">Break-even Drop</div><div class="calc-val" id="re-be">-</div></div>'
       +   '</div>'
-      +   '<div id="re-be" style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:10px;"></div>'
       + '</div>'
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="re-plan">Save as Planned</button>'
@@ -277,16 +276,10 @@ S.RevenueMenuEngineering = {
     set('re-margin', App.fmtCurrency(margin));
     set('re-impact', (impact >= 0 ? '+' : '') + App.fmtCurrency(impact));
     const oldMargin = (item.price || 0) - cost;
-    const be = document.getElementById('re-be');
-    if (be) {
-      if (np > (item.price || 0) && margin > 0 && oldMargin > 0) {
-        const drop = (1 - oldMargin / margin) * 100;
-        be.textContent = 'Weekly Impact assumes volume holds. Covers can fall up to ' + Math.max(0, drop).toFixed(0) + '% at the new price before you would have been better off leaving it alone.';
-      } else if (np > (item.price || 0)) {
-        be.textContent = 'Weekly Impact assumes volume holds.';
-      } else {
-        be.textContent = '';
-      }
+    if (np > (item.price || 0) && margin > 0 && oldMargin > 0) {
+      set('re-be', Math.max(0, (1 - oldMargin / margin) * 100).toFixed(0) + '%');
+    } else {
+      set('re-be', '-');
     }
   },
 
@@ -384,8 +377,7 @@ S.RevenueMenuEngineering = {
       });
     });
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Reprice to Target</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Every item over its margin target, with the price that brings it back. Uncheck any you want to hold, then save them as your planned menu or roll them out live. Weekly numbers assume volume holds.</div>'
-      + '<div style="max-height:46vh;overflow:auto;margin-bottom:4px;">' + listHtml + '</div>'
+      + '<div style="max-height:46vh;overflow:auto;margin:4px 0;">' + listHtml + '</div>'
       + '<div id="batch-sum" style="font-size:13px;font-weight:700;color:var(--t1);padding-top:12px;border-top:1px solid var(--b2);"></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="batch-plan">Save Checked as Planned</button>'
       + '<button class="btn btn-ghost" id="batch-live">Mark Checked Live</button></div></div>';
@@ -400,7 +392,7 @@ S.RevenueMenuEngineering = {
     const checked = [...document.querySelectorAll('.batch-chk')].filter(c => c.checked);
     const total = checked.reduce((s, c) => s + (parseFloat(c.dataset.dwk) || 0), 0);
     const el = document.getElementById('batch-sum');
-    if (el) el.textContent = checked.length + ' item' + (checked.length === 1 ? '' : 's') + ' selected, +' + App.fmtCurrency(total) + '/wk if volume holds';
+    if (el) el.textContent = checked.length + ' item' + (checked.length === 1 ? '' : 's') + ' selected, +' + App.fmtCurrency(total) + '/wk';
     const live = document.getElementById('batch-live'), plan = document.getElementById('batch-plan');
     if (live) live.disabled = !checked.length;
     if (plan) plan.disabled = !checked.length;
