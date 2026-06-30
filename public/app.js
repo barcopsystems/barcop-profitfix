@@ -2167,17 +2167,18 @@ const App = {
     // Near-opaque navy scrim (the --bg family) so the popup reads as nested in the
     // app's darkest canvas — navy-on-navy, like the on-page forms — not a navy card
     // stranded on a translucent black wash.
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(6,11,17,0.92);'
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(6,11,17,0.88);'
       + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
-    // Always-visible corner X (thin icon, inside the card's top-right) so the popup
-    // closes without scrolling to a button. Styled in style.css (.app-modal-x).
-    const closeX = opts.noClose ? '' : '<button type="button" class="app-modal-x" aria-label="Close">'
+    // The corner X (thin icon, inside the card's top-right) is the universal close,
+    // shown by default. Pass opts.noX only to force a deliberate choice (e.g. the
+    // export-acknowledgment gate). Styled in style.css (.app-modal-x).
+    const closeX = opts.noX ? '' : '<button type="button" class="app-modal-x" aria-label="Close">'
       + '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.5 3.5l8 8M11.5 3.5l-8 8"/></svg>'
       + '</button>';
     overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;position:relative;">' + closeX + html + '</div>';
     host.appendChild(overlay);
     const x = overlay.querySelector('.app-modal-x');
-    if (x) x.addEventListener('click', () => App.closeModal(id));
+    if (x) x.addEventListener('click', () => { if (typeof opts.onClose === 'function') opts.onClose(); else App.closeModal(id); });
     return overlay;
   },
   closeModal(id) {
@@ -4814,7 +4815,7 @@ const App = {
     const danger      = opts.danger !== false; // default to danger (red) confirm button
     return new Promise(resolve => {
       const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
       overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
         + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
@@ -4852,7 +4853,7 @@ const App = {
         +   '<button class="btn btn-primary" id="export-ack-go">' + esc(opts.confirmText || 'I Understand, Continue') + '</button>'
         +   '<button class="btn btn-ghost" id="export-ack-cancel">' + esc(opts.cancelText || 'Cancel') + '</button>'
         + '</div></div>';
-      this.openModal(html, { id, maxWidth: 540, noClose: true });
+      this.openModal(html, { id, maxWidth: 540, noX: true });
       let done = false;
       const finish = (val) => { if (done) return; done = true; this.closeModal(id); resolve(val); };
       document.getElementById('export-ack-go')?.addEventListener('click', () => finish(true));

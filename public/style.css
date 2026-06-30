@@ -362,6 +362,11 @@ input,select,textarea{color-scheme:dark;}
 /* Modal close X — a thin icon inside the card's top-right corner, brightens on hover. */
 .app-modal-x{position:absolute;top:12px;right:12px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:none;color:var(--t3);cursor:pointer;z-index:2;padding:0;border-radius:50%;transition:color .12s;}
 .app-modal-x:hover{color:var(--t1);}
+/* Popup form-cards: even padding all sides and inset (not full-bleed) header/footer
+   dividers, so the modal reads contained. On-page form-cards keep their full-bleed bands. */
+#app-modal-host .form-card{padding:18px;}
+#app-modal-host .form-card > .card-title{margin:0 0 16px;padding:0 0 14px;}
+#app-modal-host .form-card .card-actions{margin:16px 0 0;padding:14px 0 0;}
 .tw-nav{display:flex;gap:12px;justify-content:space-between;margin-top:16px;align-items:center;}
 
 /* ══ FORM SYSTEM ══ */
