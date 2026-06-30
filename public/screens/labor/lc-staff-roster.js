@@ -247,8 +247,7 @@ S.LaborStaffRoster = {
       actionRow = '<div id="sr-imp-actions" data-collapse-group="lc-staff-roster" style="margin-bottom:24px;"></div>';
     } else {
       modeBody = this.profileFormCells(null)
-        + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;">'
-        + '<label>Notes</label><textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+        + App.noteField({ id: 'sr-notes' });
       actionRow = '<div data-collapse-group="lc-staff-roster" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
         + '<button class="btn btn-ghost" id="sr-startover">Start Over</button>'
@@ -450,8 +449,7 @@ S.LaborStaffRoster = {
   renderProfileEditCard(s) {
     return '<div class="card form-card"><div class="card-title">Edit ' + esc(s.name || 'Profile') + '</div>'
       + this.profileFormCells(s)
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="sr-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(s?.notes || '') + '</textarea></div></div>'
+      + App.noteField({ id: 'sr-notes', value: s?.notes })
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="sr-save">Update Profile</button>'
@@ -620,8 +618,7 @@ S.LaborStaffRoster = {
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Expiration Date</label>'
           + '<input type="date" id="cert-expires" value="' + esc(c?.expiration_date || '') + '"/></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-        + '<textarea id="cert-notes" class="notes-ta" rows="2" placeholder="Optional context">' + esc(c?.notes || '') + '</textarea></div></div>'
+      + App.noteField({ id: 'cert-notes', value: c?.notes, placeholder: 'Optional context' })
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="cert-save">' + (this.certEditId ? 'Update' : 'Save Certification') + '</button>'
         + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'

@@ -59,8 +59,7 @@ S.LaborPositions = {
       + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out (% on sales)</label>'
       + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(item?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: item?.notes });
   },
 
   // Show Pays Tip Out only when Tipped; show the Tip Out % only when Pays = Yes.

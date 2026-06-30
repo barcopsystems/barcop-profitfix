@@ -133,8 +133,7 @@ S.LaborLogHours = {
       + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Labor Cost</label>'
       + '<div class="f-display" style="color:var(--w);" id="' + p + 'c-cost">-</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(a?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: a?.notes });
   },
 
   // True when a staff member has a usable secondary role (a second position with a

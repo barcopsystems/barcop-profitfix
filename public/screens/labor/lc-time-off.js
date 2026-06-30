@@ -76,8 +76,7 @@ S.LaborTimeOff = {
       + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Status</label>'
         + '<select id="' + p + 'status">' + statusOpts + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
-        + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: r?.notes });
   },
 
   renderList() {

@@ -479,8 +479,7 @@ S.LaborTraining = {
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:180px;"><label>Signed Off By</label>'
           + '<select id="tr-rec-by">' + App.staffOptions(rec.signed_off_by_id || rec.signed_off_by, { placeholder: 'Select supervisor...', audience: 'supervisor' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-        + '<textarea id="tr-rec-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(rec.notes || '') + '</textarea></div></div>'
+      + App.noteField({ id: 'tr-rec-notes', value: rec.notes })
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="tr-rec-save">Save</button>'
         + '<span id="tr-rec-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'

@@ -264,8 +264,7 @@ S.LaborTipLog = {
           + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
       + '</div>'
       + '<div id="' + p + 'tipout-wrap" class="tl-tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
-      + '<div class="form-row" style="gap:16px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Notes</label>'
-        + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(x?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: x?.notes });
   },
 
   // Wire the edit-form field interactions. Save/Cancel/anchor are wired by the
