@@ -454,7 +454,7 @@ S.InventoryAdjustments = {
         + '<div class="f" style="flex:1;min-width:170px;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="' + idp + 'witness">' + App.staffOptions(r?.witnessed_by_id || '', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:10px;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:10px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;">'
         + '<div class="calc-item"><div class="calc-label">Estimated Value</div><div class="calc-val" id="' + idp + 'c-value">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Unit Cost</div><div class="calc-val dim" id="' + idp + 'c-unitcost">-</div></div>'
       + '</div>'
