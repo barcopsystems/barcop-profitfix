@@ -174,32 +174,32 @@ S.RevenueThisWeek = {
       + '</div></div>';
   },
 
-  // ── Week-chip selector row (chips left, page actions right) ──────────────────
+  // ── Week selector row — the exact Close The Week / Profit This Week pill stepper
+  // (one pill, arrows outside, gold NOW, This Week snap), plus the lifecycle pill
+  // + Refresh on the right. ─────────────────────────────────────────────────────
   selectorRow() {
     const now = this.currentWeekEnd();
     const sel = this._weekEnd;
-    const older = this.addDays(sel, -7);
-    const fwdDisabled = sel >= now;   // never step past the in-progress current week
+    const isCur = sel >= now;
     // Lifecycle marker so it reads as a week-in-progress, not a static form:
     // "Building from your logs" until the week is saved (closed out), then "Saved."
     const saved = !!this.savedWeek(sel);
     const statePill = '<span style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;color:' + (saved ? 'var(--green)' : 'var(--t3)') + ';">'
       + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (saved ? 'var(--green)' : 'var(--t4)') + ';"></span>'
       + (saved ? 'Saved' : 'Building from your logs') + '</span>';
-    const chip = (end, active) =>
-      '<button class="rw-wk-chip btn btn-sm" data-end="' + end + '" style="'
-        + (active ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + this.weekRangeLabel(end) + (end === now ? ' <span style="font-size:9px;color:var(--gold);font-weight:800;letter-spacing:1px;">NOW</span>' : '') + '</button>';
+    const fmt = ymd => { const dt = new Date(ymd + 'T00:00:00'); return isNaN(dt.getTime()) ? ymd : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(App.weekStartFor(sel)) + ' - ' + fmt(sel);
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = '<button class="btn btn-ghost btn-sm rw-wk-prev" aria-label="Previous week" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm rw-wk-next" aria-label="Next week" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(range) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm rw-wk-now" style="margin-left:4px;">This Week</button>';
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-ghost btn-sm rw-wk-prev" aria-label="Previous week">&lsaquo;</button>'
-      + chip(older, false) + chip(sel, true)
-      + '<button class="btn btn-ghost btn-sm rw-wk-next"' + (fwdDisabled ? ' disabled style="opacity:.35;cursor:default;"' : '') + ' aria-label="Next week">&rsaquo;</button>'
-      + (sel !== now ? '<button class="btn btn-ghost btn-sm rw-wk-now" style="margin-left:4px;">This Week</button>' : '')
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
-      + statePill
+      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' + statePill
       + '<button class="btn btn-ghost btn-sm" id="rw-pull">Refresh This Week</button>'
       + '</div></div>';
   },
@@ -212,20 +212,20 @@ S.RevenueThisWeek = {
     return '<input class="form-input" type="number" id="' + id + '" value="' + esc(String(value || '')) + '" step="0.01" inputmode="decimal" style="width:100%;" oninput="S.RevenueThisWeek.onInput()"/>';
   },
   entryCard(d) {
+    const cell = (label, inner) => '<td data-label="' + label + '">' + inner + '</td>';
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Confirm the Week</div>'
-      + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
-      + '<table class="ing-tbl" style="table-layout:fixed;"><thead><tr>'
+      + '<div class="pill-wrap" style="margin-bottom:6px;">'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th>Bar Revenue</th><th>Floor Revenue</th><th>Total Covers</th><th>Labor Hours</th><th>Labor Cost</th>'
       + '</tr></thead><tbody><tr class="rw-line">'
-      + '<td>' + this.moneyCell('rw-brev', d.bar_revenue) + '</td>'
-      + '<td>' + this.moneyCell('rw-frev', d.floor_revenue) + '</td>'
-      + '<td>' + this.numCell('rw-cov', d.covers) + '</td>'
-      + '<td>' + this.numCell('rw-lhrs', d.labor_hours) + '</td>'
-      + '<td>' + this.moneyCell('rw-lcost', d.labor_cost) + '</td>'
+      + cell('Bar Revenue', this.moneyCell('rw-brev', d.bar_revenue))
+      + cell('Floor Revenue', this.moneyCell('rw-frev', d.floor_revenue))
+      + cell('Total Covers', this.numCell('rw-cov', d.covers))
+      + cell('Labor Hours', this.numCell('rw-lhrs', d.labor_hours))
+      + cell('Labor Cost', this.moneyCell('rw-lcost', d.labor_cost))
       + '</tr></tbody></table></div>'
-      + '<div class="f" style="margin:0;"><label>Notes</label>'
-      + '<textarea id="rw-notes" class="notes-ta" rows="2" placeholder="Optional" oninput="S.RevenueThisWeek.onInput()">' + esc(d.notes || '') + '</textarea></div>'
+      + App.noteField({ id: 'rw-notes', value: d.notes, placeholder: 'Optional', mt: 10 })
       + '</div>';
   },
 
@@ -272,10 +272,10 @@ S.RevenueThisWeek = {
       + '<button class="btn btn-ghost btn-sm" id="rw-export">Export PDF</button>'
       + '</div>'
       + customRow
-      + '<div id="rw-hist-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div id="rw-hist-export"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>Labor Hours</th><th>RPLH</th><th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>'
-      + App.showOlderBar('core', 'revenue_weeks_hist', all, false);
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      + App.showOlderBar('core', 'revenue_weeks_hist', all, this.filterPreset !== 'all');
   },
 
   draw() {
@@ -302,7 +302,6 @@ S.RevenueThisWeek = {
     document.getElementById('rw-save')?.addEventListener('click', () => this.saveWeek());
     document.getElementById('rw-start-over')?.addEventListener('click', () => this.startOver());
     document.getElementById('rw-pull')?.addEventListener('click', () => this.pullAll());
-    this.container.querySelectorAll('.rw-wk-chip').forEach(b => b.addEventListener('click', () => this.gotoWeek(b.dataset.end)));
     this.container.querySelector('.rw-wk-prev')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, -7)));
     this.container.querySelector('.rw-wk-next')?.addEventListener('click', () => this.gotoWeek(this.addDays(this._weekEnd, 7)));
     this.container.querySelector('.rw-wk-now')?.addEventListener('click', () => this.gotoWeek(this.currentWeekEnd()));
