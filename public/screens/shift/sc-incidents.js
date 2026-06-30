@@ -280,13 +280,11 @@ S.ShiftIncidents = {
       + this.formFields(r, 'ine-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ine-save">Update</button>'
-      + '<button class="btn btn-ghost" id="ine-cancel">Cancel</button>'
       + '<span id="ine-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="ine-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'in-edit-modal', maxWidth: 600, noClose: true });
     this.wireResolvedAutofill('ine-');
-    document.getElementById('ine-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('in-edit-modal'); });
     document.getElementById('ine-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('ine-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('in-edit-modal'); this.confirmDel(id); });
   },

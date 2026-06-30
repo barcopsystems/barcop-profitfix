@@ -50,8 +50,7 @@ S.ShiftDrawers = {
       + '<div class="f" style="width:170px;min-width:0;"><label>Cash Tolerance</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'tol" min="0" step="0.5" value="' + (d && d.cash_tolerance != null && d.cash_tolerance !== '' ? d.cash_tolerance : 10) + '"/></div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:16px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(d?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: d?.notes });
   },
 
   renderList() {
@@ -151,11 +150,9 @@ S.ShiftDrawers = {
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="dre-save">Update</button>'
-      + '<button class="btn btn-ghost" id="dre-cancel">Cancel</button>'
       + '<span id="dre-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'dr-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('dre-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('dr-edit-modal'); });
     document.getElementById('dre-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('dre-name')?.focus();
   },

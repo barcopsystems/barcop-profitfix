@@ -68,8 +68,7 @@ S.ShiftWalkedTabs = {
     const checkCell  = '<div class="f" style="width:110px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>';
     const reasonCell = '<div class="f" style="width:145px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>';
     const mgrCell    = '<div class="f" style="width:165px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>';
-    const notesRow   = '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label>'
-      + '<textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.">' + esc(r?.notes || '') + '</textarea></div></div>';
+    const notesRow   = App.noteField({ id: p + 'notes', value: r?.notes, placeholder: 'What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.' });
     // Inline log form: every data cell on one row (wraps when narrow). The edit
     // pop-up is a narrower modal, so it keeps a two-row split.
     if (inline) {
@@ -230,12 +229,10 @@ S.ShiftWalkedTabs = {
       + this.formFields(r, 'wte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wte-save">Update</button>'
-      + '<button class="btn btn-ghost" id="wte-cancel">Cancel</button>'
       + '<span id="wte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'wt-edit-modal', maxWidth: 540, noClose: true });
-    document.getElementById('wte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); });
     document.getElementById('wte-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wt-edit-modal'); this.confirmDel(id); });
   },

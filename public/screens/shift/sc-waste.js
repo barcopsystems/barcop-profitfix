@@ -133,7 +133,7 @@ S.ShiftWaste = {
       + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wlb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      + App.noteField({ id: 'wlb-notes' });
   },
 
   builderCard() {
@@ -401,7 +401,7 @@ S.ShiftWaste = {
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="wle-reason">' + this.reasonOptions(r?.reason) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wle-by">' + App.staffOptions(r?.recorded_by_id || r?.recorded_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="wle-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: 'wle-notes', value: r?.notes });
   },
 
   openEditModal(id) {
@@ -413,7 +413,6 @@ S.ShiftWaste = {
       + this.editFields(r)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wle-save">Update</button>'
-      + '<button class="btn btn-ghost" id="wle-cancel">Cancel</button>'
       + '<span id="wle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="wle-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
@@ -422,7 +421,6 @@ S.ShiftWaste = {
       const lbl = document.getElementById('wle-unit-label');
       if (lbl) lbl.textContent = this.unitLabel(this.productById(e.target.value));
     });
-    document.getElementById('wle-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('wl-edit-modal'); });
     document.getElementById('wle-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wl-edit-modal'); this.confirmDel(id); });
   },
@@ -478,7 +476,6 @@ S.ShiftWaste = {
       + this.builderInner(preset)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="wlb-save">Save All</button>'
-      + '<button class="btn btn-ghost" id="wlb-cancel">Cancel</button>'
       + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     const modal = App.openModal(html, { id: 'wl-log-modal', maxWidth: 860, noClose: true });

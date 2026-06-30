@@ -151,7 +151,7 @@ S.ShiftVoidComp = {
       + '<div class="f" id="' + p + 'custom-wrap" style="flex:1;min-width:130px;' + (isCustom ? '' : 'display:none;') + '"><label>Custom Item Name</label><input type="text" id="' + p + 'custom" value="' + esc(isCustom ? (r?.item || '') : '') + '" placeholder="What was it?"/></div>'
       + '</div>'
 
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="' + p + 'notes" class="notes-ta" rows="2" placeholder="Optional">' + esc(r?.notes || '') + '</textarea></div></div>';
+      + App.noteField({ id: p + 'notes', value: r?.notes });
   },
 
   // Type + item change handlers. p = id prefix ('vc-' inline form, 'vce-' modal).
@@ -350,13 +350,11 @@ S.ShiftVoidComp = {
       + this.formFields(r, 'vce-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="vce-save">Update</button>'
-      + '<button class="btn btn-ghost" id="vce-cancel">Cancel</button>'
       + '<span id="vce-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="vce-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'vc-edit-modal', maxWidth: 540, noClose: true });
     this.wireFormFields('vce-');
-    document.getElementById('vce-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); });
     document.getElementById('vce-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
   },
@@ -375,11 +373,9 @@ S.ShiftVoidComp = {
     const mount = () => {
       const body = this._modalMode === 'import'
         ? '<div id="vc-csv-m"></div><div id="vc-imp-result-m"></div>'
-          + '<div class="card-actions"><button class="btn btn-ghost" id="vcb-cancel">Cancel</button></div>'
         : this.builderInner(preset)
           + '<div class="card-actions">'
           + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
-          + '<button class="btn btn-ghost" id="vcb-cancel">Cancel</button>'
           + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
           + '</div>';
       const html = '<div class="card form-card" style="margin:0;">'
@@ -487,7 +483,7 @@ S.ShiftVoidComp = {
       + '<th style="min-width:150px;">Server</th><th style="width:160px;">Reason</th><th style="width:90px;"></th>'
       + '</tr></thead><tbody id="vcb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="vcb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="vcb-notes" class="notes-ta" rows="2" placeholder="Optional"></textarea></div></div>';
+      + App.noteField({ id: 'vcb-notes' });
   },
 
   // One card, two ways in: enter the shift's voids and comps by hand in the batch

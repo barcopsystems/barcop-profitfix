@@ -276,13 +276,11 @@ S.ShiftMaintenance = {
       + this.formFields(r, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Update</button>'
-      + '<button class="btn btn-ghost" id="mte-cancel">Cancel</button>'
       + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '<button class="btn btn-danger" id="mte-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'mt-edit-modal', maxWidth: 540, noClose: true });
     this.wireResolvedAutofill('mte-');
-    document.getElementById('mte-cancel')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); });
     document.getElementById('mte-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('mte-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('mt-edit-modal'); this.confirmDel(id); });
   },
@@ -296,12 +294,10 @@ S.ShiftMaintenance = {
       + this.formFields(preset || null, 'mte-')
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="mte-save">Save</button>'
-      + '<button class="btn btn-ghost" id="mte-cancel">Cancel</button>'
       + '<span id="mte-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'mt-edit-modal', maxWidth: 540, noClose: true });
     this.wireResolvedAutofill('mte-');
-    document.getElementById('mte-cancel')?.addEventListener('click', () => App.closeModal('mt-edit-modal'));
     document.getElementById('mte-save')?.addEventListener('click', () => this.saveLog(onDone));
   },
 

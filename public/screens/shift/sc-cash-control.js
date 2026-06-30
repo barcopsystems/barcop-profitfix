@@ -413,15 +413,14 @@ S.ShiftCashControl = {
       +   '<div class="f" style="width:200px;min-width:0;"><label>Amount Dropped</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ccd-amount" min="0" step="0.01" inputmode="decimal" value="' + esc(v(rec && rec.amount)) + '" style="height:48px;font-size:20px;"/></div></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t3);padding-bottom:12px;">Counts auto-fill here. Edit directly if you are not counting by bill.</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccd-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">' + (editing ? 'Update' : 'Save Drop') + '</button><button class="btn btn-ghost" id="ccd-cancel">Cancel</button>'
+      + App.noteField({ id: 'ccd-notes', value: rec?.notes })
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccd-save">' + (editing ? 'Update' : 'Save Drop') + '</button>'
       +   '<span id="ccd-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
-    App.openModal(html, { id: 'cc-modal', maxWidth: 640, noClose: true });
+    App.openModal(html, { id: 'cc-modal', maxWidth: 640, onClose: () => { this._dropOnDone = null; App.closeModal('cc-modal'); } });
     const counter = CashCounter.mount(document.getElementById('ccd-counter'), {
       onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
     });
-    document.getElementById('ccd-cancel')?.addEventListener('click', () => { this._dropOnDone = null; App.closeModal('cc-modal'); });
     document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('cash drop', async () => {
       await S.ShiftCashDrop.removeDrop(rec.id); App.closeModal('cc-modal'); this.draw();
@@ -493,8 +492,8 @@ S.ShiftCashControl = {
       +   '<div class="f" style="flex:1;min-width:0;"><label>Performed By</label><select id="ccs-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
       +   '<div class="f" style="flex:1;min-width:0;"><label>Witness</label><select id="ccs-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccs-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button><button class="btn btn-ghost" id="ccs-cancel">Cancel</button>'
+      + App.noteField({ id: 'ccs-notes', value: rec?.notes })
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccs-save">' + (editing ? 'Update' : 'Save') + '</button>'
       +   '<span id="ccs-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
@@ -504,7 +503,6 @@ S.ShiftCashControl = {
       if (el) { el.textContent = dir === 'out' ? 'Out of safe' : 'Into safe'; el.style.color = dir === 'out' ? 'var(--red)' : 'var(--gold)'; }
     };
     document.getElementById('ccs-type')?.addEventListener('change', updateDir);
-    document.getElementById('ccs-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
     document.getElementById('ccs-save')?.addEventListener('click', () => this.saveSafeMove(editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('safe entry', async () => {
       await S.ShiftSafeLog.removeEntry(rec.id); App.closeModal('cc-modal'); this.draw();
@@ -574,8 +572,8 @@ S.ShiftCashControl = {
       +   '<div class="f" style="width:190px;min-width:0;"><label>Performed By</label><select id="ccc-by" style="height:44px;">' + App.staffOptions(byId, { placeholder: 'Select staff...' }) + '</select></div>'
       +   '<div class="f" style="width:190px;min-width:0;"><label>Witness</label><select id="ccc-witness" style="height:44px;">' + App.staffOptions(witId, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccc-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccc-cancel">Cancel</button>'
+      + App.noteField({ id: 'ccc-notes', value: rec?.notes })
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccc-save">' + (editing ? 'Update' : 'Save Count') + '</button>'
       +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 620, noClose: true });
@@ -592,7 +590,6 @@ S.ShiftCashControl = {
     };
     const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
     update(counter ? counter.total() : 0);
-    document.getElementById('ccc-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
     document.getElementById('ccc-save')?.addEventListener('click', () => this.saveSafeCount(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('safe count', async () => {
       await App.removeRecord('sc', 'safe_count', rec.id); App.closeModal('cc-modal'); this.draw();
@@ -663,8 +660,8 @@ S.ShiftCashControl = {
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim" id="ccv-c-tol">&plusmn;' + App.fmtCurrency(App.drawerTolerance(dId)) + '</div></div>'
       + '</div>'
-      + '<div class="form-row" style="gap:14px;"><div class="f" style="width:100%;"><label>Notes</label><textarea id="ccv-notes" class="notes-ta" rows="2" placeholder="Optional">' + esc((rec && rec.notes) || '') + '</textarea></div></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button><button class="btn btn-ghost" id="ccv-cancel">Cancel</button>'
+      + App.noteField({ id: 'ccv-notes', value: rec?.notes })
+      + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button>'
       +   '<span id="ccv-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 720, noClose: true });
@@ -687,7 +684,6 @@ S.ShiftCashControl = {
     document.getElementById('ccv-drawer')?.addEventListener('change', calc);
     document.getElementById('ccv-expected')?.addEventListener('input', calc);
     document.getElementById('ccv-counted')?.addEventListener('input', calc);
-    document.getElementById('ccv-cancel')?.addEventListener('click', () => App.closeModal('cc-modal'));
     document.getElementById('ccv-save')?.addEventListener('click', () => this.saveCountDrawer(editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('drawer count', async () => {
       await S.ShiftVarianceLog.removeVariance(rec.id); App.closeModal('cc-modal'); this.draw();
