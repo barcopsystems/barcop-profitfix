@@ -543,7 +543,7 @@ S.EventsBookings = {
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-staff">Schedule Staff for this Event</button></div>'
         + this.divider() + this.subLabel('Run Sheet')
         + this.runSheetReadout(b)
-        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm eb-runsheet-open">Open Run Sheet</button><button class="btn btn-ghost btn-sm eb-runsheet-print">Print Run Sheet</button></div>'
+        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm eb-runsheet-open">Open Run Sheet</button><button class="btn btn-ghost btn-sm eb-runsheet-print">Export Run Sheet</button></div>'
         + '</div>';
     } else if (viewStep === 'Completed') {
       card2 = '<div class="card form-card">' + this.subLabel('Close Out the P&amp;L')
@@ -757,8 +757,8 @@ S.EventsBookings = {
     const fld = (lbl, fid, val, pre, suf) =>
       '<div class="f"><label>' + lbl + '</label><div class="fw">' + (pre ? '<span class="pre">' + pre + '</span>' : '')
       + '<input class="form-input' + (pre ? ' pre' : suf ? ' suf' : '') + '" type="number" id="' + fid + '" value="' + (val != null ? val : '') + '" step="0.01"/>' + (suf ? '<span class="suf">' + suf + '</span>' : '') + '</div></div>';
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Catering Calculator</div>'
-      + '<div class="form-grid">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Catering Calculator</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + fld('Guest Count', 'qc-guests', b.party_size || '')
         + fld('Food Cost / Head', 'qc-food', '', '$')
         + fld('Bar Cost / Head', 'qc-bar', '', '$')
@@ -769,7 +769,7 @@ S.EventsBookings = {
       + '</div>'
       + '<div id="qc-result" style="margin-top:14px;"></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="qc-apply">Apply to Quote</button></div></div>';
-    App.openModal(html, { id: 'eb-calc-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'eb-calc-modal', maxWidth: 540, noClose: true });
     const recompute = () => {
       const g = x => parseFloat(document.getElementById(x)?.value) || 0;
       const guests = g('qc-guests'), el = document.getElementById('qc-result');
@@ -856,7 +856,7 @@ S.EventsBookings = {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:640px;background:var(--surface);padding:24px;';
     wrap.innerHTML = '<div class="screen"><div class="card">'
-      + '<div class="card-title">Event Quote</div>'
+      + '<div class="card-title" style="margin-bottom:10px;">Event Quote</div>'
       + '<div class="pdf-para">Prepared ' + this.fmtDate(App.todayLocal()) + (b.contact_name ? ' for ' + esc(b.contact_name) : '') + '</div>'
       + '<table class="tbl"><tbody>' + rowsHtml + '</tbody></table>'
       + '<div class="pdf-para">This is a quote worksheet, an estimate prepared from your package pricing. Final charges may vary with headcount and selections. Not a contract.</div>'
@@ -911,11 +911,11 @@ S.EventsBookings = {
     const b = this.bookings().find(x => x.id === id);
     if (!b) return;
     const sub = [b.event_date ? this.fmtDate(b.event_date) : '', esc(b.event_time || ''), esc(b.space || ''), b.party_size ? b.party_size + ' guests' : ''].filter(Boolean).join('  &middot;  ');
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Run Sheet</span><button class="btn btn-ghost btn-sm" id="rs-print">Print Run Sheet</button></div>'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Run Sheet</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(this.title(b)) + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin:2px 0 14px;">' + sub + '</div>'
       + this.runSheetFields(b)
-      + '<div class="card-actions"><button class="btn btn-primary" id="rs-save">Save Run Sheet</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rs-save">Save Run Sheet</button><button class="btn btn-ghost" id="rs-print">Export Run Sheet</button></div></div>';
     App.openModal(html, { id: 'eb-runsheet-modal', maxWidth: 700, noClose: true });
     document.getElementById('rs-save')?.addEventListener('click', async () => {
       await this.patch(id, this.collectRunSheet());
@@ -1017,7 +1017,7 @@ S.EventsBookings = {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:680px;';
     wrap.innerHTML = '<div class="screen">'
-      + '<div class="card-title">Event Agreement</div>'
+      + '<div class="card-title" style="margin-bottom:10px;">Event Agreement</div>'
       + '<div class="pdf-para">Between ' + esc(barName) + ' and ' + esc(b.contact_name || 'the client') + ', prepared ' + this.fmtDate(App.todayLocal()) + '.</div>'
       + tbl
       + '<div class="sh">Terms</div>'

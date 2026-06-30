@@ -95,8 +95,8 @@ S.EventsPricing = {
     const fld = (lbl, fid, val, pre, suf) =>
       '<div class="f"><label>' + lbl + '</label><div class="fw">' + (pre ? '<span class="pre">' + pre + '</span>' : '')
       + '<input class="form-input' + (pre ? ' pre' : suf ? ' suf' : '') + '" type="number" id="' + fid + '" value="' + (val != null ? val : '') + '" step="0.01"/>' + (suf ? '<span class="suf">' + suf + '</span>' : '') + '</div></div>';
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Catering Calculator</div>'
-      + '<div class="form-grid">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Catering Calculator</div>'
+      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + fld('Guest Count', 'rpc-guests', '')
         + fld('Food Cost / Head', 'rpc-food', '', '$')
         + fld('Bar Cost / Head', 'rpc-bar', '', '$')
@@ -107,7 +107,7 @@ S.EventsPricing = {
       + '</div>'
       + '<div id="rpc-result" style="margin-top:14px;"></div>'
       + '</div>';
-    App.openModal(html, { id: 'rp-calc-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'rp-calc-modal', maxWidth: 540, noClose: true });
     ['rpc-guests', 'rpc-food', 'rpc-bar', 'rpc-hrs', 'rpc-wage', 'rpc-other', 'rpc-tgt'].forEach(id =>
       document.getElementById(id)?.addEventListener('input', () => this.calc()));
     this.calc();
@@ -146,7 +146,7 @@ S.EventsPricing = {
         + '<div class="f" style="flex:1 1 110px;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-ph" step="0.01" value="' + v(r.per_head) + '"/></div></div>'
       + '</div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button></div></div>';
-    App.openModal(html, { id: 'rp-edit-modal', maxWidth: 680, noClose: true });
+    App.openModal(html, { id: 'rp-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('rpe-save')?.addEventListener('click', () => this.saveEdit(id));
   },
 

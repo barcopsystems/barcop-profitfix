@@ -153,7 +153,7 @@ S.EventsCalendar = {
       : agendaDays.map(([ds, d, items]) => '<div class="card" style="margin-bottom:8px;"><div style="font-weight:700;color:var(--t1);margin-bottom:6px;">' + monShort + ' ' + d + (ds === today ? ' &middot; Today' : '') + '</div>' + items.map(chipHtml).join('') + '</div>').join('')) + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + headRow
-      + '<div class="card">' + grid + agenda + '</div>'
+      + '<div class="card" style="background:var(--input);">' + grid + agenda + '</div>'
       + '<div style="margin:16px 0 24px;"><button class="btn btn-primary" id="evc-add">Add New Date</button></div>'
       + '</div>';
     this.wire();
@@ -181,7 +181,7 @@ S.EventsCalendar = {
     const cl = (e && e.checklist) || {};
     const typeOpts = '<option value="">Select type...</option>' + this.TYPES.map(t => '<option' + (((e && e.type === t) || (!e && presetType === t)) ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     const chk = (k, label) => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t1);cursor:pointer;padding:5px 0;"><input type="checkbox" class="bc-check" id="evcf-' + k + '"' + (cl[k] ? ' checked' : '') + '/> ' + label + '</label>';
-    const html = '<div class="card form-card" style="margin:0;">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (id ? 'Edit Date' : 'Add New Date') + '</div>'
       + '<div class="form-row" style="gap:14px;">'
         + '<div class="f" style="flex:1 1 140px;"><label>Date</label><input type="date" id="evcf-date" value="' + esc(e?.date || presetDate || '') + '"/></div>'
@@ -197,7 +197,7 @@ S.EventsCalendar = {
       +   (id ? '<button class="btn btn-danger" id="evcf-del" style="margin-left:auto;">Delete</button>' : '')
       +   '<span id="evcf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
-    App.openModal(html, { id: 'evc-form', maxWidth: 560, noClose: true });
+    App.openModal(html, { id: 'evc-form', maxWidth: 540, noClose: true });
     document.getElementById('evcf-save')?.addEventListener('click', () => this.save(id));
     document.getElementById('evcf-del')?.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;
