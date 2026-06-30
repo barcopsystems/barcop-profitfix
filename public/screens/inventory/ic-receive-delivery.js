@@ -66,7 +66,8 @@ S.InventoryReceiveDelivery = {
       { h: 'Start With The Vendor', p: ['Pick the vendor up top, then set the date and who took the delivery in. Invoice number and driver are optional, but worth keeping for your records and any credit claim down the road. When you select Republic National, Bar Cop checks for any open orders you placed with them and offers them in the Open Order picker.'] },
       { h: 'Match Your Order', p: ['If you placed this order through Bar Cop, it is waiting in the Open Order picker, newest first, and Bar Cop pre-fills the most recent one so you just confirm it against the invoice. That also arms the short-count check, since Bar Cop knows what was supposed to show up, and it marks the order Received when you save so it drops off your Order Sheet. If this delivery is not one of your Bar Cop orders, or the vendor has none on file, pick No matched order (walk-in delivery) and add the lines by hand. Either way the delivery records and feeds your stock, usage, and variance.'] },
       { h: 'Check Each Line', p: ['Go down your invoice and confirm the quantity and unit price on every line. Unit price pre-fills from your product master, so you are really just confirming it still matches. Bottle beer is received by the case, so the qty is cases and the price is per case. A delivery of Modelo Especial is entered as 4 cases at the per-case price, not 96 bottles. Everything else is in its own container unit: liquor and wine by the bottle, draft by the keg.'] },
-      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop calls it out on the line and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. File it right there and it lands in Vendor Tracker under Discrepancies, where you chase the credit.'] },
+      { h: 'Flag What Is Off', p: ['When a price does not match your master cost, or you got fewer than you ordered, Bar Cop calls it out on the line and gives you a Flag button. Say your 750ml well vodka was costing 18.00 a bottle and the invoice reads 21.50. Bar Cop catches the 3.50 jump, multiplies it across every bottle on the line, and the Flag button opens a pre-filled claim with the overcharge already figured. File it right there and it drops into the Credits to Chase list below this form.'] },
+      { h: 'Chase Your Credits', p: ['Every claim you file shows in the Credits to Chase list under the form, with how long it has waited and a follow-up flag once it has gone quiet too long. Open one to request the credit, which drafts the email to your rep, log a follow-up by phone or email when you have not heard back, and mark it resolved with what you actually got back. The rep\'s phone and email sit right in the claim so you are not hunting them down. Resolved and closed claims move to the read-only rollup in Vendor Tracker.'] },
       { h: 'Print a Worksheet', p: ['Use the Worksheet button up top to print a blank Delivery Inspection Sheet. Take it to the dock, check every line by hand as the truck unloads, and enter anything that came in off back here, or later from Delivery History.'] },
       { h: 'Saving The Delivery', p: ['If any prices changed, Bar Cop asks which ones should become your new cost from here on. Apply the real increases so your pour costs stay honest, and check Dispute on the ones you are not eating, which files the vendor discrepancy claim in the same step. When a price increase pushes any menu item over its cost target, Bar Cop names that item right on the confirmation so you know what to re-price before the new cost quietly eats your margin. Saved deliveries feed your on-hand stock, your usage and variance reports, and the Vendor Tracker.'] }
     ]);
@@ -175,7 +176,7 @@ S.InventoryReceiveDelivery = {
       + '<span id="rd-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + formCard + saveRow + '</div>';
+    this.container.innerHTML = '<div class="screen">' + formCard + saveRow + '<div id="rd-chase">' + this.chaseListHtml() + '</div></div>';
 
     const orderRow = document.getElementById('rd-order-row');
     if (orderRow) orderRow.style.display = 'none';
@@ -219,6 +220,7 @@ S.InventoryReceiveDelivery = {
 
     this.container.onclick = null;
     this.recalcTotal();
+    this._wireChase();
 
     // Persist a half-entered delivery across leaving and returning. The .screen
     // wrapper is rebuilt every render, so this listener never stacks up.
@@ -252,6 +254,54 @@ S.InventoryReceiveDelivery = {
     } else if (this._draftLines && this._draftLines.length) {
       this._restoreDraft();
     }
+  },
+
+  // ── Credits to Chase ────────────────────────────────────────────────────────
+  // Open vendor credits, shown under the receive form. The active worklist (Open +
+  // Credit Requested), so a filed credit never gets forgotten; resolved/closed
+  // claims live in the Vendor Tracker rollup. Each opens the shared discrepancy
+  // modal where you request, follow up, resolve, or close it.
+  chaseListHtml() {
+    const VT = S.VendorTracker;
+    const all = (App.data && App.data.vendor_discrepancies) || [];
+    const openDiscs = all.filter(r => r && r.status !== 'Resolved').sort((a, b) => {
+      const ao = VT.isOverdue(a) ? 1 : 0, bo = VT.isOverdue(b) ? 1 : 0;
+      if (ao !== bo) return bo - ao;
+      return (a.date || '').localeCompare(b.date || '');
+    });
+    const heading = '<div class="sh" style="margin:28px 0 10px;">Credits to Chase</div>';
+    if (!openDiscs.length) {
+      return heading + '<div class="card"><div class="empty"><div class="empty-title">No open credits to chase</div>'
+        + '<div class="empty-sub">When a delivery comes up short or a price is wrong, flag the line above and the claim lands here to chase to a credit.</div></div></div>';
+    }
+    const rows = openDiscs.map(r => {
+      const overdue = VT.isOverdue(r), wd = VT.waitDays(r);
+      const statusCell = VT.discStatusText(r.status, r)
+        + ((r.status === 'Credit Requested' && wd != null)
+            ? '<div style="font-size:10px;color:' + (overdue ? 'var(--amber)' : 'var(--t3)') + ';margin-top:2px;">Waiting ' + wd + 'd' + (overdue ? ', follow up' : '') + '</div>'
+            : '');
+      const label = r.status === 'Credit Requested' ? 'Follow Up' : 'Open';
+      return '<tr>'
+        + '<td class="val">' + esc(r.vendor || '-') + '</td>'
+        + '<td>' + esc(r.sku || '-') + '</td>'
+        + '<td class="' + ((r.overcharge || 0) > 0 ? 'neg' : '') + '">' + App.fmtCurrency(r.overcharge || 0) + '</td>'
+        + '<td>' + statusCell + '</td>'
+        + '<td class="no-print"><div class="row-actions"><button class="btn btn-ghost btn-sm rd-chase-open" data-id="' + esc(r.id) + '">' + label + '</button></div></td>'
+        + '</tr>';
+    }).join('');
+    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Vendor</th><th>Product</th><th>Overcharge</th><th>Status</th><th></th></tr></thead><tbody>'
+      + rows + '</tbody></table></div>';
+  },
+  _wireChase() {
+    const wrap = document.getElementById('rd-chase');
+    if (!wrap) return;
+    wrap.querySelectorAll('.rd-chase-open').forEach(b => b.addEventListener('click', () => {
+      S.VendorTracker.openDiscrepancyModal({
+        discrepancyId: b.dataset.id,
+        onClose: () => { const w = document.getElementById('rd-chase'); if (w) { w.innerHTML = this.chaseListHtml(); this._wireChase(); } }
+      });
+    }));
   },
 
   // Remove a line: drop its data row; keep at least one.
