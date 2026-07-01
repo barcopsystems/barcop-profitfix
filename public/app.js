@@ -425,6 +425,14 @@ const App = {
   boot() {
     document.getElementById('auth-screen').style.display = 'none';
     this.updatePeriod();
+    // First-use stamp for the audit unlock window: the four audits stay locked
+    // for 7 days from here, then unlock together. Set once, persisted.
+    try {
+      if (this.data && this.data.settings && !this.data.settings.account_start) {
+        this.data.settings.account_start = this.todayLocal();
+        this.saveKey('settings');
+      }
+    } catch (e) {}
     // Recurring operating expenses: fill in any elapsed months on load so Books
     // reflects them even if the operator never opens the Operating Expenses page.
     try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
@@ -4669,6 +4677,24 @@ const App = {
   // Today's local date as 'YYYY-MM-DD'. The single source for every "today"
   // stamp in Bar Cop.
   todayLocal() { return this.ymdLocal(new Date()); },
+
+  // ── Shared audit unlock gate ────────────────────────────────────────────────
+  // All four audits behave identically: locked for the first 7 days after the
+  // account's first use (account_start, stamped once in boot), then relocked for
+  // 7 days after each run. lastDate = the YYYY-MM-DD that audit last ran (null if
+  // never). Returns { canRun, daysLeft, isFirst }. If account_start is missing
+  // (older accounts), the first-use lock is skipped and only the 7-day relock
+  // applies, so nothing is ever stuck locked.
+  auditGate(lastDate) {
+    const DAY = 86400000, LOCK = 7;
+    const start = (this.data && this.data.settings && this.data.settings.account_start) || null;
+    const sinceStart = start    ? Math.floor((Date.now() - new Date(start + 'T00:00:00').getTime())    / DAY) : Infinity;
+    const sinceLast  = lastDate ? Math.floor((Date.now() - new Date(lastDate + 'T00:00:00').getTime()) / DAY) : Infinity;
+    const startLeft = Math.max(0, LOCK - sinceStart);
+    const rerunLeft = sinceLast === Infinity ? 0 : Math.max(0, LOCK - sinceLast);
+    const daysLeft  = Math.max(startLeft, rerunLeft);
+    return { canRun: daysLeft <= 0, daysLeft: daysLeft, isFirst: sinceLast === Infinity };
+  },
 
   // Resolve the Monday of the week containing a given date string. Forecast
   // records are keyed by week_start (Monday) so every screen converts a
