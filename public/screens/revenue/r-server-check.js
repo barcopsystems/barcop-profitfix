@@ -25,6 +25,10 @@ S.RevenueServerCheck = {
   ],
   windowDays() { return this._window === 'all' ? 36500 : (parseInt(this._window) || 30); },
 
+  // Shared 9-column layout so the scorecard and the Server Shift log line up
+  // column-for-column: 8 even data columns plus a wider trailing action column.
+  COLGROUP: '<colgroup><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:10.75%;"/><col style="width:14%;"/></colgroup>',
+
   printBlank() {
     App.printBlankSheet({
       title: 'Server Shift Check Sheet',
@@ -190,10 +194,10 @@ S.RevenueServerCheck = {
   // ── New Shift Check form (always-on, top of page; editing happens in a modal) ─
   renderForm(targetCA) {
     return '<div class="card form-card">'
-      + '<div class="card-title">New Shift Check</div>'
-      + this.formBody(this._form, targetCA, 'rsc')
+      + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
+      + '<div class="collapse-body">' + this.formBody(this._form, targetCA, 'rsc') + '</div>'
       + '</div>'
-      + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<div data-collapse-group="rsc-newcheck" style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="rsc-submit">Log Check</button>'
       + '<button class="btn btn-ghost" id="rsc-startover">Start Over</button>'
       + '<span id="rsc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -250,13 +254,14 @@ S.RevenueServerCheck = {
         + '<td class="val">' + App.fmtCurrency(r.sales) + '</td>'
         + '<td>' + (r.compsPct > 0 ? r.compsPct.toFixed(1) + '%' : '-') + '</td>'
         + '<td>' + (r.tipsPct > 0 ? r.tipsPct.toFixed(1) + '%' : '-') + '</td>'
-        + '<td>' + r.entries + '</td>'
         + '<td class="no-print"><div class="row-actions">' + coachBtn + '</div></td>'
         + '</tr>';
     }).join('');
     return headingRow
-      + '<div id="rsc-sc-export"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
+      + '<div id="rsc-sc-export"><div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLGROUP
+      + '<thead><tr>'
+      + '<th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th class="no-print"></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
@@ -264,7 +269,9 @@ S.RevenueServerCheck = {
   logSection(log, targetCA) {
     const shown = log.slice(0, App.listLimit('core', 'revenue_server_check'));
     return '<div class="sh" style="margin:24px 0 10px;">Server Shift</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLGROUP
+      + '<thead><tr>'
       + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers</th><th>Sales</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
       + '</tr></thead><tbody id="rsc-log">' + this._buildRows(shown, targetCA) + '</tbody></table></div>'
       + App.showOlderBar('core', 'revenue_server_check', log, this._window !== 'all');
@@ -324,6 +331,9 @@ S.RevenueServerCheck = {
   // ── Wiring (re-run each draw; per-element listeners, no container stacking) ───
   wire() {
     const c = this.container;
+    const collapseHead = c.querySelector('.card-collapse-head');
+    if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
+    App.applyCollapsed(c);
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
