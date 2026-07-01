@@ -32,9 +32,7 @@ S.CashPosition = {
     const p = CashEngine.position();
     this.container.innerHTML = '<div class="screen">'
       + this.configCard(p)
-      + (p.hasOpening ? this.heroCard(p) : '')
-      + (p.hasOpening ? this.setAsideCard(p.setAside) : '')
-      + (p.hasOpening ? this.reserveCard(p) : '')
+      + (p.hasOpening ? '<div id="cp-export-root">' + this.heroCard(p) + this.setAsideCard(p.setAside) + this.reserveCard(p) + '</div>' : '')
       + '</div>';
     this.wire();
   },
@@ -79,7 +77,7 @@ S.CashPosition = {
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:' + (opts.big ? '40px' : '26px') + ';font-weight:600;line-height:0.9;color:' + (opts.col || 'var(--t1)') + ';">' + val + '</div></div>';
     };
     const op = sym => '<div style="align-self:flex-end;font-size:20px;color:var(--t4);padding-bottom:3px;">' + sym + '</div>';
-    return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Safe to Spend</div>'
+    return '<div class="card form-card" style="margin-top:6px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Safe to Spend</span><button class="btn btn-ghost btn-sm no-print" id="cp-export">Export PDF</button></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;">As of ' + today + '. A snapshot of your account right now, not a forecast.</div>'
       + '<div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;">'
       +   eq('Your Balance', App.fmtCurrency(p.opening || 0))
@@ -93,6 +91,7 @@ S.CashPosition = {
       + (p.safe < 0
           ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--red);">You are spending spoken-for money.</strong> Your balance is already claimed by tax, gift cards, and your reserve. Free trapped cash or hold any spend until this is back above zero.</div>'
           : '')
+      + '<div class="pdf-para" style="display:none;">Safe to Spend ' + App.fmtCurrency(p.safe) + ': your balance ' + App.fmtCurrency(p.opening || 0) + ' minus ' + App.fmtCurrency(p.setAside.total) + ' set aside and ' + App.fmtCurrency(p.reserve) + ' reserve target.</div>'
       + '</div>';
   },
 
@@ -112,6 +111,11 @@ S.CashPosition = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 2px;">'
       +   '<div style="font-size:13px;font-weight:700;color:var(--t1);">Total set aside</div>'
       +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;color:var(--gold);">' + App.fmtCurrency(sa.total) + '</div></div>'
+      + '<div class="pdf-para" style="display:none;">'
+      +   (rateSet ? 'Sales tax collected ' + App.fmtCurrency(sa.salesTax) + '. ' : '')
+      +   (CashEngine.payrollBurden() > 0 ? 'Payroll tax ' + App.fmtCurrency(sa.payrollTax) + '. ' : '')
+      +   (sa.giftCards > 0 ? 'Gift cards outstanding ' + App.fmtCurrency(sa.giftCards) + '. ' : '')
+      +   'Total set aside ' + App.fmtCurrency(sa.total) + '.</div>'
       + '</div>';
   },
 
@@ -131,6 +135,7 @@ S.CashPosition = {
             : '<div style="font-size:12px;color:var(--green);margin-top:10px;">Fully reserved. Your cushion covers ' + CashEngine.reserveWeeks() + ' weeks of fixed costs with no sales.</div>');
     return '<div class="sh" style="margin:24px 0 10px;">Your Reserve</div>'
       + '<div class="card">' + body
+      + (target > 0 ? '<div class="pdf-para" style="display:none;">Reserve: ' + App.fmtCurrency(p.cushion) + ' toward a ' + App.fmtCurrency(target) + ' target' + (gap > 0 ? ', ' + App.fmtCurrency(gap) + ' short' : ', fully funded') + '.</div>' : '')
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Free Trapped Cash</button></div></div>';
   },
 
@@ -151,6 +156,7 @@ S.CashPosition = {
     if (reset) reset.addEventListener('click', () => this.resetForm());
     this.container.onclick = ev => {
       if (ev.target.closest('#cp-save') || ev.target.closest('#cp-reset')) return;
+      if (ev.target.closest('#cp-export')) { App.exportPDF({ title: 'Cash Position', root: document.getElementById('cp-export-root') || this.container }); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
