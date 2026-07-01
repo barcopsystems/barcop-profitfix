@@ -105,7 +105,6 @@ S.RevenueAudit = {
         ['Dogs on Menu',                 num(d.S3_DOGS_COUNT), d.S3_DOGS_COUNT > 3 ? 'warn' : ''],
         ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
         ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
-        ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || '', d.S3_PRICING_STALE === true ? 'warn' : ''],
         ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
       ], null, d),
@@ -116,7 +115,6 @@ S.RevenueAudit = {
         ['Performance Spread',           cur(d.S4_PERFORMANCE_SPREAD), d.S4_PERFORMANCE_SPREAD > 5 ? 'warn' : ''],
         ['Appetizer Attach Rate',        pct(d.S4_APP_ATTACH_RATE), d.S4_APP_ATTACH_RATE < 30 ? 'warn' : ''],
         ['Dessert Attach Rate',          pct(d.S4_DESSERT_ATTACH_RATE)],
-        ['Pre-Shift Briefing',           d.S4_PRESHIFT_BRIEFING || ''],
         ['Monthly Gap from Spread',      cur(d.S4_MONTHLY_GAP), d.S4_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(5, 'Events and Private Dining', d.S5_SCORE, [
@@ -251,7 +249,6 @@ S.RevenueAudit = {
       ['Dogs on Menu',                 num(d.S3_DOGS_COUNT)],
       ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
       ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
-      ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || ''],
       ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP)],
       ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
     ]);
@@ -262,7 +259,6 @@ S.RevenueAudit = {
       ['Performance Spread',           cur(d.S4_PERFORMANCE_SPREAD)],
       ['Appetizer Attach Rate',        pct(d.S4_APP_ATTACH_RATE)],
       ['Dessert Attach Rate',          pct(d.S4_DESSERT_ATTACH_RATE)],
-      ['Pre-Shift Briefing',           d.S4_PRESHIFT_BRIEFING || ''],
       ['Monthly Gap from Spread',      cur(d.S4_MONTHLY_GAP)],
     ]);
     section(5, 'Events and Private Dining', d.S5_SCORE, [
