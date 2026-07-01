@@ -33,60 +33,43 @@ S.CashAudit = {
     const daysSince = latest && latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
     const canRun = daysSince >= 7;
     const daysLeft = canRun ? 0 : 7 - daysSince;
-    const desc = 'Generate a new audit every 7 days. A weekly read on your cash health.';
-    const hasOpening = !!(window.CashEngine && CashEngine.position && CashEngine.position().hasOpening);
-    const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).length;
-    const sales  = ((App.shiftData && App.shiftData.sc_shifts) || []).length;
-    const cashReady = hasOpening && counts >= 2 && sales >= 1;
+    const desc = 'Bar Cop reads your cash health off your own logged data. Get these in, then run it. One a week.';
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.firstAuditCard({ pfx: 'ca', title: 'Cash Audit', desc, canRun, hasLatest: !!latest, daysLeft, opts: { lockedNoInputs: true },
-          gs: { mode: 'auto', ready: cashReady,
-            intro: 'Your Cash Audit scores how hard your shelf cash works, how many days your money stays locked, your runway, and your vendor terms. It reads straight off your own data, so set these up and it unlocks.',
-            steps: [
-              { label: 'Set your opening cash balance', done: hasOpening, go: 'c-position' },
-              { label: 'Take two inventory counts', done: counts >= 2, go: 'ic-take-inventory' },
-              { label: 'Import a week of POS sales', done: sales >= 1, go: 'sc-dashboard' }
-            ] } })
+      + AuditUI.readinessCard({ pfx: 'ca', title: 'Cash Audit', desc,
+          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'cash_audit', 'ca', { hideGrade: true }) : '')
       + '</div>';
-    document.getElementById('ca-new-btn')?.addEventListener('click', () => this.showIntake());
     AuditUI.wireFirstAudit(this.container);
+    document.getElementById('ca-gen-btn')?.addEventListener('click', () => this.onGenerate());
     this.container.querySelectorAll('.ca-view-btn').forEach(btn => btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
-  showIntake() {
-    this.actions.innerHTML = '';
-    const back = document.createElement('button');
-    back.className = 'btn btn-ghost btn-sm'; back.textContent = '← Back'; back.style.marginRight = '8px';
-    back.onclick = () => this.renderMain();
-    this.actions.appendChild(back);
-
-    const counts = CashEngine.countsAsc().length;
-    const sched = ((App.laborData && App.laborData.lc_schedules) || []).length;
-    const bills = CashEngine.bills().length;
-    const terms = CashEngine.termVendors().length;
-    const opening = CashEngine.openingCash() != null;
-    const checks = [
-      { label: counts + ' inventory count' + (counts === 1 ? '' : 's'), ok: counts > 1 },
-      { label: 'Schedule and sales', ok: sched > 0 },
-      { label: bills + ' bill' + (bills === 1 ? '' : 's') + ' in Books', ok: bills > 0 },
-      { label: terms + ' vendor' + (terms === 1 ? '' : 's') + ' on terms', ok: terms > 0 },
-      { label: 'Opening cash balance', ok: opening }
+  // The data slices the Cash Audit scores, one per treasury section. Each
+  // auto-checks off once Bar Cop has it, or taps through to the step that fills
+  // it. Reads the same CashEngine and Control stores the audit scores off.
+  _readinessSteps() {
+    const hasOpening = !!(window.CashEngine && CashEngine.position && CashEngine.position().hasOpening);
+    const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).length;
+    const sales  = ((App.shiftData && App.shiftData.sc_shifts) || []).length;
+    const terms  = (window.CashEngine && CashEngine.termVendors) ? CashEngine.termVendors().length : 0;
+    return [
+      { label: 'Opening cash balance set',   done: hasOpening,   go: 'c-position' },
+      { label: 'Two inventory counts taken', done: counts >= 2,  go: 'ic-take-inventory' },
+      { label: 'A week of POS sales imported', done: sales >= 1, go: 'sc-dashboard' },
+      { label: 'Vendors on payment terms',   done: terms > 0,    go: 'ic-vendors' }
     ];
-    this.container.innerHTML = '<div class="screen">'
-      + AuditUI.formCard('Generate Your Cash Audit',
-          AuditUI.intakeHasBlock('What Bar Cop Reads', 'The Cash Audit scores off the data you already keep. Nothing to enter. Setting your opening cash balance in Cash Position sharpens the runway read.', checks))
-      + AuditUI.intakeSubmit('ca')
-      + '</div>';
-    document.getElementById('ca-iz-submit')?.addEventListener('click', () => this.generate());
+  },
+
+  onGenerate() {
+    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this.generate(); });
   },
 
   async generate() {
     if (App.demoBlock && App.demoBlock('Running an audit')) return;
-    const btn = document.getElementById('ca-iz-submit');
-    if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+    const btn = document.getElementById('ca-gen-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; btn.style.opacity = '0.7'; }
     const record = this._computeAudit();
     await App.putRecord('core', 'cash_audit', record);
     if (App.markSetupDone) App.markSetupDone('gs_c_audit');
