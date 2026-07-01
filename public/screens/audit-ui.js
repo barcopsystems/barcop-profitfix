@@ -112,6 +112,51 @@ const AuditUI = {
       }));
   },
 
+  // ── Readiness card — the shared pre-generate screen for all four audits ──────
+  // A progress bar + a checklist of what the audit reads, each row auto-checked
+  // (green) once Bar Cop has that data or tappable to jump to the step that fills
+  // it, then the Generate button at the bottom (cadence-gated). The screen wires
+  // the jump via wireFirstAudit and the Generate via #<pfx>-gen-btn; the caller
+  // runs the missing-data guard before generating.
+  //   cfg: { pfx, title, desc, steps:[{label, done, go}], canRun, daysLeft, hasLatest }
+  readinessCard(cfg) {
+    const steps = cfg.steps || [];
+    const doneCount = steps.filter(s => s.done).length;
+    const label = cfg.hasLatest ? 'Generate New Audit' : 'Generate First Audit';
+    const genBtn = cfg.canRun
+      ? '<button class="btn btn-primary" id="' + cfg.pfx + '-gen-btn">' + label + '</button>'
+      : '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">'
+        + (cfg.daysLeft > 0 ? 'Next audit in ' + cfg.daysLeft + ' day' + (cfg.daysLeft === 1 ? '' : 's') : label) + '</button>';
+    const rows = steps.map((s, i) =>
+      '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:#0D181E;border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
+      + (s.done
+          ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+          : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + (i + 1) + '</span>')
+      + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(s.label) + '</div>'
+      + (s.done ? '<span style="font-size:11px;color:var(--green);font-weight:700;flex-shrink:0;">Have it</span>'
+                : (s.go ? '<span style="color:var(--t4);font-size:13px;flex-shrink:0;">&rsaquo;</span>' : ''))
+      + '</div>').join('');
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(cfg.title) + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px;">' + cfg.desc + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;"><strong style="color:var(--t1);">' + doneCount + '</strong> of ' + steps.length + ' ready</div>'
+      + this._gsProgBar(doneCount, steps.length)
+      + rows
+      + '<div style="display:flex;justify-content:flex-end;margin-top:18px;"><span id="' + cfg.pfx + '-gen-status" style="font-size:12px;color:var(--red);display:none;margin-right:auto;align-self:center;"></span>' + genBtn + '</div>'
+      + '</div>';
+  },
+  // The missing-data guard: if any step is not done, confirm before running (the
+  // audit still runs, but the operator is warned they will burn the 7-day lock on
+  // a partial audit). Returns a promise resolving true = proceed.
+  readinessGuard(steps) {
+    const missing = (steps || []).filter(s => !s.done).map(s => s.label);
+    if (!missing.length) return Promise.resolve(true);
+    return App.confirm({
+      title: 'Run without all the data?',
+      message: 'Your audit is still missing: ' + missing.join(', ') + '. Those sections read N/A, and the audit locks for 7 days once you run. Run it now anyway?',
+      confirmText: 'Run Anyway', cancelText: 'Not Yet', danger: false
+    });
+  },
+
   // ── Landing: View-Full-Audit button + merged Latest-Audit card ─────────────
   // Summary on top, the section breakdown folded in as a compact row list (bar
   // beside the score; one row per section on mobile). View button sits above.

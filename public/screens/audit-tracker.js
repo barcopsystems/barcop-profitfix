@@ -14,24 +14,40 @@ S.AuditTracker = {
     const latest = audits[0] || null;
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = true; /* TEMP: unlocked to QA the intake form. REVERT to: daysSince >= 7 */
+    const canRun = daysSince >= 7;
     const daysLeft = canRun ? 0 : 7 - daysSince;
-    const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
+    const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.firstAuditCard({ pfx: 'at', title: 'Profit Audit', desc, canRun, hasLatest: !!latest, daysLeft,
-          gs: { mode: 'check',
-            intro: 'Your Profit Audit scores pour cost, food cost, theft and loss, vendors, and prime cost. Drop your P&L or POS sales export and Bar Cop reads a real baseline the day you start.',
-            checkLabel: 'I have a P&L or POS sales export ready to drop',
-            hint: 'One sales report is enough to start. The more you bring, a voids and comps report, invoices, recipe costs, the sharper your first audit.' } })
+      + AuditUI.readinessCard({ pfx: 'at', title: 'Profit Audit', desc,
+          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
       + '</div>';
-    document.getElementById('at-new-btn')?.addEventListener('click', () => this.showIntakeForm());
     AuditUI.wireFirstAudit(this.container);
+    document.getElementById('at-gen-btn')?.addEventListener('click', () => this.onGenerate());
     this.container.querySelectorAll('.at-view-btn').forEach(btn =>
       btn.addEventListener('click', () => this.viewAudit(parseInt(btn.dataset.idx))));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
       App.handleShowOlder(e.target, () => this.renderMain()));
+  },
+
+  // The audit reads from logged data now (no intake form). These are the data
+  // slices it scores; each auto-checks off, or taps through to the step that
+  // fills it. Done flags come from buildControlData.
+  _readinessSteps() {
+    const cd = this.buildControlData() || {};
+    return [
+      { label: 'This week confirmed in Run This Week', done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'this-week' },
+      { label: 'Inventory count taken',                done: (cd.inventory_counts || 0) > 0, go: 'ic-take-inventory' },
+      { label: 'Hours logged in Labor',                done: (cd.labor_hours || 0) > 0, go: 'lc-log-hours' },
+      { label: 'Voids and comps logged',               done: (cd.void_comp_count || 0) > 0, go: 'sc-void-comp' },
+      { label: 'Cash reconciled',                      done: (cd.cash_reconciliations || 0) > 0, go: 'sc-cash-control' },
+      { label: 'Deliveries logged',                    done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery' }
+    ];
+  },
+
+  onGenerate() {
+    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this.generateAudit(); });
   },
 
   viewAudit(idx) {
@@ -461,42 +477,34 @@ S.AuditTracker = {
 
   async generateAudit() {
     if (App.demoBlock('Running an audit')) return;
-    // Show generating state in the current container
-    const submitBtn = document.getElementById('at-iz-submit');
-    const statusEl  = document.getElementById('at-iz-status');
+    const btn      = document.getElementById('at-gen-btn');
+    const statusEl = document.getElementById('at-gen-status');
     const setStatus = (msg, color='var(--t2)') => {
       if (statusEl) { statusEl.style.display='block'; statusEl.style.color=color; statusEl.textContent=msg; }
     };
-    if (submitBtn) { submitBtn.disabled=true; submitBtn.textContent='Analyzing...'; }
+    const resetBtn = () => { if (btn) { btn.disabled=false; btn.textContent='Generate New Audit'; btn.style.opacity=''; } };
+    if (btn) { btn.disabled=true; btn.textContent='Analyzing...'; btn.style.opacity='0.7'; }
 
-    // Single shared drop zone — all files pool under one field; the server
-    // extraction reads them together regardless of field name.
-    const allFiles = FileDrop.getFiles('at-drop').map(f => ({ file: f, field: 'file' }));
-
-    const barRev  = parseFloat(this._intakeDraft?.barRev)  || 0;
-    const foodRev = parseFloat(this._intakeDraft?.foodRev) || 0;
+    // No intake form: sales and operating practices come from App Settings, the
+    // scored data from Control. Nothing to upload.
+    const s = App.data.settings || {};
+    const barRev  = parseFloat(s.annual_bar_revenue)  || 0;
+    const foodRev = parseFloat(s.annual_food_revenue) || 0;
 
     // Validation — do not run an audit with nothing to analyze
-    const hasRealData = allFiles.length > 0 || (App.data.weeks && App.data.weeks.length > 0) || barRev > 0 || foodRev > 0;
+    const hasRealData = (App.data.weeks && App.data.weeks.length > 0) || barRev > 0 || foodRev > 0;
     if (!hasRealData) {
-      setStatus('Add data before running the audit. Enter at least one week in This Week, or attach your POS reports.', 'var(--red)');
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Generate Audit'; }
+      setStatus('Close a week first in Run This Week, or set your annual sales in App Settings.', 'var(--red)');
+      resetBtn();
       return;
     }
 
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
-      const draftP = this._intakeDraft?.practices || {};
-      // Remember revenue + operating practices (as dropdown strings) so the
-      // next audit pre-fills them and the operator only changes what improved.
-      App.data.settings.annual_bar_revenue  = barRev;
-      App.data.settings.annual_food_revenue = foodRev;
-      App.data.settings.profit_practices    = draftP;
-      await App.saveKey('settings');
-
-      // Convert to the engine's shape. An unanswered question ('') is omitted
-      // so it has no effect on the score.
+      const draftP = s.profit_practices || {};
+      // Convert the saved practices (dropdown strings) to the engine's shape. An
+      // unanswered question ('') is omitted so it has no effect on the score.
       const practices = {};
       if (draftP.pour_method)    practices.pour_method    = draftP.pour_method;
       if (draftP.recipes_costed) practices.recipes_costed = draftP.recipes_costed;
@@ -513,9 +521,6 @@ S.AuditTracker = {
       form.append('practices', JSON.stringify(practices));
       const controlData = this.buildControlData();
       if (controlData) form.append('controlData', JSON.stringify(controlData));
-      for (const {file, field} of allFiles) form.append(field, file, file.name);
-
-      setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
       const res  = await fetch('/api/generate-profit-audit', { method:'POST', body: form });
       const data = await res.json();
@@ -549,7 +554,7 @@ S.AuditTracker = {
 
     } catch(e) {
       setStatus('Error: ' + (e.message||'Generation failed. Please try again.'), 'var(--red)');
-      if (submitBtn) { submitBtn.disabled=false; submitBtn.textContent='Generate Audit'; }
+      resetBtn();
     }
   },
 
