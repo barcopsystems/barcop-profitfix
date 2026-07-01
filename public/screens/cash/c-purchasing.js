@@ -73,8 +73,8 @@ S.CashPurchasing = {
     this.container.innerHTML = '<div class="screen">'
       + stats
       + this.buyVsUseCard()
-      + this.sh('Weeks On Hand By Category', exportBtn) + this.catCard()
-      + this.sh('Vendor Purchasing', orderSheetBtn) + this.vendorCard(CashEngine.vendorPurchasing(90))
+      + this.sh('Weeks On Hand By Category', '<div style="display:flex;gap:8px;">' + orderSheetBtn + exportBtn + '</div>') + this.catCard()
+      + this.sh('Vendor Purchasing') + this.vendorCard(CashEngine.vendorPurchasing(90))
       + '</div>';
 
     this.container.onclick = ev => {
