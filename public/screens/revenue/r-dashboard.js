@@ -72,6 +72,17 @@ S.RevenueDashboard = {
     return r;
   },
 
+  // Compact step summary for the Hub Revenue card; mirrors this page for the
+  // current week (save/restore the selected week so the live page is untouched).
+  hubSteps() {
+    const sv = this._weekEnd; this._weekEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    try {
+      const done = this.stepDone();
+      const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
+      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+    } finally { this._weekEnd = sv; }
+  },
+
   _auditState() {
     const latest = App.latestEvent ? App.latestEvent(this.audits()) : null;
     if (!latest) return { latest: null, daysSince: null, due: true, score: null };
