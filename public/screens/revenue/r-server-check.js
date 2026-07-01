@@ -135,7 +135,7 @@ S.RevenueServerCheck = {
     App.showHelpModal('How Server Check Works', [
       { p: ['Log each server\'s covers and sales for a shift; Bar Cop turns it into a check average and tracks every server against your target. Comps pull in from Shift Control\'s Void and Comp log and tips from Tip Tracking, so you never enter the same number twice.'] },
       { h: 'The Window', p: ['The chips set the window for the scorecard and the Server Shift list: the last 7, 30 or 90 days, or all time. The team average, top performer, who is trending down, and the spread top to bottom all reflect the window you pick.'] },
-      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
+      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. If your POS exports a per-server sales report, you can skip the hand entry: drop it at your Shift weekly close and every server\'s covers and sales land here at once. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
       { h: 'The Scorecard', p: ['Per server: check average against target and against the team, covers, sales, comps and tips as a percent of sales, and a trend arrow comparing the last 7 days to the prior 7. TOP and DOWN call out the leader and anyone slipping. Add a coaching note on any row to log it on that server in Labor Control.'] }
     ]);
   },
@@ -168,6 +168,7 @@ S.RevenueServerCheck = {
     const editing = this._editing;
     return '<div class="card form-card">'
       + '<div class="card-title">' + (editing ? 'Edit Shift Check' : 'New Shift Check') + '</div>'
+      + (editing ? '' : '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">Log one server by hand here, or import a whole week of per-server checks at your <span class="rsc-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span>.</div>')
       + '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">'
         + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input class="form-input" type="date" id="rsc-date" value="' + esc(f.date || '') + '"/></div>'
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label><select class="form-input" id="rsc-shift">' + shiftOpts + '</select></div>'
@@ -202,7 +203,7 @@ S.RevenueServerCheck = {
         + '<button class="btn btn-ghost btn-sm" id="rsc-worksheet">Worksheet</button>'
       + '</div></div>';
     if (!sc.rows.length) {
-      return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above to build the scorecard.</div></div>';
+      return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or import a per-server sales report at your Shift weekly close, to build the scorecard.</div></div>';
     }
     const rows = sc.rows.map((r, i) => {
       const vsT = r.checkAvg - targetCA;
@@ -312,6 +313,7 @@ S.RevenueServerCheck = {
     const c = this.container;
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
+    c.querySelectorAll('.rsc-goshift').forEach(b => b.addEventListener('click', () => App.openScreen('sc-dashboard')));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
     document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Server Performance', root: document.getElementById('rsc-sc-export') || c }));
 
