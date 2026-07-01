@@ -365,17 +365,13 @@ S.Hub = {
       const due = [];
       if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'this-week',   mod: 'profit'  });
       if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'r-this-week', mod: 'revenue' });
-      const importRow = '<div onclick="S.ImportWeek.open()" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
-            + '<span style="width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;"></span>'
-            + '<span style="flex:1;min-width:0;">Import this week\'s POS reports</span>'
-            + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>';
-      const dueRows = importRow + (due.length
+      const dueRows = due.length
         ? due.slice(0, 3).map(it =>
             '<div onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
             + '<span style="width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0;"></span>'
             + '<span style="flex:1;min-width:0;">' + esc(it.text) + '</span>'
             + '<span style="color:var(--t4);flex-shrink:0;">&rsaquo;</span></div>').join('')
-        : '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t3);"><span style="color:var(--green);font-weight:800;">&#10003;</span> You are current this week</div>');
+        : '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--t3);"><span style="color:var(--green);font-weight:800;">&#10003;</span> You are current this week</div>';
       whatsDueRight = '<div style="flex:1 1 16px;min-width:0;"></div>' + statDiv
         + '<div style="flex:0 0 230px;min-width:190px;">'
         +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">What\'s Due</div>'
@@ -557,8 +553,8 @@ S.Hub = {
     const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', objName:'InventoryDashboard', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
     const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', objName:'LaborDashboard', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
     const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
-    // Recovery: stat strip (from the old dashboards) + audit line; steps land
-    // when the Profit/Revenue/Cash Close The Week pages are built.
+    // Recovery: stat strip + progress bar + step checklist (from each Close The
+    // Week page's hubSteps()) + audit line, same shape as the Control cards.
     const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
     const pfStats = [
       { label:'Pour Cost', value: pW?.bar?.cost_pct != null ? App.fmtPct(pW.bar.cost_pct) : '-', color: tcol(pW?.bar?.cost_pct, pourT, 'low') },
@@ -576,9 +572,10 @@ S.Hub = {
       { label:'Runway', value: runwayTxt || '-', color: (cashSF.hasData && cashSF.runway != null && cashSF.runway <= 4) ? 'var(--red-soft)' : 'var(--t1)' },
       { label:'Safe to Spend', value: cashPos.hasOpening ? App.fmtCurrency(cashPos.safe, 0) : '-', color: (cashPos.hasOpening && cashPos.safe < 0) ? 'var(--red-soft)' : 'var(--t1)' }
     ];
-    const pfCard = richCard({ title:'Profit', screen:'dashboard', mod:'profit', stats: pfStats, footer: auditLine(pA) });
-    const rvCard = richCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue', stats: rvStats, footer: auditLine(rA) });
-    const csCard = richCard({ title:'Cash', screen:'c-dashboard', mod:'cash', stats: csStats, footer: auditLine(cA) });
+    const pfSum = safeSteps(S.Dashboard), rvSum = safeSteps(S.RevenueDashboard), csSum = safeSteps(S.CashDashboard);
+    const pfCard = richCard({ title:'Profit', screen:'dashboard', mod:'profit', objName:'Dashboard', stats: pfStats, sum: pfSum, footer: auditLine(pA) });
+    const rvCard = richCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue', objName:'RevenueDashboard', stats: rvStats, sum: rvSum, footer: auditLine(rA) });
+    const csCard = richCard({ title:'Cash', screen:'c-dashboard', mod:'cash', objName:'CashDashboard', stats: csStats, sum: csSum, footer: auditLine(cA) });
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
