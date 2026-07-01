@@ -237,11 +237,10 @@ S.RevenueServerCheck = {
       const isDown = r.trend === 'down';
       const tag = isTop ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--t3);">TOP</span>'
         : (isDown ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--red);">DOWN</span>' : '');
-      // Coaching note only where it is actionable: a server below target or
-      // trending down. Top and on-target servers do not get a coach prompt.
-      const coachable = isDown || (r.checkAvg < targetCA);
-      const coachBtn = (r.staff_id && coachable)
-        ? '<button class="btn btn-ghost btn-sm rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:10px;padding:3px 8px;">+ Coaching Note</button>' : '';
+      // A small, unobtrusive "+ note" link on every row logs a manager note on
+      // that server's record in Labor Control.
+      const coachBtn = r.staff_id
+        ? '<span class="rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:11px;color:var(--t3);cursor:pointer;white-space:nowrap;">+ note</span>' : '';
       return '<tr>'
         + '<td style="font-weight:700;color:var(--t1);">' + esc(r.name) + tag + '</td>'
         + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--t1)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
