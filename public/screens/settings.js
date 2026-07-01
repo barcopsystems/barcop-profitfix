@@ -618,24 +618,82 @@ S.HubSettings = {
     };
     const ANCH_DAYS = [0, 30, 60, 90];
     const FILL_DAYS = [7, 14, 21, 37, 44, 51, 67, 74, 81];
+    // ── Natural weekly OVERALL-score paths (keyed by daysAgo) ──────────────────
+    // A real weekly audit does not climb a flat +2 every week. These hand-authored
+    // sequences hit the reconciled milestones (90/60/30/0) but wander between them:
+    // varied jumps, a few genuine backslides (a week that goes down), heaviest in
+    // the first month. Deterministic, so the demo is stable.
+    const OVERALL_PATH = {
+      profit:  { 90:33, 81:36, 74:33, 67:39, 60:44, 51:48, 44:45, 37:52, 30:58, 21:62, 14:59, 7:65, 0:70 },
+      revenue: { 90:39, 81:41, 74:39, 67:44, 60:48, 51:51, 44:49, 37:53, 30:56, 21:59, 14:57, 7:61, 0:64 },
+      cash:    { 90:42, 81:45, 74:43, 67:48, 60:52, 51:55, 44:54, 37:58, 30:62, 21:65, 14:63, 7:67, 0:70 }
+    };
+    // ── Data-quality ramp: which section indices have real data by daysAgo ─────
+    // A new operation cannot score every section on day one. Early audits read
+    // Partial/Limited as Control captures more each week; sections not listed for
+    // a day are pruned (read N/A). Days not present here have full coverage.
+    // profit idx: 0 Bar, 1 Theft, 2 Food, 3 Vendor, 4 Prime
+    // revenue idx: 0 Check, 1 Labor, 2 Menu, 3 Server, 4 Events
+    // cash idx: 0 Capital, 1 Cycle, 2 Liquidity, 3 Terms
+    const SECTIONS_PRESENT = {
+      profit:  { 90:[0,2], 81:[0,2,4], 74:[0,1,2,4], 67:[0,1,2,4] },
+      revenue: { 90:[0,1], 81:[0,1,2], 74:[0,1,2], 67:[0,1,2,3] },
+      cash:    { 90:[0,1], 81:[0,1], 74:[0,1,2], 67:[0,1,2] }
+    };
+    // Map an action-item gap_id back to its section index, so a pruned section's
+    // recoverable item is dropped too (no dollar for a section that reads N/A).
+    const GAP_SEC = {
+      profit:  { 'pour-cost':0, 'theft-loss':1, 'food-cost':2, 'vendor-control':3 },
+      revenue: { 'check-average':0, 'labor-scheduling':1, 'menu-engineering':2, 'server-performance':3, 'events-catering':4 },
+      cash:    { 'free-trapped':0, 'order-to-par':1, 'stay-ahead':2, 'pay-on-terms':3 }
+    };
+    const SEC_NAMES = {
+      profit:  ['Bar Cost and Pour Control','Theft and Loss Prevention','Food Cost Control','Vendor Control','Prime Cost'],
+      revenue: ['Check Average and Revenue','Labor Efficiency','Menu Performance','Server Performance','Events and Private Dining'],
+      cash:    (window.S && S.CashAudit) ? S.CashAudit.SECTION_NAMES : ['Capital Efficiency','Cash Conversion Cycle','Liquidity & Runway','Payment Terms']
+    };
     const weeklySeries = (mod, richByDay) => {
       const PFX = mod === 'profit' ? 'PFA' : mod === 'revenue' ? 'RFA' : 'CA';
-      const all = ANCH_DAYS.map(d => richByDay[d]);
+      const NSEC = mod === 'cash' ? 4 : 5;
+      const path = OVERALL_PATH[mod] || {}, present = SECTIONS_PRESENT[mod] || {};
+      const names = SEC_NAMES[mod], gapSec = GAP_SEC[mod] || {};
+      // Pass 1: assemble every record (anchors pre-built; fills interpolated from
+      // the UNPRUNED anchor raws, so no null score poisons the interpolation).
+      const recByDay = {};
+      ANCH_DAYS.forEach(d => { recByDay[d] = richByDay[d]; });
       FILL_DAYS.forEach(D => {
         const hiD = ANCH_DAYS.filter(d => d < D).sort((a, b) => b - a)[0];   // newer milestone (fewer days ago)
         const loD = ANCH_DAYS.filter(d => d > D).sort((a, b) => a - b)[0];   // older milestone (more days ago)
-        const lo = richByDay[loD].raw, hi = richByDay[hiD].raw;
-        const t = (loD - D) / (loD - hiD);
-        const raw = ipRaw(lo, hi, t);
+        const raw = ipRaw(richByDay[loD].raw, richByDay[hiD].raw, (loD - D) / (loD - hiD));
         const id = PFX + '-2026-' + String(++_ipSerial).padStart(4, '0');
         raw.AUDIT_ID = id; raw.AUDIT_PERIOD = periodLabel(D);
-        if (mod === 'cash') {
-          all.push(mkCashAudit(dateStr(D), daysAgoISO(D), id, periodLabel(D), raw));
-        } else {
-          all.push(mkAudit(mod, { date: dateStr(D), generated_at: daysAgoISO(D), raw }));
+        recByDay[D] = (mod === 'cash')
+          ? mkCashAudit(dateStr(D), daysAgoISO(D), id, periodLabel(D), raw)
+          : mkAudit(mod, { date: dateStr(D), generated_at: daysAgoISO(D), raw });
+      });
+      // Pass 2: overlay the natural overall path, then prune to the data-quality
+      // ramp (drop the section + its raw score + any recoverable item it fed).
+      const days = ANCH_DAYS.concat(FILL_DAYS);
+      days.forEach(D => {
+        const rec = recByDay[D];
+        if (path[D] != null) { rec.overall_score = path[D]; if (rec.raw) rec.raw.OVERALL_SCORE = path[D]; }
+        const keep = present[D];
+        if (keep) {
+          for (let i = 0; i < NSEC; i++) {
+            if (keep.indexOf(i) === -1) {
+              delete rec.sections[names[i]];
+              // Remove the whole section from the raw (score + findings), so the
+              // full view shows a clean N/A, not N/A next to a written finding.
+              if (rec.raw) Object.keys(rec.raw).forEach(k => { if (k.indexOf('S' + (i + 1) + '_') === 0) delete rec.raw[k]; });
+            }
+          }
+          rec.action_items = (rec.action_items || []).filter(a => {
+            const si = gapSec[a.gap_id];
+            return si == null || keep.indexOf(si) !== -1;
+          });
         }
       });
-      return all;
+      return days.map(D => recByDay[D]);
     };
 
     // ── Profit Audits ──
@@ -3452,7 +3510,9 @@ S.HubSettings = {
     const d  = (label, extra, pct) => ({ label, extra, pct });           // component row; pct null = N/A
     const bcaRec = (daysAgo, auditId, subs, detail, exposures, patterns, snap) => {
       const sections = {}, sub_scores = {}, sub_score_detail = {};
-      BCA_LABELS.forEach((l, i) => { sections[l] = subs[i]; });
+      // Only covered sub-scores become sections, so the Data Quality badge reads
+      // the true coverage (N/A sub-scores are absent, not stored as null).
+      BCA_LABELS.forEach((l, i) => { if (subs[i] != null) sections[l] = subs[i]; });
       BCA_KEYS.forEach((k, i) => { sub_scores[k] = subs[i]; sub_score_detail[k] = detail[i]; });
       const covered = subs.filter(x => x != null);
       const overall = covered.length ? Math.round(covered.reduce((s, x) => s + x, 0) / covered.length) : null;
@@ -3558,11 +3618,23 @@ S.HubSettings = {
       }
     } catch (e) { /* keep the hand-authored day-0 if the engine cannot read yet */ }
 
+    // Lighter weekly fill: sub-scores + a natural path, empty component detail
+    // (the detail view renders it cleanly), no exposures. The two rich milestones
+    // below and the live day-0 engine carry the full breakdowns.
+    const bcaFill = (daysAgo, auditId, subs) =>
+      bcaRec(daysAgo, auditId, subs, [[], [], [], [], [], []], [], [], { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 });
     App.data.bar_cop_audits = [
-      // ── Day 30 (61 days ago) — overall 49. The first Bar Cop audit, on only a
-      //    few weeks of logged data. Recovery Action and Operational Consistency
-      //    read N/A until a longer trend exists; they fill in by day 60.
-      bcaRec(61, 'BCA-2026-0009',
+      // Weekly Bar Cop history on the 90/60/30/0 + fills grid, same as the recovery
+      // audits. Recovery Action and Operational Consistency read N/A until a trend
+      // exists, so the first weeks are Partial data and coverage fills in over the
+      // quarter. Two milestones stay fully detailed; the rest are lighter fills.
+      bcaFill(90, 'BCA-2026-0001', [42, 40, 38, null, null, null]),
+      bcaFill(81, 'BCA-2026-0002', [45, 43, 41, 44, null, null]),
+      bcaFill(74, 'BCA-2026-0003', [44, 43, 43, 43, null, null]),
+      bcaFill(67, 'BCA-2026-0004', [48, 46, 46, 47, null, null]),
+      // ── Day 60 (rich) — first few weeks of data; Recovery Action and Operational
+      //    Consistency read N/A until a longer trend exists; they fill in by day 30.
+      bcaRec(60, 'BCA-2026-0009',
         [50, 48, 44, 52, null, null],
         [
           [ d('Opening checklist completion', '7 opening checklists logged', 23),
@@ -3606,9 +3678,12 @@ S.HubSettings = {
         ],
         { gaps: 8, fixesLogged: 2, dollarsRecovered: 0, stillMeasuring: 2 }
       ),
-      // ── Day 60 (31 days ago) — overall 60, all six sub-scores now covered.
-      //    Procedures climbing, fixes logged and starting to pay.
-      bcaRec(31, 'BCA-2026-0013',
+      bcaFill(51, 'BCA-2026-0010', [53, 51, 51, 52, 48, null]),
+      bcaFill(44, 'BCA-2026-0011', [53, 50, 52, 51, 50, null]),
+      bcaFill(37, 'BCA-2026-0012', [57, 55, 56, 56, 53, null]),
+      // ── Day 30 (rich) — all six sub-scores now covered. Procedures climbing,
+      //    fixes logged and starting to pay.
+      bcaRec(30, 'BCA-2026-0013',
         [63, 56, 60, 62, 56, 62],
         [
           [ d('Opening checklist completion', '11 opening checklists logged', 37),
@@ -3649,21 +3724,23 @@ S.HubSettings = {
           { label: 'Void/comp concentration on Late Night shifts', detail: '11 events in last 90 days on Late Night. Pattern worth investigating.', screen: 'sc-void-comp' }
         ],
         { gaps: 7, fixesLogged: 4, dollarsRecovered: 1840, stillMeasuring: 2 }
-      )
+      ),
+      bcaFill(21, 'BCA-2026-0014', [63, 60, 62, 63, 60, 63]),
+      bcaFill(14, 'BCA-2026-0015', [62, 60, 62, 63, 59, 62]),
+      bcaFill(7,  'BCA-2026-0016', [70, 68, 70, 71, 68, 70])
     ];
 
-    // ── Day 90 (current) — generated by the LIVE engine on the seeded data, so
+    // ── Day 0 (current) — generated by the LIVE engine on the seeded data, so
     // every component line is true by construction (the seed-roundtrip rule). The
-    // engine only scores the current 30-day window, so the day-30 and day-60
-    // records above stay hand-authored history. Stamped to 1 day ago so it sits at
-    // the day-90 mark on the cadence; id fixed for a stable display.
+    // engine only scores the current 30-day window, so the older records above stay
+    // hand-authored history. Sits at today on the weekly grid; id fixed for display.
     if (window.S && S.HubBarCopAudit && S.HubBarCopAudit._computeAuditSnapshot) {
-      const bca90 = S.HubBarCopAudit._computeAuditSnapshot();
-      if (bca90) {
-        bca90.id = uid();
-        bca90.date = dateStr(1);
-        bca90.audit_id = 'BCA-2026-0017';
-        App.data.bar_cop_audits.push(bca90);
+      const bca0 = S.HubBarCopAudit._computeAuditSnapshot();
+      if (bca0) {
+        bca0.id = uid();
+        bca0.date = dateStr(0);
+        bca0.audit_id = 'BCA-2026-0017';
+        App.data.bar_cop_audits.push(bca0);
       }
     }
 
