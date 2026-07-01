@@ -384,49 +384,40 @@ S.RevenueDashboard = {
   },
 
   // ── Bar Cop Briefing — a written read on the recent revenue + labor trend. ──
+  // Code-generated (no API): check average, labor, and the one revenue move.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
-    const rec = DashUI._insRec('revenue');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
-    const btn = document.getElementById('r-insights-btn');
-    const orig = btn ? btn.textContent : '';
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
 
     const t = App.data.revenue_settings?.targets || {};
     const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+    const money = n => '$' + Math.round(n).toLocaleString('en-US');
     const caT = t.check_avg || 35;
     const lpT = App.laborTargetPct();
     const caVals  = weeks.map(w => w.check_avg).filter(v => v != null);
     const lpVals  = weeks.map(w => w.labor_pct_blended).filter(v => v != null);
-    const revVals = weeks.map(w => (w.bar_revenue || 0) + (w.floor_revenue || 0));
     const covVals = weeks.map(w => w.covers).filter(v => v != null);
-    const aCA = avg(caVals).toFixed(2), aLP = avg(lpVals).toFixed(1), aRev = avg(revVals).toFixed(0), aCov = avg(covVals).toFixed(0);
-    const caTrend = caVals.length >= 3 ? (caVals[caVals.length - 1] - caVals[0] > 1 ? 'trending up, improving' : caVals[0] - caVals[caVals.length - 1] > 1 ? 'trending down, worsening' : 'holding steady') : 'early data';
-    const lines = [
-      'Check Average: ' + weeks.map(w => w.check_avg ? '$' + w.check_avg.toFixed(2) : 'n/a').join(', ') + ' (target $' + caT + ', avg $' + aCA + ')',
-      'Check average trend: ' + caTrend,
-      'Labor %: ' + weeks.map(w => w.labor_pct_blended ? w.labor_pct_blended.toFixed(1) + '%' : 'n/a').join(', ') + ' (target ' + lpT.toFixed(1) + '%, avg ' + aLP + '%)',
-      'Avg weekly revenue: $' + aRev,
-      'Avg covers per week: ' + aCov,
-      'Weekly check average gap vs target: $' + Math.abs((parseFloat(aCA) - caT) * parseFloat(aCov)).toFixed(0) + ' ' + (parseFloat(aCA) < caT ? 'below target' : 'at or above target')
-    ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a read for a fellow owner. The facts below are computed from this operator\'s own weekly numbers.\n\nTalk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\nSTAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers, streaks, or week counts.\n- The current week figure is what the operator is looking at on screen. Never contradict it.\n- Respect the stated trend direction. If on or under target, say so plainly.\n\nFACTS:\n' + lines.join('\n') + '\n\nWrite three short paragraphs, one each: first check average against target, then labor efficiency, then the single action that will move revenue most this week. Use the exact numbers from the facts.';
+    const aCA = avg(caVals), aCov = avg(covVals);
+    const curCA = caVals.length ? caVals[caVals.length - 1] : null;
+    const curLP = lpVals.length ? lpVals[lpVals.length - 1] : null;
+    const caTrend = caVals.length >= 3 ? (caVals[caVals.length - 1] - caVals[0] > 1 ? 'trending up and improving' : caVals[0] - caVals[caVals.length - 1] > 1 ? 'trending down and worsening' : 'holding steady') : null;
+    const caGap = (aCA < caT) ? Math.round((caT - aCA) * aCov) : 0;
 
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content?.[0]?.text;
-        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
-        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('revenue', html));
-        restore();
-      })
-      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+    const paras = [];
+    if (curCA != null) {
+      let p1 = 'Your check average is running $' + curCA.toFixed(2) + ' against a $' + caT + ' target, ' + (curCA < caT ? 'money left on every table.' : 'right where you want it.');
+      if (caTrend) p1 += ' It is ' + caTrend + '.';
+      if (caGap > 0 && aCov > 0) p1 += ' On about ' + Math.round(aCov) + ' covers a week, closing that gap is roughly ' + money(caGap) + '.';
+      paras.push(p1);
+    }
+    if (curLP != null) {
+      paras.push('Labor ran ' + curLP.toFixed(1) + '% of sales against a ' + lpT.toFixed(1) + '% target, ' + (curLP > lpT ? 'carrying hours the sales did not ask for.' : 'matched to the room.'));
+    }
+    if (caGap > 0) paras.push('The fastest revenue this week is the check. Set a drink-and-app standard, teach it at pre-shift, and track it by server in Server Check.');
+    else if (curLP != null && curLP > lpT) paras.push('The money this week is in the schedule. Build to the cover forecast and cut the hour that is not earning.');
+    else paras.push('Nothing screaming here. Hold the check and the schedule, and keep the covers coming.');
+
+    const html = paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
+    DashUI.insightsModal('Bar Cop Briefing', html);
   }
 };
