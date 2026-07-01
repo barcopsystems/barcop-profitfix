@@ -168,7 +168,7 @@ S.AuditTracker = {
     });
   },
 
-  // ── Export the Profit Recovery Audit as a data-driven PDF ───────────────
+  // ── Export the Profit Audit as a data-driven PDF ───────────────
   // Rebuilds the same content viewAudit() renders (header + score, total
   // recoverable summary, ranked action items, the five scored sections with
   // their metrics + findings text, and the Operational Risk Signals) via the
@@ -192,14 +192,15 @@ S.AuditTracker = {
     if (audit.audit_period) metaBits.push(audit.audit_period);
     if (audit.audit_id)     metaBits.push(audit.audit_id);
 
-    const b = App._pdfBuilder('Profit Recovery Audit');
+    const b = App._pdfBuilder('Profit Audit');
     b.header({
-      right: 'Profit Recovery Audit',
+      right: 'Profit Audit',
       meta: metaBits.join('  ·  ') + '  ·  Profit Score ' + (audit.overall_score || 0)
     });
     b.kv('Operation', venue);
     b.kv('Profit Score', (audit.overall_score || 0) + '  (' + App.scoreLabel(audit.overall_score || 0) + ')');
-    if (audit.grade) b.kv('Data Quality', audit.grade);
+    const dq = AuditUI.dataQualityLabel(audit, App.AUDIT_PROFIT_SECTION_NAMES.length);
+    if (dq) b.kv('Data Quality', dq);
     b.kv('Target', String(d.TARGET_SCORE || 70));
 
     // Total recoverable summary (mirrors the on-screen recoverable banner).

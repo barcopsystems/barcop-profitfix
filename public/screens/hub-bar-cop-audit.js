@@ -1047,6 +1047,8 @@ S.HubBarCopAudit = {
     });
     b.kv('Operation', venue);
     b.kv('Operational Health', (overallNA ? 'N/A' : overall) + '  (' + scoreLabel + ')');
+    const dq = AuditUI.dataQualityLabel(audit, this.SECTION_NAMES.length);
+    if (dq) b.kv('Data Quality', dq);
     if (overallNA) {
       b.paragraph((audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, '
         + 'Shift, and Labor Control and the overall fills in.', { gray: 90 });

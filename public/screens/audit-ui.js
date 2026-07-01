@@ -202,15 +202,20 @@ const AuditUI = {
   // total is a faithful read of the data the app held when the audit ran). This
   // replaces the old upload-era "Tier 2 / Tier 3" grade. total = the audit's full
   // section count (passed by each caller).
-  dataQualityChip(a, total) {
+  dataQuality(a, total) {
     const scored = Object.keys((a && a.sections) || {}).length;
     const t = total || scored;
-    if (!t) return '';
-    let label, color;
-    if (scored >= t)        { label = 'Full data';    color = 'var(--green)'; }
-    else if (scored*2 >= t) { label = 'Partial data'; color = 'var(--amber)'; }
-    else                    { label = 'Limited data'; color = 'var(--t3)'; }
-    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + color + ';">' + label + '</span>';
+    if (!t) return null;
+    if (scored >= t)   return { label: 'Full data',    color: 'var(--green)' };
+    if (scored*2 >= t) return { label: 'Partial data', color: 'var(--amber)' };
+    return { label: 'Limited data', color: 'var(--t3)' };
+  },
+  // Plain-text data-quality label for the PDFs (which take text, not HTML chips).
+  dataQualityLabel(a, total) { const q = this.dataQuality(a, total); return q ? q.label : ''; },
+  dataQualityChip(a, total) {
+    const q = this.dataQuality(a, total);
+    if (!q) return '';
+    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + q.color + ';">' + q.label + '</span>';
   },
 
   // ── Landing: Audit History data-card ───────────────────────────────────────
