@@ -15,8 +15,7 @@ S.RevenueAudit = {
     this.actions.innerHTML = '';
     const audits = (App.data.revenue_audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest = audits[0] || null;
-    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
-    const canRun = g.canRun, daysLeft = g.daysLeft;
+    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
     const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
     this.container.innerHTML = '<div class="screen">'
@@ -312,7 +311,6 @@ S.RevenueAudit = {
   },
 
   async generateAudit() {
-    if (App.demoBlock('Running an audit')) return;
     const btn      = document.getElementById('ra-gen-btn');
     const statusEl = document.getElementById('ra-gen-status');
     const setStatus = (msg, color='var(--t2)') => {
