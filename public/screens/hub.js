@@ -1110,7 +1110,7 @@ S.Hub = {
     container.innerHTML = `
       <style>
         .hub-app{min-height:100% !important;}
-        .hub-app .content{padding:24px;min-width:0;}
+        .hub-app .content{padding:var(--sp) 24px 24px;min-width:0;}
         @media (max-width:768px){.hub-app .content{padding:16px 14px 72px;}}
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
