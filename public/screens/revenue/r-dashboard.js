@@ -17,7 +17,7 @@ S.RevenueDashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Revenue. Revenue Recovery is the top line: where check average, menu mix, covers, and labor efficiency are leaving money on the table. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
       { h: 'Where You Stand', p: ['Up top is the recoverable revenue your latest audit found, what you have added back so far once your fixes are measured, and your check average, labor percent, and revenue per labor hour for the week against target. Tap Bar Cop Briefing for a written read of where the numbers are heading.'] },
-      { h: 'The Steps', p: ['1. Enter this week: log this week\'s sales, covers, and labor so everything below has numbers. 2. Check your numbers against target: check average, labor percent, and revenue per labor hour, so you see exactly where the top line slipped. 3. Work your biggest leak: open Revenue Fix on the biggest-dollar gap and take it down. 4. Run your Revenue audit: score the whole top line and refresh your leak board, about monthly, flagged here when it is due.'] },
+      { h: 'The Steps', p: ['1. Run This Week: log this week\'s sales, covers, and labor so everything below has numbers. 2. Check your numbers against target: check average, labor percent, and revenue per labor hour, so you see exactly where the top line slipped. 3. Work your biggest leak: open Revenue Fix on the biggest-dollar gap and take it down. 4. Run your Revenue audit: score the whole top line and refresh your leak board, about monthly, flagged here when it is due.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
   },
@@ -56,7 +56,7 @@ S.RevenueDashboard = {
 
   ORDER: ['week', 'numbers', 'leaks', 'audit'],
   _META: {
-    week:    { n: 1, title: 'Enter this week',                   sub: 'Log this week\'s sales, covers, and labor' },
+    week:    { n: 1, title: 'Run This Week',                     sub: 'Log this week\'s sales, covers, and labor' },
     numbers: { n: 2, title: 'Check your numbers against target', sub: 'Check average, labor, and revenue per labor hour' },
     leaks:   { n: 3, title: 'Work your biggest leak',            sub: 'Open Revenue Fix on the biggest dollar gap' },
     audit:   { n: 4, title: 'Run your Revenue audit',            sub: 'Score the top line and refresh your leaks' }
@@ -293,17 +293,17 @@ S.RevenueDashboard = {
     if (k === 'week') {
       if (w) {
         const bar = w.bar_revenue || 0, floor = w.floor_revenue || 0;
-        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(floor, 0) + '</strong> floor. Open This Week to adjust the numbers or confirm the rollup.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Open This Week</button>' + this.markBtn('week', 'Mark Done'));
+        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(floor, 0) + '</strong> floor. Open it to adjust the numbers or confirm the rollup.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
       }
-      return explain('Log this week\'s numbers in This Week. Sales roll up from your imported POS, covers and labor from Shift and Labor Control; you confirm it. Nothing below scores until the week is in.')
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Enter This Week</button>' + this.markBtn('week', 'Mark Done'));
+      return explain('Log this week\'s numbers. Sales roll up from your imported POS, covers and labor from Shift and Labor Control; you confirm it. Nothing below scores until the week is in.')
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
     }
 
     if (k === 'numbers') {
       if (!w) {
-        return explain('Enter this week first and your check average, labor percent, and revenue per labor hour land here against target, so you see exactly where the top line slipped.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Enter This Week</button>' + this.markBtn('numbers', 'Mark Reviewed'));
+        return explain('Run this week first and your check average, labor percent, and revenue per labor hour land here against target, so you see exactly where the top line slipped.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('numbers', 'Mark Reviewed'));
       }
       const rows = this.metricsRows(w).map(r => {
         const col = r.good == null ? 'var(--t3)' : (r.good ? 'var(--green)' : 'var(--red)');
