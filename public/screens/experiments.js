@@ -61,7 +61,7 @@ S.RecoveryExperiments = {
       { p: ['Experiments is your own before-and-after log. When you make a change you chose, like ' + example + ', start one here. Bar Cop averages the eight weeks before the start date against the eight weeks after on the metric you are watching and shows the lift, so you know whether the change actually moved the number.'] },
       { h: 'Start one', p: ['Tap Start Experiment, name the change, set the date you made it, and pick the metric to watch (' + watched + '). Add a line on what you changed so the record stands on its own later.'] },
       { h: 'Reading it', p: ['Each active experiment shows the metric before, after, and the lift, plus how many weeks of data it has so far. A win shows in gold. Give it a couple of weeks before you read too much into the number.'] },
-      { h: 'It measures, it does not double-count', p: ['An experiment reports a metric lift only, never recovered dollars, so it never overlaps the Recovery Scoreboard. It is separate from the Fix System too: the Fix System tracks the fixes your audits prescribed, while an experiment is a change you decided to make on your own. Mark Complete to file one once you have your answer, or Delete one started by mistake.'] }
+      { h: 'It measures, it does not double-count', p: ['An experiment reports a metric lift only, never recovered dollars, so it never double-counts against your measured recovery. It is separate from the Fix System too: the Fix System tracks the fixes your audits prescribed, while an experiment is a change you decided to make on your own. Mark Complete to file one once you have your answer, or Delete one started by mistake.'] }
     ]);
   }
 };

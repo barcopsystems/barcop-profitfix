@@ -254,7 +254,7 @@ S.ThisWeek = {
   },
 
   showHowTo() {
-    App.showHelpModal('How This Week Works', [
+    App.showHelpModal('How Run This Week Works', [
       { p: ['This is the weekly confirm. Bar Cop pulls the week in from Control: revenue from your weekly POS sales import in Shift, COGS from Inventory Control, labor from Labor Control. You read the money picture up top, confirm the grid, and save.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back to the current week. The numbers below always reflect the week you have selected. Stepping to a past week you already saved loads it back into the grid so you can correct it, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, prime cost against your target, how the week tracked versus forecast, and the total dollars running over target this week, all live. Prime cost is the headline number, and labor is folded into it.'] },

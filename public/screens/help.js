@@ -16,7 +16,7 @@ S.Help = {
     App.showHelpModal('Profit Recovery Help and FAQ', [
       { p: ['This page is the full Help and FAQ for Profit Recovery: how to get started, the audit and fix workflow, how recovered dollars are measured, the weekly numbers, the loss, cash, and vendor views, and how Profit Recovery reads from your Control systems.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "recovery", "audit", or "prime" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Profit Recovery carries its own directions. Open the screen you have a question about, like This Week or the Profit Audit, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Profit Recovery carries its own directions. Open the screen you have a question about, like Run This Week or the Profit Audit, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
   },
 
@@ -25,9 +25,9 @@ S.Help = {
       { q: 'What does Profit Recovery do?',
         a: 'Profit Recovery is where the dollar leaks in your operation get found and fixed. The Profit Audit scores you across pour cost, theft and loss, food cost, vendor control, and prime cost and puts a dollar figure on each gap. Profit Fix walks the process that closes each one. The dashboard tracks what you have recovered and where you are still leaking. All of it reads from the three Control systems (Inventory, Labor, Shift), so you log operations once there and the diagnosis runs on it. The info "i" at the top of any Profit screen explains how that screen works.' },
       { q: 'Where do I start?',
-        a: 'Run your first Profit Audit on day one for a baseline. Set your annual sales and your cost targets in App Settings first, so every gap has a real number to measure against. Then open the Profit Forecast to see your profit at your current pace versus your targets, which is the day-one read on what is on the table. After that, take the biggest gap on the dashboard and work its fix, and confirm each week in This Week as it closes. The recovery numbers build from there.' },
+        a: 'Run your first Profit Audit on day one for a baseline. Set your annual sales and your cost targets in App Settings first, so every gap has a real number to measure against. Then open the Profit Forecast to see your profit at your current pace versus your targets, which is the day-one read on what is on the table. After that, take the biggest gap on the dashboard and work its fix, and confirm each week in Run This Week as it closes. The recovery numbers build from there.' },
       { q: 'Do I need every screen?',
-        a: 'No. The value comes from a few things: your Control data feeding the cost numbers, a Profit Audit for the baseline, and confirming each week in This Week. Recipe Summary, Vendor Tracker, Loss Prevention, and Over and Short are read-only diagnosis views that come alive as Control data builds. You do not enter data in them; they read what you already logged in Control.' },
+        a: 'No. The value comes from a few things: your Control data feeding the cost numbers, a Profit Audit for the baseline, and confirming each week in Run This Week. Recipe Summary, Vendor Tracker, Loss Prevention, and Over and Short are read-only diagnosis views that come alive as Control data builds. You do not enter data in them; they read what you already logged in Control.' },
       { q: 'What can I get on day one, before I have weeks of data?',
         a: 'The Profit Audit runs day one off whatever you upload (a P&L, a POS export) plus any Control data you already have, and the Profit Forecast projects your profit forward from your first confirmed weeks. The realized recovery number on the dashboard needs about thirty days of logged weeks before it turns on, because it measures your real before and after. Until then the dashboard teaches the loop and shows your audit opportunity.' }
     ]},
@@ -46,18 +46,18 @@ S.Help = {
     { t: 'Measuring Recovery', qa: [
       { q: 'How does Bar Cop measure what I recovered?',
         a: 'From your own weekly numbers. It takes your first few weeks as your baseline, measures every later week against it, and the improvement times your revenue is the recovered dollars. It is realized to date, not a projection, and it reads honestly: if a number has slipped below where you started, it says so. A figure shows once a couple of weeks of after-data exist and firms up from there.' },
-      { q: 'Why does the Recovery Scoreboard show nothing at first?',
-        a: 'Because there is no honest before and after yet. A real recovery number needs about thirty days of logged weeks. Until then the Scoreboard teaches the loop, run the audit, pick a gap, work the fix, and the dashboard shows your audit opportunity, which is what is on the table and never counted as money already won.' },
+      { q: 'Why does the recovery number show nothing at first?',
+        a: 'Because there is no honest before and after yet. A real recovery number needs about thirty days of logged weeks. Until then the Where You Stand card on the dashboard teaches the loop, run the audit, pick a gap, work the fix, and shows your audit opportunity, which is what is on the table and never counted as money already won.' },
       { q: 'Why do some gaps show a dollar figure and others do not?',
         a: 'Pour cost and food cost have a weekly cost percentage Bar Cop can measure, so they carry a live dollar a year at your current pace. Theft and loss and vendor control do not reduce to a clean weekly metric, so they read as a Review row you tap to work on their own screen rather than a fake dollar. Labor is part of prime cost, but its fix lives in Revenue Recovery, so it is worked there, not on the Profit dashboard.' },
       { q: 'Opportunity versus recovered, what is the difference?',
         a: 'Opportunity is what is on the table, from your audit and your forecast, a forward number. Recovered is what you have actually won back, measured from your logged weeks looking backward. Bar Cop never shows opportunity as money already in the register.' }
     ]},
     { t: 'The Weekly Numbers', qa: [
-      { q: 'What is This Week for?',
-        a: 'It is the weekly confirm. Bar Cop pulls the week in from Control: revenue from Shift, COGS from Inventory, labor from Labor. You read the money picture, confirm the grid, and save. You almost never type a raw number, you confirm one. Load From Control re-runs the math if a shift or count landed after you opened the week, and asks before overwriting anything you edited by hand.' },
+      { q: 'What is Run This Week for?',
+        a: 'It is the weekly confirm, and step one of your Close The Week. Bar Cop pulls the week in from Control: revenue from Shift, COGS from Inventory, labor from Labor. You read the money picture, confirm the grid, and save. You almost never type a raw number, you confirm one. Refresh This Week re-runs the math if a shift or count landed after you opened the week, and asks before overwriting anything you edited by hand.' },
       { q: 'What is prime cost and why is it the headline?',
-        a: 'Prime cost is COGS plus labor as a percentage of sales, the two costs you control day to day. It is the single number that tells you whether the operation is healthy, so it leads This Week and the dashboard. The labor in prime cost is your hourly floor labor; salaried management is a fixed cost that lands in Books, not here.' },
+        a: 'Prime cost is COGS plus labor as a percentage of sales, the two costs you control day to day. It is the single number that tells you whether the operation is healthy, so it leads Run This Week and the dashboard. The labor in prime cost is your hourly floor labor; salaried management is a fixed cost that lands in Books, not here.' },
       { q: 'What does the Profit Forecast do?',
         a: 'It projects your profit forward from the weeks you have already confirmed, two ways side by side: at your current pace, and at your cost targets. The gap between them is what tightening up is worth, and it points straight at Profit Fix. Every figure is a projection built from your own averages, an estimate to plan against, not a guarantee.' },
       { q: 'How does variance work?',
@@ -73,7 +73,7 @@ S.Help = {
       { q: 'What is Over and Short?',
         a: 'The cash diagnosis: who and what is repeatedly off. It rolls up your drawer counts by cashier and by register, so a bartender who comes up short most shifts surfaces instead of you scrolling a chronological list. A cashier or register only gets ranked once there are enough counts to read a real pattern. Shift Cash History is the log of when; this is the read on who and what to act on.' },
       { q: 'What does Vendor Tracker do?',
-        a: 'One screen with three tabs. Scorecard is the per-vendor read: spend, price drift, short counts, open and recovered credits. Price Changes is every delivery line where the price moved, annualized to a real dollar using your usage. Discrepancies is the credits you can still chase. It is fed automatically from Inventory Control deliveries. You file a discrepancy at the dock in Receive Delivery and work the claim here.' },
+        a: 'One screen with three tabs. Scorecard is the per-vendor read: spend, price drift, short counts, open and recovered credits. Price Changes is every delivery line where the price moved, annualized to a real dollar using your usage. Discrepancies is a read-only rollup of open and recovered credits, their age, and what is still due. It is fed automatically from Inventory Control deliveries. You file a discrepancy and chase the credit over in Inventory Control, at the dock in Receive Delivery or the Credits to Chase worklist there; this tab is the read on where each one stands.' },
       { q: 'What is Recipe Summary?',
         a: 'A read-only diagnostic that ranks every menu item with a recipe by its cost percentage against target, worst first. Ingredient costs flow from your live Inventory Control prices, so when a vendor price moves the recipe cost updates on its own. You edit a recipe on Menu Items in Revenue Recovery; this screen is the read.' }
     ]},
