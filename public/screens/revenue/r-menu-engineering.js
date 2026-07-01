@@ -154,7 +154,7 @@ S.RevenueMenuEngineering = {
         + '<div style="display:flex;align-items:center;flex-shrink:0;">' + btns + '</div></div>';
     };
 
-    const colgroup = '<colgroup><col style="width:190px;"/><col style="width:140px;"/><col/><col/><col/><col style="width:170px;"/></colgroup>';
+    const colgroup = '<colgroup><col style="width:22%;"/><col style="width:18%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>';
 
     // ── Ranked category cards ──────────────────────────────────────────────────
     const cards = Object.keys(byCat).sort(catSort).map(cat => {
@@ -172,7 +172,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, i.quad);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td><div class="val">' + SINGULAR[i.quad] + '</div><div style="font-size:10px;color:var(--t3);">' + esc(MOVE[i.quad]) + '</div></td>'
-          + '<td style="text-align:center;">' + f(i.price) + '</td>'
+          + '<td>' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
           + '<td>' + x.action + '</td></tr>';
@@ -180,7 +180,7 @@ S.RevenueMenuEngineering = {
       return heading(cat + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Class</th><th style="text-align:center;">Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Class</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
@@ -192,7 +192,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, null);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td>' + esc(i.category || '') + '</td>'
-          + '<td style="text-align:center;">' + f(i.price) + '</td>'
+          + '<td>' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
           + '<td>' + x.action + '</td></tr>';
@@ -200,7 +200,7 @@ S.RevenueMenuEngineering = {
       unrankedCard = heading('Too Few to Rank')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Category</th><th style="text-align:center;">Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + urows + '</tbody></table></div>';
     }
 
@@ -555,7 +555,7 @@ S.RevenueMenuEngineering = {
       + '<td><div class="val">' + esc(entry.item_name || '') + '</div></td>'
       + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
       + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
-      + '<td style="font-size:11px;">' + vCell + '</td><td></td></tr>';
+      + '<td colspan="2" style="font-size:11px;">' + vCell + '</td></tr>';
   },
 
   reviewLogHtml() {
@@ -564,8 +564,8 @@ S.RevenueMenuEngineering = {
       || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Pricing Review Log</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:190px;"/><col style="width:140px;"/><col/><col/><col/><col style="width:170px;"/></colgroup>'
-      + '<thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th>Verification</th><th></th></tr></thead>'
+      + '<colgroup><col style="width:22%;"/><col style="width:18%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>'
+      + '<thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th colspan="2">Verification</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'revenue_price_log', log, false);
   }
