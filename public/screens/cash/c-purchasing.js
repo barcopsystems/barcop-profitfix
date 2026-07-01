@@ -120,6 +120,8 @@ S.CashPurchasing = {
       + '</div>'
       + this.buyTrend(ps)
       + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;">' + note + '</div>'
+      // PDF-only summary (the Bought/Used/Net figures are styled spans the exporter skips).
+      + '<div class="pdf-para" style="display:none;">Buy vs Use. Bought ' + App.fmtCurrency(bought) + ', Used ' + App.fmtCurrency(used) + ', ' + netLabel + ' ' + App.fmtCurrency(Math.abs(net)) + '. ' + note + '</div>'
       + '</div>';
   },
   // Paired Bought / Used bars per count period: compare the two side by side. A

@@ -180,7 +180,8 @@ S.CashForecast = {
     if (opening == null || !fc.lowPoint) return '';
     const low = fc.lowPoint, credit = fc.credit || 0;
     const wk = this.fmtWk(low.ws), bal = App.fmtCurrency(low.balance);
-    const wrap = (inner) => '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">' + inner + '</div>';
+    const wrap = (inner) => '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">' + inner + '</div>'
+      + '<div class="pdf-para" style="display:none;">' + inner + '</div>';
     if (low.balance >= 0) {
       return wrap('<strong style="color:var(--green);">In the black all quarter.</strong> Tightest week is ' + wk + ' at ' + bal + '.'
         + (credit > 0 ? ' Plus ' + App.fmtCurrency(credit) + ' of credit in reserve if a slow stretch hits.' : ''));
