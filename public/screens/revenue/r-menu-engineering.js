@@ -347,6 +347,10 @@ S.RevenueMenuEngineering = {
   dogTestFor(id) {
     const tests = (App.data.menu_dog_tests || []).filter(t => t.item_id === id);
     if (!tests.length) return null;
+    // A running test always wins over an older decided one (their timestamps are
+    // not comparable: a decision carries a full ISO stamp, a start only a date).
+    const active = tests.find(t => t.status === 'Testing');
+    if (active) return active;
     return tests.slice().sort((a, b) =>
       (b.decided_at || b.start_date || '').localeCompare(a.decided_at || a.start_date || ''))[0];
   },
