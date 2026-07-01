@@ -6,8 +6,8 @@
    week's cash steps top to bottom. The one difference Kyle called for is the
    Recovery Scoreboard hero (the trapped-cash money number); everything below it
    is the end-of-week cash routine, done quickly in the weekly sit-down. The four
-   steps: run the Cash audit, free up cash in inventory (trapped stock then order
-   to par), stay ahead of the week, pay on terms. Quick reads land inline; the deep work
+   steps: free up cash in inventory (trapped stock then order to par), stay ahead
+   of the week, pay on terms, then run the Cash audit to score it. Quick reads land inline; the deep work
    launches into the screen that already does it (Dynamic Pars, the Order Sheet,
    Books). Every number is computed from real data by CashEngine. */
 
@@ -21,7 +21,7 @@ S.CashDashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Cash. Cash is the third lever Bar Cop watches: Profit is your margin, Revenue is your top line, Cash is your liquidity, the money actually in the account. Plenty of bars look fine on paper and still run tight, and this is where you catch it.'] },
       { h: 'Where You Stand', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.', 'Under it is the survival read, will you make it to next quarter: your runway, the tightest week ahead, and what is actually safe to spend, projected thirteen weeks out. Set your opening balance in Cash Position to make the runway real, and if you keep a line of credit, enter it on the Cash Forecast and the runway counts it as your backstop.'] },
-      { h: 'The Steps', p: ['The week starts by running your Cash audit, then works your cash where it is stuck. 1. Run the Cash audit: score the week and update your Cash Fix. 2. Free up cash in inventory: run down the dead stock and overstock, then order to par so cash stops piling up on the shelf. 3. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 4. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
+      { h: 'The Steps', p: ['You work your cash where it is stuck, then score the week last, the same shape as Profit and Revenue. 1. Free up cash in inventory: run down the dead stock and overstock, then order to par so cash stops piling up on the shelf. 2. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 3. Pay on terms: hold cash to the vendor due date and take any early-pay discount. 4. Run the Cash audit: score the week and update your Cash Fix with where to work next.'] },
       { h: 'Working A Step', p: ['Open a step to read the numbers, then launch into the screen that does the work and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week. None of this is daily, it is the weekly sit-down.'] }
     ]);
   },
@@ -53,12 +53,12 @@ S.CashDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['audit', 'trapped', 'week', 'terms'],
+  ORDER: ['trapped', 'week', 'terms', 'audit'],
   _META: {
-    audit:   { n: 1, title: 'Run the Cash audit',       sub: 'Score the week and update your Cash Fix' },
-    trapped: { n: 2, title: 'Free up cash in inventory', sub: 'Run down trapped stock, then order to par' },
-    week:    { n: 3, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
-    terms:   { n: 4, title: 'Pay on terms',             sub: 'Hold cash to the vendor due date' }
+    trapped: { n: 1, title: 'Free up cash in inventory', sub: 'Run down trapped stock, then order to par' },
+    week:    { n: 2, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
+    terms:   { n: 3, title: 'Pay on terms',             sub: 'Hold cash to the vendor due date' },
+    audit:   { n: 4, title: 'Run the Cash audit',       sub: 'Score the week and update your Cash Fix' }
   },
   // Cash steps are reviewed and acted on, then marked. Nothing auto-completes
   // off data (you cannot infer "I ran down the dead stock" from a number), so
@@ -364,8 +364,8 @@ S.CashDashboard = {
     if (k === 'audit') {
       const ca = App.latestEvent ? App.latestEvent(App.data.cash_audits || []) : null;
       const lead = ca && ca.overall_score != null
-        ? 'Your last Cash audit scored <strong style="color:' + App.scoreColor(ca.overall_score) + ';">' + ca.overall_score + '</strong>. Run a fresh one to score this week, then open the Cash Fix and check off what you have already handled so the steps below read where you really are.'
-        : 'Run your Cash audit first. It scores your liquidity and feeds the fix steps below. Then open the Cash Fix and mark off what you have handled.';
+        ? 'Close the week by scoring it. Your last Cash audit scored <strong style="color:' + App.scoreColor(ca.overall_score) + ';">' + ca.overall_score + '</strong>. Run a fresh one to score this week and refresh your Cash Fix with where to work next.'
+        : 'Close the week by scoring your liquidity. Run your Cash audit and it updates your Cash Fix with where to work next week.';
       return explain(lead)
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-audit">Cash Audit</button><button class="btn btn-ghost btn-sm" data-go="c-fix">Cash Fix</button>' + this.markBtn('audit', 'Mark Done'));
     }
