@@ -18,7 +18,7 @@ S.Dashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Profit. Profit Recovery is about margin: where the cost of your pours, plates, and the rest is eating money you already earned. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
       { h: 'Where You Stand', p: ['Up top is Where You Stand: the recoverable profit your latest audit found, what you have put back so far once your fixes are measured, and your pour, food, and prime cost for the week against target. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
-      { h: 'The Steps', p: ['1. Enter this week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board, about monthly, flagged here when it is due.'] },
+      { h: 'The Steps', p: ['1. Run This Week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board, about monthly, flagged here when it is due.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
   },
@@ -50,7 +50,7 @@ S.Dashboard = {
 
   ORDER: ['week', 'costs', 'leaks', 'audit'],
   _META: {
-    week:  { n: 1, title: 'Enter this week',                 sub: 'Log this week\'s bar and food sales and costs' },
+    week:  { n: 1, title: 'Run This Week',                   sub: 'Log this week\'s bar and food sales and costs' },
     costs: { n: 2, title: 'Check your costs against target', sub: 'Pour, food, and prime cost vs target' },
     leaks: { n: 3, title: 'Work your biggest leak',          sub: 'Open Profit Fix on the biggest dollar leak' },
     audit: { n: 4, title: 'Run your Profit audit',           sub: 'Score the operation and refresh your leaks' }
@@ -302,17 +302,17 @@ S.Dashboard = {
     if (k === 'week') {
       if (w) {
         const bar = (w.bar && w.bar.revenue) || 0, food = (w.food && w.food.revenue) || 0;
-        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(food, 0) + '</strong> food. Open This Week to adjust the numbers or confirm the rollup.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Open This Week</button>' + this.markBtn('week', 'Mark Done'));
+        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(food, 0) + '</strong> food. Open it to adjust the numbers or confirm the rollup.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
       }
-      return explain('Log this week\'s numbers in This Week. Revenue rolls up from your imported POS sales, COGS from your Inventory counts, and labor from Labor Control; you confirm it. Nothing below scores until the week is in.')
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Enter This Week</button>' + this.markBtn('week', 'Mark Done'));
+      return explain('Log this week\'s numbers. Revenue rolls up from your imported POS sales, COGS from your Inventory counts, and labor from Labor Control; you confirm it. Nothing below scores until the week is in.')
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
     }
 
     if (k === 'costs') {
       if (!w) {
-        return explain('Enter this week first and your bar pour cost, food cost, and prime cost land here against target, so you see exactly where margin slipped.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Enter This Week</button>' + this.markBtn('costs', 'Mark Reviewed'));
+        return explain('Run this week first and your bar pour cost, food cost, and prime cost land here against target, so you see exactly where margin slipped.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('costs', 'Mark Reviewed'));
       }
       const rows = this._costRows(w).map(r => {
         const col = r.val == null ? 'var(--t3)' : (r.over ? 'var(--red)' : 'var(--green)');
