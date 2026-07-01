@@ -25,7 +25,7 @@ S.RevenueAudit = {
       + AuditUI.readinessCard({ pfx: 'ra', title: 'Revenue Audit', desc,
           steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra', { sectionCount: SECTION_NAMES.length }) : '')
       + '</div>';
     AuditUI.wireFirstAudit(this.container);
     document.getElementById('ra-gen-btn')?.addEventListener('click', () => this.onGenerate());
