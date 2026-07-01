@@ -159,17 +159,21 @@ S.RevenueServerCheck = {
 
   // ── Shared form body (fields + live check-average box), id-prefixed so the
   //    always-on New form (rsc) and the Edit modal (rscm) never clash. ──────────
-  formBody(f, targetCA, p) {
+  formBody(f, targetCA, p, narrow) {
     const hasServers = this.staff().some(s => s.status !== 'Inactive' && App.isService && App.isService(s));
     const serverOpts = App.staffOptions(f.server || '', { audience: 'service', placeholder: hasServers ? 'Select server...' : 'Add Bar or Front of House staff in Labor Control' });
     const shiftOpts = (App.SHIFT_TYPES || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'])
       .map(tp => '<option' + (f.shift === tp ? ' selected' : '') + '>' + esc(tp) + '</option>').join('');
-    return '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input class="form-input" type="date" id="' + p + '-date" value="' + esc(f.date || '') + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label><select class="form-input" id="' + p + '-shift">' + shiftOpts + '</select></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Server</label><select class="form-input" id="' + p + '-server">' + serverOpts + '</select></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Covers</label><input class="form-input" type="number" id="' + p + '-cov" value="' + esc(f.cov || '') + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + p + '-sales" value="' + esc(f.sales || '') + '"/></div></div>'
+    // narrow = the two-column modal layout (widths come from .narrow-form CSS);
+    // otherwise the always-on page form flows as one fixed-width horizontal row.
+    const w = px => narrow ? '' : (' style="width:' + px + ';flex-shrink:0;"');
+    const rowOpen = narrow ? '<div class="form-row">' : '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">';
+    return rowOpen
+        + '<div class="f"' + w('148px') + '><label>Date</label><input class="form-input" type="date" id="' + p + '-date" value="' + esc(f.date || '') + '"/></div>'
+        + '<div class="f"' + w('150px') + '><label>Shift</label><select class="form-input" id="' + p + '-shift">' + shiftOpts + '</select></div>'
+        + '<div class="f"' + w('220px') + '><label>Server</label><select class="form-input" id="' + p + '-server">' + serverOpts + '</select></div>'
+        + '<div class="f"' + w('110px') + '><label>Covers</label><input class="form-input" type="number" id="' + p + '-cov" value="' + esc(f.cov || '') + '"/></div>'
+        + '<div class="f"' + w('150px') + '><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + p + '-sales" value="' + esc(f.sales || '') + '"/></div></div>'
       + '</div>'
       + '<div id="' + p + '-result" style="margin-top:16px;">'
         + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
@@ -202,13 +206,13 @@ S.RevenueServerCheck = {
     if (!c) return;
     const targetCA = (App.data.revenue_settings?.targets || {}).check_avg || 35;
     const f = { date: c.date || '', shift: c.shift || '', server: c.staff_id || '', cov: c.covers != null ? String(c.covers) : '', sales: c.sales != null ? String(c.sales) : '' };
-    const html = '<div class="card form-card" style="margin:0;">'
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">Edit Shift Check</div>'
-      + this.formBody(f, targetCA, 'rscm')
+      + this.formBody(f, targetCA, 'rscm', true)
       + '<div class="card-actions" style="margin-top:18px;"><button class="btn btn-primary" id="rscm-save">Update Check</button>'
       + '<span id="rscm-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
-    App.openModal(html, { id: 'rsc-edit-modal', maxWidth: 900 });
+    App.openModal(html, { id: 'rsc-edit-modal', maxWidth: 540 });
     document.getElementById('rscm-cov')?.addEventListener('input', () => this.calc('rscm'));
     document.getElementById('rscm-sales')?.addEventListener('input', () => this.calc('rscm'));
     document.getElementById('rscm-save')?.addEventListener('click', () => this.saveEdit(id));
@@ -239,7 +243,7 @@ S.RevenueServerCheck = {
       const coachBtn = (r.staff_id && coachable)
         ? '<button class="btn btn-ghost btn-sm rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:10px;padding:3px 8px;">+ Coaching Note</button>' : '';
       return '<tr>'
-        + '<td style="font-weight:700;color:' + (isDown ? 'var(--red)' : 'var(--t1)') + ';">' + esc(r.name) + tag + '</td>'
+        + '<td style="font-weight:700;color:var(--t1);">' + esc(r.name) + tag + '</td>'
         + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--t1)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
         + '<td style="color:' + (vsT >= 0 ? 'var(--t2)' : 'var(--red)') + ';">' + (vsT >= 0 ? '+' : '') + App.fmtCurrency(vsT) + '</td>'
         + '<td style="color:var(--t2);">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</td>'
