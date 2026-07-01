@@ -94,7 +94,6 @@ S.AuditTracker = {
         ['Inventory Variance $',    cur(d.S1_INV_VARIANCE_AMT), d.S1_INV_VARIANCE_AMT > 500 ? 'warn' : ''],
         ['Draft Beer Yield',        d.S1_DRAFT_YIELD_PCT != null ? d.S1_DRAFT_YIELD_PCT + '%' : '', (d.S1_DRAFT_LOSS_PCT != null && d.S1_DRAFT_LOSS_PCT >= 12) ? 'warn' : (d.S1_DRAFT_YIELD_PCT != null ? 'good' : '')],
         ['Draft Yield Loss',        d.S1_DRAFT_LOSS_PCT != null ? d.S1_DRAFT_LOSS_PCT + '% to foam and over-pour' : '', d.S1_DRAFT_LOSS_PCT >= 12 ? 'warn' : ''],
-        ['Pour Method',             d.S1_POUR_METHOD],
         ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
         ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
@@ -119,7 +118,6 @@ S.AuditTracker = {
         ['Food Variance $',         cur(d.S3_FOOD_VAR_AMT)],
         ['Recipe Coverage',         d.S3_RECIPE_COVERAGE],
         ['Inventory Frequency',     d.S3_INV_FREQ],
-        ['Waste Log',               d.S3_WASTE_LOG],
         ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
       ], null, d),
@@ -127,7 +125,6 @@ S.AuditTracker = {
         ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
         ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
         ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
-        ['Invoice vs PO Matching',  d.S4_INVOICE_VS_PO],
         ['Price Verification',      d.S4_PRICE_VERIFY],
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S4_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
         ['Credits Recovered',       d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
@@ -144,7 +141,6 @@ S.AuditTracker = {
         ['Food Cost %',             pct(d.S5_FOOD_COST_PCT)],
         ['Prime Cost %',            pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT), d.S5_PRIME_COST_PCT > (d.S5_TARGET_PCT||60) ? 'warn' : 'good'],
         ['Prime Cost Amount',       cur(d.S5_PRIME_COST_AMT)],
-        ['RPLH Tracked',            d.S5_RPLH_TRACKED],
         ['Labor by Department',     d.S5_LABOR_BY_DEPT],
         ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
       ], null, d),
@@ -240,7 +236,6 @@ S.AuditTracker = {
         ['Inventory Variance $',   cur(d.S1_INV_VARIANCE_AMT)],
         ['Draft Beer Yield',       d.S1_DRAFT_YIELD_PCT != null ? d.S1_DRAFT_YIELD_PCT + '%' : ''],
         ['Draft Yield Loss',       d.S1_DRAFT_LOSS_PCT != null ? d.S1_DRAFT_LOSS_PCT + '% to foam and over-pour' : ''],
-        ['Pour Method',            d.S1_POUR_METHOD],
         ['Recipe Coverage',        d.S1_RECIPE_COVERAGE],
         ['Monthly Gap vs Target',  gap(d.S1_MONTHLY_GAP) || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : '')],
         ['Annual Gap',             cur(d.S1_ANNUAL_GAP)]
@@ -265,7 +260,6 @@ S.AuditTracker = {
         ['Food Variance $',        cur(d.S3_FOOD_VAR_AMT)],
         ['Recipe Coverage',        d.S3_RECIPE_COVERAGE],
         ['Inventory Frequency',    d.S3_INV_FREQ],
-        ['Waste Log',              d.S3_WASTE_LOG],
         ['Monthly Gap vs Target',  cur(d.S3_MONTHLY_GAP)],
         ['Annual Gap',             cur(d.S3_ANNUAL_GAP)]
       ]],
@@ -273,7 +267,6 @@ S.AuditTracker = {
         ['Bev Invoice Count',      num(d.S4_BEV_INVOICE_COUNT)],
         ['Food Invoice Count',     num(d.S4_FOOD_INVOICE_COUNT)],
         ['Monthly Vendor Spend',   cur(d.S4_VENDOR_SPEND_MONTHLY)],
-        ['Invoice vs PO Matching', d.S4_INVOICE_VS_PO],
         ['Price Verification',     d.S4_PRICE_VERIFY],
         ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : ''],
         ['Credits Recovered',      d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
@@ -290,7 +283,6 @@ S.AuditTracker = {
         ['Food Cost %',            pct(d.S5_FOOD_COST_PCT)],
         ['Prime Cost %',           pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT)],
         ['Prime Cost Amount',      cur(d.S5_PRIME_COST_AMT)],
-        ['RPLH Tracked',           d.S5_RPLH_TRACKED],
         ['Labor by Department',    d.S5_LABOR_BY_DEPT],
         ['Monthly COGS Gap',       cur(d.S5_COMBINED_COGS_GAP)]
       ]]

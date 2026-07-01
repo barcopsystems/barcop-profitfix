@@ -141,7 +141,7 @@ S.Dashboard = {
         + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--gold);">' + App.fmtCurrency(annual, 0) + '</span>'
         + '<span style="font-size:13px;color:var(--t2);">in recoverable profit a year</span></div></div>';
     } else {
-      heroBody = '<div style="padding:2px 0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--t1);">All clear</div>'
+      heroBody = '<div style="padding:2px 0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--t1);">All clear</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Your latest audit found no dollar leaks worth chasing right now. Margins are holding.</div></div>';
     }
 
