@@ -3,19 +3,19 @@
 /* ── Blueprint — how the week works, node by node ─────────────────────────────
    A Hub-level full page (top-nav link right of The Hub). Not a link menu (that is
    the Hub) and not a data-flow diagram. It is the reference map of the weekly
-   workflow. Four numbered stages read like the Close The Week accordion: one open
-   at a time, #1 open on landing. Every section title and step is a clickable
-   node; selecting one explains what it is, why it sits where it does, and what it
-   hands off, in a persistent detail panel (desktop, the cards condense to make
-   room) or a slide-in (mobile). The panel's Open button deep-links to the actual
-   page that does the work, not just the section landing.
+   workflow: four numbered stages, all open, no dividers. Every section title and
+   step is a clickable node; selecting one explains what it is, why it sits where
+   it does, and what it hands off, in a persistent detail panel (desktop) or a
+   slide-in (mobile). The section number goes green to mark the last stage you
+   touched, and stays green until you click a node in a different stage. The
+   panel's Open button deep-links to the actual page that does the work.
 
    The stage arrays are the single source of truth; _nodes is flattened from them,
-   and each step carries its own Open target. */
+   each node carrying its stage and its own Open target. */
 
 S.FlowMap = {
   _sel: null,
-  _open: 'capture',
+  _activeStage: null,
 
   CAPTURE: [
     { id: 'inventory', title: 'Inventory', go: 'ic-dashboard',
@@ -50,10 +50,10 @@ S.FlowMap = {
     { id: 'profit', title: 'Profit', go: 'dashboard',
       d: 'Where margin gets defended. Pour cost, food cost, theft, vendor pricing, prime. It reads off your Control closes and hunts the dollars leaking out.',
       steps: [
-        { id: 'pf-1', label: 'Run This Week',          go: 'this-week',      d: 'Confirm the week\'s P&L: sales from Shift, COGS from Inventory, labor from Labor. It is the gate. Nothing below it scores until the week is in.' },
-        { id: 'pf-2', label: 'Check costs vs target',  go: 'dashboard',      d: 'Your pour, food, and prime cost against target for the week. This is where you see which cost slipped before you act on it.' },
-        { id: 'pf-3', label: 'Work your biggest leak', go: 'profit-fix',     d: 'The audit ranked your leaks by dollars and the Playbook lays out the move. Take the biggest one down in the Profit Fix. That is where the real money is.' },
-        { id: 'pf-4', label: 'Run the Profit audit',   go: 'audit-tracker',  d: 'Score the whole margin side and refresh your leak board, about monthly. It runs last because it grades the week you just worked.' }
+        { id: 'pf-1', label: 'Run This Week',          go: 'this-week',     d: 'Confirm the week\'s P&L: sales from Shift, COGS from Inventory, labor from Labor. It is the gate. Nothing below it scores until the week is in.' },
+        { id: 'pf-2', label: 'Check costs vs target',  go: 'dashboard',     d: 'Your pour, food, and prime cost against target for the week. This is where you see which cost slipped before you act on it.' },
+        { id: 'pf-3', label: 'Work your biggest leak', go: 'profit-fix',    d: 'The audit ranked your leaks by dollars and the Playbook lays out the move. Take the biggest one down in the Profit Fix. That is where the real money is.' },
+        { id: 'pf-4', label: 'Run the Profit audit',   go: 'audit-tracker', d: 'Score the whole margin side and refresh your leak board, about monthly. It runs last because it grades the week you just worked.' }
       ] },
     { id: 'revenue', title: 'Revenue', go: 'r-dashboard',
       d: 'The top line. Check average, menu pricing, and labor productivity. Two bars with the same costs make very different money depending on this.',
@@ -66,10 +66,10 @@ S.FlowMap = {
     { id: 'cash', title: 'Cash', go: 'c-dashboard',
       d: 'Liquidity. Cash trapped on the shelf, your runway, and how fast you pay. The one section that reads from everywhere to answer whether you make it to next quarter.',
       steps: [
-        { id: 'cs-1', label: 'Free up inventory cash', go: 'c-trapped',   d: 'Run down dead stock and order to par so cash stops sitting on the shelf. The fastest cash you can free without selling a thing.' },
-        { id: 'cs-2', label: 'Stay ahead of the week', go: 'c-forecast',  d: 'Look at what is going out against what is coming in across the next weeks. Catch a tight week before it lands.' },
-        { id: 'cs-3', label: 'Pay on terms',           go: 'ic-vendors',  d: 'Hold your cash to the vendor due date and take any early-pay discount worth more than the cash sitting in your account.' },
-        { id: 'cs-4', label: 'Run the Cash audit',     go: 'c-audit',     d: 'Score your liquidity and refresh the Cash Fix. Like the others, it runs last and grades the week.' }
+        { id: 'cs-1', label: 'Free up inventory cash', go: 'c-trapped',  d: 'Run down dead stock and order to par so cash stops sitting on the shelf. The fastest cash you can free without selling a thing.' },
+        { id: 'cs-2', label: 'Stay ahead of the week', go: 'c-forecast', d: 'Look at what is going out against what is coming in across the next weeks. Catch a tight week before it lands.' },
+        { id: 'cs-3', label: 'Pay on terms',           go: 'ic-vendors', d: 'Hold your cash to the vendor due date and take any early-pay discount worth more than the cash sitting in your account.' },
+        { id: 'cs-4', label: 'Run the Cash audit',     go: 'c-audit',    d: 'Score your liquidity and refresh the Cash Fix. Like the others, it runs last and grades the week.' }
       ] }
   ],
 
@@ -109,26 +109,26 @@ S.FlowMap = {
     App.openHubFullPage('Blueprint', (mount) => {
       this.container = mount;
       this._sel = null;
-      this._open = 'capture';
+      this._activeStage = null;
       this._buildNodes();
       this.render();
     }, 'flowmap');
   },
 
-  // Flatten every clickable node into one lookup, each carrying its own Open
-  // target (steps deep-link to the page that does the work).
+  // Flatten every clickable node into one lookup, each carrying its stage and its
+  // own Open target (steps deep-link to the page that does the work).
   _buildNodes() {
     const m = {};
-    const add = (id, title, d, go, action) => { m[id] = { title: title, d: d, go: go || '', action: action || '' }; };
-    const addSection = sec => {
-      add(sec.id, sec.title, sec.d, sec.go, sec.action);
-      (sec.steps || []).forEach(s => add(s.id, sec.title + ': ' + s.label, s.d, s.go || sec.go, sec.action));
+    const add = (id, title, d, go, action, stage) => { m[id] = { title: title, d: d, go: go || '', action: action || '', stage: stage }; };
+    const addSection = (sec, stage) => {
+      add(sec.id, sec.title, sec.d, sec.go, sec.action, stage);
+      (sec.steps || []).forEach(s => add(s.id, sec.title + ': ' + s.label, s.d, s.go || sec.go, sec.action, stage));
     };
-    this.CAPTURE.forEach(addSection);
-    addSection(this.EVENTS);
-    this.RECOVERY.forEach(addSection);
-    this.ASNEEDED.forEach(addSection);
-    this.OUTPUTS.forEach(addSection);
+    this.CAPTURE.forEach(s => addSection(s, 'capture'));
+    addSection(this.EVENTS, 'capture');
+    this.RECOVERY.forEach(s => addSection(s, 'recovery'));
+    this.ASNEEDED.forEach(s => addSection(s, 'asneeded'));
+    this.OUTPUTS.forEach(s => addSection(s, 'lands'));
     this._nodes = m;
   },
 
@@ -136,59 +136,39 @@ S.FlowMap = {
     const tree = this.STAGES.map(st => this.stageCard(st)).join('');
     this.container.innerHTML = this.styleBlock()
       + '<div class="screen" style="max-width:none;padding-left:24px;padding-right:24px;">'
-      + '<div class="fm-wrap' + (this._sel ? ' fm-open-panel' : '') + '"><div class="fm-tree">' + tree + '</div>'
+      + '<div class="fm-wrap"><div class="fm-tree">' + tree + '</div>'
       + '<div class="fm-panel-col"><div class="fm-panel" id="fm-panel">' + this.panelHtml(this._sel ? this._nodes[this._sel] : null) + '</div></div>'
       + '</div></div>';
 
-    this.container.querySelectorAll('.fm-sh').forEach(el =>
-      el.addEventListener('click', () => this.toggleStage(el.dataset.stage)));
     this.container.querySelectorAll('[data-node]').forEach(el =>
-      el.addEventListener('click', (ev) => { ev.stopPropagation(); this.select(el.dataset.node); }));
+      el.addEventListener('click', () => this.select(el.dataset.node)));
     this.wirePanel();
   },
 
   stageCard(st) {
-    const isOpen = this._open === st.key;
-    const circle = isOpen
-      ? '<span class="fm-hdnum fm-hdnum-on">' + st.num + '</span>'
-      : '<span class="fm-hdnum">' + st.num + '</span>';
-    let body = '';
-    if (isOpen) {
-      let inner = this.grid(this[st.list], st.cols);
-      if (st.feeder) inner += this.eventsFeeder();
-      body = '<div class="fm-sbody"><div class="fm-hds">' + esc(st.sub) + '</div><div class="fm-grid">' + inner + '</div></div>';
-    }
-    return '<div class="fm-stage' + (isOpen ? ' open' : '') + '">'
-      + '<div class="fm-sh" data-stage="' + st.key + '">' + circle
-      + '<span class="fm-hdt">' + esc(st.title) + '</span>'
-      + '<span class="fm-chev">' + (isOpen ? '&#9652;' : '&#9662;') + '</span></div>'
-      + body + '</div>';
-  },
-
-  toggleStage(key) {
-    this._open = (this._open === key) ? null : key;
-    this.render();
+    const inner = this.grid(this[st.list], st.cols, st.feeder ? this.eventsFeeder() : '');
+    const on = this._activeStage === st.key ? ' fm-hdnum-on' : '';
+    return '<div class="fm-stage">'
+      + '<div class="fm-hd">'
+      +   '<span class="fm-hdnum' + on + '" data-stage="' + st.key + '">' + st.num + '</span>'
+      +   '<div style="min-width:0;"><div class="fm-hdt">' + esc(st.title) + '</div><div class="fm-hds">' + esc(st.sub) + '</div></div>'
+      + '</div>' + inner + '</div>';
   },
 
   select(id) {
     const node = this._nodes[id];
     if (!node) return;
     this._sel = id;
+    this._activeStage = node.stage;
+    // Green number on the stage this node lives in; stays until another stage.
+    this.container.querySelectorAll('.fm-hdnum[data-stage]').forEach(el => el.classList.toggle('fm-hdnum-on', el.dataset.stage === node.stage));
     if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
       App.showHelpModal(node.title, [{ p: [node.d] }]);
       return;
     }
-    const wrap = this.container.querySelector('.fm-wrap');
-    if (wrap) wrap.classList.add('fm-open-panel');
     this.container.querySelectorAll('[data-node]').forEach(el => el.classList.toggle('fm-on', el.dataset.node === id));
     const panel = document.getElementById('fm-panel');
     if (panel) { panel.innerHTML = this.panelHtml(node); this.wirePanel(); }
-  },
-  closePanel() {
-    this._sel = null;
-    const wrap = this.container.querySelector('.fm-wrap');
-    if (wrap) wrap.classList.remove('fm-open-panel');
-    this.container.querySelectorAll('[data-node]').forEach(el => el.classList.remove('fm-on'));
   },
 
   panelHtml(node) {
@@ -200,20 +180,18 @@ S.FlowMap = {
     const openBtn = (node.go || node.action)
       ? '<button class="btn btn-primary btn-sm" id="fm-open" data-go="' + esc(node.go || '') + '" data-action="' + esc(node.action || '') + '" style="margin-top:16px;">Open</button>'
       : '';
-    return '<button class="fm-x" id="fm-close" aria-label="Close">&times;</button>'
-      + '<div class="fm-p-title">' + esc(node.title) + '</div>'
+    return '<div class="fm-p-title">' + esc(node.title) + '</div>'
       + '<div class="fm-p-body">' + esc(node.d) + '</div>' + openBtn;
   },
   wirePanel() {
     const b = document.getElementById('fm-open');
     if (b) b.addEventListener('click', () => this.goTo(b.dataset.go, b.dataset.action));
-    const x = document.getElementById('fm-close');
-    if (x) x.addEventListener('click', () => this.closePanel());
   },
 
   // ── Grid + tiles ────────────────────────────────────────────────────────────
-  grid(cards, cols) {
-    return '<div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));gap:12px;">' + cards.map(c => this.tile(c)).join('') + '</div>';
+  grid(cards, cols, extra) {
+    return '<div style="display:grid;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));gap:12px;">'
+      + cards.map(c => this.tile(c)).join('') + (extra || '') + '</div>';
   },
   tile(c) {
     let inner = '';
@@ -237,26 +215,18 @@ S.FlowMap = {
 
   styleBlock() {
     return '<style>'
-      + '.fm-wrap{display:grid;grid-template-columns:1fr;gap:20px;align-items:start;}'
-      + '.fm-wrap.fm-open-panel{grid-template-columns:minmax(0,1fr) 360px;}'
-      + '.fm-panel-col{display:none;}'
-      + '.fm-wrap.fm-open-panel .fm-panel-col{display:block;}'
-      + '@media(max-width:900px){.fm-wrap.fm-open-panel{grid-template-columns:1fr;}.fm-panel-col{display:none !important;}}'
-      + '.fm-panel{position:sticky;top:8px;background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 20px;position:relative;}'
-      + '.fm-x{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--t3);font-size:20px;line-height:1;cursor:pointer;padding:0;}'
-      + '.fm-x:hover{color:var(--t1);}'
-      + '.fm-p-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:10px;padding-right:20px;}'
+      + '.fm-wrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start;}'
+      + '@media(max-width:900px){.fm-wrap{grid-template-columns:1fr;}.fm-panel-col{display:none;}}'
+      + '.fm-panel{position:sticky;top:8px;background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 20px;}'
+      + '.fm-p-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:10px;}'
       + '.fm-p-body{font-size:13px;color:var(--t2);line-height:1.7;}'
-      + '.fm-tree{display:flex;flex-direction:column;gap:12px;}'
-      + '.fm-stage{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;}'
-      + '.fm-sh{display:flex;align-items:center;gap:13px;padding:16px 18px;cursor:pointer;}'
+      + '.fm-tree{display:flex;flex-direction:column;gap:18px;}'
+      + '.fm-stage{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 20px;}'
+      + '.fm-hd{display:flex;align-items:flex-start;gap:13px;margin-bottom:16px;}'
       + '.fm-hdnum{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:13px;font-weight:800;}'
       + '.fm-hdnum-on{background:var(--green);color:var(--bg);}'
-      + '.fm-hdt{flex:1;min-width:0;font-size:15px;font-weight:700;color:var(--t1);}'
-      + '.fm-chev{color:var(--t3);font-size:13px;flex-shrink:0;}'
-      + '.fm-sbody{padding:2px 18px 18px;}'
-      + '.fm-hds{font-size:12px;color:var(--t3);line-height:1.55;margin-bottom:14px;max-width:680px;}'
-      + '.fm-grid{display:grid;grid-template-columns:1fr;gap:12px;}'
+      + '.fm-hdt{font-size:15px;font-weight:700;color:var(--t1);}'
+      + '.fm-hds{font-size:12px;color:var(--t3);line-height:1.55;margin-top:3px;max-width:680px;}'
       + '.fm-tile{background:#0D181E;border:1px solid var(--b-edge);border-radius:var(--r2);padding:13px 15px;display:flex;flex-direction:column;min-width:0;}'
       + '.fm-tt{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;padding:3px 5px;margin:-3px -5px;border-radius:5px;transition:background .12s;}'
       + '.fm-tt:hover{background:#16242E;}'
