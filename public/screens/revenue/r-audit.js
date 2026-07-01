@@ -368,6 +368,7 @@ S.RevenueAudit = {
 
       // Row-per-record in core_events now; full audit history retained (the old
       // 12-audit blob cap is gone) and paged via "Show older" on the list.
+      App.dedupeAuditToday(App.data.revenue_audits, auditRecord);
       await App.putRecord('core', 'revenue_audit', auditRecord);
       App.markSetupDone('gs_r_audit');
 
