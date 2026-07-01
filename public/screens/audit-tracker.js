@@ -350,9 +350,9 @@ S.AuditTracker = {
   showHowTo() {
     App.showHelpModal('How the Profit Audit Works', [
       { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
-      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth. Your annual sales and a few operating-practice answers come from App Settings (Business Profile and Audit Setup). Set those once and every audit reads them.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth, and your annual sales come from your Business Profile in App Settings. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, an inventory count, hours logged, voids logged, cash reconciled, deliveries logged. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
-      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in App Settings, and answer the Audit Setup questions once. 3. Generate. Sections with no data show N/A and fill in as you log more.'] },
+      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in your Business Profile once. 3. Generate. Sections with no data show N/A and fill in as you log more.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you straight into Profit Fix on that exact gap. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Every score and dollar figure is computed in code from your real numbers, the same every time. A section with no data is left out, never guessed.'] }
     ]);
@@ -385,23 +385,14 @@ S.AuditTracker = {
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
-      const draftP = s.profit_practices || {};
-      // Convert the saved practices (dropdown strings) to the engine's shape. An
-      // unanswered question ('') is omitted so it has no effect on the score.
-      const practices = {};
-      if (draftP.pour_method)    practices.pour_method    = draftP.pour_method;
-      if (draftP.recipes_costed) practices.recipes_costed = draftP.recipes_costed;
-      if (draftP.inv_freq)       practices.inv_freq       = draftP.inv_freq;
-      if (draftP.invoice_vs_po)  practices.invoice_vs_po  = draftP.invoice_vs_po;
-      if (draftP.backup_vendors) practices.backup_vendors = draftP.backup_vendors;
-      if (draftP.void_approval === 'true' || draftP.void_approval === 'false') practices.void_approval = draftP.void_approval === 'true';
-      if (draftP.drawer_recon === 'true' || draftP.drawer_recon === 'false')   practices.drawer_recon  = draftP.drawer_recon === 'true';
-
+      // Honest-by-construction: the audit scores solely on what Bar Cop measures
+      // from real data (Control + weekly numbers). No self-reported operating
+      // practices feed the score. A manager cannot inflate the number an owner
+      // relies on by claiming a practice they do not actually follow.
       const auditAppData = JSON.parse(JSON.stringify(App.data));
 
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
-      form.append('practices', JSON.stringify(practices));
       const controlData = this.buildControlData();
       if (controlData) form.append('controlData', JSON.stringify(controlData));
 
