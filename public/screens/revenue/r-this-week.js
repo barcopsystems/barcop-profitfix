@@ -154,7 +154,7 @@ S.RevenueThisWeek = {
   },
 
   showHowTo() {
-    App.showHelpModal('How This Week Works', [
+    App.showHelpModal('How Run This Week Works', [
       { p: ['This is the weekly revenue confirm. Bar Cop pulls the week in from Control: revenue and covers from your weekly POS sales import in Shift, hours and cost from Labor Control. You read the money picture up top, confirm the numbers, and save.'] },
       { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 15 - Jun 21. This Week opens on the current week, tagged NOW. Step back with the arrows to review or correct an earlier week, and This Week snaps you back. The numbers always reflect the selected week. Stepping to a week you already saved loads it back for editing, and saving updates that week instead of creating a new one. A small marker by the selector tells you where the week stands: Building from your logs while it is still a draft, or Saved once you have closed it out.'] },
       { h: 'The Money Picture', p: ['Total revenue, how the week tracked versus your forecast, check average against target, labor percent against target, and revenue per labor hour, all live as you confirm the numbers.'] },
