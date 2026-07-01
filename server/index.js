@@ -9,6 +9,7 @@ const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
 const { computeProfitAudit, computeRevenueAudit } = require('./audit-compute');
+const { profitNarrative, revenueNarrative } = require('./audit-narrative');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -116,7 +117,7 @@ async function generateProfitAudit(apiKey, files, appData, practices, controlDat
   // Stamp identifiers code owns (not the model).
   numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
   numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateProfitNarrative(apiKey, numbers);
+  const prose = profitNarrative(numbers);   // code-generated findings, no API
   // Computed numbers win over anything the model echoed back.
   return Object.assign({}, prose, numbers);
 }
@@ -240,7 +241,7 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
   const numbers = computeRevenueAudit(appData, controlData, extracted);
   numbers.AUDIT_ID = 'RFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
   numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
-  const prose = await generateRevenueNarrative(apiKey, numbers);
+  const prose = revenueNarrative(numbers);   // code-generated findings, no API
   return Object.assign({}, prose, numbers);
 }
 
