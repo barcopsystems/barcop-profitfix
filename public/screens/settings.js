@@ -430,6 +430,19 @@ S.HubSettings = {
     App.data.settings.annual_bar_revenue = 624000;
     App.data.settings.annual_food_revenue= 374400;
     App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, labor_cost_pct:30, prime_cost_pct:60 };
+    // Audit Setup answers (App Settings -> Audit Setup). The operating practices
+    // the two recovery audits read but no report shows. Seeded to the Anchor's
+    // profile: a disciplined craft-cocktail bar and bistro ninety days into its
+    // recovery. Bool answers are 'true'/'false' strings to match what the panel
+    // saves and what generateAudit reads.
+    App.data.settings.profit_practices = {
+      pour_method:'Jiggered/measured', recipes_costed:'all', inv_freq:'Weekly',
+      void_approval:'true', drawer_recon:'true', invoice_vs_po:'Spot checked'
+    };
+    App.data.settings.revenue_practices = {
+      pre_shift:'every', upsell_standard:'true', private_dining_min:'true',
+      menu_engineered:'true', last_price_increase:'within_6mo', labor_to_forecast:'true'
+    };
     App.data.settings.onboarding_complete= true;
 
     // ── Bar Products ──

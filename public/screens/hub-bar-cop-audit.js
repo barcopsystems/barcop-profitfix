@@ -817,6 +817,32 @@ S.HubBarCopAudit = {
   // and the Audit History data-card. This audit reads from logged data (no upload),
   // so the request card shows only a countdown when locked, and the history hides
   // the Data Quality (upload tier) column.
+  // The data slices the Bar Cop Audit reads across the whole operation, one per
+  // sub-score. Each auto-checks off once Bar Cop has it, or taps through to the
+  // step that fills it.
+  _readinessSteps() {
+    const pAud = ((App.data && App.data.audits) || []).length >= 1;
+    const rAud = ((App.data && App.data.revenue_audits) || []).length >= 1;
+    const _spanDays = arr => {
+      const ds = (arr || []).map(r => r && (r.date || r.week_start)).filter(Boolean).sort();
+      return ds.length ? (new Date(ds[ds.length - 1] + 'T00:00:00') - new Date(ds[0] + 'T00:00:00')) / 86400000 : 0;
+    };
+    const invDone   = (((App.inventoryData && App.inventoryData.ic_counts) || []).length) >= 2;
+    const laborDone = _spanDays((App.laborData && App.laborData.lc_actuals) || []) >= 13;
+    const shiftDone = _spanDays((App.shiftData && App.shiftData.sc_shifts) || []) >= 13;
+    return [
+      { label: 'Profit Audit run',            done: pAud,      go: 'audit-tracker' },
+      { label: 'Revenue Audit run',           done: rAud,      go: 'r-audit' },
+      { label: 'Two inventory counts taken',  done: invDone,   go: 'ic-take-inventory' },
+      { label: 'Two weeks of labor hours logged', done: laborDone, go: 'lc-log-hours' },
+      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'sc-dashboard' }
+    ];
+  },
+
+  onGenerate() {
+    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this._generate(); });
+  },
+
   renderMain() {
     const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0] || null;
@@ -828,30 +854,11 @@ S.HubBarCopAudit = {
     const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
     const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
 
-    const desc = 'Generate a new audit every week. It reads your trailing 30 days.';
-
-    const pAud = ((App.data && App.data.audits) || []).length >= 1;
-    const rAud = ((App.data && App.data.revenue_audits) || []).length >= 1;
-    const _spanDays = arr => {
-      const ds = (arr || []).map(r => r && (r.date || r.week_start)).filter(Boolean).sort();
-      return ds.length ? (new Date(ds[ds.length - 1] + 'T00:00:00') - new Date(ds[0] + 'T00:00:00')) / 86400000 : 0;
-    };
-    const invDone   = (((App.inventoryData && App.inventoryData.ic_counts) || []).length) >= 2;
-    const laborDone = _spanDays((App.laborData && App.laborData.lc_actuals) || []) >= 13;
-    const shiftDone = _spanDays((App.shiftData && App.shiftData.sc_shifts) || []) >= 13;
-    const bcReady = pAud && rAud && invDone && laborDone && shiftDone && enough;
+    const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Get these in, then run it. Reads your trailing 30 days, once a week.';
 
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.firstAuditCard({ pfx: 'bca', title: 'Bar Cop Audit', desc, canRun, hasLatest: !!latest, daysLeft, opts: { lockedNoInputs: true, notReady: !enough },
-          gs: { mode: 'auto', ready: bcReady,
-            intro: 'The Bar Cop Audit scores how disciplined your whole operation runs, across cost control, cash, inventory, labor, and recovery. It reads your own logged data, so get these going and it unlocks.',
-            steps: [
-              { label: 'Run your Profit Audit', done: pAud, go: 'audit-tracker' },
-              { label: 'Run your Revenue Audit', done: rAud, go: 'r-audit' },
-              { label: 'Take 2 inventory counts', done: invDone, go: 'ic-take-inventory' },
-              { label: 'Log 2 weeks of labor hours', done: laborDone, go: 'lc-log-hours' },
-              { label: 'Import 2 weeks of POS sales', done: shiftDone, go: 'sc-dashboard' }
-            ] } })
+      + AuditUI.readinessCard({ pfx: 'bca', title: 'Bar Cop Audit', desc,
+          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
       + '</div>';
@@ -859,7 +866,7 @@ S.HubBarCopAudit = {
     // Landing has no screen-specific topbar actions.
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
-    document.getElementById('bca-new-btn')?.addEventListener('click', () => this._generate());
+    document.getElementById('bca-gen-btn')?.addEventListener('click', () => this.onGenerate());
     AuditUI.wireFirstAudit(this.container);
     this.container.querySelectorAll('.bca-view-btn').forEach(btn => {
       btn.addEventListener('click', () => this._viewAuditByIdx(parseInt(btn.dataset.idx, 10)));

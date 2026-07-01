@@ -346,130 +346,13 @@ S.AuditTracker = {
   // Findings text now renders inline under each section via findingsBlock()
   // inside the sectionBlock helper in viewAudit().
 
-  // ── Stepped intake wizard ─────────────────────────────────────────────────
-  _intakeStep: 1,
-  _intakeDraft: null,
-
-  showIntakeForm() {
-    this._intakeStep = 1;
-    // Pre-fill from Hub Settings if available so the operator only types
-    // these numbers once across the whole platform (per the "Bar Cop knows
-    // this already" rule). They can still override before running the audit.
-    const s = App.data?.settings || {};
-    // Operating practices persist across audits. They pre-fill from last time
-    // so the operator just updates what changed (e.g. Free pour -> Jiggered)
-    // and watches the score move. Defaults describe an uncontrolled operation.
-    const p = s.profit_practices || {};
-    // Stored as dropdown strings. Unanswered = '' so a brand-new audit starts
-    // every question on "Select Answer" and an unanswered question has zero
-    // effect on the score. Returning audits pre-fill the operator's last
-    // answers so they only change what improved.
-    const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
-    this._intakeDraft = {
-      barRev:  s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '',
-      foodRev: s.annual_food_revenue != null ? String(s.annual_food_revenue) : '',
-      practices: {
-        pour_method:    p.pour_method    || '',
-        recipes_costed: p.recipes_costed || '',
-        inv_freq:       p.inv_freq       || '',
-        void_approval:  boolStr(p.void_approval),
-        drawer_recon:   boolStr(p.drawer_recon),
-        invoice_vs_po:  p.invoice_vs_po  || '',
-        backup_vendors: p.backup_vendors || ''
-      }
-    };
-    this.actions.innerHTML = '';
-    this.renderIntake();
-  },
-
-  // Single-page Profit intake. Revenue is the only required input; every upload
-  // is optional because an operator running Control already has the data, and
-  // the slots map 1:1 to the sections computeProfitAudit scores.
-  renderIntake() {
-    const d = this._intakeDraft || {};
-    document.getElementById('topbar-sub').textContent = '';
-    // The form is always viewable so the operator can review/update inputs. The
-    // weekly cadence gates only the Generate action.
-    const _a = (App.data.audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
-    const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = _since >= 7;
-    const daysLeft = canRun ? 0 : 7 - _since;
-
-    // Pills — every section the audit can pull from Control. Always listed:
-    // greyed until that data exists, gold-tint when Bar Cop is using it.
-    const cd = this.buildControlData();
-    const checks = [
-      { label: 'Bar Pour Cost',   ok: cd && cd.bar_cost_pct != null },
-      { label: 'Food Cost',       ok: cd && cd.food_cost_pct != null },
-      { label: 'Prime Cost',      ok: cd && cd.prime_cost_pct != null },
-      { label: 'Voids and Comps', ok: cd && cd.void_comp_count > 0 },
-      { label: 'Cash Variance',   ok: cd && cd.cash_reconciliations > 0 },
-      { label: 'Vendor Drift',    ok: cd && cd.deliveries_logged > 0 },
-      { label: 'Payroll / Labor', ok: cd && cd.labor_hours > 0 }
-    ];
-
-    const salesCard = AuditUI.formCard('Annual Sales',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + AuditUI.moneyField('at-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
-      + AuditUI.moneyField('at-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
-      + '</div>'
-      + AuditUI.intakeHasBlock('What Bar Cop Already Has', 'Highlighted sections pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.', checks));
-
-    const uploadCard = AuditUI.formCard('Your Reports',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Optional. Drop in a report to score a section Bar Cop cannot see yet. One drop zone takes them all.</div>'
-      + FileDrop.render('at-drop', { items: [
-          { t: 'Profit and Loss or Monthly Sales Summary', s: 'Scores Bar Cost, Food Cost and Prime Cost (revenue, COGS and labor in one report).' },
-          { t: 'Voids, Comps and Cash Report',             s: 'Scores Theft and Loss (void and comp rate, unapproved voids, cash variance).' },
-          { t: 'Invoices and Vendor Pricing',              s: 'Scores Vendor Control (invoice matching, price drift).' },
-          { t: 'Recipe Costing Sheet',                     s: 'Adds repricing opportunities ranked by dollar impact, and recipe coverage.', hi: true },
-          { t: 'Inventory Count Sheets (Bar and Kitchen)', s: 'Adds per-product pour and food cost variance.' }
-        ] }));
-
-    // Operating-practice questions. Answers persist and pre-fill the next audit.
-    const pr = d.practices || {};
-    const questionsCard = AuditUI.formCard('A Few Quick Questions',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your scores and are not in your reports. Answer what applies; the rest carry over to next time.</div>'
-      + AuditUI.intakeQRow('at', 'How do you pour spirits?', 'pour_method', [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']], pr.pour_method)
-      + AuditUI.intakeQRow('at', 'Are your recipes costed?', 'recipes_costed', [['none','None'],['some','Some'],['all','All']], pr.recipes_costed)
-      + AuditUI.intakeQRow('at', 'How often do you count inventory?', 'inv_freq', [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']], pr.inv_freq)
-      + AuditUI.intakeQRow('at', 'Manager approval on voids and comps?', 'void_approval', [['false','No'],['true','Yes']], pr.void_approval)
-      + AuditUI.intakeQRow('at', 'Drawer reconciled every shift?', 'drawer_recon', [['false','No'],['true','Yes']], pr.drawer_recon)
-      + AuditUI.intakeQRow('at', 'Invoices matched to orders?', 'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']], pr.invoice_vs_po));
-
-    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('at') + '</div>';
-    FileDrop.attach('at-drop');
-
-    document.getElementById('at-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
-    document.getElementById('at-iz-submit')?.addEventListener('click', () => {
-      const barRev = parseFloat(document.getElementById('at-iz-bar-rev')?.value) || 0;
-      const foodRev = parseFloat(document.getElementById('at-iz-food-rev')?.value) || 0;
-      if (barRev === 0 && foodRev === 0) {
-        const st = document.getElementById('at-iz-status');
-        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one sales figure to run the audit.'; }
-        return;
-      }
-      this._intakeDraft.barRev = document.getElementById('at-iz-bar-rev')?.value || '';
-      this._intakeDraft.foodRev = document.getElementById('at-iz-food-rev')?.value || '';
-      const val = id => (document.getElementById('at-q-' + id) || {}).value || '';
-      this._intakeDraft.practices = {
-        pour_method:    val('pour_method'),
-        recipes_costed: val('recipes_costed'),
-        inv_freq:       val('inv_freq'),
-        void_approval:  val('void_approval'),
-        drawer_recon:   val('drawer_recon'),
-        invoice_vs_po:  val('invoice_vs_po'),
-        backup_vendors: val('backup_vendors')
-      };
-      this.generateAudit();
-    });
-  },
 
   showHowTo() {
     App.showHelpModal('How the Profit Audit Works', [
       { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
-      { h: 'What Bar Cop already has', p: ['If you run the Inventory, Shift, and Labor Control systems, those numbers feed the audit automatically as verified ground truth. A brand-new operation has none yet, so this first audit reads from what you enter and upload.'] },
-      { h: 'The steps', p: ['1. Enter your annual sales (the dollar baseline). A bar with no kitchen leaves Food blank.', '2. Upload any reports that cover a section Bar Cop cannot see yet (a P&L covers Bar, Food, and Prime in one file).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in as you log more.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth. Your annual sales and a few operating-practice answers come from App Settings (Business Profile and Audit Setup). Set those once and every audit reads them.'] },
+      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, an inventory count, hours logged, voids logged, cash reconciled, deliveries logged. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
+      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in App Settings, and answer the Audit Setup questions once. 3. Generate. Sections with no data show N/A and fill in as you log more.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you straight into Profit Fix on that exact gap. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Every score and dollar figure is computed in code from your real numbers, the same every time. A section with no data is left out, never guessed.'] }
     ]);
