@@ -995,7 +995,7 @@ S.HubBarCopAudit = {
     // (their recoverable-strip slot), then Top Operational Exposures (this audit's
     // "what to act on"), the six sub-scores, and Recurring Patterns.
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.viewHero(audit, 'Bar Cop Audit', 'bca')
+      + AuditUI.viewHero(audit, 'Bar Cop Audit', 'bca', this.SECTION_NAMES.length)
       + naNote
       + recoveryStrip
       + exposureCard

@@ -10,15 +10,6 @@
    revenue / 'ca' cash). Built off the Profit audit (audit-tracker.js). */
 const AuditUI = {
 
-  // Data-quality tier badge — app colors only (gold-tint full / neutral else).
-  tierChip(grade) {
-    if (!grade) return '';
-    const full = grade.includes('3') || grade.toLowerCase().includes('full') || grade.toLowerCase().includes('complete');
-    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;'
-      + (full ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">' + esc(grade) + '</span>';
-  },
-
   // ── Landing: request card ─────────────────────────────────────────────────
   // opts.lockedNoInputs: this audit reads from logged data (no intake to edit),
   //   so when locked show only the countdown, never a "Review / Update Inputs".
@@ -200,7 +191,7 @@ const AuditUI = {
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
       + '<div style="margin-top:16px;">' + secRows + '</div>'
-      + '<div style="display:flex;justify-content:flex-end;margin-top:14px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
+      + '<div style="display:flex;justify-content:flex-end;margin-top:20px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
       + '</div>';
   },
 
@@ -246,7 +237,7 @@ const AuditUI = {
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list">'
       + '<colgroup><col style="width:24%;"><col style="width:14%;"><col style="width:16%;"><col style="width:28%;"><col style="width:18%;"></colgroup>'
-      + '<thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
+      + '<thead><tr><th>Audit Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', listKey, audits, false);
   },
@@ -349,8 +340,9 @@ const AuditUI = {
   // ── Full view: score hero — full-bleed divider header (title left, Briefing
   //    right), then bar name + period + grade badge on the left and the overall
   //    score + band on the right. ──────────────────────────────────────────────
-  viewHero(audit, heroLabel, pfx) {
+  viewHero(audit, heroLabel, pfx, sectionCount) {
     const naO = audit.overall_score == null;
+    const dqChip = AuditUI.dataQualityChip(audit, sectionCount);
     const scoreColor = naO ? 'var(--t3)' : App.scoreColor(audit.overall_score||0);
     const scoreLabel = naO ? '' : App.scoreLabel(audit.overall_score);
     const sub = (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '');
@@ -363,7 +355,7 @@ const AuditUI = {
       + '<div>'
       + '<div style="font-size:20px;font-weight:800;color:var(--t1);">' + esc(audit.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + sub + '</div>'
-      + (audit.grade ? '<div style="margin-top:10px;">' + AuditUI.tierChip(audit.grade) + '</div>' : '')
+      + (dqChip ? '<div style="margin-top:10px;">' + dqChip + '</div>' : '')
       + '</div>'
       + (naO
           ? '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:4px;">Not enough data yet</div></div>'
