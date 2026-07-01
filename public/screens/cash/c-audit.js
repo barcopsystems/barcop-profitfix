@@ -300,9 +300,6 @@ S.CashAudit = {
   viewAudit(idx) {
     const audit = this.audits()[idx];
     if (!audit) return;
-    // Badge for cohesion with the Bar Cop audit. Default it for older seeded
-    // audits that predate the grade so the badge always shows.
-    if (!audit.grade) audit.grade = 'Complete Cash Analysis';
     this.actions.innerHTML = '';
     const back = document.createElement('button'); back.className = 'btn btn-ghost btn-sm'; back.textContent = '← Back'; back.style.marginRight = '8px'; back.onclick = () => this.renderMain(); this.actions.appendChild(back);
     const pr = document.createElement('button'); pr.className = 'btn btn-ghost btn-sm'; pr.textContent = 'Print / Save PDF'; pr.onclick = () => this.exportPDF(audit); this.actions.appendChild(pr);
@@ -369,9 +366,10 @@ S.CashAudit = {
     if (!audit) return;
     try { await App._ensurePDFLib(); } catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
     const d = audit.raw || {};
-    const b = App._pdfBuilder('Cash Recovery Audit');
-    b.header({ right: 'Cash Recovery Audit' });
-    b.paragraph((audit.bar_name || 'Your Bar') + '  |  ' + (audit.date || '') + '  |  Overall ' + (audit.overall_score != null ? audit.overall_score : 'N/A'), { gray: 55 });
+    const b = App._pdfBuilder('Cash Audit');
+    b.header({ right: 'Cash Audit' });
+    const dq = AuditUI.dataQualityLabel(audit, this.SECTION_NAMES.length);
+    b.paragraph((audit.bar_name || 'Your Bar') + '  |  ' + (audit.date || '') + '  |  Overall ' + (audit.overall_score != null ? audit.overall_score : 'N/A') + (dq ? '  |  ' + dq : ''), { gray: 55 });
     if (audit.cash_to_free > 0) { b.spacer(4); b.heading('Cash to Free: ' + App.fmtCurrency(audit.cash_to_free), 13); }
     if ((audit.action_items || []).length) { b.spacer(4); b.sectionTitle('Action Items'); audit.action_items.forEach((a, i) => b.paragraph((i + 1) + '. ' + a.action, { gray: 55 })); }
     this.SECTION_NAMES.forEach((nm, i) => {
@@ -386,7 +384,7 @@ S.CashAudit = {
     const f = App.deliverableFooter();
     b.disclaimer(f.workbookSubject);
     const venue = (App.data && App.data.settings && App.data.settings.bar_name) || 'Bar Cop';
-    await b.save(venue + ' - Cash Recovery Audit - ' + (audit.date || ''));
+    await b.save(venue + ' - Cash Audit - ' + (audit.date || ''));
   },
 
   showHowTo() {
