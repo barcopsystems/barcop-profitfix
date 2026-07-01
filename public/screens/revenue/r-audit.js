@@ -299,128 +299,13 @@ S.RevenueAudit = {
     await b.save('BarCop_RevenueAudit_' + stamp + '.pdf');
   },
 
-  // ── Stepped intake wizard ─────────────────────────────────────────────────
-  _intakeStep: 1,
-  _intakeDraft: null,
-
-  // ── Stepped intake wizard ─────────────────────────────────────────────────
-  _intakeStep: 1,
-  _intakeDraft: null,
-
-  showIntakeForm() {
-    this._intakeStep = 1;
-    // Pre-fill Annual Bar/Food Revenue. Priority: Hub Settings → 12-week
-    // revenue_weeks average × 52 → empty. Operator can override.
-    const s = App.data?.settings || {};
-    let barRev  = s.annual_bar_revenue  != null ? String(s.annual_bar_revenue)  : '';
-    let foodRev = s.annual_food_revenue != null ? String(s.annual_food_revenue) : '';
-    if (!barRev || !foodRev) {
-      const weeks = (App.data?.revenue_weeks || [])
-        .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-12);
-      if (weeks.length >= 1) {
-        const avgBar  = weeks.reduce((s, w) => s + (parseFloat(w.bar_revenue)   || 0), 0) / weeks.length;
-        const avgFood = weeks.reduce((s, w) => s + (parseFloat(w.floor_revenue) || 0), 0) / weeks.length;
-        if (!barRev  && avgBar  > 0) barRev  = String(Math.round(avgBar  * 52));
-        if (!foodRev && avgFood > 0) foodRev = String(Math.round(avgFood * 52));
-      }
-    }
-    const p = s.revenue_practices || {};
-    const boolStr = v => v === true ? 'true' : v === false ? 'false' : (v || '');
-    this._intakeDraft = {
-      barRev, foodRev,
-      practices: {
-        pre_shift:          p.pre_shift || '',
-        upsell_standard:    boolStr(p.upsell_standard),
-        private_dining_min: boolStr(p.private_dining_min),
-        menu_engineered:    boolStr(p.menu_engineered),
-        last_price_increase: p.last_price_increase || '',
-        labor_to_forecast:  boolStr(p.labor_to_forecast)
-      }
-    };
-    this.actions.innerHTML = '';
-    this.renderIntake();
-  },
-
-  // Single-page Revenue intake (replaces the 6-step wizard). Mirrors the Profit
-  // pattern: revenue baseline + "what Bar Cop already has" + code-mapped upload
-  // slots + practice questions (Select Answer = no score impact), no notes.
-  renderIntake() {
-    const d = this._intakeDraft || {};
-    document.getElementById('topbar-sub').textContent = '';
-    // Form viewable anytime; the weekly cadence gates only Generate.
-    const _a = (App.data.revenue_audits || []).slice().sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
-    const _since = _a[0] && _a[0].date ? Math.floor((Date.now() - new Date(_a[0].date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = _since >= 7;
-    const daysLeft = canRun ? 0 : 7 - _since;
-
-    const cd = this.buildControlData();
-    const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
-    const checks = [
-      { label: 'Check Average',  ok: cd && cd.check_average != null },
-      { label: 'Labor and RPLH', ok: cd && (cd.labor_pct_blended != null || cd.rplh_blended != null) },
-      { label: 'Menu Mix',       ok: costedMenu.length >= 4 },
-      { label: 'Server Spread',  ok: (App.data.revenue_server_checks || []).length >= 3 },
-      { label: 'Events',         ok: (App.data.bookings || []).length > 0 }
-    ];
-
-    const salesCard = AuditUI.formCard('Annual Sales',
-      '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">Sets the dollar baselines for the audit. Enter at least one; leave Food blank if you run no kitchen.</div>'
-      + '<div class="form-row" style="gap:16px;">'
-      + AuditUI.moneyField('ra-iz-bar-rev', 'Annual Bar Sales', '618000', d.barRev)
-      + AuditUI.moneyField('ra-iz-food-rev', 'Annual Food Sales', '372000', d.foodRev)
-      + '</div>'
-      + AuditUI.intakeHasBlock('What Bar Cop Already Has', 'Highlighted areas pull from your Control data automatically. The greyed ones fill in as you log them, or from an upload below.', checks));
-
-    const uploadCard = AuditUI.formCard('Your Reports',
-      FileDrop.render('ra-drop', { items: [
-          { t: 'POS Sales Summary',          s: 'Scores Check Average (revenue, covers, blended check average).' },
-          { t: 'Server Sales Report',        s: 'Scores Server Performance (check average by server, spread, top and bottom).', hi: true },
-          { t: 'Menu Sales Mix and Pricing', s: 'Scores Menu Performance (Stars, Plowhorses, Dogs, pricing).' },
-          { t: 'Labor Schedule or Payroll',  s: 'Scores Labor Efficiency (labor percent, RPLH, overtime).' },
-          { t: 'Event and Catering Records', s: 'Scores Events and Private Dining (event revenue, frequency).' }
-        ] }));
-
-    const pr = d.practices || {};
-    const questionsCard = AuditUI.formCard('A Few Quick Questions',
-      AuditUI.intakeQRow('ra', 'Pre-shift briefing held?', 'pre_shift', [['never','Never'],['sometimes','Sometimes'],['every','Every shift']], pr.pre_shift)
-      + AuditUI.intakeQRow('ra', 'Server upsell standard taught and tracked?', 'upsell_standard', [['false','No'],['true','Yes']], pr.upsell_standard)
-      + AuditUI.intakeQRow('ra', 'Private dining package with a spend minimum?', 'private_dining_min', [['false','No'],['true','Yes']], pr.private_dining_min)
-      + AuditUI.intakeQRow('ra', 'Menu repriced or engineered in last 6 months?', 'menu_engineered', [['false','No'],['true','Yes']], pr.menu_engineered)
-      + AuditUI.intakeQRow('ra', 'When did you last raise menu prices?', 'last_price_increase', [['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']], pr.last_price_increase)
-      + AuditUI.intakeQRow('ra', 'Labor scheduled to a sales forecast?', 'labor_to_forecast', [['false','No'],['true','Yes']], pr.labor_to_forecast));
-
-    this.container.innerHTML = '<div class="screen">' + salesCard + uploadCard + questionsCard + AuditUI.intakeSubmit('ra') + '</div>';
-    FileDrop.attach('ra-drop');
-
-    document.getElementById('ra-iz-cancel')?.addEventListener('click', () => { document.getElementById('topbar-sub').textContent = ''; this.renderMain(); });
-    document.getElementById('ra-iz-submit')?.addEventListener('click', () => {
-      const barRev = parseFloat(document.getElementById('ra-iz-bar-rev')?.value) || 0;
-      const foodRev = parseFloat(document.getElementById('ra-iz-food-rev')?.value) || 0;
-      if (barRev === 0 && foodRev === 0) {
-        const st = document.getElementById('ra-iz-status');
-        if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'Enter at least one sales figure to run the audit.'; }
-        return;
-      }
-      this._intakeDraft.barRev = document.getElementById('ra-iz-bar-rev')?.value || '';
-      this._intakeDraft.foodRev = document.getElementById('ra-iz-food-rev')?.value || '';
-      const val = id => (document.getElementById('ra-q-' + id) || {}).value || '';
-      this._intakeDraft.practices = {
-        pre_shift:          val('pre_shift'),
-        upsell_standard:    val('upsell_standard'),
-        private_dining_min: val('private_dining_min'),
-        menu_engineered:    val('menu_engineered'),
-        last_price_increase: val('last_price_increase'),
-        labor_to_forecast:  val('labor_to_forecast')
-      };
-      this.generateAudit();
-    });
-  },
 
   showHowTo() {
     App.showHelpModal('How the Revenue Audit Works', [
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
-      { h: 'What Bar Cop already has', p: ['If you log weekly numbers, schedules, menu items, and servers in Bar Cop, those feed the audit automatically. A new operation reads from what you enter and upload here instead.'] },
-      { h: 'The steps', p: ['1. Enter your annual sales (the dollar baseline).', '2. Upload any reports for a section Bar Cop cannot see yet (a POS sales summary covers Check Average, a server sales report covers Server Performance, and so on).', '3. Answer the quick questions about how you operate.', '4. Generate. Sections with no data show N/A and fill in over time.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically. Your annual sales and a few operating-practice answers come from App Settings (Business Profile and Audit Setup). Set those once and every audit reads them.'] },
+      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, hours logged, menu items priced with covers, server checks logged, and events booked. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
+      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in App Settings, and answer the Audit Setup questions once. 3. Generate. Sections with no data show N/A and fill in over time.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
     ]);
