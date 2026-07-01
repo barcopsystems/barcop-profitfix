@@ -159,8 +159,7 @@ S.Dashboard = {
     const rows = this._costRows(latest);
     const mini = (label, r) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (r.val == null ? 'var(--t3)' : r.over ? 'var(--red)' : 'var(--green)') + ';">' + (r.val == null ? '-' : App.fmtPct(r.val)) + '</div>'
-      + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">target ' + App.fmtPct(r.tgt) + '</div></div>';
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (r.val == null ? 'var(--t3)' : r.over ? 'var(--red)' : 'var(--green)') + ';">' + (r.val == null ? '-' : App.fmtPct(r.val)) + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
     return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       + mini('Bar Pour Cost', rows[0]) + vdiv + mini('Food Cost', rows[1]) + vdiv + mini('Prime Cost', rows[2])
