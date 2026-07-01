@@ -6,8 +6,8 @@
    week's cash steps top to bottom. The one difference Kyle called for is the
    Recovery Scoreboard hero (the trapped-cash money number); everything below it
    is the end-of-week cash routine, done quickly in the weekly sit-down. The four
-   steps are the four Cash Fix Systems: free trapped cash, order to par, stay
-   ahead of the week, pay on terms. Quick reads land inline; the deep work
+   steps: run the Cash audit, free up cash in inventory (trapped stock then order
+   to par), stay ahead of the week, pay on terms. Quick reads land inline; the deep work
    launches into the screen that already does it (Dynamic Pars, the Order Sheet,
    Books). Every number is computed from real data by CashEngine. */
 
@@ -21,7 +21,7 @@ S.CashDashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Cash. Cash is the third lever Bar Cop watches: Profit is your margin, Revenue is your top line, Cash is your liquidity, the money actually in the account. Plenty of bars look fine on paper and still run tight, and this is where you catch it.'] },
       { h: 'Where You Stand', p: ['Up top is your trapped cash: working capital sitting on the shelf in dead stock and overstock instead of in your account. As you free it up, the number comes down and Cash Freed tracks what you put back. It reads off your counts, so it sharpens as you count.', 'Under it is the survival read, will you make it to next quarter: your runway, the tightest week ahead, and what is actually safe to spend, projected thirteen weeks out. Set your opening balance in Cash Position to make the runway real, and if you keep a line of credit, enter it on the Cash Forecast and the runway counts it as your backstop.'] },
-      { h: 'The Steps', p: ['The week starts by running your Cash audit, then works the four Cash Fix Systems. 1. Run the Cash audit: score the week and update your Cash Fix. 2. Free up trapped cash: run down the dead stock and cut pars that are too high. 3. Order to par: buy what you use, not what you fear, so cash stops piling up on the shelf. 4. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 5. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
+      { h: 'The Steps', p: ['The week starts by running your Cash audit, then works your cash where it is stuck. 1. Run the Cash audit: score the week and update your Cash Fix. 2. Free up cash in inventory: run down the dead stock and overstock, then order to par so cash stops piling up on the shelf. 3. Stay ahead of the week: look at what is going out (bills, buys, labor) against what is coming in, and catch a tight day before it bites. 4. Pay on terms: hold cash to the vendor due date and take any early-pay discount.'] },
       { h: 'Working A Step', p: ['Open a step to read the numbers, then launch into the screen that does the work and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week. None of this is daily, it is the weekly sit-down.'] }
     ]);
   },
@@ -53,13 +53,12 @@ S.CashDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  ORDER: ['audit', 'trapped', 'order', 'week', 'terms'],
+  ORDER: ['audit', 'trapped', 'week', 'terms'],
   _META: {
-    audit:   { n: 1, title: 'Run the Cash audit',        sub: 'Score the week and update your Cash Fix' },
-    trapped: { n: 2, title: 'Free up trapped cash',      sub: 'Dead stock and overstock to run down' },
-    order:   { n: 3, title: 'Order to par, not to fear', sub: 'Buy what you use, not what you fear' },
-    week:    { n: 4, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
-    terms:   { n: 5, title: 'Pay on terms',              sub: 'Hold cash to the vendor due date' }
+    audit:   { n: 1, title: 'Run the Cash audit',       sub: 'Score the week and update your Cash Fix' },
+    trapped: { n: 2, title: 'Free up cash in inventory', sub: 'Run down trapped stock, then order to par' },
+    week:    { n: 3, title: 'Stay ahead of the week',    sub: 'What is going out versus coming in' },
+    terms:   { n: 4, title: 'Pay on terms',             sub: 'Hold cash to the vendor due date' }
   },
   // Cash steps are reviewed and acted on, then marked. Nothing auto-completes
   // off data (you cannot infer "I ran down the dead stock" from a number), so
@@ -301,13 +300,12 @@ S.CashDashboard = {
       return this._META.audit.sub;
     }
     if (k === 'trapped') {
-      if (!st.trapped.hasData) return this._META.trapped.sub;
-      return st.trapped.total > 0 ? App.fmtCurrency(st.trapped.total, 0) + ' to free up' : 'Nothing trapped right now';
-    }
-    if (k === 'order') {
-      if (!st.over.hasData) return this._META.order.sub;
-      const w = st.over.weeksOnHand;
-      return w != null ? w.toFixed(1) + ' weeks on hand' + (st.over.excess > 0 ? ', ' + App.fmtCurrency(st.over.excess, 0) + ' over' : '') : this._META.order.sub;
+      const t = st.trapped, o = st.over;
+      if (!t.hasData && (!o || !o.hasData)) return this._META.trapped.sub;
+      const parts = [];
+      if (t.hasData && t.total > 0) parts.push(App.fmtCurrency(t.total, 0) + ' to free up');
+      if (o && o.hasData && o.weeksOnHand != null) parts.push(o.weeksOnHand.toFixed(1) + ' weeks on hand' + (o.excess > 0 ? ', ' + App.fmtCurrency(o.excess, 0) + ' over' : ''));
+      return parts.length ? parts.join(' · ') : 'Inventory cash is moving';
     }
     if (k === 'week') {
       const sf = st.survival;
@@ -362,38 +360,34 @@ S.CashDashboard = {
     }
 
     if (k === 'trapped') {
-      const t = st.trapped;
-      if (!t.hasData) {
-        return explain('Bar Cop reads trapped cash off your counts. Take a couple of weekly counts and the dead stock and overstock show up here with the dollars you can free.')
+      const t = st.trapped, o = st.over;
+      if (!t.hasData && (!o || !o.hasData)) {
+        return explain('Bar Cop reads the cash tied up in inventory off your counts. Take a couple of weekly counts and your dead stock, overstock, and weeks on hand show up here with the dollars you can free.')
           + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-take-inventory">Take Inventory</button>' + this.markBtn('trapped', 'Mark Done'));
       }
-      if (t.total <= 0) {
-        return explain('Nothing dead and nothing piled up above par worth chasing. Your shelf cash is moving.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Dead Stock</button>' + this.markBtn('trapped', 'Mark Done'));
+      // Part one: trapped stock (dead + over par) to run down.
+      let body = '';
+      if (t.hasData && t.total > 0) {
+        const rows = t.items.slice(0, 4).map(it => itemLine(
+          it.name + (it.kind === 'dead' ? ' (not moving)' : ' (over par)'),
+          App.fmtCurrency(it.free, 0))).join('');
+        body += explain('You have <strong style="color:var(--gold);">' + App.fmtCurrency(t.total, 0) + '</strong> trapped: ' + App.fmtCurrency(t.dead, 0) + ' in dead stock and ' + App.fmtCurrency(t.overPar, 0) + ' sitting above par. Run the dogs down, feature them, or cut the par so you stop reordering them.') + rows;
+      } else if (t.hasData) {
+        body += explain('Nothing dead and nothing piled up above par worth chasing. Your shelf cash is moving.');
       }
-      const rows = t.items.slice(0, 4).map(it => itemLine(
-        it.name + (it.kind === 'dead' ? ' (not moving)' : ' (over par)'),
-        App.fmtCurrency(it.free, 0))).join('');
-      return explain('You have <strong style="color:var(--gold);">' + App.fmtCurrency(t.total, 0) + '</strong> trapped: ' + App.fmtCurrency(t.dead, 0) + ' in dead stock and ' + App.fmtCurrency(t.overPar, 0) + ' sitting above par. Run the dogs down, feature them, or cut the par so you stop reordering them.')
-        + rows
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button><button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>' + this.markBtn('trapped', 'Mark Done'));
-    }
-
-    if (k === 'order') {
-      const o = st.over;
-      if (!o.hasData) {
-        return explain('Once you have two counts, Bar Cop shows how many weeks of inventory you are sitting on and flags the cash tied up beyond what you actually use.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Order Sheet</button>' + this.markBtn('order', 'Mark Done'));
+      // Part two: order to par, so you stop buying ahead of your use.
+      if (o && o.hasData) {
+        const w = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) : '-';
+        const orderLead = o.excess > 0
+          ? 'You are holding <strong style="color:var(--gold);">' + w + ' weeks</strong> of inventory against a ' + o.targetWeeks + '-week target, ' + App.fmtCurrency(o.excess, 0) + ' beyond what you use. Order to par this week, not to a number that feels safe.'
+          : 'You are holding ' + w + ' weeks of inventory, right in line with a ' + o.targetWeeks + '-week target. Keep ordering to par.';
+        const reorderLine = st.reorder.count > 0
+          ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Bringing everything to par this week runs <strong>' + App.fmtCurrency(st.reorder.total, 0) + '</strong> across ' + st.reorder.count + ' item' + (st.reorder.count === 1 ? '' : 's') + '.</div>'
+          : '';
+        body += (body ? '<div style="height:1px;background:var(--b2);margin:14px 0;"></div>' : '') + explain(orderLead) + reorderLine;
       }
-      const w = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) : '-';
-      const lead = o.excess > 0
-        ? 'You are holding <strong style="color:var(--gold);">' + w + ' weeks</strong> of inventory against a ' + o.targetWeeks + '-week target. That is ' + App.fmtCurrency(o.excess, 0) + ' tied up beyond what you use. Order to par this week, not to a number that feels safe.'
-        : 'You are holding ' + w + ' weeks of inventory, right in line with a ' + o.targetWeeks + '-week target. Keep ordering to par.';
-      const reorderLine = st.reorder.count > 0
-        ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Bringing everything to par this week runs <strong>' + App.fmtCurrency(st.reorder.total, 0) + '</strong> across ' + st.reorder.count + ' item' + (st.reorder.count === 1 ? '' : 's') + '.</div>'
-        : '';
-      return explain(lead) + reorderLine
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-purchasing">Purchasing</button><button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Order Sheet</button>' + this.markBtn('order', 'Mark Done'));
+      return body
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button><button class="btn btn-ghost btn-sm" data-go="c-purchasing">Purchasing</button><button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Order Sheet</button>' + this.markBtn('trapped', 'Mark Done'));
     }
 
     if (k === 'week') {

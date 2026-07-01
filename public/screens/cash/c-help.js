@@ -32,7 +32,7 @@ S.CashHelp = {
       { q: 'How does Bar Cop decide what is trapped?',
         a: 'Two ways, off your counts. Dead stock is product on the shelf that did not move at all between your last two counts, its full value is cash sitting still. Overstock is product you are holding well above its par, the cash tied up in the extra is money you did not need to spend yet. Bar Cop counts each product once so nothing double counts, and ranks them by the dollars you can free.' },
       { q: 'What do I actually do about it?',
-        a: 'Run the dogs down. Feature a dead bottle, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of what you use. The Free up trapped cash step takes you straight to the dead stock list and your pars, where that work happens.' }
+        a: 'Run the dogs down. Feature a dead bottle, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of what you use. The Free up cash in inventory step takes you straight to the dead stock list and your pars, where that work happens.' }
     ]},
     { t: 'Cash Flow', qa: [
       { q: 'How does the week-ahead read work?',
