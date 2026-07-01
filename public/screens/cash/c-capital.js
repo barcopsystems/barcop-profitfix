@@ -95,6 +95,8 @@ S.CashCapital = {
       + '</div>'
       + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;">'
       + note + '</div>'
+      // PDF-only summary (the day figures are styled spans the exporter skips).
+      + '<div class="pdf-para" style="display:none;">Product sits ' + days(c.dio) + '. You take ' + days(c.dpo) + ' to pay. Cash locked ' + days(c.cycle) + '. ' + note + '</div>'
       + '</div>';
   },
 
