@@ -29,8 +29,8 @@ S.CashTrapped = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   dataCard(rowsHtml) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
-      + this.COLS + '<thead><tr>' + this.HEADERS + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLS + '<thead><tr>' + this.HEADERS + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
   },
 
   rowHtml(it) {
