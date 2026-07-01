@@ -12,8 +12,7 @@ S.AuditTracker = {
     this.actions.innerHTML = '';
     const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest = audits[0] || null;
-    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
-    const canRun = g.canRun, daysLeft = g.daysLeft;
+    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
     const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'at', title: 'Profit Audit', desc,
@@ -358,7 +357,6 @@ S.AuditTracker = {
   },
 
   async generateAudit() {
-    if (App.demoBlock('Running an audit')) return;
     const btn      = document.getElementById('at-gen-btn');
     const statusEl = document.getElementById('at-gen-status');
     const setStatus = (msg, color='var(--t2)') => {

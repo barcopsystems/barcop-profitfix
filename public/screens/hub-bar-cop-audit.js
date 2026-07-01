@@ -850,10 +850,7 @@ S.HubBarCopAudit = {
   renderMain() {
     const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0] || null;
-    // Same unlock gate as the other three: locked 7 days from first use, then 7
-    // days after each run. Thin data is a warning at run time, not a hard lock.
-    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
-    const canRun = g.canRun, daysLeft = g.daysLeft;
+    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
 
     const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Get these in, then run it. Reads your trailing 30 days, once a week.';
 
