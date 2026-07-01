@@ -2971,6 +2971,13 @@ const App = {
     return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
   },
 
+  // Small neutral cadence tag for an import drop, so an operator can tell at a
+  // glance what belongs in the weekly sitting versus what is run on demand. The
+  // word carries the meaning; no color coding (stays inside the color system).
+  cadenceTag(text) {
+    return '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);border:1px solid var(--b-edge);border-radius:4px;padding:2px 7px;vertical-align:middle;white-space:nowrap;">' + esc(text || '') + '</span>';
+  },
+
   // Collapsed "+ Note" field. Replaces an always-open notes textarea on a form
   // with a small "+ Note" link that reveals a standard 2-row note box on click
   // (so an empty notes box stops eating vertical space on every form). Auto-opens
