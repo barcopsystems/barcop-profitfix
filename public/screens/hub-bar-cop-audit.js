@@ -797,9 +797,13 @@ S.HubBarCopAudit = {
 
   // ── Generate flow ───────────────────────────────────────────────────────
   async _generate() {
-    const gate = this._canRunAudit();
-    if (!gate.ok) return;
-    if (!this._hasEnoughData()) return;
+    // There is a hard floor below the readiness warning: with literally nothing
+    // logged there is nothing to score, so say so rather than fail silently.
+    if (!this._hasEnoughData()) {
+      const st = document.getElementById('bca-gen-status');
+      if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'No data to score yet. Log a week of Inventory, Shift, or Labor Control first.'; }
+      return;
+    }
     // Row-per-record in core_events now; full executive-audit history is kept
     // (the 12-audit blob cap is gone) and paged via "Show older" on the list.
     const snapshot = this._computeAuditSnapshot();
@@ -846,13 +850,10 @@ S.HubBarCopAudit = {
   renderMain() {
     const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0] || null;
-    const enough = this._hasEnoughData();
-
-    const daysSince = latest && latest.date
-      ? Math.floor((Date.now() - new Date(latest.date).getTime()) / 86400000)
-      : Infinity;
-    const canRun   = enough && daysSince >= this.AUDIT_INTERVAL_DAYS;
-    const daysLeft = (canRun || !enough) ? 0 : Math.max(0, this.AUDIT_INTERVAL_DAYS - daysSince);
+    // Same unlock gate as the other three: locked 7 days from first use, then 7
+    // days after each run. Thin data is a warning at run time, not a hard lock.
+    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
+    const canRun = g.canRun, daysLeft = g.daysLeft;
 
     const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Get these in, then run it. Reads your trailing 30 days, once a week.';
 

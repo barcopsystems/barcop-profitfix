@@ -117,7 +117,7 @@ const AuditUI = {
     const genBtn = cfg.canRun
       ? '<button class="btn btn-primary" id="' + cfg.pfx + '-gen-btn">' + label + '</button>'
       : '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">'
-        + (cfg.daysLeft > 0 ? 'Next audit in ' + cfg.daysLeft + ' day' + (cfg.daysLeft === 1 ? '' : 's') : label) + '</button>';
+        + (cfg.daysLeft > 0 ? (cfg.hasLatest ? 'Next audit in ' : 'Audit unlocks in ') + cfg.daysLeft + ' day' + (cfg.daysLeft === 1 ? '' : 's') : label) + '</button>';
     const rows = steps.map((s, i) =>
       '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:#0D181E;border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
       + (s.done

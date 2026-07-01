@@ -12,10 +12,8 @@ S.AuditTracker = {
     this.actions.innerHTML = '';
     const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest = audits[0] || null;
-    const daysSince = latest && latest.date
-      ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = daysSince >= 7;
-    const daysLeft = canRun ? 0 : 7 - daysSince;
+    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
+    const canRun = g.canRun, daysLeft = g.daysLeft;
     const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'at', title: 'Profit Audit', desc,
