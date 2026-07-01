@@ -340,7 +340,7 @@ S.CashAudit = {
     ].join('');
 
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.viewHero(audit, 'Cash Recovery Audit', 'ca')
+      + AuditUI.viewHero(audit, 'Cash Audit', 'ca', this.SECTION_NAMES.length)
       + this.cashStrip(audit)
       + AuditUI.actionsArea(audit, 'cash', 'ca')
       + sections
