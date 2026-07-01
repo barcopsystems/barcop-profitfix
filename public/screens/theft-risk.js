@@ -241,9 +241,9 @@ S.TheftRisk = {
     if (!invId) {
       const introDefs = v.stepsDef || this.VARIANCE_STEPS;
       const prev = introDefs.map((st, i) =>
-        '<div style="padding:9px 0;border-top:1px solid var(--b2);">'
+        '<div style="background:#0D181E;border-radius:var(--r2);padding:12px 14px;margin-bottom:8px;">'
         + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + (i + 1) + '. ' + esc(st.title) + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:2px;">' + esc(st.detail) + '</div></div>').join('');
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(st.detail) + '</div></div>').join('');
       card.innerHTML = '<div class="card-title">Open Investigation</div>'
         + '<div style="font-size:15px;font-weight:800;color:var(--t1);">' + esc(v.sku) + '</div>' + sub
         + '<div style="margin:12px 0 2px;">' + prev + '</div>'
