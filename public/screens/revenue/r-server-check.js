@@ -14,7 +14,6 @@
 S.RevenueServerCheck = {
   _calc: null,
   _entryId: null,
-  _editing: false,
   _saving: false,
   _form: null,
   _window: '30',
@@ -158,40 +157,62 @@ S.RevenueServerCheck = {
       + '</div></div>';
   },
 
-  // ── New Shift Check form ─────────────────────────────────────────────────────
-  renderForm(targetCA) {
-    const f = this._form;
+  // ── Shared form body (fields + live check-average box), id-prefixed so the
+  //    always-on New form (rsc) and the Edit modal (rscm) never clash. ──────────
+  formBody(f, targetCA, p) {
     const hasServers = this.staff().some(s => s.status !== 'Inactive' && App.isService && App.isService(s));
     const serverOpts = App.staffOptions(f.server || '', { audience: 'service', placeholder: hasServers ? 'Select server...' : 'Add Bar or Front of House staff in Labor Control' });
     const shiftOpts = (App.SHIFT_TYPES || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'])
       .map(tp => '<option' + (f.shift === tp ? ' selected' : '') + '>' + esc(tp) + '</option>').join('');
-    const editing = this._editing;
-    return '<div class="card form-card">'
-      + '<div class="card-title">' + (editing ? 'Edit Shift Check' : 'New Shift Check') + '</div>'
-      + (editing ? '' : '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">Log one server by hand here, or import a whole week of per-server checks at your <span class="rsc-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span>.</div>')
-      + '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">'
-        + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input class="form-input" type="date" id="rsc-date" value="' + esc(f.date || '') + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label><select class="form-input" id="rsc-shift">' + shiftOpts + '</select></div>'
-        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Server</label><select class="form-input" id="rsc-server">' + serverOpts + '</select></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Covers</label><input class="form-input" type="number" id="rsc-cov" value="' + esc(f.cov || '') + '"/></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rsc-sales" value="' + esc(f.sales || '') + '"/></div></div>'
+    return '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">'
+        + '<div class="f" style="width:148px;flex-shrink:0;"><label>Date</label><input class="form-input" type="date" id="' + p + '-date" value="' + esc(f.date || '') + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label><select class="form-input" id="' + p + '-shift">' + shiftOpts + '</select></div>'
+        + '<div class="f" style="width:220px;flex-shrink:0;"><label>Server</label><select class="form-input" id="' + p + '-server">' + serverOpts + '</select></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Covers</label><input class="form-input" type="number" id="' + p + '-cov" value="' + esc(f.cov || '') + '"/></div>'
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + p + '-sales" value="' + esc(f.sales || '') + '"/></div></div>'
       + '</div>'
-      + '<div id="rsc-result" style="margin-top:16px;">'
+      + '<div id="' + p + '-result" style="margin-top:16px;">'
         + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
           + '<div style="display:flex;align-items:center;gap:36px;flex-wrap:wrap;">'
-            + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="rsc-ca">-</div></div>'
+            + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="' + p + '-ca">-</div></div>'
             + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg" style="color:var(--t3);">$' + targetCA + '</div></div>'
-            + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val lg" id="rsc-var">-</div></div>'
-            + '<div style="margin-left:auto;"><div id="rsc-badge" style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;"></div></div>'
+            + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val lg" id="' + p + '-var">-</div></div>'
+            + '<div style="margin-left:auto;"><div id="' + p + '-badge" style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;"></div></div>'
           + '</div>'
         + '</div>'
-      + '</div>'
+      + '</div>';
+  },
+
+  // ── New Shift Check form (always-on, top of page; editing happens in a modal) ─
+  renderForm(targetCA) {
+    return '<div class="card form-card">'
+      + '<div class="card-title">New Shift Check</div>'
+      + this.formBody(this._form, targetCA, 'rsc')
       + '</div>'
       + '<div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="rsc-submit">' + (editing ? 'Update Check' : 'Log Check') + '</button>'
-      + (editing ? '<button class="btn btn-ghost" id="rsc-cancel">Cancel</button>' : '<button class="btn btn-ghost" id="rsc-startover">Start Over</button>')
+      + '<button class="btn btn-primary" id="rsc-submit">Log Check</button>'
+      + '<button class="btn btn-ghost" id="rsc-startover">Start Over</button>'
       + '<span id="rsc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
+  },
+
+  // Edit a logged check in a modal (not back up in the New form).
+  openEditModal(id) {
+    const c = (App.data.revenue_server_checks || []).find(x => x.id === id);
+    if (!c) return;
+    const targetCA = (App.data.revenue_settings?.targets || {}).check_avg || 35;
+    const f = { date: c.date || '', shift: c.shift || '', server: c.staff_id || '', cov: c.covers != null ? String(c.covers) : '', sales: c.sales != null ? String(c.sales) : '' };
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Edit Shift Check</div>'
+      + this.formBody(f, targetCA, 'rscm')
+      + '<div class="card-actions" style="margin-top:18px;"><button class="btn btn-primary" id="rscm-save">Update Check</button>'
+      + '<span id="rscm-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
+      + '</div>';
+    App.openModal(html, { id: 'rsc-edit-modal', maxWidth: 900 });
+    document.getElementById('rscm-cov')?.addEventListener('input', () => this.calc('rscm'));
+    document.getElementById('rscm-sales')?.addEventListener('input', () => this.calc('rscm'));
+    document.getElementById('rscm-save')?.addEventListener('click', () => this.saveEdit(id));
+    this.calc('rscm');
   },
 
   // ── Per-server scorecard (data-card, exportable) ─────────────────────────────
@@ -212,7 +233,10 @@ S.RevenueServerCheck = {
       const isDown = r.trend === 'down';
       const tag = isTop ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--t3);">TOP</span>'
         : (isDown ? ' <span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--red);">DOWN</span>' : '');
-      const coachBtn = r.staff_id
+      // Coaching note only where it is actionable: a server below target or
+      // trending down. Top and on-target servers do not get a coach prompt.
+      const coachable = isDown || (r.checkAvg < targetCA);
+      const coachBtn = (r.staff_id && coachable)
         ? '<button class="btn btn-ghost btn-sm rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:10px;padding:3px 8px;">+ Coaching Note</button>' : '';
       return '<tr>'
         + '<td style="font-weight:700;color:' + (isDown ? 'var(--red)' : 'var(--t1)') + ';">' + esc(r.name) + tag + '</td>'
@@ -228,18 +252,18 @@ S.RevenueServerCheck = {
         + '</tr>';
     }).join('');
     return headingRow
-      + '<div id="rsc-sc-export"><div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div id="rsc-sc-export"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th>Entries</th><th class="no-print"></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   },
 
   // ── Shift log (data-card) ────────────────────────────────────────────────────
   logSection(log, targetCA) {
     const shown = log.slice(0, App.listLimit('core', 'revenue_server_check'));
     return '<div class="sh" style="margin:24px 0 10px;">Server Shift</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Date</th><th>Shift</th><th>Server</th><th>Covers</th><th>Sales</th><th>Check Avg</th><th>vs Target</th><th>Status</th><th class="no-print"></th>'
-      + '</tr></thead><tbody id="rsc-log">' + this._buildRows(shown, targetCA) + '</tbody></table></div></div>'
+      + '</tr></thead><tbody id="rsc-log">' + this._buildRows(shown, targetCA) + '</tbody></table></div>'
       + App.showOlderBar('core', 'revenue_server_check', log, this._window !== 'all');
   },
 
@@ -294,26 +318,11 @@ S.RevenueServerCheck = {
     this._form = { date: v('rsc-date'), shift: v('rsc-shift'), server: v('rsc-server'), cov: v('rsc-cov'), sales: v('rsc-sales') };
   },
 
-  // Load an existing record into the form for editing.
-  editEntry(id) {
-    const c = (App.data.revenue_server_checks || []).find(x => x.id === id);
-    if (!c) return;
-    this._entryId = id;
-    this._editing = true;
-    this._form = { date: c.date || '', shift: c.shift || '', server: c.staff_id || '', cov: c.covers != null ? String(c.covers) : '', sales: c.sales != null ? String(c.sales) : '' };
-    this.draw();
-    const el = App._activeContentEl ? App._activeContentEl() : null;
-    if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' });
-    else if (el) el.scrollTop = 0;
-    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
-  },
-
   // ── Wiring (re-run each draw; per-element listeners, no container stacking) ───
   wire() {
     const c = this.container;
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
-    c.querySelectorAll('.rsc-goshift').forEach(b => b.addEventListener('click', () => App.openScreen('sc-dashboard')));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
     document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Server Performance', root: document.getElementById('rsc-sc-export') || c }));
 
@@ -325,8 +334,7 @@ S.RevenueServerCheck = {
       this._saving = true; setTimeout(() => { this._saving = false; }, 1500);
       this.captureForm(); this.calc(); this.save();
     });
-    document.getElementById('rsc-cancel')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._editing = false; this.draw(); });
-    document.getElementById('rsc-startover')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._editing = false; this._calc = null; this.draw(); });
+    document.getElementById('rsc-startover')?.addEventListener('click', () => { this._form = this.freshForm(); this._entryId = App.uid(); this._calc = null; this.draw(); });
 
     c.querySelectorAll('.rsc-coach').forEach(btn => btn.addEventListener('click', () => {
       // Open the canonical coaching-note form in place (writes to this server's
@@ -335,7 +343,7 @@ S.RevenueServerCheck = {
       S.LaborStaffRoster.noteEditId = null;
       S.LaborStaffRoster.openNoteModal(btn.dataset.sid, { onSaved: () => this.draw() });
     }));
-    c.querySelectorAll('.rsc-edit').forEach(btn => btn.addEventListener('click', () => this.editEntry(btn.dataset.id)));
+    c.querySelectorAll('.rsc-edit').forEach(btn => btn.addEventListener('click', () => this.openEditModal(btn.dataset.id)));
     c.querySelectorAll('.rsc-del').forEach(btn => btn.addEventListener('click', async () => {
       const ok = await App.confirmDelete();
       if (!ok) return;
@@ -344,13 +352,14 @@ S.RevenueServerCheck = {
     }));
   },
 
-  calc() {
-    const cov = parseFloat(document.getElementById('rsc-cov')?.value) || 0;
-    const sales = parseFloat(document.getElementById('rsc-sales')?.value) || 0;
+  calc(p) {
+    p = p || 'rsc';
+    const cov = parseFloat(document.getElementById(p + '-cov')?.value) || 0;
+    const sales = parseFloat(document.getElementById(p + '-sales')?.value) || 0;
     const target = App.data.revenue_settings?.targets?.check_avg || 35;
-    const caEl = document.getElementById('rsc-ca');
-    const vEl  = document.getElementById('rsc-var');
-    const bEl  = document.getElementById('rsc-badge');
+    const caEl = document.getElementById(p + '-ca');
+    const vEl  = document.getElementById(p + '-var');
+    const bEl  = document.getElementById(p + '-badge');
     if (!caEl) return;
     // The box is always visible; it reads "-" until covers and sales are entered.
     if (cov === 0 || sales === 0) {
@@ -398,9 +407,36 @@ S.RevenueServerCheck = {
     App.putRecord('core', 'revenue_server_check', entry).then(() => {
       this._form = this.freshForm();
       this._entryId = App.uid();
-      this._editing = false;
       this._calc = null;
       this.draw();
     });
+  },
+
+  // Save an edit made in the modal (reads the rscm-* fields directly).
+  saveEdit(id) {
+    const v = k => document.getElementById(k)?.value ?? '';
+    const err = document.getElementById('rscm-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (err) err.style.display = 'none';
+    const cov = parseFloat(v('rscm-cov')) || 0;
+    const sales = parseFloat(v('rscm-sales')) || 0;
+    if (!cov || !sales) return fail('Enter covers and total sales before saving.');
+    const staff = this.staffById(v('rscm-server'));
+    if (!staff) return fail('Pick a server.');
+    const c = (App.data.revenue_server_checks || []).find(x => x.id === id);
+    if (!c) return;
+    const date = v('rscm-date'), shift = v('rscm-shift');
+    const matchShift = this.activeShiftFor(date, shift);
+    const entry = {
+      ...c,
+      date, shift,
+      shift_id:    matchShift ? matchShift.id : (c.shift_id || ''),
+      staff_id:    staff.id,
+      server_name: staff.name,
+      covers:      cov,
+      sales,
+      saved_at:    new Date().toISOString()
+    };
+    App.putRecord('core', 'revenue_server_check', entry).then(() => { App.closeModal('rsc-edit-modal'); this.draw(); });
   }
 };
