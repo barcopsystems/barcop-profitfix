@@ -779,14 +779,16 @@ S.HubBarCopAudit = {
       recovery_snapshot: this._recoveryActivitySnapshot(),
       // Mirror the recovery audit shape so AuditOutlook can reuse the same
       // helper without special-casing Bar Cop Audit.
-      sections: {
-        'Operational Discipline':   disc.score,
-        'Cash Integrity':           cash.score,
-        'Inventory Execution':      inv.score,
-        'Labor Hygiene':            labor.score,
-        'Recovery Action':          rec.score,
-        'Operational Consistency':  cons.score
-      },
+      // Only covered sub-scores become sections, so the Data Quality badge reads
+      // true coverage (all-null must read Limited, not Full). sub_scores above keeps
+      // all six keys so the N/A rings still render.
+      sections: (function () {
+        const s = {};
+        [['Operational Discipline', disc.score], ['Cash Integrity', cash.score], ['Inventory Execution', inv.score],
+         ['Labor Hygiene', labor.score], ['Recovery Action', rec.score], ['Operational Consistency', cons.score]]
+          .forEach(([k, v]) => { if (v != null) s[k] = v; });
+        return s;
+      })(),
       action_items: this._topExposures().map(e => ({
         action: e.label + '. ' + e.detail,
         gap_id: e.gap_id || null,
