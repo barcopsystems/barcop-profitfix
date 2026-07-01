@@ -38,7 +38,7 @@ S.CashAudit = {
       + AuditUI.readinessCard({ pfx: 'ca', title: 'Cash Audit', desc,
           steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'cash_audit', 'ca', { hideGrade: true }) : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'cash_audit', 'ca', { sectionCount: this.SECTION_NAMES.length }) : '')
       + '</div>';
     AuditUI.wireFirstAudit(this.container);
     document.getElementById('ca-gen-btn')?.addEventListener('click', () => this.onGenerate());
