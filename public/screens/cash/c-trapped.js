@@ -52,8 +52,8 @@ S.CashTrapped = {
       ? items.map(it => this.rowHtml(it)).join('')
       : '<tr><td colspan="6" style="color:var(--t3);">' + emptyMsg + '</td></tr>';
     const head = titleRight
-      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + titleRight + '</div>'
-      : '<div class="sh" style="margin:0 0 10px;">' + title + '</div>';
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">' + title + '</div>' + titleRight + '</div>'
+      : '<div class="sh" style="margin:24px 0 10px;">' + title + '</div>';
     return head + this.dataCard(rows);
   },
 
