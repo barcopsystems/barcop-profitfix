@@ -172,7 +172,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, i.quad);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td><div class="val">' + SINGULAR[i.quad] + '</div><div style="font-size:10px;color:var(--t3);">' + esc(MOVE[i.quad]) + '</div></td>'
-          + '<td>' + f(i.price) + '</td>'
+          + '<td style="text-align:center;">' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
           + '<td>' + x.action + '</td></tr>';
@@ -180,7 +180,7 @@ S.RevenueMenuEngineering = {
       return heading(cat + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Class</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Class</th><th style="text-align:center;">Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
@@ -192,7 +192,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, null);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td>' + esc(i.category || '') + '</td>'
-          + '<td>' + f(i.price) + '</td>'
+          + '<td style="text-align:center;">' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
           + '<td>' + x.action + '</td></tr>';
@@ -200,7 +200,7 @@ S.RevenueMenuEngineering = {
       unrankedCard = heading('Too Few to Rank')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Category</th><th style="text-align:center;">Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + urows + '</tbody></table></div>';
     }
 
