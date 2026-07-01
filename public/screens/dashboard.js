@@ -397,75 +397,50 @@ S.Dashboard = {
 
   // ── Bar Cop Briefing: a written read of the profit week, cached a week per
   //    section via DashUI so repeat opens do not spend on the API. ─────────────
+  // Code-generated (no API): reads the cost trend and writes three short
+  // paragraphs in the operator voice, the worst cost, the trends, the one move.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const weeks = this.weeks().slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
     if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
-
-    const rec = DashUI._insRec('profit');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
 
     const t = this.targets();
     const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
     const r1 = n => (Math.round(n * 10) / 10).toFixed(1);
+    const money = n => '$' + Math.round(n).toLocaleString('en-US');
     const direction = v => {
-      if (v.length < 3) return 'not enough weeks to call a trend';
+      if (v.length < 3) return 'still too few weeks to call a trend';
       const d = v[v.length - 1] - v[0];
       return d > 0.5 ? 'rising, getting worse' : d < -0.5 ? 'falling, improving' : 'holding steady';
     };
-    const metricFact = (name, raw, tgt) => {
-      const v = raw.filter(x => x != null);
-      if (!v.length) return name + ': no weeks logged yet.';
-      const cur = v[v.length - 1], avg = v.reduce((s, x) => s + x, 0) / v.length;
-      const lo = Math.min(...v), hi = Math.max(...v), over = cur - tgt;
-      const overTxt = over > 0.05 ? r1(over) + ' points OVER target' : over < -0.05 ? r1(-over) + ' points under target' : 'right on target';
-      return name + ': current week ' + r1(cur) + '%, target ' + tgt + '%, ' + overTxt + '. '
-        + 'Last ' + v.length + ' weeks ran ' + r1(lo) + '% to ' + r1(hi) + '%, averaging ' + r1(avg) + '%, '
-        + v.filter(x => x > tgt).length + ' of ' + v.length + ' weeks over target. Direction: ' + direction(v) + '.';
-    };
-    const bP = weeks.map(w => w.bar && w.bar.cost_pct);
-    const fP = weeks.map(w => w.food && w.food.cost_pct);
-    const pP = weeks.map(w => w.prime_cost_pct);
     const bR = weeks.map(w => w.bar && w.bar.revenue).filter(v => v != null);
     const aR = bR.length ? bR.reduce((s, x) => s + x, 0) / bR.length : 0;
-    const curB = bP.filter(v => v != null).slice(-1)[0];
+
+    const costs = [
+      { name: 'Bar pour cost', arr: weeks.map(w => w.bar && w.bar.cost_pct),  tgt: bT, act: 'jigger the wells, cost your recipes, and watch pour variance in Spot Check' },
+      { name: 'Food cost',     arr: weeks.map(w => w.food && w.food.cost_pct), tgt: fT, act: 'tighten portions and log waste in Inventory' },
+      { name: 'Prime cost',    arr: weeks.map(w => w.prime_cost_pct),          tgt: pT, act: 'work the biggest of pour, food, and labor first in Profit Fix' }
+    ].map(c => { const v = c.arr.filter(x => x != null); return Object.assign(c, { cur: v.length ? v[v.length - 1] : null, n: v.length, dir: direction(v) }); })
+     .filter(c => c.cur != null);
+    costs.forEach(c => c.over = c.cur - c.tgt);
+    const curB = (costs.find(c => c.name === 'Bar pour cost') || {}).cur;
     const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
-    const facts = [
-      metricFact('Bar pour cost', bP, bT),
-      metricFact('Food cost', fP, fT),
-      metricFact('Prime cost', pP, pT),
-      'Bar revenue is averaging about $' + Math.round(aR) + ' a week.',
-      barOver > 0
-        ? 'At this bar pour cost, the overage is costing about $' + barOver + ' a week.'
-        : 'Bar pour cost is at or under target, so there is no pour overage to chase right now.'
-    ];
-    const prompt = 'You are a 30-year bar and restaurant operator writing a read for a fellow owner. The facts below are already computed from this operator\'s own weekly numbers.\n\n'
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
-      + 'STAY TRUE TO THE FACTS:\n'
-      + '- Use only the facts below. Do not invent numbers, streaks, or week counts.\n'
-      + '- The "current week" figure is the number the operator is looking at on screen. Never contradict it.\n'
-      + '- Respect the stated direction. If a metric is falling and improving, do not call it stuck or rising. If it is on or under target, say so plainly.\n'
-      + '- State over or under target exactly as given.\n\n'
-      + 'FACTS:\n' + facts.join('\n')
-      + '\n\nWrite three short paragraphs, one each: first the cost that needs attention most (the one furthest over target, or say plainly if all are at or under target), then what the trends are telling you, then the single action that matters most this week. Use the exact numbers from the facts.';
+    const worst = costs.slice().sort((a, b) => b.over - a.over)[0];
 
-    const btn = this.container.querySelector('[data-insights]');
-    const orig = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
+    const paras = [];
+    if (worst && worst.over > 0.05) {
+      let p1 = 'Your ' + worst.name.toLowerCase() + ' is running ' + r1(worst.cur) + '% against a ' + worst.tgt + '% target, ' + r1(worst.over) + ' point' + (Math.round(worst.over) === 1 ? '' : 's') + ' over and the first one to chase.';
+      if (worst.name === 'Bar pour cost' && barOver > 0) p1 += ' On about ' + money(aR) + ' of bar sales a week, that overage is roughly ' + money(barOver) + ' walking out.';
+      paras.push(p1);
+    } else if (costs.length) {
+      paras.push('Your costs are at or under target: ' + costs.map(c => c.name.toLowerCase().replace(' cost', '') + ' ' + r1(c.cur) + '%').join(', ') + '. Nothing here is bleeding, which is the whole job.');
+    }
+    if (costs.some(c => c.n >= 3)) {
+      paras.push('Over the last ' + Math.max.apply(null, costs.map(c => c.n)) + ' weeks, ' + costs.map(c => c.name.toLowerCase() + ' is ' + c.dir).join(', ') + '.');
+    }
+    if (worst && worst.over > 0.05) paras.push('This week, put the wrench on ' + worst.name.toLowerCase() + ': ' + worst.act + ' until it comes back to target.');
+    else paras.push('Nothing urgent to chase. Hold the discipline and keep logging every week so the trend stays honest.');
 
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read the trend right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content && data.content[0] && data.content[0].text;
-        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
-        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('profit', html));
-        restore();
-      })
-      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+    const html = paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
+    DashUI.insightsModal('Bar Cop Briefing', html);
   }
 };
