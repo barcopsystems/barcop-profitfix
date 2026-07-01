@@ -101,7 +101,7 @@ S.RevenueDogTest = {
           +   '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + (done ? 'var(--gold)' : 'var(--t3)') + ';">'
           +     (done ? 'TEST COMPLETE, DECIDE' : 'Day ' + elapsed + ' of ' + this.WINDOW + ', ' + remaining + ' left') + '</div>'
           + '</div>'
-          + '<div class="prog" style="margin-bottom:10px;"><div class="prog-fill" style="width:' + pct + '%;"></div></div>'
+          + '<div class="prog" style="margin-bottom:10px;"><div class="prog-fill" style="width:' + pct + '%;background:var(--green);"></div></div>'
           + (t.change_notes ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:10px;">' + esc(t.change_notes) + '</div>' : '')
           + '<div class="form-row" style="margin-bottom:10px;align-items:flex-end;">'
           +   '<div class="f" style="width:150px;"><label>Baseline Weekly</label><div style="font-size:13px;color:var(--t2);padding:8px 0;">' + (t.baseline_volume != null ? t.baseline_volume + ' units' : '-') + '</div></div>'
@@ -137,9 +137,9 @@ S.RevenueDogTest = {
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dt-del" data-id="' + esc(t.id) + '">Remove</button></div></td></tr>';
       }).join('');
       history = '<div class="sh" style="margin:22px 0 10px;">Test History</div>'
-        + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Item</th><th>Started</th><th>Baseline</th><th>Final Weekly</th><th>Change</th><th>Decision</th><th></th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'menu_dog_test', decided, false);
     }
 
