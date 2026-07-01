@@ -1412,8 +1412,9 @@ const App = {
       { h: 'Setup and multiple bars', p: ['While setup is unfinished, a banner up top tracks how far along you are and jumps to the checklist. If you run more than one bar, a Viewing switcher and a Group button appear in the top bar: switch the active bar, or open the Group Dashboard to compare headline numbers across all of them.'] }
     ] },
     'flowmap': { title: 'Blueprint', sections: [
-      { h: 'What this is', p: ['The Blueprint shows how your data moves through Bar Cop, left to right: your Control sections capture it, This Week rolls it into a P&L, Recovery and the Bar Cop Audit diagnose where money is leaking, the Fix Process closes the gaps, and the Hub and Books report it.'] },
-      { h: 'How to use it', p: ['Tap any box to see exactly what feeds it and what it feeds, with a button to open that screen. Use it to trace where a number you logged ends up, or how one part of Bar Cop connects to another.'] }
+      { h: 'What this is', p: ['The Blueprint is your weekly workflow, top to bottom. Bar Cop runs on one sitting at the end of the week, and this maps how that sitting cascades: first you close your three Control sections (Inventory, Labor, Shift), then you roll them up and work the money in Recovery (Profit, Revenue, Cash), and only then do you chase the specific jobs the close flags.'] },
+      { h: 'The two bands', p: ['Your weekly sitting is the top band, worked in order: close Control, then work Recovery, where each section opens with Run This Week to pull your closes into one read. As needed is the band below it, the triggered jobs (investigations, repricing, Dog Tests, vendor credit chases, spot checks) you open only when the week surfaces them, never on a schedule. It all lands on the outputs at the bottom: the Hub, Books, and your Bar Cop Audit score.'] },
+      { h: 'How to use it', p: ['Read it top to bottom to see the order of your week, and tap any block to jump straight into that screen. The plumbing (which number feeds which) lives in each section\'s Help under Connections; this is about the flow of the work, not the data.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
