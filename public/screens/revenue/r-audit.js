@@ -303,9 +303,9 @@ S.RevenueAudit = {
   showHowTo() {
     App.showHelpModal('How the Revenue Audit Works', [
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
-      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically. Your annual sales and a few operating-practice answers come from App Settings (Business Profile and Audit Setup). Set those once and every audit reads them.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically, and your annual sales come from your Business Profile in App Settings. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, hours logged, menu items priced with covers, server checks logged, and events booked. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
-      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in App Settings, and answer the Audit Setup questions once. 3. Generate. Sections with no data show N/A and fill in over time.'] },
+      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in your Business Profile once. 3. Generate. Sections with no data show N/A and fill in over time.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run one a week; it scores your trailing four weeks, and each is saved so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
     ]);
@@ -338,21 +338,14 @@ S.RevenueAudit = {
     setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
-      const draftP = s.revenue_practices || {};
-      // Unanswered question ('') is omitted so it has no score effect.
-      const practices = {};
-      if (draftP.pre_shift) practices.pre_shift = draftP.pre_shift;
-      if (draftP.upsell_standard === 'true' || draftP.upsell_standard === 'false') practices.upsell_standard = draftP.upsell_standard === 'true';
-      if (draftP.private_dining_min === 'true' || draftP.private_dining_min === 'false') practices.private_dining_min = draftP.private_dining_min === 'true';
-      if (draftP.menu_engineered === 'true' || draftP.menu_engineered === 'false') practices.menu_engineered = draftP.menu_engineered === 'true';
-      if (draftP.last_price_increase) practices.last_price_increase = draftP.last_price_increase;
-      if (draftP.labor_to_forecast === 'true' || draftP.labor_to_forecast === 'false') practices.labor_to_forecast = draftP.labor_to_forecast === 'true';
-
+      // Honest-by-construction: the audit scores solely on what Bar Cop measures
+      // from real data (weekly numbers, schedules, menu, servers, events). No
+      // self-reported operating practices feed the score, so the number an owner
+      // relies on cannot be inflated by a claim the data does not back up.
       const auditAppData = JSON.parse(JSON.stringify(App.data));
 
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
-      form.append('practices', JSON.stringify(practices));
       const controlData = this.buildControlData();
       if (controlData) form.append('controlData', JSON.stringify(controlData));
 
