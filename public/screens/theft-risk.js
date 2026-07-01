@@ -124,7 +124,7 @@ S.TheftRisk = {
   // Shared 5-column layout so the What Flagged card and the Investigations cards
   // line up column-for-column (wide name column, three data columns, trailing
   // action column).
-  COLGROUP: '<colgroup><col style="width:38%;"/><col style="width:15%;"/><col style="width:17%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>',
+  COLGROUP: '<colgroup><col style="width:33%;"/><col style="width:15%;"/><col style="width:17%;"/><col style="width:16%;"/><col style="width:19%;"/></colgroup>',
 
   // ── Investigations — read-only rollup; Work jumps to the source ─────────────
   // Loss Prevention is the cross-source overview (variance, spot-check, sales).
