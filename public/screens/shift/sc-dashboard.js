@@ -235,7 +235,7 @@ S.ShiftDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. If your POS also exports a per-server or product-mix report, drop those here too and Bar Cop feeds your Server Check and Menu Engineering off the same sitting. Mark this done once the week is in.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
         + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.')
