@@ -1385,7 +1385,7 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Blueprint'],['audit','Audits'],['events','Events'],['books','Books']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Workflow'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
@@ -1411,10 +1411,10 @@ const App = {
       { h: 'Key Metrics and Trend', p: ['Key Metrics is your six headline numbers, each against its target and colored only when it slips. The Cost and Revenue Trend charts bar pour cost, check average, and prime cost over the last eight weeks; hover a point for that week\'s reading.'] },
       { h: 'Setup and multiple bars', p: ['While setup is unfinished, a banner up top tracks how far along you are and jumps to the checklist. If you run more than one bar, a Viewing switcher and a Group button appear in the top bar: switch the active bar, or open the Group Dashboard to compare headline numbers across all of them.'] }
     ] },
-    'flowmap': { title: 'Blueprint', sections: [
-      { h: 'What this is', p: ['The Blueprint is your weekly workflow, top to bottom. Bar Cop runs on one sitting at the end of the week, and this maps how that sitting cascades: first you close your three Control sections (Inventory, Labor, Shift), then you roll them up and work the money in Recovery (Profit, Revenue, Cash), and only then do you chase the specific jobs the close flags.'] },
-      { h: 'The two bands', p: ['Your weekly sitting is the top band, worked in order: close Control, then work Recovery, where each section opens with Run This Week to pull your closes into one read. As needed is the band below it, the triggered jobs (investigations, repricing, Dog Tests, vendor credit chases, spot checks) you open only when the week surfaces them, never on a schedule. It all lands on the outputs at the bottom: the Hub, Books, and your Bar Cop Audit score.'] },
-      { h: 'How to use it', p: ['Read it top to bottom to see the order of your week, and tap any block to jump straight into that screen. The plumbing (which number feeds which) lives in each section\'s Help under Connections; this is about the flow of the work, not the data.'] }
+    'flowmap': { title: 'How the Workflow Map Works', sections: [
+      { h: 'What this is', p: ['The Workflow map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
+      { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Run This Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
+      { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
@@ -1759,7 +1759,7 @@ const App = {
     const root = { title: 'Bar Cop Menu', groups: [
       { label: 'Go to', items: [
         { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
-        { label: 'Blueprint', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
+        { label: 'Workflow', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Dashboard', IC.books),
