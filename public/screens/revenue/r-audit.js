@@ -333,7 +333,6 @@ S.RevenueAudit = {
       return;
     }
 
-    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
 
     try {
       // Honest-by-construction: the audit scores solely on what Bar Cop measures
@@ -351,7 +350,6 @@ S.RevenueAudit = {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Server error');
 
-      setStatus('Saving audit...', 'var(--t2)');
       const d = data.auditData || {};
 
       const auditRecord = {
