@@ -12,11 +12,13 @@ S.ShiftDashboard = {
   _weekEnd: null,    // Sunday of the selected week
   _openStep: null,   // which step is expanded ('' = all collapsed; null = auto-open first undone)
   _flash: null,      // one-shot confirmation line under the banner
+  _showServer: false,// step 1 optional drop: per-server sales revealed
+  _showPmix: false,  // step 1 optional drop: product mix revealed
 
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Shift. You land on the week, see how far along you are, and work the steps top to bottom. The current step opens right here as a workspace, so you do the quick things without leaving the page. When the week is done it reads "You\'re current this week."'] },
-      { h: 'The Steps', p: ['1. Import this week\'s sales: drop your weekly POS sales-by-day report (one row per day) and Bar Cop reads the whole week at once. 2. Reconcile cash: drop your POS cash report, or reconcile each drawer by hand in Cash Control if your POS does not make one. 3. Log exceptions: waste, spills, and walked tabs, off your sheet. 4. Review loss flags: cash shorts, voids, and comps worth a look.'] },
+      { h: 'The Steps', p: ['1. Import this week\'s sales: drop your weekly POS sales-by-day report (one row per day) and Bar Cop reads the whole week at once. If your POS also exports a per-server sales report or a product-mix report, drop those in the same step and Bar Cop feeds your Server Check, Sales Integrity, and Menu Engineering off the same sitting. 2. Reconcile cash: drop your POS cash report, or reconcile each drawer by hand in Cash Control if your POS does not make one. 3. Log exceptions: waste, spills, and walked tabs, off your sheet. 4. Review loss flags: cash shorts, voids, and comps worth a look.'] },
       { h: 'Working A Step', p: ['Click a step to open it. The import runs right on the page. The others either do the quick part here or send you to the full screen and come back. Mark a step done and the bar advances. The week selector at the top steps you to a prior week to close it out.'] },
       { h: 'The Bottom Strip', p: ['Once the week is in, the strip shows your revenue, voids, and cash over/short at a glance. Below it, the as-needed jobs (Spot Check, Maintenance, Run Checklists) are one tap away whenever you need them, not part of the weekly flow.'] }
     ]);
@@ -42,7 +44,7 @@ S.ShiftDashboard = {
     const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
     if (n > 0 && next > cur) return;   // never walk into the future
     this._weekEnd = next;
-    this._openStep = null; this._flash = null;
+    this._openStep = null; this._flash = null; this._showServer = false; this._showPmix = false;
     this.render(this.container, this.actions);
   },
 
@@ -108,7 +110,11 @@ S.ShiftDashboard = {
       + this.outlierStrip()
       + '</div>';
 
-    if (this._openStep === 'import') this.mountImport();
+    if (this._openStep === 'import') {
+      this.mountImport();
+      if (this._showServer) this.mountServer();
+      if (this._showPmix) this.mountPmix();
+    }
     if (this._openStep === 'cash') this.mountCashImport();
     this.wire();
   },
@@ -219,12 +225,27 @@ S.ShiftDashboard = {
       ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
       : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
   },
+  // Step-1 optional sales cut (per-server / product mix): collapsed to a small
+  // grey toggle until the operator has that report; revealed as its own labeled
+  // dropzone. Same one-sitting import, extra fan-out.
+  optDrop(flag, id, title, sub) {
+    if (this['_show' + flag]) {
+      return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + sub + '</div>'
+        + '<div id="' + id + '"></div><div id="' + id + '-res"></div></div>';
+    }
+    return '<div style="margin-top:12px;"><span class="sc-opt-toggle" data-opt="' + flag + '" style="font-size:11px;color:var(--t3);cursor:pointer;">+ Add ' + title.toLowerCase() + ' <span style="color:var(--t4);">(optional)</span></span></div>';
+  },
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS for this week and drop it below. Re-importing replaces the days already in. Mark this done once the week is fully in.</div>'
+      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. If your POS also exports a per-server or product-mix report, drop those here too and Bar Cop feeds your Server Check and Menu Engineering off the same sitting. Mark this done once the week is in.</div>'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
-        + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' + this.markBtn('import', 'Mark Done') + '</div>';
+        + this.optDrop('Server', 'sc-ck-server', 'Per-server sales', 'One row per server. Feeds Server Check and Sales Integrity.')
+        + this.optDrop('Pmix', 'sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.')
+        + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
@@ -404,6 +425,68 @@ S.ShiftDashboard = {
     this.render(this.container, this.actions);
   },
 
+  // ── Inline per-server sales import (step 1 optional) ─────────────────────────
+  // Feeds Server Check + Sales Integrity off the same weekly sitting. Matches each
+  // server to the roster by name; unmatched rows are skipped and surfaced.
+  mountServer() {
+    const el = document.getElementById('sc-ck-server');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS per-server sales report here',
+      dropSub: 'Needs a Server, Date, Covers, and Total Sales column. One row per server, per day.',
+      fields: PosIngest.FIELDS.server,
+      confirmLabel: 'Import',
+      onState: st => this._toggleBtns('sc-ck-import-btns', st),
+      onComplete: rows => this.importServer(rows)
+    });
+  },
+  async importServer(rows) {
+    const { toAdd, skipped, dupCount } = PosIngest.build('server', rows);
+    const res = document.getElementById('sc-ck-server-res');
+    if (!toAdd.length) {
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (dupCount ? 'No new server rows imported. ' + dupCount + ' already logged.' : 'No server rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.') + '</div>';
+      return;
+    }
+    const ok = await PosIngest.commit('server', toAdd);
+    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
+      + (dupCount ? ' (' + dupCount + ' already logged)' : '')
+      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '') + '.';
+    this._openStep = 'import';
+    this.render(this.container, this.actions);
+  },
+
+  // ── Inline product-mix (PMIX) import (step 1 optional) ───────────────────────
+  // Feeds Menu Engineering covers. Matches each item to the menu by name and
+  // updates weekly_covers in place; unmatched item names are skipped and surfaced.
+  mountPmix() {
+    const el = document.getElementById('sc-ck-pmix');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS product-mix (PMIX) report here',
+      dropSub: 'Needs an Item Name and Units Sold column. One row per menu item for the week.',
+      fields: PosIngest.FIELDS.pmix,
+      confirmLabel: 'Import',
+      onState: st => this._toggleBtns('sc-ck-import-btns', st),
+      onComplete: rows => this.importPmix(rows)
+    });
+  },
+  async importPmix(rows) {
+    const { toAdd, skipped } = PosIngest.build('pmix', rows);
+    const res = document.getElementById('sc-ck-pmix-res');
+    if (!toAdd.length) {
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated. Each row needs an item name Bar Cop can match on your menu and a units-sold number.</div>';
+      return;
+    }
+    const ok = await PosIngest.commit('pmix', toAdd);
+    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
+      + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '') + '.';
+    this._openStep = 'import';
+    this.render(this.container, this.actions);
+  },
+
   // ── Inline cash-report import (step 2) ───────────────────────────────────────
   // The POS blind close already computed over/short; drop that report and the
   // variance pattern lands without a hand reconcile. Manual reconcile lives on
@@ -497,6 +580,8 @@ S.ShiftDashboard = {
   wire() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
+      const opt = ev.target.closest('.sc-opt-toggle');
+      if (opt) { this['_show' + opt.dataset.opt] = true; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
@@ -507,7 +592,7 @@ S.ShiftDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.sc-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.sc-wk-next')) { this._stepWeek(7); return; }
-      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this._showServer = false; this._showPmix = false; this.render(this.container, this.actions); return; }
     };
   }
 };
