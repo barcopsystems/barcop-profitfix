@@ -860,7 +860,7 @@ S.HubBarCopAudit = {
       + AuditUI.readinessCard({ pfx: 'bca', title: 'Bar Cop Audit', desc,
           steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { hideGrade: true }) : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { sectionCount: this.SECTION_NAMES.length }) : '')
       + '</div>';
 
     // Landing has no screen-specific topbar actions.

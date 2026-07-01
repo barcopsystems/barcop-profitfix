@@ -21,7 +21,7 @@ S.AuditTracker = {
       + AuditUI.readinessCard({ pfx: 'at', title: 'Profit Audit', desc,
           steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
       + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : '')
-      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at') : '')
+      + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at', { sectionCount: App.AUDIT_PROFIT_SECTION_NAMES.length }) : '')
       + '</div>';
     AuditUI.wireFirstAudit(this.container);
     document.getElementById('at-gen-btn')?.addEventListener('click', () => this.onGenerate());

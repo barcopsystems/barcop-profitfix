@@ -136,13 +136,15 @@ const AuditUI = {
       + (s.done ? '<span style="font-size:11px;color:var(--green);font-weight:700;flex-shrink:0;">Have it</span>'
                 : (s.go ? '<span style="color:var(--t4);font-size:13px;flex-shrink:0;">&rsaquo;</span>' : ''))
       + '</div>').join('');
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">' + esc(cfg.title) + '</div>'
+    // Generate button lives OUTSIDE the card, bottom-left, at normal size (the
+    // app-wide on-page form-button standard). Status message sits beside it.
+    return '<div class="card form-card" style="margin-bottom:12px;"><div class="card-title">' + esc(cfg.title) + '</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px;">' + cfg.desc + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;"><strong style="color:var(--t1);">' + doneCount + '</strong> of ' + steps.length + ' ready</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;"><strong style="color:var(--green);">' + doneCount + '</strong> of ' + steps.length + ' ready</div>'
       + this._gsProgBar(doneCount, steps.length)
       + rows
-      + '<div style="display:flex;justify-content:flex-end;margin-top:18px;"><span id="' + cfg.pfx + '-gen-status" style="font-size:12px;color:var(--red);display:none;margin-right:auto;align-self:center;"></span>' + genBtn + '</div>'
-      + '</div>';
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:12px;margin:0 0 20px;">' + genBtn + '<span id="' + cfg.pfx + '-gen-status" style="font-size:12px;color:var(--red);display:none;"></span></div>';
   },
   // The missing-data guard: if any step is not done, confirm before running (the
   // audit still runs, but the operator is warned they will burn the 7-day lock on
@@ -187,8 +189,7 @@ const AuditUI = {
         + '<div style="width:32px;text-align:right;flex-shrink:0;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';font-size:12px;">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff:'') + '</div>'
         + '</div>';
     }).join('');
-    return '<div style="margin-bottom:12px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
-      + '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
+    return '<div class="card" style="margin-bottom:16px;overflow:hidden;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
@@ -199,16 +200,36 @@ const AuditUI = {
       + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:' + scoreColor + ';margin:2px 0 8px;">' + scoreLabel + '</div>'
       + '</div></div>'
       + '<div style="margin-top:16px;">' + secRows + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;margin-top:14px;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="0">View Full Audit</button></div>'
       + '</div>';
   },
 
+  // ── Data-quality badge ─────────────────────────────────────────────────────
+  // Uniform across all four audits: how much of the audit had real data behind
+  // it, measured by how many of its sections cleared the confidence bar and got
+  // scored (a section reads N/A when the app has no data for it, so scored-of-
+  // total is a faithful read of the data the app held when the audit ran). This
+  // replaces the old upload-era "Tier 2 / Tier 3" grade. total = the audit's full
+  // section count (passed by each caller).
+  dataQualityChip(a, total) {
+    const scored = Object.keys((a && a.sections) || {}).length;
+    const t = total || scored;
+    if (!t) return '';
+    let label, color;
+    if (scored >= t)        { label = 'Full data';    color = 'var(--green)'; }
+    else if (scored*2 >= t) { label = 'Partial data'; color = 'var(--amber)'; }
+    else                    { label = 'Limited data'; color = 'var(--t3)'; }
+    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + color + ';">' + label + '</span>';
+  },
+
   // ── Landing: Audit History data-card ───────────────────────────────────────
-  // opts.hideGrade drops the Data Quality column for audits with no grade tier
-  // (the Bar Cop Audit, which reads from logged data and has no upload tier).
+  // Identical across all four audits: Date / Score / Change / Data Quality / View,
+  // one #0D181E pill per row via .row-list, colgroup for even spacing, data left-
+  // aligned under its header. opts.sectionCount = the audit's full section count,
+  // read by dataQualityChip.
   historyCard(audits, listKey, pfx, opts) {
     opts = opts || {};
-    // Column layout kept (Date / Score / Change / Data Quality / View), but each
-    // row is a #0D181E pill via the .row-list table styling.
+    const total = opts.sectionCount || 0;
     const rows = audits.slice(0, App.listLimit('core', listKey)).map((a,i) => {
       const p    = audits[i+1];
       const naA  = a.overall_score == null;
@@ -216,16 +237,17 @@ const AuditUI = {
       const diff = (p && !naA && p.overall_score != null) ? a.overall_score - p.overall_score : null;
       return '<tr>'
         + '<td>' + (a.date||'').slice(0,10) + '</td>'
-        + '<td style="text-align:right;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</td>'
-        + '<td style="text-align:right;color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</td>'
-        + (opts.hideGrade ? '' : '<td>' + AuditUI.tierChip(a.grade) + '</td>')
+        + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</td>'
+        + '<td style="color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</td>'
+        + '<td>' + AuditUI.dataQualityChip(a, total) + '</td>'
         + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '">View</button></td>'
         + '</tr>';
     }).join('');
     return '<div class="sh" style="margin:24px 0 10px;">Audit History</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Date</th><th style="text-align:right;">Score</th><th style="text-align:right;">Change</th>' + (opts.hideGrade ? '' : '<th>Data Quality</th>') + '<th></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list">'
+      + '<colgroup><col style="width:24%;"><col style="width:14%;"><col style="width:16%;"><col style="width:28%;"><col style="width:18%;"></colgroup>'
+      + '<thead><tr><th>Date</th><th>Score</th><th>Change</th><th>Data Quality</th><th></th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', listKey, audits, false);
   },
 
