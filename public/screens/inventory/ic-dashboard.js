@@ -571,53 +571,42 @@ S.InventoryDashboard = {
   // ── Bar Cop Briefing: a written read of the inventory week, the same button
   //    the recovery dashboards carry. Cached a week per section (DashUI helpers)
   //    so repeat opens do not spend on the API. ──────────────────────────────
+  // Code-generated (no API): where inventory stands, where cash is stuck, the move.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const st = this._st || this.computeState();
     if (!st.latest) { DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and Bar Cop can read your inventory week for you.'); return; }
-    const rec = DashUI._insRec('inventory');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
-    const prompt = this._insPrompt(st);
-    const btn = this.container.querySelector('[data-insights]');
-    const orig = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your inventory right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content && data.content[0] && data.content[0].text;
-        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
-        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('inventory', html));
-        restore();
-      })
-      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
   },
 
-  _insPrompt(st) {
+  _insBriefing(st) {
     const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    const facts = [
-      'Inventory value on hand: ' + m(st.inventoryValue),
-      'Weeks of inventory on hand: ' + (st.weeksOnHand != null ? st.weeksOnHand.toFixed(1) + ' weeks' : 'n/a, needs two counts'),
-      'Last counted: ' + (st.latest ? st.latest.date + (st.hasCountThisWeek ? ' (this week)' : ', ' + st.lastAge + ' days ago') : 'never'),
-      'Used this period (cost of goods): ' + (st.periodCost != null ? m(st.periodCost) : 'n/a, needs two counts'),
-      'To reorder, below par: ' + m(st.reorderTotal) + ' across ' + st.reorderCount + ' product' + (st.reorderCount === 1 ? '' : 's'),
-      'Shrinkage written off in the last 30 days: ' + m(st.shrink),
-      'Spot-check flags in the last 30 days: ' + st.spotFlags,
-      'Dead stock items (on hand, no movement): ' + st.deadAll,
-      'Top fast movers: ' + (st.fast.length ? st.fast.map(x => x.name + ' ' + m(x.cost)).join(', ') : 'none yet'),
-      'Dead stock tying up cash: ' + (st.dead.length ? st.dead.map(x => x.name + ' ' + m(x.tied)).join(', ') : 'none'),
-      'Pars that look off versus real usage: ' + st.parOff,
-      'Menu items now over their cost target: ' + st.menuOver
-    ].join('\n');
-    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the inventory side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
-      + 'STAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers.\n- If a number is not set or needs more counts, say so plainly instead of guessing.\n\n'
-      + 'FACTS:\n' + facts
-      + '\n\nWrite two or three short paragraphs: first where the inventory stands (value on hand, weeks on hand, whether the count is current), then where cash is leaking or stuck (shrinkage, dead stock, pars off versus usage), then the single move that matters most this week. Use the exact numbers from the facts.';
+    const paras = [];
+
+    // 1 — where the inventory stands
+    let p1 = 'You are holding ' + m(st.inventoryValue) + ' on the shelf';
+    if (st.weeksOnHand != null) p1 += ', about ' + st.weeksOnHand.toFixed(1) + ' weeks of stock';
+    p1 += '. ' + (st.hasCountThisWeek ? 'Your count is current, so this read is real.'
+                : st.latest ? 'Last count was ' + st.lastAge + ' days ago, so the number drifts until you recount.'
+                : 'No count on file yet, so treat this as a starting point.');
+    paras.push(p1);
+
+    // 2 — where cash is leaking or stuck
+    const leaks = [];
+    if (st.shrink > 0) leaks.push(m(st.shrink) + ' written off to shrinkage in the last thirty days');
+    if (st.deadAll > 0) leaks.push(st.deadAll + ' dead item' + (st.deadAll === 1 ? '' : 's') + ' tying up cash' + (st.dead && st.dead.length ? ', worst is ' + st.dead[0].name + ' at ' + m(st.dead[0].tied) : ''));
+    if (st.parOff > 0) leaks.push(st.parOff + ' par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage');
+    if (st.menuOver > 0) leaks.push(st.menuOver + ' menu item' + (st.menuOver === 1 ? '' : 's') + ' now over cost target');
+    paras.push(leaks.length ? 'Where cash is stuck: ' + leaks.join(', ') + '.' : 'Nothing is leaking or stuck right now. Shrinkage is clean and the pars are close to usage.');
+
+    // 3 — the single move
+    let move;
+    if (st.reorderCount > 0) move = 'Place your order first: ' + m(st.reorderTotal) + ' across ' + st.reorderCount + ' product' + (st.reorderCount === 1 ? '' : 's') + ' are below par.';
+    else if (st.dead && st.dead.length) move = 'Run down the dead stock, starting with ' + st.dead[0].name + '. It is cash sitting still.';
+    else if (!st.hasCountThisWeek) move = 'Take this week\'s count so the whole read is real, not drifting.';
+    else move = 'Nothing urgent. Hold the count rhythm and keep the pars tight to usage.';
+    paras.push(move);
+
+    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
