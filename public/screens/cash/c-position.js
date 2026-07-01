@@ -98,7 +98,7 @@ S.CashPosition = {
 
   setAsideCard(sa) {
     const row = (label, val, sub, warn) =>
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#0D181E;border-radius:var(--r2);margin-bottom:8px;">'
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--b2);">'
       + '<div><div style="font-size:13px;color:var(--t1);">' + label + '</div>' + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + sub + '</div>' : '') + '</div>'
       + '<div style="font-size:14px;font-weight:600;color:' + (warn && val > 0 ? 'var(--amber)' : 'var(--t1)') + ';white-space:nowrap;">' + App.fmtCurrency(val) + '</div></div>';
     const rateSet = CashEngine.salesTaxRate() > 0;
