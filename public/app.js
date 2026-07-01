@@ -1500,6 +1500,14 @@ const App = {
         'Event Close Rate: the share of event inquiries you turn into booked events. The Events system grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
       ] }
     ] },
+    'settings-audit': { title: 'How Audit Setup Works', sections: [
+      { h: 'What this page is', p: [
+        'A short list of questions about how you operate that the Profit and Revenue audits read. Bar Cop scores everything it can measure straight from your Control data. These few answers cover the handful of practices no report shows, like how you pour, whether recipes are costed, and whether voids need approval.',
+        'Set them once. The audits run without them, so a blank answer just carries no weight. Answer what you can and the audit score gets sharper. Each set saves on its own with its Save Data button.'
+      ] },
+      { h: 'Profit Audit questions', p: ['Pour method, recipe costing, count frequency, void and comp approval, drawer reconciliation, and invoice matching. These refine the Bar Cost, Theft and Loss, and Vendor Control sections of the Profit Audit.'] },
+      { h: 'Revenue Audit questions', p: ['Pre-shift briefings, the upsell standard, private-dining minimums, menu repricing, your last price increase, and whether labor is scheduled to a sales forecast. These refine the service and pricing sections of the Revenue Audit.'] }
+    ] },
     'getting-started': { title: 'How Getting Started Works', sections: [
       { h: 'What this page is', p: ['The setup checklist that turns a blank account into a working one, grouped into four phases: Foundation, Baseline Diagnosis, Capture System, and Weekly Work.'] },
       { h: 'How to use it', p: ['Work the steps top to bottom. Each one has a Go button that drops you on the exact screen to do it, and you check it off when done. The phases build on each other: Foundation sets your profile and targets, Baseline runs your first audits, Capture builds the operational engine, and Weekly Work is the ongoing rhythm.'] },
@@ -1683,6 +1691,7 @@ const App = {
         'getting-started':    () => S2.HubGettingStarted && S2.HubGettingStarted.open(),
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
         'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
+        'settings-audit':     () => S2.HubSettings && S2.HubSettings.open('audit-setup'),
         'user-account':       () => S2.HubUserAccounts && S2.HubUserAccounts.open('account'),
         'user-team':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('team'),
         'settings-help':      () => S2.HubSettingsHelp && S2.HubSettingsHelp.open(),
@@ -1920,6 +1929,7 @@ const App = {
     if (id === 'settings') { S.HubSettings.open(); return; }
     if (id === 'settings-profile') { S.HubSettings.open('business-profile'); return; }
     if (id === 'settings-targets') { S.HubSettings.open('recovery-targets'); return; }
+    if (id === 'settings-audit') { S.HubSettings.open('audit-setup'); return; }
     if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
