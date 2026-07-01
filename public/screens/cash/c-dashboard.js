@@ -476,60 +476,54 @@ S.CashDashboard = {
   // ── Bar Cop Briefing: a written read of the cash picture, same button Profit
   //    and Revenue carry. Cached once a week per section (DashUI helpers) so
   //    repeat opens do not spend on the API. ──────────────────────────────────
+  // Code-generated (no API): survival read, where cash is stuck, the one move.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const st = this._st || this.computeState();
     const sf = st.survival, t = st.trapped;
     if (!(sf && sf.hasData) && !(t && t.hasData)) {
       DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and add your sales, schedule, and bills, and Bar Cop can read your cash for you.');
       return;
     }
-    const rec = DashUI._insRec('cash');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
-    const prompt = this._insPrompt(st);
-    const btn = this.container.querySelector('[data-insights]');
-    const orig = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your cash right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content && data.content[0] && data.content[0].text;
-        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
-        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('cash', html));
-        restore();
-      })
-      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
   },
 
-  _insPrompt(st) {
+  _insBriefing(st) {
     const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    const sf = st.survival || {}, pos = st.position || {}, cyc = st.cycle || {}, t = st.trapped || {}, f = st.freed || {};
+    const sf = st.survival || {}, pos = st.position || {}, cyc = st.cycle || {}, t = st.trapped || {};
     const totalVendors = (window.CashEngine && CashEngine.vendors) ? CashEngine.vendors().length : 0;
     const onTerms = (st.termVendors || []).length;
-    const runway = sf.hasOpening ? (sf.runway == null ? 'holds all 13 weeks' : (sf.runway === 0 ? 'runs out this week' : sf.runway + ' weeks')) : 'not set (no opening balance)';
-    const low = sf.hasOpening && sf.lowPoint ? (this.fmtWk(sf.lowPoint.ws) + ' at ' + m(sf.lowPoint.balance)) : 'n/a';
-    const facts = [
-      'Trapped cash on the shelf: ' + (t.hasData ? m(t.total) + ' (' + m(t.dead) + ' dead stock, ' + m(t.overPar) + ' above par)' : 'not counted yet'),
-      'Cash freed so far (drop from your first weeks): ' + (f.building ? 'still building, not enough counts yet' : m(f.dollars)),
-      'Runway: ' + runway,
-      'Tightest week ahead: ' + low,
-      'Tight weeks in the next 13 (more cash out than in): ' + (sf.tightWeeks != null ? sf.tightWeeks : 'n/a'),
-      'Safe to spend right now: ' + (pos.hasOpening ? m(pos.safe) : 'n/a (opening balance not set)'),
-      'Cash locked in the operating cycle: ' + (cyc.hasData ? Math.round(cyc.cycle) + ' days (product sits ' + Math.round(cyc.dio) + ' days, you take ' + Math.round(cyc.dpo) + ' days to pay)' : 'n/a'),
-      'Vendors on payment terms: ' + onTerms + ' of ' + totalVendors,
-      'Cash going out this week (bills plus reorder): ' + m(st.outThisWeek)
-    ].join('\n');
-    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the cash side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
-      + 'STAY TRUE TO THE FACTS:\n'
-      + '- Use only the facts below. Do not invent numbers or weeks.\n'
-      + '- If a number is not set or not counted yet, say so plainly instead of guessing.\n\n'
-      + 'FACTS:\n' + facts
-      + '\n\nWrite two or three short paragraphs: first the survival read (runway and the tightest week, can they make the next quarter), then where the cash is stuck (trapped shelf cash and how long cash stays locked), then the single move that matters most this week. Use the exact numbers from the facts.';
+    const paras = [];
+
+    // 1 — the survival read
+    if (sf.hasOpening) {
+      let p1 = sf.runway == null ? 'Your cash holds all thirteen weeks ahead.'
+             : sf.runway === 0 ? 'Your cash runs out this week. This is the fire.'
+             : 'Your cash runs about ' + sf.runway + ' week' + (sf.runway === 1 ? '' : 's') + ' before it would go negative.';
+      if (sf.lowPoint) p1 += ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + m(sf.lowPoint.balance) + '.';
+      if (sf.tightWeeks > 0) p1 += ' ' + sf.tightWeeks + ' of the next thirteen run tight, more going out than coming in.';
+      if (pos.hasOpening && pos.safe != null) p1 += ' Safe to spend right now is ' + m(pos.safe) + (pos.safe < 0 ? ', which means you are into money already spoken for.' : '.');
+      paras.push(p1);
+    } else {
+      let p1 = 'Set your opening cash balance in Cash Position and this becomes a real runway instead of just timing.';
+      if (sf.tightWeeks > 0) p1 = sf.tightWeeks + ' of the next thirteen weeks run more cash out than in. ' + p1;
+      paras.push(p1);
+    }
+
+    // 2 — where the cash is stuck
+    let p2 = '';
+    if (t.hasData && t.total > 0) p2 = m(t.total) + ' of shelf cash is stuck, ' + m(t.dead) + ' in dead stock and ' + m(t.overPar) + ' above par. ';
+    else if (t.hasData) p2 = 'Almost nothing is trapped on the shelf, your inventory is working. ';
+    if (cyc.hasData) p2 += 'Your cash is locked about ' + Math.round(cyc.cycle) + ' days: product sits ' + Math.round(cyc.dio) + ' and you take ' + Math.round(cyc.dpo) + ' to pay.';
+    if (p2.trim()) paras.push(p2.trim());
+
+    // 3 — the single move that matters most
+    let move;
+    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) move = 'Buy runway this week. Move a payment to its due date and hold any order you can before the tight week lands.';
+    else if (t.hasData && t.total > 2000) move = 'The fastest cash is on your own shelf. Run the dead stock down and order to par in Trapped Cash.';
+    else if (totalVendors && onTerms < totalVendors) move = 'Put the ' + (totalVendors - onTerms) + ' vendor' + ((totalVendors - onTerms) === 1 ? '' : 's') + ' without terms on terms, so you stop financing them early.';
+    else move = 'Nothing on fire. Keep ordering to par and paying on the due date, not before.';
+    paras.push(move);
+
+    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   }
 };
