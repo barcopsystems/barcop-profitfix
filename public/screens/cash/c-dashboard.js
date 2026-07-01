@@ -78,6 +78,17 @@ S.CashDashboard = {
     return r;
   },
 
+  // Compact step summary for the Hub Cash card; mirrors this page for the
+  // current week (save/restore the selected week so the live page is untouched).
+  hubSteps() {
+    const sv = this._weekStart; this._weekStart = this.todayMonday();
+    try {
+      const done = this.stepDone();
+      const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
+      return { steps, doneCount: steps.filter(s => s.done).length, total: steps.length };
+    } finally { this._weekStart = sv; }
+  },
+
   // ── Heavy compute, once per render ───────────────────────────────────────────
   computeState() {
     const ws = this.weekStart(), we = this.weekEnd();
