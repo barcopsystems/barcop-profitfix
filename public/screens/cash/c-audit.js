@@ -68,6 +68,7 @@ S.CashAudit = {
     const btn = document.getElementById('ca-gen-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; btn.style.opacity = '0.7'; }
     const record = this._computeAudit();
+    App.dedupeAuditToday(App.data.cash_audits, record);
     await App.putRecord('core', 'cash_audit', record);
     if (App.markSetupDone) App.markSetupDone('gs_c_audit');
     this.renderMain();
