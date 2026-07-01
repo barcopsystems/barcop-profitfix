@@ -325,56 +325,43 @@ S.ShiftDashboard = {
 
   // ── Bar Cop Briefing: a written read of the floor week, cached a week per
   //    section via DashUI so repeat opens do not spend on the API. ─────────────
+  // Code-generated (no API): where sales stand, where money walks, the one move.
   showInsights() {
-    if (App.demoBlock && App.demoBlock('Bar Cop Briefing')) return;
     const st = this._wys();
     if (!st.hasSales) { DashUI.insightsModal('Bar Cop Briefing', 'Import a week of sales and Bar Cop can read your floor week for you.'); return; }
-    const rec = DashUI._insRec('shift');
-    if (rec && DashUI._insFresh(rec)) { DashUI.insightsModal('Bar Cop Briefing', rec.html, rec.generated_at); return; }
-    const prompt = this._insPrompt(st);
-    const btn = this.container.querySelector('[data-insights]');
-    const orig = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Analyzing...'; }
-    const restore = label => { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = label || orig || 'Bar Cop Briefing'; } };
-    fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }) })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        if (data.error) { DashUI.insightsModal('Bar Cop Briefing', 'Could not read your floor right now: ' + esc(data.error.message || 'try again.')); restore('Try Again'); return; }
-        const text = data.content && data.content[0] && data.content[0].text;
-        if (!text) { DashUI.insightsModal('Bar Cop Briefing', 'No response came back. Try again.'); restore('Try Again'); return; }
-        const clean = text.replace(/—/g, ', ').replace(/–/g, '-').replace(/ -- /g, ', ').replace(/--/g, '-');
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n\n/g, '</p><p style="margin:12px 0 0;">');
-        const html = '<p style="margin:0;">' + safe + '</p>';
-        DashUI.insightsModal('Bar Cop Briefing', html, DashUI._insSave('shift', html));
-        restore();
-      })
-      .catch(err => { DashUI.insightsModal('Bar Cop Briefing', 'Connection error: ' + esc(err.message) + '. Check your connection and try again.'); restore('Try Again'); });
+    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
   },
 
-  _insPrompt(st) {
+  _insBriefing(st) {
     const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
     const wkVar = this.variances().filter(v => this.inWeek(v.date));
     const shorts = wkVar.filter(v => v.status === 'Short').length;
     const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
-    const waste = this.waste().filter(r => this.inWeek(r.date)).length;
     const walked = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
-    const facts = [
-      'Sales this week (actual, from sales import): ' + m(st.rev) + ' across ' + st.days + ' day' + (st.days === 1 ? '' : 's'),
-      'Covers this week: ' + st.covers,
-      'Check average: ' + (st.checkAvg != null ? m(st.checkAvg) : 'n/a, no covers entered'),
-      'Cash over/short this week (net): ' + (st.netVar > 0 ? '+' : '') + m(st.netVar),
-      'Cash shorts this week: ' + shorts,
-      'Drawers out of tolerance: ' + oot,
-      'Voids this week: ' + m(st.voidTot),
-      'Comps this week: ' + m(st.compTot),
-      'Waste/spill records logged: ' + waste,
-      'Walked tabs logged: ' + walked
-    ].join('\n');
-    return 'You are a 30-year bar and restaurant operator writing a read for a fellow owner about the floor and register side of their bar this week. The facts below are computed from this operator\'s own data.\n\n'
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless).\n\n'
-      + 'STAY TRUE TO THE FACTS:\n- Use only the facts below. Do not invent numbers.\n- If a number is not set or the week\'s sales are not imported, say so plainly instead of guessing.\n\n'
-      + 'FACTS:\n' + facts
-      + '\n\nWrite two or three short paragraphs: first where sales stand (revenue, covers, check average), then where money is walking (cash shorts, drawers out of tolerance, voids and comps), then the single move that matters most this week. Use the exact numbers from the facts.';
+    const paras = [];
+
+    // 1 — where sales stand
+    let p1 = 'You rang ' + m(st.rev) + ' across ' + st.days + ' day' + (st.days === 1 ? '' : 's') + ' this week on ' + st.covers + ' covers';
+    p1 += st.checkAvg != null ? ', a ' + m(st.checkAvg) + ' check.' : '.';
+    paras.push(p1);
+
+    // 2 — where money is walking
+    const walks = [];
+    if (st.netVar < 0) walks.push('the drawer came up ' + m(Math.abs(st.netVar)) + ' short net' + (shorts > 0 ? ' across ' + shorts + ' short shift' + (shorts === 1 ? '' : 's') : ''));
+    else if (st.netVar > 0) walks.push('the drawer ran ' + m(st.netVar) + ' over net, which is its own flag');
+    if (oot > 0) walks.push(oot + ' drawer' + (oot === 1 ? '' : 's') + ' out of tolerance');
+    if ((st.voidTot || 0) + (st.compTot || 0) > 0) walks.push(m(st.voidTot) + ' in voids and ' + m(st.compTot) + ' in comps');
+    if (walked > 0) walks.push(walked + ' walked tab' + (walked === 1 ? '' : 's'));
+    paras.push(walks.length ? 'Where money is walking: ' + walks.join(', ') + '.' : 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.');
+
+    // 3 — the single move
+    let move;
+    if (oot > 0 || st.netVar < -20) move = 'Chase the cash first. Pull the out-of-tolerance drawers in Cash Control and see who counted and when.';
+    else if ((st.voidTot || 0) + (st.compTot || 0) > 0) move = 'Watch the voids and comps by server in Loss Prevention. The ones who spike are the conversation.';
+    else move = 'Nothing walking this week. Keep the drawer counts honest and log the exceptions as they happen.';
+    paras.push(move);
+
+    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   outlierStrip() {
