@@ -295,7 +295,6 @@ S.SalesIntegrity = {
     const latest = this.latestReview();
     const importCard = '<div class="card form-card">'
       + '<div class="card-title">Sales Integrity Review</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">This is the deep theft read; it wants a richer per-server export (no-sale opens, voids, cash and card split, comps, refunds). Basic per-server covers and sales import at your <span class="si-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span> and show in Server Check.</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div>'
       + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
@@ -434,8 +433,6 @@ S.SalesIntegrity = {
   wire() {
     document.getElementById('si-export')?.addEventListener('click', () => this.printReview(this._viewing || this.latestReview()));
     this.container.onclick = ev => {
-      const gs = ev.target.closest('.si-goshift');
-      if (gs) { App.openScreen('sc-dashboard'); return; }
       const inv = ev.target.closest('.si-investigate');
       if (inv) { this.openInvestigation(inv.dataset.name, inv.dataset.staff); return; }
       const view = ev.target.closest('.si-view');
@@ -499,7 +496,7 @@ S.SalesIntegrity = {
     App.showHelpModal('How Sales Integrity Works', [
       { p: ['Sales Integrity is the deep theft read. You drop a per-server sales report from your POS and Bar Cop benchmarks every server against the rest of the floor, then flags the ones whose numbers do not add up, with a dollar exposure on each. It is the feature an owner runs every shift or every week.'] },
       { h: 'What it catches, what it does not', p: ['It catches the register and cash games that leave a fingerprint in the sales data: no-sale drawer opens, void abuse, abnormal cash mix, low average checks, heavy comps, refunds, plus drawer shorts and walkouts Bar Cop already has on file. It does not catch product theft (overpouring, free pours, watering or walking out bottles), because an unrung free drink never reaches a sales report. Pour cost, inventory variance, and spot checks catch that half.'] },
-      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; every other column unlocks one more signal, so the richer the export, the sharper the read. A server with too few checks to judge fairly is set aside, not flagged.'] },
+      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; every other column unlocks one more signal, so the richer the export, the sharper the read. A server with too few checks to judge fairly is set aside, not flagged.', 'This is the deep theft read and wants a richer export than the weekly one, with the register and cash columns. Your basic per-server covers and sales already import at the Shift weekly close and show up in Server Check, so use that for check averages and this for the theft patterns.'] },
       { h: 'How a server gets flagged', p: ['One outlier is noise; a real pattern stacks. A server flags only when several signals line up or a strong tell (no-sales, void abuse, drawer shorts) is severe. They are sorted worst first, grouped into Register Manipulation, Cash Skimming, and Under-Ringing, with the dollar exposure where it can be computed honestly.'] },
       { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Open Investigation starts a six-step case over in Loss Prevention so you work it the same way you work any variance: watch the drawer, pull the void timestamps, talk to the shift, document the finding. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
     ]);
