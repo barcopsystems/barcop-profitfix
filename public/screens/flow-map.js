@@ -1,14 +1,15 @@
 'use strict';
 
 /* ── Blueprint — your weekly workflow, top to bottom ──────────────────────────
-   A Hub-level full page (top-nav link right of The Hub). This is not a data-flow
-   diagram (that plumbing lives in each section's Help -> Connections). It maps
-   the WORKFLOW: how one weekly sitting cascades through the app. Two bands read
-   top to bottom, "Your weekly sitting" (close Control, then work the money in
+   A Hub-level full page (top-nav link right of The Hub). Not a data-flow diagram
+   (that plumbing lives in each section's Help -> Connections). It maps the
+   WORKFLOW: how one weekly sitting cascades through the app. Two bands read top
+   to bottom, "Your weekly sitting" (close Control, then work the money in
    Recovery) and "As needed" (the jobs the close flags), landing on the outputs.
-   Every block is clickable and jumps into that screen.
 
-   SECTIONS below are the single source of truth; the layout derives from them. */
+   Visual language is lifted from the Close The Week step pages: surface cards,
+   circle step numbers, app colors only. The only loose text on the canvas is the
+   connector line between bands. SECTIONS are the single source of truth. */
 
 S.FlowMap = {
   open() {
@@ -19,11 +20,12 @@ S.FlowMap = {
   },
 
   SECTIONS: {
-    // The three Control closes: capture the week's raw numbers.
+    // The three Control closes (+ Events feeder): capture the week's raw numbers.
     capture: [
       { id: 'inventory', title: 'Inventory', go: 'ic-dashboard', steps: ['Take the count', 'Receive deliveries', 'Order to par', 'Review flags'] },
       { id: 'labor',     title: 'Labor',     go: 'lc-dashboard', steps: ['Import hours', 'Log tips', 'Build next week', 'Review flags'] },
-      { id: 'shift',     title: 'Shift',     go: 'sc-dashboard', steps: ['Import sales', 'Reconcile cash', 'Log exceptions', 'Review flags'] }
+      { id: 'shift',     title: 'Shift',     go: 'sc-dashboard', steps: ['Import sales', 'Reconcile cash', 'Log exceptions', 'Review flags'] },
+      { id: 'events',    title: 'Events',    go: 'ev-dashboard', feeder: 'Feeds catering and deposits into the week ahead.' }
     ],
     // The three Recovery closes: roll the week up and work the money.
     recovery: [
@@ -33,49 +35,50 @@ S.FlowMap = {
     ],
     // Triggered work: off the weekly clock, opened only when the close flags it.
     asneeded: [
-      { id: 'invest',    title: 'Investigations',      go: 'theft-risk',         trigger: 'a loss flag in Profit needs working' },
-      { id: 'menu',      title: 'Reprice the menu',    go: 'r-menu-engineering', trigger: 'check average or a margin is slipping' },
-      { id: 'dogtest',   title: 'Dog Test',            go: 'r-dog-test',          trigger: 'Menu Engineering flags a Dog to keep or cut' },
+      { id: 'invest',    title: 'Investigations',       go: 'theft-risk',          trigger: 'a loss flag in Profit needs working' },
+      { id: 'menu',      title: 'Reprice the menu',     go: 'r-menu-engineering',  trigger: 'check average or a margin is slipping' },
+      { id: 'dogtest',   title: 'Dog Test',             go: 'r-dog-test',          trigger: 'Menu Engineering flags a Dog to keep or cut' },
       { id: 'chase',     title: 'Chase vendor credits', go: 'ic-receive-delivery', trigger: 'a delivery came up short or a price jumped' },
-      { id: 'spotcheck', title: 'Spot Check',          go: 'ic-spot-check',       trigger: 'a variance is worth catching mid-week' }
+      { id: 'spotcheck', title: 'Spot Check',           go: 'ic-spot-check',       trigger: 'a variance is worth catching mid-week' }
     ],
     // Where the week lands.
     outputs: [
-      { id: 'hub',   title: 'The Hub',        action: 'hub',   desc: 'Recovered dollars and your Bar Cop Audit score, across every section.' },
-      { id: 'books', title: 'Books',          action: 'books', desc: 'Month-end financials, the Weekly P&L Brief, and the payroll worksheet.' },
-      { id: 'bca',   title: 'Bar Cop Audit',  action: 'audit', desc: 'The cross-system score that reads all three Control sections.' }
+      { id: 'hub',   title: 'The Hub',       action: 'hub',   desc: 'Recovered dollars and your audit score, across every section.' },
+      { id: 'books', title: 'Books',         action: 'books', desc: 'Month-end financials, the Weekly P&L, and payroll.' },
+      { id: 'bca',   title: 'Bar Cop Audit', action: 'audit', desc: 'The cross-system score off your Control data.' }
     ]
   },
 
   render() {
     const S = this.SECTIONS;
-    const grid = cards => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;">' + cards.map(c => this.card(c)).join('') + '</div>';
+    const grid = cards => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(216px,1fr));gap:14px;">' + cards.map(c => this.card(c)).join('') + '</div>';
 
-    const eventsFeeder = '<div class="fm-card" data-go="ev-dashboard" style="cursor:pointer;margin-top:14px;background:var(--input);border:1px dashed var(--b-edge);border-radius:var(--r);padding:11px 15px;font-size:12px;color:var(--t3);line-height:1.6;">'
-      + '<span style="color:var(--gold);font-weight:700;">Events feeds in &rarr; </span>'
-      + 'bookings, catering, and deposits flow into your week ahead and the Revenue audit. It runs on its own clock, not the weekly close.</div>';
-
-    const intro = '<div style="font-size:13px;color:var(--t2);line-height:1.7;max-width:700px;margin-bottom:24px;">'
-      + 'This is your weekly workflow, top to bottom. Bar Cop runs on one sitting at the end of the week: close your Control sections, roll them up and work the money in Recovery, and only then chase the specific jobs the week flags. Tap any block to jump into it.</div>';
-
-    const html = intro
-      + this.band('Your weekly sitting', 'One sitting at the end of the week. Work it top to bottom.')
-      + this.stage('1 &middot; Close your Control sections', 'Put the week\'s raw numbers in.')
+    const html = this.band('Your weekly sitting')
       + grid(S.capture)
-      + eventsFeeder
-      + this.connector('Your three closes roll up into each section\'s weekly numbers.')
-      + this.stage('2 &middot; Work the money in Recovery', 'Each section opens with Run This Week, which pulls your Control closes into one weekly read, then diagnoses, fixes, and scores.')
+      + this.connector('Your closes roll up into each section\'s weekly numbers.')
       + grid(S.recovery)
-      + this.connector('Working your biggest leak, or running an audit, points you at the specific jobs below.')
-      + this.band('As needed', 'Off the weekly clock. You open these only when the close flags them.')
+      + this.connector('Working a leak or running an audit points you at the jobs below.')
+      + this.band('As needed')
       + grid(S.asneeded)
-      + this.connector('Everything you recover and score rolls up to')
-      + this.band('Where it lands', '')
+      + this.connector('It all rolls up to')
+      + this.band('Where it lands')
       + grid(S.outputs);
 
     this.container.innerHTML = '<style>'
-      + '.fm-card{transition:border-color .12s,background .12s;}'
-      + '.fm-card:hover{border-color:var(--gold) !important;background:var(--gold-tint) !important;}'
+      + '.fm-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:15px 16px;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:background .12s;}'
+      + '.fm-card:hover{background:var(--hover);}'
+      + '.fm-ct{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
+      + '.fm-cn{font-size:14px;font-weight:700;color:var(--t1);}'
+      + '.fm-ch{color:var(--t4);font-size:15px;line-height:1;}'
+      + '.fm-step{display:flex;align-items:center;gap:11px;padding:4px 0;}'
+      + '.fm-num{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:10px;font-weight:800;}'
+      + '.fm-sl{font-size:12px;color:var(--t2);line-height:1.35;}'
+      + '.fm-meta{font-size:11.5px;color:var(--t3);line-height:1.55;}'
+      + '.fm-band{font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--t3);margin:26px 0 12px;}'
+      + '.fm-conn{display:flex;flex-direction:column;align-items:center;gap:7px;margin:18px 0 8px;}'
+      + '.fm-conn-line{width:1px;height:16px;background:var(--b2);}'
+      + '.fm-conn-txt{font-size:11.5px;color:var(--t3);text-align:center;max-width:520px;line-height:1.5;}'
+      + '.fm-conn-arw{color:var(--t4);font-size:15px;line-height:1;}'
       + '</style>'
       + '<div class="screen" style="max-width:none;padding-left:24px;padding-right:24px;">' + html + '</div>';
 
@@ -83,43 +86,26 @@ S.FlowMap = {
       el.addEventListener('click', () => this.goTo(el.dataset.go, el.dataset.action)));
   },
 
-  // ── Building blocks ─────────────────────────────────────────────────────────
-  band(title, sub) {
-    return '<div style="margin:26px 0 14px;">'
-      + '<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);">' + title + '</div>'
-      + (sub ? '<div style="font-size:12px;color:var(--t3);margin-top:5px;line-height:1.5;">' + sub + '</div>' : '')
-      + '</div>';
-  },
-  stage(title, sub) {
-    return '<div style="margin:0 0 12px;">'
-      + '<div class="sh" style="margin:0;">' + title + '</div>'
-      + (sub ? '<div style="font-size:11.5px;color:var(--t3);margin-top:5px;line-height:1.55;max-width:640px;">' + sub + '</div>' : '')
-      + '</div>';
-  },
+  band(title) { return '<div class="fm-band">' + esc(title) + '</div>'; },
+
   connector(label) {
-    return '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin:18px 0 8px;">'
-      + '<div style="width:1px;height:16px;background:var(--b2);"></div>'
-      + (label ? '<div style="font-size:11.5px;color:var(--t3);text-align:center;max-width:560px;line-height:1.55;">' + label + '</div>' : '')
-      + '<div style="color:var(--t4);font-size:15px;line-height:1;">&#9662;</div>'
-      + '</div>';
+    return '<div class="fm-conn"><div class="fm-conn-line"></div>'
+      + (label ? '<div class="fm-conn-txt">' + esc(label) + '</div>' : '')
+      + '<div class="fm-conn-arw">&#9662;</div></div>';
   },
+
   card(c) {
-    const steps = (c.steps || []).map((s, i) =>
-      '<div style="display:flex;gap:9px;align-items:baseline;font-size:12px;color:var(--t2);padding:3px 0;">'
-      + '<span style="color:var(--t4);font-size:10px;font-weight:700;flex-shrink:0;width:9px;">' + (i + 1) + '</span>'
-      + '<span style="line-height:1.4;">' + esc(s) + '</span></div>').join('');
-    const trigger = c.trigger
-      ? '<div style="font-size:11px;color:var(--t3);line-height:1.55;"><span style="color:var(--gold);font-weight:700;">When </span>' + esc(c.trigger) + '</div>'
-      : '';
-    const desc = c.desc ? '<div style="font-size:11px;color:var(--t3);line-height:1.55;">' + esc(c.desc) + '</div>' : '';
-    return '<div class="fm-card" data-go="' + esc(c.go || '') + '" data-action="' + esc(c.action || '') + '" '
-      + 'style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;min-width:0;display:flex;flex-direction:column;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;' + (steps || trigger || desc ? 'margin-bottom:11px;' : '') + '">'
-      +   '<span style="font-size:13.5px;font-weight:700;color:var(--t1);">' + esc(c.title) + '</span>'
-      +   '<span style="color:var(--t4);font-size:15px;">&rsaquo;</span>'
-      + '</div>'
-      + steps + trigger + desc
-      + '</div>';
+    let inner = '';
+    if (c.steps) {
+      inner = c.steps.map((s, i) => '<div class="fm-step"><span class="fm-num">' + (i + 1) + '</span><span class="fm-sl">' + esc(s) + '</span></div>').join('');
+    } else if (c.trigger) {
+      inner = '<div class="fm-meta"><span style="color:var(--t4);">When </span>' + esc(c.trigger) + '</div>';
+    } else if (c.feeder || c.desc) {
+      inner = '<div class="fm-meta">' + esc(c.feeder || c.desc) + '</div>';
+    }
+    return '<div class="fm-card" data-go="' + esc(c.go || '') + '" data-action="' + esc(c.action || '') + '">'
+      + '<div class="fm-ct" style="' + (inner ? 'margin-bottom:11px;' : '') + '"><span class="fm-cn">' + esc(c.title) + '</span><span class="fm-ch">&rsaquo;</span></div>'
+      + inner + '</div>';
   },
 
   goTo(go, action) {
