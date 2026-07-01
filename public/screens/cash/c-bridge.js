@@ -119,11 +119,16 @@ S.CashBridge = {
       +   (diff > 0.5
             ? '<strong style="color:var(--amber);">' + App.fmtCurrency(diff) + '</strong> went somewhere other than the bank. The bridge below shows where.'
             : 'You kept all of your profit this period. Nothing leaked out to inventory, draws, or capital.')
-      + '</div></div>';
+      + '</div>'
+      // PDF-only summary (the hero number is a styled span the exporter skips).
+      + '<div class="pdf-para" style="display:none;">' + App.fmtCurrency(kept, 0) + ' cash kept of ' + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '.' + (diff > 0.5 ? ' ' + App.fmtCurrency(diff) + ' went somewhere other than the bank.' : ' You kept all of your profit this period.') + '</div>'
+      + '</div>';
   },
 
   waterfall(br) {
+    const pdfItems = [];
     const row = (label, amount, sub, isResult) => {
+      pdfItems.push({ label, amount, isResult });
       const neg = amount < 0;
       const color = isResult ? (amount < 0 ? 'var(--red)' : 'var(--green)') : (neg ? 'var(--red)' : 'var(--green)');
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (isResult ? '' : 'border-bottom:1px solid var(--b2);') + '">'
@@ -139,7 +144,11 @@ S.CashBridge = {
     if (co.tax > 0) rows += row('Tax remitted', -co.tax, 'Money you collected and paid through');
     rows += '<div style="height:1px;background:var(--row-div);margin:4px 0;"></div>';
     rows += row('Cash you actually kept', br.cashKept, '', true);
-    return '<div class="card">' + rows + '</div>';
+    // PDF-only table (the on-screen waterfall is styled divs the exporter skips).
+    const pdfTable = '<table class="row-list" style="display:none;"><thead><tr><th>Where Your Profit Went</th><th>Amount</th></tr></thead><tbody>'
+      + pdfItems.map(it => '<tr><td>' + esc(it.label) + '</td><td>' + (it.amount < 0 ? '-' : (it.isResult ? '' : '+')) + App.fmtCurrency(Math.abs(it.amount)) + '</td></tr>').join('')
+      + '</tbody></table>';
+    return '<div class="card">' + rows + pdfTable + '</div>';
   },
 
   // ── Recurring Outflows: active series, managed in one place ───────────────────
@@ -168,7 +177,7 @@ S.CashBridge = {
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring monthly when you log a draw or loan that repeats.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Recurring Outflows</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:20%"><col style="width:30%"><col style="width:16%"><col style="width:16%"><col style="width:18%"></colgroup>'
+      + '<colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>'
       + '<thead><tr><th>Type</th><th>Note</th><th>Status</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';
   },
@@ -188,7 +197,7 @@ S.CashBridge = {
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No one-time outflows logged for ' + esc(b.label) + '.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:16%"><col style="width:22%"><col style="width:32%"><col style="width:14%"><col style="width:16%"></colgroup>'
+      + '<colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>'
       + '<thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';
   },
