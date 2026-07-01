@@ -12,8 +12,6 @@ S.ShiftDashboard = {
   _weekEnd: null,    // Sunday of the selected week
   _openStep: null,   // which step is expanded ('' = all collapsed; null = auto-open first undone)
   _flash: null,      // one-shot confirmation line under the banner
-  _showServer: false,// step 1 optional drop: per-server sales revealed
-  _showPmix: false,  // step 1 optional drop: product mix revealed
 
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
@@ -44,7 +42,7 @@ S.ShiftDashboard = {
     const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
     if (n > 0 && next > cur) return;   // never walk into the future
     this._weekEnd = next;
-    this._openStep = null; this._flash = null; this._showServer = false; this._showPmix = false;
+    this._openStep = null; this._flash = null;
     this.render(this.container, this.actions);
   },
 
@@ -112,8 +110,8 @@ S.ShiftDashboard = {
 
     if (this._openStep === 'import') {
       this.mountImport();
-      if (this._showServer) this.mountServer();
-      if (this._showPmix) this.mountPmix();
+      this.mountServer();
+      this.mountPmix();
     }
     if (this._openStep === 'cash') this.mountCashImport();
     this.wire();
@@ -225,17 +223,14 @@ S.ShiftDashboard = {
       ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
       : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
   },
-  // Step-1 optional sales cut (per-server / product mix): collapsed to a small
-  // grey toggle until the operator has that report; revealed as its own labeled
-  // dropzone. Same one-sitting import, extra fan-out.
-  optDrop(flag, id, title, sub) {
-    if (this['_show' + flag]) {
-      return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
-        + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + sub + '</div>'
-        + '<div id="' + id + '"></div><div id="' + id + '-res"></div></div>';
-    }
-    return '<div style="margin-top:12px;"><span class="sc-opt-toggle" data-opt="' + flag + '" style="font-size:11px;color:var(--t3);cursor:pointer;">+ Add ' + title.toLowerCase() + ' <span style="color:var(--t4);">(optional)</span></span></div>';
+  // Step-1 optional sales cut (per-server / product mix): its own labeled
+  // dropzone, always shown under the required daily drop. Same one-sitting
+  // import, extra fan-out.
+  optDrop(id, title, sub) {
+    return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + sub + '</div>'
+      + '<div id="' + id + '"></div><div id="' + id + '-res"></div></div>';
   },
   workspace(k, isDone) {
     this._isDone = isDone;
@@ -243,8 +238,8 @@ S.ShiftDashboard = {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. If your POS also exports a per-server or product-mix report, drop those here too and Bar Cop feeds your Server Check and Menu Engineering off the same sitting. Mark this done once the week is in.</div>'
         + '<div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
-        + this.optDrop('Server', 'sc-ck-server', 'Per-server sales', 'One row per server. Feeds Server Check and Sales Integrity.')
-        + this.optDrop('Pmix', 'sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.')
+        + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server. Feeds Server Check and Sales Integrity.')
+        + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.')
         + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
@@ -580,8 +575,6 @@ S.ShiftDashboard = {
   wire() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
-      const opt = ev.target.closest('.sc-opt-toggle');
-      if (opt) { this['_show' + opt.dataset.opt] = true; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
@@ -592,7 +585,7 @@ S.ShiftDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.sc-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.sc-wk-next')) { this._stepWeek(7); return; }
-      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this._showServer = false; this._showPmix = false; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this.render(this.container, this.actions); return; }
     };
   }
 };
