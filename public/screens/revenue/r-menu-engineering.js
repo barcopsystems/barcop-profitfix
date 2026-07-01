@@ -365,7 +365,7 @@ S.RevenueMenuEngineering = {
     }
     if (dt && dt.status === 'Kept') {
       const d = (dt.decided_at || '').slice(0, 10);
-      return '<div class="row-actions" style="align-items:center;"><span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:var(--green);">KEPT' + (d ? ' ' + d : '') + '</span>'
+      return '<div class="row-actions" style="align-items:center;"><span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:var(--green);white-space:nowrap;">KEPT' + (d ? ' ' + d : '') + '</span>'
         + '<button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(id) + '">Re-test</button></div>';
     }
     return '<div class="row-actions"><button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(id) + '">Dog Test</button></div>';
