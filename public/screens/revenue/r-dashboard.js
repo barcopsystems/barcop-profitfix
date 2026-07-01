@@ -151,8 +151,7 @@ S.RevenueDashboard = {
     }
     const mini = m => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + m.label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (m.good == null ? 'var(--t1)' : m.good ? 'var(--green)' : 'var(--red)') + ';">' + m.value + '</div>'
-      + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">' + m.sub + '</div></div>';
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (m.good == null ? 'var(--t1)' : m.good ? 'var(--green)' : 'var(--red)') + ';">' + m.value + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
     return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       + this.metricsRows(latest).map(mini).join(vdiv)
