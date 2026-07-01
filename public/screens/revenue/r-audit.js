@@ -177,14 +177,16 @@ S.RevenueAudit = {
     const num = v => v != null ? String(v) : '';
     const yN  = v => v === true ? 'Yes' : v === false ? 'No' : '';
 
-    const period = [audit.audit_period, audit.audit_id, audit.grade].filter(Boolean).map(x => String(x)).join('  ·  ');
+    const period = [audit.audit_period, audit.audit_id].filter(Boolean).map(x => String(x)).join('  ·  ');
     const metaBits = [(audit.date || '').slice(0, 10) || App._pdfDateStamp(), 'Score ' + overall + ' (' + App.scoreLabel(overall) + ')'];
     if (period) metaBits.push(period);
 
-    const b = App._pdfBuilder('Revenue Recovery Audit');
-    b.header({ right: 'Revenue Recovery Audit', meta: metaBits.join('   ·   ') });
+    const b = App._pdfBuilder('Revenue Audit');
+    b.header({ right: 'Revenue Audit', meta: metaBits.join('   ·   ') });
     b.kv('Bar', audit.bar_name || App.data.settings.bar_name || 'Your Bar');
     b.kv('Revenue Score', overall + ' of 100  (' + App.scoreLabel(overall) + ')');
+    const dq = AuditUI.dataQualityLabel(audit, 5);
+    if (dq) b.kv('Data Quality', dq);
     b.kv('Target', String(d.TARGET_SCORE || 70));
 
     // Ranked action items (same source + ordering as the screen).
