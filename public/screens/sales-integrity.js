@@ -295,6 +295,7 @@ S.SalesIntegrity = {
     const latest = this.latestReview();
     const importCard = '<div class="card form-card">'
       + '<div class="card-title">Sales Integrity Review</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">This is the deep theft read; it wants a richer per-server export (no-sale opens, voids, cash and card split, comps, refunds). Basic per-server covers and sales import at your <span class="si-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span> and show in Server Check.</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div>'
       + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
@@ -433,6 +434,8 @@ S.SalesIntegrity = {
   wire() {
     document.getElementById('si-export')?.addEventListener('click', () => this.printReview(this._viewing || this.latestReview()));
     this.container.onclick = ev => {
+      const gs = ev.target.closest('.si-goshift');
+      if (gs) { App.openScreen('sc-dashboard'); return; }
       const inv = ev.target.closest('.si-investigate');
       if (inv) { this.openInvestigation(inv.dataset.name, inv.dataset.staff); return; }
       const view = ev.target.closest('.si-view');
