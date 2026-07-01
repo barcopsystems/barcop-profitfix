@@ -2875,7 +2875,10 @@ const App = {
   // Page directions render as a right-side slide-in panel (not a centered modal):
   // it reads as "reference that slid in," dismisses with Close or a click off it,
   // and never destroys anything.
-  showHelpModal(title, sections) {
+  // action (optional) = { label, onClick } renders a primary button in a footer
+  // bar; clicking it closes the panel then runs onClick. Lets a help panel double
+  // as a detail panel with an Open action (used by the Workflow map on mobile).
+  showHelpModal(title, sections, action) {
     const sh = t => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 8px;">' + t + '</div>';
     const pp = t => '<p style="margin:0 0 10px;">' + t + '</p>';
     let body = '';
@@ -2890,7 +2893,8 @@ const App = {
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
       + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'
-      + '<div style="padding:20px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;flex:1;">' + body + '</div>';
+      + '<div style="padding:20px;font-size:13px;color:var(--t2);line-height:1.75;overflow-y:auto;flex:1;">' + body + '</div>'
+      + (action ? '<div style="padding:14px 20px;border-top:1px solid var(--b2);flex-shrink:0;"><button class="btn btn-primary" data-help-action style="width:100%;">' + action.label + '</button></div>' : '');
     const close = () => {
       box.style.transform = 'translateX(100%)';
       m.style.opacity = '0';
@@ -2898,6 +2902,7 @@ const App = {
     };
     m.addEventListener('click', close);
     box.querySelector('[data-help-close]').addEventListener('click', close);
+    if (action) box.querySelector('[data-help-action]').addEventListener('click', () => { close(); action.onClick(); });
     document.body.appendChild(m);
     document.body.appendChild(box);
     requestAnimationFrame(() => { m.style.opacity = '1'; box.style.transform = 'translateX(0)'; });
