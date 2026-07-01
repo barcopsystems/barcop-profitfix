@@ -222,11 +222,13 @@ S.LaborDashboard = {
     this._isDone = isDone;
     if (k === 'hours') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping will not double-count. No export? Log hours from your posted schedule in Log Hours.</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Timeclock hours</span>' + App.cadenceTag('Weekly') + '</div>'
         + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
         + '<div id="lc-ck-hours-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
     if (k === 'tips') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Tracking. Mark this done once it is handled, or if there are no tips to log.</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Tips export</span>' + App.cadenceTag('Weekly') + '</div>'
         + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-res"></div>'
         + '<div id="lc-ck-tips-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Tracking</button>'
