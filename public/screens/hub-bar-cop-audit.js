@@ -880,6 +880,34 @@ S.HubBarCopAudit = {
   },
 
   // ── Render: single audit detail (single-page layout) ────────────────────
+  // Per-sub-score 3-part findings (NARRATIVE / FINDING / TOOL), the same
+  // structure and tight operator voice as the Profit, Revenue, and Cash audits,
+  // so all four read the same. Built off the sub-score and its component checks.
+  _SUB_VOICE: {
+    operational_discipline:  { area: 'opening and closing discipline', screen: 'Checklists',      good: 'The floor is running the sweeps.',                 bad: 'Shifts are starting and closing without the checklist.', fix: 'Run the opening and closing sweeps every shift and log them in Checklists.' },
+    cash_integrity:          { area: 'cash handling',                  screen: 'Cash Control',     good: 'The drawer is tight and the variances are small.', bad: 'The cash path has a gap, variances or missed counts.',   fix: 'Count every drawer and log the drops in Cash Control.' },
+    inventory_execution:     { area: 'inventory execution',            screen: 'Inventory',        good: 'Counts and spot checks are on schedule.',          bad: 'Counts and spot checks are falling behind.',             fix: 'Hold the weekly count and spot-check rhythm in Inventory.' },
+    labor_hygiene:           { area: 'labor hygiene',                  screen: 'Build Schedule',   good: 'The schedule is holding and the certs are current.', bad: 'Callouts, overtime, or lapsed certs are showing.',      fix: 'Schedule to the forecast and keep certs current in Build Schedule and Staff Roster.' },
+    recovery_action:         { area: 'recovery follow-through',        screen: 'the Fix systems',  good: 'You are working your gaps and they are moving.',    bad: 'Surfaced gaps are sitting without a fix logged.',       fix: 'Work your open gaps in the Fix systems and log what you do.' },
+    operational_consistency: { area: 'week-to-week consistency',       screen: 'Run This Week',    good: 'Your covers, labor, and pour cost hold week to week.', bad: 'Your weekly numbers are swinging.',                  fix: 'Keep closing every week so the numbers steady and the trend can read.' }
+  },
+  _subFindings(key, score, detail) {
+    if (score == null) return {};
+    const v = this._SUB_VOICE[key] || { area: 'this area', screen: 'Bar Cop', good: '', bad: '', fix: '' };
+    const scored = (detail || []).filter(c => !(c.na || c.pct == null));
+    const full = scored.filter(c => c.pct >= 100).length;
+    const weak = scored.filter(c => c.pct < 100).sort((a, b) => a.pct - b.pct).slice(0, 2);
+    const strong = score >= 70;
+    return {
+      narrative: strong ? `Your ${v.area} is holding at ${score}. ${v.good}` : `Your ${v.area} is running ${score}. ${v.bad}`,
+      finding: scored.length
+        ? (full ? `${full} of ${scored.length} checks are at full marks. ` : '')
+          + (weak.length ? `The soft spots are ${weak.map(c => c.label.toLowerCase() + ' (' + c.pct + ')').join(' and ')}.` : 'Every check in this section is at full marks.')
+        : '',
+      tool: strong ? `Hold it. Keep it logged in ${v.screen}.` : v.fix
+    };
+  },
+
   _renderDetail(audit) {
     this._viewingId = audit.id;
     const overallNA = audit.overall_score == null;
@@ -903,19 +931,9 @@ S.HubBarCopAudit = {
         const naC = c.na || c.pct == null;
         return { label: c.label, extra: c.extra, value: naC ? 'N/A' : String(c.pct), valColor: naC ? 'var(--t3)' : App.scoreColor(c.pct) };
       }));
-      // One-line finding generated from the checks: how many are at full marks
-      // and the weakest ones, so each section reads like the recovery audits.
-      let finding = '';
-      if (!isNA) {
-        const scored = detail.filter(c => !(c.na || c.pct == null));
-        if (scored.length >= 2) {
-          const full = scored.filter(c => c.pct >= 100).length;
-          const weak = scored.filter(c => c.pct < 100).sort((a, b) => a.pct - b.pct).slice(0, 2);
-          const parts = [full + ' of ' + scored.length + ' checks at full marks.'];
-          if (weak.length) parts.push('Weakest: ' + weak.map(c => c.label.toLowerCase() + ' (' + c.pct + ')').join(' and ') + '.');
-          finding = parts.join(' ');
-        }
-      }
+      // 3-part findings (narrative / finding / tool), same as the other three audits.
+      const fp = isNA ? {} : this._subFindings(key, sc, detail);
+      const findLines = [fp.narrative, fp.finding, fp.tool].filter(Boolean);
       const scoreBlock = isNA
         ? '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>'
         : AuditUI.scoreRing(sc);
@@ -927,7 +945,7 @@ S.HubBarCopAudit = {
         +   scoreBlock
         + '</div>'
         + (breakdown ? divider + breakdown : '')
-        + (finding ? divider + AuditUI.findingsBlock([finding]) : '')
+        + (findLines.length ? divider + AuditUI.findingsBlock(findLines) : '')
         + '</div>';
     };
 
@@ -1067,6 +1085,10 @@ S.HubBarCopAudit = {
       b.sectionTitle(name);
       b.kv('Sub-Score', isNA ? 'N/A (Not enough data)' : String(raw));
       const detail = (audit.sub_score_detail && audit.sub_score_detail[key]) || [];
+      if (!isNA) {
+        const fp = this._subFindings(key, raw, detail);
+        [fp.narrative, fp.finding, fp.tool].filter(Boolean).forEach(t => b.paragraph(t, { gray: 55 }));
+      }
       if (detail.length) {
         b.table(['Component', 'Detail', 'Score'], detail.map(c => [
           c.label,
