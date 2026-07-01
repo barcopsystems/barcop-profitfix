@@ -87,16 +87,10 @@ S.CashTrapped = {
     const dead = t.items.filter(it => it.kind === 'dead');
     const over = t.items.filter(it => it.kind === 'over');
 
-    const bottomRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;">'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Dead Stock Report</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Cut Pars</button>'
-      + '</div>';
-
     this.container.innerHTML = '<div class="screen">'
       + stats
       + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.', exportBtn)
       + this.section('Overstock', over, 'Nothing above par right now.')
-      + bottomRow
       + '</div>';
 
     this.container.onclick = ev => {

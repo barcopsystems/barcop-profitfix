@@ -68,17 +68,13 @@ S.CashPurchasing = {
       + this.statItem('Order to Par', reorder.total > 0 ? App.fmtCurrency(reorder.total) : '-'));
 
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="cp-export">Export PDF</button>';
-    const bottomRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;">'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Adjust Pars</button>'
-      + '</div>';
+    const orderSheetBtn = '<button class="btn btn-ghost btn-sm no-print" data-go="ic-order-sheet">Open Order Sheet</button>';
 
     this.container.innerHTML = '<div class="screen">'
       + stats
       + this.buyVsUseCard()
       + this.sh('Weeks On Hand By Category', exportBtn) + this.catCard()
-      + this.sh('Vendor Purchasing') + this.vendorCard(CashEngine.vendorPurchasing(90))
-      + bottomRow
+      + this.sh('Vendor Purchasing', orderSheetBtn) + this.vendorCard(CashEngine.vendorPurchasing(90))
       + '</div>';
 
     this.container.onclick = ev => {

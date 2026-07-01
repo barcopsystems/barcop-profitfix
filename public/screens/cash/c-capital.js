@@ -68,11 +68,6 @@ S.CashCapital = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Return on Your Shelf Cash</div><button class="btn btn-ghost btn-sm no-print" id="cc-export">Export PDF</button></div>'
       + this.dataCard(headers, rows)
       + this.cycleSection()
-      + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
-      +   '<button class="btn btn-ghost btn-sm" data-go="c-trapped">Free Trapped Cash</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-go="c-purchasing">Order to Par</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-go="ic-vendors">Vendor Terms</button>'
-      + '</div>'
       + '</div>';
     this.wire();
   },
