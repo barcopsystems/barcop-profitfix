@@ -109,9 +109,9 @@ app.post('/api/generate-profit-audit', (req, res) => {
       figures are always authoritative. See memory: audit-honesty-rebuild. */
 async function generateProfitAudit(apiKey, files, appData, practices, controlData) {
   const extracted = await extractProfitInputs(apiKey, files);
-  // Operator-stated practices are authoritative over anything the model read
-  // from a file — the operator knows whether they jigger or count inventory.
-  Object.assign(extracted, practices || {});
+  // Honest-by-construction: the audit scores solely on measured data. Self-reported
+  // operating practices are intentionally ignored (nothing sends them) so a claim
+  // can never override, or inflate past, what the data actually shows.
   const numbers = computeProfitAudit(appData, controlData, extracted);
   // Stamp identifiers code owns (not the model).
   numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
@@ -235,7 +235,8 @@ app.post('/api/generate-revenue-audit', (req, res) => {
    MERGE with computed numbers authoritative. */
 async function generateRevenueAudit(apiKey, files, appData, practices, controlData) {
   const extracted = await extractRevenueInputs(apiKey, files);
-  Object.assign(extracted, practices || {});   // operator answers win over file reads
+  // Honest-by-construction: scores solely on measured data; self-reported practices
+  // are intentionally ignored (nothing sends them) and never override the numbers.
   const numbers = computeRevenueAudit(appData, controlData, extracted);
   numbers.AUDIT_ID = 'RFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
   numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
