@@ -30,8 +30,7 @@ S.CashAudit = {
     this.actions.innerHTML = '';
     const audits = this.audits();
     const latest = audits[0] || null;
-    const g = App.auditGate(latest && latest.date ? String(latest.date).slice(0,10) : null);
-    const canRun = g.canRun, daysLeft = g.daysLeft;
+    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
     const desc = 'Bar Cop reads your cash health off your own logged data. Get these in, then run it. One a week.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'ca', title: 'Cash Audit', desc,
@@ -66,7 +65,6 @@ S.CashAudit = {
   },
 
   async generate() {
-    if (App.demoBlock && App.demoBlock('Running an audit')) return;
     const btn = document.getElementById('ca-gen-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; btn.style.opacity = '0.7'; }
     const record = this._computeAudit();
