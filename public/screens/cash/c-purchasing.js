@@ -30,8 +30,8 @@ S.CashPurchasing = {
     return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
   fixedTable(headerCells, bodyRows) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
-      + this.COLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
   },
   sh(t, right) {
     return right
@@ -104,14 +104,17 @@ S.CashPurchasing = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:600;line-height:1;color:' + (cls || 'var(--t1)') + ';">' + val + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + sub + '</div></div>';
     const op = sym => '<div style="align-self:center;font-size:20px;color:var(--t4);">' + sym + '</div>';
-    const caption = '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;">Your last ' + ps.length + ' count period' + (ps.length === 1 ? '' : 's') + ', ' + this.fmtDay(ps[0].start) + ' to ' + this.fmtDay(ps[ps.length - 1].end) + '.</div>';
+    const legKey = (col, label) => '<span style="display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--t3);"><span style="width:9px;height:9px;border-radius:2px;background:' + col + ';"></span>' + label + '</span>';
+    const legend = ps.length >= 2 ? '<div class="no-print" style="display:flex;gap:16px;flex-shrink:0;">' + legKey('var(--sel-active-bg)', 'Bought') + legKey('var(--t3)', 'Used') + '</div>' : '';
+    const caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div style="font-size:11px;color:var(--t3);">Your last ' + ps.length + ' count period' + (ps.length === 1 ? '' : 's') + ', ' + this.fmtDay(ps[0].start) + ' to ' + this.fmtDay(ps[ps.length - 1].end) + '.</div>'
+      + legend + '</div>';
     const note = overBuy
       ? 'You bought <strong style="color:var(--amber);">' + App.fmtCurrency(net) + '</strong> more than you used over this stretch. That cash is sitting on your shelf. Order to par to close the gap.'
       : drawDown
         ? 'You used <strong style="color:var(--green);">' + App.fmtCurrency(Math.abs(net)) + '</strong> more than you bought over this stretch, drawing the shelf down and pulling cash back to your account. Keep ordering to par so you do not run short.'
         : 'You bought just about what you used over this stretch. Your buying is matching your sales.';
-    return this.sh('Buy vs Use')
-      + '<div class="card">' + caption
+    return '<div class="card">' + caption
       + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">'
       + stat('Bought', App.fmtCurrency(bought), 'Purchases received')
       + op('&minus;')
@@ -136,9 +139,7 @@ S.CashPurchasing = {
       + '<div style="height:' + H + 'px;display:flex;align-items:flex-end;justify-content:center;gap:5px;">' + bar(p.bought, BOUGHT) + bar(p.used, USED) + '</div>'
       + '<div style="height:1px;background:var(--b2);"></div>'
       + '<div style="font-size:9px;color:var(--t4);margin-top:6px;white-space:nowrap;">' + this.fmtDay(p.end) + '</div></div>').join('');
-    const key = (col, label) => '<span style="display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--t3);"><span style="width:9px;height:9px;border-radius:2px;background:' + col + ';"></span>' + label + '</span>';
     return '<div class="no-print" style="margin-top:18px;">'
-      + '<div style="display:flex;gap:16px;margin-bottom:12px;">' + key(BOUGHT, 'Bought') + key(USED, 'Used') + '</div>'
       + '<div style="display:flex;align-items:flex-end;gap:10px;">' + cols + '</div></div>';
   },
 

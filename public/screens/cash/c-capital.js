@@ -21,7 +21,7 @@ S.CashCapital = {
 
   statItem(label, val, cls) { return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>'; },
   statsCard(items) { return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>'; },
-  dataCard(headers, rowsHtml) { return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>' + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div>'; },
+  dataCard(headers, rowsHtml) { return '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>' + headers + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'; },
 
   verdict(gmroi) {
     if (gmroi == null) return ['Set margins', 'var(--t3)'];
@@ -65,7 +65,7 @@ S.CashCapital = {
 
     this.container.innerHTML = '<div class="screen">'
       + stats
-      + '<div class="sh" style="margin:24px 0 10px;">Return on Your Shelf Cash</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Return on Your Shelf Cash</div><button class="btn btn-ghost btn-sm no-print" id="cc-export">Export PDF</button></div>'
       + this.dataCard(headers, rows)
       + this.cycleSection()
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
@@ -105,6 +105,7 @@ S.CashCapital = {
 
   wire() {
     this.container.onclick = ev => {
+      if (ev.target.closest('#cc-export')) { App.exportPDF({ title: 'Capital Efficiency', root: this.container }); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
