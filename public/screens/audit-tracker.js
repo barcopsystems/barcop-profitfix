@@ -379,8 +379,6 @@ S.AuditTracker = {
       return;
     }
 
-    setStatus('Analyzing your data... This takes 60 to 90 seconds.', 'var(--t2)');
-
     try {
       // Honest-by-construction: the audit scores solely on what Bar Cop measures
       // from real data (Control + weekly numbers). No self-reported operating
@@ -397,7 +395,6 @@ S.AuditTracker = {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Generation failed');
 
-      setStatus('Saving audit...', 'var(--gold)');
       const d = data.auditData || {};
 
       const auditRecord = {
