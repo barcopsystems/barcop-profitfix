@@ -50,7 +50,7 @@ S.RevenueMenuEngineering = {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Items.'] },
       { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
-      { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Update Covers from Sales Mix takes a product mix export from your POS, one row per item with units sold for the week, matches each row to a menu item by name, and refreshes every item\'s covers in one drop. Run it weekly and the classification, the suggested prices, and the pricing checks all stay honest.'] },
+      { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Covers refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh covers between closes, Re-import Covers up top takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
       { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
       { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
@@ -209,7 +209,7 @@ S.RevenueMenuEngineering = {
     const plannedCount = items.filter(i => i.planned_price > 0).length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     const actionsRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="me-covers">Update Covers from Sales Mix</button>'
+      + '<button class="btn btn-ghost btn-sm" id="me-covers">Re-import Covers</button>'
       + (plannedCount > 0 ? '<button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button>' : '')
       + '</div>';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -454,18 +454,20 @@ S.RevenueMenuEngineering = {
     this.draw();
   },
 
-  // ── Update Covers from a POS sales-mix (PMIX) export ─────────────────────────
+  // ── Re-import covers from a POS sales-mix (PMIX) export ───────────────────────
   // Per-item covers drive the whole page (classification, suggested prices, the
-  // pricing checks), and no one hand-types fifty items a week. Drop a product-mix
-  // report and it matches each row to a menu item by name and refreshes every
-  // item's weekly covers in one pass. Same POS-agnostic model as the other imports.
+  // pricing checks). Covers normally refresh when the product-mix report drops at
+  // the Shift weekly close; this is the between-closes door to re-import just
+  // covers. Matches each row to a menu item by name and upserts weekly_covers.
   openCoversImport() {
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Update Covers from Sales Mix</div>'
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Re-import Covers</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">Covers refresh on their own when you drop your product mix at the <span id="me-cov-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span>. Use this to re-import just covers between closes.</div>'
       + '<div id="me-cov-csv"></div>'
       + '<div id="me-cov-result"></div>'
       + '<div id="me-cov-actions" class="no-print" style="margin-top:12px;"></div>'
       + '</div>';
     App.openModal(html, { id: 'me-cov-modal', maxWidth: 640, onClose: () => App.closeModal('me-cov-modal') });
+    document.getElementById('me-cov-goshift')?.addEventListener('click', () => { App.closeModal('me-cov-modal'); App.openScreen('sc-dashboard'); });
     if (typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(document.getElementById('me-cov-csv'), {
       dropTitle: 'Drop your POS sales mix export here',
