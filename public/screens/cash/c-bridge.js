@@ -69,7 +69,10 @@ S.CashBridge = {
     const b = this.periodBounds();
     const br = CashEngine.bridge(b.s, b.e);
     const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
-    const periodRow = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:28px 0 16px;">' + this.PERIODS.map(chip).join('') + '</div>';
+    const periodRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 16px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + this.PERIODS.map(chip).join('') + '</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="cb-export">Export PDF</button>'
+      + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
       + this.addCard()
@@ -164,10 +167,10 @@ S.CashBridge = {
         }).join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring monthly when you log a draw or loan that repeats.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Recurring Outflows</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:20%"><col style="width:30%"><col style="width:16%"><col style="width:16%"><col style="width:18%"></colgroup>'
       + '<thead><tr><th>Type</th><th>Note</th><th>Status</th><th>Amount</th><th class="no-print"></th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div></div>';
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   // ── Logged Outflows: one-time outflows in the selected period ─────────────────
@@ -184,10 +187,10 @@ S.CashBridge = {
           + '</tr>').join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No one-time outflows logged for ' + esc(b.label) + '.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
-      + '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl">'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:16%"><col style="width:22%"><col style="width:32%"><col style="width:14%"><col style="width:16%"></colgroup>'
       + '<thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th class="no-print"></th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div></div>';
+      + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   // ── Add / edit / repeat ──────────────────────────────────────────────────────
@@ -294,6 +297,7 @@ S.CashBridge = {
     App.applyCollapsed(this.container);
     this.container.onclick = async ev => {
       if (ev.target.closest('#cb-save') || ev.target.closest('#cb-clear') || ev.target.closest('.card-collapse-head')) return;
+      if (ev.target.closest('#cb-export')) { App.exportPDF({ title: 'Cash Bridge', root: this.container }); return; }
       const pc = ev.target.closest('.cb-period');
       if (pc) { this._period = pc.dataset.p; this.draw(); return; }
       const ed = ev.target.closest('.cb-edit');
