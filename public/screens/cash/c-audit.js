@@ -158,11 +158,11 @@ S.CashAudit = {
       SAFE_TO_SPEND: pos.hasOpening ? pos.safe : null,
       // S4
       VENDORS_ON_TERMS: tv.length, TOTAL_VENDORS: totalV, WEIGHTED_DPO: dpo,
-      // findings
-      S1_FINDING: this._s1Finding(s1, trapped, invValue, cap, lazyCats),
-      S2_FINDING: this._s2Finding(s2, cyc),
-      S3_FINDING: this._s3Finding(s3, sf, pos),
-      S4_FINDING: this._s4Finding(s4, tv.length, totalV, dpo)
+      // findings — 3-part (NARRATIVE / FINDING / TOOL), reads like Profit and Revenue
+      ...this._s1Parts(s1, trapped, invValue, cap, lazyCats),
+      ...this._s2Parts(s2, cyc),
+      ...this._s3Parts(s3, sf, pos),
+      ...this._s4Parts(s4, tv.length, totalV, dpo)
     };
 
     return {
@@ -260,38 +260,73 @@ S.CashAudit = {
       + '</div>';
   },
 
-  _s1Finding(s1, trapped, invValue, cap, lazyCats) {
-    if (s1 == null) return '';
+  // ── 3-part findings (NARRATIVE / FINDING / TOOL), same structure and voice as
+  //    the Profit and Revenue audits so all four read the same. ────────────────
+  _s1Parts(s1, trapped, invValue, cap, lazyCats) {
+    if (s1 == null) return {};
     const cur = v => App.fmtCurrency(v);
-    const turnsTxt = cap.turns != null ? ' Your shelf cash turns about ' + cap.turns.toFixed(1) + ' times a year.' : '';
-    const lazyTxt = lazyCats.length ? ' The capital working hardest against you sits in ' + lazyCats.join(', ') + '.' : '';
-    if (trapped.total > 0) return 'You have ' + cur(trapped.total) + ' of your shelf cash frozen in stock that is not moving or sitting above par, against ' + cur(invValue) + ' on hand. Freeing it puts real money back in the account.' + turnsTxt + lazyTxt;
-    return 'Almost none of your shelf cash is trapped. Your inventory is working.' + turnsTxt;
+    const turns = cap.turns != null ? 'Your shelf cash turns about ' + cap.turns.toFixed(1) + ' times a year. ' : '';
+    if (trapped.total > 0) return {
+      S1_NARRATIVE: 'You have ' + cur(trapped.total) + ' of shelf cash frozen in slow movers and overstock, against ' + cur(invValue) + ' on hand. That is money working too little.',
+      S1_FINDING: turns + (lazyCats.length ? 'The deadest weight sits in ' + lazyCats.join(', ') + '.' : 'Freeing it puts real money back in the account.'),
+      S1_TOOL: 'Run the dead stock down and cut the over-par in Trapped Cash, then hold pars to real usage so it does not pile back on the shelf.'
+    };
+    return {
+      S1_NARRATIVE: 'Almost none of your shelf cash is trapped. Your inventory is working.',
+      S1_FINDING: turns + 'The shelf is turning cash, not holding it.',
+      S1_TOOL: 'Hold it. Keep ordering to par so cash does not pile back onto the shelf.'
+    };
   },
-  _s2Finding(s2, cyc) {
-    if (s2 == null || !cyc.hasData) return '';
+  _s2Parts(s2, cyc) {
+    if (s2 == null || !cyc.hasData) return {};
     const cur = v => App.fmtCurrency(v);
     const d = v => Math.round(v) + ' day' + (Math.round(v) === 1 ? '' : 's');
-    if (cyc.cycle > 0) return 'Your cash is locked about ' + d(cyc.cycle) + ': product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay. About ' + cur(cyc.lockedCash) + ' is tied up in that cycle, and every day you shorten it frees roughly ' + cur(cyc.dailyCogs) + '. Order to par to cut the days product sits, and hold your terms to stretch the days you pay.';
-    return 'Your cash comes back before the bills are due. Product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay, so your vendors are financing your inventory. Hold that.';
+    if (cyc.cycle > 0) return {
+      S2_NARRATIVE: 'Your cash is locked about ' + d(cyc.cycle) + ': product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay.',
+      S2_FINDING: 'About ' + cur(cyc.lockedCash) + ' is tied up in that cycle, and every day you shorten it frees roughly ' + cur(cyc.dailyCogs) + '.',
+      S2_TOOL: 'Order to par to cut the days product sits, and hold your terms to stretch the days you pay.'
+    };
+    return {
+      S2_NARRATIVE: 'Your cash comes back before the bills are due. Product sits ' + d(cyc.dio) + ' and you take ' + d(cyc.dpo) + ' to pay.',
+      S2_FINDING: 'Your vendors are financing your inventory. That is the right side of the cycle.',
+      S2_TOOL: 'Hold it. Keep ordering to par and paying on the due date.'
+    };
   },
-  _s3Finding(s3, sf, pos) {
-    if (s3 == null || !sf.hasData) return '';
+  _s3Parts(s3, sf, pos) {
+    if (s3 == null || !sf.hasData) return {};
     const cur = v => App.fmtCurrency(v);
-    if (!sf.hasOpening) {
-      if (sf.tightWeeks > 0) return sf.tightWeeks + ' of the next thirteen weeks have more cash going out than coming in. Set your opening cash balance in Cash Position to turn this into a real runway and see exactly which week runs thin.';
-      return 'No tight weeks in the next thirteen, your cash timing looks clear. Set your opening cash balance in Cash Position to see the full runway.';
-    }
-    const lowTxt = sf.lowPoint ? ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + cur(sf.lowPoint.balance) + '.' : '';
     const safeTxt = (pos.safe != null && pos.safe < 0) ? ' Your Safe to Spend is under zero, you are leaning on money already spoken for.' : '';
-    if (sf.runway != null) return 'Your cash runs about ' + this.runwayLabel(sf.runway) + ' before it would go negative.' + lowTxt + ' Free trapped cash and hold payments to their due dates to push the runway out.' + safeTxt;
-    return 'Your cash holds all thirteen weeks.' + lowTxt + ' ' + (sf.tightWeeks > 0 ? sf.tightWeeks + ' week' + (sf.tightWeeks === 1 ? '' : 's') + ' run tight on flow, catch them on the forecast before they land.' : 'No tight weeks ahead.') + safeTxt;
+    if (!sf.hasOpening) return {
+      S3_NARRATIVE: sf.tightWeeks > 0 ? sf.tightWeeks + ' of the next thirteen weeks have more cash going out than coming in.' : 'No tight weeks in the next thirteen. Your cash timing looks clear.',
+      S3_FINDING: 'Without an opening balance this is timing only, not a real runway.',
+      S3_TOOL: 'Set your opening cash balance in Cash Position to see the full runway and exactly which week runs thin.'
+    };
+    const lowTxt = sf.lowPoint ? ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + cur(sf.lowPoint.balance) + '.' : '';
+    if (sf.runway != null) return {
+      S3_NARRATIVE: 'Your cash runs about ' + this.runwayLabel(sf.runway) + ' before it would go negative.',
+      S3_FINDING: (lowTxt ? lowTxt.trim() : 'The next thirteen weeks are the window.') + safeTxt,
+      S3_TOOL: 'Free trapped cash and hold payments to their due dates to push the runway out.'
+    };
+    return {
+      S3_NARRATIVE: 'Your cash holds all thirteen weeks.',
+      S3_FINDING: (lowTxt ? lowTxt.trim() + ' ' : '') + (sf.tightWeeks > 0 ? sf.tightWeeks + ' week' + (sf.tightWeeks === 1 ? '' : 's') + ' run tight on flow.' : 'No tight weeks ahead.') + safeTxt,
+      S3_TOOL: sf.tightWeeks > 0 ? 'Catch the tight weeks on the forecast before they land, move a payment or hold an order.' : 'Hold it. Keep the forecast current so a tight week cannot surprise you.'
+    };
   },
-  _s4Finding(s4, onTerms, totalV, dpo) {
-    if (s4 == null) return '';
+  _s4Parts(s4, onTerms, totalV, dpo) {
+    if (s4 == null) return {};
     const d = Math.round(dpo);
-    if (onTerms < totalV) return onTerms + ' of ' + totalV + ' vendors are on terms, and you hold about ' + d + ' day' + (d === 1 ? '' : 's') + ' on average before you pay. Set terms on the rest and pay each bill on its due date, not early, to keep the float.';
-    return 'Every vendor is on terms and you hold about ' + d + ' day' + (d === 1 ? '' : 's') + ' on average. Keep paying on the due date, not before, to keep the float yours.';
+    const hold = 'you hold about ' + d + ' day' + (d === 1 ? '' : 's') + ' on average before you pay';
+    if (onTerms < totalV) return {
+      S4_NARRATIVE: onTerms + ' of ' + totalV + ' vendors are on terms, and ' + hold + '.',
+      S4_FINDING: 'The ' + (totalV - onTerms) + ' without terms are the ones you are financing early.',
+      S4_TOOL: 'Set terms on the rest, and pay each bill on its due date, not early, to keep the float.'
+    };
+    return {
+      S4_NARRATIVE: 'Every vendor is on terms, and ' + hold + '.',
+      S4_FINDING: 'You are holding your cash to the last honest day.',
+      S4_TOOL: 'Keep paying on the due date, not before, to keep the float yours.'
+    };
   },
 
   viewAudit(idx) {
