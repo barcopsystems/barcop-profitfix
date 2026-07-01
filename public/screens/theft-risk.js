@@ -91,13 +91,16 @@ S.TheftRisk = {
       + '<td style="color:' + (t > 0 ? 'var(--red)' : 'var(--t3)') + ';font-weight:700;">' + t + '</td>'
       + '<td>' + w + '</td>'
       + '<td>' + (amt ? App.fmtCurrency(amt) : '-') + '</td>'
+      + '<td class="no-print"></td>'
       + '</tr>';
     const flagsTable = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 10px;">'
       + '<div class="sh" style="margin:0;">What Flagged</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="tr-brief">Loss Prevention Brief</button>'
       + '</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th></tr></thead><tbody>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.COLGROUP
+      + '<thead><tr>'
+      + '<th>Signal</th><th>Today</th><th>Last 7 Days</th><th>Amount (7d)</th><th class="no-print"></th></tr></thead><tbody>'
       + fRow('Cash drawer shorts', td.shorts.count, wkd.shorts.count, wkd.shorts.amount)
       + fRow('Flagged spot checks', td.spots.count, wkd.spots.count, wkd.spots.amount)
       + fRow('Confirmed theft (adjustment log)', td.theft.count, wkd.theft.count, wkd.theft.amount)
@@ -117,6 +120,11 @@ S.TheftRisk = {
   },
 
   INV_FOLLOWUP_DAYS: 7,
+
+  // Shared 5-column layout so the What Flagged card and the Investigations cards
+  // line up column-for-column (wide name column, three data columns, trailing
+  // action column).
+  COLGROUP: '<colgroup><col style="width:38%;"/><col style="width:15%;"/><col style="width:17%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>',
 
   // ── Investigations — read-only rollup; Work jumps to the source ─────────────
   // Loss Prevention is the cross-source overview (variance, spot-check, sales).
@@ -148,7 +156,9 @@ S.TheftRisk = {
           + '<td class="no-print"><button class="btn btn-ghost btn-sm vi-work" data-inv="' + esc(inv.id) + '">Work</button></td>'
           + '</tr>';
       }).join('');
-      h += '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      h += '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + this.COLGROUP
+        + '<thead><tr>'
         + '<th>Currently Open</th><th>Opened</th><th>Age</th><th>Progress</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'variance_investigation', open, false);
     } else {
@@ -161,11 +171,13 @@ S.TheftRisk = {
         '<tr>'
         + '<td><div class="val">' + esc(inv.sku) + '</div></td>'
         + '<td>' + esc(inv.resolved_date || '-') + '</td>'
-        + '<td style="color:var(--t2);">' + esc(inv.resolution || '-') + '</td>'
+        + '<td colspan="2" style="color:var(--t2);">' + esc(inv.resolution || '-') + '</td>'
         + '<td class="no-print"><button class="btn btn-danger btn-sm vi-remove" data-inv="' + esc(inv.id) + '">Delete</button></td>'
         + '</tr>').join('');
-      h += '<div class="card" style="overflow-x:auto;margin-top:16px;"><table class="row-list"><thead><tr>'
-        + '<th>Resolved</th><th>Resolved On</th><th>Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      h += '<div class="card" style="overflow-x:auto;margin-top:16px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + this.COLGROUP
+        + '<thead><tr>'
+        + '<th>Resolved</th><th>Resolved On</th><th colspan="2">Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'variance_investigation', newest, false);
     }
     return h;
