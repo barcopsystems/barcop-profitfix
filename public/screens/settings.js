@@ -371,9 +371,6 @@ S.HubSettings = {
     App.data.settings.annual_food_revenue= 374400;
     App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, labor_cost_pct:30, prime_cost_pct:60 };
     App.data.settings.onboarding_complete= true;
-    // The demo represents ~90 days of use, so the first-week audit lock is long
-    // past. Audit availability then follows each audit's own 7-day relock.
-    App.data.settings.account_start = dateStr(90);
 
     // ── Bar Products ──
     const bp = [

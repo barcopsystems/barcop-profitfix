@@ -809,6 +809,7 @@ S.HubBarCopAudit = {
     // Row-per-record in core_events now; full executive-audit history is kept
     // (the 12-audit blob cap is gone) and paged via "Show older" on the list.
     const snapshot = this._computeAuditSnapshot();
+    App.dedupeAuditToday(App.data.bar_cop_audits, snapshot);
     const ok = await App.putRecord('core', 'bar_cop_audit', snapshot);
     if (ok) {
       this._viewingId = snapshot.id;

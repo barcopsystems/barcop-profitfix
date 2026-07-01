@@ -413,6 +413,7 @@ S.AuditTracker = {
 
       // Row-per-record in core_events now, so the old 12-audit blob cap is gone:
       // full audit history is retained and paged via "Show older" on the list.
+      App.dedupeAuditToday(App.data.audits, auditRecord);
       await App.putRecord('core', 'audit', auditRecord);
       App.markSetupDone('gs_p_audit');
 
