@@ -17,7 +17,7 @@ S.RevenueAudit = {
     const latest = audits[0] || null;
     const daysSince = latest && latest.date
       ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const canRun = daysSince >= 7;
+    const canRun = true; /* TEMP: unlocked to QA the intake form. REVERT to: daysSince >= 7 */
     const daysLeft = canRun ? 0 : 7 - daysSince;
     const desc = 'Generate a new audit every week. Run your first one any time. It scores your trailing four weeks.';
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
