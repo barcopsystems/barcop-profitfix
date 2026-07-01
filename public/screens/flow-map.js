@@ -163,14 +163,8 @@ S.FlowMap = {
     // Green number on the stage this node lives in; stays until another stage.
     this.container.querySelectorAll('.fm-hdnum[data-stage]').forEach(el => el.classList.toggle('fm-hdnum-on', el.dataset.stage === node.stage));
     if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
-      const openBtn = (node.go || node.action)
-        ? '<div class="card-actions"><button class="btn btn-primary" id="fm-mopen" data-go="' + esc(node.go || '') + '" data-action="' + esc(node.action || '') + '">Open</button></div>'
-        : '';
-      App.openModal('<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(node.title) + '</div>'
-        + '<div style="font-size:13px;color:var(--t2);line-height:1.7;">' + esc(node.d) + '</div>' + openBtn + '</div>',
-        { id: 'fm-detail-modal', maxWidth: 440 });
-      const mb = document.getElementById('fm-mopen');
-      if (mb) mb.addEventListener('click', () => { App.closeModal('fm-detail-modal'); this.goTo(mb.dataset.go, mb.dataset.action); });
+      const action = (node.go || node.action) ? { label: 'Open', onClick: () => this.goTo(node.go, node.action) } : null;
+      App.showHelpModal(node.title, [{ p: [node.d] }], action);
       return;
     }
     this.container.querySelectorAll('[data-node]').forEach(el => el.classList.toggle('fm-on', el.dataset.node === id));
