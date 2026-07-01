@@ -13,7 +13,8 @@ S.HubSettings = {
   // safely.
   _GROUPS: {
     'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'tax', 'service'] },
-    'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue'] }
+    'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue'] },
+    'audit-setup':      { title: 'Audit Setup',      action: 'settings-audit',   ids: ['profit-practices', 'revenue-practices'] }
   },
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps.
@@ -29,7 +30,9 @@ S.HubSettings = {
       { id:'tax',     title:'Taxes, Payroll & Wage',     body:this.secTaxes(),         save:true },
       { id:'service', title:'Service Periods',           body:this.secServicePeriods(), save:true },
       { id:'profit',  title:'Profit Targets',            body:this.secProfit(),        save:true },
-      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true }
+      { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true },
+      { id:'profit-practices',  title:'Profit Audit Questions',  body:this.secProfitPractices(),  save:true },
+      { id:'revenue-practices', title:'Revenue Audit Questions', body:this.secRevenuePractices(), save:true }
     ];
     const grp = this._GROUPS[group];
     const secs = grp ? allSecs.filter(s => grp.ids.indexOf(s.id) !== -1) : allSecs;
@@ -124,6 +127,39 @@ S.HubSettings = {
       + '</div>';
   },
 
+  // ── Audit Setup — the operating-practice questions the two recovery audits
+  // read. Bar Cop scores what it can measure from your Control data; these few
+  // answers cover the handful of practices no report shows (how you pour, whether
+  // recipes are costed, void approval, and so on) and refine the score. They
+  // persist to settings.profit_practices / settings.revenue_practices and the
+  // audits run fine without them. Reuses AuditUI.intakeQRow (the same rows the
+  // old intake forms used), so a blank answer just carries no weight.
+  _bstr(v) { return v === true ? 'true' : v === false ? 'false' : (v || ''); },
+
+  secProfitPractices() {
+    const p = (App.data.settings || {}).profit_practices || {};
+    const b = this._bstr;
+    return '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your Profit Audit score and are not in any report. Answer what applies; the rest carry no weight. Saved here, so you set them once.</div>'
+      + AuditUI.intakeQRow('ap', 'How do you pour spirits?', 'pour_method', [['Free pour','Free pour'],['Jiggered/measured','Jiggered or measured']], p.pour_method)
+      + AuditUI.intakeQRow('ap', 'Are your recipes costed?', 'recipes_costed', [['none','None'],['some','Some'],['all','All']], p.recipes_costed)
+      + AuditUI.intakeQRow('ap', 'How often do you count inventory?', 'inv_freq', [['Never','Never'],['Monthly','Monthly'],['Weekly','Weekly']], p.inv_freq)
+      + AuditUI.intakeQRow('ap', 'Manager approval on voids and comps?', 'void_approval', [['false','No'],['true','Yes']], b(p.void_approval))
+      + AuditUI.intakeQRow('ap', 'Drawer reconciled every shift?', 'drawer_recon', [['false','No'],['true','Yes']], b(p.drawer_recon))
+      + AuditUI.intakeQRow('ap', 'Invoices matched to orders?', 'invoice_vs_po', [['Never matched','Never'],['Spot checked','Spot check'],['Matched every delivery','Every delivery']], p.invoice_vs_po);
+  },
+
+  secRevenuePractices() {
+    const p = (App.data.settings || {}).revenue_practices || {};
+    const b = this._bstr;
+    return '<div style="font-size:12px;color:var(--t3);margin-bottom:6px;">These shape your Revenue Audit score and are not in any report. Answer what applies; the rest carry no weight. Saved here, so you set them once.</div>'
+      + AuditUI.intakeQRow('ar', 'Pre-shift briefing held?', 'pre_shift', [['never','Never'],['sometimes','Sometimes'],['every','Every shift']], p.pre_shift)
+      + AuditUI.intakeQRow('ar', 'Server upsell standard taught and tracked?', 'upsell_standard', [['false','No'],['true','Yes']], b(p.upsell_standard))
+      + AuditUI.intakeQRow('ar', 'Private dining package with a spend minimum?', 'private_dining_min', [['false','No'],['true','Yes']], b(p.private_dining_min))
+      + AuditUI.intakeQRow('ar', 'Menu repriced or engineered in last 6 months?', 'menu_engineered', [['false','No'],['true','Yes']], b(p.menu_engineered))
+      + AuditUI.intakeQRow('ar', 'When did you last raise menu prices?', 'last_price_increase', [['within_6mo','Within 6 months'],['6_12mo','6 to 12 months'],['over_year','Over a year ago'],['never','Cannot recall']], p.last_price_increase)
+      + AuditUI.intakeQRow('ar', 'Labor scheduled to a sales forecast?', 'labor_to_forecast', [['false','No'],['true','Yes']], b(p.labor_to_forecast));
+  },
+
   // secShift removed. Cash variance tolerance now lives in Shift Control's
   // own Setup section (Cash Tolerances) so all Control setup stays with the
   // module it controls. Hub Settings keeps only genuinely cross-system fields.
@@ -216,6 +252,30 @@ S.HubSettings = {
       delete rs.targets.kitchen_labor_pct;
       delete rs.targets.floor_labor_pct;
       keys.push('revenue_settings');
+    } else if (which === 'profit-practices') {
+      const s = App.data.settings;
+      const val = id => (document.getElementById('ap-q-' + id) || {}).value || '';
+      s.profit_practices = {
+        pour_method:    val('pour_method'),
+        recipes_costed: val('recipes_costed'),
+        inv_freq:       val('inv_freq'),
+        void_approval:  val('void_approval'),
+        drawer_recon:   val('drawer_recon'),
+        invoice_vs_po:  val('invoice_vs_po')
+      };
+      keys.push('settings');
+    } else if (which === 'revenue-practices') {
+      const s = App.data.settings;
+      const val = id => (document.getElementById('ar-q-' + id) || {}).value || '';
+      s.revenue_practices = {
+        pre_shift:           val('pre_shift'),
+        upsell_standard:     val('upsell_standard'),
+        private_dining_min:  val('private_dining_min'),
+        menu_engineered:     val('menu_engineered'),
+        last_price_increase: val('last_price_increase'),
+        labor_to_forecast:   val('labor_to_forecast')
+      };
+      keys.push('settings');
     } else {
       return;
     }

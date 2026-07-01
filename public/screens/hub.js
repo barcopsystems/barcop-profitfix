@@ -86,6 +86,7 @@ S.Hub = {
       getStart:'<path d="M2.5 8.5l4 4 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       profile: '<path d="M3 7.5V14h11V7.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 4h13l1 3.5H1L2 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 14v-3.5h4V14" stroke="currentColor" stroke-width="1.2" fill="none"/>',
       target:  '<circle cx="8.5" cy="8.5" r="6.3" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="3.4" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/>',
+      auditq:  '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       user:    '<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       team:    '<circle cx="6" cy="6.5" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.4 1.9-4 4.2-4s4.2 1.6 4.2 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="12" cy="6" r="1.9" stroke="currentColor" stroke-width="1.2"/><path d="M11.4 10.1c1.8.3 3.1 1.7 3.1 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
@@ -104,6 +105,7 @@ S.Hub = {
       + '<div class="nav-section">Settings</div>'
       + row('settings-profile', 'Business Profile', 'profile')
       + row('settings-targets', 'Recovery Targets', 'target')
+      + row('settings-audit', 'Audit Setup', 'auditq')
       + '<div class="nav-section">Account</div>'
       + row('user-account', 'Your Account', 'user')
       + (isAdmin ? row('user-team', 'Team Members', 'team') : '')
@@ -1258,6 +1260,7 @@ S.Hub = {
       else if (action === 'settings-home')      S.HubSettingsHome?.open?.();
       else if (action === 'settings-profile')   S.HubSettings.open('business-profile');
       else if (action === 'settings-targets')   S.HubSettings.open('recovery-targets');
+      else if (action === 'settings-audit')     S.HubSettings.open('audit-setup');
       else if (action === 'settings')           S.HubSettings.open();
       else if (action === 'user-account')       S.HubUserAccounts.open('account');
       else if (action === 'user-team')          S.HubUserAccounts.open('team');
