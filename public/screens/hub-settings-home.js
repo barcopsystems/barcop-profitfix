@@ -117,18 +117,7 @@ S.HubSettingsHome = {
     ];
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 
-    // ── Audit Setup — the operating-practice answers the two recovery audits read.
-    const countAns = (o, ks) => ks.filter(k => { const v = (o || {})[k]; return v != null && v !== ''; }).length;
-    const pAns = countAns(s.profit_practices,  ['pour_method','recipes_costed','inv_freq','void_approval','drawer_recon','invoice_vs_po']);
-    const rAns = countAns(s.revenue_practices, ['pre_shift','upsell_standard','private_dining_min','menu_engineered','last_price_increase','labor_to_forecast']);
-    const ansVal = (n) => n === 0 ? dash : (n + ' of 6 answered');
-    const auditRows = [
-      kvRow('Profit Questions',  ansVal(pAns)),
-      kvRow('Revenue Questions', ansVal(rAns))
-    ];
-    const auditCard = card('Audit Setup', 'settings-audit', 'Edit', auditRows);
-
-    mount.innerHTML = '<div class="screen">' + setupCard + acctCard + profileCard + targetCard + auditCard + '</div>';
+    mount.innerHTML = '<div class="screen">' + setupCard + acctCard + profileCard + targetCard + '</div>';
     this._wire();
   },
 
@@ -139,7 +128,6 @@ S.HubSettingsHome = {
       else if (act === 'user-team')        S.HubUserAccounts?.open?.('team');
       else if (act === 'settings-profile') S.HubSettings?.open?.('business-profile');
       else if (act === 'settings-targets') S.HubSettings?.open?.('recovery-targets');
-      else if (act === 'settings-audit')   S.HubSettings?.open?.('audit-setup');
     };
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));
   }
