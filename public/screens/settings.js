@@ -545,6 +545,12 @@ S.HubSettings = {
     const daysAgoISO = (n) => new Date(Date.now() - n*24*60*60*1000).toISOString();
     const mkAudit = (mod, p) => {
       const d = p.raw;
+      // Weekly fills carry interpolated numbers but no authored narrative. Generate
+      // the same 3-line findings the live audits use so every seeded audit reads the
+      // same; the milestones already carry their authored narrative, so skip those.
+      if (!d.S1_NARRATIVE && window.AuditNarrative) {
+        Object.assign(d, mod === 'profit' ? AuditNarrative.profitNarrative(d) : AuditNarrative.revenueNarrative(d));
+      }
       const sections = {};
       const items = [];
       if (mod === 'profit') {
@@ -3533,7 +3539,65 @@ S.HubSettings = {
     //  seeded data, so it matches the Cash screens exactly and behaves like a
     //  real user's. The older milestones are hand-authored frozen history.
     // ════════════════════════════════════════════════════════════════════
+    // Seed-time 3-line findings for the cash audits, built off the same numbers
+    // and in the same voice as the live c-audit engine, so every cash audit
+    // (milestones and weekly fills) reads the same as Profit, Revenue, and Bar Cop.
+    const _cashFindings = (r) => {
+      const cur = v => App.fmtCurrency(v);
+      const dtxt = v => Math.round(v) + ' day' + (Math.round(v) === 1 ? '' : 's');
+      const o = {};
+      if (r.S1_SCORE != null) {
+        const turns = r.BLENDED_TURNS != null ? 'Your shelf cash turns about ' + r.BLENDED_TURNS.toFixed(1) + ' times a year. ' : '';
+        if (r.TRAPPED_CASH > 0) {
+          o.S1_NARRATIVE = 'You have ' + cur(r.TRAPPED_CASH) + ' of shelf cash frozen in slow movers and overstock, against ' + cur(r.INVENTORY_VALUE) + ' on hand. That is money working too little.';
+          o.S1_FINDING = turns + 'Freeing it puts real money back in the account.';
+          o.S1_TOOL = 'Run the dead stock down and cut the over-par in Trapped Cash, then hold pars to real usage so it does not pile back on the shelf.';
+        } else {
+          o.S1_NARRATIVE = 'Almost none of your shelf cash is trapped. Your inventory is working.';
+          o.S1_FINDING = turns + 'The shelf is turning cash, not holding it.';
+          o.S1_TOOL = 'Hold it. Keep ordering to par so cash does not pile back onto the shelf.';
+        }
+      }
+      if (r.S2_SCORE != null && r.CYCLE_DAYS != null) {
+        if (r.CYCLE_DAYS > 0) {
+          o.S2_NARRATIVE = 'Your cash is locked about ' + dtxt(r.CYCLE_DAYS) + ': product sits ' + dtxt(r.DIO) + ' and you take ' + dtxt(r.DPO) + ' to pay.';
+          o.S2_FINDING = 'About ' + cur(r.LOCKED_CASH) + ' is tied up in that cycle, and every day you shorten it frees roughly ' + cur(r.DAILY_COGS) + '.';
+          o.S2_TOOL = 'Order to par to cut the days product sits, and hold your terms to stretch the days you pay.';
+        } else {
+          o.S2_NARRATIVE = 'Your cash comes back before the bills are due. Product sits ' + dtxt(r.DIO) + ' and you take ' + dtxt(r.DPO) + ' to pay.';
+          o.S2_FINDING = 'Your vendors are financing your inventory. That is the right side of the cycle.';
+          o.S2_TOOL = 'Hold it. Keep ordering to par and paying on the due date.';
+        }
+      }
+      if (r.S3_SCORE != null) {
+        const safeTxt = (r.SAFE_TO_SPEND != null && r.SAFE_TO_SPEND < 0) ? ' Your Safe to Spend is under zero, you are leaning on money already spoken for.' : '';
+        const lowTxt = (r.LOW_POINT_WEEK && r.LOW_POINT_BAL != null) ? ' The tightest week is ' + r.LOW_POINT_WEEK + ' at ' + cur(r.LOW_POINT_BAL) + '.' : '';
+        if (r.RUNWAY != null) {
+          o.S3_NARRATIVE = 'Your cash runs about ' + Math.round(r.RUNWAY) + ' weeks before it would go negative.';
+          o.S3_FINDING = (lowTxt ? lowTxt.trim() : 'The next thirteen weeks are the window.') + safeTxt;
+          o.S3_TOOL = 'Free trapped cash and hold payments to their due dates to push the runway out.';
+        } else {
+          o.S3_NARRATIVE = r.TIGHT_WEEKS > 0 ? r.TIGHT_WEEKS + ' of the next thirteen weeks run tight.' : 'No tight weeks in the next thirteen. Your cash timing looks clear.';
+          o.S3_FINDING = 'Without an opening balance this is timing only, not a real runway.';
+          o.S3_TOOL = 'Set your opening cash balance in Cash Position to see the full runway.';
+        }
+      }
+      if (r.S4_SCORE != null && r.TOTAL_VENDORS) {
+        const hold = 'you hold about ' + dtxt(r.WEIGHTED_DPO) + ' on average before you pay';
+        if (r.VENDORS_ON_TERMS < r.TOTAL_VENDORS) {
+          o.S4_NARRATIVE = r.VENDORS_ON_TERMS + ' of ' + r.TOTAL_VENDORS + ' vendors are on terms, and ' + hold + '.';
+          o.S4_FINDING = 'The ' + (r.TOTAL_VENDORS - r.VENDORS_ON_TERMS) + ' without terms are the ones you are financing early.';
+          o.S4_TOOL = 'Set terms on the rest, and pay each bill on its due date, not early, to keep the float.';
+        } else {
+          o.S4_NARRATIVE = 'Every vendor is on terms, and ' + hold + '.';
+          o.S4_FINDING = 'You are holding your cash to the last honest day.';
+          o.S4_TOOL = 'Keep paying on the due date, not before, to keep the float yours.';
+        }
+      }
+      return o;
+    };
     const mkCashAudit = (date, generated_at, audit_id, period, raw) => {
+      Object.assign(raw, _cashFindings(raw));   // 3-line findings on every cash audit
       const N = (window.S && S.CashAudit) ? S.CashAudit.SECTION_NAMES
               : ['Capital Efficiency', 'Cash Conversion Cycle', 'Liquidity & Runway', 'Payment Terms'];
       const sections = {};
@@ -3621,8 +3685,25 @@ S.HubSettings = {
     // Lighter weekly fill: sub-scores + a natural path, empty component detail
     // (the detail view renders it cleanly), no exposures. The two rich milestones
     // below and the live day-0 engine carry the full breakdowns.
+    // Weekly fills now carry real component rows per covered sub-score, so the
+    // detail view shows scoring rows and the full 3-line findings on every audit,
+    // not just the milestones. pct values spread deterministically around the
+    // sub-score (one near full marks, the rest varied) so it reads like a real week.
+    const BCA_COMPS = [
+      ['Opening checklist completion', 'Closing checklist completion', 'Inventory counts completed', 'Spot checks completed', 'Shifts logged'],
+      ['Cash variance trend', 'Drawer counts per operating day', 'Cash drops on revenue days'],
+      ['Inventory counts on schedule', 'Spot checks completed', 'Vendor discrepancy resolution rate', 'Spot check clean variance rate'],
+      ['Schedule adherence', 'Callout frequency', 'Overtime incidents under control', 'Certifications current', 'Coaching log activity'],
+      ['Acting on surfaced gaps', 'Fixes that produced movement'],
+      ['Weekly covers consistency', 'Weekly labor % consistency', 'Weekly pour cost % consistency']
+    ];
+    const BCA_OFF = [30, -16, 8, -20, 14, -10, 4];   // spread that averages near the sub-score
+    const bcaDetailFor = (subs) => subs.map((s, i) => {
+      if (s == null) return [];
+      return BCA_COMPS[i].map((label, j) => ({ label, extra: '', pct: Math.max(15, Math.min(100, Math.round(s + BCA_OFF[j % BCA_OFF.length]))) }));
+    });
     const bcaFill = (daysAgo, auditId, subs) =>
-      bcaRec(daysAgo, auditId, subs, [[], [], [], [], [], []], [], [], { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 });
+      bcaRec(daysAgo, auditId, subs, bcaDetailFor(subs), [], [], { gaps: 0, fixesLogged: 0, dollarsRecovered: 0, stillMeasuring: 0 });
     App.data.bar_cop_audits = [
       // Weekly Bar Cop history on the 90/60/30/0 + fills grid, same as the recovery
       // audits. Recovery Action and Operational Consistency read N/A until a trend
