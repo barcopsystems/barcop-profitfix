@@ -205,7 +205,9 @@ S.RevenueMenuItems = {
   CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
   renderLanding() {
-    const all = this.items();
+    const everything = this.items();
+    const all = everything.filter(i => !i.archived);
+    const archivedItems = everything.filter(i => i.archived);
     const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
 
     // Inline add form is always-on at the top (edit happens in the modal), so
@@ -312,7 +314,24 @@ S.RevenueMenuItems = {
       body = '<div id="mi-list-export">' + warn + sections + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + addWrap + body + '</div>';
+    // Archived items (cut from a Dog Test, or archived here): kept out of the menu
+    // and Menu Engineering, restorable or deletable for good. Mirrors Locations.
+    const archivedSection = archivedItems.length
+      ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+        + '<th>Item</th><th>Category</th><th>Price</th><th></th>'
+        + '</tr></thead><tbody>'
+        + archivedItems.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
+            + '<td><div class="val">' + esc(item.name) + '</div></td>'
+            + '<td>' + esc(item.category || '') + '</td>'
+            + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
+            + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Restore</button>'
+            + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete Permanently</button></div></td>'
+          + '</tr>').join('')
+        + '</tbody></table></div>'
+      : '';
+
+    this.container.innerHTML = '<div class="screen">' + addWrap + body + archivedSection + '</div>';
 
     // Toggle wiring (both lanes)
     this.container.querySelectorAll('.mi-mode').forEach(b =>
@@ -335,6 +354,27 @@ S.RevenueMenuItems = {
     this.container.querySelectorAll('.mi-del').forEach(b =>
       b.addEventListener('click', async () => {
         const ok = await App.confirmDelete();
+        if (!ok) return;
+        App.data.menu_items = this.items().filter(i => i.id !== b.dataset.id);
+        await App.saveKey('menu_items');
+        this.renderLanding();
+      }));
+    // Archived: restore brings the item back to the live menu; delete-permanently
+    // removes it for good (guarded, since there is no undo).
+    this.container.querySelectorAll('.mi-restore').forEach(b =>
+      b.addEventListener('click', async () => {
+        const item = this.items().find(i => i.id === b.dataset.id);
+        if (item) { item.archived = false; await App.saveKey('menu_items'); this.renderLanding(); }
+      }));
+    this.container.querySelectorAll('.mi-delperm').forEach(b =>
+      b.addEventListener('click', async () => {
+        const item = this.items().find(i => i.id === b.dataset.id);
+        if (!item) return;
+        const ok = await App.confirm({
+          title: 'Delete this item permanently?',
+          message: '"' + (item.name || 'This item') + '" will be removed for good. This cannot be undone.',
+          confirmText: 'Delete Permanently', danger: true
+        });
         if (!ok) return;
         App.data.menu_items = this.items().filter(i => i.id !== b.dataset.id);
         await App.saveKey('menu_items');

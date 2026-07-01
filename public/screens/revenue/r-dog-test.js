@@ -26,7 +26,7 @@ S.RevenueDogTest = {
       { p: ['A Dog (low margin and low volume in the Menu Engineering groups) is not always a bad dish. Some are good items buried in a bad menu slot with a weak description. Before you pull one, give it a fair 90-day test in a better position with a rewritten description and watch whether volume moves.'] },
       { h: 'Starting a Test', p: ['Pick the menu item and Bar Cop auto-fills the baseline from its current weekly covers on Menu Items. Note what you changed (new position, new description) and start. The test runs 90 days.'] },
       { h: 'Tracking It', p: ['Current weekly volume reads live from that item\'s weekly covers on the Menu Items screen, so keep that number current as service data comes in. The card shows the lift against baseline and counts down the 90 days.'] },
-      { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Remove It if it did not. The decision snapshots the final volume and lands in Test History.'] }
+      { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Cut It to pull it off the menu. Either way the decision snapshots the final volume and lands in Test History. A kept item stays on the menu and shows as Kept back in Menu Engineering; a cut item moves to Archived on Menu Items, where you can restore it or delete it for good.'] }
     ]);
   },
 
@@ -45,7 +45,7 @@ S.RevenueDogTest = {
 
     // Filter to items that have a name. Sort alphabetically. Store by ID so
     // renaming the item in Menu Items doesn't orphan the test.
-    const items = (App.data.menu_items || []).filter(m => m && m.id && m.name)
+    const items = (App.data.menu_items || []).filter(m => m && m.id && m.name && !m.archived)
       .slice().sort((a, b) => a.name.localeCompare(b.name));
     const opts = '<option value="">Select a menu item...</option>'
       + items.map(m => {
@@ -110,7 +110,7 @@ S.RevenueDogTest = {
           + '</div>'
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
           +   '<button class="btn btn-primary btn-sm dt-keep" data-id="' + esc(t.id) + '">Keep It</button>'
-          +   '<button class="btn btn-danger btn-sm dt-remove" data-id="' + esc(t.id) + '">Remove It</button>'
+          +   '<button class="btn btn-danger btn-sm dt-remove" data-id="' + esc(t.id) + '">Cut It</button>'
           +   '<button class="btn btn-ghost btn-sm dt-cancel" data-id="' + esc(t.id) + '" style="margin-left:auto;">Cancel Test</button>'
           + '</div>'
           + '</div>';
@@ -122,7 +122,7 @@ S.RevenueDogTest = {
       const rows = decided.slice(0, App.listLimit('core', 'menu_dog_test')).map(t => {
         const decision = t.status === 'Kept'
           ? '<span style="color:var(--green);font-weight:600;">Kept</span>'
-          : '<span style="color:var(--t3);font-weight:600;">Removed</span>';
+          : '<span style="color:var(--t3);font-weight:600;">Cut</span>';
         // For decided tests, fall back to the volume snapshot saved at decision time.
         const liveCur = currentFor(t);
         const finalCur = (t.current_volume != null) ? t.current_volume : liveCur;
@@ -184,7 +184,7 @@ S.RevenueDogTest = {
     this.container.querySelectorAll('.dt-keep').forEach(b =>
       b.addEventListener('click', () => this.decide(b.dataset.id, 'Kept')));
     this.container.querySelectorAll('.dt-remove').forEach(b =>
-      b.addEventListener('click', () => this.decide(b.dataset.id, 'Removed')));
+      b.addEventListener('click', () => this.decide(b.dataset.id, 'Cut')));
     this.container.querySelectorAll('.dt-cancel, .dt-del').forEach(b =>
       b.addEventListener('click', () => this.del(b.dataset.id)));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e =>
@@ -203,6 +203,7 @@ S.RevenueDogTest = {
 
     const item = (App.data.menu_items || []).find(m => m.id === itemId);
     if (!item) return fail('Item no longer exists. Pick another.');
+    if (this.list().some(t => t.item_id === itemId && t.status === 'Testing')) return fail('This item already has an active Dog Test.');
 
     const rec = {
       id: App.uid(),
@@ -228,6 +229,14 @@ S.RevenueDogTest = {
     if (item && item.weekly_covers != null) t.current_volume = item.weekly_covers;
     t.status = status;
     t.decided_at = new Date().toISOString();
+    // Cut pulls the item off the menu: it soft-archives so Menu Engineering and
+    // Menu Items stop showing it, but it lands in Archived on Menu Items where it
+    // can be restored or deleted for good. Keep leaves the item live.
+    if (status === 'Cut' && item) {
+      item.archived = true;
+      App.putRecord('core', 'menu_dog_test', t).then(() => App.saveKey('menu_items')).then(() => this.draw());
+      return;
+    }
     App.putRecord('core', 'menu_dog_test', t).then(() => this.draw());
   },
 

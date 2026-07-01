@@ -66,7 +66,7 @@ S.RevenueMenuEngineering = {
   },
 
   draw() {
-    const priced = (App.data.menu_items || []).some(i => i.price && i.cost);
+    const priced = (App.data.menu_items || []).some(i => i.price && i.cost && !i.archived);
     this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '') + this.classificationHtml() + '</div>';
     const c = this.container;
     c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));
@@ -84,7 +84,7 @@ S.RevenueMenuEngineering = {
   classificationHtml() {
     // Inject the effective cost (auto-computed from recipe when attached, else
     // the manually-entered cost) so the math always sees a current number.
-    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers);
+    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
     if (items.length >= 4) App.markSetupDone('gs_r_eng');
     if (items.length < 4) {
       return '<div class="card"><div class="empty">'
@@ -132,7 +132,7 @@ S.RevenueMenuEngineering = {
 
       let action;
       if (planned) action = '<div class="row-actions"><button class="btn btn-primary btn-sm me-marklive" data-id="' + esc(i.id) + '">Mark Live</button><button class="btn btn-ghost btn-sm me-cancelplan" data-id="' + esc(i.id) + '">Cancel</button></div>';
-      else if (isDog) action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(i.id) + '">Dog Test</button></div>';
+      else if (isDog) action = this.dogAction(i.id);
       else if (sugg) action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div>';
       else action = '';
 
@@ -342,9 +342,33 @@ S.RevenueMenuEngineering = {
 
   // ── Reprice to Target — the batch "engineer the whole menu" pass ─────────────
   // Item ids classified as Dog in their own category, excluded from bulk reprice
+  // The latest Dog Test on an item (by decision, else start date), so the Dog row
+  // can reflect a running or finished test instead of always offering a new one.
+  dogTestFor(id) {
+    const tests = (App.data.menu_dog_tests || []).filter(t => t.item_id === id);
+    if (!tests.length) return null;
+    return tests.slice().sort((a, b) =>
+      (b.decided_at || b.start_date || '').localeCompare(a.decided_at || a.start_date || ''))[0];
+  },
+  // The Dog quadrant action: a running test shows its day count, a kept item is
+  // tagged and offers a re-test, and an untested Dog gets the Dog Test button.
+  // (A Cut item is archived and never reaches this list.)
+  dogAction(id) {
+    const dt = this.dogTestFor(id);
+    if (dt && dt.status === 'Testing') {
+      const el = Math.max(0, Math.floor((Date.now() - new Date((dt.start_date || '') + 'T00:00:00').getTime()) / 86400000));
+      return '<div class="row-actions"><button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(id) + '">Testing &middot; Day ' + el + '/90</button></div>';
+    }
+    if (dt && dt.status === 'Kept') {
+      const d = (dt.decided_at || '').slice(0, 10);
+      return '<div class="row-actions" style="align-items:center;"><span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:var(--green);">KEPT' + (d ? ' ' + d : '') + '</span>'
+        + '<button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(id) + '">Re-test</button></div>';
+    }
+    return '<div class="row-actions"><button class="btn btn-ghost btn-sm me-dogtest" data-id="' + esc(id) + '">Dog Test</button></div>';
+  },
   // (Dogs go to the Dog Test, not a blind price bump).
   _dogIds() {
-    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers);
+    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
     const byCat = {}; items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
     const dogs = new Set();
     Object.values(byCat).forEach(list => {
@@ -362,6 +386,7 @@ S.RevenueMenuEngineering = {
     const dogs = this._dogIds();
     const out = [];
     (App.data.menu_items || []).forEach(item => {
+      if (item.archived) return;
       if (!(item.price > 0 && item.weekly_covers > 0)) return;
       if (item.planned_price > 0) return;
       if (dogs.has(item.id)) return;
