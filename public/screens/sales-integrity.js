@@ -294,7 +294,7 @@ S.SalesIntegrity = {
     this._viewing = null;
     const latest = this.latestReview();
     const importCard = '<div class="card form-card">'
-      + '<div class="card-title">Sales Integrity Review</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Sales Integrity Review</span>' + App.cadenceTag('As needed') + '</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div>'
       + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
