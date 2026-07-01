@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Blueprint — how the week works, node by node ─────────────────────────────
+/* ── Workflow — how the week works, node by node ──────────────────────────────
    A Hub-level full page (top-nav link right of The Hub). Not a link menu (that is
    the Hub) and not a data-flow diagram. It is the reference map of the weekly
    workflow: four numbered stages, all open, no dividers. Every section title and
@@ -106,7 +106,7 @@ S.FlowMap = {
   ],
 
   open() {
-    App.openHubFullPage('Blueprint', (mount) => {
+    App.openHubFullPage('Workflow', (mount) => {
       this.container = mount;
       this._sel = null;
       this._activeStage = null;
