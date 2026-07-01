@@ -65,71 +65,88 @@ window.AuditOutlook = {
     btn.addEventListener('click', () => this._handleClick(auditType, audit, btn));
   },
 
-  _handleClick(auditType, audit, btn) {
-    const cached = this._stored(this._cacheKey(auditType, audit));
-    if (cached) {
-      this._showModal(auditType, audit, cached);
-      return;
-    }
-    this._generate(auditType, audit, btn);
+  // Code-generated (no API): builds the per-audit read and shows it instantly.
+  _handleClick(auditType, audit) {
+    this._showModal(auditType, audit, this._buildOutlook(auditType, audit));
   },
 
-  async _generate(auditType, audit, btn) {
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.style.opacity = '0.65';
-    btn.style.cursor = 'not-allowed';
-    btn.textContent = 'Analyzing...';
+  _itemShort(i) {
+    return String((i && (i.action || i.gap_id)) || 'the top item').replace(/\.\s.*$/, '').replace(/\.$/, '');
+  },
 
-    const prompt = this._buildPrompt(auditType, audit);
-    try {
-      const r = await fetch('/api/claude', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 600,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const data = await r.json();
-      if (data.error) {
-        this._showError('API error: ' + esc(data.error.message || 'unknown'));
-        btn.textContent = 'Try Again';
-        btn.disabled = false;
-        btn.style.opacity = '';
-        btn.style.cursor = '';
-        return;
-      }
-      const raw = data.content?.[0]?.text || '';
-      const sanitized = this._sanitize(raw);
-      if (!sanitized.trim()) {
-        this._showError('Empty response. Try again.');
-        btn.textContent = 'Try Again';
-        btn.disabled = false;
-        btn.style.opacity = '';
-        btn.style.cursor = '';
-        return;
-      }
-      const paragraphs = sanitized.split(/\n\n+/).map(p =>
-        '<div style="margin-bottom:14px;">' + esc(p).replace(/\n/g, '<br>') + '</div>'
-      ).join('');
-      App.data.audit_outlooks = App.data.audit_outlooks || {};
-      App.data.audit_outlooks[this._cacheKey(auditType, audit)] = paragraphs;
-      App.save();
-      this._showModal(auditType, audit, paragraphs);
-      btn.textContent = originalLabel;
-      btn.disabled = false;
-      btn.style.opacity = '';
-      btn.style.cursor = '';
-    } catch (e) {
-      this._showError('Could not generate outlook: ' + esc(e.message || 'unknown error'));
-      btn.textContent = 'Try Again';
-      btn.disabled = false;
-      btn.style.opacity = '';
-      btn.style.cursor = '';
+  _buildOutlook(auditType, audit) {
+    return auditType === 'cash' ? this._cashOutlook(audit) : this._scoreOutlook(auditType, audit);
+  },
+
+  _scoreOutlook(auditType, audit) {
+    const typeLabel = this._typeLabel(auditType);
+    const weekly = auditType === 'bar-cop';
+    const target = (audit.raw && audit.raw.TARGET_SCORE) || 70;
+    const score = audit.overall_score;
+    const money = (v) => '$' + Math.round(v || 0).toLocaleString('en-US');
+    const sections = audit.sections || {};
+    const secEntries = Object.keys(sections).map(n => [n, sections[n]]).filter(([, v]) => v != null);
+    const items = (audit.action_items || []).slice().sort((a, b) => (b.monthly_impact || 0) - (a.monthly_impact || 0));
+    const monthlyTotal = items.reduce((s, i) => s + (i.monthly_impact || 0), 0);
+    const paras = [];
+
+    // 1 — the overall story
+    let p1;
+    if (score == null) p1 = 'Not enough data to score this ' + typeLabel + ' audit yet. Keep logging and it fills in.';
+    else if (score >= target) p1 = 'Your ' + typeLabel + ' audit came back at ' + score + ', at or above the ' + target + ' line. This side of the operation is running the way it should.';
+    else p1 = 'Your ' + typeLabel + ' audit scored ' + score + ' against a ' + target + ' target. There is real room here, and the money below says where.';
+    if (secEntries.length) {
+      const weakest = secEntries.slice().sort((a, b) => a[1] - b[1])[0];
+      if (score != null && weakest[1] < target) p1 += ' The weakest area is ' + weakest[0] + ' at ' + weakest[1] + '.';
     }
+    paras.push(p1);
+
+    // 2 — the biggest concern or win, with the number
+    if (items.length && items[0].monthly_impact > 0) {
+      let p2 = 'The fattest single line is ' + this._itemShort(items[0]).toLowerCase() + ', about ' + money(items[0].monthly_impact) + ' a month.';
+      if (monthlyTotal > 0 && !weekly) p2 += ' All in, the sheet is worth about ' + money(monthlyTotal) + ' a month to close.';
+      paras.push(p2);
+    } else if (items.length) {
+      paras.push('The top thing to tighten is ' + this._itemShort(items[0]).toLowerCase() + '.');
+    }
+
+    // 3 — the one move
+    if (items.length) paras.push('If you make one move ' + (weekly ? 'this week' : 'this month') + ', start with ' + this._itemShort(items[0]).toLowerCase() + '. It is the biggest number on the board.');
+    return paras.map(p => '<div style="margin-bottom:14px;">' + esc(p) + '</div>').join('');
+  },
+
+  _cashOutlook(audit) {
+    const d = audit.raw || {};
+    const m = (v) => v == null ? 'n/a' : '$' + Math.round(v).toLocaleString('en-US');
+    const paras = [];
+
+    // 1 — the survival read
+    if (d.HAS_OPENING) {
+      let p1 = d.RUNWAY == null ? 'Your cash holds all thirteen weeks ahead.'
+             : d.RUNWAY === 0 ? 'Your cash runs out this week. This is the fire.'
+             : 'Your cash runs about ' + d.RUNWAY + ' week' + (d.RUNWAY === 1 ? '' : 's') + ' before it would go negative.';
+      if (d.LOW_POINT_WEEK) p1 += ' The tightest week is ' + d.LOW_POINT_WEEK + ' at ' + m(d.LOW_POINT_BAL) + '.';
+      if (d.TIGHT_WEEKS > 0) p1 += ' ' + d.TIGHT_WEEKS + ' of the next thirteen run tight.';
+      if (d.SAFE_TO_SPEND != null) p1 += ' Safe to spend right now is ' + m(d.SAFE_TO_SPEND) + (d.SAFE_TO_SPEND < 0 ? ', into money already spoken for.' : '.');
+      paras.push(p1);
+    } else {
+      paras.push('Set your opening cash balance in Cash Position and the runway becomes real. Right now this is timing only.' + (d.TIGHT_WEEKS > 0 ? ' ' + d.TIGHT_WEEKS + ' of the next thirteen weeks run more cash out than in.' : ''));
+    }
+
+    // 2 — where the cash is stuck
+    let p2 = '';
+    if (d.TRAPPED_CASH > 0) p2 = m(d.TRAPPED_CASH) + ' of shelf cash is stuck, ' + m(d.DEAD_STOCK) + ' dead and ' + m(d.OVERSTOCK) + ' above par. ';
+    if (d.CYCLE_DAYS != null) p2 += 'Your cash is locked about ' + Math.round(d.CYCLE_DAYS) + ' days: product sits ' + Math.round(d.DIO) + ' and you take ' + Math.round(d.DPO) + ' to pay.';
+    if (p2.trim()) paras.push(p2.trim());
+
+    // 3 — the single move
+    let move;
+    if (d.HAS_OPENING && d.RUNWAY != null && d.RUNWAY <= 4) move = 'Cover the tight week now. Move a payment to its due date and hold any order you can.';
+    else if (d.TRAPPED_CASH > 2000) move = 'Free the shelf cash first. Run the dead stock down and order to par in Trapped Cash.';
+    else if (d.TOTAL_VENDORS && d.VENDORS_ON_TERMS < d.TOTAL_VENDORS) move = 'Put the ' + (d.TOTAL_VENDORS - d.VENDORS_ON_TERMS) + ' vendor' + ((d.TOTAL_VENDORS - d.VENDORS_ON_TERMS) === 1 ? '' : 's') + ' without terms on terms, so you stop paying early.';
+    else move = 'Nothing on fire. Keep ordering to par and paying on the due date.';
+    paras.push(move);
+    return paras.map(p => '<div style="margin-bottom:14px;">' + esc(p) + '</div>').join('');
   },
 
   _showModal(auditType, audit, bodyHtml) {
@@ -153,83 +170,4 @@ window.AuditOutlook = {
     if (auditType === 'bar-cop')  return 'Bar Cop';
     return 'Operational';
   },
-
-  _buildPrompt(auditType, audit) {
-    if (auditType === 'cash') return this._buildCashPrompt(audit);
-    return this._buildScorePrompt(auditType, audit);
-  },
-
-  // Cash audits do not have a per-action monthly dollar (the opportunity is a
-  // one-time amount and the rest is timing), so the generic score prompt would
-  // miss the point. This one leads with the survival story off the 13-week
-  // forecast and names the single move that fixes the tight week.
-  _buildCashPrompt(audit) {
-    const d = audit.raw || {};
-    const date  = (audit.date || '').slice(0, 10) || 'unknown';
-    const score = audit.overall_score != null ? audit.overall_score : 'n/a';
-    const sections = audit.sections || {};
-    const sectionLines = Object.keys(sections).map(n => '- ' + n + ': ' + (sections[n] != null ? sections[n] : 'n/a')).join('\n') || '- none';
-    const m = (v) => v == null ? 'n/a' : '$' + Math.round(v).toLocaleString();
-    const dys = (v) => v == null ? 'n/a' : Math.round(v) + ' days';
-    const runway = d.HAS_OPENING ? (d.RUNWAY == null ? 'holds all 13 weeks' : (d.RUNWAY === 0 ? 'runs out this week' : d.RUNWAY + ' weeks')) : 'not set (no opening balance)';
-    const low = d.HAS_OPENING && d.LOW_POINT_WEEK ? (d.LOW_POINT_WEEK + ' at ' + m(d.LOW_POINT_BAL)) : 'n/a';
-
-    return 'You are a 30-year bar and restaurant operator writing a brief cash analysis for a fellow owner. '
-      + 'This is the survival read: can they make it through the next quarter, and where is their money really going. '
-      + 'Write 2 to 3 short paragraphs. '
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. Every point lands on a real number from the data. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless). '
-      + 'First paragraph: the survival story. Lead with the runway and the tightest week, what the cash picture says about the next 13 weeks right now. '
-      + 'Second paragraph: where the cash is stuck, the trapped shelf cash and how many days the cash stays locked in the cycle, with the numbers. '
-      + 'Third paragraph: the single most important move to make this week to cover the tight week or free the cash. One clear action. '
-      + 'Total length: 150 to 200 words.\n\n'
-      + 'AUDIT DATE: ' + date + '\n'
-      + 'OVERALL CASH SCORE: ' + score + '\n\n'
-      + 'SECTION SCORES:\n' + sectionLines + '\n\n'
-      + 'THE 13-WEEK SURVIVAL PICTURE:\n'
-      + '- Runway: ' + runway + '\n'
-      + '- Tightest week: ' + low + '\n'
-      + '- Tight weeks (more cash out than in): ' + (d.TIGHT_WEEKS != null ? d.TIGHT_WEEKS : 'n/a') + ' of 13\n'
-      + '- Safe to spend right now: ' + (d.SAFE_TO_SPEND != null ? m(d.SAFE_TO_SPEND) : 'n/a (opening balance not set)') + '\n\n'
-      + 'WHERE THE CASH IS STUCK:\n'
-      + '- Cash to free (one-time, dead stock + above par): ' + m(d.TRAPPED_CASH) + '\n'
-      + '- Of that, dead stock: ' + m(d.DEAD_STOCK) + '; above par: ' + m(d.OVERSTOCK) + '\n'
-      + '- Cash locked in the cycle: ' + dys(d.CYCLE_DAYS) + ' (product sits ' + dys(d.DIO) + ', you take ' + dys(d.DPO) + ' to pay)\n'
-      + '- Vendors on terms: ' + (d.VENDORS_ON_TERMS != null ? d.VENDORS_ON_TERMS + ' of ' + d.TOTAL_VENDORS : 'n/a') + '\n';
-  },
-
-  _buildScorePrompt(auditType, audit) {
-    const typeLabel  = this._typeLabel(auditType);
-    const weekly = auditType === 'bar-cop';
-    const date       = (audit.date || '').slice(0, 10) || 'unknown';
-    const score      = audit.overall_score != null ? audit.overall_score : 'n/a';
-    const sections   = audit.sections || {};
-    const sectionLines = Object.keys(sections).map(name => {
-      const v = sections[name];
-      return '- ' + name + ': ' + (v != null ? v : 'n/a');
-    }).join('\n') || '- none';
-
-    const items = (audit.action_items || []).slice()
-      .sort((a, b) => (b.monthly_impact || 0) - (a.monthly_impact || 0))
-      .slice(0, 5);
-    const itemLines = items.length
-      ? items.map(i => '- ' + (i.action || i.gap_id || 'Action')
-          + (i.monthly_impact ? ' (~$' + Math.round(i.monthly_impact) + '/mo)' : '')).join('\n')
-      : '- none';
-    const monthlyTotal = (audit.action_items || []).reduce((s, i) => s + (i.monthly_impact || 0), 0);
-
-    return 'You are a 30-year bar and restaurant operator writing a brief analysis for a fellow owner about their ' + typeLabel + ' audit. '
-      + 'Write 2 to 3 short paragraphs. '
-      + 'Talk straight across the bar. Give the numbers as they are, the good, the bad, and the ugly, in depth and specific. Do not teach, explain the basics, lecture, or hand out pep talks. No motivational lines, nothing like "you already know what to do," nothing that talks down to the reader. You can be dry and a little funny, and you can weave in a quick bit of bar-floor storytelling so a rough number reads easy instead of stinging, but never at the operator\'s expense and never invented. Every point lands on a real number from the data. No emdashes, no double dashes, no bullet points, no headers, no AI words (cadence, leverage, robust, going forward, ecosystem, synthesize, comprehensive, seamless). '
-      + 'Lead with the overall story (what the score says about the operation right now). '
-      + 'Second paragraph: the biggest concern or biggest win with specific numbers. '
-      + 'Third paragraph (optional): the single most important action to take ' + (weekly ? 'this week' : 'this month') + '. '
-      + 'Total length: 150 to 200 words.\n\n'
-      + 'AUDIT DATE: ' + date + '\n'
-      + 'OVERALL SCORE: ' + score + '\n\n'
-      + 'SECTION SCORES:\n' + sectionLines + '\n\n'
-      + (weekly
-          ? 'TOP FINDINGS:\n' + itemLines + '\n'
-          : 'TOP ACTION ITEMS (ranked by monthly impact):\n' + itemLines + '\n\n'
-            + 'MONTHLY OPPORTUNITY (sum of all action items): $' + Math.round(monthlyTotal) + '\n');
-  }
 };
