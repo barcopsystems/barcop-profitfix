@@ -50,7 +50,7 @@ S.RevenueMenuEngineering = {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Items.'] },
       { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
-      { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Covers refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh covers between closes, Re-import Covers up top takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
+      { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Covers refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh covers between closes, the Re-import Covers drop at the bottom of this page takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
       { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
       { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
@@ -66,17 +66,18 @@ S.RevenueMenuEngineering = {
   },
 
   draw() {
-    this.container.innerHTML = '<div class="screen">' + this.classificationHtml() + '</div>';
+    const priced = (App.data.menu_items || []).some(i => i.price && i.cost);
+    this.container.innerHTML = '<div class="screen">' + this.classificationHtml() + (priced ? this.coversImportHtml() : '') + '</div>';
     const c = this.container;
     c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));
     c.querySelectorAll('.me-marklive').forEach(b => b.addEventListener('click', () => this.markLive(b.dataset.id)));
     c.querySelectorAll('.me-cancelplan').forEach(b => b.addEventListener('click', () => this.cancelPlanned(b.dataset.id)));
     c.querySelectorAll('.me-dogtest').forEach(b => b.addEventListener('click', () => { App._dogTestPreselect = b.dataset.id; App.navigate('r-dog-test'); }));
-    document.getElementById('me-covers')?.addEventListener('click', () => this.openCoversImport());
     document.getElementById('me-batch')?.addEventListener('click', () => this.openBatch());
     document.getElementById('me-marklive-all')?.addEventListener('click', () => this.markAllLive());
     document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
+    if (priced) this.mountCoversImport();
   },
 
   // ── The page: diagnosis (quadrant) + prescription (suggested price + action) ─
@@ -208,10 +209,9 @@ S.RevenueMenuEngineering = {
     const avgCostPct = items.reduce((s, i) => s + (i.cost / i.price * 100), 0) / items.length;
     const plannedCount = items.filter(i => i.planned_price > 0).length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    const actionsRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-      + '<button class="btn btn-ghost btn-sm" id="me-covers">Re-import Covers</button>'
-      + (plannedCount > 0 ? '<button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button>' : '')
-      + '</div>';
+    const actionsRow = (plannedCount > 0)
+      ? '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;"><button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button></div>'
+      : '';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calcItem('Items Analyzed', items.length)
       + calcItem('Avg Cost %', avgCostPct.toFixed(1) + '%')
@@ -457,21 +457,32 @@ S.RevenueMenuEngineering = {
   // ── Re-import covers from a POS sales-mix (PMIX) export ───────────────────────
   // Per-item covers drive the whole page (classification, suggested prices, the
   // pricing checks). Covers normally refresh when the product-mix report drops at
-  // the Shift weekly close; this is the between-closes door to re-import just
-  // covers. Matches each row to a menu item by name and upserts weekly_covers.
-  openCoversImport() {
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Re-import Covers</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin:-6px 0 14px;line-height:1.6;">Covers refresh on their own when you drop your product mix at the <span id="me-cov-goshift" style="color:var(--gold);cursor:pointer;">Shift weekly close</span>. Use this to re-import just covers between closes.</div>'
-      + '<div id="me-cov-csv"></div>'
-      + '<div id="me-cov-result"></div>'
-      + '<div id="me-cov-actions" class="no-print" style="margin-top:12px;"></div>'
-      + '</div>';
-    App.openModal(html, { id: 'me-cov-modal', maxWidth: 640, onClose: () => App.closeModal('me-cov-modal') });
-    document.getElementById('me-cov-goshift')?.addEventListener('click', () => { App.closeModal('me-cov-modal'); App.openScreen('sc-dashboard'); });
-    if (typeof CSVMapper === 'undefined') return;
-    CSVMapper.mount(document.getElementById('me-cov-csv'), {
-      dropTitle: 'Drop your POS sales mix export here',
-      dropSub: 'A product mix (PMIX) report for the week: one row per item with units sold. Bar Cop matches each row to a menu item by name and refreshes its weekly covers. Nothing else on the item changes.',
+  // the Shift weekly close; this on-page drop is the between-closes door to
+  // re-import just covers. Matches each row to a menu item by name and upserts
+  // weekly_covers. Directions live in the nav-i help (Keeping Covers Current).
+  coversImportHtml() {
+    const fl = this._coversFlash; this._coversFlash = null;
+    let flash = '';
+    if (fl) {
+      flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
+        + (fl.updated ? 'Updated covers on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
+        + '</div>'
+        + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Items or rename to match.</div>' : '');
+    }
+    return '<div class="no-print" style="margin-top:26px;">'
+      + '<div class="sh" style="margin:0 0 10px;">Re-import Covers</div>'
+      + '<div class="card form-card" style="margin:0;">'
+      +   '<div id="me-cov-csv"></div>' + flash
+      +   '<div id="me-cov-actions" style="margin-top:12px;"></div>'
+      + '</div></div>';
+  },
+
+  mountCoversImport() {
+    const el = document.getElementById('me-cov-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS product-mix (PMIX) report here',
+      dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly covers.',
       actionsEl: '#me-cov-actions',
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Update Covers',
@@ -484,14 +495,7 @@ S.RevenueMenuEngineering = {
     const { toAdd, skipped } = PosIngest.build('pmix', rows);
     let updated = 0;
     if (toAdd.length) { await PosIngest.commit('pmix', toAdd); updated = toAdd.length; }
-    const unmatched = skipped.filter(s => s && s !== '(blank)');
-    const result = document.getElementById('me-cov-result');
-    if (result) {
-      result.innerHTML = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (updated ? 'var(--gold)' : 'var(--red)') + ';">'
-        + (updated ? 'Updated covers on ' + updated + ' item' + (updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
-        + '</div>'
-        + (unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + unmatched.slice(0, 8).map(esc).join(', ') + (unmatched.length > 8 ? ', and ' + (unmatched.length - 8) + ' more' : '') + '. Add them in Menu Items or rename to match.</div>' : '');
-    }
+    this._coversFlash = { updated, unmatched: skipped.filter(s => s && s !== '(blank)') };
     this.draw();
   },
 
