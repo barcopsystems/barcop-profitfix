@@ -35,8 +35,8 @@ S.CashForecast = {
 
   statItem(label, val, cls) { return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>'; },
   fixed5(headerCells, bodyRows) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl" style="table-layout:fixed;">'
-      + this.CFCOLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div></div>';
+    return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.CFCOLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
   },
   signed(v) { return (v < 0 ? '-' : '+') + App.fmtCurrency(Math.abs(v)); },
   fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
@@ -69,8 +69,8 @@ S.CashForecast = {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Your Cash Across the Quarter</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="cf-export">Export for Lender</button></div>'
       + this.forecastCard(fc, opening)
-      + this.eventsCard()
       + this.billsCard()
+      + this.eventsCard()
       + '</div>';
     this.wire();
     this.wireChart();
@@ -106,7 +106,7 @@ S.CashForecast = {
 
   // ── The quarter: running-balance chart over the 13-week table, one card ───────
   forecastCard(fc, opening) {
-    return '<div class="card card-bleed data-card" style="overflow:hidden;">'
+    return '<div class="card">'
       + (opening != null ? '<div style="margin-bottom:14px;">' + this.curve(fc) + '</div>' : '')
       + this.lowLine(fc, opening)
       + this.tableInner(fc, opening)
@@ -206,7 +206,7 @@ S.CashForecast = {
         + (opening != null ? '<td data-label="Balance" class="val" style="font-weight:600;color:' + (r.balance < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + App.fmtCurrency(r.balance) + '</td>' : '')
         + '</tr>';
     }).join('');
-    return '<div class="card-bleed-tbl" style="margin-top:0;"><table class="tbl"><thead><tr>' + headers + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    return '<div style="overflow-x:auto;margin-top:0;"><table class="row-list"><thead><tr>' + headers + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
   // ── Stress test: slow-season chips + "Can I afford it" what-if ────────────────
