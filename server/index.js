@@ -9,7 +9,7 @@ const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
 const { computeProfitAudit, computeRevenueAudit } = require('./audit-compute');
-const { profitNarrative, revenueNarrative } = require('./audit-narrative');
+const { profitNarrative, revenueNarrative } = require('../public/components/audit-narrative');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
