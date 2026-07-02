@@ -213,6 +213,18 @@ S.HubBarCopAudit = {
       extra: maint.length === 0 ? 'No maintenance logged' : (deferredMaint.length + ' open over 14 days')
     });
 
+    // Pre-shift briefings held. OPT-IN: a bar that never logs one reads N/A here
+    // (excluded, no ding); once it starts, it scores briefings against operating days.
+    const briefings = (App.shiftData?.sc_briefings) || [];
+    const wkBriefings = briefings.filter(b => b.held && this._withinWindow(b.date, this.WINDOW_DAYS));
+    const briefDays = new Set(wkShifts.map(s => s.date)).size;
+    components.push({
+      label: 'Pre-shift briefings held',
+      ratio: wkBriefings.length === 0 ? null : (briefDays > 0 ? Math.min(1, wkBriefings.length / briefDays) : 1),
+      na: wkBriefings.length === 0,
+      extra: wkBriefings.length === 0 ? 'Not used' : (wkBriefings.length + ' held over ' + briefDays + ' operating days')
+    });
+
     return this._rollup(components);
   },
 

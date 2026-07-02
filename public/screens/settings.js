@@ -2746,6 +2746,25 @@ S.HubSettings = {
     });
     App.shiftData.sc_waste = scWaste;
 
+    // Pre-Shift Briefings — a realistic run of daily line-ups over the last few
+    // weeks (not every single day, so the discipline read stays honest, not a flat
+    // 100). Feeds the Pre-Shift Briefing history + the Bar Cop Audit opt-in read.
+    const briefFocus = [
+      'Push the fall cocktail list, name a pairing at every table.',
+      'Dessert attach is soft. Offer both, every table.',
+      'New server on section 3, back them up and watch the section.',
+      'Slow Tuesday. Work the bar and sell the app.',
+      'Big party at 7. Prep the private room early.',
+      'Feature the salmon tonight, best margin on the board.',
+      'Wine dinner Thursday, mention it to every four-top.',
+      'Weekend rush. Keep the second-round check tight.'
+    ];
+    App.shiftData.sc_briefings = [2, 4, 6, 9, 11, 13, 16, 18].map((ago, i) => ({
+      id: uid(), date: dateStr(ago), focus: briefFocus[i % briefFocus.length],
+      stars_count: 4, stars: [], check_target: 40, covers_forecast: null, held: true,
+      created_at: new Date().toISOString()
+    }));
+
     // Incident Log — the kind of thing a real bar documents for protection: a
     // dram-shop cut-off, a guest slip, an ejected fight, an open property-damage
     // case still being chased. A mix of Resolved and one Open across the window.
