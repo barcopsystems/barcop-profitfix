@@ -53,7 +53,7 @@ S.RevenueServerCheck = {
   // Active shift on a given date (most recent open). Used for shift_id capture.
   activeShiftFor(date, shiftType) {
     return this.shifts().filter(s => s.date === date && (!shiftType || s.shift_type === shiftType))
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
+      .sort(App.cmpNewest)[0] || null;
   },
 
   // ── Scorecard computation (per-server metrics over the last N days) ──────────
