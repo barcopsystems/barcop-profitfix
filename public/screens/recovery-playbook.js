@@ -935,8 +935,7 @@ S.RecoveryPlaybook = {
               'If a SKU stays unexplained after that, it moves to Loss Prevention (theft).'
             ] },
             { t: 'docs', items: [
-              { file: 'Measured_Pour_Standards_Policy.docx', label: 'Measured Pour Standards Policy' },
-              { file: 'Bar_Inventory_Procedures_Manual.docx', label: 'Bar Inventory Procedures Manual' }
+              { file: 'Measured_Pour_Standards_Policy.docx', label: 'Measured Pour Standards Policy' }
             ] }
           ]
         },
@@ -992,7 +991,6 @@ S.RecoveryPlaybook = {
               'Targets are in the Benchmarks section. Run the category breakdown the moment blended food cost is above target.'
             ] },
             { t: 'docs', items: [
-              { file: 'Daily_Food_Waste_Tracking.pdf', label: 'Daily Food Waste Sheet' },
               { file: 'Portion_Control_Audit.pdf', label: 'Portion Control Audit' },
               { file: 'Food_Handling_Portion_Standards.docx', label: 'Food Handling and Portion Standards' }
             ] }
@@ -1021,9 +1019,7 @@ S.RecoveryPlaybook = {
               'Quarterly: sit down with each rep with your variance history and competitor pricing. Ask for a match or an explanation. Confirm terms in writing after.'
             ] },
             { t: 'docs', items: [
-              { file: 'Vendor_Agreement_Terms_Checklist.docx', label: 'Vendor Agreement Terms Checklist' },
-              { file: 'Vendor_Delivery_Inspection.pdf', label: 'Vendor Delivery Inspection' },
-              { file: 'Vendor_Delivery_Discrepancy.pdf', label: 'Vendor Discrepancy Report' }
+              { file: 'Vendor_Agreement_Terms_Checklist.docx', label: 'Vendor Agreement Terms Checklist' }
             ] }
           ]
         },
@@ -1047,10 +1043,6 @@ S.RecoveryPlaybook = {
               'Act this week. One week with a reason can wait. Three weeks up is structural.',
               'Net sales means after comps and discounts, never register totals.',
               'Targets by concept type are in the Benchmarks section.'
-            ] },
-            { t: 'docs', items: [
-              { file: 'Weekly_PL_Snapshot.pdf', label: 'Weekly P&L Snapshot' },
-              { file: 'Monthly_Cost_Control_Review_Agenda.docx', label: 'Monthly Cost Control Review Agenda' }
             ] }
           ]
         },
@@ -1072,11 +1064,7 @@ S.RecoveryPlaybook = {
               note: 'Week 3 feels uncomfortable the first time you tell experienced bartenders to use a jigger or post specs in a kitchen that has run on feel for years. Do it anyway. Professional, direct, not apologetic. This is how the bar runs now.' },
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'You do not track any of this on paper. The moment you do the first real step in Control, your Profit Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month P&L. Your setup checklist lives in Getting Started.' },
-            { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' },
-            { t: 'docs', items: [
-              { file: '90Day_Cost_Control_Roadmap.docx', label: '90-Day Cost Control Roadmap' },
-              { file: 'Monthly_Cost_Control_Review_Agenda.docx', label: 'Monthly Cost Control Review Agenda' }
-            ] }
+            { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
           ]
         },
         {
@@ -1294,9 +1282,6 @@ S.RecoveryPlaybook = {
               'Put Dogs on a 90-day test in a better spot with a better description, then keep or cut.',
               'Update item costs whenever a supplier price moves more than 5 percent. Stale costs put items in the wrong quadrant.',
               'Give every Star and high-margin item a description that names the key ingredient and a pairing. A pairing in the description is an embedded upsell.'
-            ] },
-            { t: 'docs', items: [
-              { file: 'revenue/Menu_Engineering_Audit.pdf', label: 'Menu Engineering Review Worksheet' }
             ] }
           ]
         },
@@ -1318,9 +1303,6 @@ S.RecoveryPlaybook = {
               'Review quarterly on a fixed calendar, and any time a supplier raises a high-volume item more than 8 percent.',
               'Price spirits, wine, draft, and food on their own math. They are not the same category.',
               'Close the review with a written list and a target print date. An intention to reprice the salmon is not a review.'
-            ] },
-            { t: 'docs', items: [
-              { file: 'revenue/Quarterly_Pricing_Review.pdf', label: 'Quarterly Pricing Review Checklist' }
             ] }
           ]
         },
@@ -1342,9 +1324,6 @@ S.RecoveryPlaybook = {
               'Every Monday, review actual labor by department against target. Flag anything more than 2 points over.',
               'Decide whether a miss was a scheduling error or a revenue miss, and assign one action before the review closes.',
               'Treat overtime as a schedule to fix, not a cost to accept. Redistribute the hours.'
-            ] },
-            { t: 'docs', items: [
-              { file: 'revenue/Weekly_Labor_Review.pdf', label: 'Weekly Labor Review Form' }
             ] }
           ]
         },
@@ -1389,9 +1368,7 @@ S.RecoveryPlaybook = {
               'Set the next week briefing items from your Menu Engineering Stars.'
             ] },
             { t: 'docs', items: [
-              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' },
-              { file: 'revenue/PreShift_Upsell_Briefing.pdf', label: 'Pre-Shift Upsell Briefing' },
-              { file: 'revenue/Table_Visit_Audit.pdf', label: 'Table Visit Audit' }
+              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' }
             ] }
           ]
         },
@@ -1415,8 +1392,7 @@ S.RecoveryPlaybook = {
               'Check the four-week trend two weeks after coaching. Moving, acknowledge it. Not moving, a second conversation in writing.'
             ] },
             { t: 'docs', items: [
-              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' },
-              { file: 'revenue/Table_Visit_Audit.pdf', label: 'Table Visit Audit' }
+              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' }
             ] }
           ]
         },
@@ -1438,10 +1414,7 @@ S.RecoveryPlaybook = {
               note: 'Week 3 feels uncomfortable the first time you hand experienced servers a written standard. Do it anyway. Direct, professional, not apologetic. This is how the floor runs now.' },
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'You do not track this on paper. The moment you do the first real step, your Revenue Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month numbers. Your setup checklist lives in Getting Started.' },
-            { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' },
-            { t: 'docs', items: [
-              { file: 'revenue/30_90Day_Revenue_Growth_Roadmap.docx', label: '30 and 90-Day Revenue Growth Roadmap' }
-            ] }
+            { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' }
           ]
         },
         {
