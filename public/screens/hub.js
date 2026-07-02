@@ -444,7 +444,7 @@ S.Hub = {
     })();
     const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
     const rowDiv = (onclick, dot, label, value, valColor) =>
-      '<div class="hd-step hd-prow" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;min-width:0;">'
+      '<div class="hd-prow" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;min-width:0;">'
       + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
       + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(label) + '</span>'
       + (value ? '<span style="flex-shrink:0;font-size:11px;font-weight:600;color:' + valColor + ';white-space:nowrap;">' + esc(value) + '</span>' : '')
@@ -485,12 +485,9 @@ S.Hub = {
       const watch    = bandItems.filter(a => a.sev !== 'bad');
       const naRow = (a, dot) => rowDiv(goOf(a), dot, a.label || a.text || '', a.value || '', 'var(--t2)');
       // No group headers: severity reads from the dot color (red = act now,
-      // amber = keep an eye) and the order (reds first). A small gap sets the
-      // last red apart from the first amber.
-      const naGap = (critical.length && watch.length) ? '<div style="height:10px;"></div>' : '';
+      // amber = keep an eye) and the order (reds first).
       needsBand = cardWrap('Needs Attention', '<div style="max-height:188px;overflow-y:auto;">'
         + critical.map(a => naRow(a, 'var(--red)')).join('')
-        + naGap
         + watch.map(a => naRow(a, 'var(--amber)')).join('')
         + '</div>');
     } else {
