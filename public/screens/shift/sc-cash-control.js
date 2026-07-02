@@ -91,8 +91,11 @@ S.ShiftCashControl = {
     const drops = this.drops().filter(x => (x.drawer_id === d.id || x.drawer === d.name) && this.inWindow(x.date));
     const dropTotal = drops.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
     const vars = this.variances().filter(x => x.drawer_id === d.id || x.drawer === d.name);
-    const lastVar = vars.slice().sort((a, b) =>
-      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime())[0] || null;
+    // Pick the latest reconcile by its real date. Sorting by created_at is a
+    // footgun: seeded records share one created_at, so the tie fell back to
+    // array order (insertion-order right after Re-Load vs date-desc after a
+    // refresh), which flipped the shown "Last reconcile" date between states.
+    const lastVar = App.latestEvent(vars);
     return { dropCount: drops.length, dropTotal, lastVar };
   },
 
