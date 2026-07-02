@@ -3632,7 +3632,7 @@ const App = {
   // predate the flag, so their items are treated as counted. { pid: {onHand,value} }.
   _perpetualInventory() {
     const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());   // newest first
+      .sort(App.cmpNewest);   // newest first by record date
     const seen = {};      // "pid@@loc" already resolved to its newest counted value
     const byProd = {};
     counts.forEach(cnt => {
@@ -4658,9 +4658,7 @@ const App = {
     const list = (this.shiftData && this.shiftData.sc_shifts) || [];
     const open = list.filter(s => s.status === 'Open');
     if (!open.length) return null;
-    return open.slice().sort((a, b) =>
-      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
-    )[0];
+    return open.slice().sort(App.cmpNewest)[0];
   },
   activeManagerId() {
     const s = this.activeShift();
@@ -5126,6 +5124,24 @@ const App = {
     const dk = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
     return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
   },
+
+  // Sort comparators keyed on a record's real DATE, with created_at only as a
+  // tiebreak. Use these anywhere you sort event records — NEVER sort by
+  // created_at first. Event stores load date-desc and both the sample seed and
+  // a batch POS import stamp every record with one identical created_at, so a
+  // created_at-primary sort collapses to array order on the tie (insertion
+  // order right after Re-Load, date-desc after a refresh). That is the "the
+  // date flipped when I refreshed" class of bug. cmpNewest = newest first,
+  // cmpOldest = oldest first. Reference as App.cmpNewest (not this.) since they
+  // are passed straight to .sort() where `this` would be lost.
+  _recDate(r) {
+    return String((r && (r.date || r.period_end || r.date_reported || r.date_86 || r.generated_at || r.saved_at)) || '');
+  },
+  cmpNewest(a, b) {
+    return App._recDate(b).localeCompare(App._recDate(a))
+        || String((b && b.created_at) || '').localeCompare(String((a && a.created_at) || ''));
+  },
+  cmpOldest(a, b) { return -App.cmpNewest(a, b); },
 
   uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

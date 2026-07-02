@@ -19,8 +19,7 @@ window.CashEngine = {
   bills()       { return (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : []; },
 
   countsAsc() {
-    return [...this.counts()].sort((a, b) =>
-      new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+    return [...this.counts()].sort(App.cmpOldest);
   },
 
   // Perpetual on-hand quantity + dollar value per product (last counted value
