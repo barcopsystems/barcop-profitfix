@@ -99,18 +99,9 @@ const Onboarding = {
     s.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev').value) || 0;
     s.service_periods     = periods;
     s.onboarding_complete = true;
-
-    // The operator just filled identity, baselines, and service periods, so the
-    // gs_profile and gs_service_periods Foundation tasks are done by definition.
-    App.data.hub_setup_progress = App.data.hub_setup_progress || {};
-    const now = new Date().toISOString();
-    App.data.hub_setup_progress.gs_profile = now;
-    App.data.hub_setup_progress.gs_service_periods = now;
     await App.saveKey('settings');
-    await App.saveKey('hub_setup_progress');
 
     document.getElementById('ob-overlay').classList.add('hidden');
-    if (S.HubGettingStarted) S.HubGettingStarted.open();
-    else App.showHub();
+    App.showHub();
   }
 };
