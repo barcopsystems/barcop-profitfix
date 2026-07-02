@@ -1,19 +1,25 @@
 'use strict';
 
 /* ── Shift Control — Pre-Shift Briefing ───────────────────────────────────────
-   The before-doors line-up tool, next to Run Checklists. Bar Cop builds the
-   briefing from live data so the manager reads it instead of filling a blank
-   sheet: the check-average target, the cover forecast, a featured-items list
-   pre-filled with your best-margin sellers (swap or remove any that do not fit
-   this service), and your upsell sequence (customizable on-page). The manager
-   adds a focus line, reads it at line-up or exports it, and taps Held to log it.
-   Logging is OPT-IN: it feeds the Bar Cop Audit's operational discipline only
-   once you use it, and never dings a bar that does not. Held records live in
-   the sc_briefings event store; the customized upsell sequence lives in the
-   sc_upsell_sequence config blob. Service-period neutral (no "tonight"): the
-   same briefing works for breakfast, lunch, happy hour, or dinner. */
+   The before-doors line-up tool, next to Run Checklists. It is PER SERVICE
+   PERIOD: pick the period (Lunch, Dinner, ...) from the operator's configured
+   service periods and hold a separate briefing for each, so a bar that runs
+   lunch and dinner logs a pre-lunch and a pre-dinner briefing the same day.
+   Bar Cop builds each one from live data: the check-average target, the day's
+   cover forecast, a featured-items list pre-filled with your best-margin sellers
+   (swap or remove any that do not fit this service), and your upsell sequence
+   (customizable on-page). The manager adds a focus line, reads it at line-up or
+   exports it, and taps Held to log it. Logging is OPT-IN: it feeds the Bar Cop
+   Audit's operational discipline only once you use it, and never dings a bar
+   that does not. Held records live in the sc_briefings event store keyed by
+   (date + period); the customized upsell sequence lives in the
+   sc_upsell_sequence config blob. */
 
 S.ShiftPreShift = {
+
+  _period: null,
+  _focusBy: {},      // period -> in-progress focus text
+  _featuredBy: {},   // period -> in-progress featured item ids
 
   // Default upsell sequence. The operator can customize it on-page; the saved
   // version lives in App.shiftData.sc_upsell_sequence. Kept as [title, desc].
@@ -30,13 +36,29 @@ S.ShiftPreShift = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
-    if (this._focus == null) this._focus = (this._todayRecord() || {}).focus || '';
     this.draw();
   },
 
   briefings() { return (App.shiftData && App.shiftData.sc_briefings) || []; },
-  _todayRecord() { const t = App.todayLocal(); return this.briefings().find(b => (b.date || '') === t) || null; },
   n(v) { return (v == null || isNaN(v)) ? null : Number(v); },
+
+  // The record for today's currently-selected service period, or null.
+  _record() {
+    const t = App.todayLocal();
+    return this.briefings().find(b => (b.date || '') === t && (b.period || '') === this._period) || null;
+  },
+
+  // Resolve the selected period, defaulting to the one the clock is in. Returns
+  // the operator's configured period names.
+  _ensurePeriod() {
+    const periods = App.SHIFT_TYPES || [];
+    if (!periods.length) { this._period = this._period || 'Service'; return periods; }
+    if (!this._period || !periods.includes(this._period)) {
+      const cur = App.servicePeriodByTime();
+      this._period = (cur && cur.name && periods.includes(cur.name)) ? cur.name : periods[0];
+    }
+    return periods;
+  },
 
   // ── The upsell sequence (customizable) ──────────────────────────────────────
   upsellSeq() {
@@ -45,8 +67,14 @@ S.ShiftPreShift = {
     return this.UPSELL.map(u => ({ title: u[0], desc: u[1] }));
   },
 
-  // ── Featured items (pre-filled with recommended Stars, manager-adjustable) ───
-  // Recommended: high margin AND high volume vs the whole menu.
+  // ── Focus + featured, held per selected period ──────────────────────────────
+  _curFocus() {
+    const p = this._period;
+    if (this._focusBy[p] == null) { const rec = this._record(); this._focusBy[p] = (rec && rec.focus) || ''; }
+    return this._focusBy[p];
+  },
+
+  // Recommended featured items: high margin AND high volume vs the whole menu.
   todayStars() {
     const items = ((App.data && App.data.menu_items) || [])
       .filter(i => !i.archived && this.n(i.price) != null && this.n(i.cost) != null && this.n(i.weekly_covers) != null && i.weekly_covers > 0);
@@ -58,16 +86,17 @@ S.ShiftPreShift = {
       .sort((a, b) => (b.price - b.cost) - (a.price - a.cost))
       .slice(0, 5);
   },
-  _initFeatured() {
-    const rec = this._todayRecord();
-    this._featured = (rec && Array.isArray(rec.featured))
-      ? rec.featured.slice()
-      : this.todayStars().map(s => s.id);
+  _curFeatured() {   // array of item ids for the selected period
+    const p = this._period;
+    if (this._featuredBy[p] == null) {
+      const rec = this._record();
+      this._featuredBy[p] = (rec && Array.isArray(rec.featured)) ? rec.featured.slice() : this.todayStars().map(s => s.id);
+    }
+    return this._featuredBy[p];
   },
   featuredItems() {
-    if (this._featured == null) this._initFeatured();
     const menu = (App.data && App.data.menu_items) || [];
-    return this._featured.map(id => menu.find(m => m.id === id)).filter(Boolean);
+    return this._curFeatured().map(id => menu.find(m => m.id === id)).filter(Boolean);
   },
   _itemMargin(it) {
     const cost = App.menuItemCost(it);
@@ -80,7 +109,7 @@ S.ShiftPreShift = {
     return this.n(t.check_avg);
   },
 
-  // The cover forecast for today from the week's revenue forecast (covers_per_day).
+  // The day's cover forecast from the week's revenue forecast (covers_per_day).
   coversToday() {
     const fc = (App.data && App.data.revenue_forecasts) || [];
     if (!fc.length) return null;
@@ -96,14 +125,21 @@ S.ShiftPreShift = {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   draw() {
+    const periods = this._ensurePeriod();
     const tgt = this.checkTarget();
     const covers = this.coversToday();
     const featured = this.featuredItems();
-    const held = this._todayRecord();
+    const held = this._record();
     const dateLabel = new Date(App.todayLocal() + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
     const stat = (label, val, sub) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg">' + val + '</div>' + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
+
+    // Service-period selector (only when the operator runs more than one period).
+    const periodChips = periods.length > 1
+      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'
+        + App.filterChips(this._period, periods.map(p => ({ v: p, label: p })), 'pb-period-chip') + '</div>'
+      : '';
 
     const featHtml = featured.length
       ? featured.map((it, idx) => {
@@ -115,7 +151,7 @@ S.ShiftPreShift = {
             + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.name || 'Item') + '</div>'
             + mHtml
             + '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
-            + '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '" title="Remove">&times;</button>'
+            + '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
             + '</div>';
         }).join('')
       : '<div style="font-size:12px;color:var(--t3);padding:10px 14px;background:#0D181E;border-radius:6px;margin-top:6px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</div>';
@@ -127,35 +163,34 @@ S.ShiftPreShift = {
 
     const upsellBlock = this._editUpsell ? this._upsellEditorHtml() : this._upsellStaticHtml();
 
+    // Date + held status, compact, next to the Today's Focus heading.
+    const statusLine = '<span style="font-size:11px;color:var(--t3);">&middot; ' + esc(dateLabel) + '</span>'
+      + (held ? '<span style="font-size:11px;color:var(--green);font-weight:700;">&middot; Briefing held</span>' : '');
+
     this.container.innerHTML = '<div class="screen">'
-      // Date + held status (thin line; the old header card is gone, its intro is in the "i" help)
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;">' + esc(dateLabel)
-      +   (held ? '  &middot;  <span style="color:var(--green);font-weight:700;">Briefing held</span>' : '') + '</div>'
+      + periodChips
       // Live stat strip (top)
       + '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
       +   stat('Check Average Target', tgt != null ? App.fmtCurrency(tgt) : '-', 'your target this service')
       +   stat('Covers Forecast', covers != null ? String(covers) : '-', covers != null ? 'expected today' : 'set a forecast in Build Schedule')
       +   stat('Items Featured', String(featured.length), 'push these')
       + '</div></div>'
-      // Today's focus (heading row carries the Export button)
+      // Today's focus (heading row carries the date/held status and the Export button)
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 10px;">'
-      +   '<div class="sh" style="margin:0;">Today\'s Focus</div>'
+      +   '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><div class="sh" style="margin:0;">Today\'s Focus</div>' + statusLine + '</div>'
       +   '<button class="btn btn-ghost btn-sm" id="pb-export">Export Briefing</button>'
       + '</div>'
       + '<div class="card form-card" style="margin-bottom:16px;">'
-      +   '<div class="f"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._focus || '') + '</textarea></div>'
+      +   '<div class="f"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
       + '</div>'
       // Featured items
       + '<div class="sh" style="margin:20px 0 10px;">Featured Items</div>'
-      + '<div class="card" style="margin-bottom:16px;">'
-      +   '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:2px;">Bar Cop recommends your best-margin sellers. Swap or remove any that do not fit this service.</div>'
-      +   featHtml + featActions
-      + '</div>'
+      + '<div class="card" style="margin-bottom:16px;">' + featHtml + featActions + '</div>'
       // Upsell sequence (static list or on-page editor)
       + upsellBlock
       // Actions
       + '<div style="display:flex;align-items:center;gap:12px;margin:0 0 20px;">'
-      +   '<button class="btn btn-primary" id="pb-held">' + (held ? 'Update Today\'s Briefing' : 'Mark Briefing Held') + '</button>'
+      +   '<button class="btn btn-primary" id="pb-held">' + (held ? 'Update Briefing' : 'Mark Briefing Held') + '</button>'
       +   '<span id="pb-status" style="font-size:12px;color:var(--green);display:none;"></span>'
       + '</div>'
       // History
@@ -202,18 +237,18 @@ S.ShiftPreShift = {
   },
 
   historyHtml() {
-    const all = this.briefings().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const all = this.briefings().slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.period || '').localeCompare(b.period || ''));
     if (!all.length) return '';
     const rows = all.slice(0, App.listLimit('sc', 'briefing')).map(b => '<tr>'
       + '<td>' + (b.date || '') + '</td>'
-      + '<td>' + (b.stars_count != null ? b.stars_count + ' featured' : '') + '</td>'
+      + '<td>' + esc(b.period || '') + '</td>'
       + '<td style="color:var(--t2);">' + esc((b.focus || '').slice(0, 70)) + '</td>'
       + '<td class="no-print"><div class="row-actions"><button class="btn btn-danger btn-sm pb-hist-del" data-id="' + esc(b.id) + '">Delete</button></div></td>'
       + '</tr>').join('');
     return '<div class="sh" style="margin:24px 0 10px;">Briefing History</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:20%;"><col style="width:16%;"><col style="width:44%;"><col style="width:20%;"></colgroup>'
-      + '<thead><tr><th>Date</th><th>Featured</th><th>Focus</th><th class="no-print"></th></tr></thead>'
+      + '<colgroup><col style="width:18%;"><col style="width:18%;"><col style="width:44%;"><col style="width:20%;"></colgroup>'
+      + '<thead><tr><th>Date</th><th>Period</th><th>Briefing Focus</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('sc', 'briefing', all, false);
   },
@@ -221,18 +256,19 @@ S.ShiftPreShift = {
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     const c = this.container;
+    c.querySelectorAll('.pb-period-chip').forEach(b => b.addEventListener('click', () => { this._period = b.dataset.v; this.draw(); }));
+
     const focusEl = c.querySelector('#pb-focus');
-    if (focusEl) focusEl.addEventListener('input', e => { this._focus = e.target.value; });
+    if (focusEl) focusEl.addEventListener('input', e => { this._focusBy[this._period] = e.target.value; });
     c.querySelector('#pb-export')?.addEventListener('click', () => this.print());
     c.querySelector('#pb-held')?.addEventListener('click', () => this.markHeld());
 
     // Featured controls
     c.querySelector('#pb-fadd')?.addEventListener('click', () => this._openPicker('add', -1));
-    c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featured = this.todayStars().map(s => s.id); this.draw(); });
+    c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this.todayStars().map(s => s.id); this.draw(); });
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
     c.querySelectorAll('.pb-fremove').forEach(b => b.addEventListener('click', () => {
-      if (this._featured == null) this._initFeatured();
-      this._featured.splice(parseInt(b.dataset.idx, 10), 1);
+      this._curFeatured().splice(parseInt(b.dataset.idx, 10), 1);
       this.draw();
     }));
 
@@ -322,9 +358,9 @@ S.ShiftPreShift = {
     document.getElementById('pb-pick-list')?.addEventListener('click', ev => {
       const it = ev.target.closest('.pb-pick-item');
       if (!it) return;
-      if (this._featured == null) this._initFeatured();
-      if (mode === 'swap' && idx >= 0) this._featured[idx] = it.dataset.id;
-      else this._featured.push(it.dataset.id);
+      const ids = this._curFeatured();
+      if (mode === 'swap' && idx >= 0) ids[idx] = it.dataset.id;
+      else ids.push(it.dataset.id);
       App.closeModal('pb-pick-modal');
       this.draw();
     });
@@ -333,11 +369,12 @@ S.ShiftPreShift = {
   async markHeld() {
     const items = this.featuredItems();
     const date = App.todayLocal();
-    const existing = this._todayRecord();
+    const period = this._period;
+    const existing = this._record();
     const rec = {
       id: (existing && existing.id) || App.uid(),
-      date,
-      focus: this._focus || '',
+      date, period,
+      focus: this._curFocus() || '',
       stars_count: items.length,
       featured: items.map(i => i.id),
       stars: items.map(i => i.name),
@@ -349,7 +386,7 @@ S.ShiftPreShift = {
     const ok = await App.putRecord('sc', 'briefing', rec);
     if (ok) {
       const st = this.container.querySelector('#pb-status');
-      if (st) { st.style.display = 'inline'; st.textContent = 'Logged for ' + date + '.'; }
+      if (st) { st.style.display = 'inline'; st.textContent = 'Logged ' + period + ' for ' + date + '.'; }
       this.draw();
     }
   },
@@ -360,27 +397,29 @@ S.ShiftPreShift = {
     const items = this.featuredItems();
     const tgt = this.checkTarget();
     const covers = this.coversToday();
+    const period = this._period;
     const dateLabel = new Date(App.todayLocal() + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     const b = App._pdfBuilder('Pre-Shift Briefing');
-    b.header({ right: 'Pre-Shift Briefing', meta: dateLabel });
+    b.header({ right: period + ' Pre-Shift Briefing', meta: dateLabel });
+    b.kv('Service period', period);
     b.kv('Check average target', tgt != null ? App.fmtCurrency(tgt) : 'Not set');
     b.kv('Covers forecast', covers != null ? String(covers) : 'Not set');
-    if (this._focus) { b.spacer(2); b.sectionTitle('Today\'s Focus'); b.spacer(4); b.paragraph(this._focus, { gray: 40 }); }
+    if (this._curFocus()) { b.spacer(2); b.sectionTitle('Today\'s Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
     b.sectionTitle('Featured Items'); b.spacer(4);
     if (items.length) b.table(['Item', 'Margin'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-']; }), { columnStyles: { 1: { cellWidth: 90, halign: 'right' } } });
     else b.paragraph('No items featured. Cost and price your menu in Menu Engineering to feature your best margins.', { gray: 70 });
     b.sectionTitle('The Upsell Sequence'); b.spacer(4);
     this.upsellSeq().forEach((u, i) => b.paragraph((i + 1) + '. ' + u.title + (u.desc ? '. ' + u.desc : ''), { gray: 45 }));
     const venue = (App.data && App.data.settings && App.data.settings.bar_name) || 'Bar Cop';
-    await b.save(venue + ' - Pre-Shift Briefing - ' + App.todayLocal() + '.pdf');
+    await b.save(venue + ' - Pre-Shift Briefing - ' + period + ' - ' + App.todayLocal() + '.pdf');
   },
 
   showHowTo() {
     App.showHelpModal('How the Pre-Shift Briefing Works', [
-      { p: ['The Pre-Shift Briefing is the line-up sheet, read to the floor before doors. Bar Cop builds it from your live numbers so it is current every shift, with nothing to fill in from scratch. Read it at line-up, or tap Export Briefing for a paper copy. It works for any service: breakfast, lunch, happy hour, or dinner.'] },
-      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin, high-volume sellers from Menu Engineering. Swap or remove any that do not fit this service, or reset back to the recommendations. You add one line of focus for the shift.'] },
+      { p: ['The Pre-Shift Briefing is the line-up sheet, read to the floor before doors. It is per service period: pick the period at the top and Bar Cop builds a briefing for it, so a bar that runs lunch and dinner holds a separate pre-lunch and pre-dinner line-up the same day. If you run one service, you will not see the period picker. Read it at line-up, or tap Export Briefing for a paper copy.'] },
+      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin, high-volume sellers from Menu Engineering. Swap or remove any that do not fit the period you are briefing, add your own from the menu, or reset back to the recommendations. You add one line of focus for the shift.'] },
       { h: 'Customize the upsell sequence', p: ['Tap Customize on the upsell sequence to write your own steps, drag them into the order you want, and save. Your version is used from then on, on screen and on the export, and applies to every briefing until you change it again.'] },
-      { h: 'Run it and log it', p: ['Tap Mark Briefing Held to log that you ran it. Logging is optional: it counts toward your Bar Cop Audit operational discipline once you start using it, and never counts against you if you do not. Briefing History keeps a record; delete any entry logged by mistake.'] }
+      { h: 'Run it and log it', p: ['Tap Mark Briefing Held to log that you ran it for the selected period. Logging is optional: it counts toward your Bar Cop Audit operational discipline once you start using it, and never counts against you if you do not. Briefing History keeps a record per period; delete any entry logged by mistake.'] }
     ]);
   }
 };
