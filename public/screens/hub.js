@@ -444,7 +444,7 @@ S.Hub = {
     })();
     const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
     const rowDiv = (onclick, dot, label, value, valColor) =>
-      '<div class="hd-step" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;background:#0D181E;border-radius:6px;cursor:pointer;min-width:0;">'
+      '<div class="hd-step hd-prow" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;min-width:0;">'
       + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
       + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(label) + '</span>'
       + (value ? '<span style="flex-shrink:0;font-size:11px;font-weight:600;color:' + valColor + ';white-space:nowrap;">' + esc(value) + '</span>' : '')
@@ -1108,6 +1108,8 @@ S.Hub = {
         .hub-app .hd-arow{background:#0D181E;}
         .hub-app .hd-arow:hover{background:#0F1A21;}
         .hub-app .hd-step:hover{background:#13212A;}
+        .hub-app .hd-prow{border-top:1px solid var(--b2);}
+        .hub-app .hd-prow:first-child{border-top:none;}
         @media (max-width:768px){.hub-app .hub-stat-div{display:none;}}
         /* Card-internal scroll for list panels (alerts, PAI, weekly readout)
            when row count exceeds card height. Thin scrollbar so it does not
