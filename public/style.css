@@ -731,6 +731,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* Recessed select with the soft-grey chevron (matches .f select), for selects outside a .f field. */
 .at-qsel{appearance:none;-webkit-appearance:none;color-scheme:dark;cursor:pointer;background-color:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);font-family:'Barlow',sans-serif;font-size:12px;padding:7px 26px 7px 10px;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
 .at-qsel:focus{border-color:var(--focus-cell);}
+/* Custom chevron for the popup-form selects (Report a Bug / Contact Support) so
+   they match the account switcher instead of the raw OS arrow. Layers over the
+   form's inline background-color — that inline MUST be background-color, not the
+   background shorthand, which would wipe this image. */
+.pop-select{appearance:none;-webkit-appearance:none;color-scheme:dark;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px!important;}
 
 /* ══ UN-BOX PROTOTYPE — full-width page on the canvas (Drawers/Registers) ══
    Scoped to .page so the rest of the app (.screen) is byte-for-byte unchanged.

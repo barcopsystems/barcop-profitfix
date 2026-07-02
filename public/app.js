@@ -2922,7 +2922,7 @@ const App = {
       + 'Still stuck? '
       + '<span onclick="S.HubReportBug.openModal();" style="color:var(--gold);cursor:pointer;font-weight:600;">Report a bug</span>'
       + ' &middot; '
-      + '<span onclick="S.HubSupport.open();" style="color:var(--gold);cursor:pointer;font-weight:600;">Contact support</span>'
+      + '<span onclick="S.HubSupport.openModal();" style="color:var(--gold);cursor:pointer;font-weight:600;">Contact support</span>'
       + '</div>';
   },
 
