@@ -319,6 +319,16 @@ S.HubSettings = {
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
 
+    // Deterministic pseudo-random for ALL sample data. The demo must load the same
+    // every time: same reload => same numbers => same audit scores AND the same
+    // recoverable dollar. Math.random would reseed the server checks, cash
+    // variances, and inventory usage on every reload, which drifted the live
+    // audit's gap math (the recoverable "a year" changed on each Re-Load even
+    // though nothing the operator did had changed). This fixed-seed generator
+    // keeps the spread realistic while staying identical run to run. Called in a
+    // fixed order through loadSample, so the sequence is stable.
+    const rnd = (() => { let s = 987654321; return () => { s = (1103515245 * s + 12345) & 0x7fffffff; return s / 0x7fffffff; }; })();
+
     // Drop the cockpit's per-week "done" stamps (localStorage) so a fresh sample
     // does not inherit phantom step checks from a prior session.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
@@ -422,13 +432,13 @@ S.HubSettings = {
     const weeks = window.ANCHOR.weeks.map(a => {
       const endDate = dateStr(sunOff + window.ANCHOR.endAgo(a));
       const bar_count = bp.map(p => {
-        const used = +(Math.random()*3+0.5).toFixed(2);
-        return { product_id:p.id, beg_inv:+(Math.random()*2+0.5).toFixed(1), purchases:+(Math.random()*4+1).toFixed(0), end_inv:+(Math.random()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
+        const used = +(rnd()*3+0.5).toFixed(2);
+        return { product_id:p.id, beg_inv:+(rnd()*2+0.5).toFixed(1), purchases:+(rnd()*4+1).toFixed(0), end_inv:+(rnd()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
       });
       const bar_variance = bp.map(p => {
         const cnt = bar_count.find(c=>c.product_id===p.id);
         const actualPours = (cnt?.units_used||0) * p.pours_per_bottle;
-        const theo = Math.round(actualPours * (0.95 + Math.random()*0.08));
+        const theo = Math.round(actualPours * (0.95 + rnd()*0.08));
         const varU = +(actualPours - theo).toFixed(1);
         return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':(varU>0?'Over: Investigate':'Under: Investigate') };
       });
@@ -461,7 +471,7 @@ S.HubSettings = {
     const operatingExpenses = [];
     opexMonths.forEach(mk => {
       opexMonthly.forEach(([cat, amt]) => {
-        operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + Math.random() * 0.1)).toFixed(2), vendor:'', notes:'' });
+        operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + rnd() * 0.1)).toFixed(2), vendor:'', notes:'' });
       });
     });
     // Two ongoing recurring bills (recur every month until cancelled, no fixed
@@ -812,7 +822,7 @@ S.HubSettings = {
         S4_SCORE: 42, S4_SERVER_COUNT: 9, S4_TOP_CHECK_AVG: 44.00, S4_BOTTOM_CHECK_AVG: 27.50,
         S4_TEAM_CHECK_AVG: 35.75, S4_PERFORMANCE_SPREAD: 16.50, S4_COMP_PCT: 5.2, S4_COMP_BENCHMARK_PCT: 3, S4_MONTHLY_GAP: 3200,
         S5_SCORE: 39, S5_EVENT_REV_PERIOD: 2400, S5_EVENTS_PER_MONTH: 1, S5_AVG_EVENT_REVENUE: 2400,
-        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 5400
+        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 0
       }}),
       60: mkAudit('revenue', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 48,
@@ -829,7 +839,7 @@ S.HubSettings = {
         S4_SCORE: 50, S4_SERVER_COUNT: 9, S4_TOP_CHECK_AVG: 45.20, S4_BOTTOM_CHECK_AVG: 31.60,
         S4_TEAM_CHECK_AVG: 38.40, S4_PERFORMANCE_SPREAD: 13.60, S4_COMP_PCT: 4.0, S4_COMP_BENCHMARK_PCT: 3, S4_MONTHLY_GAP: 2100,
         S5_SCORE: 48, S5_EVENT_REV_PERIOD: 6800, S5_EVENTS_PER_MONTH: 3, S5_AVG_EVENT_REVENUE: 2267,
-        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 3200
+        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 0
       }}),
       30: mkAudit('revenue', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 56,
@@ -846,7 +856,7 @@ S.HubSettings = {
         S4_SCORE: 58, S4_SERVER_COUNT: 10, S4_TOP_CHECK_AVG: 46.40, S4_BOTTOM_CHECK_AVG: 35.40,
         S4_TEAM_CHECK_AVG: 40.90, S4_PERFORMANCE_SPREAD: 11.00, S4_COMP_PCT: 3.2, S4_COMP_BENCHMARK_PCT: 3, S4_MONTHLY_GAP: 1500,
         S5_SCORE: 53, S5_EVENT_REV_PERIOD: 9000, S5_EVENTS_PER_MONTH: 4, S5_AVG_EVENT_REVENUE: 2250,
-        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 2200
+        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 0
       }}),
       0: mkAudit('revenue', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 64,
@@ -863,7 +873,7 @@ S.HubSettings = {
         S4_SCORE: 66, S4_SERVER_COUNT: 10, S4_TOP_CHECK_AVG: 47.20, S4_BOTTOM_CHECK_AVG: 37.80,
         S4_TEAM_CHECK_AVG: 42.50, S4_PERFORMANCE_SPREAD: 9.40, S4_COMP_PCT: 2.6, S4_COMP_BENCHMARK_PCT: 3, S4_MONTHLY_GAP: 1100,
         S5_SCORE: 60, S5_EVENT_REV_PERIOD: 11200, S5_EVENTS_PER_MONTH: 5, S5_AVG_EVENT_REVENUE: 2240,
-        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 1500
+        S5_MINIMUM_MET: 'Tracked', S5_MONTHLY_GAP: 0
       }})
     });
 
@@ -1050,10 +1060,10 @@ S.HubSettings = {
     const rSC = [];
     [7, 9, 12, 14, 16, 19, 21].forEach((d, i) => {
       rServers.forEach((nm, j) => {
-        const cv = 18 + Math.round(Math.random() * 14);
+        const cv = 18 + Math.round(rnd() * 14);
         rSC.push({ id:uid(), date:dateStr(d), shift:['Dinner','Lunch','Bar'][i % 3],
           server_name:nm, covers:cv,
-          sales:+(cv * (31 + j * 1.5 + Math.random() * 7)).toFixed(2),
+          sales:+(cv * (31 + j * 1.5 + rnd() * 7)).toFixed(2),
           saved_at:daysAgoISO(d) });
       });
     });
@@ -2169,10 +2179,10 @@ S.HubSettings = {
       for (let di = 0; di < 7; di++) {
         const date = dateStr(baseAgo + 6 - di);
         activeRegs.forEach((dr, ri) => {
-          const exp = 600 + Math.round(Math.random() * 350);
+          const exp = 600 + Math.round(rnd() * 350);
           const variance = improving
-            ? Math.round((Math.random() - 0.55) * 12)
-            : Math.round((Math.random() - 0.75) * 30);
+            ? Math.round((rnd() - 0.55) * 12)
+            : Math.round((rnd() - 0.75) * 30);
           const tol = (dr.cash_tolerance != null) ? dr.cash_tolerance : 10;
           scVariances.push({
             id:uid(), date:date,
@@ -2284,7 +2294,7 @@ S.HubSettings = {
         const dropId = uid();
         const safeId = uid();
         const dropDate = dateStr(baseAgo + 6 - di);
-        const dropAmount = 900 + Math.round(Math.random() * 500);
+        const dropAmount = 900 + Math.round(rnd() * 500);
         weekDrops += dropAmount;
         const performed = mgrs[(a.wk + di) % 3];
         const witness   = mgrs[(a.wk + di + 1) % 3];
@@ -2673,7 +2683,7 @@ S.HubSettings = {
         const server = wtServers[(a.wk + k) % wtServers.length];
         const mgr    = mgrs[(a.wk + k) % 3];
         const reason = wtReasons[(a.wk + k) % wtReasons.length];
-        const amount = 20 + Math.round(Math.random() * (improving ? 55 : 100));
+        const amount = 20 + Math.round(rnd() * (improving ? 55 : 100));
         scWalkedTabs.push({
           id:uid(), date:dateStr(baseAgo + (k === 0 ? 5 : 6)), time:(k === 0 ? '21:50' : '23:10'),
           server_id:staffIdByName(server), server:server,
@@ -2974,9 +2984,9 @@ S.HubSettings = {
         const role = posNameOf(st.position_id);
         const earner = isEarnerRole(role);
         const base = role === 'Bartender' ? 135 : 100;
-        const cash = earner ? Math.round(base * (0.30 + Math.random() * 0.22)) : 0;
-        const card = earner ? Math.round(base * (0.92 + Math.random() * 0.40)) : 0;
-        const sales = earner ? Math.round((role === 'Bartender' ? 1450 : 1150) + Math.random() * 450) : 0;
+        const cash = earner ? Math.round(base * (0.30 + rnd() * 0.22)) : 0;
+        const card = earner ? Math.round(base * (0.92 + rnd() * 0.40)) : 0;
+        const sales = earner ? Math.round((role === 'Bartender' ? 1450 : 1150) + rnd() * 450) : 0;
         const paid = earner ? Math.round(sales * (TIPOUT_PCT[role] || 0) / 100 * 100) / 100 : 0;
         return { st, role, earner, cash, card, sales, paid, received:0, hours: role === 'Server' ? 5 : 7 };
       });
