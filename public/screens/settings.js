@@ -2749,19 +2749,22 @@ S.HubSettings = {
     // Pre-Shift Briefings — a realistic run of daily line-ups over the last few
     // weeks (not every single day, so the discipline read stays honest, not a flat
     // 100). Feeds the Pre-Shift Briefing history + the Bar Cop Audit opt-in read.
-    const briefFocus = [
-      'Push the fall cocktail list, name a pairing at every table.',
-      'Dessert attach is soft. Offer both, every table.',
-      'New server on section 3, back them up and watch the section.',
-      'Slow Tuesday. Work the bar and sell the app.',
-      'Big party at 7. Prep the private room early.',
-      'Feature the salmon tonight, best margin on the board.',
-      'Wine dinner Thursday, mention it to every four-top.',
-      'Weekend rush. Keep the second-round check tight.'
+    // Each briefing carries its service period. A couple of days hold two (a Happy
+    // Hour and a Dinner line-up), so the per-period model shows in the history.
+    const briefSeed = [
+      { ago: 2,  period: 'Dinner',      focus: 'Push the fall cocktail list, name a pairing at every table.' },
+      { ago: 2,  period: 'Happy Hour',  focus: 'Well pours are running heavy, tighten them up before the rush.' },
+      { ago: 4,  period: 'Dinner',      focus: 'Dessert attach is soft. Offer both, every table.' },
+      { ago: 6,  period: 'Lunch',       focus: 'New server on section 3, back them up and watch the section.' },
+      { ago: 9,  period: 'Dinner',      focus: 'Big party at 7. Prep the private room early.' },
+      { ago: 11, period: 'Dinner',      focus: 'Feature the salmon tonight, best margin on the board.' },
+      { ago: 13, period: 'Happy Hour',  focus: 'Slow Tuesday. Work the bar and sell the app.' },
+      { ago: 16, period: 'Dinner',      focus: 'Wine dinner Thursday, mention it to every four-top.' },
+      { ago: 18, period: 'Dinner',      focus: 'Weekend rush. Keep the second-round check tight.' }
     ];
-    App.shiftData.sc_briefings = [2, 4, 6, 9, 11, 13, 16, 18].map((ago, i) => ({
-      id: uid(), date: dateStr(ago), focus: briefFocus[i % briefFocus.length],
-      stars_count: 4, stars: [], check_target: 40, covers_forecast: null, held: true,
+    App.shiftData.sc_briefings = briefSeed.map(b => ({
+      id: uid(), date: dateStr(b.ago), period: b.period, focus: b.focus,
+      stars_count: 4, stars: [], featured: [], check_target: 40, covers_forecast: null, held: true,
       created_at: new Date().toISOString()
     }));
 
