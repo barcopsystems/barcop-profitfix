@@ -15,12 +15,11 @@ S.RevenueAudit = {
     this.actions.innerHTML = '';
     const audits = (App.data.revenue_audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest = audits[0] || null;
-    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
-    const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
+    const desc = 'Bar Cop scores your trailing four weeks off your logged data. Run it whenever you want a fresh read.';
     const SECTION_NAMES = ['Check Average and Revenue', 'Labor Efficiency', 'Menu Performance', 'Server Performance', 'Events and Private Dining'];
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'ra', title: 'Revenue Audit', desc,
-          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
+          steps: this._readinessSteps(), sectionsReady: this._sectionsReady(), hasLatest: !!latest })
       + (latest ? AuditUI.landingCard(latest, audits[1], SECTION_NAMES, 'ra') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'revenue_audit', 'ra', { sectionCount: SECTION_NAMES.length }) : '')
       + '</div>';
@@ -44,8 +43,21 @@ S.RevenueAudit = {
     ];
   },
 
-  onGenerate() {
-    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this.generateAudit(); });
+  onGenerate() { this.generateAudit(); },
+
+  // One boolean per scored section = whether Bar Cop can score it now. Drives the
+  // projected data badge so it matches what a run would produce.
+  _sectionsReady() {
+    const cd = this.buildControlData() || {};
+    const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
+    const events = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
+    return [
+      cd.check_average != null,                                             // S1 Check Average
+      cd.labor_pct_blended != null || cd.rplh_blended != null,              // S2 Labor
+      costedMenu.length >= 4,                                               // S3 Menu
+      (App.data.revenue_server_checks || []).length >= 3 || cd.server_comp_pct != null,  // S4 Server
+      events.length > 0                                                     // S5 Events
+    ];
   },
 
   viewAudit(idx) {
