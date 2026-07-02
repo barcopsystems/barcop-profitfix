@@ -85,7 +85,7 @@ const FixDocs = (() => {
     (blocks || []).forEach(blk => {
       switch (blk.t) {
         case 'para':      b.paragraph(blk.text, { italic: !!blk.italic, gray: blk.gray != null ? blk.gray : GREY }); break;
-        case 'section':   b.sectionTitle(blk.title); break;
+        case 'section':   b.sectionTitle(blk.title); b.spacer(6); break;
         case 'heading':   b.heading(blk.text, blk.size || 11); break;
         case 'table':     b.table(blk.head, blk.rows, blk.opts || {}); break;
         case 'fields':    (blk.items || []).forEach(it => fieldLine(b, it.label || it, it.value != null ? it.value : (it.auto ? ctx[it.auto] : ''))); break;
@@ -108,7 +108,6 @@ const FixDocs = (() => {
       title: 'Measured Pour Standards Policy', tag: 'PourStandardsPolicy', module: 'profit', disclaimer: POLICY_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Effective Date' },
           { label: 'Policy Owner (Manager / Owner)' }
         ]},
@@ -145,7 +144,6 @@ const FixDocs = (() => {
       title: 'Theft and Loss Prevention Policy', tag: 'TheftLossPolicy', module: 'profit', disclaimer: POLICY_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Business Name', auto: 'bar_name' },
           { label: 'State' },
           { label: 'Effective Date' },
           { label: 'Policy Owner (Owner / GM)' }
@@ -192,7 +190,6 @@ const FixDocs = (() => {
         { t: 'heading', text: 'Written Warning', size: 11 },
         { t: 'section', title: '1. Employee' },
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Employee name' },
           { label: 'Position / role' },
           { label: 'Date of warning' },
@@ -233,7 +230,6 @@ const FixDocs = (() => {
       title: 'Vendor Agreement Terms Checklist', tag: 'VendorTermsChecklist', module: 'profit', disclaimer: POLICY_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Vendor name' },
           { label: 'Product category (spirits / beer / wine / food / supplies)' },
           { label: 'Account rep and contact' },
@@ -271,7 +267,6 @@ const FixDocs = (() => {
       title: 'Server Upsell Standards and Scripts', tag: 'ServerUpsellStandards', module: 'revenue', disclaimer: POLICY_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Effective Date' }
         ]},
         { t: 'section', title: 'The Standard' },
@@ -298,7 +293,6 @@ const FixDocs = (() => {
       title: 'Food Handling and Portion Standards', tag: 'FoodPortionStandards', module: 'profit', disclaimer: POLICY_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Effective Date' },
           { label: 'Kitchen Manager' }
         ]},
@@ -334,7 +328,6 @@ const FixDocs = (() => {
       title: 'Portion Control Audit', tag: 'PortionControlAudit', module: 'profit', disclaimer: FORM_DISCLAIMER,
       blocks: [
         { t: 'fields', items: [
-          { label: 'Establishment', auto: 'bar_name' },
           { label: 'Date' },
           { label: 'Station' },
           { label: 'Auditor' }
