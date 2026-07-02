@@ -448,6 +448,10 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Build Checklists</span>
       </div>
+      <div class="nav-item" data-screen="sc-preshift" id="nav-sc-preshift">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 6.5v4l7 3V3.5l-7 3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M3 6.5H2.2A.7.7 0 0 0 1.5 7.2v2.6a.7.7 0 0 0 .7.7H3M12 6c1 .5 1 4 0 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Pre-Shift Briefing</span>
+      </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="sc-drawers" id="nav-sc-drawers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
