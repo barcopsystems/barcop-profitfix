@@ -381,6 +381,15 @@ S.HubSettings = {
     App.data.settings.annual_food_revenue= 374400;
     App.data.settings.targets = { bar_pour_cost_pct:22, food_cost_pct:32, labor_cost_pct:30, prime_cost_pct:60 };
     App.data.settings.onboarding_complete= true;
+    // The Anchor's own services (a craft cocktail bar + bistro): Lunch, Happy Hour
+    // (a Custom, since it is no longer a standard preset), Dinner, Late Night — no
+    // Breakfast. Feeds SHIFT_TYPES app-wide + the Pre-Shift Briefing daypart chips.
+    App.data.settings.service_periods = [
+      { id:'sp_anchor_lunch',  name:'Lunch',      start:'11:00', end:'16:00' },
+      { id:'sp_anchor_hh',     name:'Happy Hour', start:'15:00', end:'18:00', custom:true },
+      { id:'sp_anchor_dinner', name:'Dinner',     start:'16:00', end:'22:00' },
+      { id:'sp_anchor_late',   name:'Late Night', start:'22:00', end:'02:00' }
+    ];
 
     // ── Bar Products ──
     const bp = [
