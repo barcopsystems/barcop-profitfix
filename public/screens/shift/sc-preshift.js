@@ -48,8 +48,7 @@ S.ShiftPreShift = {
     return this.briefings().find(b => (b.date || '') === t && (b.period || '') === this._period) || null;
   },
 
-  // Resolve the selected period, defaulting to the one the clock is in. Returns
-  // the operator's configured period names.
+  // Resolve the selected period, defaulting to the one the clock is in.
   _ensurePeriod() {
     const periods = App.SHIFT_TYPES || [];
     if (!periods.length) { this._period = this._period || 'Service'; return periods; }
@@ -135,11 +134,14 @@ S.ShiftPreShift = {
     const stat = (label, val, sub) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg">' + val + '</div>' + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
 
-    // Service-period selector (only when the operator runs more than one period).
-    const periodChips = periods.length > 1
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'
-        + App.filterChips(this._period, periods.map(p => ({ v: p, label: p })), 'pb-period-chip') + '</div>'
-      : '';
+    // Row above the combined card: service-period chips on the left (only when
+    // the operator runs more than one period), Export Briefing on the right.
+    const topRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +   (periods.length > 1 ? App.filterChips(this._period, periods.map(p => ({ v: p, label: p })), 'pb-period-chip') : '')
+      + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="pb-export">Export Briefing</button>'
+      + '</div>';
 
     const featHtml = featured.length
       ? featured.map((it, idx) => {
@@ -161,56 +163,57 @@ S.ShiftPreShift = {
       + '<button class="btn btn-ghost btn-sm" id="pb-freset">Reset to Recommended</button>'
       + '</div>';
 
-    const upsellBlock = this._editUpsell ? this._upsellEditorHtml() : this._upsellStaticHtml();
-
     // Date + held status, compact, next to the Today's Focus heading.
     const statusLine = '<span style="font-size:11px;color:var(--t3);">&middot; ' + esc(dateLabel) + '</span>'
       + (held ? '<span style="font-size:11px;color:var(--green);font-weight:700;">&middot; Briefing held</span>' : '');
 
+    // Combined card: Today's Focus (label + status + entry) over the Featured Items list.
+    const colHead = '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Featured Items</div>';
+    const combinedCard = '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><div class="sh" style="margin:0;">Today\'s Focus</div>' + statusLine + '</div>'
+      + '<div class="f"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
+      + '<div class="divider"></div>'
+      + colHead + featHtml + featActions
+      + '</div>';
+
+    const upsellBlock = this._editUpsell ? this._upsellEditorHtml() : this._upsellStaticHtml();
+
     this.container.innerHTML = '<div class="screen">'
-      + periodChips
       // Live stat strip (top)
       + '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
       +   stat('Check Average Target', tgt != null ? App.fmtCurrency(tgt) : '-', 'your target this service')
       +   stat('Covers Forecast', covers != null ? String(covers) : '-', covers != null ? 'expected today' : 'set a forecast in Build Schedule')
       +   stat('Items Featured', String(featured.length), 'push these')
       + '</div></div>'
-      // Today's focus (heading row carries the date/held status and the Export button)
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 10px;">'
-      +   '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><div class="sh" style="margin:0;">Today\'s Focus</div>' + statusLine + '</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="pb-export">Export Briefing</button>'
-      + '</div>'
-      + '<div class="card form-card" style="margin-bottom:16px;">'
-      +   '<div class="f"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
-      + '</div>'
-      // Featured items
-      + '<div class="sh" style="margin:20px 0 10px;">Featured Items</div>'
-      + '<div class="card" style="margin-bottom:16px;">' + featHtml + featActions + '</div>'
-      // Upsell sequence (static list or on-page editor)
+      + topRow
+      + combinedCard
       + upsellBlock
       // Actions
       + '<div style="display:flex;align-items:center;gap:12px;margin:0 0 20px;">'
       +   '<button class="btn btn-primary" id="pb-held">' + (held ? 'Update Briefing' : 'Mark Briefing Held') + '</button>'
       +   '<span id="pb-status" style="font-size:12px;color:var(--green);display:none;"></span>'
       + '</div>'
-      // History
       + this.historyHtml()
       + '</div>';
 
     this.wire();
   },
 
+  // Circle step number, styled like the Workflow map's node numbers.
+  _stepNum(i) {
+    return '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--b-edge);color:var(--t3);font-size:11px;font-weight:700;">' + (i + 1) + '</span>';
+  },
+
   _upsellStaticHtml() {
     const seq = this.upsellSeq();
-    const seqHtml = seq.map((u, i) => '<div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--b2);">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t3);width:20px;flex-shrink:0;">' + (i + 1) + '</div>'
+    const seqHtml = seq.map((u, i) => '<div style="display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--b2);">'
+      + this._stepNum(i)
       + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(u.title) + '</div>'
       + (u.desc ? '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-top:2px;">' + esc(u.desc) + '</div>' : '') + '</div></div>').join('');
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 10px;">'
-      +   '<div class="sh" style="margin:0;">The Upsell Sequence</div>'
-      +   '<button class="btn btn-ghost btn-sm" id="pb-up-customize">Customize</button>'
-      + '</div>'
-      + '<div class="card" style="margin-bottom:16px;">' + seqHtml + '</div>';
+    return '<div class="sh" style="margin:20px 0 10px;">The Upsell Sequence</div>'
+      + '<div class="card">' + seqHtml
+      +   '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="pb-up-customize">Customize</button></div>'
+      + '</div>';
   },
 
   _upsellEditorHtml() {
@@ -226,13 +229,12 @@ S.ShiftPreShift = {
     const body = this._upsellDraft.length ? rows
       : '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">No steps yet. Add one below.</div>';
     return '<div class="sh" style="margin:20px 0 10px;">The Upsell Sequence</div>'
-      + '<div class="card form-card" style="margin-bottom:0;">'
+      + '<div class="card form-card">'
       +   '<div id="pb-up-items">' + body + '</div>'
-      +   '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="pb-up-add">+ Add Step</button></div>'
-      + '</div>'
-      + '<div style="margin:14px 0 24px;display:flex;align-items:center;gap:8px;">'
-      +   '<button class="btn btn-primary" id="pb-up-save">Save Sequence</button>'
-      +   '<button class="btn btn-ghost" id="pb-up-cancel">Cancel</button>'
+      +   '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
+      +     '<button class="btn btn-ghost btn-sm" id="pb-up-add">+ Add Step</button>'
+      +     '<button class="btn btn-primary btn-sm" id="pb-up-save">Save Sequence</button>'
+      +   '</div>'
       + '</div>';
   },
 
@@ -272,13 +274,12 @@ S.ShiftPreShift = {
       this.draw();
     }));
 
-    // Upsell: static → customize; editor → add/remove/drag/save/cancel
+    // Upsell: static → customize; editor → add/remove/drag/save (no cancel)
     c.querySelector('#pb-up-customize')?.addEventListener('click', () => {
       this._editUpsell = true;
       this._upsellDraft = this.upsellSeq().map(u => ({ title: u.title, desc: u.desc }));
       this.draw();
     });
-    c.querySelector('#pb-up-cancel')?.addEventListener('click', () => { this._editUpsell = false; this._upsellDraft = null; this.draw(); });
     c.querySelector('#pb-up-save')?.addEventListener('click', () => this.saveUpsell());
     c.querySelector('#pb-up-add')?.addEventListener('click', () => { this._syncUpsell(); this._upsellDraft.push({ title: '', desc: '' }); this.draw(); });
     const upHost = c.querySelector('#pb-up-items');
@@ -336,7 +337,7 @@ S.ShiftPreShift = {
       + cats[cat].map(i => {
           const m = this._itemMargin(i);
           const mTxt = m != null ? App.fmtCurrency(m) + ' margin' : '';
-          return '<div class="pb-pick-item" data-id="' + esc(i.id) + '" style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 10px;border-radius:6px;cursor:pointer;">'
+          return '<div class="pb-pick-item" data-id="' + esc(i.id) + '" style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 12px;background:#0D181E;border-radius:6px;margin-top:6px;cursor:pointer;">'
             + '<span style="font-size:13px;color:var(--t1);">' + esc(i.name || 'Item') + '</span>'
             + '<span style="font-size:11px;color:var(--gold);flex-shrink:0;">' + mTxt + '</span></div>';
         }).join('')
@@ -418,7 +419,7 @@ S.ShiftPreShift = {
     App.showHelpModal('How the Pre-Shift Briefing Works', [
       { p: ['The Pre-Shift Briefing is the line-up sheet, read to the floor before doors. It is per service period: pick the period at the top and Bar Cop builds a briefing for it, so a bar that runs lunch and dinner holds a separate pre-lunch and pre-dinner line-up the same day. If you run one service, you will not see the period picker. Read it at line-up, or tap Export Briefing for a paper copy.'] },
       { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin, high-volume sellers from Menu Engineering. Swap or remove any that do not fit the period you are briefing, add your own from the menu, or reset back to the recommendations. You add one line of focus for the shift.'] },
-      { h: 'Customize the upsell sequence', p: ['Tap Customize on the upsell sequence to write your own steps, drag them into the order you want, and save. Your version is used from then on, on screen and on the export, and applies to every briefing until you change it again.'] },
+      { h: 'Customize the upsell sequence', p: ['Tap Customize at the bottom of the upsell sequence to write your own steps, drag them into the order you want, and Save. Your version is used from then on, on screen and on the export, and applies to every briefing until you change it again.'] },
       { h: 'Run it and log it', p: ['Tap Mark Briefing Held to log that you ran it for the selected period. Logging is optional: it counts toward your Bar Cop Audit operational discipline once you start using it, and never counts against you if you do not. Briefing History keeps a record per period; delete any entry logged by mistake.'] }
     ]);
   }
