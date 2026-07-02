@@ -104,7 +104,7 @@ S.HubSupport = {
     const replyLine = userEmail
       ? 'We will get back to you at <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span> within one business day.'
       : 'We will get back to you within one business day.';
-    return '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:48px 24px;text-align:center;">'
+    return '<div style="padding:48px 24px;text-align:center;">'
       + '<svg width="56" height="56" viewBox="0 0 26 26" fill="none" style="margin:0 auto;display:block;">'
       +   '<circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/>'
       +   '<path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
@@ -112,7 +112,6 @@ S.HubSupport = {
       + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;margin-top:18px;text-transform:uppercase;">Message Sent</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.7;margin-top:14px;max-width:460px;margin-left:auto;margin-right:auto;">Your message is on its way to the support team. ' + replyLine + '</div>'
       + '<div style="margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
-      +   '<button class="btn btn-primary" id="hs-sup-done">' + (this._modal ? 'Close' : 'Back to Hub') + '</button>'
       +   '<button class="btn btn-ghost" id="hs-sup-another">Send Another</button>'
       + '</div>'
       + '</div>';
