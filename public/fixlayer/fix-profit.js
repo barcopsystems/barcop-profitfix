@@ -111,10 +111,7 @@ FIX.profit = [
           detail: 'Open the Profit dashboard and read food cost against your target. The Fix Areas card carries the dollar gap, annualized at this week\'s pace.' },
         { kind: 'action', target: 'sc-waste', targetLabel: 'Waste and Spill Log',
           title: 'Log waste in Shift Control with reason codes',
-          detail: 'Log every spill, dumped pour, broken product, and expired item in the Waste and Spill Log with a reason code, never a bare count. Logged waste also comes out of inventory variance so legit losses do not read as theft.' },
-        { kind: 'reference', target: 'Daily_Food_Waste_Tracking.pdf', targetLabel: 'Daily Food Waste Sheet',
-          title: 'Paper backup for the line',
-          detail: 'Optional. Print the Daily Food Waste Sheet for the kitchen line if a tablet is not within reach during service. Transfer each entry into the Waste and Spill Log at end of shift so it counts toward variance.' },
+          detail: 'Log every spill, dumped pour, broken product, and expired item in the Waste and Spill Log with a reason code, never a bare count. Logged waste comes out of inventory variance so legit losses do not read as theft. If a tablet is not near the line during service, tap Worksheet on the Waste log to print a blank sheet and enter the entries at end of shift.' },
         { kind: 'action',
           title: 'Spot-check plate portions on the line',
           detail: 'Weigh a few plates of a dish during service against the portion spec on the recipe card. A cook over-portioning fries 20 percent on a 200-cover night burns 40 extra pounds a week. Coach the portion on the spot and back it with the Portion Control Audit below.' },
@@ -206,10 +203,7 @@ FIX.profit = [
           detail: 'Each week, open your Weekly P&L Brief under Accounting. Bar Cop builds it from the weeks you confirm: revenue, COGS, labor, and prime cost broken out by bar and food, ready to file or hand your bookkeeper. Four of these are your month.' },
         { kind: 'result', target: 'books', targetLabel: 'Month-End Books',
           title: 'Review the month-end numbers',
-          detail: 'Once a month, open Month-End Books and walk management through the four weeks together. They are already built from your weekly rollups, so spend the meeting on decisions, not data entry. Set next month\'s cost-control priorities with a named owner on each.' },
-        { kind: 'reference', target: 'Monthly_Cost_Control_Review_Agenda.docx', targetLabel: 'Monthly Cost Control Review Agenda',
-          title: 'Use the review agenda to run the meeting',
-          detail: 'Download the Monthly Cost Control Review Agenda and run the management meeting off it. Walk every cost line, skip nothing.' }
+          detail: 'Once a month, open Month-End Books and walk management through the four weeks together, cost line by cost line, skipping nothing. It is already built from your weekly rollups, so spend the meeting on decisions, not data entry. Set next month\'s cost-control priorities with a named owner on each.' }
       ]
     },
 

@@ -21,11 +21,8 @@ FIX.revenue = [
           title: 'Set up the menu data',
           detail: 'In Menu Items, enter every item with its name, category, current price, and yield-adjusted food cost. Update an item\'s cost whenever a vendor price moves more than 5%.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
-          title: 'Read the quadrant every quarter',
-          detail: 'Open Menu Engineering the first week of January, April, July, and October. Rank items by dollar margin and volume, not cost percent, and work the four groups top to bottom.' },
-        { kind: 'reference', target: 'Menu_Engineering_Audit.pdf', targetLabel: 'Menu Engineering Review Worksheet',
-          title: 'Work the quadrant decisions on the worksheet',
-          detail: 'Download the Menu Engineering Review Worksheet and record a decision for every item. Move Stars and high-margin Puzzles into prime menu positions. Flag any Dog that might just be in a bad slot with a weak description.' },
+          title: 'Read the quadrant and record a decision on every item',
+          detail: 'Open Menu Engineering the first week of January, April, July, and October. Rank items by dollar margin and volume, not cost percent, and work the four groups top to bottom. Move Stars and high-margin Puzzles into prime menu positions, and flag any Dog that might just be in a bad slot with a weak description. Export PDF gives you the worked quadrant to take into the menu meeting.' },
         { kind: 'action', target: 'r-dog-test', targetLabel: 'Dog Test Tracker',
           title: 'Put each Dog on a 90-day test before you pull it',
           detail: 'In the Dog Test Tracker, start a 90-day test on each Dog: record its baseline weekly volume, move it to a better slot with a rewritten description, and update the volume as it runs. Keep or cut it on the day-90 number.' },
@@ -71,9 +68,9 @@ FIX.revenue = [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Apply the change directly on Menu Items',
           detail: 'Once you have the number, open the item in Menu Items and update the price. Bar Cop logs the change to the Pricing system on your Recovery Scoreboard, then watches check average and revenue for the eight weeks after. Nothing to mark done.' },
-        { kind: 'reference', target: 'Quarterly_Pricing_Review.pdf', targetLabel: 'Quarterly Pricing Review Checklist',
+        { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Run the full pricing review every quarter',
-          detail: 'Download the Quarterly Pricing Review checklist and work it the first week of each quarter. It refreshes costs, lists the items to reprice and remove, sets the menu print date, and confirms servers were briefed before the new menu goes live.' }
+          detail: 'The first week of each quarter, work the whole menu in Menu Engineering: refresh costs, reprice the items over target, set the menu print date, and confirm servers were briefed before the new menu goes live. The Pricing Review Log at the bottom checks each change against the real result three weeks on.' }
       ]
     },
 
@@ -105,11 +102,8 @@ FIX.revenue = [
           title: 'Clear projected overtime before you post',
           detail: 'In Overtime Watch, find anyone heading into overtime on the schedule you just built. Move the concentrated hours to under-scheduled staff before the schedule goes out.' },
         { kind: 'result', target: 'lc-reports', targetLabel: 'Labor History',
-          title: 'Read labor cost on total labor',
-          detail: 'After the week, open the Week view in Labor History and read labor cost percent by department against target. It runs on total labor, wages plus payroll taxes and benefits, 10 to 15% above wages alone.' },
-        { kind: 'reference', target: 'Weekly_Labor_Review.pdf', targetLabel: 'Weekly Labor Review Form',
-          title: 'Run the Monday labor review',
-          detail: 'Download the Weekly Labor Review Form and work it every Monday before you build the new schedule. Flag any department more than 2 points over target, decide whether it was a scheduling error or a revenue miss, and assign one action before you close the review. Fix a scheduling error in next week\'s schedule; fix a revenue miss in the pre-shift briefing.' }
+          title: 'Run the Monday labor review on total labor',
+          detail: 'Every Monday before you build the new schedule, open the Week view in Labor History and read labor cost percent by department against target. It runs on total labor, wages plus payroll taxes and benefits, 10 to 15% above wages alone. Flag any department more than 2 points over, decide whether it was a scheduling error or a revenue miss, and set one action: fix a scheduling error in next week\'s schedule, fix a revenue miss in the pre-shift briefing.' }
       ]
     },
 
@@ -176,9 +170,9 @@ FIX.revenue = [
         { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
           title: 'Run the pre-shift briefing every shift',
           detail: 'Print the Pre-Shift Upsell Briefing and run it five minutes before doors: today\'s two or three Stars, one check average target for the shift, the upsell sequence, and one named beverage pairing.' },
-        { kind: 'reference', target: 'Table_Visit_Audit.pdf', targetLabel: 'Table Visit Audit',
-          title: 'Audit the floor with table visit audits',
-          detail: 'Run two unannounced table visit audits a week with the Table Visit Audit form. Check whether the briefing is showing up in how servers work the tables.' },
+        { kind: 'action', target: 'r-server-check', targetLabel: 'Server Check',
+          title: 'Watch the floor against your standard',
+          detail: 'Twice a week at varied times, watch a few tables unannounced against your server upsell standard, then coach off the numbers in Server Check. Is the briefing showing up in how servers work the tables, or not?' },
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Coach below-average servers from the data',
           detail: 'In Server Check, pull the servers trending down two weeks running. Coach each of them that week, one on one, not the whole team.' }
@@ -211,9 +205,9 @@ FIX.revenue = [
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Measure performance by individual check average',
           detail: 'In Server Check, rank servers by individual check average, not impression and not total sales. The one with the most covers often ranks lower than you would guess.' },
-        { kind: 'reference', target: 'Table_Visit_Audit.pdf', targetLabel: 'Table Visit Audit',
-          title: 'Audit the floor with table visit audits',
-          detail: 'Run two unannounced table visit audits a week with the Table Visit Audit form. Mark which of the six touch points each server is missing.' },
+        { kind: 'action', target: 'r-server-check', targetLabel: 'Server Check',
+          title: 'Watch the floor against the standard',
+          detail: 'Twice a week, watch a few tables unannounced and note which of the six touch points each server is missing, then coach off their own Server Check numbers, not an impression.' },
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Coach the bottom and recognize the top, from the data',
           detail: 'In Server Check, find who is below team average and trending down, and who is on top. Coach the bottom with their own numbers, never a judgment: their check average against the team average, not "your tables are not selling." Name last week\'s top performer in the briefing.' }
