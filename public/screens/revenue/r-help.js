@@ -21,7 +21,7 @@ S.RevenueHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'Where do I start?',
-        a: 'Open Getting Started from the Settings sidebar for the full setup path. For Revenue specifically: enter your menu in Menu Items, then let Labor and Shift Control feed your hours, covers, and revenue. Revenue Recovery comes alive once your menu is priced and your first weeks of Shift and Labor data have populated the cover counts and revenue totals. The info "i" on any Revenue screen explains how that screen works.' },
+        a: 'For Revenue: enter your menu in Menu Items, then let Labor and Shift Control feed your hours, covers, and revenue. Revenue Recovery comes alive once your menu is priced and your first weeks of Shift and Labor data have populated the cover counts and revenue totals. The info "i" on any Revenue screen explains how that screen works.' },
       { q: 'What is Revenue Recovery, and how is it different from Profit Recovery?',
         a: 'Profit Recovery is about cost control: pour cost, food cost, theft, vendor pricing, prime cost. Revenue Recovery is about what your team actually collects from every guest. Two operations can run the same food costs and completely different revenues depending on how well their servers sell, how well their menu is priced, and how efficiently labor is scheduled against volume. Revenue Recovery tracks check average by server, RPLH against forecast, and menu contribution margin by item. One question: how much money are you capable of making versus how much you are actually making.' },
       { q: 'Do I need every screen?',
