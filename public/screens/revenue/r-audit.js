@@ -65,13 +65,6 @@ S.RevenueAudit = {
     const num = v => v != null ? String(v) : '';
     const yN  = v => v === true ? 'Yes' : v === false ? 'No' : '';
 
-    const signals6 = [
-      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
-      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
-      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
-      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
-    ].filter(s => s.label);
-
     const sections = [
       AuditUI.sectionBlock(1, 'Check Average and Revenue', d.S1_SCORE, [
         ['Blended Check Average',        cur(d.S1_CHECK_AVG), d.S1_CHECK_AVG < d.S1_CHECK_AVG_TARGET ? 'warn' : 'good'],
@@ -79,12 +72,6 @@ S.RevenueAudit = {
         ['Bar Check Average',            cur(d.S1_BAR_CHECK_AVG)],
         ['Food Check Average',           cur(d.S1_FOOD_CHECK_AVG)],
         ['Monthly Cover Count',          num(d.S1_COVER_COUNT)],
-        ['Beverage Attachment',          d.S1_BEV_PER_COVER != null ? d.S1_BEV_PER_COVER + ' drinks per guest' : '', (d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null && d.S1_BEV_PER_COVER < d.S1_BEV_ATTACH_BENCHMARK) ? 'warn' : (d.S1_BEV_PER_COVER != null ? 'good' : '')],
-        ['Attachment Benchmark',         d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null ? d.S1_BEV_ATTACH_BENCHMARK + ' drinks per guest' : ''],
-        ['Drinks Sold (period)',         d.S1_BEV_PER_COVER != null ? num(d.S1_BEV_UNITS) : ''],
-        ['Checks With a Drink',          d.S1_BEV_INCIDENCE_PCT != null ? d.S1_BEV_INCIDENCE_PCT + '%' : ''],
-        ['Weakest Daypart',              d.S1_DAYPART_WEAKEST ? d.S1_DAYPART_WEAKEST + ' at ' + cur(d.S1_DAYPART_WEAKEST_CHECK) : '', d.S1_DAYPART_SPREAD >= 4 ? 'warn' : ''],
-        ['Daypart Check Spread',         d.S1_DAYPART_SPREAD != null ? cur(d.S1_DAYPART_SPREAD) + ' (weakest to strongest)' : ''],
         ['Monthly Revenue',              cur(d.S1_MONTHLY_REVENUE)],
         ['Monthly Gap vs Target',        cur(d.S1_MONTHLY_GAP), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',                   cur(d.S1_ANNUAL_GAP),  d.S1_ANNUAL_GAP  > 0 ? 'warn' : ''],
@@ -95,8 +82,6 @@ S.RevenueAudit = {
         ['RPLH',                         cur(d.S2_RPLH)],
         ['RPLH Target',                  cur(d.S2_RPLH_TARGET)],
         ['Total Labor Period',           cur(d.S2_LABOR_PERIOD)],
-        ['Scheduled vs Actual Hours',    d.S2_SCHED_VS_ACTUAL || ''],
-        ['Overtime Hours',               d.S2_OVERTIME_HRS ? num(d.S2_OVERTIME_HRS) + ' hrs' : ''],
         ['Monthly Labor Gap',            cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(3, 'Menu Performance', d.S3_SCORE, [
@@ -105,28 +90,25 @@ S.RevenueAudit = {
         ['Dogs on Menu',                 num(d.S3_DOGS_COUNT), d.S3_DOGS_COUNT > 3 ? 'warn' : ''],
         ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
         ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
-        ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
-        ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
+        ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || '', d.S3_PRICING_STALE === true ? 'warn' : (d.S3_PRICING_STALE === false ? 'good' : '')],
+        ['Dog Tests Running',            d.S3_DOG_TESTS_ACTIVE != null ? num(d.S3_DOG_TESTS_ACTIVE) : ''],
       ], null, d),
       AuditUI.sectionBlock(4, 'Server Performance', d.S4_SCORE, [
-        ['Server Count Analyzed',        num(d.S4_SERVER_COUNT)],
+        ['Servers Analyzed',             num(d.S4_SERVER_COUNT)],
         ['Top Server Check Average',     cur(d.S4_TOP_CHECK_AVG)],
         ['Bottom Server Check Average',  cur(d.S4_BOTTOM_CHECK_AVG)],
+        ['Team Check Average',           cur(d.S4_TEAM_CHECK_AVG)],
         ['Performance Spread',           cur(d.S4_PERFORMANCE_SPREAD), d.S4_PERFORMANCE_SPREAD > 5 ? 'warn' : ''],
-        ['Appetizer Attach Rate',        pct(d.S4_APP_ATTACH_RATE), d.S4_APP_ATTACH_RATE < 30 ? 'warn' : ''],
-        ['Dessert Attach Rate',          pct(d.S4_DESSERT_ATTACH_RATE)],
+        ['Comp % of Sales',              d.S4_COMP_PCT != null ? d.S4_COMP_PCT + '%' + (d.S4_COMP_BENCHMARK_PCT != null ? ' (Benchmark: under ' + d.S4_COMP_BENCHMARK_PCT + '%)' : '') : '', (d.S4_COMP_PCT != null && d.S4_COMP_BENCHMARK_PCT != null && d.S4_COMP_PCT > d.S4_COMP_BENCHMARK_PCT) ? 'warn' : ''],
         ['Monthly Gap from Spread',      cur(d.S4_MONTHLY_GAP), d.S4_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(5, 'Events and Private Dining', d.S5_SCORE, [
         ['Event Revenue Period',         cur(d.S5_EVENT_REV_PERIOD)],
         ['Events per Month',             num(d.S5_EVENTS_PER_MONTH)],
         ['Average Event Revenue',        cur(d.S5_AVG_EVENT_REVENUE)],
-        ['Private Dining Minimum Met',   yN(d.S5_MINIMUM_MET)],
-        ['Catering Revenue Period',      cur(d.S5_CATERING_REV_PERIOD)],
-        ['Annual Event Gap',             cur(d.S5_ANNUAL_EVENT_GAP), d.S5_ANNUAL_EVENT_GAP > 0 ? 'warn' : ''],
+        ['Private Dining Minimum Met',   d.S5_MINIMUM_MET || ''],
         ['Monthly Gap',                  cur(d.S5_MONTHLY_GAP), d.S5_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
-      ...(signals6.length ? [AuditUI.sectionBlock(6, 'Operational Risk Signals', null, [], signals6, d)] : []),
     ].join('');
 
     this.container.innerHTML = '<div class="screen" id="ra-audit-view">'
@@ -223,12 +205,6 @@ S.RevenueAudit = {
       ['Bar Check Average',            cur(d.S1_BAR_CHECK_AVG)],
       ['Food Check Average',           cur(d.S1_FOOD_CHECK_AVG)],
       ['Monthly Cover Count',          num(d.S1_COVER_COUNT)],
-      ['Beverage Attachment',          d.S1_BEV_PER_COVER != null ? d.S1_BEV_PER_COVER + ' drinks per guest' : ''],
-      ['Attachment Benchmark',         d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null ? d.S1_BEV_ATTACH_BENCHMARK + ' drinks per guest' : ''],
-      ['Drinks Sold (period)',         d.S1_BEV_PER_COVER != null ? num(d.S1_BEV_UNITS) : ''],
-      ['Checks With a Drink',          d.S1_BEV_INCIDENCE_PCT != null ? d.S1_BEV_INCIDENCE_PCT + '%' : ''],
-      ['Weakest Daypart',              d.S1_DAYPART_WEAKEST ? d.S1_DAYPART_WEAKEST + ' at ' + cur(d.S1_DAYPART_WEAKEST_CHECK) : ''],
-      ['Daypart Check Spread',         d.S1_DAYPART_SPREAD != null ? cur(d.S1_DAYPART_SPREAD) + ' (weakest to strongest)' : ''],
       ['Monthly Revenue',              cur(d.S1_MONTHLY_REVENUE)],
       ['Monthly Gap vs Target',        cur(d.S1_MONTHLY_GAP)],
       ['Annual Gap',                   cur(d.S1_ANNUAL_GAP)],
@@ -239,8 +215,6 @@ S.RevenueAudit = {
       ['RPLH',                         cur(d.S2_RPLH)],
       ['RPLH Target',                  cur(d.S2_RPLH_TARGET)],
       ['Total Labor Period',           cur(d.S2_LABOR_PERIOD)],
-      ['Scheduled vs Actual Hours',    d.S2_SCHED_VS_ACTUAL || ''],
-      ['Overtime Hours',               d.S2_OVERTIME_HRS ? num(d.S2_OVERTIME_HRS) + ' hrs' : ''],
       ['Monthly Labor Gap',            cur(d.S2_MONTHLY_GAP)],
     ]);
     section(3, 'Menu Performance', d.S3_SCORE, [
@@ -249,44 +223,25 @@ S.RevenueAudit = {
       ['Dogs on Menu',                 num(d.S3_DOGS_COUNT)],
       ['Puzzles on Menu',              num(d.S3_PUZZLES_COUNT)],
       ['Top Category by Revenue',      d.S3_TOP_CATEGORY || ''],
-      ['Menu Mix Gap',                 cur(d.S3_MONTHLY_GAP)],
-      ['Pricing Opportunity',          cur(d.S3_PRICING_OPPORTUNITY)],
+      ['Last Price Increase',          d.S3_LAST_PRICE_INCREASE || ''],
+      ['Dog Tests Running',            d.S3_DOG_TESTS_ACTIVE != null ? num(d.S3_DOG_TESTS_ACTIVE) : ''],
     ]);
     section(4, 'Server Performance', d.S4_SCORE, [
-      ['Server Count Analyzed',        num(d.S4_SERVER_COUNT)],
+      ['Servers Analyzed',             num(d.S4_SERVER_COUNT)],
       ['Top Server Check Average',     cur(d.S4_TOP_CHECK_AVG)],
       ['Bottom Server Check Average',  cur(d.S4_BOTTOM_CHECK_AVG)],
+      ['Team Check Average',           cur(d.S4_TEAM_CHECK_AVG)],
       ['Performance Spread',           cur(d.S4_PERFORMANCE_SPREAD)],
-      ['Appetizer Attach Rate',        pct(d.S4_APP_ATTACH_RATE)],
-      ['Dessert Attach Rate',          pct(d.S4_DESSERT_ATTACH_RATE)],
+      ['Comp % of Sales',              d.S4_COMP_PCT != null ? d.S4_COMP_PCT + '%' + (d.S4_COMP_BENCHMARK_PCT != null ? ' (Benchmark: under ' + d.S4_COMP_BENCHMARK_PCT + '%)' : '') : ''],
       ['Monthly Gap from Spread',      cur(d.S4_MONTHLY_GAP)],
     ]);
     section(5, 'Events and Private Dining', d.S5_SCORE, [
       ['Event Revenue Period',         cur(d.S5_EVENT_REV_PERIOD)],
       ['Events per Month',             num(d.S5_EVENTS_PER_MONTH)],
       ['Average Event Revenue',        cur(d.S5_AVG_EVENT_REVENUE)],
-      ['Private Dining Minimum Met',   yN(d.S5_MINIMUM_MET)],
-      ['Catering Revenue Period',      cur(d.S5_CATERING_REV_PERIOD)],
-      ['Annual Event Gap',             cur(d.S5_ANNUAL_EVENT_GAP)],
+      ['Private Dining Minimum Met',   d.S5_MINIMUM_MET || ''],
       ['Monthly Gap',                  cur(d.S5_MONTHLY_GAP)],
     ]);
-
-    // Operational Risk Signals (Section 6) — same source as signals6 on screen.
-    const signals6 = [
-      { score: d.S6_SIG1_SCORE, label: d.S6_SIG1_LABEL, evidence: d.S6_SIG1_EVIDENCE, gap: d.S6_SIG1_GAP, tool: d.S6_SIG1_TOOL },
-      { score: d.S6_SIG2_SCORE, label: d.S6_SIG2_LABEL, evidence: d.S6_SIG2_EVIDENCE, gap: d.S6_SIG2_GAP, tool: d.S6_SIG2_TOOL },
-      { score: d.S6_SIG3_SCORE, label: d.S6_SIG3_LABEL, evidence: d.S6_SIG3_EVIDENCE, gap: d.S6_SIG3_GAP, tool: d.S6_SIG3_TOOL },
-      { score: d.S6_SIG4_SCORE, label: d.S6_SIG4_LABEL, evidence: d.S6_SIG4_EVIDENCE, gap: d.S6_SIG4_GAP, tool: d.S6_SIG4_TOOL },
-    ].filter(s => s.label);
-    if (signals6.length) {
-      b.sectionTitle('Section 6  ·  Operational Risk Signals');
-      signals6.forEach(sig => {
-        b.heading((sig.label || '') + (sig.score ? '  [' + String(sig.score).toUpperCase() + ']' : ''), 10);
-        if (sig.evidence) b.paragraph(sig.evidence);
-        if (sig.gap)      b.paragraph(sig.gap);
-        if (sig.tool)     b.paragraph(sig.tool);
-      });
-    }
 
     b.disclaimer(App.deliverableFooter().disclaimerLines.join(' '));
 
@@ -392,22 +347,14 @@ S.RevenueAudit = {
   extractActionItems(d) {
     const items = [];
     if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Close check average gap. $' + Math.round(d.S1_MONTHLY_GAP) + '/month at current cover count.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'check-average' });
-    // Beverage attachment routes to the same check-average lever. No separate
-    // dollar (monthly_impact 0) so it never double-counts the check-average gap.
-    if (d.S1_BEV_PER_COVER != null && d.S1_BEV_ATTACH_BENCHMARK != null && d.S1_BEV_PER_COVER < d.S1_BEV_ATTACH_BENCHMARK) {
-      items.push({ action: 'Lift beverage attachment. ' + d.S1_BEV_PER_COVER + ' drinks per guest vs a ' + d.S1_BEV_ATTACH_BENCHMARK + ' benchmark. Build the drink into every table, it is the highest-margin add.', monthly_impact: 0, gap_id: 'check-average' });
-    }
-    // Daypart diagnostic — surfaced only when a real gap exists. No dollar (the
-    // blended check-average gap already carries it).
-    if (d.S1_DAYPART_SPREAD >= 4 && d.S1_DAYPART_WEAKEST) {
-      items.push({ action: 'Work your weakest daypart. ' + d.S1_DAYPART_WEAKEST + ' runs a ' + Math.round(d.S1_DAYPART_WEAKEST_CHECK) + ' dollar check against ' + Math.round(d.S1_DAYPART_STRONGEST_CHECK) + ' at your strongest. Targeted menu, staffing, and upsell there close most of the gap.', monthly_impact: 0, gap_id: 'check-average' });
-    }
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce labor cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month over target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'labor-scheduling' });
-    if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Improve menu mix. $' + Math.round(d.S3_MONTHLY_GAP) + '/month opportunity from repricing Dogs.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'menu-engineering' });
-    // Pricing lag — operator-stated, no fabricated dollar (we have no per-item
-    // price-vs-market data). Surfaced as a finding routing to repricing.
-    if (d.S3_PRICING_STALE === true) items.push({ action: 'Reprice the menu. Your last price increase was ' + (d.S3_LAST_PRICE_INCREASE ? d.S3_LAST_PRICE_INCREASE.toLowerCase() : 'over a year ago') + '. Inflation has quietly eaten the margin on every plate since then.', monthly_impact: 0, gap_id: 'pricing' });
+    // Menu: Dogs and stale pricing route to Menu Engineering. Repricing recency is
+    // read from the price-change log now, not a self-report. No fabricated dollar.
+    if (d.S3_DOGS_COUNT > 3) items.push({ action: 'Cut the dead weight on the menu. ' + d.S3_DOGS_COUNT + ' Dogs are running low margin and low volume. Reprice or Dog Test them in Menu Engineering before they eat the mix.', monthly_impact: 0, gap_id: 'menu-engineering' });
+    if (d.S3_PRICING_STALE === true) items.push({ action: 'Reprice the menu. Your last price increase was ' + (d.S3_LAST_PRICE_INCREASE ? d.S3_LAST_PRICE_INCREASE.toLowerCase() : 'over a year ago') + '. Inflation has quietly eaten the margin on every plate since then. Reprice to target in Menu Engineering.', monthly_impact: 0, gap_id: 'menu-engineering' });
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Close server performance spread. $' + Math.round(d.S4_MONTHLY_GAP) + '/month from bottom third to team average.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'server-performance' });
+    // Comp discipline routes to Server Check, no separate dollar.
+    if (d.S4_COMP_PCT != null && d.S4_COMP_BENCHMARK_PCT != null && d.S4_COMP_PCT > d.S4_COMP_BENCHMARK_PCT) items.push({ action: 'Tighten comp discipline. Comps are ' + d.S4_COMP_PCT + '% of server sales against an under-' + d.S4_COMP_BENCHMARK_PCT + '% benchmark. Watch the comp rate by server in Server Check.', monthly_impact: 0, gap_id: 'server-performance' });
     if (d.S5_MONTHLY_GAP > 0) items.push({ action: 'Grow event revenue. $' + Math.round(d.S5_MONTHLY_GAP) + '/month gap to target.', monthly_impact: d.S5_MONTHLY_GAP, gap_id: 'events-catering' });
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
   },
@@ -451,11 +398,22 @@ S.RevenueAudit = {
       cd.sources.push('Labor Control actuals');
     }
 
-    // Labor Control — staff roster (server performance section)
-    const staff = lab.lc_staff || [];
-    if (staff.length) {
-      cd.roster_count = staff.length;
-      cd.sources.push('Labor Control staff roster');
+    // Server comp discipline (Revenue S4): comps as a % of server sales over the
+    // trailing four weeks. Server sales come from the Server Check log, comps from
+    // Shift Control's void/comp log. Fed as one team rate the server audit grades.
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
+    const cutoffStr = App.ymdLocal ? App.ymdLocal(cutoff) : cutoff.toISOString().slice(0, 10);
+    const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr);
+    if (checks.length) {
+      const serverSales = checks.reduce((s, c) => s + (parseFloat(c.sales) || 0), 0);
+      const comps = ((App.shiftData && App.shiftData.sc_void_comps) || [])
+        .filter(r => r.type === 'Comp' && (r.date || '') >= cutoffStr);
+      const compTotal = comps.reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
+      if (serverSales > 0) {
+        cd.server_comp_total = Math.round(compTotal);
+        cd.server_comp_pct = r1((compTotal / serverSales) * 100);
+        cd.sources.push('Server Check log');
+      }
     }
 
     return cd.sources.length ? cd : null;
