@@ -41,7 +41,6 @@ S.HubReportBug = {
   _wireModal() {
     if (this._state === 'form') {
       document.getElementById('hrb-submit')?.addEventListener('click', () => this.submit());
-      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.closeModal('hrb-modal'));
     } else {
       document.getElementById('hrb-done')?.addEventListener('click', () => App.closeModal('hrb-modal'));
       document.getElementById('hrb-another')?.addEventListener('click', () => { this._state = 'form'; this._rerenderModalBody(); });
@@ -60,7 +59,6 @@ S.HubReportBug = {
 
     if (this._state === 'form') {
       document.getElementById('hrb-submit')?.addEventListener('click', () => this.submit());
-      document.getElementById('hrb-cancel')?.addEventListener('click', () => App.showHub());
     } else {
       document.getElementById('hrb-done')?.addEventListener('click', () => App.showHub());
       document.getElementById('hrb-another')?.addEventListener('click', () => {
@@ -71,7 +69,7 @@ S.HubReportBug = {
   },
 
   _renderForm() {
-    const inputStyle = 'background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--w);font-family:\'Barlow\',sans-serif;font-size:13px;padding:9px 11px;width:100%;outline:none;';
+    const inputStyle = 'background-color:var(--input);border:1px solid var(--b1);border-radius:var(--r2);color:var(--w);font-family:\'Barlow\',sans-serif;font-size:13px;padding:9px 11px;width:100%;outline:none;';
     const taStyle    = inputStyle + 'resize:vertical;min-height:90px;line-height:1.6;';
     const labelStyle = 'font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:block;margin-bottom:7px;';
     const reqStar    = '<span style="color:var(--red);margin-left:2px;">*</span>';
@@ -86,7 +84,7 @@ S.HubReportBug = {
       + '</div>'
       + '<div style="margin-bottom:18px;">'
       +   '<label style="' + labelStyle + '">Severity' + reqStar + '</label>'
-      +   '<select id="hrb-severity" style="' + inputStyle + 'cursor:pointer;">'
+      +   '<select id="hrb-severity" class="pop-select" style="' + inputStyle + 'cursor:pointer;">'
       +     '<option value="minor">Minor (small glitch or visual issue)</option>'
       +     '<option value="moderate" selected>Moderate (feature works but has bugs)</option>'
       +     '<option value="major">Major (feature is broken)</option>'
@@ -108,7 +106,6 @@ S.HubReportBug = {
       + '<div id="hrb-status" style="font-size:11px;font-weight:700;letter-spacing:0.04em;margin-bottom:12px;display:none;"></div>'
       + '<div style="display:flex;gap:10px;align-items:center;">'
       +   '<button class="btn btn-primary" id="hrb-submit">Submit Report</button>'
-      +   '<button class="btn btn-ghost" id="hrb-cancel">Cancel</button>'
       + '</div>';
 
     // In the popup the modal card already provides the chrome, so skip the
