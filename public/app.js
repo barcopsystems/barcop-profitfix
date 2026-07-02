@@ -479,13 +479,6 @@ const App = {
     }
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
-    } else if (!this.setupMeetsThreshold() && window.S && S.HubGettingStarted) {
-      // Returning user, onboarding done, but setup hasn't crossed the
-      // Foundation + 1 audit threshold yet. Default-land on Getting Started
-      // so the next action is one click away. They can still navigate to
-      // the Hub Dashboard manually via the sidebar.
-      S.HubGettingStarted.open();
-      this._promptSync();
     } else {
       this.showHub();
       this._promptSync();
@@ -1505,11 +1498,6 @@ const App = {
         'Event Close Rate: the share of event inquiries you turn into booked events. The Events system grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
       ] }
     ] },
-    'getting-started': { title: 'How Getting Started Works', sections: [
-      { h: 'What this page is', p: ['The setup checklist that turns a blank account into a working one, grouped into four phases: Foundation, Baseline Diagnosis, Capture System, and Weekly Work.'] },
-      { h: 'How to use it', p: ['Work the steps top to bottom. Each one has a Go button that drops you on the exact screen to do it, and you check it off when done. The phases build on each other: Foundation sets your profile and targets, Baseline runs your first audits, Capture builds the operational engine, and Weekly Work is the ongoing rhythm.'] },
-      { h: 'When it is done', p: ['Once every step is checked, Getting Started drops off the Settings sidebar on its own so it is not in your way. Your setup status always lives on the Settings overview.'] }
-    ] },
     'user-account': { title: 'How Your Account Works', sections: [
       { h: 'What this page is', p: ['Your personal account controls: your password, your subscription, a full data backup, and, outside the demo, the testing tools.'] },
       { h: 'Password and backup', p: ['Set a new password any time. Export Backup saves everything in your account (settings, weekly numbers, audits, and all your Inventory, Labor, and Shift records) to one file you keep offsite. Restore from Backup loads one of those files back to recover your data or move it to another account.'] },
@@ -1685,7 +1673,6 @@ const App = {
         'operating-expenses': () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open(),
         'expense-history':    () => S2.HubExpenseHistory && S2.HubExpenseHistory.open(),
         'books-help':         () => S2.HubBooksHelp && S2.HubBooksHelp.open(),
-        'getting-started':    () => S2.HubGettingStarted && S2.HubGettingStarted.open(),
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
         'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
         'user-account':       () => S2.HubUserAccounts && S2.HubUserAccounts.open('account'),
@@ -1925,7 +1912,6 @@ const App = {
     if (id === 'settings') { S.HubSettings.open(); return; }
     if (id === 'settings-profile') { S.HubSettings.open('business-profile'); return; }
     if (id === 'settings-targets') { S.HubSettings.open('recovery-targets'); return; }
-    if (id === 'getting-started') { S.HubGettingStarted.open(); return; }
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
     if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
@@ -4016,10 +4002,6 @@ const App = {
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
-    if (id === 'getting-started') {
-      S.HubGettingStarted.open();
-      return;
-    }
     // Landing on a screen is the base of its in-screen view history (floating back).
     this._currentScreenId = id;
     this._viewStack = [];
