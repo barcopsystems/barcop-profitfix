@@ -294,6 +294,42 @@ const FixDocs = (() => {
       ]
     },
 
+    'food-standards': {
+      title: 'Food Handling and Portion Standards', tag: 'FoodPortionStandards', module: 'profit', disclaimer: POLICY_DISCLAIMER,
+      blocks: [
+        { t: 'fields', items: [
+          { label: 'Establishment', auto: 'bar_name' },
+          { label: 'Effective Date' },
+          { label: 'Kitchen Manager' }
+        ]},
+        { t: 'section', title: '1. Purpose' },
+        { t: 'para', text: 'This sets the kitchen standard for safe food handling and consistent portions. Everyone on the line reads it and works to it. Safe handling keeps guests safe and keeps the inspector off your back. Consistent portions protect food cost, because over-portioning a high-volume plate is money off every ticket.' },
+        { t: 'section', title: '2. Food Handling' },
+        { t: 'table', head: ['Area', 'Standard'], rows: [
+          ['Cold holding', 'Keep cold food at 40F or below. Check and log walk-in and reach-in temps at open and close.'],
+          ['Hot holding', 'Hold hot food at 135F or above. Reheat to 165F before it goes on the line.'],
+          ['Cooking temps', 'Poultry 165F, ground meat 155F, whole cuts and fish 145F. Use a probe thermometer, not the clock.'],
+          ['Storage and FIFO', 'Label and date everything. First in, first out. Raw stored below and away from ready-to-eat.'],
+          ['Cross-contamination', 'Separate boards and knives by product. Wash, rinse, sanitize between tasks. Change gloves between raw and ready-to-eat.'],
+          ['Hygiene', 'Wash hands on the clock, after every break, and between tasks. No bare-hand contact with ready-to-eat food.']
+        ], opts: { columnStyles: { 0: { cellWidth: 110, fontStyle: 'bold' } } } },
+        { t: 'section', title: '3. Portion Standards' },
+        { t: 'para', text: 'Every plate goes out to the portion on its recipe card, not by eye. The tools below stay on the line at all times.' },
+        { t: 'checklist', items: [
+          'Portion scale at every station, in service and calibrated',
+          'Portioned scoops, ladles, and spoodles matched to each recipe spec',
+          'Ring molds or templates where plate presentation is specified',
+          'Proteins pre-portioned, weighed, and labeled during prep, not on the fly',
+          'Cooks weigh-check their own plates against spec at the start of every shift'
+        ]},
+        { t: 'para', text: 'Portions are audited on the line against these standards. Coaching is on the spot and treated as training, not discipline.' },
+        { t: 'section', title: '4. Acknowledgment' },
+        { t: 'para', text: 'I have read the Food Handling and Portion Standards and I will work to them on every shift.' },
+        { t: 'fields', items: [{ label: 'Employee name (print)' }] },
+        { t: 'signatures', roles: ['Employee', 'Kitchen Manager'] }
+      ]
+    },
+
     'portion-audit': {
       title: 'Portion Control Audit', tag: 'PortionControlAudit', module: 'profit', disclaimer: FORM_DISCLAIMER,
       blocks: [

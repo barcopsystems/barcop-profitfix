@@ -35,7 +35,8 @@ window.FixPanel = {
     'Employee_Corrective_Action_Template.docx':'corrective-action',
     'Vendor_Agreement_Terms_Checklist.docx':   'vendor-terms',
     'Server_Upsell_Standards_Scripts.docx':    'server-standards',
-    'Portion_Control_Audit.pdf':               'portion-audit'
+    'Portion_Control_Audit.pdf':               'portion-audit',
+    'Food_Handling_Portion_Standards.docx':    'food-standards'
   },
 
   gapAreas(moduleKey) {
