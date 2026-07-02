@@ -164,7 +164,7 @@ FIX.revenue = [
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Scorecard',
           title: 'Set the team baseline and read the spread',
           detail: 'Read the Server Scorecard at the top of Server Check for team average, top performer, and anyone trending down. Give it four weeks for a real baseline, then work the servers flagged below team average. Check the spread for a few coaching cases versus a floor-wide gap.' },
-        { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
+        { kind: 'reference', doc: 'server-standards', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Train and post the upsell sequence',
           detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Run the sequence in order: pre-dinner beverage, appetizer, dessert close.' },
         { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
@@ -199,7 +199,7 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Server_Upsell_Standards_Scripts.docx', targetLabel: 'Server Upsell Standards and Scripts',
+        { kind: 'reference', doc: 'server-standards', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Write and roll out the server standard',
           detail: 'Download the Server Upsell Standards and Scripts, set your six touch points, and hand it to every active server. Collect a signed acknowledgment, file the copies, and post one in the server area. Brief every manager on it, and put it in front of every new server on day one.' },
         { kind: 'result', target: 'r-server-check', targetLabel: 'Server Check',

@@ -35,7 +35,7 @@ FIX.profit = [
         { kind: 'result', target: 'this-week', targetLabel: 'This Week',
           title: 'Review the trend every week',
           detail: 'Once a week, open This Week and read pour cost against target across your saved weeks. Watch whether it is holding or drifting.' },
-        { kind: 'reference', target: 'Measured_Pour_Standards_Policy.docx', targetLabel: 'Measured Pour Standards Policy',
+        { kind: 'reference', doc: 'pour-standards', targetLabel: 'Measured Pour Standards Policy',
           title: 'Put a written pour standard in place',
           detail: 'Download the Measured Pour Standards Policy, set your pour sizes, and have every staff member sign it before the effective date.' }
       ]
@@ -57,7 +57,7 @@ FIX.profit = [
 
     process: {
       steps: [
-        { kind: 'reference', target: 'Theft_Loss_Prevention_Policy.docx', targetLabel: 'Theft and Loss Prevention Policy',
+        { kind: 'reference', doc: 'theft-loss-policy', targetLabel: 'Theft and Loss Prevention Policy',
           title: 'Set a written theft and loss policy',
           detail: 'Download the Theft and Loss Prevention Policy, set the cash, comp, and product rules, and have every staff member sign it at hire.' },
         { kind: 'action', target: 'sc-void-comp', targetLabel: 'Void and Comp Log',
@@ -78,7 +78,7 @@ FIX.profit = [
         { kind: 'result', target: 'theft-risk', targetLabel: 'Loss Prevention',
           title: 'Review the loss signals weekly',
           detail: 'Once a week, open Loss Prevention and work what flagged: drawer shorts, spot checks, confirmed theft. The worst push to the Hub so they find you.' },
-        { kind: 'reference', target: 'Employee_Corrective_Action_Template.docx', targetLabel: 'Employee Corrective Action Template',
+        { kind: 'reference', doc: 'corrective-action', targetLabel: 'Employee Corrective Action Template',
           title: 'Escalate a documented pattern',
           detail: 'One incident is a data point; two on the same employee within 30 days is a pattern. Document each one in writing as you see it, and use the Corrective Action Template once the pattern is clear.' }
       ]
@@ -115,7 +115,7 @@ FIX.profit = [
         { kind: 'action',
           title: 'Spot-check plate portions on the line',
           detail: 'Weigh a few plates of a dish during service against the portion spec on the recipe card. A cook over-portioning fries 20 percent on a 200-cover night burns 40 extra pounds a week. Coach the portion on the spot and back it with the Portion Control Audit below.' },
-        { kind: 'reference', target: 'Portion_Control_Audit.pdf', targetLabel: 'Portion Control Audit',
+        { kind: 'reference', doc: 'portion-audit', targetLabel: 'Portion Control Audit',
           title: 'Run portion control audits',
           detail: 'Use the Portion Control Audit form on at least two stations a week at varied times, against the portion spec on each recipe card. Treat what you find as training, not discipline.' },
         { kind: 'result', target: 'this-week', targetLabel: 'This Week',
@@ -164,7 +164,7 @@ FIX.profit = [
         { kind: 'result', target: 'vendor-scorecard', targetLabel: 'Vendor Tracker',
           title: 'Bring the per-vendor rollup to a quarterly review',
           detail: 'Once a quarter, open Vendor Tracker\'s Scorecard tab for the per-vendor rollup: total spend, net price drift, short counts, open and recovered overcharges, days to credit, and a status (High, Watch, Clean). Export PDF and take it into the rep meeting. Ask for a price match or an explanation on every High and Watch line, and talk volume terms.' },
-        { kind: 'reference', target: 'Vendor_Agreement_Terms_Checklist.docx', targetLabel: 'Vendor Agreement Terms Checklist',
+        { kind: 'reference', doc: 'vendor-terms', targetLabel: 'Vendor Agreement Terms Checklist',
           title: 'Confirm the terms in writing',
           detail: 'Within 48 hours of the review, download the Vendor Agreement Terms Checklist, fill in the pricing, substitution policy, and delivery terms you agreed to, and send it to your rep. If your only record is a phone call, you have no dispute.' }
       ]
