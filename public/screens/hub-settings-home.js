@@ -16,15 +16,6 @@ S.HubSettingsHome = {
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
-    const GS     = S.HubGettingStarted;
-    const TASKS  = (GS && GS.TASKS)  || [];
-    const GROUPS = (GS && GS.GROUPS) || [];
-    const prog   = (App.data && App.data.hub_setup_progress) || {};
-    const done   = TASKS.filter(t => prog[t.id]).length;
-    const total  = TASKS.length;
-    const pct    = total ? Math.round(done / total * 100) : 0;
-    const complete = total > 0 && done === total;
-
     // ── Shared #0D181E data-row block helpers ──
     // finish(): stamp the --row-div divider on every row but the last (rows carry a {{div}} placeholder).
     const finish = (rows) => {
@@ -45,28 +36,6 @@ S.HubSettingsHome = {
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:0;"><span>' + title + '</span>'
       +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
       + bleedBlock(rows) + '</div>';
-
-    // ── Setup completeness ── (inset #0D181E block; it sits below the progress bar so it does not bleed)
-    const groupRows = GROUPS.map(g => {
-      const gt   = TASKS.filter(t => t.group === g.id);
-      const gd   = gt.filter(t => prog[t.id]).length;
-      const gpct = gt.length ? Math.round(gd / gt.length * 100) : 0;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;background:#0D181E;{{div}}">'
-        + '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(g.title) + '</div>'
-        + '<div style="width:120px;height:5px;background:var(--input);border-radius:3px;overflow:hidden;"><div style="width:' + gpct + '%;height:100%;background:' + (gpct === 100 ? 'var(--green)' : 'var(--gold)') + ';"></div></div>'
-        + '<div style="width:44px;text-align:right;font-size:11px;color:var(--t3);">' + gd + '/' + gt.length + '</div></div>';
-    });
-
-    // The setup card exists only while there is setup left to do. Once every
-    // step is done, Getting Started disappears (from the sidebar too), so the
-    // card has nothing to be about and is dropped entirely.
-    const setupCard = complete ? '' : ('<div class="card form-card" style="margin-bottom:18px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Setup</span>'
-      +   '<button class="btn btn-primary btn-sm" data-act="getting-started">Continue Setup</button></div>'
-      + '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;">' + done + ' of ' + total + ' steps done. Finish setup so every number has real data behind it.</div>'
-      + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="width:' + pct + '%;height:100%;background:var(--gold);"></div></div>'
-      + insetBlock(groupRows)
-      + '</div>');
 
     // ── Account (subscription + renewal + team for admins) ──
     const s       = (App.data && App.data.settings) || {};
@@ -117,14 +86,13 @@ S.HubSettingsHome = {
     ];
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 
-    mount.innerHTML = '<div class="screen">' + setupCard + acctCard + profileCard + targetCard + '</div>';
+    mount.innerHTML = '<div class="screen">' + acctCard + profileCard + targetCard + '</div>';
     this._wire();
   },
 
   _wire() {
     const go = (act) => {
-      if (act === 'getting-started')       S.HubGettingStarted?.open?.();
-      else if (act === 'user-account')     S.HubUserAccounts?.open?.('account');
+      if (act === 'user-account')          S.HubUserAccounts?.open?.('account');
       else if (act === 'user-team')        S.HubUserAccounts?.open?.('team');
       else if (act === 'settings-profile') S.HubSettings?.open?.('business-profile');
       else if (act === 'settings-targets') S.HubSettings?.open?.('recovery-targets');

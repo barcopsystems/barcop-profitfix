@@ -1063,7 +1063,7 @@ S.RecoveryPlaybook = {
               ],
               note: 'Week 3 feels uncomfortable the first time you tell experienced bartenders to use a jigger or post specs in a kitchen that has run on feel for years. Do it anyway. Professional, direct, not apologetic. This is how the bar runs now.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'You do not track any of this on paper. The moment you do the first real step in Control, your Profit Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month P&L. Your setup checklist lives in Getting Started.' },
+            { t: 'p', text: 'You do not track any of this on paper. The moment you do the first real step in Control, your Profit Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month P&L.' },
             { t: 'go', label: 'Profit Fix System', screen: 'profit-fix', focus: 'pour-cost' }
           ]
         },
@@ -1413,7 +1413,7 @@ S.RecoveryPlaybook = {
               ],
               note: 'Week 3 feels uncomfortable the first time you hand experienced servers a written standard. Do it anyway. Direct, professional, not apologetic. This is how the floor runs now.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'You do not track this on paper. The moment you do the first real step, your Revenue Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month numbers. Your setup checklist lives in Getting Started.' },
+            { t: 'p', text: 'You do not track this on paper. The moment you do the first real step, your Revenue Fix System logs that day and measures from there. It reads your live data and tells you which systems are running and which are slipping, so the 45-day fade shows up as a status you can see, not a surprise on next month numbers.' },
             { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' }
           ]
         },

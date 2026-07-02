@@ -20,9 +20,9 @@ S.HubSettingsHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is in Settings?',
-        a: 'Two things: how Bar Cop is tuned to your operation, and your account. Business Profile and Recovery Targets hold your operation details and the benchmarks Bar Cop measures you against. Your Account and Team Members handle your login, subscription, backups, and who else can get in. The overview shows how far along your setup is and links to each page.' },
-      { q: 'What is the setup progress about?',
-        a: 'It mirrors the Getting Started checklist: the steps that turn a blank account into a working one. As you complete them the bar fills in. Once everything is done, Getting Started and the setup card drop off on their own so they are not in your way forever.' }
+        a: 'Two things: how Bar Cop is tuned to your operation, and your account. Business Profile and Recovery Targets hold your operation details and the benchmarks Bar Cop measures you against. Your Account and Team Members handle your login, subscription, backups, and who else can get in. The overview shows your account, profile, and targets at a glance, each with an Edit link.' },
+      { q: 'How do I set up Bar Cop?',
+        a: 'Setup happens as you go, not from a separate checklist. When you first sign in, onboarding captures your business name, annual sales, and service periods. From there, each section walks you through its own setup the first time you open it with no data, showing the steps in order right on that page. Your profile and targets always live here in Settings if you need to adjust them later.' }
     ]},
     { t: 'Business Profile', qa: [
       { q: 'What are service periods and why do they matter?',

@@ -100,10 +100,8 @@ S.Hub = {
         + '<span class="nav-label">' + name + '</span></div>';
     // Getting Started (and its Setup heading) drop off once setup is complete,
     // the same way the old grab-bag hid it. Team Members is admin-only.
-    const setupDone = !!(App.isSetupComplete && App.isSetupComplete());
     const isAdmin   = !!(window.DB && DB.isAdmin && DB.isAdmin());
     return ''
-      + (setupDone ? '' : '<div class="nav-section">Setup</div>' + row('getting-started', 'Getting Started', 'getStart'))
       + '<div class="nav-section">Settings</div>'
       + row('settings-profile', 'Business Profile', 'profile')
       + row('settings-targets', 'Recovery Targets', 'target')
@@ -362,7 +360,7 @@ S.Hub = {
     // caught-up line, not a false nudge. The audit cadence is NOT repeated here, it
     // already lives in the Audit Scores panel (days-left + Run button).
     let whatsDueRight = '';
-    if (App.isSetupComplete && App.isSetupComplete()) {
+    if (App.data && App.data.settings && App.data.settings.onboarding_complete) {
       const nd = new Date(App.nextSunday() + 'T00:00:00'); nd.setDate(nd.getDate() - 7);
       const lastEnd = App.ymdLocal(nd);
       const wkConfirmed = arr => (arr || []).some(w => ((w.period_end || '') + '').slice(0, 10) >= lastEnd);
@@ -673,21 +671,10 @@ S.Hub = {
         ${auditRow('Cash',    cA, sysTrend(cAudits), 'c-audit',       'cash',    false)}
       </div>${shWrapClose}`;
 
-    // Setup catch-up banner — shows above the dashboard whenever the Hub
-    // Getting Started checklist is incomplete. One click opens the checklist
-    // so the operator can pick up where they left off. Hides at 100% done.
-    const setupTasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
-    const setupProg  = data.hub_setup_progress || {};
-    const setupDone  = setupTasks.filter(t => setupProg[t.id]).length;
-    const setupTotal = setupTasks.length;
-    const catchupBanner = (setupTotal > 0 && setupDone < setupTotal && !App._setupDismissed)
-      ? '<div class="hub-catchup" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:var(--r);padding:10px 16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">'
-        + '<div style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--t1);">Continue Setup</div>'
-        + '<div style="flex:1;font-size:12px;color:var(--t2);line-height:1.5;">' + setupDone + ' of ' + setupTotal + ' setup tasks done.</div>'
-        + '<button class="btn btn-ghost btn-sm hub-catchup-go" type="button">Next Tasks</button>'
-        + '<button class="btn btn-ghost btn-sm hub-catchup-x" type="button">Dismiss</button>'
-        + '</div>'
-      : '';
+    // (The old "Continue Setup" catch-up banner was removed with the Getting
+    // Started checklist; the Hub's empty-state tiles + each section's day-one
+    // guide are the onboarding now.)
+    const catchupBanner = '';
     // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
     // and a 22px number so each tile fits in the shorter container that now
     // shares the middle column with the Recovery Scoreboard above it.
@@ -925,10 +912,9 @@ S.Hub = {
       +   '</div>'
       + '</div>';
     const startHereGuide =
-        '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;padding:2px 2px 8px;">Welcome to Bar Cop. It finds the money leaking out of your operation and tells you exactly how to plug it. Three steps to your first recovery number:</div>'
-      + ghStep(1, 'Finish your setup', 'Add your bar\'s basics so the audits have real numbers to measure against.', 'Continue Setup', 'if(window.S&&S.HubGettingStarted)S.HubGettingStarted.open()')
-      + ghStep(2, 'Run your first audit', 'Profit, Revenue, or Cash. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
-      + ghStep(3, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
+        '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;padding:2px 2px 8px;">Welcome to Bar Cop. It finds the money leaking out of your operation and tells you exactly how to plug it. Two steps to your first recovery number:</div>'
+      + ghStep(1, 'Run your first audit', 'Profit, Revenue, or Cash. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
+      + ghStep(2, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
     const aiCount = itemRows.length;
     const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--t1);line-height:1;">' + aiCount + '</div>'
@@ -1204,13 +1190,6 @@ S.Hub = {
       await DB.signOut();
     });
 
-    container.querySelector('.hub-catchup-go')?.addEventListener('click', () => {
-      if (window.S && S.HubGettingStarted) S.HubGettingStarted.open();
-    });
-    container.querySelector('.hub-catchup-x')?.addEventListener('click', () => {
-      App._setupDismissed = true;   // per-login; resets on next loadAllData
-      container.querySelector('.hub-catchup')?.remove();
-    });
 
     document.getElementById('hub-sidebar-toggle')?.addEventListener('click', () => {
       this._sidebarCollapsed = !this._sidebarCollapsed;
@@ -1239,7 +1218,6 @@ S.Hub = {
       closeHubMobileSidebar();
       if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
       else if (action === 'hub-home')           App.showHub();
-      else if (action === 'getting-started')    S.HubGettingStarted.open();
       else if (action === 'audit-help')         S.HubAuditHelp?.open?.();
       else if (action === 'books-help')         S.HubBooksHelp?.open?.();
       else if (action === 'settings-help')      S.HubSettingsHelp?.open?.();
