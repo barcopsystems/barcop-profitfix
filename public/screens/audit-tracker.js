@@ -12,11 +12,10 @@ S.AuditTracker = {
     this.actions.innerHTML = '';
     const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const latest = audits[0] || null;
-    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
-    const desc = 'Bar Cop scores your trailing four weeks off your logged data. Get these in, then run it. One a week.';
+    const desc = 'Bar Cop scores your trailing four weeks off your logged data. Run it whenever you want a fresh read.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'at', title: 'Profit Audit', desc,
-          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
+          steps: this._readinessSteps(), sectionsReady: this._sectionsReady(), hasLatest: !!latest })
       + (latest ? AuditUI.landingCard(latest, audits[1], App.AUDIT_PROFIT_SECTION_NAMES, 'at') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'audit', 'at', { sectionCount: App.AUDIT_PROFIT_SECTION_NAMES.length }) : '')
       + '</div>';
@@ -43,8 +42,22 @@ S.AuditTracker = {
     ];
   },
 
-  onGenerate() {
-    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this.generateAudit(); });
+  onGenerate() { this.generateAudit(); },
+
+  // One boolean per SCORED section (Pour, Food, Shrink, Theft, Vendor) = whether
+  // Bar Cop has data to score it right now. Drives the projected data badge so it
+  // matches what a run would actually produce. Prime is context, not counted.
+  _sectionsReady() {
+    const cd = this.buildControlData() || {};
+    const discreps = (App.data && App.data.vendor_discrepancies) || [];
+    const vlog = (App.data && App.data.vendor_log) || [];
+    return [
+      cd.bar_cost_pct != null,                                                       // S1 Pour
+      cd.food_cost_pct != null,                                                       // S2 Food
+      (cd.inventory_counts || 0) > 0 || cd.inv_variance_dollar != null || cd.waste_total != null || (cd.spot_checks || 0) > 0,   // S3 Shrink & Waste
+      (cd.void_comp_count || 0) > 0 || (cd.cash_reconciliations || 0) > 0 || cd.walked_tabs_total != null || cd.sales_integrity_flags != null,  // S4 Theft & Cash
+      (cd.deliveries_logged || 0) > 0 || (cd.vendor_price_changes || 0) > 0 || discreps.length > 0 || vlog.length > 0   // S5 Vendor
+    ];
   },
 
   viewAudit(idx) {

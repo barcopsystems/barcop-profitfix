@@ -103,21 +103,46 @@ const AuditUI = {
       }));
   },
 
+  // ── Projected data quality ───────────────────────────────────────────────────
+  // The level this audit would come out at if run RIGHT NOW, off the data Bar Cop
+  // currently holds. readyArr = one boolean per SCORED section (true = that section
+  // has data to score). Uses the same Full/Partial/Limited thresholds as the
+  // post-run dataQuality badge, so the projection matches the real result. Zero
+  // ready reads "Not enough data".
+  projectedQuality(readyArr) {
+    const total = (readyArr || []).length;
+    const scored = (readyArr || []).filter(Boolean).length;
+    if (!total || scored === 0) return { label: 'Not enough data', color: 'var(--t3)', none: true, full: false };
+    if (scored >= total)   return { label: 'Full data',    color: 'var(--green)', none: false, full: true };
+    if (scored * 2 >= total) return { label: 'Partial data', color: 'var(--amber)', none: false, full: false };
+    return { label: 'Limited data', color: 'var(--t3)', none: false, full: false };
+  },
+  projectedChip(q) {
+    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + q.color + ';white-space:nowrap;flex-shrink:0;">' + esc(q.label) + '</span>';
+  },
+
   // ── Readiness card — the shared pre-generate screen for all four audits ──────
-  // A progress bar + a checklist of what the audit reads, each row auto-checked
+  // A live projected-quality badge (what the audit would come out at if run now)
+  // + a progress bar + a checklist of what the audit reads, each row auto-checked
   // (green) once Bar Cop has that data or tappable to jump to the step that fills
-  // it, then the Generate button at the bottom (cadence-gated). The screen wires
-  // the jump via wireFirstAudit and the Generate via #<pfx>-gen-btn; the caller
-  // runs the missing-data guard before generating.
-  //   cfg: { pfx, title, desc, steps:[{label, done, go}], canRun, daysLeft, hasLatest }
+  // it, then the Generate button at the bottom. Audits are uncapped (run anytime),
+  // so there is no lock and no run-without-data warning. The screen wires the jump
+  // via wireFirstAudit and the Generate via #<pfx>-gen-btn.
+  //   cfg: { pfx, title, desc, steps:[{label, done, go}], sectionsReady:[bool], hasLatest }
   readinessCard(cfg) {
     const steps = cfg.steps || [];
     const doneCount = steps.filter(s => s.done).length;
+    // Projected badge: prefer an explicit per-section readiness array (faithful to
+    // the post-run badge); fall back to step completion when a caller omits it.
+    const readyArr = Array.isArray(cfg.sectionsReady) ? cfg.sectionsReady : steps.map(s => !!s.done);
+    const q = AuditUI.projectedQuality(readyArr);
     const label = cfg.hasLatest ? 'Generate New Audit' : 'Generate First Audit';
-    const genBtn = cfg.canRun
-      ? '<button class="btn btn-primary" id="' + cfg.pfx + '-gen-btn">' + label + '</button>'
-      : '<button class="btn btn-primary" disabled style="opacity:0.5;cursor:default;">'
-        + (cfg.daysLeft > 0 ? (cfg.hasLatest ? 'Next audit in ' : 'Audit unlocks in ') + cfg.daysLeft + ' day' + (cfg.daysLeft === 1 ? '' : 's') : label) + '</button>';
+    const genBtn = '<button class="btn btn-primary" id="' + cfg.pfx + '-gen-btn">' + label + '</button>';
+    const projLine = q.none
+      ? 'No data in Bar Cop yet. Work the steps below, then run your first audit.'
+      : q.full
+        ? 'Run it now and you get a <strong style="color:' + q.color + ';">Full data</strong> audit. Bar Cop has everything this reads.'
+        : 'Run it now and you get a <strong style="color:' + q.color + ';">' + esc(q.label) + '</strong> audit. Fill in the rest below to move it up.';
     const rows = steps.map((s, i) =>
       '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:#0D181E;border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
       + (s.done
@@ -129,25 +154,15 @@ const AuditUI = {
       + '</div>').join('');
     // Generate button lives OUTSIDE the card, bottom-left, at normal size (the
     // app-wide on-page form-button standard). Status message sits beside it.
-    return '<div class="card form-card" style="margin-bottom:12px;"><div class="card-title">' + esc(cfg.title) + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px;">' + cfg.desc + '</div>'
+    return '<div class="card form-card" style="margin-bottom:12px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>' + esc(cfg.title) + '</span>' + AuditUI.projectedChip(q) + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:6px;">' + cfg.desc + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">' + projLine + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;"><strong style="color:var(--green);">' + doneCount + '</strong> of ' + steps.length + ' ready</div>'
       + this._gsProgBar(doneCount, steps.length)
       + rows
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:12px;margin:0 0 20px;">' + genBtn + '<span id="' + cfg.pfx + '-gen-status" style="font-size:12px;color:var(--red);display:none;"></span></div>';
-  },
-  // The missing-data guard: if any step is not done, confirm before running (the
-  // audit still runs, but the operator is warned they will burn the 7-day lock on
-  // a partial audit). Returns a promise resolving true = proceed.
-  readinessGuard(steps) {
-    const missing = (steps || []).filter(s => !s.done).map(s => s.label);
-    if (!missing.length) return Promise.resolve(true);
-    return App.confirm({
-      title: 'Run without all the data?',
-      message: 'Your audit is still missing: ' + missing.join(', ') + '. Those sections read N/A, and the audit locks for 7 days once you run. Run it now anyway?',
-      confirmText: 'Run Anyway', cancelText: 'Not Yet', danger: false
-    });
   },
 
   // ── Landing: View-Full-Audit button + merged Latest-Audit card ─────────────

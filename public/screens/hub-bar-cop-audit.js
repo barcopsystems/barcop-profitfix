@@ -846,20 +846,27 @@ S.HubBarCopAudit = {
     ];
   },
 
-  onGenerate() {
-    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this._generate(); });
+  onGenerate() { this._generate(); },
+
+  // One boolean per sub-score = whether it has enough data to score now. Drives
+  // the projected data badge so it matches what a run would produce.
+  _sectionsReady() {
+    return [
+      this._scoreOperationalDiscipline(), this._scoreCashIntegrity(),
+      this._scoreInventoryExecution(), this._scoreLaborHygiene(),
+      this._scoreRecoveryAction(), this._scoreOperationalConsistency()
+    ].map(s => !!(s && s.score != null));
   },
 
   renderMain() {
     const audits = this.audits().slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const latest = audits[0] || null;
-    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
 
-    const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Get these in, then run it. Reads your trailing 30 days, once a week.';
+    const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Reads your trailing 30 days. Run it whenever you want a fresh read.';
 
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'bca', title: 'Bar Cop Audit', desc,
-          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
+          steps: this._readinessSteps(), sectionsReady: this._sectionsReady(), hasLatest: !!latest })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { sectionCount: this.SECTION_NAMES.length }) : '')
       + '</div>';
