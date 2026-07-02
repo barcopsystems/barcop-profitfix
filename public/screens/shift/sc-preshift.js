@@ -140,7 +140,7 @@ S.ShiftPreShift = {
 
     // Row above the combined card: service-period chips on the left (only when
     // the operator runs more than one period), Export Briefing on the right.
-    const topRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0;">'
+    const topRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 10px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       +   (periods.length > 1 ? App.filterChips(this._period, periods.map(p => ({ v: p, label: p })), 'pb-period-chip') : '')
       + '</div>'
