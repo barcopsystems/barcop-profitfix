@@ -21,8 +21,7 @@ S.InventoryCountHistory = {
     return ((App.inventoryData && App.inventoryData.ic_counts) || []);
   },
   sorted() {
-    return [...this.counts()].sort((a, b) =>
-      new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+    return [...this.counts()].sort(App.cmpOldest);
   },
   fmtDate(str) {
     if (!str) return '-';

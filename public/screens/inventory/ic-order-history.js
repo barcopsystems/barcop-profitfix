@@ -23,8 +23,7 @@ S.InventoryOrderHistory = {
     return App.inventoryData.ic_orders;
   },
   sorted() {
-    return [...this.orders()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    return [...this.orders()].sort(App.cmpNewest);
   },
   fmtDate(str) {
     if (!str) return '-';

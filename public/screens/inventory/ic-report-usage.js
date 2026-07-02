@@ -21,7 +21,7 @@ S.InventoryUsageReport = {
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+      .sort(App.cmpOldest);
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },

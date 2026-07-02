@@ -17,7 +17,7 @@ S.InventoryOrderSheet = {
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+      .sort(App.cmpOldest);
   },
   products() { return ((App.inventoryData && App.inventoryData.ic_products) || []); },
   productById(id) { return this.products().find(p => p.id === id); },
@@ -95,9 +95,7 @@ S.InventoryOrderSheet = {
     if (!vendorName) return null;
     const open = this.orders().filter(o => o && o.vendor === vendorName && o.status !== 'Received');
     if (open.length === 0) return null;
-    return open.slice().sort((a, b) =>
-      new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime()
-    )[0];
+    return open.slice().sort(App.cmpNewest)[0];
   },
 
   renderMain() {

@@ -445,8 +445,7 @@ S.InventorySpotCheck = {
   renderHistory() {
     this.actions.innerHTML = '';
     this._onHistory = true;
-    const all = [...this.checks()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const all = [...this.checks()].sort(App.cmpNewest);
     const flagged = all.reduce((s, c) => s + (c.flagged_count || 0), 0);
     const totalVar = all.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'

@@ -34,7 +34,7 @@ S.InventoryReceiveDelivery = {
     return this.orders()
       .filter(o => o && o.vendor === vendorName && o.status !== 'Received')
       .slice()
-      .sort((a, b) => new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime());
+      .sort(App.cmpNewest);
   },
   // Find a product by id OR fall back to a case-insensitive name match. Used
   // when pre-filling from an order whose line items may pre-date the

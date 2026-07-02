@@ -18,8 +18,7 @@ S.InventoryDeliveryHistory = {
     return ((App.inventoryData && App.inventoryData.ic_deliveries) || []);
   },
   sorted() {
-    return [...this.deliveries()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    return [...this.deliveries()].sort(App.cmpNewest);
   },
   fmtDate(str) {
     if (!str) return '-';

@@ -47,7 +47,7 @@ S.InventoryTransfers = {
   activeShift() {
     const list = (App.shiftData && App.shiftData.sc_shifts) || [];
     return list.filter(s => s.status === 'Open')
-      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0] || null;
+      .sort(App.cmpNewest)[0] || null;
   },
 
   fmtDate(str) {
