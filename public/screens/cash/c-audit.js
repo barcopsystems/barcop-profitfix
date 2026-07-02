@@ -30,11 +30,10 @@ S.CashAudit = {
     this.actions.innerHTML = '';
     const audits = this.audits();
     const latest = audits[0] || null;
-    const canRun = true, daysLeft = 0;   // audits are uncapped, run anytime
-    const desc = 'Bar Cop reads your cash health off your own logged data. Get these in, then run it. One a week.';
+    const desc = 'Bar Cop reads your cash health off your own logged data. Run it whenever you want a fresh read.';
     this.container.innerHTML = '<div class="screen">'
       + AuditUI.readinessCard({ pfx: 'ca', title: 'Cash Audit', desc,
-          steps: this._readinessSteps(), canRun, hasLatest: !!latest, daysLeft })
+          steps: this._readinessSteps(), sectionsReady: this._sectionsReady(), hasLatest: !!latest })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'ca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'cash_audit', 'ca', { sectionCount: this.SECTION_NAMES.length }) : '')
       + '</div>';
@@ -60,8 +59,20 @@ S.CashAudit = {
     ];
   },
 
-  onGenerate() {
-    AuditUI.readinessGuard(this._readinessSteps()).then(ok => { if (ok) this.generate(); });
+  onGenerate() { this.generate(); },
+
+  // One boolean per scored treasury section = whether CashEngine can score it now.
+  // Drives the projected data badge so it matches what a run would produce.
+  _sectionsReady() {
+    const E = window.CashEngine;
+    if (!E) return [false, false, false, false];
+    const safe = (fn, d) => { try { return fn(); } catch (e) { return d; } };
+    return [
+      safe(() => E.trapped().hasData && E.avgInventoryValue() > 0, false),   // S1 Capital Efficiency
+      safe(() => E.cashCycle().hasData, false),                              // S2 Cash Conversion Cycle
+      safe(() => E.survivalForecast(13).hasData, false),                     // S3 Liquidity & Runway
+      safe(() => E.vendors().length > 0, false)                             // S4 Payment Terms
+    ];
   },
 
   async generate() {
