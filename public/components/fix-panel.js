@@ -25,6 +25,19 @@
 window.FixPanel = {
   RESOURCE_ROOT: 'assets/resources/',
 
+  // Reference docs are generated in Bar Cop's own PDF style now (headed with the
+  // operator's establishment name) instead of served as stored files. A reference
+  // step whose target maps here downloads the generated doc via FixDocs; the map
+  // is the bridge from the legacy stored-filename target to the generator id.
+  DOC_IDS: {
+    'Measured_Pour_Standards_Policy.docx':     'pour-standards',
+    'Theft_Loss_Prevention_Policy.docx':       'theft-loss-policy',
+    'Employee_Corrective_Action_Template.docx':'corrective-action',
+    'Vendor_Agreement_Terms_Checklist.docx':   'vendor-terms',
+    'Server_Upsell_Standards_Scripts.docx':    'server-standards',
+    'Portion_Control_Audit.pdf':               'portion-audit'
+  },
+
   gapAreas(moduleKey) {
     return (window.FIX && Array.isArray(FIX[moduleKey])) ? FIX[moduleKey] : [];
   },
@@ -433,11 +446,17 @@ window.FixPanel = {
     const label = esc(s.targetLabel || '');
 
     let link = '';
+    const dlIcon = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 5l3 3 3-3M1 9.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     if (kind === 'reference') {
-      if (s.target) {
+      const docId = s.doc || (s.target && this.DOC_IDS[s.target]);
+      if (docId) {
+        // Generated in Bar Cop style, headed with the operator's establishment name.
+        link = '<button class="btn btn-ghost btn-sm fp-doc" data-doc="' + esc(docId) + '" '
+          + 'style="display:inline-flex;align-items:center;gap:6px;">' + dlIcon
+          + 'Download' + (label ? ': ' + label : '') + '</button>';
+      } else if (s.target) {
         link = '<a class="btn btn-ghost btn-sm" href="' + this.docPath(module, s.target) + '" download '
-          + 'style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">'
-          + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 5l3 3 3-3M1 9.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          + 'style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">' + dlIcon
           + 'Download' + (label ? ': ' + label : '') + '</a>';
       }
     } else if (s.target) {
@@ -659,6 +678,11 @@ window.FixPanel = {
     container.querySelectorAll('.fp-go').forEach(btn => btn.addEventListener('click', () => {
       App._fixFocus = gapId;
       App.openScreen(btn.dataset.target);
+    }));
+
+    // Generated reference docs (branded to the operator), built on the fly.
+    container.querySelectorAll('.fp-doc').forEach(btn => btn.addEventListener('click', () => {
+      if (window.FixDocs) FixDocs.download(btn.dataset.doc);
     }));
 
     container.querySelector('.fp-impl-save')?.addEventListener('click', () => {
