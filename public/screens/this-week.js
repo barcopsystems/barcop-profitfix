@@ -33,7 +33,7 @@ S.ThisWeek = {
   // ── Inventory Control COGS feed ───────────────────────────────────────────
   icCOGS(cats, periodEnd) {
     const counts = [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort((a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+      .sort(App.cmpOldest);
     if (counts.length < 2) return null;
     // Scope to the count pair ending on or before the selected week, so loading a
     // past week pulls THAT week's usage, not the most recent counts. With no

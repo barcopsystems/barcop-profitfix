@@ -3234,8 +3234,7 @@ S.HubSettings = {
       const VR = S.InventoryVarianceReport;
       if (!VR || !VR.categoryTheoretical) return;
       const savedEnd = VR.endCountId, savedRows = VR.posRows, savedMap = VR.manualMap;
-      const asc = [...(App.inventoryData.ic_counts || [])].sort((a, b) =>
-        new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime());
+      const asc = [...(App.inventoryData.ic_counts || [])].sort(App.cmpOldest);
       const ends = asc.slice(1);   // each count that closes a period
       // Theoretical is the ceiling; actual rings a realistic notch lower, with a
       // small period-to-period wobble so the trend never reads mechanically flat.

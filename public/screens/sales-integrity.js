@@ -73,8 +73,7 @@ S.SalesIntegrity = {
     return App.data.sales_reviews;
   },
   latestReview() {
-    const list = this.reviews().slice().sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const list = this.reviews().slice().sort(App.cmpNewest);
     return list[0] || null;
   },
   staffByName() {
@@ -411,8 +410,7 @@ S.SalesIntegrity = {
   },
 
   renderHistory(currentId) {
-    const all = this.reviews().slice().sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const all = this.reviews().slice().sort(App.cmpNewest);
     const past = all.filter(r => r.id !== currentId);
     if (!past.length) return '';
     const rows = past.slice(0, App.listLimit('core', 'sales_review')).map(r => '<tr class="si-hist-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
