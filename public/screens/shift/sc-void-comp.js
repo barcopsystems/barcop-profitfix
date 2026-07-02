@@ -295,7 +295,7 @@ S.ShiftVoidComp = {
 
     // Hold the in-progress batch through leave/return (manual builder only; import
     // mode has no form to hold). Restore the header, then capture header + line rows.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot && document.getElementById('vcb-rows')) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       const cap = () => {

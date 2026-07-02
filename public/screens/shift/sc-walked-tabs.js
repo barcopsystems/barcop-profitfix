@@ -204,7 +204,7 @@ S.ShiftWalkedTabs = {
 
     // Hold the in-progress inline form through leave/return: restore the draft,
     // then capture on every input so a re-render rebuilds from it.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       const cap = () => { this._draft = App.captureDraft(formRoot); };

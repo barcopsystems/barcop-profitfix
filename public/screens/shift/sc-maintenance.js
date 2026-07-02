@@ -233,7 +233,7 @@ S.ShiftMaintenance = {
     document.getElementById('mt-f-to')?.addEventListener('change',   e => { this.filterTo   = e.target.value || ''; this.renderList(); });
 
     // Hold the in-progress inline form through leave/return.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       const cap = () => { this._draft = App.captureDraft(formRoot); };

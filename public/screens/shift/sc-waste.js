@@ -360,7 +360,7 @@ S.ShiftWaste = {
 
     // Hold the in-progress batch through leave/return: restore the header, refresh
     // each line's cost, then capture header + line rows on every input/change.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       formRoot.querySelectorAll('.wl-line').forEach(line => this.refreshLineCalc(line));
