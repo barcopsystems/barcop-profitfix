@@ -2593,19 +2593,15 @@ const App = {
   // with no per-file change. Defaults below until they set their own.
   SERVICE_PERIOD_PRESETS: [
     { name: 'Breakfast',  start: '06:00', end: '11:00' },
-    { name: 'Brunch',     start: '09:00', end: '14:00' },
     { name: 'Lunch',      start: '11:00', end: '16:00' },
-    { name: 'Happy Hour', start: '15:00', end: '18:00' },
     { name: 'Dinner',     start: '16:00', end: '22:00' },
-    { name: 'Late Night', start: '22:00', end: '02:00' },
-    { name: 'Full Day',   start: '00:00', end: '23:59' }
+    { name: 'Late Night', start: '22:00', end: '02:00' }
   ],
   DEFAULT_SERVICE_PERIODS: [
-    { id: 'sp_def_brunch', name: 'Brunch',     start: '09:00', end: '14:00' },
-    { id: 'sp_def_lunch',  name: 'Lunch',      start: '11:00', end: '16:00' },
-    { id: 'sp_def_dinner', name: 'Dinner',     start: '16:00', end: '22:00' },
-    { id: 'sp_def_late',   name: 'Late Night', start: '22:00', end: '02:00' },
-    { id: 'sp_def_full',   name: 'Full Day',   start: '00:00', end: '23:59' }
+    { id: 'sp_def_breakfast', name: 'Breakfast',  start: '06:00', end: '11:00' },
+    { id: 'sp_def_lunch',     name: 'Lunch',      start: '11:00', end: '16:00' },
+    { id: 'sp_def_dinner',    name: 'Dinner',     start: '16:00', end: '22:00' },
+    { id: 'sp_def_late',      name: 'Late Night', start: '22:00', end: '02:00' }
   ],
   servicePeriods() {
     const sp = this.data && this.data.settings && this.data.settings.service_periods;
