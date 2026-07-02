@@ -181,7 +181,7 @@ S.ShiftPreShift = {
     // (like the Briefing History card), the Margin is its own column, and the row
     // action buttons take the standard pill-row size.
     const combinedCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><div class="sh" style="margin:0;">Today\'s Focus</div>' + statusLine + '</div>'
+      + '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><div class="sh" style="margin:0;">' + esc(this._period) + ' Focus</div>' + statusLine + '</div>'
       + '<div class="f" style="margin-bottom:20px;"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
       + featTable + featActions
       + '</div>';
@@ -422,7 +422,7 @@ S.ShiftPreShift = {
     b.kv('Service period', period);
     b.kv('Check average target', tgt != null ? App.fmtCurrency(tgt) : 'Not set');
     b.kv('Covers forecast', covers != null ? String(covers) : 'Not set');
-    if (this._curFocus()) { b.spacer(2); b.sectionTitle('Today\'s Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
+    if (this._curFocus()) { b.spacer(2); b.sectionTitle(period + ' Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
     b.sectionTitle('Featured Items'); b.spacer(4);
     if (items.length) b.table(['Item', 'Margin'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-']; }), { columnStyles: { 1: { cellWidth: 90, halign: 'right' } } });
     else b.paragraph('No items featured. Cost and price your menu in Menu Engineering to feature your best margins.', { gray: 70 });
