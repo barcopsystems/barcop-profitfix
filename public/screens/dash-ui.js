@@ -53,9 +53,7 @@ const DashUI = {
       + '<button class="btn btn-ghost btn-sm db-qa" data-go="' + screen + '">' + esc(opts.runText || 'Run Audit') + '</button>';
     const score = latest.overall_score || 0;
     const col = App.scoreColor(score);
-    const daysSince = latest.date ? Math.floor((Date.now() - new Date(latest.date + 'T00:00:00').getTime()) / 86400000) : Infinity;
-    const daysLeft = Math.max(0, 7 - daysSince);
-    const timing = daysLeft > 0 ? 'Next audit in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') : 'Ready to run a new audit';
+    const timing = 'Run a fresh one anytime.';
     return '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'
       + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(App.scoreLabel(score)) + '</div>'
@@ -101,7 +99,7 @@ const DashUI = {
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (label || 'Bar Cop Briefing') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
-      + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. A weekly read, refreshes once a week. Not financial or business advice.</div>' : '')
+      + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. Refresh it anytime. Not financial or business advice.</div>' : '')
       + '</div>';
     App.openModal(html, { id: 'db-insights-modal', maxWidth: 620 });
   },

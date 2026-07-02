@@ -18,7 +18,7 @@ S.Dashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Profit. Profit Recovery is about margin: where the cost of your pours, plates, and the rest is eating money you already earned. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
       { h: 'Where You Stand', p: ['Up top is Where You Stand: the recoverable profit your latest audit found, what you have put back so far once your fixes are measured, and your pour, food, and prime cost for the week against target. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
-      { h: 'The Steps', p: ['1. Run This Week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board, about monthly, flagged here when it is due.'] },
+      { h: 'The Steps', p: ['1. Run This Week: log this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board. Run it whenever you want a fresh read, flagged here when it has been a while.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
   },
@@ -359,7 +359,7 @@ S.Dashboard = {
     } else if (as.due) {
       lead = 'It has been ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' since your last Profit audit (scored ' + scored + '). Run a fresh one to rescore the operation and refresh the leak board.';
     } else {
-      lead = 'Your Profit audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. The next one can run in ' + (7 - as.daysSince) + ' day' + ((7 - as.daysSince) === 1 ? '' : 's') + ', so there is nothing to run this week. You are good here.';
+      lead = 'Your Profit audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. You are good here for the week. Run a fresh one anytime you want to rescore the operation.';
     }
     return explain(lead)
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="audit-tracker">' + (as.due ? 'Run Profit Audit' : 'View Profit Audit') + '</button><button class="btn btn-ghost btn-sm" data-go="profit-fix">Profit Fix</button>' + this.markBtn('audit', 'Mark Done'));

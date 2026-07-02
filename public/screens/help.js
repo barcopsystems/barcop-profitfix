@@ -23,7 +23,7 @@ S.Help = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does Profit Recovery do?',
-        a: 'Profit Recovery is where the dollar leaks in your operation get found and fixed. The Profit Audit scores you across pour cost, theft and loss, food cost, vendor control, and prime cost and puts a dollar figure on each gap. Profit Fix walks the process that closes each one. The dashboard tracks what you have recovered and where you are still leaking. All of it reads from the three Control systems (Inventory, Labor, Shift), so you log operations once there and the diagnosis runs on it. The info "i" at the top of any Profit screen explains how that screen works.' },
+        a: 'Profit Recovery is where the dollar leaks in your operation get found and fixed. The Profit Audit scores you across pour and bar cost, food cost, shrink and waste, theft and cash loss, and vendor cost control, with prime cost shown as context, and puts a dollar figure on each gap. Profit Fix walks the process that closes each one. The dashboard tracks what you have recovered and where you are still leaking. All of it reads from the three Control systems (Inventory, Labor, Shift), so you log operations once there and the diagnosis runs on it. The info "i" at the top of any Profit screen explains how that screen works.' },
       { q: 'Where do I start?',
         a: 'Run your first Profit Audit on day one for a baseline. Set your annual sales and your cost targets in App Settings first, so every gap has a real number to measure against. Then open the Profit Forecast to see your profit at your current pace versus your targets, which is the day-one read on what is on the table. After that, take the biggest gap on the dashboard and work its fix, and confirm each week in Run This Week as it closes. The recovery numbers build from there.' },
       { q: 'Do I need every screen?',
@@ -37,7 +37,7 @@ S.Help = {
       { q: 'Why did a section come back N/A?',
         a: 'Because there was nothing to grade it on honestly. A cost section needs a cost percentage, and theft and loss needs real void, comp, or cash data or a documented control. With nothing there, Bar Cop leaves the section out rather than inventing a score. It fills in as you log more or upload a report that covers it.' },
       { q: 'What is the Bar Cop Briefing?',
-        a: 'A short operator-voice read on your latest audit, written from your own numbers. It tells you what the score says and the one or two things to do this month, in plain language. It is cached per audit, so re-opening the same audit does not regenerate it.' },
+        a: 'A short operator-voice read on your latest audit, written from your own numbers. It tells you what the score says and the one or two things to do next, in plain language. It is generated in code from the audit, so it opens instantly and reads the same every time.' },
       { q: 'How does Profit Fix close a gap?',
         a: 'Each gap has a fix process, an ordered set of steps that link straight to the Bar Cop screen that does the work. Bar Cop reads your progress from your real Control data, not from checkboxes you tick, so a step reads done only when the work actually shows up: a count logged, a recipe costed, a comp threshold set. The fix starts measuring on its own the first time you take a tracked action. There is no button to mark it implemented.' },
       { q: 'What does Watch Out For show?',

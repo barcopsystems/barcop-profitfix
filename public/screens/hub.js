@@ -283,7 +283,7 @@ S.Hub = {
       }
       const daysSince = d.a.date ? Math.floor((Date.now() - new Date(d.a.date + 'T00:00:00').getTime()) / 86400000) : null;
       if (daysSince != null && daysSince > 30) {
-        auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'overdue ' + daysSince + 'd', text: d.name + ' audit overdue · last run ' + daysSince + ' days ago', screen:d.screen, mod:d.mod });
+        auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'last run ' + daysSince + 'd', text: d.name + ' audit last run ' + daysSince + ' days ago, run a fresh one', screen:d.screen, mod:d.mod });
       }
     });
     const alerts = metricAlerts.concat(this.forwardAlerts()).concat(auditAlerts)
@@ -503,11 +503,9 @@ S.Hub = {
     // ── Section cards: one per section, Control row + Recovery row. Each mirrors
     //    its section, a headline number/state + the weekly-close status + a jump
     //    into that section. The whole card is the deep link. ──
-    const nextIn = a => (a && a.date != null) ? Math.max(0, 7 - (daysSince(a.date) || 0)) : null;
     const auditLine = (a) => {
       if (!a || a.overall_score == null) return '<span style="color:var(--t4);">No audit yet, run it for a baseline</span>';
-      const ni = nextIn(a);
-      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b> · ' + (ni === 0 ? 'due now' : 'next in ' + ni + 'd');
+      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b> · run a fresh one anytime';
     };
     // ── Section card: a snapshot of the section (3-stat strip from its own
     //    dashboard) over the weekly-close checklist. Control cards carry the
@@ -582,27 +580,15 @@ S.Hub = {
     // big score / 100 with the score bar full-width below it, then the red
     // dollar statement (or green "On target") computed honestly from the
     // audit's action_items, then audit date + trend in small subtext. The
-    // action mirrors the weekly rolling rule the audit screens enforce.
-    const auditDaysLeft = (a) => {
-      if (!a || !a.date) return 0;
-      const d = Math.floor((Date.now() - new Date(a.date + 'T00:00:00').getTime()) / 86400000);
-      return Math.max(0, 7 - d);
-    };
+    // action: audits are uncapped now, so there is no countdown. The button is
+    // always live (Run First Audit before the first, Run Audit after).
     const auditRow = (name, audit, trend, screen, mod, isFirst) => {
       const score      = audit?.overall_score ?? null;
       // Number stays a quiet neutral; the score bar + marker below carry the
       // red/amber/green so the color is not doubled up on the number.
       const scoreColor = score != null ? 'var(--t1)' : 'var(--t4)';
-      const daysLeft   = auditDaysLeft(audit);
-      const canRun     = daysLeft <= 0;
       const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
-
-      // Action area: button when ready, countdown otherwise
-      const actionHtml = canRun
-        ? '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>'
-        : '<div style="text-align:right;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;line-height:1.3;">'
-          + 'Next Audit<br><span style="color:var(--t2);font-family:\'Barlow\',sans-serif;font-weight:700;font-size:12px;letter-spacing:0;text-transform:none;">in '
-          + daysLeft + ' day' + (daysLeft===1?'':'s') + '</span></div>';
+      const actionHtml = '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>';
 
       // Score block: big number / 100 + target line + bar with marker
       let scoreBlock;
