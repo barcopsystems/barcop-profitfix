@@ -252,12 +252,23 @@ S.CashAudit = {
   riskSection(audit) {
     const signals = audit.signals || [];
     if (signals.length) return AuditUI.sectionBlock(5, 'Cash Risk Signals', null, [], signals, null);
+    // No signals fired. Two very different reasons: a healthy bar (there was cash
+    // data and nothing tripped) reads "Clear"; an audit with no data behind it
+    // cannot claim anything is healthy, so it reads "Not enough data" like the
+    // scored sections above. Scored-section count is the honest data signal.
+    const hasData = Object.keys(audit.sections || {}).length > 0;
+    const tag = hasData
+      ? '<div style="color:var(--green);font-weight:800;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Clear</div>'
+      : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
+    const body = hasData
+      ? 'No cash risks flagged. Your runway, what is safe to spend, your draws, and your reserve are all in a healthy range.'
+      : 'Not enough data to flag cash risks yet. Set your opening cash balance and log a week of cash and inventory, then run it.';
     return '<div class="card" style="margin-bottom:14px;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section 5</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Cash Risk Signals</div></div>'
-      + '<div style="color:var(--green);font-weight:800;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Clear</div></div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No cash risks flagged. Your runway, what is safe to spend, your draws, and your reserve are all in a healthy range.</div>'
+      + tag + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">' + body + '</div>'
       + '</div>';
   },
 
