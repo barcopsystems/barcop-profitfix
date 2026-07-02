@@ -17,7 +17,7 @@ S.RevenueDashboard = {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Revenue. Revenue Recovery is the top line: where check average, menu mix, covers, and labor efficiency are leaving money on the table. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
       { h: 'Where You Stand', p: ['Up top is the recoverable revenue your latest audit found, what you have added back so far once your fixes are measured, and your check average, labor percent, and revenue per labor hour for the week against target. Tap Bar Cop Briefing for a written read of where the numbers are heading.'] },
-      { h: 'The Steps', p: ['1. Run This Week: log this week\'s sales, covers, and labor so everything below has numbers. 2. Check your numbers against target: check average, labor percent, and revenue per labor hour, so you see exactly where the top line slipped. 3. Work your biggest leak: open Revenue Fix on the biggest-dollar gap and take it down. 4. Run your Revenue audit: score the whole top line and refresh your leak board, about monthly, flagged here when it is due.'] },
+      { h: 'The Steps', p: ['1. Run This Week: log this week\'s sales, covers, and labor so everything below has numbers. 2. Check your numbers against target: check average, labor percent, and revenue per labor hour, so you see exactly where the top line slipped. 3. Work your biggest leak: open Revenue Fix on the biggest-dollar gap and take it down. 4. Run your Revenue audit: score the whole top line and refresh your leak board. Run it whenever you want a fresh read, flagged here when it has been a while.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
   },
@@ -349,7 +349,7 @@ S.RevenueDashboard = {
     } else if (as.due) {
       lead = 'It has been ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' since your last Revenue audit (scored ' + scored + '). Run a fresh one to rescore the top line and refresh the leak board.';
     } else {
-      lead = 'Your Revenue audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. The next one can run in ' + (7 - as.daysSince) + ' day' + ((7 - as.daysSince) === 1 ? '' : 's') + ', so there is nothing to run this week. You are good here.';
+      lead = 'Your Revenue audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. You are good here for the week. Run a fresh one anytime you want to rescore the top line.';
     }
     return explain(lead)
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-audit">' + (as.due ? 'Run Revenue Audit' : 'View Revenue Audit') + '</button><button class="btn btn-ghost btn-sm" data-go="r-fix">Revenue Fix</button>' + this.markBtn('audit', 'Mark Done'));
