@@ -54,7 +54,7 @@ S.HubBooksHelp = {
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
-    this.container.innerHTML = '<div class="screen">' + search + tabs + '<div id="help-body">' + this.bodyHtml() + '</div></div>';
+    this.container.innerHTML = '<div class="screen">' + search + tabs + '<div id="help-body">' + this.bodyHtml() + '</div>' + App.helpFooter() + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
   },
