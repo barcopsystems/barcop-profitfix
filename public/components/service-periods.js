@@ -42,7 +42,7 @@ window.ServicePeriods = {
     const emit = () => { if (opts.onChange) opts.onChange(ctrl.value()); };
 
     const pillStyle = on => 'padding:9px 16px;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;'
-      + (on ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);');
+      + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--input);border:1px solid var(--b1);color:var(--t2);');
     const setStyle = 'font-size:10px;padding:3px 10px;border-radius:10px;border:1px solid var(--b1);background:transparent;color:var(--t3);cursor:pointer;white-space:nowrap;';
     const inStyle = 'width:100%;background:var(--bg);border:1px solid var(--b1);border-radius:5px;padding:5px 7px;color:var(--t1);font-size:13px;box-sizing:border-box;';
     const tlbl = 'font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;';

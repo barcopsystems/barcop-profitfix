@@ -21,7 +21,7 @@ const Onboarding = {
   _section(n, title, body) {
     return '<div style="margin-top:34px;">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
-      +   '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + n + '</div>'
+      +   '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">' + n + '</div>'
       +   '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">' + title + '</div>'
       + '</div>'
       + '<div style="margin-left:36px;">' + body + '</div>'
@@ -50,7 +50,7 @@ const Onboarding = {
 
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Enter your basics here and then run your bar\'s first recovery audit.</div>'
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Set your basics below and you are ready to go.</div>'
       + this._section(1, 'The Basics', basics)
       + this._section(2, 'Your Numbers', numbers)
       + this._section(3, 'Service Periods', service)
