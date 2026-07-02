@@ -2695,11 +2695,11 @@ const App = {
   // extractSections, viewAudit sections array, and renderNarrative sections
   // array so the list never drifts across the three call sites.
   AUDIT_PROFIT_SECTION_NAMES: [
-    'Bar Cost and Pour Control',
-    'Theft and Loss Prevention',
-    'Food Cost Control',
-    'Vendor Control',
-    'Prime Cost'
+    'Pour and Bar Cost',
+    'Food Cost',
+    'Shrink and Waste',
+    'Theft and Cash Loss',
+    'Vendor Cost Control'
   ],
 
   // Categories on sc_void_comps records. A 30-year operator separates loss
