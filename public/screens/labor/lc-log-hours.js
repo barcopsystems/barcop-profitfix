@@ -67,7 +67,7 @@ S.LaborLogHours = {
   scheduleForWeek(ws) {
     const matches = this.schedules().filter(s => s.week_start === ws);
     if (!matches.length) return null;
-    return matches.slice().sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+    return matches.slice().sort(App.cmpNewest)[0];
   },
   latestScheduleWeek() {
     const list = this.schedules();

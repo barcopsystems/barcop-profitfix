@@ -60,7 +60,7 @@ S.LaborCalloutLog = {
     if (!staffId || !date) return null;
     const ws = this.mondayOf(date);
     const sched = this.schedules().filter(s => s.week_start === ws)
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+      .sort(App.cmpNewest)[0];
     if (!sched) return { noSchedule: true };
     const d = new Date(date + 'T00:00:00');
     if (isNaN(d.getTime())) return { noSchedule: true };

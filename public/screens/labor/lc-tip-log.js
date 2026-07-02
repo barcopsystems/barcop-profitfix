@@ -65,7 +65,7 @@ S.LaborTipLog = {
   scheduleForDate(date) {
     const ws = this.mondayOf(date);
     return this.schedules().filter(s => s.week_start === ws)
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
+      .sort(App.cmpNewest)[0] || null;
   },
   // Hours for a scheduled shift: its stored hours, else computed from start/end.
   schedHours(sh) {
