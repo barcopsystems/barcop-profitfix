@@ -29,9 +29,9 @@ FIX.revenue = [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
           title: 'Reprice the Plowhorses',
           detail: 'In Menu Items, raise the Plowhorse prices one item at a time. A $2 bump on five Plowhorses beats a 6% raise across the whole menu.' },
-        { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
+        { kind: 'action', target: 'sc-preshift', targetLabel: 'Pre-Shift Briefing',
           title: 'Brief servers off the Stars list',
-          detail: 'Print the Pre-Shift Upsell Briefing and build it off the current Stars list. Feature only items from that list.' }
+          detail: 'Open Pre-Shift Briefing in Shift. Bar Cop builds it from tonight\'s Stars, your check average target, and the cover forecast. Feature only the Stars it lists, read it at line-up, and print it if you want a copy on the pass.' }
       ]
     },
 
@@ -167,9 +167,9 @@ FIX.revenue = [
         { kind: 'reference', doc: 'server-standards', targetLabel: 'Server Upsell Standards and Scripts',
           title: 'Train and post the upsell sequence',
           detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Run the sequence in order: pre-dinner beverage, appetizer, dessert close.' },
-        { kind: 'reference', target: 'PreShift_Upsell_Briefing.pdf', targetLabel: 'Pre-Shift Upsell Briefing',
+        { kind: 'action', target: 'sc-preshift', targetLabel: 'Pre-Shift Briefing',
           title: 'Run the pre-shift briefing every shift',
-          detail: 'Print the Pre-Shift Upsell Briefing and run it five minutes before doors: today\'s two or three Stars, one check average target for the shift, the upsell sequence, and one named beverage pairing.' },
+          detail: 'Open Pre-Shift Briefing in Shift five minutes before doors. Bar Cop fills in tonight\'s two or three Stars, the check average target, the cover forecast, and the upsell sequence. Add one line of focus, read it to the floor, and mark it held to track it.' },
         { kind: 'action', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Watch the floor against your standard',
           detail: 'Twice a week at varied times, watch a few tables unannounced against your server upsell standard, then coach off the numbers in Server Check. Is the briefing showing up in how servers work the tables, or not?' },
