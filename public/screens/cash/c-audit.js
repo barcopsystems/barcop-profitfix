@@ -449,7 +449,7 @@ S.CashAudit = {
       { h: 'Cash to Free', p: ['The opportunity number up top is the cash you can free right now, the dead stock plus the overstock above par. It is a one-time amount you can put back in the account, not a monthly figure, so Bar Cop shows it as exactly that.'] },
       { h: 'Sharpen the Runway', p: ['Set your opening cash balance in Cash Position and the audit reads a real runway, the week you would run thin, and what is actually safe to spend. Without it, the liquidity read still scores your tight weeks, the ones where more cash goes out than comes in.'] },
       { h: 'Cash Risk Signals', p: ['The last section flags the cross-cutting risks the four scores do not isolate: a cash crunch coming in the next thirteen weeks, a Safe to Spend gone negative, owner draws and debt outpacing what the business keeps, a reserve running thin. Each one fires only when it is actually true, so a flush bar shows few or none.'] },
-      { h: 'Action Items', p: ['Each audit ranks what to work first by where you are weakest, and every Fix This button drops you straight into that Cash Fix system. Run it weekly and watch the score climb as you free the cash and tighten the cycle.'] }
+      { h: 'Action Items', p: ['Each audit ranks what to work first by where you are weakest, and every Fix This button drops you straight into that Cash Fix system. Run it whenever you want a fresh read and watch the score climb as you free the cash and tighten the cycle.'] }
     ]);
   }
 };
