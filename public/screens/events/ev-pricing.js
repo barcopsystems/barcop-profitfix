@@ -76,7 +76,7 @@ S.EventsPricing = {
 
   wire() {
     document.getElementById('rp-add')?.addEventListener('click', () => this.addPackage());
-    document.getElementById('rp-clear')?.addEventListener('click', () => this.draw());
+    document.getElementById('rp-clear')?.addEventListener('click', () => { this._draft = null; this.draw(); });
     document.getElementById('rp-calc')?.addEventListener('click', () => this.cateringCalcModal());
     document.getElementById('rp-export')?.addEventListener('click', () => { const el = document.getElementById('rp-list'); if (el) App.exportPDF({ title: 'Rate Card', root: el }); });
     this.container.querySelectorAll('.rp-edit').forEach(b => b.addEventListener('click', () => this.editModal(b.dataset.id)));
@@ -86,6 +86,14 @@ S.EventsPricing = {
       App.data.event_rate_cards = this.rateCards().filter(r => r.id !== b.dataset.id);
       await App.saveKey('event_rate_cards'); this.draw();
     }));
+    // Hold the in-progress package through leave/return; only Save or Start Over clears it.
+    const formRoot = this.container.querySelector('.form-card');
+    if (formRoot) {
+      if (this._draft) App.restoreDraft(formRoot, this._draft);
+      const cap = () => { this._draft = App.captureDraft(formRoot); };
+      formRoot.addEventListener('input', cap);
+      formRoot.addEventListener('change', cap);
+    }
   },
 
   // The Catering Calculator as a popup (the on-page version was removed).
@@ -126,6 +134,7 @@ S.EventsPricing = {
       room_fee:   parseFloat(g('rp-room')?.value) || 0,
       per_head:   parseFloat(g('rp-ph')?.value) || 0
     });
+    this._draft = null;
     await App.saveKey('event_rate_cards');
     this.draw();
   },

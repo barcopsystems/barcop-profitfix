@@ -136,7 +136,7 @@ S.EventsRegulars = {
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
     document.getElementById('rg-add')?.addEventListener('click', () => this.add());
-    document.getElementById('rg-clear')?.addEventListener('click', () => this.renderList());
+    document.getElementById('rg-clear')?.addEventListener('click', () => { this._draft = null; this.renderList(); });
     this.container.querySelectorAll('.rg-row, .rg-edit').forEach(el => el.addEventListener('click', ev => { if (ev.target.closest('.rg-del')) return; this.showEdit(el.dataset.id); }));
     this.container.querySelectorAll('.rg-del').forEach(b => b.addEventListener('click', async ev => {
       ev.stopPropagation();
@@ -144,6 +144,17 @@ S.EventsRegulars = {
       App.data.event_regulars = this.regulars().filter(x => x.id !== b.dataset.id);
       await App.saveKey('event_regulars'); this.renderList();
     }));
+    // Hold the in-progress Add-a-Regular entry through leave/return (manual mode only;
+    // import mode has no form). Only Save or Start Over clears it.
+    if (this.entryMode !== 'import') {
+      const formRoot = this.container.querySelector('.form-card');
+      if (formRoot) {
+        if (this._draft) App.restoreDraft(formRoot, this._draft);
+        const cap = () => { this._draft = App.captureDraft(formRoot); };
+        formRoot.addEventListener('input', cap);
+        formRoot.addEventListener('change', cap);
+      }
+    }
   },
 
   async add() {
@@ -151,6 +162,7 @@ S.EventsRegulars = {
     if (!rec.name) { const e = document.getElementById('rg-err'); if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
     rec.id = App.uid(); rec.created_at = new Date().toISOString();
     this.regulars().push(rec);
+    this._draft = null;
     await App.saveKey('event_regulars');
     this.renderList();
   },
