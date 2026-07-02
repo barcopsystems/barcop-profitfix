@@ -153,8 +153,8 @@ S.RecoveryPlaybook = {
         return '<div class="pb-docs">' + b.items.map(it => {
           // Kept docs are generated in Bar Cop style (headed with the operator's
           // establishment name) via FixDocs; anything else falls back to a stored file.
-          const base = String(it.file).split('/').pop();
-          const docId = (window.FixPanel && FixPanel.DOC_IDS[base]);
+          const base = String(it.file || '').split('/').pop();
+          const docId = it.doc || (window.FixPanel && FixPanel.DOC_IDS[base]);
           if (docId) return '<button class="btn btn-ghost btn-sm pb-doc" data-doc="' + esc(docId) + '" style="justify-content:flex-start;">'
             + this._icon('reference') + 'Download: ' + esc(it.label) + '</button>';
           return '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download style="text-decoration:none;">'
@@ -935,7 +935,7 @@ S.RecoveryPlaybook = {
               'If a SKU stays unexplained after that, it moves to Loss Prevention (theft).'
             ] },
             { t: 'docs', items: [
-              { file: 'Measured_Pour_Standards_Policy.docx', label: 'Measured Pour Standards Policy' }
+              { doc: 'pour-standards', label: 'Measured Pour Standards Policy' }
             ] }
           ]
         },
@@ -963,8 +963,8 @@ S.RecoveryPlaybook = {
               'Escalate: one incident, document and watch. Two in 30 days on the same person, written corrective action. Confirmed cash theft, document fully and talk to your attorney before the conversation.'
             ] },
             { t: 'docs', items: [
-              { file: 'Theft_Loss_Prevention_Policy.docx', label: 'Theft and Loss Prevention Policy' },
-              { file: 'Employee_Corrective_Action_Template.docx', label: 'Employee Corrective Action Template' }
+              { doc: 'theft-loss-policy', label: 'Theft and Loss Prevention Policy' },
+              { doc: 'corrective-action', label: 'Employee Corrective Action Template' }
             ] }
           ]
         },
@@ -991,8 +991,8 @@ S.RecoveryPlaybook = {
               'Targets are in the Benchmarks section. Run the category breakdown the moment blended food cost is above target.'
             ] },
             { t: 'docs', items: [
-              { file: 'Portion_Control_Audit.pdf', label: 'Portion Control Audit' },
-              { file: 'Food_Handling_Portion_Standards.docx', label: 'Food Handling and Portion Standards' }
+              { doc: 'portion-audit', label: 'Portion Control Audit' },
+              { doc: 'food-standards', label: 'Food Handling and Portion Standards' }
             ] }
           ]
         },
@@ -1019,7 +1019,7 @@ S.RecoveryPlaybook = {
               'Quarterly: sit down with each rep with your variance history and competitor pricing. Ask for a match or an explanation. Confirm terms in writing after.'
             ] },
             { t: 'docs', items: [
-              { file: 'Vendor_Agreement_Terms_Checklist.docx', label: 'Vendor Agreement Terms Checklist' }
+              { doc: 'vendor-terms', label: 'Vendor Agreement Terms Checklist' }
             ] }
           ]
         },
@@ -1368,7 +1368,7 @@ S.RecoveryPlaybook = {
               'Set the next week briefing items from your Menu Engineering Stars.'
             ] },
             { t: 'docs', items: [
-              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' }
+              { doc: 'server-standards', label: 'Server Upsell Standards and Scripts' }
             ] }
           ]
         },
@@ -1392,7 +1392,7 @@ S.RecoveryPlaybook = {
               'Check the four-week trend two weeks after coaching. Moving, acknowledge it. Not moving, a second conversation in writing.'
             ] },
             { t: 'docs', items: [
-              { file: 'revenue/Server_Upsell_Standards_Scripts.docx', label: 'Server Upsell Standards and Scripts' }
+              { doc: 'server-standards', label: 'Server Upsell Standards and Scripts' }
             ] }
           ]
         },

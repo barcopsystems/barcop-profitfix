@@ -364,6 +364,13 @@ S.ProfitFix = {
       + '<span style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(s.title) + '</span>'
       + statusLine + detail + '</div>';
 
+    // Reference docs are generated in Bar Cop style now (headed with the operator's
+    // establishment name), not served as stored files. s.doc is the generator id;
+    // the DOC_IDS map bridges any legacy stored-filename target.
+    const docId = s.doc || (kind === 'reference' && s.target && window.FixPanel ? FixPanel.DOC_IDS[s.target] : null);
+    if (docId) {
+      return '<div class="pf-step pf-stepcard pf-doc" data-doc="' + esc(docId) + '" style="cursor:pointer;">' + inner + '</div>';
+    }
     if (s.target && kind === 'reference') {
       return '<a class="pf-step pf-stepcard" href="' + this.docPath(s.target) + '" download style="text-decoration:none;">' + inner + '</a>';
     }
@@ -405,6 +412,7 @@ S.ProfitFix = {
 
   wireWorkspace() {
     this.container.querySelectorAll('.pf-go').forEach(btn => btn.addEventListener('click', () => { App._fixFocus = this._workGap; App.openScreen(btn.dataset.target); }));
+    this.container.querySelectorAll('.pf-doc').forEach(btn => btn.addEventListener('click', () => { if (window.FixDocs) FixDocs.download(btn.dataset.doc); }));
   },
 
   showHowTo() {
