@@ -1228,7 +1228,11 @@ const App = {
     if (!nav) return;
     opts = opts || {};
     const iren = Object.assign({ 'Help and FAQ': 'Help' }, opts.items || {});
-    nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
+    // Support-group links (Report a Bug, Contact Support) stay when the caller
+    // asks to keep them, e.g. the App Settings sidebar's Support group.
+    if (!opts.keepSupport) {
+      nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
+    }
     nav.querySelectorAll('.nav-item .nav-label').forEach(l => { const t = (l.textContent || '').trim(); if (iren[t]) l.textContent = iren[t]; });
     nav.querySelectorAll('.nav-section').forEach(sec => {
       // Drop a header whose whole group is empty or role-hidden (no stray divider).
@@ -2907,6 +2911,19 @@ const App = {
     document.body.appendChild(m);
     document.body.appendChild(box);
     requestAnimationFrame(() => { m.style.opacity = '1'; box.style.transform = 'translateX(0)'; });
+  },
+
+  // Shared footer for the section Help/FAQ pages: a subtle "still stuck?" line
+  // that links to the bug report (opens a popup in place, keeping you on the
+  // page) and Contact Support. Appended after the help body on every Help page
+  // so support is reachable from wherever an operator is reading help.
+  helpFooter() {
+    return '<div style="border-top:1px solid var(--b2);margin-top:26px;padding-top:16px;font-size:12px;color:var(--t3);line-height:1.7;">'
+      + 'Still stuck? '
+      + '<span onclick="S.HubReportBug.openModal();" style="color:var(--gold);cursor:pointer;font-weight:600;">Report a bug</span>'
+      + ' &middot; '
+      + '<span onclick="S.HubSupport.open();" style="color:var(--gold);cursor:pointer;font-weight:600;">Contact support</span>'
+      + '</div>';
   },
 
   // Shared report chrome: connected "folder" tabs + the panel they open into.
