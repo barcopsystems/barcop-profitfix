@@ -75,15 +75,19 @@ S.ShiftPreShift = {
 
   // Recommended featured items: high margin AND high volume vs the whole menu.
   todayStars() {
+    // Cost is computed from the recipe/product, not stored on the item, so read it
+    // through App.menuItemCost (a bare i.cost is null for most items).
     const items = ((App.data && App.data.menu_items) || [])
-      .filter(i => !i.archived && this.n(i.price) != null && this.n(i.cost) != null && this.n(i.weekly_covers) != null && i.weekly_covers > 0);
+      .filter(i => !i.archived)
+      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers) }))
+      .filter(x => x.price != null && x.cost != null && x.covers != null && x.covers > 0);
     if (items.length < 4) return [];
-    const cm = arr => arr.reduce((s, i) => s + (i.price - i.cost), 0) / arr.length;
-    const cv = arr => arr.reduce((s, i) => s + (i.weekly_covers || 0), 0) / arr.length;
-    const avgCM = cm(items), avgCov = cv(items);
-    return items.filter(i => (i.price - i.cost) >= avgCM && i.weekly_covers >= avgCov)
+    const avgCM = items.reduce((s, x) => s + (x.price - x.cost), 0) / items.length;
+    const avgCov = items.reduce((s, x) => s + x.covers, 0) / items.length;
+    return items.filter(x => (x.price - x.cost) >= avgCM && x.covers >= avgCov)
       .sort((a, b) => (b.price - b.cost) - (a.price - a.cost))
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(x => x.item);
   },
   _curFeatured() {   // array of item ids for the selected period
     const p = this._period;
@@ -136,7 +140,7 @@ S.ShiftPreShift = {
 
     // Row above the combined card: service-period chips on the left (only when
     // the operator runs more than one period), Export Briefing on the right.
-    const topRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">'
+    const topRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       +   (periods.length > 1 ? App.filterChips(this._period, periods.map(p => ({ v: p, label: p })), 'pb-period-chip') : '')
       + '</div>'
