@@ -55,7 +55,7 @@ S.Reports = {
         + '</div>'
       + '</div>'
       + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<button class="btn btn-primary" id="qbo-download">Download File</button>'
+        + '<button class="btn btn-primary" id="qbo-download">Generate File</button>'
         + '<span id="qbo-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
