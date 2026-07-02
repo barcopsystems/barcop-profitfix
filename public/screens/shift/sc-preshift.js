@@ -143,20 +143,25 @@ S.ShiftPreShift = {
       + '<button class="btn btn-ghost btn-sm" id="pb-export">Export Briefing</button>'
       + '</div>';
 
-    const featHtml = featured.length
+    const featRows = featured.length
       ? featured.map((it, idx) => {
           const m = this._itemMargin(it);
           const mHtml = m != null
-            ? '<div style="flex-shrink:0;font-size:12px;color:var(--gold);font-weight:700;">' + App.fmtCurrency(m) + ' margin</div>'
-            : '<div style="flex-shrink:0;font-size:12px;color:var(--t4);">&mdash;</div>';
-          return '<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:#0D181E;border-radius:6px;margin-top:6px;">'
-            + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.name || 'Item') + '</div>'
-            + mHtml
-            + '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
-            + '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
-            + '</div>';
+            ? '<span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(m) + '</span>'
+            : '<span style="color:var(--t4);">&mdash;</span>';
+          return '<tr>'
+            + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
+            + '<td data-label="Margin">' + mHtml + '</td>'
+            + '<td class="no-print"><div class="row-actions">'
+            +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
+            +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
+            + '</div></td></tr>';
         }).join('')
-      : '<div style="font-size:12px;color:var(--t3);padding:10px 14px;background:#0D181E;border-radius:6px;margin-top:6px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</div>';
+      : '<tr><td colspan="3" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
+    const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:46%"/><col style="width:20%"/><col/></colgroup>'
+      + '<thead><tr><th>Featured Items</th><th>Margin</th><th class="no-print"></th></tr></thead>'
+      + '<tbody>' + featRows + '</tbody></table></div>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
       + '<button class="btn btn-ghost btn-sm" id="pb-fadd">+ Add Item</button>'
@@ -167,13 +172,14 @@ S.ShiftPreShift = {
     const statusLine = '<span style="font-size:11px;color:var(--t3);">&middot; ' + esc(dateLabel) + '</span>'
       + (held ? '<span style="font-size:11px;color:var(--green);font-weight:700;">&middot; Briefing held</span>' : '');
 
-    // Combined card: Today's Focus (label + status + entry) over the Featured Items list.
-    const colHead = '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Featured Items</div>';
+    // Combined card: Today's Focus (label + status + entry) over the Featured Items
+    // list. The list is a row-list table so its column header carries the divider
+    // (like the Briefing History card), the Margin is its own column, and the row
+    // action buttons take the standard pill-row size.
     const combinedCard = '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><div class="sh" style="margin:0;">Today\'s Focus</div>' + statusLine + '</div>'
-      + '<div class="f"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
-      + '<div class="divider"></div>'
-      + colHead + featHtml + featActions
+      + '<div class="f" style="margin-bottom:20px;"><textarea class="form-input" id="pb-focus" rows="2" placeholder="One thing to hit this shift: a slow daypart, a new dish, a dessert push...">' + esc(this._curFocus() || '') + '</textarea></div>'
+      + featTable + featActions
       + '</div>';
 
     const upsellBlock = this._editUpsell ? this._upsellEditorHtml() : this._upsellStaticHtml();
@@ -201,7 +207,7 @@ S.ShiftPreShift = {
 
   // Circle step number, styled like the Workflow map's node numbers.
   _stepNum(i) {
-    return '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--b-edge);color:var(--t3);font-size:11px;font-weight:700;">' + (i + 1) + '</span>';
+    return '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--b-edge);color:var(--t3);font-size:11px;font-weight:700;line-height:1;">' + (i + 1) + '</span>';
   },
 
   _upsellStaticHtml() {
@@ -218,7 +224,7 @@ S.ShiftPreShift = {
 
   _upsellEditorHtml() {
     const rows = this._upsellDraft.map((u, idx) =>
-      '<div class="pb-up-line" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;">'
+      '<div class="pb-up-line" data-id="' + idx + '" data-idx="' + idx + '" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;">'
       + DragReorder.handleDivHTML()
       + '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">'
       +   '<input type="text" class="form-input pb-up-title" value="' + esc(u.title) + '" placeholder="Step title"/>'
@@ -289,12 +295,19 @@ S.ShiftPreShift = {
         const rm = ev.target.closest('.pb-up-remove');
         if (!rm) return;
         this._syncUpsell();
-        this._upsellDraft.splice(parseInt(rm.dataset.idx, 10), 1);
+        // Index by live DOM position, not a stale data-idx (a drag reorders the
+        // rows without a re-render).
+        const row = rm.closest('.pb-up-line');
+        const idx = [...this.container.querySelectorAll('.pb-up-line')].indexOf(row);
+        if (idx > -1) this._upsellDraft.splice(idx, 1);
         this.draw();
       });
+      // On drop: sync state from the reordered DOM. No re-render here — the rows
+      // are already in their new order, and re-rendering mid-drop is what made the
+      // drag stick instead of dropping on mouse release.
       DragReorder.wire({
         container: upHost, rowSelector: '.pb-up-line', handleSelector: '.dr-handle',
-        onCommit: () => { this._syncUpsell(); this.draw(); }
+        onCommit: () => { this._syncUpsell(); }
       });
     }
 
