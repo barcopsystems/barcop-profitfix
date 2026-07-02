@@ -150,7 +150,7 @@ S.LaborTimeOff = {
       else if (edit) { ev.stopPropagation(); this.openEditModal(edit.dataset.id); }
       else if (row && App.canEdit('lc-time-off')) this.openEditModal(row.dataset.id);
     };
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot) {
       if (this._draft) App.restoreDraft(formRoot, this._draft);
       const cap = () => { this._draft = App.captureDraft(formRoot); };

@@ -217,7 +217,7 @@ S.LaborCalloutLog = {
     };
     // Restore an in-progress draft before the schedule note recomputes off it;
     // then capture on every input so the draft stays current through a re-render.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
     ['co-staff', 'co-date', 'co-coveredby'].forEach(id =>
       document.getElementById(id)?.addEventListener('change', () => this.updateSchedNote('co-')));

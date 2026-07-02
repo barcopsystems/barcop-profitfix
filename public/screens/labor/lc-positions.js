@@ -138,7 +138,7 @@ S.LaborPositions = {
     App.applyCollapsed(this.container);
     // Restore an in-progress draft before wiring so the tip-field disclosure reads
     // the restored values; then capture on every input so the draft stays current.
-    const formRoot = this.container.querySelector('.collapse-body');
+    const formRoot = this.container.querySelector('.form-card');
     if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
     this.wireTipFields('lp-');
     if (formRoot) {

@@ -365,7 +365,7 @@ S.LaborLogHours = {
     else {
       // Manual: restore an in-progress draft before wiring so the live cost preview
       // reads the restored values; then capture on every input so it stays current.
-      const formRoot = this.container.querySelector('.collapse-body');
+      const formRoot = this.container.querySelector('.form-card');
       if (formRoot && this._draft) App.restoreDraft(formRoot, this._draft);
       this.wireForm('lo-');
       if (formRoot) {

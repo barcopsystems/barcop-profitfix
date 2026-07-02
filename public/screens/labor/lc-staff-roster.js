@@ -326,7 +326,7 @@ S.LaborStaffRoster = {
     else {
       // Restore an in-progress Add-Staff draft, then sync the pay label to the
       // restored Pay Type (a synthetic change event would wipe the pay value).
-      const formRoot = this.container.querySelector('.collapse-body');
+      const formRoot = this.container.querySelector('.form-card');
       if (formRoot && this._draft) {
         App.restoreDraft(formRoot, this._draft);
         const typeEl = document.getElementById('sr-paytype'), labelEl = document.getElementById('sr-pay-label');
