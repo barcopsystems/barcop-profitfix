@@ -77,74 +77,54 @@ S.AuditTracker = {
     const gap = (v) => v > 0 ? [cur(v), 'warn'] : v < 0 ? [cur(Math.abs(v)) + ' under target', 'good'] : [''];
     const [s1gap]  = gap(d.S1_MONTHLY_GAP);
 
-    const signals6 = [
-      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
-      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
-      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
-      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL},
-    ].filter(s => s.label);
-
     const NAMES = App.AUDIT_PROFIT_SECTION_NAMES;
     const sections = [
       AuditUI.sectionBlock(1, NAMES[0], d.S1_SCORE, [
         ['Bar Pour Cost %',         pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT), d.S1_BAR_COST_PCT > d.S1_TARGET_PCT ? 'warn' : 'good'],
         ['Monthly Bar Revenue',     cur(d.S1_BAR_REV_MONTHLY)],
         ['Bev COGS Period',         cur(d.S1_BEV_COGS_PERIOD)],
-        ['Inventory Variance %',    pct(d.S1_INV_VARIANCE_PCT), d.S1_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
-        ['Inventory Variance $',    cur(d.S1_INV_VARIANCE_AMT), d.S1_INV_VARIANCE_AMT > 500 ? 'warn' : ''],
-        ['Draft Beer Yield',        d.S1_DRAFT_YIELD_PCT != null ? d.S1_DRAFT_YIELD_PCT + '%' : '', (d.S1_DRAFT_LOSS_PCT != null && d.S1_DRAFT_LOSS_PCT >= 12) ? 'warn' : (d.S1_DRAFT_YIELD_PCT != null ? 'good' : '')],
-        ['Draft Yield Loss',        d.S1_DRAFT_LOSS_PCT != null ? d.S1_DRAFT_LOSS_PCT + '% to foam and over-pour' : '', d.S1_DRAFT_LOSS_PCT >= 12 ? 'warn' : ''],
-        ['Recipe Coverage',         d.S1_RECIPE_COVERAGE],
-        ['Monthly Gap vs Target',   s1gap || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''), d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
+        ['Recipe Costing',          d.S1_RECIPE_COVERAGE, (d.S1_RECIPE_COVERAGE_PCT != null && d.S1_RECIPE_COVERAGE_PCT < 50) ? 'warn' : ''],
+        ['Monthly Gap vs Target',   d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : '', d.S1_MONTHLY_GAP > 0 ? 'warn' : ''],
         ['Annual Gap',              cur(d.S1_ANNUAL_GAP), d.S1_ANNUAL_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(2, NAMES[1], d.S2_SCORE, [
-        ['Void/Comp %',             pct(d.S2_VOID_COMP_PCT), d.S2_VOID_COMP_PCT > 2 ? 'warn' : ''],
-        ['Void/Comp Amount',        cur(d.S2_VOID_COMP_AMT), d.S2_VOID_COMP_AMT > 0 ? 'warn' : ''],
-        ['Unauthorized Voids %',    pct(d.S2_VOIDS_NO_APPROVAL_PCT), d.S2_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
-        ['Discount % of Sales',     d.S2_DISCOUNT_PCT != null ? d.S2_DISCOUNT_PCT + '%' + (d.S2_DISCOUNT_BENCHMARK_PCT != null ? ' (Benchmark: under ' + d.S2_DISCOUNT_BENCHMARK_PCT + '%)' : '') : '', (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) ? 'warn' : ''],
-        ['Discount Total',          d.S2_DISCOUNT_PCT != null ? cur(d.S2_DISCOUNT_TOTAL) : ''],
-        ['No-Sale Drawer Opens',    d.S2_NO_SALE_COUNT != null ? num(d.S2_NO_SALE_COUNT) : '', d.S2_NO_SALE_COUNT > 0 ? 'warn' : ''],
-        ['Drawer Reconciliation',   d.S2_DRAWER_RECON],
-        ['Cash Policy Documented',  d.S2_CASH_POLICY],
-        ['Void Approval Required',  d.S2_VOID_APPROVAL],
-        ['Spillage Log',            d.S2_SPILLAGE_LOG],
-        ['Monthly Gap',             cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
+        ['Food Cost %',             pct(d.S2_FOOD_COST_PCT, d.S2_TARGET_PCT), d.S2_FOOD_COST_PCT > d.S2_TARGET_PCT ? 'warn' : 'good'],
+        ['Monthly Food Revenue',    cur(d.S2_FOOD_REV_MONTHLY)],
+        ['Recipe Costing',          d.S2_RECIPE_COVERAGE, (d.S2_RECIPE_COVERAGE_PCT != null && d.S2_RECIPE_COVERAGE_PCT < 50) ? 'warn' : ''],
+        ['Monthly Gap vs Target',   d.S2_MONTHLY_GAP ? cur(d.S2_MONTHLY_GAP) : '', d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
+        ['Annual Gap',              cur(d.S2_ANNUAL_GAP), d.S2_ANNUAL_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(3, NAMES[2], d.S3_SCORE, [
-        ['Food Cost %',             pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT), d.S3_FOOD_COST_PCT > d.S3_TARGET_PCT ? 'warn' : 'good'],
-        ['Monthly Food Revenue',    cur(d.S3_FOOD_REV_MONTHLY)],
-        ['Food Variance %',         pct(d.S3_FOOD_VAR_PCT), d.S3_FOOD_VAR_PCT > 3 ? 'warn' : ''],
-        ['Food Variance $',         cur(d.S3_FOOD_VAR_AMT)],
-        ['Recipe Coverage',         d.S3_RECIPE_COVERAGE],
-        ['Inventory Frequency',     d.S3_INV_FREQ],
-        ['Monthly Gap vs Target',   cur(d.S3_MONTHLY_GAP), d.S3_MONTHLY_GAP > 0 ? 'warn' : ''],
-        ['Annual Gap',              cur(d.S3_ANNUAL_GAP), d.S3_ANNUAL_GAP > 0 ? 'warn' : ''],
+        ['Inventory Variance $',    cur(d.S3_INV_VARIANCE_DOLLAR), d.S3_INV_VARIANCE_DOLLAR > 0 ? 'warn' : ''],
+        ['Inventory Variance %',    d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : '', d.S3_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
+        ['Count Cadence',           d.S3_COUNT_CADENCE, /monthly|not counted/i.test(d.S3_COUNT_CADENCE||'') ? 'warn' : (d.S3_COUNT_CADENCE ? 'good' : '')],
+        ['Counts This Period',      num(d.S3_COUNTS_IN_PERIOD)],
+        ['Spot Checks',             num(d.S3_SPOT_CHECKS)],
+        ['Spot Check Variance $',   cur(d.S3_SPOT_VARIANCE_DOLLAR), d.S3_SPOT_VARIANCE_DOLLAR > 300 ? 'warn' : ''],
+        ['Waste Logged',            cur(d.S3_WASTE_TOTAL)],
+        ['Measured Shrink (in pour and food cost)', cur(d.S3_SHRINK_PERIOD), d.S3_SHRINK_PERIOD > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(4, NAMES[3], d.S4_SCORE, [
-        ['Bev Invoice Count',       num(d.S4_BEV_INVOICE_COUNT)],
-        ['Food Invoice Count',      num(d.S4_FOOD_INVOICE_COUNT)],
-        ['Monthly Vendor Spend',    cur(d.S4_VENDOR_SPEND_MONTHLY)],
-        ['Price Verification',      d.S4_PRICE_VERIFY],
-        ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S4_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
-        ['Credits Recovered',       d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
-        ['Credit Recovery Rate',    d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : '', (d.S4_CREDIT_RECOVERY_PCT != null && d.S4_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
-        ['Est. Monthly Exposure',   cur(d.S4_EXPOSURE_MONTHLY), d.S4_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
-        ['Est. Annual Exposure',    cur(d.S4_EXPOSURE_ANNUAL),  d.S4_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
+        ['Void/Comp %',             pct(d.S4_VOID_COMP_PCT), d.S4_VOID_COMP_PCT > 2 ? 'warn' : ''],
+        ['Void/Comp Amount',        cur(d.S4_VOID_COMP_AMT), d.S4_VOID_COMP_AMT > 0 ? 'warn' : ''],
+        ['Unauthorized Voids %',    pct(d.S4_VOIDS_NO_APPROVAL_PCT), d.S4_VOIDS_NO_APPROVAL_PCT > 0 ? 'warn' : ''],
+        ['Cash Short Rate',         d.S4_CASH_SHORT_RATE_PCT != null ? d.S4_CASH_SHORT_RATE_PCT + '% of counts' : '', d.S4_CASH_SHORT_RATE_PCT > 15 ? 'warn' : ''],
+        ['Drawer Reconciliation',   d.S4_DRAWER_RECON],
+        ['Walked Tabs',             cur(d.S4_WALKED_TABS_TOTAL) + (d.S4_WALKED_TABS_COUNT ? ' across ' + d.S4_WALKED_TABS_COUNT : ''), d.S4_WALKED_TABS_TOTAL > 0 ? 'warn' : ''],
+        ['Sales Integrity Flags',   d.S4_SALES_INTEGRITY_FLAGS != null ? num(d.S4_SALES_INTEGRITY_FLAGS) : '', d.S4_SALES_INTEGRITY_FLAGS > 0 ? 'warn' : ''],
+        ['Monthly Gap',             cur(d.S4_MONTHLY_GAP), d.S4_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(5, NAMES[4], d.S5_SCORE, [
-        ['Total Revenue Period',    cur(d.S5_TOTAL_REV_PERIOD)],
-        ['Total COGS Period',       cur(d.S5_TOTAL_COGS_PERIOD)],
-        ['Labor Period',            cur(d.S5_LABOR_PERIOD)],
-        ['Labor %',                 pct(d.S5_LABOR_PCT), d.S5_LABOR_PCT > 35 ? 'warn' : ''],
-        ['Bar Pour Cost %',         pct(d.S5_BAR_COST_PCT)],
-        ['Food Cost %',             pct(d.S5_FOOD_COST_PCT)],
-        ['Prime Cost %',            pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT), d.S5_PRIME_COST_PCT > (d.S5_TARGET_PCT||60) ? 'warn' : 'good'],
-        ['Prime Cost Amount',       cur(d.S5_PRIME_COST_AMT)],
-        ['Labor by Department',     d.S5_LABOR_BY_DEPT],
-        ['Monthly COGS Gap',        cur(d.S5_COMBINED_COGS_GAP), d.S5_COMBINED_COGS_GAP > 0 ? 'warn' : ''],
+        ['Deliveries Logged',       num(d.S5_DELIVERIES_LOGGED)],
+        ['Price Changes Caught',    num(d.S5_VENDOR_PRICE_CHANGES)],
+        ['Monthly Vendor Spend',    cur(d.S5_VENDOR_SPEND_MONTHLY)],
+        ['Price Verification',      d.S5_PRICE_VERIFY],
+        ['Uncollected Vendor Credits', d.S5_UNCOLLECTED_CREDITS != null ? cur(d.S5_UNCOLLECTED_CREDITS) + (d.S5_OPEN_CREDIT_COUNT ? ' across ' + d.S5_OPEN_CREDIT_COUNT + ' open' : '') : '', d.S5_UNCOLLECTED_CREDITS > 0 ? 'warn' : ''],
+        ['Credits Recovered',       d.S5_RECOVERED_CREDITS != null ? cur(d.S5_RECOVERED_CREDITS) : ''],
+        ['Credit Recovery Rate',    d.S5_CREDIT_RECOVERY_PCT != null ? d.S5_CREDIT_RECOVERY_PCT + '%' : '', (d.S5_CREDIT_RECOVERY_PCT != null && d.S5_CREDIT_RECOVERY_PCT < 40) ? 'warn' : ''],
+        ['Est. Monthly Exposure',   cur(d.S5_EXPOSURE_MONTHLY), d.S5_EXPOSURE_MONTHLY > 500 ? 'warn' : ''],
+        ['Est. Annual Exposure',    cur(d.S5_EXPOSURE_ANNUAL),  d.S5_EXPOSURE_ANNUAL  > 5000? 'warn' : ''],
       ], null, d),
-      ...(signals6.length ? [AuditUI.sectionBlock(6, 'Operational Risk Signals', null, [], signals6, d)] : []),
     ].join('');
 
     this.container.innerHTML = '<div class="screen">'
@@ -152,6 +132,7 @@ S.AuditTracker = {
       + AuditUI.recoverStrip(audit)
       + AuditUI.actionsArea(audit, 'profit', 'at')
       + sections
+      + this.primeContext(d)
       + '</div>';
 
     AuditUI.attachOutlook('at', audit, 'profit');
@@ -159,6 +140,33 @@ S.AuditTracker = {
     this.container.querySelectorAll('.at-fix-btn').forEach(btn => {
       btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('profit-fix'); });
     });
+  },
+
+  // ── Prime Cost — context card, NOT a scored section ─────────────
+  // Prime is pour + food + labor, so averaging it into the overall would double-
+  // weight S1 and S2. It reads as context here: where the whole margin stands.
+  primeContext(d) {
+    if (d.PRIME_COST_PCT == null) return '';
+    const cur = v => v ? App.fmtCurrency(v) : '';
+    const pct = v => v != null ? v + '%' : '';
+    const over = d.PRIME_COST_PCT > (d.PRIME_TARGET_PCT || 60);
+    const rows = [
+      { label: 'Prime Cost %', value: pct(d.PRIME_COST_PCT) + (d.PRIME_TARGET_PCT ? ' (Target: ' + d.PRIME_TARGET_PCT + '%)' : ''), valColor: over ? 'var(--red)' : 'var(--green)' },
+      { label: 'Prime Cost Amount', value: cur(d.PRIME_COST_AMT) },
+      { label: 'Labor %', value: pct(d.PRIME_LABOR_PCT), valColor: d.PRIME_LABOR_PCT > 35 ? 'var(--red)' : 'var(--t1)' },
+      { label: 'Labor Period', value: cur(d.PRIME_LABOR_PERIOD) },
+      { label: 'Total Revenue Period', value: cur(d.PRIME_TOTAL_REV_PERIOD) },
+      { label: 'Total COGS Period', value: cur(d.PRIME_TOTAL_COGS_PERIOD) }
+    ].filter(r => r.value && r.value !== '$0');
+    if (!rows.length) return '';
+    return '<div class="card" style="margin-bottom:14px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Context</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--t1);">Prime Cost</div></div></div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin:8px 0 4px;">Pour, food, and labor together. Shown for context, not scored into the overall (it would double-count Pour and Food above).</div>'
+      + '<div style="border-top:1px solid var(--b2);margin:12px 0;"></div>'
+      + AuditUI.metricRows(rows)
+      + '</div>';
   },
 
   // ── Export the Profit Audit as a data-driven PDF ───────────────
@@ -232,59 +240,47 @@ S.AuditTracker = {
         ['Bar Pour Cost %',        pct(d.S1_BAR_COST_PCT, d.S1_TARGET_PCT)],
         ['Monthly Bar Revenue',    cur(d.S1_BAR_REV_MONTHLY)],
         ['Bev COGS Period',        cur(d.S1_BEV_COGS_PERIOD)],
-        ['Inventory Variance %',   pct(d.S1_INV_VARIANCE_PCT)],
-        ['Inventory Variance $',   cur(d.S1_INV_VARIANCE_AMT)],
-        ['Draft Beer Yield',       d.S1_DRAFT_YIELD_PCT != null ? d.S1_DRAFT_YIELD_PCT + '%' : ''],
-        ['Draft Yield Loss',       d.S1_DRAFT_LOSS_PCT != null ? d.S1_DRAFT_LOSS_PCT + '% to foam and over-pour' : ''],
-        ['Recipe Coverage',        d.S1_RECIPE_COVERAGE],
-        ['Monthly Gap vs Target',  gap(d.S1_MONTHLY_GAP) || (d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : '')],
+        ['Recipe Costing',         d.S1_RECIPE_COVERAGE],
+        ['Monthly Gap vs Target',  d.S1_MONTHLY_GAP ? cur(d.S1_MONTHLY_GAP) : ''],
         ['Annual Gap',             cur(d.S1_ANNUAL_GAP)]
       ]],
       [2, NAMES[1], d.S2_SCORE, [
-        ['Void/Comp %',            pct(d.S2_VOID_COMP_PCT)],
-        ['Void/Comp Amount',       cur(d.S2_VOID_COMP_AMT)],
-        ['Unauthorized Voids %',   pct(d.S2_VOIDS_NO_APPROVAL_PCT)],
-        ['Discount % of Sales',    d.S2_DISCOUNT_PCT != null ? d.S2_DISCOUNT_PCT + '%' + (d.S2_DISCOUNT_BENCHMARK_PCT != null ? ' (Benchmark: under ' + d.S2_DISCOUNT_BENCHMARK_PCT + '%)' : '') : ''],
-        ['Discount Total',         d.S2_DISCOUNT_PCT != null ? cur(d.S2_DISCOUNT_TOTAL) : ''],
-        ['No-Sale Drawer Opens',   d.S2_NO_SALE_COUNT != null ? num(d.S2_NO_SALE_COUNT) : ''],
-        ['Drawer Reconciliation',  d.S2_DRAWER_RECON],
-        ['Cash Policy Documented', d.S2_CASH_POLICY],
-        ['Void Approval Required', d.S2_VOID_APPROVAL],
-        ['Spillage Log',           d.S2_SPILLAGE_LOG],
-        ['Monthly Gap',            cur(d.S2_MONTHLY_GAP)]
+        ['Food Cost %',            pct(d.S2_FOOD_COST_PCT, d.S2_TARGET_PCT)],
+        ['Monthly Food Revenue',   cur(d.S2_FOOD_REV_MONTHLY)],
+        ['Recipe Costing',         d.S2_RECIPE_COVERAGE],
+        ['Monthly Gap vs Target',  d.S2_MONTHLY_GAP ? cur(d.S2_MONTHLY_GAP) : ''],
+        ['Annual Gap',             cur(d.S2_ANNUAL_GAP)]
       ]],
       [3, NAMES[2], d.S3_SCORE, [
-        ['Food Cost %',            pct(d.S3_FOOD_COST_PCT, d.S3_TARGET_PCT)],
-        ['Monthly Food Revenue',   cur(d.S3_FOOD_REV_MONTHLY)],
-        ['Food Variance %',        pct(d.S3_FOOD_VAR_PCT)],
-        ['Food Variance $',        cur(d.S3_FOOD_VAR_AMT)],
-        ['Recipe Coverage',        d.S3_RECIPE_COVERAGE],
-        ['Inventory Frequency',    d.S3_INV_FREQ],
-        ['Monthly Gap vs Target',  cur(d.S3_MONTHLY_GAP)],
-        ['Annual Gap',             cur(d.S3_ANNUAL_GAP)]
+        ['Inventory Variance $',   cur(d.S3_INV_VARIANCE_DOLLAR)],
+        ['Inventory Variance %',   d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : ''],
+        ['Count Cadence',          d.S3_COUNT_CADENCE],
+        ['Counts This Period',     num(d.S3_COUNTS_IN_PERIOD)],
+        ['Spot Checks',            num(d.S3_SPOT_CHECKS)],
+        ['Spot Check Variance $',  cur(d.S3_SPOT_VARIANCE_DOLLAR)],
+        ['Waste Logged',           cur(d.S3_WASTE_TOTAL)],
+        ['Measured Shrink (in pour and food cost)', cur(d.S3_SHRINK_PERIOD)]
       ]],
       [4, NAMES[3], d.S4_SCORE, [
-        ['Bev Invoice Count',      num(d.S4_BEV_INVOICE_COUNT)],
-        ['Food Invoice Count',     num(d.S4_FOOD_INVOICE_COUNT)],
-        ['Monthly Vendor Spend',   cur(d.S4_VENDOR_SPEND_MONTHLY)],
-        ['Price Verification',     d.S4_PRICE_VERIFY],
-        ['Uncollected Vendor Credits', d.S4_UNCOLLECTED_CREDITS != null ? cur(d.S4_UNCOLLECTED_CREDITS) + (d.S4_OPEN_CREDIT_COUNT ? ' across ' + d.S4_OPEN_CREDIT_COUNT + ' open' : '') : ''],
-        ['Credits Recovered',      d.S4_RECOVERED_CREDITS != null ? cur(d.S4_RECOVERED_CREDITS) : ''],
-        ['Credit Recovery Rate',   d.S4_CREDIT_RECOVERY_PCT != null ? d.S4_CREDIT_RECOVERY_PCT + '%' : ''],
-        ['Est. Monthly Exposure',  cur(d.S4_EXPOSURE_MONTHLY)],
-        ['Est. Annual Exposure',   cur(d.S4_EXPOSURE_ANNUAL)]
+        ['Void/Comp %',            pct(d.S4_VOID_COMP_PCT)],
+        ['Void/Comp Amount',       cur(d.S4_VOID_COMP_AMT)],
+        ['Unauthorized Voids %',   pct(d.S4_VOIDS_NO_APPROVAL_PCT)],
+        ['Cash Short Rate',        d.S4_CASH_SHORT_RATE_PCT != null ? d.S4_CASH_SHORT_RATE_PCT + '% of counts' : ''],
+        ['Drawer Reconciliation',  d.S4_DRAWER_RECON],
+        ['Walked Tabs',            cur(d.S4_WALKED_TABS_TOTAL) + (d.S4_WALKED_TABS_COUNT ? ' across ' + d.S4_WALKED_TABS_COUNT : '')],
+        ['Sales Integrity Flags',  d.S4_SALES_INTEGRITY_FLAGS != null ? num(d.S4_SALES_INTEGRITY_FLAGS) : ''],
+        ['Monthly Gap',            cur(d.S4_MONTHLY_GAP)]
       ]],
       [5, NAMES[4], d.S5_SCORE, [
-        ['Total Revenue Period',   cur(d.S5_TOTAL_REV_PERIOD)],
-        ['Total COGS Period',      cur(d.S5_TOTAL_COGS_PERIOD)],
-        ['Labor Period',           cur(d.S5_LABOR_PERIOD)],
-        ['Labor %',                pct(d.S5_LABOR_PCT)],
-        ['Bar Pour Cost %',        pct(d.S5_BAR_COST_PCT)],
-        ['Food Cost %',            pct(d.S5_FOOD_COST_PCT)],
-        ['Prime Cost %',           pct(d.S5_PRIME_COST_PCT, d.S5_TARGET_PCT)],
-        ['Prime Cost Amount',      cur(d.S5_PRIME_COST_AMT)],
-        ['Labor by Department',    d.S5_LABOR_BY_DEPT],
-        ['Monthly COGS Gap',       cur(d.S5_COMBINED_COGS_GAP)]
+        ['Deliveries Logged',      num(d.S5_DELIVERIES_LOGGED)],
+        ['Price Changes Caught',   num(d.S5_VENDOR_PRICE_CHANGES)],
+        ['Monthly Vendor Spend',   cur(d.S5_VENDOR_SPEND_MONTHLY)],
+        ['Price Verification',     d.S5_PRICE_VERIFY],
+        ['Uncollected Vendor Credits', d.S5_UNCOLLECTED_CREDITS != null ? cur(d.S5_UNCOLLECTED_CREDITS) + (d.S5_OPEN_CREDIT_COUNT ? ' across ' + d.S5_OPEN_CREDIT_COUNT + ' open' : '') : ''],
+        ['Credits Recovered',      d.S5_RECOVERED_CREDITS != null ? cur(d.S5_RECOVERED_CREDITS) : ''],
+        ['Credit Recovery Rate',   d.S5_CREDIT_RECOVERY_PCT != null ? d.S5_CREDIT_RECOVERY_PCT + '%' : ''],
+        ['Est. Monthly Exposure',  cur(d.S5_EXPOSURE_MONTHLY)],
+        ['Est. Annual Exposure',   cur(d.S5_EXPOSURE_ANNUAL)]
       ]]
     ];
 
@@ -301,22 +297,20 @@ S.AuditTracker = {
       }
     });
 
-    // Section 6 — Operational Risk Signals (only when present).
-    const signals6 = [
-      {score:d.S6_SIG1_SCORE, label:d.S6_SIG1_LABEL, evidence:d.S6_SIG1_EVIDENCE, gap:d.S6_SIG1_GAP, tool:d.S6_SIG1_TOOL},
-      {score:d.S6_SIG2_SCORE, label:d.S6_SIG2_LABEL, evidence:d.S6_SIG2_EVIDENCE, gap:d.S6_SIG2_GAP, tool:d.S6_SIG2_TOOL},
-      {score:d.S6_SIG3_SCORE, label:d.S6_SIG3_LABEL, evidence:d.S6_SIG3_EVIDENCE, gap:d.S6_SIG3_GAP, tool:d.S6_SIG3_TOOL},
-      {score:d.S6_SIG4_SCORE, label:d.S6_SIG4_LABEL, evidence:d.S6_SIG4_EVIDENCE, gap:d.S6_SIG4_GAP, tool:d.S6_SIG4_TOOL}
-    ].filter(s => s.label);
-    if (signals6.length) {
-      b.sectionTitle('Section 6  ·  Operational Risk Signals');
-      b.table(['Risk', 'Signal', 'Evidence', 'Gap', 'Tool'], signals6.map(s => [
-        (s.score || '').toUpperCase(),
-        s.label || '',
-        s.evidence || '',
-        s.gap || '',
-        s.tool || ''
-      ]), { columnStyles: { 0: { cellWidth: 50 } } });
+    // Prime Cost — context, not a scored section.
+    if (d.PRIME_COST_PCT != null) {
+      b.sectionTitle('Context  ·  Prime Cost');
+      b.paragraph('Pour, food, and labor together. Shown for context, not scored into the overall.', { gray: 70 });
+      const primeRows = [
+        ['Prime Cost %', pct(d.PRIME_COST_PCT, d.PRIME_TARGET_PCT)],
+        ['Prime Cost Amount', cur(d.PRIME_COST_AMT)],
+        ['Labor %', pct(d.PRIME_LABOR_PCT)],
+        ['Labor Period', cur(d.PRIME_LABOR_PERIOD)],
+        ['Total Revenue Period', cur(d.PRIME_TOTAL_REV_PERIOD)],
+        ['Total COGS Period', cur(d.PRIME_TOTAL_COGS_PERIOD)]
+      ].filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0')
+        .map(([label, val]) => [label, String(val)]);
+      if (primeRows.length) b.table(['Metric', 'Value'], primeRows);
     }
 
     b.disclaimer(App.deliverableFooter().workbookSubject);
@@ -339,7 +333,7 @@ S.AuditTracker = {
 
   showHowTo() {
     App.showHelpModal('How the Profit Audit Works', [
-      { p: ['The Profit Audit scores five areas: Bar Cost, Theft and Loss, Food Cost, Vendor Control, and Prime Cost. It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
+      { p: ['The Profit Audit scores five areas: Pour and Bar Cost, Food Cost, Shrink and Waste, Theft and Cash Loss, and Vendor Cost Control. Prime cost shows below the sections as context, not scored (it is pour plus food plus labor, so scoring it would double-count). It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
       { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth, and your annual sales come from your Business Profile in App Settings. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, an inventory count, hours logged, voids logged, cash reconciled, deliveries logged. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
       { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in your Business Profile once. 3. Generate. Sections with no data show N/A and fill in as you log more.'] },
@@ -431,30 +425,21 @@ S.AuditTracker = {
 
   extractActionItems(d) {
     const items = [];
+    // S1 Pour and S2 Food are real measured cost gaps (recoverable dollars).
     if (d.S1_MONTHLY_GAP > 0) items.push({ action: 'Reduce bar pour cost. $' + Math.round(d.S1_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S1_MONTHLY_GAP, gap_id: 'pour-cost' });
-    // Draft yield loss routes to the same pour-cost lever. No separate dollar
-    // (monthly_impact 0) — the loss already sits inside the bar pour cost gap.
-    if (d.S1_DRAFT_LOSS_PCT != null && d.S1_DRAFT_LOSS_PCT >= 12) items.push({ action: 'Cut draft yield loss. ' + d.S1_DRAFT_LOSS_PCT + '% of every keg is going to foam and over-pour. Tune line temperature, pressure, and pour discipline.', monthly_impact: 0, gap_id: 'pour-cost' });
-    if (d.S3_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S3_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S3_MONTHLY_GAP, gap_id: 'food-cost' });
-    if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S2_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'theft-loss' });
-    // Discount + no-sale theft vectors. Surfaced as flagged behavior (no separate
-    // recoverable dollar — not all discounts are recoverable, and no-sale opens
-    // have no honest dollar without an investigation).
-    if (d.S2_DISCOUNT_PCT != null && d.S2_DISCOUNT_BENCHMARK_PCT != null && d.S2_DISCOUNT_PCT > d.S2_DISCOUNT_BENCHMARK_PCT) items.push({ action: 'Tighten discount control. Discounts are ' + d.S2_DISCOUNT_PCT + '% of sales vs an under-' + d.S2_DISCOUNT_BENCHMARK_PCT + '% benchmark. Require manager authorization on every discount.', monthly_impact: 0, gap_id: 'theft-loss' });
-    if (d.S2_NO_SALE_COUNT >= 10) items.push({ action: 'Review no-sale drawer opens. ' + d.S2_NO_SALE_COUNT + ' no-sale register opens this period. Set a no-sale policy and log a reason for every one, it is the simplest cover for pocketing cash.', monthly_impact: 0, gap_id: 'theft-loss' });
-    // Vendor exposure is an ESTIMATE (a few percent of spend), not a measured
-    // leak like pour or food, so it stays out of the recoverable headline
-    // (monthly_impact 0) and is surfaced qualitatively. The real vendor dollars
-    // are the filed-but-uncollected credits below.
-    if (d.S4_EXPOSURE_MONTHLY > 0) items.push({ action: 'Tighten vendor verification. Match every invoice to its PO and price sheet. On unverified invoices a few percent of spend routinely slips through in overcharges and short counts, roughly $' + Math.round(d.S4_EXPOSURE_MONTHLY) + ' a month of exposure to catch.', monthly_impact: 0, gap_id: 'vendor-control' });
-    // Uncollected vendor credits are real filed overcharges. Surfaced with the
-    // actual dollar in text; monthly_impact 0 (a one-time recovery, not monthly,
-    // and kept out of the headline so it never double-counts vendor exposure).
-    if (d.S4_UNCOLLECTED_CREDITS > 0) items.push({ action: 'Chase your filed vendor credits. $' + Math.round(d.S4_UNCOLLECTED_CREDITS) + ' in flagged overcharges is filed but not yet recovered across ' + (d.S4_OPEN_CREDIT_COUNT || 0) + ' open discrepanc' + (d.S4_OPEN_CREDIT_COUNT === 1 ? 'y' : 'ies') + '. The work of catching it is already done.', monthly_impact: 0, gap_id: 'vendor-control' });
-    // Prime cost (S5_COMBINED_COGS_GAP) is the bar + food COGS overage, i.e. it
-    // already equals S1 + S3. It is shown as context on the Prime Cost section,
-    // never added here as a recoverable item, or the Total Recoverable would
-    // double-count the same dollars. (Decision: audit-honesty-rebuild.)
+    if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'food-cost' });
+    // S3 Shrink is diagnostic: its dollar already lives inside the pour and food
+    // gaps above, so it surfaces the where (monthly_impact 0, never re-added).
+    if (d.S3_INV_VARIANCE_DOLLAR > 0 && (d.S3_INV_VARIANCE_PCT == null || d.S3_INV_VARIANCE_PCT > 2)) items.push({ action: 'Work your inventory variance. $' + Math.round(d.S3_INV_VARIANCE_DOLLAR) + ' of product was used but never rung this period. Count weekly, run the variance report, and chase the biggest negative lines in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
+    if (/monthly|not counted/i.test(d.S3_COUNT_CADENCE || '')) items.push({ action: 'Count more often. Inventory is running ' + String(d.S3_COUNT_CADENCE).toLowerCase() + '. You cannot catch shrink you do not count for. Move to a weekly count.', monthly_impact: 0, gap_id: 'theft-loss' });
+    // S4 Theft: void/comp excess is a real distinct dollar.
+    if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S4_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'theft-loss' });
+    if (d.S4_SALES_INTEGRITY_FLAGS > 0) items.push({ action: 'Work your Sales Integrity flags. ' + d.S4_SALES_INTEGRITY_FLAGS + ' server' + (d.S4_SALES_INTEGRITY_FLAGS === 1 ? '' : 's') + ' flagged as an outlier worth a closer look. Open the investigation in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
+    // S5 Vendor exposure is an ESTIMATE (a few percent of spend), so it stays out
+    // of the recoverable headline; filed-but-uncollected credits are real dollars
+    // but a one-time recovery, also monthly_impact 0.
+    if (d.S5_EXPOSURE_MONTHLY > 0) items.push({ action: 'Tighten vendor verification. Match every invoice to its PO and price sheet. On unverified invoices a few percent of spend slips through in overcharges, roughly $' + Math.round(d.S5_EXPOSURE_MONTHLY) + ' a month of exposure to catch.', monthly_impact: 0, gap_id: 'vendor-control' });
+    if (d.S5_UNCOLLECTED_CREDITS > 0) items.push({ action: 'Chase your filed vendor credits. $' + Math.round(d.S5_UNCOLLECTED_CREDITS) + ' in flagged overcharges is filed but not yet recovered across ' + (d.S5_OPEN_CREDIT_COUNT || 0) + ' open discrepanc' + (d.S5_OPEN_CREDIT_COUNT === 1 ? 'y' : 'ies') + '. The work of catching it is already done.', monthly_impact: 0, gap_id: 'vendor-control' });
     return items.sort((a,b) => (b.monthly_impact||0) - (a.monthly_impact||0));
   },
 
@@ -521,6 +506,36 @@ S.AuditTracker = {
       cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
       cd.spot_check_variance_dollar = r1(spots.reduce((s,c) => s + (c.total_variance_dollar || 0), 0));
       cd.sources.push('Inventory Control spot checks');
+    }
+
+    // Inventory Control — variance report runs (theoretical vs actual usage $ =
+    // the measured shrink: over-pour, waste, theft, count error). Feeds S3.
+    const vruns = (inv.ic_variance_runs || []).filter(inWindow);
+    if (vruns.length) {
+      cd.inv_variance_dollar = r1(vruns.reduce((s,v) => s + (v.total_sales_variance || 0), 0));
+      cd.sources.push('Inventory Control variance report');
+    }
+
+    // Shift Control — waste and spill log (food and bev loss $). Feeds S3.
+    const waste = (sh.sc_waste || []).filter(inWindow);
+    if (waste.length) {
+      cd.waste_total = r1(waste.reduce((s,w) => s + (w.cost || 0), 0));
+      cd.sources.push('Shift Control waste log');
+    }
+
+    // Shift Control — walked tabs (revenue lost to walk-outs). Feeds S4.
+    const walked = (sh.sc_walked_tabs || []).filter(inWindow);
+    if (walked.length) {
+      cd.walked_tabs_total = r1(walked.reduce((s,w) => s + (w.amount || 0), 0));
+      cd.walked_tabs_count = walked.length;
+      cd.sources.push('Shift Control walked tabs');
+    }
+
+    // Sales Integrity — per-server fraud reviews (flagged server count). Feeds S4.
+    const reviews = (App.data.sales_reviews || []).filter(inWindow);
+    if (reviews.length) {
+      cd.sales_integrity_flags = reviews.reduce((s,r) => s + ((r.summary && r.summary.flagged) || 0), 0);
+      cd.sources.push('Sales Integrity reviews');
     }
 
     // Shift Control — voids and comps
