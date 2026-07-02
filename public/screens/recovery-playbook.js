@@ -74,6 +74,8 @@ S.RecoveryPlaybook = {
         if (btn.dataset.focus) App._fixFocus = btn.dataset.focus;
         App.openScreen(btn.dataset.screen);
       }));
+    content.querySelectorAll('.pb-doc').forEach(btn =>
+      btn.addEventListener('click', () => { if (window.FixDocs) FixDocs.download(btn.dataset.doc); }));
 
     // Interactive diagnostic: Yes/No per question reveals its outcome and scores
     // live. Delegated on the fresh .pb-body (recreated each render, so no leak).
@@ -148,9 +150,16 @@ S.RecoveryPlaybook = {
       case 'go':
         return '<div class="pb-gorow">' + this.goBtn(b) + '</div>';
       case 'docs':
-        return '<div class="pb-docs">' + b.items.map(it =>
-          '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download style="text-decoration:none;">'
-          + this._icon('reference') + 'Download: ' + esc(it.label) + '</a>').join('') + '</div>';
+        return '<div class="pb-docs">' + b.items.map(it => {
+          // Kept docs are generated in Bar Cop style (headed with the operator's
+          // establishment name) via FixDocs; anything else falls back to a stored file.
+          const base = String(it.file).split('/').pop();
+          const docId = (window.FixPanel && FixPanel.DOC_IDS[base]);
+          if (docId) return '<button class="btn btn-ghost btn-sm pb-doc" data-doc="' + esc(docId) + '" style="justify-content:flex-start;">'
+            + this._icon('reference') + 'Download: ' + esc(it.label) + '</button>';
+          return '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download style="text-decoration:none;">'
+            + this._icon('reference') + 'Download: ' + esc(it.label) + '</a>';
+        }).join('') + '</div>';
       default:
         return '';
     }
