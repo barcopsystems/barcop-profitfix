@@ -204,8 +204,7 @@ S.ShiftVoidComp = {
   renderList() {
     this.editId = null;
     const all = [...this.records()];
-    const filtered = this.applyFilters(all).sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const filtered = this.applyFilters(all).sort(App.cmpNewest);
 
     const formCard = this.builderCard();
 

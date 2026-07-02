@@ -50,7 +50,7 @@ S.ShiftChecklists = {
   activeManagerId() {
     const open = ((App.shiftData && App.shiftData.sc_shifts) || [])
       .filter(s => s.status === 'Open')
-      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())[0];
+      .sort(App.cmpNewest)[0];
     return open ? (open.manager_id || '') : '';
   },
 
@@ -192,7 +192,7 @@ S.ShiftChecklists = {
       + '<span id="cl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>';
 
-    const allRuns = [...this.typeRuns()].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const allRuns = [...this.typeRuns()].sort(App.cmpNewest);
     let histSection = '';
     if (allRuns.length) {
       const filtered = this.applyFilters(allRuns);

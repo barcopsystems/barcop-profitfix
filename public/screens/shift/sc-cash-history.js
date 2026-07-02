@@ -143,7 +143,7 @@ S.ShiftCashHistory = {
 
   // ── Cash Drops tab ──────────────────────────────────────────────────────────
   bodyDrops() {
-    const all = [...S.ShiftCashDrop.drops()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+    const all = [...S.ShiftCashDrop.drops()].sort(App.cmpNewest);
     if (!all.length) return { empty: this.emptyTab('No cash drops logged yet.', 'Log a drop on Cash Control.', '<th>Date</th><th>Drawer</th><th>Performed By</th><th>Amount</th>', 4) };
     const filtered = all.filter(d => this.inRange(d.date));
     const total = filtered.reduce((t, d) => t + (d.amount || 0), 0);
@@ -197,7 +197,7 @@ S.ShiftCashHistory = {
 
   // ── Variances tab ───────────────────────────────────────────────────────────
   bodyVariances() {
-    const all = [...S.ShiftVarianceLog.variances()].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+    const all = [...S.ShiftVarianceLog.variances()].sort(App.cmpNewest);
     if (!all.length) return { empty: this.emptyTab('No variances logged yet.', 'Count a drawer on Cash Control.', '<th>Date</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', 7) };
     const filtered = all.filter(v => this.inRange(v.date));
     const net = filtered.reduce((t, v) => t + (v.variance || 0), 0);

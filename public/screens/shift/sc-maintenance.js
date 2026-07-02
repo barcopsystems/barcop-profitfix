@@ -139,7 +139,7 @@ S.ShiftMaintenance = {
       const ao = a.status !== 'Resolved', bo = b.status !== 'Resolved';
       if (ao !== bo) return ao ? -1 : 1;                          // open before resolved
       if (ao) { const pr = this.priorityRank(a.priority) - this.priorityRank(b.priority); if (pr !== 0) return pr; }
-      return new Date(b.created_at || b.date_reported).getTime() - new Date(a.created_at || a.date_reported).getTime();
+      return App.cmpNewest(a, b);
     });
 
     const formCard = '<div class="card form-card">'

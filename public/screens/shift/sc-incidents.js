@@ -145,7 +145,7 @@ S.ShiftIncidents = {
       const ao = a.status !== 'Resolved', bo = b.status !== 'Resolved';
       if (ao !== bo) return ao ? -1 : 1;                       // open before resolved
       if (ao) { const sr = this.severityRank(a.severity) - this.severityRank(b.severity); if (sr !== 0) return sr; }
-      return new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime();
+      return App.cmpNewest(a, b);
     });
 
     const formCard = '<div class="card form-card">'

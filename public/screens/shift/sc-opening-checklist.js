@@ -113,8 +113,7 @@ S.ShiftOpeningChecklist = {
       + '</div></div>';
 
     // history
-    const hist = [...this.typeRuns()].sort((a, b) =>
-      new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+    const hist = [...this.typeRuns()].sort(App.cmpNewest);
     let histCard;
     if (hist.length === 0) {
       histCard = '';
