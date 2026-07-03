@@ -434,9 +434,9 @@ S.Hub = {
     // Getting Started replaces Where You Stand until the operator has fed Bar Cop
     // anything real. It flips to the live stats the moment any of them can populate
     // (an audit run, a week confirmed, or an inventory count taken). This is the
-    // first thing a new operator sees after onboarding, so it orients them to the
-    // whole arc — feed the week, confirm it, run an audit — that the section cards
-    // below break down.
+    // first thing a new operator sees after onboarding, so it points at the setup
+    // that has to happen first — the three Control sections — then the first audit.
+    // Nothing else can be done until those are set up.
     const hubStarted = anyAudit || pWeeks.length > 0 || rWeeks.length > 0
       || icCounts.length > 0 || recoveryTotal.dollars > 0 || trapped.hasData || bcScore != null;
     // Same chip style as the section Get Started cards (App.controlGetStarted):
@@ -449,11 +449,12 @@ S.Hub = {
       +   '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
     const gettingStarted = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps to getting started in Bar Cop.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps to getting started in Bar Cop. Set up your Control sections first, then run your first audit.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +   gsChip(1, 'Log your first week', 'ic-dashboard', 'inventory')
-      +   gsChip(2, 'Confirm the Week', 'dashboard', 'profit')
-      +   gsChip(3, 'Run your first audit', 'audit-tracker', 'profit')
+      +   gsChip(1, 'Set up Inventory Control', 'ic-dashboard', 'inventory')
+      +   gsChip(2, 'Set up Labor Control', 'lc-dashboard', 'labor')
+      +   gsChip(3, 'Set up Shift Control', 'sc-dashboard', 'shift')
+      +   gsChip(4, 'Run your first audit', 'audit-tracker', 'profit')
       + '</div></div>';
     const topCard = hubStarted ? tiles : gettingStarted;
 
