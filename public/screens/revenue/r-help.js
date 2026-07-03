@@ -14,7 +14,7 @@ S.RevenueHelp = {
     App.showHelpModal('Revenue Help and FAQ', [
       { p: ['This page is the full Help and FAQ for Revenue Recovery: how to get started, how Revenue reads from your Control systems, and the judgment calls behind the numbers.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "RPLH", "audit", or "covers" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Revenue carries its own directions. Open the screen you have a question about, like Run This Week or Menu Engineering, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Revenue carries its own directions. Open the screen you have a question about, like Confirm the Week or Menu Engineering, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
     ]);
   },
 
@@ -29,7 +29,7 @@ S.RevenueHelp = {
     ]},
     { t: 'How It Connects', qa: [
       { q: 'What flows from Shift Control into Revenue Recovery?',
-        a: 'Shift revenue (bar plus floor) feeds Run This Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Run This Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering covers, off the same sitting.' },
+        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering covers, off the same sitting.' },
       { q: 'What flows from Labor Control into Revenue Recovery?',
         a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
       { q: 'What flows from Inventory Control into Revenue Recovery?',
@@ -37,7 +37,7 @@ S.RevenueHelp = {
       { q: 'How does a price change get tracked?',
         a: 'Menu Engineering is the one place a menu price changes now. Repricing an item first saves a planned price you can model against volume; Mark Live is the moment it becomes real, sets the price, and logs the change with its date. Editing a price directly on a Menu Item logs it the same way. Pricing is tracked as a logged change, not a recovered-dollar figure, because a raise only pays if volume holds. So the dashboard shows Pricing as a Review row, and the Pricing Review Log at the bottom of Menu Engineering checks the real weekly margin swing against what you predicted once three weeks of covers land. Covers come from your weekly product-mix import.' },
       { q: 'Why do my Revenue numbers not match my POS exactly?',
-        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Run This Week sum from there.' }
+        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Confirm the Week sum from there.' }
     ]},
     { t: 'Decisions', qa: [
       { q: 'How do I price my menu, and what happened to the Price Calculator?',
@@ -47,7 +47,7 @@ S.RevenueHelp = {
       { q: 'How often can I run an audit?',
         a: 'As often as you want. There is no lock and no countdown. It scores your trailing four weeks, so each run reflects a fresh week of confirmed numbers without whipsawing on one slow or busy day, and Bar Cop keeps one record a day so the history stays clean. The Revenue Audit landing shows a live data badge for what level it would come out at right now. Most operators run it with their weekly close, but that is your call.' },
       { q: 'What is a good RPLH, and how do I set my target?',
-        a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and track it on Run This Week and the Revenue dashboard.' },
+        a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and track it on Confirm the Week and the Revenue dashboard.' },
       { q: 'Why are cost savings and revenue growth never combined into one number?',
         a: 'Because they are different jobs with different levers. Cutting labor cost and lifting check average both add to profit, but blending them into one "recovery" figure hides which one is actually moving and lets a win on one side paper over a loss on the other. Bar Cop keeps cost savings (labor) and revenue growth (check average, menu, servers) separate, and every figure is computed from your real data.' }
     ]}
