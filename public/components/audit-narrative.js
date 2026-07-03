@@ -45,11 +45,11 @@ function profitNarrative(d) {
   // S3 — Shrink & Waste
   if (d.S3_SCORE != null) {
     const vpct = d.S3_INV_VARIANCE_PCT, vdol = d.S3_INV_VARIANCE_DOLLAR;
-    const bad = (vpct != null && vpct > 2) || (d.S3_COUNT_CADENCE && /monthly|not counted/i.test(d.S3_COUNT_CADENCE));
+    const bad = (vpct != null && vpct > 2) || (d.S3_COUNT_FREQ && /monthly|not counted/i.test(d.S3_COUNT_FREQ));
     o.S3_NARRATIVE = (vdol != null)
       ? `The variance report shows ${money(vdol)} of product used but never rung this period${vpct != null ? `, ${pct1(vpct)} of your cost of goods` : ''}. That is over-pour, waste, and theft you can see.`
       : `You are counting inventory but the variance is not scored yet. Run the variance report to put a dollar on the shrink.`;
-    o.S3_FINDING = `Counts are running ${String(d.S3_COUNT_CADENCE || '').toLowerCase()}${d.S3_WASTE_TOTAL != null ? `, and ${money(d.S3_WASTE_TOTAL)} of waste is logged` : ''}. You can only catch shrink you count for, and that dollar already sits inside your pour and food cost above.`;
+    o.S3_FINDING = `Counts are running ${String(d.S3_COUNT_FREQ || '').toLowerCase()}${d.S3_WASTE_TOTAL != null ? `, and ${money(d.S3_WASTE_TOTAL)} of waste is logged` : ''}. You can only catch shrink you count for, and that dollar already sits inside your pour and food cost above.`;
     o.S3_TOOL = bad
       ? `Count weekly, run the variance report every count, and work the biggest negative lines in Loss Prevention.`
       : `Hold the weekly count and the variance report. That is what keeps the shrink honest.`;
