@@ -82,7 +82,8 @@ S.InventoryVarianceReport = {
       { h: 'Dig Deeper: Set It Up, Then Run It', p: ['For product-by-product detail, scroll to Dig Deeper and upload a product sales report from your POS for that exact date range. Map the product name, quantity, and sales columns once, map anything unmatched, then Run Report. Bar Cop saves the run so you can look back at it later.'] },
       { h: 'Map Anything Unmatched', p: ['Any POS row that does not line up with a product or menu item shows under Unmatched. Map each one once and Bar Cop remembers it for every future upload. Cocktails and plates explode through their recipe so each ingredient gets its share. If a product sells in more than one size, a pint and a pitcher, each size you set up shows as its own choice, so map the pitcher line to the pitcher size and it draws the right ounces and revenue.'] },
       { h: 'Comps And Waste Come Out First', p: ['Bar Cop subtracts logged comps and waste from your used number before comparing to sales, because those are known non-revenue losses. What is left is the amount that should match POS, so variance is unexplained loss, not give-aways you already tracked.'] },
-      { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours, and bottles. Draft shows ounces and kegs. Bottle beer matches bottle for bottle. Mixers read in quarts. Food reads per ingredient in its own unit. Cocktails and plates explode through their recipe so each ingredient gets its share.'] },
+      { h: 'Two Views', p: ['Sales Variance is in dollars: what the product you poured should have rung up versus what the register actually rang. Usage Variance reads in each category\'s own unit. Liquor and wine show ounces, pours, and bottles. Draft shows ounces and kegs. Bottle beer matches bottle for bottle. Mixers read in quarts. Food reads per ingredient in its own unit. Cocktails and plates explode through their recipe so each ingredient gets its share. The $ Var column puts a dollar on every line: what that extra usage cost you at your product cost. Red is over recipe, money that walked.'] },
+      { h: 'Over Recipe And Coverage', p: ['On the Usage tab the stat strip shows Over Recipe, the total dollars used past what your recipes and sales account for, and Recipe Coverage, the share of your POS sales that made it into this read. Low coverage means POS lines are still unmatched or missing a recipe. Map them and both numbers tighten.'] },
       { h: 'Variance Standards (You Set These)', p: [
         'Each category gets one number: the variance you will accept before it flags. Below the line is OK, above it flags. You set them once in the Set Variance Standards card up top, and they drive both the Quick Variance Check and this deep dive. Starting points:',
         'Liquor: flag over 2%. Wine by the glass: over 3%. Bottle Beer: over 2%. Draft: over 10%. Misc mixers: over 10%. Food: over 5%.',
@@ -186,7 +187,8 @@ S.InventoryVarianceReport = {
         compUnits: a.comp_units || 0, wasteUnits: a.waste_units || 0, used,
         poursMade:  b.servingsPerUnit != null ? used * b.servingsPerUnit : null,
         ouncesUsed: b.ozPerUnit != null ? used * b.ozPerUnit : null,
-        usageCost:  b.unitCost != null ? used * b.unitCost : null
+        usageCost:  b.unitCost != null ? used * b.unitCost : null,
+        unitCost:   b.unitCost != null ? b.unitCost : null
       };
     });
     return map;
@@ -808,18 +810,29 @@ S.InventoryVarianceReport = {
     const run = this.runs().find(r => r.id === this._viewRunId);
     const periodLabel = run ? (this.fmtDate(run.start_date) + ' - ' +this.fmtDate(run.end_date)) : '';
 
-    // Stats headline (current run, current standards).
+    // Stats headline (current run, current standards). The Usage tab shows the
+    // dollar holes + recipe coverage; the Sales tab keeps the sales-variance read.
     const unmatched = this.unmatchedPos().length;
     const recognized = this.posRows.length - unmatched;
-    const sr = this.salesRows();
-    const flagged = sr.filter(r => !r.mixedSizes && (r.varPct != null || r.unitVar != null)
-      && this.status(r.key, r.varPct, r.unitVar).label === 'Flag').length;
-    const netVar = sr.reduce((s, r) => s + ((!r.mixedSizes && r.salesVar != null) ? r.salesVar : 0), 0);
-    const statsCard = this.statsCard(
-      this.statItem('Recognized', recognized)
-      + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
-      + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
-      + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
+    let statsCard;
+    if (this.tab === 'usage') {
+      const agg = this.usageDollarAgg();
+      statsCard = this.statsCard(
+        this.statItem('Recognized', recognized)
+        + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
+        + this.statItem('Over Recipe', App.fmtCurrency(agg.overRecipe), agg.overRecipe > 0 ? 'warn' : '')
+        + this.statItem('Recipe Coverage', agg.coveragePct == null ? '-' : Math.round(agg.coveragePct) + '%', (agg.coveragePct != null && agg.coveragePct < 80) ? 'warn' : ''));
+    } else {
+      const sr = this.salesRows();
+      const flagged = sr.filter(r => !r.mixedSizes && (r.varPct != null || r.unitVar != null)
+        && this.status(r.key, r.varPct, r.unitVar).label === 'Flag').length;
+      const netVar = sr.reduce((s, r) => s + ((!r.mixedSizes && r.salesVar != null) ? r.salesVar : 0), 0);
+      statsCard = this.statsCard(
+        this.statItem('Recognized', recognized)
+        + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
+        + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
+        + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
+    }
 
     // Period = a two-period scroller over the saved runs (no category filter; the
     // Sales and Usage tables group by category instead). History is all-periods,
@@ -950,6 +963,12 @@ S.InventoryVarianceReport = {
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
   pct(v) { if (v == null) return '<span style="color:var(--t4);">-</span>'; const x = Number(v.toFixed(1)) === 0 ? 0 : v; return x.toFixed(1) + '%'; },
+  // Dollar-variance cell: money used beyond what the recipes/sales account for.
+  // Over recipe (positive) is a leak, shown red; under stays neutral.
+  dCell(dv) {
+    if (dv == null || isNaN(dv)) return '<td>' + this.n(null) + '</td>';
+    return '<td class="' + (dv > 0.005 ? 'neg' : '') + '">' + (dv > 0 ? '+' : '') + App.fmtCurrency(dv) + '</td>';
+  },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
   salesRows() {
@@ -1055,6 +1074,20 @@ S.InventoryVarianceReport = {
       if (!pos[pid]) return;
       const u = usage[pid], pr = pos[pid], p = u.product || {};
       if (p.category !== cat) return;
+      // Dollar variance: (actual counting-units used − theoretical units the
+      // recipes/sales account for) x cost per counting unit. Theoretical units
+      // are already in the counting unit for Food/Misc; Bottle Beer is by the
+      // case; the rest convert theoretical ounces sold to containers.
+      const csOz  = parseFloat(p.container_size_oz) || 0;
+      const cseSz = parseFloat(p.case_size) || 0;
+      const soldOz = pr.ouncesSold || 0;
+      const actualUnits = u.used;
+      let theoUnits;
+      if (cat === 'Food' || cat === 'Misc') theoUnits = soldOz;
+      else if (cat === 'Bottle Beer')       theoUnits = (csOz ? soldOz / csOz : 0) / (cseSz || 1);
+      else                                   theoUnits = csOz ? soldOz / csOz : null;
+      const dollarVar = (u.unitCost != null && actualUnits != null && theoUnits != null)
+        ? (actualUnits - theoUnits) * u.unitCost : null;
       rows.push({
         pid, name: u.name, fromMenu: pr.fromMenu,
         ouncesUsed: u.ouncesUsed, ouncesSold: pr.ouncesSold || 0,
@@ -1062,7 +1095,8 @@ S.InventoryVarianceReport = {
         containerSizeOz: parseFloat(p.container_size_oz) || 0,
         caseSize: parseFloat(p.case_size) || 0,
         unitType: p.unit_type || '',
-        byBottle: this.isByBottle(p)
+        byBottle: this.isByBottle(p),
+        unitCost: u.unitCost, usageCost: u.usageCost, dollarVar
       });
     });
     return rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -1095,9 +1129,10 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.ouncesSold) + '</td>' + '<td>' + this.n(r.ouncesUsed) + '</td>'
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableBottleWine(rows, label) {
     const body = rows.map(r => {
@@ -1109,9 +1144,10 @@ S.InventoryVarianceReport = {
         + '<td><div class="val">' + esc(r.name) + this.recipeTag(r) + '</div></td>'
         + '<td>' + this.n(bottlesSold, 0) + '</td>' + '<td>' + this.n(bottlesUsed, 0) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableDraft(rows, label) {
     const body = rows.map(r => {
@@ -1122,9 +1158,10 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.ouncesSold) + '</td>' + '<td>' + this.n(r.ouncesUsed) + '</td>'
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed, 2) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableBottleBeer(rows, label) {
     const body = rows.map(r => {
@@ -1141,9 +1178,10 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(bottlesSold, 0) + '</td>' + '<td>' + this.n(bottlesUsed, 0) + '</td>'
         + '<td>' + this.n(casesUsed) + '</td>' + '<td>' + this.n(caseVar) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableMisc(rows, label) {
     const body = rows.map(r => {
@@ -1155,9 +1193,10 @@ S.InventoryVarianceReport = {
         + '<td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + this.n(recipeQt, 2) + '</td>' + '<td>' + this.n(countedQt, 2) + '</td>'
         + '<td>' + this.n(qtVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', '$ Var', 'Status'], body);
   },
   foodUnit(name) { const m = /\(([^)]+)\)\s*$/.exec(name || ''); return m ? m[1].trim() : 'unit'; },
   foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
@@ -1173,9 +1212,10 @@ S.InventoryVarianceReport = {
         + '<td>' + esc(unit) + '</td>'
         + '<td>' + this.n(recipeUse, 2) + '</td>' + '<td>' + this.n(countedUse, 2) + '</td>'
         + '<td>' + this.n(useVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
+        + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', 'Status'], body);
+    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', '$ Var', 'Status'], body);
   },
   renderUsageCat(cat, rows) {
     // Misc rows are mixers, Food rows are recipe ingredients — name them so.
@@ -1192,6 +1232,21 @@ S.InventoryVarianceReport = {
       return out;
     }
     return this.usageTableLiquorWine(cat, rows, label);
+  },
+  // Aggregate for the Usage stat strip: total money used beyond what the recipes
+  // and sales account for (the "over recipe" holes), plus how much of your POS
+  // sales the read actually covers (unmatched items are the uncovered gap).
+  usageDollarAgg() {
+    let overRecipe = 0;
+    this.availableCats().forEach(cat => {
+      this.usageVarRows(cat).forEach(r => {
+        if (r.dollarVar != null && !isNaN(r.dollarVar) && r.dollarVar > 0) overRecipe += r.dollarVar;
+      });
+    });
+    const totalSales     = (this.posRows || []).reduce((s, r) => s + (parseFloat(r.sales) || 0), 0);
+    const unmatchedSales = this.unmatchedPos().reduce((s, r) => s + (parseFloat(r.sales) || 0), 0);
+    const coveragePct = totalSales > 0 ? Math.max(0, (totalSales - unmatchedSales) / totalSales * 100) : null;
+    return { overRecipe, coveragePct };
   },
   tabUsage() {
     const avail = this.availableCats();
