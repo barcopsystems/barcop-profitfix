@@ -186,10 +186,10 @@ S.Dashboard = {
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
     return App.controlGetStarted('Profit', [
-      { num: 1, label: 'Run your first Profit Audit', screen: 'audit-tracker', done: hasAudit },
-      { num: 2, label: 'Set up Inventory Control',    screen: 'ic-dashboard',  done: hasInv },
-      { num: 3, label: 'Set up Shift Control',        screen: 'sc-dashboard',  done: hasShift },
-      { num: 4, label: 'Set up Labor Control',        screen: 'lc-dashboard',  done: hasLabor }
+      { num: 1, label: 'Set up Inventory Control',    screen: 'ic-dashboard',  done: hasInv },
+      { num: 2, label: 'Set up Shift Control',        screen: 'sc-dashboard',  done: hasShift },
+      { num: 3, label: 'Set up Labor Control',        screen: 'lc-dashboard',  done: hasLabor },
+      { num: 4, label: 'Run your first Profit Audit', screen: 'audit-tracker', done: hasAudit }
     ]);
   },
 
