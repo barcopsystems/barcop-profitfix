@@ -114,11 +114,14 @@ S.LaborStaffRoster = {
       '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
       + esc(posLabel(p)) + '</option>').join('');
     const defaultPos = s ? this.positionById(s.position_id) : positions[0];
-    const isSal = !!(s && s.pay_type === 'Salary');
-    const hourly = s ? s.wage : (defaultPos ? defaultPos.default_wage : null);
+    // A new hire inherits the position's default pay type and figure; an existing
+    // person keeps their own.
+    const isSal = s ? (s.pay_type === 'Salary') : !!(defaultPos && defaultPos.pay_type === 'Salary');
     const payVal = isSal
-      ? ((s && s.annual_salary != null && s.annual_salary !== '') ? s.annual_salary : '')
-      : ((hourly != null && hourly !== '') ? hourly : '');
+      ? (s ? ((s.annual_salary != null && s.annual_salary !== '') ? s.annual_salary : '')
+           : (defaultPos && defaultPos.default_salary != null ? defaultPos.default_salary : ''))
+      : (s ? ((s.wage != null && s.wage !== '') ? s.wage : '')
+           : (defaultPos && defaultPos.default_wage != null ? defaultPos.default_wage : ''));
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Name</label>'
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
@@ -177,22 +180,33 @@ S.LaborStaffRoster = {
     const labelEl = document.getElementById('sr-pay-label');
     if (!posEl || !payEl || !typeEl) return;
     let wageTouched = !!editing;
+    let typeTouched = !!editing;
     payEl.addEventListener('input', () => { wageTouched = true; });
+    // Changing the position pre-fills the pay type + figure from the position's
+    // defaults, unless the operator has already set them by hand on this form.
     posEl.addEventListener('change', e => {
-      if (typeEl.value === 'Salary') return;
-      if (wageTouched) return;
       const p = this.positionById(e.target.value);
-      payEl.value = (p && p.default_wage != null) ? p.default_wage : '';
+      if (!p) return;
+      if (!typeTouched) {
+        const sal = p.pay_type === 'Salary';
+        typeEl.value = sal ? 'Salary' : 'Hourly';
+        if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
+      }
+      if (!wageTouched) {
+        payEl.value = typeEl.value === 'Salary'
+          ? (p.default_salary != null ? p.default_salary : '')
+          : (p.default_wage != null ? p.default_wage : '');
+      }
     });
     typeEl.addEventListener('change', () => {
+      typeTouched = true;
       const sal = typeEl.value === 'Salary';
       if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
-      payEl.value = '';
       wageTouched = false;
-      if (!sal) {
-        const p = this.positionById(posEl.value);
-        if (p && p.default_wage != null) payEl.value = p.default_wage;
-      }
+      const p = this.positionById(posEl.value);
+      payEl.value = sal
+        ? (p && p.default_salary != null ? p.default_salary : '')
+        : (p && p.default_wage != null ? p.default_wage : '');
     });
     // Regular-days-off chips: plain selectable chip (no checkbox), gold-tint when on.
     document.querySelectorAll('.sr-off-chip').forEach(chip => chip.addEventListener('click', () => {
@@ -374,7 +388,7 @@ S.LaborStaffRoster = {
   showHowTo() {
     App.showHelpModal('How the Staff Roster Works', [
       { p: ['The roster is your team: every staff member, their position, wage, and status. It is the source for scheduling, hours, tips, and the Revenue Recovery server list, so getting it right here means it is right everywhere.'] },
-      { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default hourly wage, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it. If someone works a second role at a different rate, like a server who picks up bar shifts, set a Secondary Role and its wage; logging hours in that role then costs at the secondary rate, and a Role picker shows up on Log Hours for them.'] },
+      { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default pay type and figure, an hourly wage or a salary, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it. If someone works a second role at a different rate, like a server who picks up bar shifts, set a Secondary Role and its wage; logging hours in that role then costs at the secondary rate, and a Role picker shows up on Log Hours for them.'] },
       { h: 'Fixing A Wage Change', p: ['Open a person and a Wage History table shows every raise and cut with the date it took effect. If a change landed on the wrong day, those shifts cost out at the wrong rate, so Edit the change to correct its effective date, or Delete one entered in error. To change the current wage, edit the profile up top; that records a fresh change here on its own.'] },
       { h: 'Regular Days Off', p: ['Tap the weekday chips to mark a standing day someone never works, like a server who is always off Sundays. Build Schedule blocks every one of those weekdays automatically, so you do not have to remember it each week. For a one-time request (a vacation week, a day off), use Time Off instead.'] },
       { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.'] },

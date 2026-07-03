@@ -76,16 +76,26 @@ S.LaborPositions = {
     const basis = (item && item.tip_out_basis === 'tips') ? 'tips' : 'sales';
     const deptOpts = this.DEPARTMENTS.map(d =>
       '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
-    const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
+    // Pay Type matches the roster: Hourly shows a Default Wage, Salary a Default
+    // Salary. The staff roster pre-fills a new hire's pay type + figure from this.
+    const isSalPos = (item && item.pay_type === 'Salary');
+    const payVal = isSalPos
+      ? ((item && item.default_salary != null && item.default_salary !== '') ? item.default_salary : '')
+      : ((item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '');
     const cs = w => narrow ? 'flex:0 1 calc(50% - 8px);min-width:140px;' : 'width:' + w + 'px;flex-shrink:0;';
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       + '<div class="f" style="' + cs(200) + '"><label>Position Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
       + '<div class="f" style="' + cs(170) + '"><label>Department</label>'
       + '<select id="' + p + 'dept">' + deptOpts + '</select></div>'
-      + '<div class="f" style="' + cs(140) + '"><label>Default Wage</label>'
+      + '<div class="f" style="' + cs(130) + '"><label>Pay Type</label>'
+      + '<select id="' + p + 'paytype">'
+      + '<option' + (isSalPos ? '' : ' selected') + '>Hourly</option>'
+      + '<option' + (isSalPos ? ' selected' : '') + '>Salary</option>'
+      + '</select></div>'
+      + '<div class="f" style="' + cs(150) + '"><label id="' + p + 'pay-label">' + (isSalPos ? 'Default Salary' : 'Default Wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'wage" min="0" step="0.01" '
-      + 'value="' + wageVal + '" placeholder="0.00"/></div></div>'
+      + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
       + '<div class="f" style="' + cs(150) + '"><label>Type</label>'
       + '<select id="' + p + 'tipped">'
       + '<option value="no"' + (tipped ? '' : ' selected') + '>Non-Tipped</option>'
@@ -125,6 +135,12 @@ S.LaborPositions = {
     typeEl?.addEventListener('change', refresh);
     paysEl?.addEventListener('change', refresh);
     refresh();
+    // Pay Type swaps the pay field label between an hourly wage and an annual salary.
+    const payTypeEl = document.getElementById(p + 'paytype');
+    const payLabelEl = document.getElementById(p + 'pay-label');
+    payTypeEl?.addEventListener('change', () => {
+      if (payLabelEl) payLabelEl.textContent = payTypeEl.value === 'Salary' ? 'Default Salary' : 'Default Wage';
+    });
   },
 
   renderList() {
@@ -147,7 +163,7 @@ S.LaborPositions = {
       + '</div>';
 
     const headHtml = '<thead><tr>'
-      + '<th>Position</th><th>Department</th><th>Default Wage</th><th>Type</th><th></th>'
+      + '<th>Position</th><th>Department</th><th>Default Pay</th><th>Type</th><th></th>'
       + '</tr></thead>';
     let bodyHtml;
     if (list.length === 0) {
@@ -156,7 +172,9 @@ S.LaborPositions = {
       const rows = list.map(p => '<tr class="lp-row" data-id="' + p.id + '" style="cursor:pointer;">'
         + '<td><div class="val">' + esc(p.name || '-') + '</div></td>'
         + '<td>' + esc(p.department || '-') + '</td>'
-        + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
+        + '<td class="val">' + (p.pay_type === 'Salary'
+            ? (p.default_salary != null ? App.fmtCurrency(p.default_salary) + '/yr' : 'Salary')
+            : (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-')) + '</td>'
         + '<td>' + (p.tipped
             ? '<span style="color:var(--t1);font-weight:700;">Tipped</span><span style="color:var(--t3);"> &middot; ' + ((parseFloat(p.tip_out_pct) || 0) > 0 ? 'tips out ' + App.fmtPct(p.tip_out_pct) + ' of ' + (p.tip_out_basis === 'tips' ? 'tips' : 'sales') : 'receives') + '</span>'
             : '<span style="color:var(--t3);font-weight:700;">Non-Tipped</span>') + '</td>'
@@ -221,18 +239,21 @@ S.LaborPositions = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById(p + 'name')?.value.trim();
     if (!name) { fail('Position name is required.'); return; }
-    const wage = parseFloat(document.getElementById(p + 'wage')?.value);
+    const payType = (document.getElementById(p + 'paytype')?.value === 'Salary') ? 'Salary' : 'Hourly';
+    const payNum = parseFloat(document.getElementById(p + 'wage')?.value);
 
     const isTipped = (document.getElementById(p + 'tipped')?.value || 'no') === 'yes';
     const pays = isTipped && (document.getElementById(p + 'pays')?.value || 'no') === 'yes';
     const tipoutRaw = parseFloat(document.getElementById(p + 'tipout')?.value);
     if (pays && (isNaN(tipoutRaw) || tipoutRaw <= 0)) { fail('Enter the tip-out percent, or set Pays Tip Out to No.'); return; }
     const rec = {
-      id:           this.editId || App.uid(),
+      id:            this.editId || App.uid(),
       name,
-      department:   document.getElementById(p + 'dept')?.value || 'Other',
-      default_wage: isNaN(wage) ? null : wage,
-      tipped:       isTipped,
+      department:    document.getElementById(p + 'dept')?.value || 'Other',
+      pay_type:      payType,
+      default_wage:   payType === 'Hourly' ? (isNaN(payNum) ? null : payNum) : null,
+      default_salary: payType === 'Salary' ? (isNaN(payNum) ? null : payNum) : null,
+      tipped:        isTipped,
       tip_out_pct:  pays ? tipoutRaw : 0,
       tip_out_basis: pays ? ((document.getElementById(p + 'basis')?.value === 'tips') ? 'tips' : 'sales') : 'sales',
       notes:        document.getElementById(p + 'notes')?.value.trim() || ''
@@ -265,7 +286,7 @@ S.LaborPositions = {
   showHowTo() {
     App.showHelpModal('How Positions Work', [
       { p: ['Positions are the job roles you schedule and pay: bartender, server, line cook, and so on. Every shift you build and every hour you log is tied to a position, so this is the list that drives your whole labor cost.'] },
-      { h: 'Department and Default Wage', p: ['Each position belongs to a department (Bar, Front of House, Kitchen, Management) and carries a default hourly wage. That wage pre-fills when you add a staff member in the role, so you set the number once here instead of on every hire.'] },
+      { h: 'Department and Default Pay', p: ['Each position belongs to a department (Bar, Front of House, Kitchen, Management) and carries a default pay setup: a Pay Type of Hourly with a default wage, or Salary with a default annual figure (the way you would set a manager). When you add a staff member in the role, their pay type and figure pre-fill from here, so you set it once instead of on every hire, and you can still override it per person.'] },
       { h: 'Tipped Roles and Tip-Out', p: ['Mark a position Tipped if the role earns tip income. Then choose whether it Pays Tip Out: Yes for a role that rings sales and tips out (servers, bartenders), which opens a Tip Out % field; No for a role that only receives tip-out (bussers, barbacks, runners). Different roles can tip out different percents. Bar Cop uses this in Tip Tracking: roles that pay get a Sales column and tip out that percent of their sales, roles that do not get an editable Received amount, and a role that both pays and receives (a bartender taking the bar share from servers) gets both. It all feeds the Pay Periods tip-credit check.'] },
       { h: 'Where Positions Show Up', p: ['Add a position once and it is available everywhere: the staff roster, the schedule builder, the hours log, and every labor report. Edit a position any time and the change carries forward without touching past records.'] }
     ]);
