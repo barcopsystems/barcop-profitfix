@@ -1477,7 +1477,7 @@ const App = {
       { h: 'Filter and export', p: ['The range chips, This Month, Last Month, Year to Date, Last 12 Months, or All Time, scope both the log and the category totals. Export PDF saves the full filtered list. You can edit or delete any past entry right from its row.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
-      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your annual bar and food sales, your taxes, and the service periods you run. One-time setup you revisit when something changes. Each section saves on its own with its Save button.'] },
+      { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your taxes and wage settings, and the service periods you run. One-time setup you revisit when something changes. Save it all with the one Save Data button below the card.'] },
       { h: 'Taxes and payroll', p: ['Set your sales tax rate, how often you file (monthly or quarterly), and your payroll tax percentage once here. Cash, Books, and Events all read them, so you enter them in one place: the Month-End Sales Tax worksheet uses your rate, and Cash Position uses them to size the money you have collected but already owe.'] },
       { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] }
     ] },
