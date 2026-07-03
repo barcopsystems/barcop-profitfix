@@ -17,7 +17,42 @@ S.LaborPositions = {
     return App.laborData.lc_positions;
   },
 
+  // ── Starter positions ───────────────────────────────────────────────────────
+  // A fresh account should not land on an empty page that also blocks the roster
+  // and the schedule builder. Seed the roles every bar and kitchen runs so the
+  // operator can staff up on day one, then edit the wage, tip-out, or names to
+  // fit the house. Wage is left blank on purpose (the operator sets their own
+  // number) and tip-out defaults to zero (their policy to set). Fires once per
+  // account (flagged), so a deleted starter never comes back and an account that
+  // already has positions (the demo, or a returning user) is left untouched.
+  STARTER_POSITIONS: [
+    { name: 'Bartender',        department: 'Bar',            tipped: true  },
+    { name: 'Barback',          department: 'Bar',            tipped: true  },
+    { name: 'Server',           department: 'Front of House', tipped: true  },
+    { name: 'Busser',           department: 'Front of House', tipped: true  },
+    { name: 'Host',             department: 'Front of House', tipped: false },
+    { name: 'Line Cook',        department: 'Kitchen',        tipped: false },
+    { name: 'Prep Cook',        department: 'Kitchen',        tipped: false },
+    { name: 'Dishwasher',       department: 'Kitchen',        tipped: false },
+    { name: 'Kitchen Manager',  department: 'Management',     tipped: false },
+    { name: 'General Manager',  department: 'Management',     tipped: false }
+  ],
+  ensureStarters() {
+    if (!App.laborData) App.laborData = {};
+    if (App.laborData.lc_positions_seeded) return;
+    const list = this.positions();
+    if (list.length > 0) { App.laborData.lc_positions_seeded = true; return; }   // already has positions
+    this.STARTER_POSITIONS.forEach(p => list.push({
+      id: App.uid(), name: p.name, department: p.department,
+      default_wage: null, tipped: !!p.tipped, tip_out_pct: 0, notes: '',
+      created_at: new Date().toISOString()
+    }));
+    App.laborData.lc_positions_seeded = true;
+    App.saveLabor();
+  },
+
   render(container, actions) {
+    this.ensureStarters();
     this.container = container;
     if (actions) actions.innerHTML = '';
     this.editId = null;

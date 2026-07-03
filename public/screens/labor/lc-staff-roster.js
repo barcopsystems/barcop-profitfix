@@ -84,6 +84,12 @@ S.LaborStaffRoster = {
   },
 
   render(container, actions) {
+    // Seed starter positions + training templates for a fresh account so a new
+    // operator who lands on the roster first never hits the "add positions
+    // first" wall, and has onboarding checklists ready to assign. Both are
+    // one-time, guarded, and leave any account with existing data untouched.
+    if (S.LaborPositions && S.LaborPositions.ensureStarters) S.LaborPositions.ensureStarters();
+    if (S.LaborTraining && S.LaborTraining.ensureStarters) S.LaborTraining.ensureStarters();
     this.container = container;
     this.actions = actions;
     // Cross-screen focus: Labor Reports (and others) set App._staffFocus =

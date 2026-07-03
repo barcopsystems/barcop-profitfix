@@ -31,6 +31,72 @@ S.LaborTraining = {
     if (!Array.isArray(App.laborData.lc_training_templates)) App.laborData.lc_training_templates = [];
     return App.laborData.lc_training_templates;
   },
+
+  // ── Starter templates ───────────────────────────────────────────────────────
+  // A fresh account should not land on an empty page. Seed the onboarding
+  // checklists every operator ends up building anyway, ready to assign, print,
+  // edit, or delete. Left position-agnostic (Any position) so they carry no
+  // dependency on the seeded position ids. Fires once per account (flagged), so a
+  // deleted starter never comes back and an account that already has templates
+  // (the demo, or a returning user) is left untouched.
+  STARTER_TEMPLATES: [
+    { name: 'New Hire Orientation', items: [
+      'Complete new-hire paperwork and emergency contact', 'Tour the building: entrances, exits, restrooms, storage',
+      'Review the schedule, clock-in procedure, and break policy', 'Set up POS login and go over how to clock in and out',
+      'Review dress code and personal appearance standards', 'Walk fire exits, extinguishers, and first-aid kit locations',
+      'Cover the harassment and conduct policy', 'Introduce the team and assign a shift buddy',
+      'Review tip-out policy and how pay periods work' ] },
+    { name: 'Bartender Onboarding', items: [
+      'Learn the well, call, and premium liquor layout', 'Pour test: free-pour to a four-count and verify with a jigger',
+      'Make the house cocktail list to spec', 'Learn draft beer list, bottle list, and wine by the glass',
+      'Practice ringing tabs, transfers, splits, and comps in the POS', 'Learn the opening and closing bar checklists',
+      'Review card handling, tab management, and closing out', 'Cover checking IDs and refusing over-served guests',
+      'Learn how to log a spill, breakage, or comp', 'Shadow a full shift, then run the bar with a lead watching' ] },
+    { name: 'Server Onboarding', items: [
+      'Learn the floor plan and table numbers', 'Study the menu: ingredients, allergens, and the 86 process',
+      'Learn steps of service from greet to check drop', 'Practice ringing orders, modifiers, and sending to the kitchen',
+      'Learn wine, beer, and cocktail basics for upselling', 'Cover running food, checking a table, and handling a complaint',
+      'Practice closing out cards and running a checkout report', 'Review the tip-out policy and how to record it',
+      'Shadow a server for a full shift', 'Take a section with a trainer backing you up' ] },
+    { name: 'Line Cook Onboarding', items: [
+      'Tour the line, stations, walk-in, and dry storage', 'Review the prep list and how to date and rotate product',
+      'Learn each station: setup, par levels, and breakdown', 'Cook the core menu items to spec with the chef',
+      'Cover ticket times, the rail, and calling the line', 'Review knife safety, burns, and the first-aid kit',
+      'Learn cooler and hot-hold temp logs and why they matter', 'Cover allergen handling and cross-contamination',
+      'Learn the closing clean-down and equipment shutdown', 'Run a station on a live service with the chef watching' ] },
+    { name: 'Host Onboarding', items: [
+      'Learn the floor plan, sections, and table turn times', 'Practice the greeting and managing the wait list',
+      'Learn the reservation system and how to seat evenly', 'Cover phone etiquette and taking reservations',
+      'Learn to quote accurate wait times', 'Handle large parties, special requests, and seating conflicts',
+      'Review menus, specials, and the 86 list', 'Cover opening and closing host-stand duties' ] },
+    { name: 'Responsible Alcohol Service', items: [
+      'Confirm state alcohol-server certification is current or scheduled', 'Learn how to check IDs and spot a fake',
+      'Review the signs of intoxication', 'Practice slowing or cutting off an over-served guest',
+      'Cover never serving a minor and the penalties', 'Review the last-call and closing-time rules',
+      'Know how to offer water, food, and a ride', 'Document any refusal or incident' ] },
+    { name: 'Food Safety and Allergens', items: [
+      'Confirm food-handler certification is current or scheduled', 'Review handwashing and glove use',
+      'Cover the big allergens and how to answer a guest question', 'Prevent cross-contamination in prep and on the line',
+      'Learn safe cooking, cooling, and holding temperatures', 'Review date-labeling and stock rotation (FIFO)',
+      'Cover cleaning and sanitizing surfaces and tools', 'Know what to do if a guest reports a reaction' ] },
+    { name: 'Closing Procedures', items: [
+      'Complete the station closing checklist and clean-down', 'Restock to par for the next shift',
+      'Break down, wash, and store all equipment and tools', 'Pull and record waste, spills, and comps',
+      'Reconcile the drawer and record over or short', 'Take out trash and complete floor and restroom checks',
+      'Set alarms, lock coolers and liquor, and secure the building', 'Check out with the manager on duty' ] }
+  ],
+  ensureStarters() {
+    if (!App.laborData) App.laborData = {};
+    if (App.laborData.lc_training_seeded) return;
+    const list = this.templates();
+    if (list.length > 0) { App.laborData.lc_training_seeded = true; return; }   // already has templates
+    this.STARTER_TEMPLATES.forEach(t => list.push({
+      id: App.uid(), name: t.name, position_id: '', items: (t.items || []).slice(),
+      created_at: new Date().toISOString()
+    }));
+    App.laborData.lc_training_seeded = true;
+    App.saveLabor();
+  },
   records() {
     if (!App.laborData) App.laborData = {};
     if (!Array.isArray(App.laborData.lc_training)) App.laborData.lc_training = [];
@@ -88,6 +154,7 @@ S.LaborTraining = {
   //  SCREEN — Training Templates maker + Team Training Status
   // ════════════════════════════════════════════════════════════════════════
   render(container, actions) {
+    this.ensureStarters();
     this.container = container;
     this.actions = actions;
     if (this.actions) this.actions.innerHTML = '';
