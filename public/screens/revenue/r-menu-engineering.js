@@ -499,7 +499,7 @@ S.RevenueMenuEngineering = {
         + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Items or rename to match.</div>' : '');
     }
     return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Covers</span>' + App.cadenceTag('As needed') + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Covers</span>' + App.freqTag('As needed') + '</div>'
       + '<div id="me-cov-csv"></div>' + flash
       + '<div id="me-cov-actions" style="margin-top:12px;"></div>'
       + '</div>';
