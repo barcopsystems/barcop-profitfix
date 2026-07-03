@@ -166,7 +166,7 @@ const ConfirmWeek = {
     document.querySelectorAll('#' + this.MODAL_ID + ' .cw-go').forEach(el => el.addEventListener('click', () => {
       App.closeModal(this.MODAL_ID); App.openScreen(el.dataset.go);
     }));
-    document.getElementById('cw-refresh')?.addEventListener('click', () => this._render());
+    document.getElementById('cw-refresh')?.addEventListener('click', () => this._refresh());
     document.getElementById('cw-save')?.addEventListener('click', () => this._save());
     this._recalc();
   },
@@ -197,6 +197,44 @@ const ConfirmWeek = {
     set('cw-m-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= caTgt ? 'good' : 'warn') : '');
     set('cw-m-lp', laborPct != null ? laborPct.toFixed(1) + '%' : '-', laborPct != null ? (laborPct <= laborTgt ? 'good' : 'warn') : '');
     set('cw-m-rplh', rplh != null ? App.fmtCurrency(rplh) : '-');
+  },
+
+  // Force the Control-sourced cells back to the live auto-fill, overwriting any
+  // manual edits (this is what "Refresh from Control" promises). Leaves the
+  // manual optional fields (ancillary, fees, notes) alone and does not re-render.
+  _refresh() {
+    const pe = this._weekEnd;
+    const sales   = this.salesRollup(pe);
+    const barCogs = S.ThisWeek.icCOGS(App.BAR_CATS, pe);
+    const foodCogs= S.ThisWeek.icCOGS(App.KITCHEN_CATS, pe);
+    const laborSp = S.ThisWeek.laborCost(pe) || { bar: 0, food: 0 };
+    const laborTot= (S.RevenueThisWeek.laborFeed(pe)) || { cost: 0, hours: 0 };
+    const auto = {
+      'cw-bar-rev':  sales.any ? sales.bar.toFixed(2)   : '',
+      'cw-bar-cogs': barCogs != null ? barCogs.toFixed(2) : '',
+      'cw-bar-lab':  laborSp.bar ? laborSp.bar.toFixed(2) : '',
+      'cw-food-rev': sales.any ? sales.floor.toFixed(2) : '',
+      'cw-food-cogs':foodCogs != null ? foodCogs.toFixed(2) : '',
+      'cw-food-lab': laborSp.food ? laborSp.food.toFixed(2) : '',
+      'cw-covers':   sales.any ? String(sales.covers)   : ''
+    };
+    const apply = () => {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      Object.keys(auto).forEach(id => set(id, auto[id]));
+      this._hours = laborTot.hours || 0;
+      this._recalc();
+    };
+    // Only warn if a Control-sourced cell actually differs from the fresh pull.
+    const num = v => parseFloat(v) || 0;
+    const edited = Object.keys(auto).some(id => num(document.getElementById(id) && document.getElementById(id).value) !== num(auto[id]));
+    if (!edited) { apply(); return; }
+    App.confirm({
+      title: 'Refresh from Control?',
+      message: 'This replaces the numbers you edited with the latest from your Control data.',
+      confirmText: 'Update from Control',
+      cancelText: 'Keep My Numbers',
+      danger: false
+    }).then(ok => { if (ok) apply(); });
   },
 
   async _save() {
