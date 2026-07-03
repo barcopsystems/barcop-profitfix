@@ -182,7 +182,7 @@ S.CashDashboard = {
   },
   getStartedBox(d) {
     return DashUI.dayOneStrip(
-      'Four steps and this card fills in with your trapped cash, your runway, and what is safe to spend.',
+      'Four steps to getting started in Cash Recovery.',
       [
         { done: d.hasOpening, num: 1, label: 'Set your Cash Position', go: 'c-position' },
         { done: d.hasInv,   num: 2, label: 'Set up Inventory Control', go: 'ic-dashboard', cross: true },
@@ -198,7 +198,7 @@ S.CashDashboard = {
     if (!t.hasData) {
       heroBody = '<div style="font-size:13px;color:var(--t2);line-height:1.6;padding:2px 0;">Take a couple of inventory counts and Bar Cop starts reading the cash trapped on your shelves, dead stock and overstock you can turn back into money.</div>';
     } else if (t.total <= 0) {
-      heroBody = '<div style="padding:2px 0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--t1);">All clear</div>'
+      heroBody = '<div style="padding:2px 0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--t1);">All clear</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">No dead stock or overstock worth chasing right now. Your shelf cash is working.</div></div>';
     } else {
       heroBody = '<div style="padding:2px 0;">'
