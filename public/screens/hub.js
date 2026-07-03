@@ -127,7 +127,7 @@ S.Hub = {
     const CHECKLIST_ICON = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
     const MSTYLE = {
       books:    { id: 'nav-books-home',    action: 'books-home', leafLabel: 'Close The Books', leafIcon: CHECKLIST_ICON },
-      settings: { id: 'nav-settings-home', action: 'settings-home', keepSupport: true },
+      settings: { id: 'nav-settings-home', action: 'settings-home', leafLabel: 'Bar Cop Settings', leafIcon: CHECKLIST_ICON, keepSupport: true },
       // Audits has no Dashboard leaf (the Bar Cop Audit page IS its landing, now
       // a flat link); it only renames the recovery-audits group.
       audit:    { remaps: { groups: { 'By Recovery System': 'Recovery Audits' } } }

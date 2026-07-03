@@ -16,26 +16,18 @@ S.HubSettingsHome = {
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
-    // ── Shared #0D181E data-row block helpers ──
-    // finish(): stamp the --row-div divider on every row but the last (rows carry a {{div}} placeholder).
-    const finish = (rows) => {
-      const items = rows.filter(Boolean);
-      return items.map((r, i) => r.replace('{{div}}', i < items.length - 1 ? 'border-bottom:1px solid var(--row-div);' : '')).join('');
-    };
-    // insetBlock = rows in a rounded --b-edge container (sits inside a card that has other content above it, e.g. Setup).
-    const insetBlock = (rows) => '<div style="border:1px solid var(--b-edge);border-radius:6px;overflow:hidden;">' + finish(rows) + '</div>';
-    // bleedBlock = rows pulled flush to the card's left / right / bottom edges (the card carries overflow:hidden).
-    const bleedBlock = (rows) => '<div class="kv-bleed">' + finish(rows) + '</div>';
+    // ── Snapshot cards render label/value rows as .pnl-list pills (the row-list
+    // pill look, but keeps its two columns on mobile so a label never stacks
+    // above its value). Each row is one attribute: a muted uppercase label cell
+    // + the value cell. ──
     const dash = '<span style="color:var(--t3);">Not set</span>';
-    const kvRow = (label, val) => '<div style="display:flex;gap:14px;padding:11px 20px;background:#0D181E;{{div}}">'
-      + '<div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding-top:2px;flex-shrink:0;">' + label + '</div>'
-      + '<div style="flex:1;font-size:13px;color:var(--t1);min-width:0;">' + val + '</div></div>';
-    // The Account / Profile / Targets cards bleed their data rows to the card edges (data-card look):
-    // overflow:hidden clips the rounded corners, the title's bottom margin is dropped so rows sit flush under the band.
-    const card = (title, act, btnLabel, rows) => '<div class="card form-card" style="margin-bottom:18px;overflow:hidden;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:0;"><span>' + title + '</span>'
+    const kvRow = (label, val) => '<tr>'
+      + '<td style="width:130px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">' + label + '</td>'
+      + '<td style="color:var(--t1);">' + val + '</td></tr>';
+    const card = (title, act, btnLabel, rows) => '<div class="card form-card" style="margin-bottom:18px;">'
+      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>' + title + '</span>'
       +   '<button class="btn btn-ghost btn-sm" data-act="' + act + '">' + btnLabel + '</button></div>'
-      + bleedBlock(rows) + '</div>';
+      + '<table class="pnl-list"><tbody>' + rows.filter(Boolean).join('') + '</tbody></table></div>';
 
     // ── Account (subscription + renewal + team for admins) ──
     const s       = (App.data && App.data.settings) || {};
@@ -56,7 +48,7 @@ S.HubSettingsHome = {
       email ? kvRow('Signed in', esc(email)) : '',
       kvRow('Plan', planVal),
       renewVal ? kvRow('Renews', esc(renewVal)) : '',
-      isAdmin ? '<div style="display:flex;gap:14px;padding:11px 20px;background:#0D181E;align-items:center;{{div}}"><div style="width:120px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Team</div><div style="flex:1;"><button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button></div></div>' : ''
+      isAdmin ? kvRow('Team', '<button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button>') : ''
     ];
     const acctCard = card('Account', 'user-account', 'Manage', acctRows);
 
