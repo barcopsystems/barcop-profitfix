@@ -439,25 +439,21 @@ S.Hub = {
     // below break down.
     const hubStarted = anyAudit || pWeeks.length > 0 || rWeeks.length > 0
       || icCounts.length > 0 || recoveryTotal.dollars > 0 || trapped.hasData || bcScore != null;
-    const gsStep = (n, t, d, btn, onclick) =>
-        '<div style="display:flex;gap:13px;align-items:flex-start;padding:14px 0;' + (n === 1 ? '' : 'border-top:1px solid var(--b2);') + '">'
-      +   '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">' + n + '</div>'
-      +   '<div style="flex:1;min-width:0;">'
-      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + t + '</div>'
-      +     '<div style="font-size:11px;color:var(--t3);line-height:1.5;' + (btn ? 'margin-bottom:10px;' : '') + '">' + d + '</div>'
-      +     (btn ? '<button class="btn btn-primary btn-sm" onclick="' + onclick + '">' + btn + '</button>' : '')
-      +   '</div>'
-      + '</div>';
-    const gettingStarted =
-        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Getting Started</div>'
-      + '</div>'
-      + '<div style="padding:14px 22px 18px;">'
-      +   '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;margin-bottom:6px;">Welcome to Bar Cop. Feed it your week and it shows you exactly where money is leaking and how to plug it. Three steps to your first numbers:</div>'
-      +   gsStep(1, 'Log your first week', 'Work down the section cards below: take your inventory count, log your hours, and import your POS sales. That is your weekly sitting.', null, null)
-      +   gsStep(2, 'Confirm the Week', 'Roll your sales, costs, and labor into your Profit and Revenue numbers.', 'Confirm the Week', "S.Hub._enter('dashboard','profit')")
-      +   gsStep(3, 'Run your first audit', 'Bar Cop scores your whole operation and puts a dollar figure on every leak.', 'Run an Audit', "S.Hub._enter('audit-tracker','profit')")
+    // Same chip style as the section Get Started cards (App.controlGetStarted):
+    // a Get Started title, one subtitle line, and a flex row of numbered chips
+    // that navigate. Each chip carries its own module so the Hub router lands on
+    // the right section.
+    const gsChip = (n, label, screen, mod) =>
+        '<div onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
+      +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:1px solid var(--t3);color:var(--t3);">' + n + '</span>'
+      +   '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
+    const gettingStarted = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Get Started</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Three steps to getting started in Bar Cop.</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +   gsChip(1, 'Log your first week', 'ic-dashboard', 'inventory')
+      +   gsChip(2, 'Confirm the Week', 'dashboard', 'profit')
+      +   gsChip(3, 'Run your first audit', 'audit-tracker', 'profit')
       + '</div></div>';
     const topCard = hubStarted ? tiles : gettingStarted;
 
