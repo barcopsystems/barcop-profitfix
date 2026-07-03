@@ -138,6 +138,7 @@ S.InventoryProducts = {
       showMenuPrice:   false,
       showCaseSize:    false,
       showUnitType:    true,
+      showPackSize:    true,
       defaultUnitType: 'lb',
       showCalcStrip:   false,
       showServingSizes:false
@@ -154,6 +155,7 @@ S.InventoryProducts = {
       showMenuPrice:   false,
       showCaseSize:    false,
       showUnitType:    true,
+      showPackSize:    true,
       defaultUnitType: 'each',
       showCalcStrip:   false,
       showServingSizes:false
@@ -623,6 +625,7 @@ S.InventoryProducts = {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
+      const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
       row2 = ''
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
@@ -630,6 +633,12 @@ S.InventoryProducts = {
         + '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
+        // Pack size: how many individual pieces are in one unit (100 wings per bag,
+        // 150 limes per case). Optional — leave blank when the unit IS the piece
+        // (each, lb). Drives the per-piece cost used by recipes and loose counts.
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pack Size <span style="color:var(--t4);font-weight:400;">(per unit)</span></label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + v(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Each</label><div class="f-display" id="ip-pack-cps">-</div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
@@ -773,6 +782,10 @@ S.InventoryProducts = {
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
+    // Food / Misc pack size: live per-piece cost (unit cost / pack size).
+    ['ip-cost','ip-pack'].forEach(fid =>
+      document.getElementById(fid)?.addEventListener('input', () => this._calcPack()));
+    this._calcPack();
     // Resale block (Food / Misc): toggle the menu-price fields + live cost/serving.
     document.getElementById('ip-sold')?.addEventListener('change', e => {
       const box = document.getElementById('ip-resale');
@@ -847,6 +860,16 @@ S.InventoryProducts = {
   getSubcat() {
     const sel = document.getElementById('ip-subcat-sel');
     return sel ? sel.value : (document.getElementById('ip-subcat')?.value.trim() || '');
+  },
+
+  // Live per-piece cost for a Food / Misc pack: unit cost / pack size. Shown as
+  // Cost / Each so the operator sees, say, $0.20 a wing off a $20 bag of 100.
+  _calcPack() {
+    const el = document.getElementById('ip-pack-cps');
+    if (!el) return;
+    const cost = parseFloat(document.getElementById('ip-cost')?.value) || 0;
+    const pack = parseInt(document.getElementById('ip-pack')?.value) || 0;
+    el.textContent = (cost > 0 && pack > 0) ? App.fmtCurrency(cost / pack, (cost / pack) < 1 ? 3 : 2) : '-';
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -995,6 +1018,9 @@ S.InventoryProducts = {
       ? (parseInt(document.getElementById('ip-case-size')?.value) || null)
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
+    // Pack size: pieces per unit (Food / Misc). Optional; null when the unit is
+    // already the piece. Drives per-piece cost + loose counts.
+    const packSize = spec.showPackSize ? (parseInt(document.getElementById('ip-pack')?.value) || null) : null;
     // Other sizes sold: each row needs a size and a price to count.
     const servingSizes = [];
     if (spec.showServingSizes) {
@@ -1031,6 +1057,7 @@ S.InventoryProducts = {
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
       container_size_oz:   oz,
       case_size:           caseSize,
+      pack_size:           packSize,
       pour_size_oz:        pour,
       unit_type:           unitType,
       unit_cost:           cost,
