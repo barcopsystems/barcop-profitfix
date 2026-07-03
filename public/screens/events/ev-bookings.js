@@ -294,7 +294,7 @@ S.EventsBookings = {
 
     let listSection;
     if (all.length === 0) {
-      listSection = '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Log your first booking above. Your pipeline shows here as you add them.</div>';
+      listSection = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Log your first booking above. Your pipeline shows here as you add them.</div></div>';
     } else {
       const chipDefs = [{ v: '', label: 'All' }].concat(this.STAGES.map(s => ({ v: s, label: s })));
       const chips = App.filterChips(this.filterStage, chipDefs, 'eb-stage-chip');

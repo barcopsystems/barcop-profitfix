@@ -119,7 +119,7 @@ S.EventsRegulars = {
     }).join('') || '<tr><td colspan="6" style="color:var(--t3);text-align:center;padding:14px;">No regulars match.</td></tr>';
 
     const listSection = all.length === 0
-      ? '<div style="font-size:12px;color:var(--t3);padding:6px 2px;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div>'
+      ? '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div></div>'
       : headRow + '<div id="rg-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         + App.showOlderBar('core', 'event_regulars', list, !!this.filter);
 
