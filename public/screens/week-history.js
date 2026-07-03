@@ -32,13 +32,10 @@ S.WeekHistory = {
   draw() {
     const money0 = v => App.fmtCurrency(v || 0, 0);
     const rows = this.joined();
-    const head = '<div class="sh" style="margin:0 0 4px;">Weekly Recovery</div>'
-      + '<h1 style="font-size:22px;font-weight:800;color:var(--w);margin:0 0 4px;">Week History</h1>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:20px;">Every week you have confirmed, read only. Edit a week or add one you missed and the Confirm the Week form opens.</div>';
-
     if (!rows.length) {
-      this.container.innerHTML = '<div class="screen">' + head
-        + '<div class="card"><div style="font-size:13px;color:var(--t2);padding:6px 0;">No weeks confirmed yet. Open Close The Week and confirm the week, and it shows here once saved.</div>'
+      this.container.innerHTML = '<div class="screen"><div class="card form-card">'
+        + '<div class="card-title">Week History</div>'
+        + '<div style="font-size:13px;color:var(--t2);padding:2px 0;">No weeks confirmed yet. Open Close The Week and confirm the week, and it shows here once saved.</div>'
         + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" data-add-missed>Confirm a Week</button></div></div></div>';
       this.wire();
       return;
@@ -49,8 +46,9 @@ S.WeekHistory = {
     const t = (App.data.settings && App.data.settings.targets) || {};
     const primeTgt = t.prime_cost_pct != null ? t.prime_cost_pct : 60;
     const stat = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
-    const summary = '<div class="sh" style="margin:0 0 10px;">Latest Confirmed Week &middot; ' + esc(this.wk(l.pe)) + '</div>'
-      + '<div class="card" style="margin-bottom:24px;"><div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;">'
+    const summary = '<div class="card form-card" style="margin-bottom:24px;">'
+      + '<div class="card-title">Latest Confirmed Week &middot; ' + esc(this.wk(l.pe)) + '</div>'
+      + '<div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;">'
       + stat('Revenue', money0(this.totalRev(l)))
       + stat('Prime Cost', lp.prime_cost_pct != null ? lp.prime_cost_pct.toFixed(1) + '%' : '-', (lp.prime_cost_pct != null && lp.prime_cost_pct > primeTgt) ? 'warn' : 'good')
       + stat('Check Avg', lr.check_avg ? App.fmtCurrency(lr.check_avg) : '-')
@@ -81,7 +79,7 @@ S.WeekHistory = {
       + '</tr></thead><tbody>' + body + '</tbody></table></div>' + showOlder
       + '<div style="margin:16px 0 24px;"><button class="btn btn-ghost btn-sm" data-add-missed>Missed a week? Add it</button></div>';
 
-    this.container.innerHTML = '<div class="screen">' + head + summary + table + '</div>';
+    this.container.innerHTML = '<div class="screen">' + summary + table + '</div>';
     this.wire();
   },
 
