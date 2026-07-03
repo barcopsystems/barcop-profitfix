@@ -193,7 +193,7 @@ S.RevenueDashboard = {
       { num: 1, label: 'Set up Shift Control',         screen: 'sc-dashboard', done: hasShift },
       { num: 2, label: 'Set up Labor Control',         screen: 'lc-dashboard', done: hasLabor },
       { num: 3, label: 'Run your first Revenue Audit', screen: 'r-audit',     done: hasAudit }
-    ]);
+    ], 'Recovery');
   },
 
   weekSelector() {
