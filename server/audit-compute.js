@@ -115,10 +115,14 @@ function computeProfitAudit(appData, controlData) {
   const wkBarLabor = avg(weeks.map(w => w.bar && w.bar.labor));
   const wkFoodLabor = avg(weeks.map(w => w.food && w.food.labor));
 
+  // No closed weeks yet: fall back to the weekly sales estimate the operator gave
+  // at audit-generate time (a fresh, contextual number for the week being scored,
+  // not a stale annual guess). A real week always supersedes it.
+  const estWk = settings.week_sales_estimate || {};
   const monthlyBarRev = wkBarRev != null ? wkBarRev * WEEKS_PER_MONTH
-    : (num(settings.annual_bar_revenue) ? settings.annual_bar_revenue / 12 : null);
+    : (num(estWk.bar) ? estWk.bar * WEEKS_PER_MONTH : null);
   const monthlyFoodRev = wkFoodRev != null ? wkFoodRev * WEEKS_PER_MONTH
-    : (num(settings.annual_food_revenue) ? settings.annual_food_revenue / 12 : null);
+    : (num(estWk.food) ? estWk.food * WEEKS_PER_MONTH : null);
   const periodBarRev = wkBarRev != null ? wkBarRev * periodWeeks : monthlyBarRev;
   const periodFoodRev = wkFoodRev != null ? wkFoodRev * periodWeeks : monthlyFoodRev;
   const periodTotalRev = (periodBarRev || 0) + (periodFoodRev || 0);
@@ -377,8 +381,11 @@ function computeRevenueAudit(appData, controlData) {
   const rplhTarget = num(rt.rplh_dinner) != null ? rt.rplh_dinner : 75;
 
   const wkTotalRev = avg(weeks.map(w => num(w.total_revenue) != null ? w.total_revenue : (num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0)));
-  const annualTotal = (num(settings.annual_bar_revenue) || 0) + (num(settings.annual_food_revenue) || 0);
-  const monthlyRev = wkTotalRev != null ? wkTotalRev * WEEKS_PER_MONTH : (annualTotal > 0 ? annualTotal / 12 : null);
+  // No closed weeks yet: fall back to the operator's weekly sales estimate given
+  // at generate time (contextual and fresh, not a stale annual guess).
+  const estWk = settings.week_sales_estimate || {};
+  const estWeekTotal = (num(estWk.bar) || 0) + (num(estWk.food) || 0);
+  const monthlyRev = wkTotalRev != null ? wkTotalRev * WEEKS_PER_MONTH : (estWeekTotal > 0 ? estWeekTotal * WEEKS_PER_MONTH : null);
   const wkCovers = avg(weeks.map(w => w.covers));
   const monthlyCovers = wkCovers != null ? wkCovers * WEEKS_PER_MONTH : null;
 
@@ -566,7 +573,6 @@ if (require.main === module) {
   const appData = {
     settings: {
       bar_name: 'The Anchor Bar & Kitchen', city_state: 'Austin, TX',
-      annual_bar_revenue: 624000, annual_food_revenue: 374400,
       targets: { bar_pour_cost_pct: 22, food_cost_pct: 32, prime_cost_pct: 60 }
     },
     weeks: [1, 2, 3, 4].map(i => ({
@@ -632,13 +638,13 @@ if (require.main === module) {
   ];
 
   // Bar-only: Food N/A, excluded from overall.
-  const barOnly = computeProfitAudit({ settings: { annual_bar_revenue: 720000, targets: {} }, menu_items: [] },
+  const barOnly = computeProfitAudit({ settings: { week_sales_estimate: { bar: 13800 }, targets: {} }, menu_items: [] },
     { bar_cost_pct: 24, sources: ['x'] });
   checks.push(['bar-only: S2 Food N/A', barOnly.S2_SCORE, null]);
   checks.push(['bar-only: S1 Bar scored', barOnly.S1_SCORE != null, true]);
 
   // No inventory activity -> S3 N/A.
-  const noInv = computeProfitAudit({ settings: { annual_bar_revenue: 600000, annual_food_revenue: 360000, targets: {} } },
+  const noInv = computeProfitAudit({ settings: { week_sales_estimate: { bar: 11500, food: 6900 }, targets: {} } },
     { bar_cost_pct: 22, food_cost_pct: 31, sources: ['x'] });
   checks.push(['no inventory data: S3 N/A', noInv.S3_SCORE, null]);
 
