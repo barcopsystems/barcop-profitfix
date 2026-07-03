@@ -2507,8 +2507,8 @@ S.HubSettings = {
       { name:'Server',    department:'Front of House', default_wage:ANCHL.wages.floor,   tipped:true,  tip_out_pct:3 },
       { name:'Busser',    department:'Front of House', default_wage:11,                  tipped:true,  tip_out_pct:0 },
       { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
-      { name:'Manager',   department:'Management',     default_wage:28,                  tipped:false },
-      { name:'Assistant Manager', department:'Management', default_wage:24,               tipped:false },
+      { name:'Manager',   department:'Management',     pay_type:'Salary', default_salary:68000, tipped:false },
+      { name:'Assistant Manager', department:'Management', pay_type:'Salary', default_salary:52000, tipped:false },
     ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
