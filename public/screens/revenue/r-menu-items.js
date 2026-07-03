@@ -96,6 +96,12 @@ S.RevenueMenuItems = {
     if (p.category === 'Misc' && mode === 'single' && p.cost_per_pour != null) {
       return { unit: 'pours', costPerUnit: p.cost_per_pour };
     }
+    // Food / Misc bought by a container with a pack size: the recipe measures the
+    // ingredient in pieces (6 wings) and costs at the per-piece price. Products
+    // with no pack size keep their plain unit cost.
+    if ((p.category === 'Food' || p.category === 'Misc') && p.pack_size > 0) {
+      return { unit: 'ea', costPerUnit: (App.piecePrice ? (App.piecePrice(p) || 0) : (p.unit_cost || 0)) };
+    }
     return { unit: 'units', costPerUnit: p.unit_cost || 0 };
   },
 
