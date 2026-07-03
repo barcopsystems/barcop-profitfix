@@ -33,12 +33,12 @@ S.AuditTracker = {
   _readinessSteps() {
     const cd = this.buildControlData() || {};
     return [
-      { label: 'This week confirmed in Close The Week', done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'dashboard' },
       { label: 'Inventory count taken',                done: (cd.inventory_counts || 0) > 0, go: 'ic-take-inventory' },
       { label: 'Hours logged in Labor',                done: (cd.labor_hours || 0) > 0, go: 'lc-log-hours' },
+      { label: 'Deliveries logged',                    done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery' },
       { label: 'Voids and comps logged',               done: (cd.void_comp_count || 0) > 0, go: 'sc-void-comp' },
       { label: 'Cash reconciled',                      done: (cd.cash_reconciliations || 0) > 0, go: 'sc-cash-control' },
-      { label: 'Deliveries logged',                    done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery' }
+      { label: 'Confirm the week',                     done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'dashboard' }
     ];
   },
 
@@ -348,7 +348,7 @@ S.AuditTracker = {
     App.showHelpModal('How the Profit Audit Works', [
       { p: ['The Profit Audit scores five areas: Pour and Bar Cost, Food Cost, Shrink and Waste, Theft and Cash Loss, and Vendor Cost Control. Prime cost shows below the sections as context, not scored (it is pour plus food plus labor, so scoring it would double-count). It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
       { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth. Your sales come from the weeks you close, and until the first one is in Bar Cop asks once for last week\'s bar and food sales so the score has real numbers to work from. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
-      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, an inventory count, hours logged, voids logged, cash reconciled, deliveries logged. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
+      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: an inventory count, hours logged, deliveries logged, voids logged, cash reconciled, and the week confirmed. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
       { h: 'The steps', p: ['1. Get your week in: confirm the week in Close The Week and log your Control data. 2. Generate. If no week is closed yet, enter last week\'s bar and food sales when Bar Cop asks. Sections with no data show N/A and fill in as you log more.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you straight into Profit Fix on that exact gap. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run it whenever you want a fresh read; it scores your trailing four weeks, and Bar Cop keeps one record a day so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Every score and dollar figure is computed in code from your real numbers, the same every time. A section with no data is left out, never guessed.'] }

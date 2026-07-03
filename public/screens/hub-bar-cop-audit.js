@@ -850,11 +850,11 @@ S.HubBarCopAudit = {
     const laborDone = _spanDays((App.laborData && App.laborData.lc_actuals) || []) >= 13;
     const shiftDone = _spanDays((App.shiftData && App.shiftData.sc_shifts) || []) >= 13;
     return [
-      { label: 'Profit Audit run',            done: pAud,      go: 'audit-tracker' },
-      { label: 'Revenue Audit run',           done: rAud,      go: 'r-audit' },
       { label: 'Two inventory counts taken',  done: invDone,   go: 'ic-take-inventory' },
       { label: 'Two weeks of labor hours logged', done: laborDone, go: 'lc-log-hours' },
-      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'sc-dashboard' }
+      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'sc-dashboard' },
+      { label: 'Profit Audit run',            done: pAud,      go: 'audit-tracker' },
+      { label: 'Revenue Audit run',           done: rAud,      go: 'r-audit' }
     ];
   },
 
