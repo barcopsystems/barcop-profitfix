@@ -336,8 +336,7 @@ S.InventoryProducts = {
 
     let body;
     if (prods.length === 0) {
-      body = '<div class="empty"><div class="empty-title">No ' + esc(this.activeCat) + ' products yet</div>'
-        + '<div class="empty-sub">Click the ' + esc(this.activeCat) + ' card above to add your first one.</div></div>';
+      body = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</div></div>';
     } else {
       const spec = this.FORM_SPEC[this.activeCat];
       const pourable = this.isPourable(this.activeCat);
