@@ -88,7 +88,7 @@ S.WeekHistory = {
     const showOlder = rows.length > limit
       ? '<div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" data-show-older>Show older</button></div>' : '';
 
-    const table = '<div class="sh" style="margin:0 0 10px;">Weeks</div>'
+    const table = '<div class="sh" style="margin:0 0 10px;">Week History</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Week</th><th>Revenue</th><th>Prime Cost</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>' + showOlder;
