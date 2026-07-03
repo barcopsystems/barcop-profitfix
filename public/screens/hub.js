@@ -431,6 +431,36 @@ S.Hub = {
       + '</div>'
       + '</div></div>';
 
+    // Getting Started replaces Where You Stand until the operator has fed Bar Cop
+    // anything real. It flips to the live stats the moment any of them can populate
+    // (an audit run, a week confirmed, or an inventory count taken). This is the
+    // first thing a new operator sees after onboarding, so it orients them to the
+    // whole arc — feed the week, confirm it, run an audit — that the section cards
+    // below break down.
+    const hubStarted = anyAudit || pWeeks.length > 0 || rWeeks.length > 0
+      || icCounts.length > 0 || recoveryTotal.dollars > 0 || trapped.hasData || bcScore != null;
+    const gsStep = (n, t, d, btn, onclick) =>
+        '<div style="display:flex;gap:13px;align-items:flex-start;padding:14px 0;' + (n === 1 ? '' : 'border-top:1px solid var(--b2);') + '">'
+      +   '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">' + n + '</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + t + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);line-height:1.5;' + (btn ? 'margin-bottom:10px;' : '') + '">' + d + '</div>'
+      +     (btn ? '<button class="btn btn-primary btn-sm" onclick="' + onclick + '">' + btn + '</button>' : '')
+      +   '</div>'
+      + '</div>';
+    const gettingStarted =
+        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
+      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Getting Started</div>'
+      + '</div>'
+      + '<div style="padding:14px 22px 18px;">'
+      +   '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;margin-bottom:6px;">Welcome to Bar Cop. Feed it your week and it shows you exactly where money is leaking and how to plug it. Three steps to your first numbers:</div>'
+      +   gsStep(1, 'Log your first week', 'Work down the section cards below: take your inventory count, log your hours, and import your POS sales. That is your weekly sitting.', null, null)
+      +   gsStep(2, 'Confirm the Week', 'Roll your sales, costs, and labor into your Profit and Revenue numbers.', 'Confirm the Week', "S.Hub._enter('dashboard','profit')")
+      +   gsStep(3, 'Run your first audit', 'Bar Cop scores your whole operation and puts a dollar figure on every leak.', 'Run an Audit', "S.Hub._enter('audit-tracker','profit')")
+      + '</div></div>';
+    const topCard = hubStarted ? tiles : gettingStarted;
+
     // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
     //    card. Condition-gated, so it is never a nag; collapses to All Clear. ──
@@ -1069,7 +1099,7 @@ S.Hub = {
     //    six section cards (Control row + Recovery row) the operator closes each
     //    week. Cards are content-height (no fixed rows), so the page breathes. ──
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
-          <div class="hub-grid-tiles">${tiles}</div>
+          <div class="hub-grid-tiles">${topCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;">${priorityCard}${needsBand}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
@@ -1168,7 +1198,8 @@ S.Hub = {
     if (App.setActiveHubNav) App.setActiveHubNav('hub-home');
 
     // Mount the Bar Cop Briefing button (weekly cross-system narrative).
-    if (window.BarCopBriefing) BarCopBriefing.attach(document.getElementById('hub-briefing-slot'), this._briefingData);
+    const _bSlot = document.getElementById('hub-briefing-slot');
+    if (window.BarCopBriefing && _bSlot) BarCopBriefing.attach(_bSlot, this._briefingData);
 
     // Line the Bar Cop Audit divider up flush with the Briefing button's left
     // edge: both right-anchor to the card's right padding, so a right margin sized
