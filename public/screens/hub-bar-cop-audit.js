@@ -911,7 +911,7 @@ S.HubBarCopAudit = {
     inventory_execution:     { area: 'inventory execution',            screen: 'Inventory',        good: 'Counts and spot checks are on schedule.',          bad: 'Counts and spot checks are falling behind.',             fix: 'Hold the weekly count and spot-check rhythm in Inventory.' },
     labor_hygiene:           { area: 'labor hygiene',                  screen: 'Build Schedule',   good: 'The schedule is holding and the certs are current.', bad: 'Callouts, overtime, or lapsed certs are showing.',      fix: 'Schedule to the forecast and keep certs current in Build Schedule and Staff Roster.' },
     recovery_action:         { area: 'recovery follow-through',        screen: 'the Fix systems',  good: 'You are working your gaps and they are moving.',    bad: 'Surfaced gaps are sitting without a fix logged.',       fix: 'Work your open gaps in the Fix systems and log what you do.' },
-    operational_consistency: { area: 'week-to-week consistency',       screen: 'Run This Week',    good: 'Your covers, labor, and pour cost hold week to week.', bad: 'Your weekly numbers are swinging.',                  fix: 'Keep closing every week so the numbers steady and the trend can read.' }
+    operational_consistency: { area: 'week-to-week consistency',       screen: 'Close The Week',    good: 'Your covers, labor, and pour cost hold week to week.', bad: 'Your weekly numbers are swinging.',                  fix: 'Keep closing every week so the numbers steady and the trend can read.' }
   },
   _subFindings(key, score, detail) {
     if (score == null) return {};

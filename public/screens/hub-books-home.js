@@ -226,7 +226,7 @@ S.HubBooksHome = {
       else if (act === 'year-end')           S.HubYearEnd?.open?.();
       else if (act === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (act === 'permits')            S.HubPermits?.open?.();
-      else if (act === 'this-week')          App.openScreen('this-week');
+      else if (act === 'this-week')          App.openScreen('dashboard');
       else if (act === 'ic-dashboard')       App.openScreen('ic-dashboard');
     };
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));

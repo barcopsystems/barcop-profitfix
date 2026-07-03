@@ -50,7 +50,7 @@ S.FlowMap = {
     { id: 'profit', title: 'Profit', go: 'dashboard',
       d: 'Where margin gets defended. Pour cost, food cost, theft, vendor pricing, prime. It reads off your Control closes and hunts the dollars leaking out.',
       steps: [
-        { id: 'pf-1', label: 'Run This Week',          go: 'this-week',     d: 'Confirm the week\'s P&L: sales from Shift, COGS from Inventory, labor from Labor. It is the gate. Nothing below it scores until the week is in.' },
+        { id: 'pf-1', label: 'Confirm the Week',        go: 'dashboard',     d: 'Confirm the week\'s P&L: sales from Shift, COGS from Inventory, labor from Labor. It is the gate. Nothing below it scores until the week is in.' },
         { id: 'pf-2', label: 'Check costs vs target',  go: 'dashboard',     d: 'Your pour, food, and prime cost against target for the week. This is where you see which cost slipped before you act on it.' },
         { id: 'pf-3', label: 'Work your biggest leak', go: 'profit-fix',    d: 'The audit ranked your leaks by dollars and the Playbook lays out the move. Take the biggest one down in the Profit Fix. That is where the real money is.' },
         { id: 'pf-4', label: 'Run the Profit audit',   go: 'audit-tracker', d: 'Score the whole margin side and refresh your leak board. Run it whenever you want a fresh read; it runs last because it grades the week you just worked.' }
@@ -58,7 +58,7 @@ S.FlowMap = {
     { id: 'revenue', title: 'Revenue', go: 'r-dashboard',
       d: 'The top line. Check average, menu pricing, and labor productivity. Two bars with the same costs make very different money depending on this.',
       steps: [
-        { id: 'rv-1', label: 'Run This Week',           go: 'r-this-week', d: 'Confirm sales, covers, and labor for the week. Same gate as Profit: it pulls your closes into one read and nothing below scores until it is in.' },
+        { id: 'rv-1', label: 'Confirm the Week',        go: 'r-dashboard', d: 'Confirm sales, covers, and labor for the week. Same gate as Profit: it pulls your closes into one read and nothing below scores until it is in.' },
         { id: 'rv-2', label: 'Check numbers vs target', go: 'r-dashboard', d: 'Check average, labor percent, and revenue per labor hour against target. Where you see which lever on the top line slipped.' },
         { id: 'rv-3', label: 'Work your biggest leak',  go: 'r-fix',       d: 'Open the Revenue Fix on the biggest-dollar gap and close it. Menu, pricing, servers, or labor, whichever is costing you the most.' },
         { id: 'rv-4', label: 'Run the Revenue audit',   go: 'r-audit',     d: 'Score the top line and refresh the leak board. Run it whenever you want a fresh read; it runs last, grading the week you just worked.' }
