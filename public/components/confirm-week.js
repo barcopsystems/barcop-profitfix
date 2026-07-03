@@ -230,7 +230,7 @@ const ConfirmWeek = {
     if (!edited) { apply(); return; }
     App.confirm({
       title: 'Refresh from Control?',
-      message: 'This replaces the numbers you edited with the latest from your Control data.',
+      message: 'This replaces the numbers you manually entered with the latest calculated numbers from your Control data.',
       confirmText: 'Update from Control',
       cancelText: 'Keep My Numbers',
       danger: false
