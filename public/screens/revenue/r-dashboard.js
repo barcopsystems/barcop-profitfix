@@ -56,7 +56,7 @@ S.RevenueDashboard = {
 
   ORDER: ['week', 'numbers', 'leaks', 'audit'],
   _META: {
-    week:    { n: 1, title: 'Run This Week',                     sub: 'Log this week\'s sales, covers, and labor' },
+    week:    { n: 1, title: 'Confirm the Week',                  sub: 'Confirm this week\'s sales, covers, and labor' },
     numbers: { n: 2, title: 'Check your numbers against target', sub: 'Check average, labor, and revenue per labor hour' },
     leaks:   { n: 3, title: 'Work your biggest leak',            sub: 'Open Revenue Fix on the biggest dollar gap' },
     audit:   { n: 4, title: 'Run your Revenue audit',            sub: 'Score the top line and refresh your leaks' }
@@ -303,17 +303,17 @@ S.RevenueDashboard = {
     if (k === 'week') {
       if (w) {
         const bar = w.bar_revenue || 0, floor = w.floor_revenue || 0;
-        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(floor, 0) + '</strong> floor. Open it to adjust the numbers or confirm the rollup.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
+        return explain('This week is confirmed: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(floor, 0) + '</strong> floor. Edit it if a number needs fixing.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-confirm-week>Edit This Week</button>');
       }
-      return explain('Log this week\'s numbers. Sales roll up from your imported POS, covers and labor from Shift and Labor Control; you confirm it. Nothing below scores until the week is in.')
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
+      return explain('Confirm this week\'s numbers. Sales roll up from your imported POS, covers and labor from Shift and Labor Control; you confirm it. Nothing below scores until the week is in.')
+        + btnRow('<button class="btn btn-primary btn-sm" data-confirm-week>Confirm the Week</button>');
     }
 
     if (k === 'numbers') {
       if (!w) {
-        return explain('Run this week first and your check average, labor percent, and revenue per labor hour land here against target, so you see exactly where the top line slipped.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-this-week">Run This Week</button>' + this.markBtn('numbers', 'Mark Reviewed'));
+        return explain('Confirm this week first and your check average, labor percent, and revenue per labor hour land here against target, so you see exactly where the top line slipped.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-confirm-week>Confirm the Week</button>' + this.markBtn('numbers', 'Mark Reviewed'));
       }
       const rows = this.metricsRows(w).map(r => {
         const col = r.good == null ? 'var(--t3)' : (r.good ? 'var(--green)' : 'var(--red)');
@@ -373,6 +373,7 @@ S.RevenueDashboard = {
       if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('[data-confirm-week]')) { ConfirmWeek.open(this.weekEnd(), { onDone: () => this.render(this.container, this.actions) }); return; }
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       if (ev.target.closest('.fp-fixarea') || ev.target.closest('.fp-step')) return;
       const go = ev.target.closest('[data-go]');
