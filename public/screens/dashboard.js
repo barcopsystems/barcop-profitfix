@@ -50,7 +50,7 @@ S.Dashboard = {
 
   ORDER: ['week', 'costs', 'leaks', 'audit'],
   _META: {
-    week:  { n: 1, title: 'Run This Week',                   sub: 'Log this week\'s bar and food sales and costs' },
+    week:  { n: 1, title: 'Confirm the Week',                sub: 'Confirm this week\'s bar and food sales and costs' },
     costs: { n: 2, title: 'Check your costs against target', sub: 'Pour, food, and prime cost vs target' },
     leaks: { n: 3, title: 'Work your biggest leak',          sub: 'Open Profit Fix on the biggest dollar leak' },
     audit: { n: 4, title: 'Run your Profit audit',           sub: 'Score the operation and refresh your leaks' }
@@ -312,17 +312,17 @@ S.Dashboard = {
     if (k === 'week') {
       if (w) {
         const bar = (w.bar && w.bar.revenue) || 0, food = (w.food && w.food.revenue) || 0;
-        return explain('This week is in: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(food, 0) + '</strong> food. Open it to adjust the numbers or confirm the rollup.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
+        return explain('This week is confirmed: <strong>' + App.fmtCurrency(bar, 0) + '</strong> bar and <strong>' + App.fmtCurrency(food, 0) + '</strong> food. Edit it if a number needs fixing.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-confirm-week>Edit This Week</button>');
       }
-      return explain('Log this week\'s numbers. Revenue rolls up from your imported POS sales, COGS from your Inventory counts, and labor from Labor Control; you confirm it. Nothing below scores until the week is in.')
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('week', 'Mark Done'));
+      return explain('Confirm this week\'s numbers. Revenue rolls up from your imported POS sales, COGS from your Inventory counts, and labor from Labor Control; you confirm it. Nothing below scores until the week is in.')
+        + btnRow('<button class="btn btn-primary btn-sm" data-confirm-week>Confirm the Week</button>');
     }
 
     if (k === 'costs') {
       if (!w) {
-        return explain('Run this week first and your bar pour cost, food cost, and prime cost land here against target, so you see exactly where margin slipped.')
-          + btnRow('<button class="btn btn-ghost btn-sm" data-go="this-week">Run This Week</button>' + this.markBtn('costs', 'Mark Reviewed'));
+        return explain('Confirm this week first and your bar pour cost, food cost, and prime cost land here against target, so you see exactly where margin slipped.')
+          + btnRow('<button class="btn btn-ghost btn-sm" data-confirm-week>Confirm the Week</button>' + this.markBtn('costs', 'Mark Reviewed'));
       }
       const rows = this._costRows(w).map(r => {
         const col = r.val == null ? 'var(--t3)' : (r.over ? 'var(--red)' : 'var(--green)');
@@ -383,6 +383,7 @@ S.Dashboard = {
       if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('[data-confirm-week]')) { ConfirmWeek.open(this.weekEnd(), { onDone: () => this.render(this.container, this.actions) }); return; }
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       // Leak-board rows (.fp-fixarea) are wired by FixPanel.wireFixAreas; skip them
       // here so a tap routes into the fix process, not a no-op.
