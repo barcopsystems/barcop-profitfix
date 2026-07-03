@@ -40,7 +40,7 @@ const AuditUI = {
     const id = 'week-sales-modal';
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">Estimate Last Week\'s Sales</div>'
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.55;">No sales file dropped yet. Enter last week\'s bar and food sales so this audit has real numbers to work from. Once you drop your POS sales file in Shift when you close the week, those numbers take over and this box goes away for good.</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.55;">Enter last week\'s bar and food sales so this audit has real numbers to work from. Once you drop your POS sales files when closing the week, those numbers take over and this box goes away for good.</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Last Week\'s Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ws-bar" min="0" step="1" placeholder="0"/></div></div>'
       +   '<div class="f"><label>Last Week\'s Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ws-food" min="0" step="1" placeholder="0"/></div></div>'
