@@ -212,7 +212,7 @@ S.HubBooksHome = {
     return DashUI.dayOneStrip(
       'Your books build themselves from what you log. Four steps and this card fills in with your operating income, month to date and year to date.',
       [
-        { done: d.hasWeeks,   num: 1, label: 'Log your first week',             go: 'this-week' },
+        { done: d.hasWeeks,   num: 1, label: 'Confirm your first week',          go: 'dashboard' },
         { done: d.hasOpex,    num: 2, label: 'Add your operating expenses',     go: 'operating-expenses' },
         { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-dashboard' },
         { done: d.hasPermits, num: 4, label: 'Enter your permits and licenses', go: 'permits' }
