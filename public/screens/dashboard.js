@@ -250,8 +250,7 @@ S.Dashboard = {
     if (k === 'audit') {
       const as = this._auditState();
       if (!as.latest || as.score == null) return this._META.audit.sub;
-      if (as.due) return 'Due now &middot; last scored ' + as.score + (as.daysSince != null ? ', ' + as.daysSince + 'd ago' : '');
-      return 'Current &middot; scored ' + as.score + ' &middot; next due in ' + (7 - as.daysSince) + 'd';
+      return 'Scored ' + as.score + (as.due ? ' &middot; run a fresh one' : '');
     }
     return '';
   },
@@ -357,9 +356,9 @@ S.Dashboard = {
     if (!as.latest || as.score == null) {
       lead = 'Run your first Profit audit. It scores the whole operation and lists every leak with the dollars a year it costs you, which is what feeds the steps above.';
     } else if (as.due) {
-      lead = 'It has been ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' since your last Profit audit (scored ' + scored + '). Run a fresh one to rescore the operation and refresh the leak board.';
+      lead = 'Your last Profit audit scored ' + scored + '. Run a fresh one to rescore the operation and refresh the leak board.';
     } else {
-      lead = 'Your Profit audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. You are good here for the week. Run a fresh one anytime you want to rescore the operation.';
+      lead = 'Your Profit audit is current, scored ' + scored + '. Run a fresh one anytime you want to rescore the operation.';
     }
     return explain(lead)
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="audit-tracker">' + (as.due ? 'Run Profit Audit' : 'View Profit Audit') + '</button><button class="btn btn-ghost btn-sm" data-go="profit-fix">Profit Fix</button>' + this.markBtn('audit', 'Mark Done'));
