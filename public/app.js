@@ -3527,6 +3527,19 @@ const App = {
   //
   // Ingredient row shape: { source: 'product'|'batch', id, quantity }.
   // Legacy shape { product_id, quantity } is still recognized.
+  // Per-piece cost of a Food / Misc product bought by a container that carries a
+  // pack size (unit_cost / pack_size) — e.g. a $20 bag of 100 wings = $0.20 each.
+  // null when there is no pack size (the unit itself is the piece, like each/lb),
+  // in which case the piece cost IS the unit cost. Recipes and loose counts read
+  // this so a "6 wings" line costs correctly off a bag-bought item.
+  piecePrice(p) {
+    if (!p) return null;
+    const c = parseFloat(p.unit_cost);
+    if (isNaN(c)) return null;
+    const pk = parseFloat(p.pack_size);
+    return (pk > 0) ? c / pk : c;
+  },
+
   menuItemCost(item) {
     if (!item) return null;
 
