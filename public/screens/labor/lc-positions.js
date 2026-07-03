@@ -25,6 +25,9 @@ S.LaborPositions = {
   // number) and tip-out defaults to zero (their policy to set). Fires once per
   // account (flagged), so a deleted starter never comes back and an account that
   // already has positions (the demo, or a returning user) is left untouched.
+  // Tipped roles start Tipped with no tip-out set (percent 0 = receives). The
+  // operator decides who pays tip out, at what percent, and on what basis (a
+  // percent of sales or a percent of tips), because that policy is theirs to set.
   STARTER_POSITIONS: [
     { name: 'Bartender',        department: 'Bar',            tipped: true  },
     { name: 'Barback',          department: 'Bar',            tipped: true  },
@@ -70,6 +73,7 @@ S.LaborPositions = {
     // Progressive disclosure: Tipped reveals Pays Tip Out; Pays = Yes reveals the %.
     const tipped = !!(item && item.tipped);
     const pays = tipped && (parseFloat(item.tip_out_pct) || 0) > 0;
+    const basis = (item && item.tip_out_basis === 'tips') ? 'tips' : 'sales';
     const deptOpts = this.DEPARTMENTS.map(d =>
       '<option' + ((item ? item.department : 'Bar') === d ? ' selected' : '') + '>' + d + '</option>').join('');
     const wageVal = (item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '';
@@ -92,7 +96,12 @@ S.LaborPositions = {
       + '<option value="no"' + (pays ? '' : ' selected') + '>No</option>'
       + '<option value="yes"' + (pays ? ' selected' : '') + '>Yes</option>'
       + '</select></div>'
-      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out (% on sales)</label>'
+      + '<div class="f" id="' + p + 'basis-wrap" style="' + cs(160) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out On</label>'
+      + '<select id="' + p + 'basis">'
+      + '<option value="sales"' + (basis === 'tips' ? '' : ' selected') + '>% of Sales</option>'
+      + '<option value="tips"' + (basis === 'tips' ? ' selected' : '') + '>% of Tips</option>'
+      + '</select></div>'
+      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out %</label>'
       + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
       + App.noteField({ id: p + 'notes', value: item?.notes });
@@ -104,11 +113,13 @@ S.LaborPositions = {
     const typeEl = document.getElementById(p + 'tipped');
     const paysEl = document.getElementById(p + 'pays');
     const paysWrap = document.getElementById(p + 'pays-wrap');
+    const basisWrap = document.getElementById(p + 'basis-wrap');
     const tipoutWrap = document.getElementById(p + 'tipout-wrap');
     const refresh = () => {
       const tipped = typeEl?.value === 'yes';
       const pays = paysEl?.value === 'yes';
       if (paysWrap) paysWrap.style.display = tipped ? '' : 'none';
+      if (basisWrap) basisWrap.style.display = (tipped && pays) ? '' : 'none';
       if (tipoutWrap) tipoutWrap.style.display = (tipped && pays) ? '' : 'none';
     };
     typeEl?.addEventListener('change', refresh);
@@ -147,7 +158,7 @@ S.LaborPositions = {
         + '<td>' + esc(p.department || '-') + '</td>'
         + '<td class="val">' + (p.default_wage != null ? App.fmtCurrency(p.default_wage) + '/hr' : '-') + '</td>'
         + '<td>' + (p.tipped
-            ? '<span style="color:var(--t1);font-weight:700;">Tipped</span><span style="color:var(--t3);"> &middot; ' + ((parseFloat(p.tip_out_pct) || 0) > 0 ? 'tips out ' + App.fmtPct(p.tip_out_pct) : 'receives') + '</span>'
+            ? '<span style="color:var(--t1);font-weight:700;">Tipped</span><span style="color:var(--t3);"> &middot; ' + ((parseFloat(p.tip_out_pct) || 0) > 0 ? 'tips out ' + App.fmtPct(p.tip_out_pct) + ' of ' + (p.tip_out_basis === 'tips' ? 'tips' : 'sales') : 'receives') + '</span>'
             : '<span style="color:var(--t3);font-weight:700;">Non-Tipped</span>') + '</td>'
         + '<td><div class="row-actions">'
         + (App.canEdit('lc-positions') ? '<button class="btn btn-ghost btn-sm lp-edit" data-id="' + p.id + '">Edit</button>' : '')
@@ -223,6 +234,7 @@ S.LaborPositions = {
       default_wage: isNaN(wage) ? null : wage,
       tipped:       isTipped,
       tip_out_pct:  pays ? tipoutRaw : 0,
+      tip_out_basis: pays ? ((document.getElementById(p + 'basis')?.value === 'tips') ? 'tips' : 'sales') : 'sales',
       notes:        document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();

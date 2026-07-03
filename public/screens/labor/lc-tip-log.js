@@ -229,7 +229,7 @@ S.LaborTipLog = {
     App.showHelpModal('How Tips Work', [
       { p: ['This screen handles a day\'s tips two ways: the toggle up top picks Log Tips to record each person\'s actual cash and card tips, or Tip Pool to split a shared pool across the crew. Both share the same week and day picker, so pick the day once and switch as you need.'] },
       { h: 'Logging Tips', p: ['On Log Tips, tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole day at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week. Most weeks you import this off your POS export on Close The Week in Labor instead.'] },
-      { h: 'Tip-Outs', p: ['Set each role\'s tip-out percent in Positions: servers and bartenders tip out a percent of their sales, while bussers and barbacks stay at 0 and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out at their role\'s percent; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
+      { h: 'Tip-Outs', p: ['Set each role\'s tip-out in Positions: turn on Pays Tip Out, then choose whether it is a percent of their sales (usually 1 to 2 percent) or a percent of the tips they made (usually 10 to 20 percent), and set the number. Support roles like bussers and barbacks stay off and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out on whichever basis you set; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on Close The Week in Labor. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
       { h: 'Saved Tip Pools', p: ['Every split you save lands in the Saved Tip Pools list at the bottom of Tip Pool mode. The stats up top total the pools in the range you pick with the chips, and Export PDF saves the list. Edit reopens a pool in a pop-up to fix a number (Update writes back to the same record, no duplicate) and Delete removes one you logged in error. To review a pool\'s per-person split, open the Tip Pools tab in Tip History.'] },
@@ -273,17 +273,12 @@ S.LaborTipLog = {
     p = p || 'tle-';
     document.getElementById(p + 'date')?.addEventListener('change', e => { this._eDate = e.target.value || this._eDate; this.populateStaffList(x, p); });
     document.getElementById(p + 'staff')?.addEventListener('change', () => this.onStaffChange(x, p));
-    document.getElementById(p + 'cash')?.addEventListener('input', () => this.calc(p));
-    document.getElementById(p + 'card')?.addEventListener('input', () => this.calc(p));
-    // Earner edit row: tip-out = sales x %, live.
-    const updTipout = () => {
-      const el = document.getElementById(p + 'c-tipout');
-      if (!el) return;
-      const sales = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
-      el.textContent = sales > 0 ? '-' + App.fmtCurrency(sales * App.tipOutPctFor(x ? x.staff_id : '') / 100, 2) : '-';
-    };
-    document.getElementById(p + 'sales')?.addEventListener('input', updTipout);
-    updTipout();
+    // Cash/card change the gross total and, for a tips-basis role, the tip-out.
+    const upd = () => { this.calc(p); this.updateTipoutPreview(p); };
+    document.getElementById(p + 'cash')?.addEventListener('input', upd);
+    document.getElementById(p + 'card')?.addEventListener('input', upd);
+    document.getElementById(p + 'sales')?.addEventListener('input', () => this.updateTipoutPreview(p));
+    this.updateTipoutPreview(p);
     this.populateStaffList(x, p);
     this.calc(p);
   },
@@ -296,15 +291,33 @@ S.LaborTipLog = {
     if (!App.tipOutEnabled() || !staffId) return '';
     const v = val => (val != null && val !== '') ? val : '';
     const toPct = App.tipOutPctFor(staffId);
+    const basis = App.tipOutBasisFor(staffId);
     const role = App.tipRole(staffId) || 'earner';
     const receivedCell = '<div class="f" style="width:170px;flex-shrink:0;"><label>Tip-Out Received</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(receivedVal) + '"/></div></div>';
+    // Payer needs a Sales cell only when the tip-out is a percent of sales; on a
+    // percent-of-tips basis the cash and card cells above already hold the base.
+    const salesCell = basis === 'tips' ? '' : '<div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(salesVal) + '"/></div></div>';
+    const toLabel = 'Tip-Out (' + App.fmtPct(toPct) + ' of ' + (basis === 'tips' ? 'tips' : 'sales') + ')';
     return role === 'support'
       ? '<div class="form-row" style="gap:16px;">' + receivedCell + '</div>'
-      : '<div class="form-row" style="gap:16px;flex-wrap:wrap;"><div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
-        + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(salesVal) + '"/></div></div>'
-        + '<div class="f" style="flex-shrink:0;"><label>Tip-Out (' + App.fmtPct(toPct) + ')</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
+      : '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + salesCell
+        + '<div class="f" style="flex-shrink:0;"><label>' + toLabel + '</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
         + receivedCell + '</div>';
+  },
+
+  // Live tip-out preview in the edit modal: the payer's percent on their basis
+  // (their sales, or the tips they made). Reads whichever cells are present.
+  updateTipoutPreview(p) {
+    p = p || 'tl-';
+    const el = document.getElementById(p + 'c-tipout');
+    if (!el) return;
+    const staffId = document.getElementById(p + 'staff')?.value || '';
+    const sales = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
+    const gross = (parseFloat(document.getElementById(p + 'cash')?.value) || 0) + (parseFloat(document.getElementById(p + 'card')?.value) || 0);
+    const paid = App.tipOutPaid(staffId, sales, gross);
+    el.textContent = paid > 0 ? '-' + App.fmtCurrency(paid, 2) : '-';
   },
 
   // Rebuild the tip-out row from the currently selected staff (edit modal), keeping
@@ -317,14 +330,8 @@ S.LaborTipLog = {
     const sales = document.getElementById(p + 'sales')?.value;
     const received = document.getElementById(p + 'received')?.value;
     wrap.innerHTML = this.tipoutRowHtml(staffId, p, sales, received);
-    const upd = () => {
-      const el = document.getElementById(p + 'c-tipout');
-      if (!el) return;
-      const s = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
-      el.textContent = s > 0 ? '-' + App.fmtCurrency(s * App.tipOutPctFor(staffId) / 100, 2) : '-';
-    };
-    document.getElementById(p + 'sales')?.addEventListener('input', upd);
-    upd();
+    document.getElementById(p + 'sales')?.addEventListener('input', () => this.updateTipoutPreview(p));
+    this.updateTipoutPreview(p);
   },
 
   renderList() {
@@ -515,7 +522,7 @@ S.LaborTipLog = {
       + '</div>'
       + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent of sales you set per role, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent you set per role, on their sales or on the tips they made, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
       + '</div>';
     return header + tables + addBtn + reconBox;
   },
@@ -581,11 +588,12 @@ S.LaborTipLog = {
         sales: sup ? 0 : (parseFloat(r.sales) || 0),
         hours: parseFloat(r.hours) || 0,
         received: on ? (parseFloat(r.received) || 0) : 0,   // earners (a bartender) can receive too
-        pct: on ? App.tipOutPctFor(r.staff_id) : 0,         // this role's tip-out % of sales
+        pct: on ? App.tipOutPctFor(r.staff_id) : 0,         // this role's tip-out %
         paid: 0
       };
     });
-    if (on) out.forEach(o => { if (o.staff_id && o.role === 'earner' && o.sales > 0) o.paid = o.sales * o.pct / 100; });
+    // Payer's tip-out = their percent on their basis (sales, or the tips they made).
+    if (on) out.forEach(o => { if (o.staff_id && o.role === 'earner') o.paid = App.tipOutPaid(o.staff_id, o.sales, o.cash + o.card); });
     out.forEach(o => { o.net = o.cash + o.card - o.paid + o.received; });
     return out;
   },
@@ -932,17 +940,16 @@ S.LaborTipLog = {
     if (!staff) { fail('Choose a staff member.'); return; }
     const num = id => { const n = parseFloat(document.getElementById(p + id)?.value); return isNaN(n) ? null : n; };
     const cash = num('cash') || 0, card = num('card') || 0;
-    // Tip-out side (edit pop-up). Earner pays sales x their role's %; anyone can
-    // have an operator-entered Received (a bartender takes the bar share). A row
-    // can be valid on received alone (support).
+    // Tip-out side (edit pop-up). Earner pays their percent on their basis (sales,
+    // or the tips they made); anyone can have an operator-entered Received (a
+    // bartender takes the bar share). A row can be valid on received alone (support).
     const tipOn = App.tipOutEnabled();
     const role = App.tipRole(staff) || 'earner';
-    const myPct = App.tipOutPctFor(staff);
     const r2 = n => Math.round((n || 0) * 100) / 100;
     let salesV = 0, paidV = 0, receivedV = 0;
     if (tipOn) {
       receivedV = num('received') || 0;
-      if (role !== 'support') { salesV = num('sales') || 0; paidV = salesV * myPct / 100; }
+      if (role !== 'support') { salesV = num('sales') || 0; paidV = App.tipOutPaid(staff, salesV, cash + card); }
     }
     if (cash + card <= 0 && receivedV <= 0) { fail('Enter cash or card tips.'); return; }
 
