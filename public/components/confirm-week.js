@@ -113,28 +113,32 @@ const ConfirmWeek = {
       + stat('Revenue', 'cw-m-rev') + stat('Prime Cost', 'cw-m-prime') + stat('Check Avg', 'cw-m-ca')
       + stat('Labor %', 'cw-m-lp') + stat('RPLH', 'cw-m-rplh') + '</div></div>';
 
-    // Editable grid (Bar / Food rows x Revenue / COGS / Labor) + covers.
-    const cell = id => '<td><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="' + id + '"/></div></td>';
-    const grid = '<div class="card" style="padding:0;overflow:hidden;margin:0 0 14px;"><table class="ing-tbl" style="width:100%;">'
-      + '<thead><tr><th style="width:110px;"></th><th>Revenue</th><th>COGS</th><th>Labor</th></tr></thead><tbody>'
+    // Editable grid (Bar / Food rows x Revenue / COGS / Labor). Pill rows, fixed
+    // layout so it always fits the modal; overflow-x wrapper (not .pill-wrap) so
+    // it stays a table on desktop.
+    const cell = id => '<td><div class="fw" style="margin:0;"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="' + id + '" style="width:100%;min-width:0;"/></div></td>';
+    const grid = '<div style="overflow-x:auto;margin:0 0 16px;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:58px;"/><col/><col/><col/></colgroup>'
+      + '<thead><tr><th></th><th>Revenue</th><th>COGS</th><th>Labor</th></tr></thead><tbody>'
       + '<tr class="cw-line"><td style="font-weight:600;color:var(--t1);">Bar</td>' + cell('cw-bar-rev') + cell('cw-bar-cogs') + cell('cw-bar-lab') + '</tr>'
       + '<tr class="cw-line"><td style="font-weight:600;color:var(--t1);">Food</td>' + cell('cw-food-rev') + cell('cw-food-cogs') + cell('cw-food-lab') + '</tr>'
       + '</tbody></table></div>';
 
-    const coversField = '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+    // Total Covers + Events Revenue (read-only, from bookings) on one row, the
+    // events value vertically centered against the covers input.
+    const evRev = parseFloat(m.catering && m.catering.revenue) || 0;
+    const coversField = '<div class="form-row" style="gap:24px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">'
       + '<div class="f" style="width:150px;"><label>Total Covers</label><input class="cw-in" type="number" step="1" id="cw-covers"/></div>'
-      + (m.catering && (m.catering.revenue || m.catering.cogs || m.catering.labor)
-          ? '<div class="f" style="width:auto;"><label>Catering (from bookings)</label><div style="font-size:13px;color:var(--t2);padding-top:7px;">' + money(parseFloat(m.catering.revenue) || 0) + ' revenue, read-only</div></div>'
-          : '')
+      + '<div class="f" style="width:auto;"><label>Events Revenue</label>'
+      +   '<div style="min-height:36px;display:flex;align-items:center;font-size:13px;color:var(--t2);">' + (evRev > 0 ? money(evRev) + ' from bookings' : 'None this week') + '</div></div>'
       + '</div>';
 
     const manual = '<div class="sh" style="margin:6px 0 10px;">Optional</div>'
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div class="f" style="width:160px;"><label>Ancillary Revenue</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-rev"/></div></div>'
-      + '<div class="f" style="width:160px;"><label>Its Cost</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-cogs"/></div></div>'
-      + '<div class="f" style="width:180px;"><label>Platform / Operating Fees</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-fees"/></div></div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
+      + '<div class="f" style="width:180px;"><label>Ancillary Revenue</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-rev"/></div></div>'
+      + '<div class="f" style="width:200px;"><label>Platform / Operating Fees</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-fees"/></div></div>'
       + '</div>'
-      + '<div class="f" style="width:100%;margin-bottom:4px;"><label>Notes</label><textarea class="notes-ta" rows="2" id="cw-notes"></textarea></div>';
+      + App.noteField({ id: 'cw-notes', value: m.notes, mt: 10 });
 
     const confirmLabel = m.confirmed ? 'Update the Week' : 'Confirm the Week';
     const html = '<div class="card form-card" style="margin:0;">'
@@ -152,8 +156,7 @@ const ConfirmWeek = {
     set('cw-bar-rev', m.bar.revenue);   set('cw-bar-cogs', m.bar.cogs);   set('cw-bar-lab', m.bar.labor);
     set('cw-food-rev', m.food.revenue); set('cw-food-cogs', m.food.cogs); set('cw-food-lab', m.food.labor);
     set('cw-covers', m.covers);
-    set('cw-anc-rev', m.other.revenue); set('cw-anc-cogs', m.other.cogs); set('cw-fees', m.platform_fees);
-    set('cw-notes', m.notes);
+    set('cw-anc-rev', m.other.revenue); set('cw-fees', m.platform_fees);
     this._hours = m.hours;
     this._catering = m.catering;
 
@@ -203,7 +206,7 @@ const ConfirmWeek = {
     const bRev = this._val('cw-bar-rev'), bCogs = this._val('cw-bar-cogs'), bLab = this._val('cw-bar-lab');
     const fRev = this._val('cw-food-rev'), fCogs = this._val('cw-food-cogs'), fLab = this._val('cw-food-lab');
     const covers = this._val('cw-covers');
-    const oRev = this._val('cw-anc-rev'), oCogs = this._val('cw-anc-cogs'), fees = this._val('cw-fees');
+    const oRev = this._val('cw-anc-rev'), oCogs = 0, fees = this._val('cw-fees');
     const notes = (document.getElementById('cw-notes')?.value || '').trim();
     const cat = this._catering || {};
     const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
