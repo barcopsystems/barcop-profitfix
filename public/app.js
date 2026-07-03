@@ -2978,9 +2978,9 @@ const App = {
   },
 
   // Small neutral cadence tag for an import drop, so an operator can tell at a
-  // glance what belongs in the weekly sitting versus what is run on demand. The
+  // glance what belongs in the weekly sitting versus what runs on demand. The
   // word carries the meaning; no color coding (stays inside the color system).
-  cadenceTag(text) {
+  freqTag(text) {
     return '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);border:1px solid var(--b-edge);border-radius:4px;padding:2px 7px;vertical-align:middle;white-space:nowrap;">' + esc(text || '') + '</span>';
   },
 
