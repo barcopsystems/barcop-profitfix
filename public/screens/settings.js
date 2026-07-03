@@ -88,8 +88,6 @@ S.HubSettings = {
       + '<div class="f" style="width:95px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
       + '<div class="f" style="width:120px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
-      + '<div class="f" style="width:130px;"><label>Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-abr" value="' + (s.annual_bar_revenue||'') + '" placeholder="Annual Bar Sales"/></div></div>'
-      + '<div class="f" style="width:130px;"><label>Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-afr" value="' + (s.annual_food_revenue||'') + '" placeholder="Annual Food Sales"/></div></div>'
       + '</div>';
   },
 
@@ -177,8 +175,6 @@ S.HubSettings = {
       s.phone               = document.getElementById('hs-phone')?.value.trim() || '';
       s.address             = document.getElementById('hs-address')?.value.trim() || '';
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
-      s.annual_bar_revenue  = numOr('hs-abr', 0);
-      s.annual_food_revenue = numOr('hs-afr', 0);
       // Filling the profile here (not just via onboarding) checks off the setup step.
       if (s.bar_name && App.markSetupDone) App.markSetupDone('gs_profile');
       return ['settings'];

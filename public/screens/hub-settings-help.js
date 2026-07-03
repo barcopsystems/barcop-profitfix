@@ -22,13 +22,13 @@ S.HubSettingsHelp = {
       { q: 'What is in Settings?',
         a: 'Two things: how Bar Cop is tuned to your operation, and your account. Business Profile and Recovery Targets hold your operation details and the benchmarks Bar Cop measures you against. Your Account and Team Members handle your login, subscription, backups, and who else can get in. The overview shows your account, profile, and targets at a glance, each with an Edit link.' },
       { q: 'How do I set up Bar Cop?',
-        a: 'Setup happens as you go, not from a separate checklist. When you first sign in, onboarding captures your business name, annual sales, and service periods. From there, each section walks you through its own setup the first time you open it with no data, showing the steps in order right on that page. Your profile and targets always live here in Settings if you need to adjust them later.' }
+        a: 'Setup happens as you go, not from a separate checklist. When you first sign in, onboarding captures your business name, location, and service periods. From there, each section walks you through its own setup the first time you open it with no data, showing the steps in order right on that page. Your profile and targets always live here in Settings if you need to adjust them later.' }
     ]},
     { t: 'Business Profile', qa: [
       { q: 'What are service periods and why do they matter?',
         a: 'They are the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. They are not cosmetic: they set every shift-type field across Bar Cop, including the schedule, cash tolerances, and the Recovery daypart breakdowns. Turn on the ones you run, and add a custom one if your venue runs something different.' },
-      { q: 'Why does it ask for annual Sales?',
-        a: 'Your annual bar and food figures are the numbers you know off your P&L. They give the audits and forecasts a baseline to measure against before you have weeks of logged data behind them.' }
+      { q: 'Where do my sales numbers come from?',
+        a: 'From the weeks you close in Run This Week. Until your first week is in, the audits ask once for last week\'s bar and food sales so they have a real number to measure against. After that, your closed weeks drive everything and you are not asked again.' }
     ]},
     { t: 'Recovery Targets', qa: [
       { q: 'What are the targets?',

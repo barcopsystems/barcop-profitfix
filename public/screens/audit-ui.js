@@ -26,6 +26,43 @@ const AuditUI = {
       }));
   },
 
+  // ── Weekly sales estimate (cold-start fallback) ──────────────────────────────
+  // Until the first week is closed there is no real revenue for an audit to size
+  // its dollars off. Instead of a stale annual guess from onboarding, we ask for
+  // last week's bar + food sales at generate time, store it keyed to the current
+  // week, and let a real POS week supersede it. A new week re-prompts.
+  _weekKey() { return App.weekStartFor(App.todayLocal()); },
+  weekSalesEstimate() {
+    const e = (App.data.settings || {}).week_sales_estimate;
+    return (e && e.week === this._weekKey() && ((+e.bar || 0) > 0 || (+e.food || 0) > 0)) ? e : null;
+  },
+  promptWeekSales(onReady) {
+    const id = 'week-sales-modal';
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">Estimate Last Week\'s Sales</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">No sales file has been dropped yet. Enter last week\'s bar and food sales so this audit sizes off real numbers. Drop your POS file later and it takes over.</div>'
+      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
+      +   '<div class="f" style="width:100%;"><label>Last Week\'s Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ws-bar" min="0" step="1" placeholder="0"/></div></div>'
+      +   '<div class="f" style="width:100%;"><label>Last Week\'s Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ws-food" min="0" step="1" placeholder="0"/></div></div>'
+      + '</div>'
+      + '<div class="card-actions"><button class="btn btn-primary" id="ws-save">Use These Numbers</button>'
+      +   '<button class="btn btn-ghost" id="ws-cancel">Cancel</button>'
+      +   '<span id="ws-err" style="color:var(--red);font-size:12px;align-self:center;display:none;">Enter at least one number.</span></div>'
+      + '</div>';
+    App.openModal(html, { id, maxWidth: 540, noClose: true });
+    document.getElementById('ws-cancel')?.addEventListener('click', () => App.closeModal(id));
+    document.getElementById('ws-save')?.addEventListener('click', async () => {
+      const bar  = parseFloat(document.getElementById('ws-bar')?.value)  || 0;
+      const food = parseFloat(document.getElementById('ws-food')?.value) || 0;
+      if (bar <= 0 && food <= 0) { const e = document.getElementById('ws-err'); if (e) e.style.display = 'inline'; return; }
+      App.data.settings = App.data.settings || {};
+      App.data.settings.week_sales_estimate = { week: this._weekKey(), bar, food };
+      await App.saveKey('settings');
+      App.closeModal(id);
+      if (onReady) onReady();
+    });
+  },
+
   // ── Projected data quality ───────────────────────────────────────────────────
   // The level this audit would come out at if run RIGHT NOW, off the data Bar Cop
   // currently holds. readyArr = one boolean per SCORED section (true = that section

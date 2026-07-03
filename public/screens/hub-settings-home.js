@@ -63,8 +63,6 @@ S.HubSettingsHome = {
       kvRow('Location', esc(s.city_state || '') || dash),
       kvRow('Phone', esc(s.phone || '') || dash),
       kvRow('Address', esc(s.address || '') || dash),
-      kvRow('Bar Sales', s.annual_bar_revenue ? fmt$0(s.annual_bar_revenue) + '/yr' : dash),
-      kvRow('Food Sales', s.annual_food_revenue ? fmt$0(s.annual_food_revenue) + '/yr' : dash),
       kvRow('Service Periods', periods.length ? esc(periods.join(' · ')) : dash)
     ];
     const profileCard = card('Business Profile', 'settings-profile', 'Edit', profileRows);
