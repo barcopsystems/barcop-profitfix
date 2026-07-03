@@ -228,7 +228,7 @@ S.ShiftDashboard = {
   // import, extra fan-out.
   optDrop(id, title, sub) {
     return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></span>' + App.cadenceTag('Weekly') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></span>' + App.freqTag('Weekly') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + sub + '</div>'
       + '<div id="' + id + '"></div><div id="' + id + '-res"></div></div>';
   },
@@ -236,7 +236,7 @@ S.ShiftDashboard = {
     this._isDone = isDone;
     if (k === 'import') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.cadenceTag('Weekly') + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.freqTag('Weekly') + '</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
         + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.')
         + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.')
@@ -244,7 +244,7 @@ S.ShiftDashboard = {
     }
     if (k === 'cash') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Cash report</span>' + App.cadenceTag('Weekly') + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Cash report</span>' + App.freqTag('Weekly') + '</div>'
         + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
         + '<div id="sc-ck-cash-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile by Hand</button>'
