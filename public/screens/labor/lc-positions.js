@@ -34,8 +34,9 @@ S.LaborPositions = {
     { name: 'Line Cook',        department: 'Kitchen',        tipped: false },
     { name: 'Prep Cook',        department: 'Kitchen',        tipped: false },
     { name: 'Dishwasher',       department: 'Kitchen',        tipped: false },
-    { name: 'Kitchen Manager',  department: 'Management',     tipped: false },
-    { name: 'General Manager',  department: 'Management',     tipped: false }
+    { name: 'Kitchen Manager',   department: 'Management',     tipped: false },
+    { name: 'Assistant Manager', department: 'Management',     tipped: false },
+    { name: 'General Manager',   department: 'Management',     tipped: false }
   ],
   ensureStarters() {
     if (!App.laborData) App.laborData = {};
