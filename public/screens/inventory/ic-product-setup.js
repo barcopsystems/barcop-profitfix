@@ -334,11 +334,21 @@ S.InventoryProducts = {
 
     const tabs = this.catTabs();
 
+    const spec = this.FORM_SPEC[this.activeCat];
+    const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
+    const costCol = 'Cost Per';
+    // Column headers + fixed colgroup, shared by the populated list AND the empty
+    // state so the headers always show and the empty message sits in the data row.
+    const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
+      + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
+    const colgroup = '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+
     let body;
     if (prods.length === 0) {
-      body = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</div></div>';
+      body = '<div class="card" style="overflow-x:auto;margin-top:18px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + colgroup + '<thead><tr><th></th><th>Product</th>' + headerCols + '</tr></thead>'
+        + '<tbody><tr><td colspan="9" style="color:var(--t3);">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</td></tr></tbody></table></div>';
     } else {
-      const spec = this.FORM_SPEC[this.activeCat];
       const pourable = this.isPourable(this.activeCat);
       const dismissed = this._dismissedAlerts && this._dismissedAlerts.has(this.activeCat);
       const alertBar = (incompleteHere.length > 0 && !dismissed)
@@ -356,20 +366,9 @@ S.InventoryProducts = {
         + (selCount > 0 ? '<button class="btn btn-danger btn-sm ip-sel-del">Delete ' + selCount + ' Selected</button>' : '')
         + '</div>';
 
-      const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
-      const costCol = 'Cost Per';
-
       // Group the list by Sub-Category (Misc Type for Misc) into its own card so a
       // manager can scan each style — "Vodka Products (18)" — and spot what is
-      // missing. The sub-category lands in the first column header, like the
-      // category-grouped usage reports. Products with no sub-category fall into an
-      // "Uncategorized" card at the bottom.
-      const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
-        + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
-      // Shared fixed colgroup so every group card lines its columns up in straight
-      // lines down the page (and the mobile full-width stack hook kicks in).
-      // Content-proportioned widths so each column hugs its data and the gaps read evenly.
-      const colgroup = '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+      // missing. Products with no sub-category fall into an "Uncategorized" card.
       const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
         const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
