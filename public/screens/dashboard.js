@@ -190,7 +190,7 @@ S.Dashboard = {
       { num: 2, label: 'Set up Shift Control',        screen: 'sc-dashboard',  done: hasShift },
       { num: 3, label: 'Set up Labor Control',        screen: 'lc-dashboard',  done: hasLabor },
       { num: 4, label: 'Run your first Profit Audit', screen: 'audit-tracker', done: hasAudit }
-    ]);
+    ], 'Recovery');
   },
 
   weekSelector() {
