@@ -78,9 +78,9 @@ S.ProfitForecast = {
     if (rr.nW < this.MIN_WEEKS) {
       App.setupCard(this.container, {
         title: 'Profit Forecast',
-        lead: 'Once you have a few weeks confirmed in This Week, Bar Cop projects your profit forward at your current pace and at your cost targets, so you can see what tightening up is worth. You have ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ' saved so far.',
+        lead: 'Once you have a few weeks confirmed, Bar Cop projects your profit forward at your current pace and at your cost targets, so you can see what tightening up is worth. You have ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ' saved so far.',
         steps: [
-          { title: 'Confirm your weeks', desc: 'Pull each week from Control and save it in This Week. A few weeks gives an honest run-rate.', btn: 'Open This Week', screen: 'this-week', done: rr.nW > 0 },
+          { title: 'Confirm your weeks', desc: 'Confirm each week from the Profit dashboard. A few weeks gives an honest run-rate.', btn: 'Confirm the Week', screen: 'dashboard', done: rr.nW > 0 },
           { title: 'Set your cost targets', desc: 'Your prime cost target drives the at-target scenario.', btn: 'App Settings', screen: 'settings', done: false }
         ]
       });
@@ -154,7 +154,7 @@ S.ProfitForecast = {
 
   showHowTo() {
     App.showHelpModal('How Profit Forecast Works', [
-      { p: ['A look ahead at your profit, projected from the weeks you have already confirmed in This Week. It runs two scenarios side by side: where you land at your current pace, and where you would land at your cost targets. The gap between them is what cleaning up is worth.'] },
+      { p: ['A look ahead at your profit, projected from the weeks you have already confirmed. It runs two scenarios side by side: where you land at your current pace, and where you would land at your cost targets. The gap between them is what cleaning up is worth.'] },
       { h: 'How the Projection Is Built', p: ['Bar Cop takes your recent weekly sales and prime cost percentage, holds them forward across the window you pick, and subtracts your operating costs (the same expenses Books uses). It is a run-rate estimate from real history, not a promise. Pick Next Month, Quarter, 6 Months, or Year.'] },
       { h: 'Current Pace vs Your Targets', p: ['Current Pace uses your recent prime cost. At Your Targets swaps in your target prime cost from App Settings. The Target Upside up top is the profit difference, the money on the table if you hit your targets. That is exactly what Profit Fix is for.'] },
       { h: 'Reaching True Profit', p: ['Profit here is sales minus prime cost minus operating costs. If you have not logged operating costs yet, it shows profit before operating costs and tells you so. Log them under Accounting, Operating Expenses, to get the full net number.'] },
