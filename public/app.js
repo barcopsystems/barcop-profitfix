@@ -1755,7 +1755,7 @@ const App = {
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Dashboard', IC.books),
-        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Dashboard', IC.settings, 'App Settings')
+        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Bar Cop Settings', IC.settings, 'App Settings')
       ]},
       { label: 'Control', items: [
         drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', IC.inventory),
