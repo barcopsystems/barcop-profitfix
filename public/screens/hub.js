@@ -445,7 +445,7 @@ S.Hub = {
     // the right section.
     const gsChip = (n, label, screen, mod) =>
         '<div onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
-      +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--sel-active-bg);color:var(--gold);">' + n + '</span>'
+      +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1;background:var(--sel-active-bg);color:var(--gold);">' + n + '</span>'
       +   '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
     const gettingStarted = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Get Started</div>'
