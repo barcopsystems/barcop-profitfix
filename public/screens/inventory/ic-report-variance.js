@@ -372,7 +372,7 @@ S.InventoryVarianceReport = {
 
     let importBlock;
     if (!this.posRows) {
-      importBlock = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Upload Full POS Sales</span>' + App.cadenceTag('As needed') + '</div>'
+      importBlock = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Upload Full POS Sales</span>' + App.freqTag('As needed') + '</div>'
         + '<div style="font-size:11px;color:var(--t3);margin:-4px 0 12px;">Breaks your variance down to every product, recipe-level.</div>'
         + '<div id="vr-import"></div></div>'
         + '<div id="vr-import-actions"></div>';
