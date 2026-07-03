@@ -2194,7 +2194,7 @@ const App = {
   // Shift). Sits above the weekly cockpit and disappears once every step's data
   // exists. steps: [{ num, label, screen, done }]; sectionLabel e.g. 'Inventory'.
   // Step chips link to their setup screen via data-go (each cockpit's wire handles it).
-  controlGetStarted(sectionLabel, steps) {
+  controlGetStarted(sectionLabel, steps, kind) {
     if (!steps || !steps.length || steps.every(s => s.done)) return '';
     const numWord = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' }[steps.length] || steps.length;
     const chip = s =>
@@ -2205,7 +2205,7 @@ const App = {
       + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + esc(s.label) + '</span></div>';
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + numWord + ' steps to getting started in ' + esc(sectionLabel) + ' Control.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + numWord + ' steps to getting started in ' + esc(sectionLabel) + ' ' + (kind || 'Control') + '.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + steps.map(chip).join('') + '</div>'
       + '</div>';
   },
