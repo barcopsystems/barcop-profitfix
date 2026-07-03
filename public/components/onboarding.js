@@ -39,12 +39,6 @@ const Onboarding = {
       + '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
       + '</div>';
 
-    const numbers = '<div style="' + this._help + '">A rough estimate is fine. No food sales? Enter zero.</div>'
-      + '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Bar Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-bar-rev" value="' + v(s.annual_bar_revenue) + '"/></div></div>'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Annual Food Sales</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ob-food-rev" value="' + v(s.annual_food_revenue) + '"/></div></div>'
-      + '</div>';
-
     const service = '<div style="' + this._help + '">Turn on the services you run. Tap one to set its hours.</div>'
       + '<div id="ob-sp-mount"></div>';
 
@@ -52,8 +46,7 @@ const Onboarding = {
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
       + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Set your basics below and you are ready to go.</div>'
       + this._section(1, 'The Basics', basics)
-      + this._section(2, 'Your Numbers', numbers)
-      + this._section(3, 'Service Periods', service)
+      + this._section(2, 'Service Periods', service)
       + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;text-align:center;"></div>'
       + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Continue to Bar Cop</button></div>';
 
@@ -63,7 +56,7 @@ const Onboarding = {
 
     document.getElementById('ob-name')?.focus();
     document.getElementById('ob-finish')?.addEventListener('click', () => this.finish());
-    ['ob-name', 'ob-city', 'ob-state', 'ob-bar-rev'].forEach(id => {
+    ['ob-name', 'ob-city', 'ob-state'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('ob-invalid'));
     });
   },
@@ -73,9 +66,9 @@ const Onboarding = {
     const showErr = m => { if (err) { err.textContent = m; err.style.display = 'block'; } };
     if (err) err.style.display = 'none';
 
-    // Required cells flag with a red border only, no message. Annual Food is optional.
+    // Required cells flag with a red border only, no message.
     let firstBad = null;
-    ['ob-name', 'ob-city', 'ob-state', 'ob-bar-rev'].forEach(id => {
+    ['ob-name', 'ob-city', 'ob-state'].forEach(id => {
       const el = document.getElementById(id);
       const blank = !el || !(el.value || '').trim();
       el?.closest('.f')?.classList.toggle('ob-invalid', blank);
@@ -95,8 +88,6 @@ const Onboarding = {
     const state = document.getElementById('ob-state').value.trim();
     s.bar_name            = document.getElementById('ob-name').value.trim();
     s.city_state          = city && state ? city + ', ' + state : city || state || '';
-    s.annual_bar_revenue  = parseFloat(document.getElementById('ob-bar-rev').value)  || 0;
-    s.annual_food_revenue = parseFloat(document.getElementById('ob-food-rev').value) || 0;
     s.service_periods     = periods;
     s.onboarding_complete = true;
     await App.saveKey('settings');
