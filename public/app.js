@@ -1411,7 +1411,7 @@ const App = {
     ] },
     'flowmap': { title: 'How the Workflow Map Works', sections: [
       { h: 'What this is', p: ['The Workflow map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
-      { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Run This Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
+      { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Confirm the Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
       { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
