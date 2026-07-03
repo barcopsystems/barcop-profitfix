@@ -23,6 +23,17 @@ S.WeekHistory = {
       .filter(x => x.pe)
       .sort((a, b) => b.pe.localeCompare(a.pe));
   },
+  // Week-ends that have POS sales imported in Shift (so an unconfirmed one has
+  // something real to confirm). Keeps phantom empty weeks off a fresh account.
+  weeksWithData() {
+    const set = {};
+    ((App.shiftData && App.shiftData.sc_shifts) || []).forEach(s => {
+      if (!s.date || ((s.bar_revenue || 0) + (s.floor_revenue || 0) + (s.covers || 0)) === 0) return;
+      const pe = App.periodEndFor(App.weekStartFor(s.date));
+      if (pe) set[pe] = true;
+    });
+    return set;
+  },
   wk(pe) { return App.dateRangeLabel(App.weekStartFor(pe), pe); },
   totalRev(x) {
     const p = x.p || {};
@@ -34,14 +45,20 @@ S.WeekHistory = {
     const confirmed = this.joined();                       // confirmed weeks, newest first
     const byPe = {}; confirmed.forEach(x => { byPe[x.pe] = x; });
 
-    // A recent completed-week window so unconfirmed gaps surface as Confirm rows,
-    // merged with every confirmed week (which can go further back).
-    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    // Weeks shown = every confirmed week + any week with POS sales imported but
+    // never confirmed. Nothing else, so a fresh account is not littered with
+    // empty weeks that have nothing to confirm.
     const seen = {};
-    let pe = cur;
-    for (let i = 0; i < 10; i++) { seen[pe] = true; const d = new Date(pe + 'T00:00:00'); d.setDate(d.getDate() - 7); pe = App.ymdLocal(d); }
     confirmed.forEach(x => { seen[x.pe] = true; });
+    Object.keys(this.weeksWithData()).forEach(pe => { seen[pe] = true; });
     const rows = Object.keys(seen).sort((a, b) => b.localeCompare(a)).map(k => byPe[k] || { pe: k, p: null, r: null });
+
+    if (!rows.length) {
+      this.container.innerHTML = '<div class="screen"><div class="card form-card"><div class="card-title">Week History</div>'
+        + '<div style="font-size:13px;color:var(--t2);padding:2px 0;">No weeks yet. Confirm your week over in Close The Week and it shows up here.</div></div></div>';
+      this.wire();
+      return;
+    }
 
     // ── Latest confirmed week, laid out (or a placeholder when none yet) ──
     const stat = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
