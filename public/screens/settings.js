@@ -12,7 +12,7 @@ S.HubSettings = {
   // ServicePeriods and saves the sections actually present, so a subset renders
   // safely.
   _GROUPS: {
-    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'tax', 'service'] },
+    'business-profile': { title: 'Business Profile', action: 'settings-profile', ids: ['profile', 'service', 'tax'] },
     'recovery-targets': { title: 'Recovery Targets', action: 'settings-targets', ids: ['profit', 'revenue'] }
   },
 
@@ -32,20 +32,37 @@ S.HubSettings = {
       { id:'revenue', title:'Revenue Targets',           body:this.secRevenue(),       save:true }
     ];
     const grp = this._GROUPS[group];
-    const secs = grp ? allSecs.filter(s => grp.ids.indexOf(s.id) !== -1) : allSecs;
+    const secs = grp ? grp.ids.map(id => allSecs.find(s => s.id === id)).filter(Boolean)
+                     : allSecs;
     container.scrollTop = 0;
 
-    const cards = secs.map(s =>
-      '<div class="card form-card" data-section="' + s.id + '" style="margin-bottom:16px;">'
-      + this.sectionHead(s.id, s.title, s.save)
-      + s.body
-      + '</div>'
-    ).join('');
+    let inner;
+    if (group === 'business-profile') {
+      // All sections in ONE card, separated by full-bleed divider lines, with a
+      // single gold Save Data button outside the card (bottom-left) that saves
+      // every section at once.
+      const parts = secs.map((s, i) =>
+        (i > 0 ? '<div style="border-top:1px solid var(--b2);margin:22px -20px 20px;"></div>' : '')
+        + '<div data-section="' + s.id + '">'
+        + '<div class="sh">' + esc(s.title) + '</div>'
+        + s.body
+        + '</div>'
+      ).join('');
+      inner = '<div class="card form-card" style="margin-bottom:0;">' + parts + '</div>'
+        + '<div style="display:flex;align-items:center;gap:12px;margin:16px 0 24px;">'
+        +   '<button class="btn btn-primary hs-save-all">Save Data</button>'
+        +   '<span class="hs-msg" data-msg="all" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
+        + '</div>';
+    } else {
+      inner = secs.map(s =>
+        '<div class="card form-card" data-section="' + s.id + '" style="margin-bottom:16px;">'
+        + this.sectionHead(s.id, s.title, s.save)
+        + s.body
+        + '</div>'
+      ).join('');
+    }
 
-    container.innerHTML =
-      '<div class="screen">'
-      + cards
-      + '</div>';
+    container.innerHTML = '<div class="screen">' + inner + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire(container);
   },
@@ -133,6 +150,8 @@ S.HubSettings = {
     container.querySelectorAll('.hs-save').forEach(btn => {
       btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
     });
+    const saveAll = container.querySelector('.hs-save-all');
+    if (saveAll) saveAll.addEventListener('click', () => this.saveBusinessProfile());
     const spMount = container.querySelector('#hs-sp-mount');
     if (spMount && window.ServicePeriods) {
       this._spCtrl = ServicePeriods.mount(spMount, { selected: App.servicePeriods() });
@@ -144,10 +163,11 @@ S.HubSettings = {
     if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 2500); }
   },
 
-  // ── Per-section save — writes only that section's existing keys ─────────────
-  saveSection(which) {
+  // ── Write one section's fields into the live stores; return the App.data keys
+  // to persist ([] = nothing to push, e.g. Taxes writes device-local + Labor),
+  // or null when validation fails (Service Periods) so the caller aborts. ──────
+  _writeSection(which) {
     const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
-    const keys = [];
 
     if (which === 'profile') {
       const s = App.data.settings;
@@ -159,12 +179,12 @@ S.HubSettings = {
       s.city_state          = city && state ? city + ', ' + state : city || state || '';
       s.annual_bar_revenue  = numOr('hs-abr', 0);
       s.annual_food_revenue = numOr('hs-afr', 0);
-      keys.push('settings');
       // Filling the profile here (not just via onboarding) checks off the setup step.
       if (s.bar_name && App.markSetupDone) App.markSetupDone('gs_profile');
+      return ['settings'];
     } else if (which === 'tax') {
       // Cross-section financial settings live on this device via CashEngine,
-      // not in App.data, so there are no keys to push (Promise.all([]) flashes Saved).
+      // not in App.data, so there are no App.data keys to push.
       if (window.CashEngine) {
         CashEngine.setSalesTaxRate(document.getElementById('hs-tax')?.value || '');
         CashEngine.setTaxFrequency(document.getElementById('hs-freq')?.value || 'monthly');
@@ -172,22 +192,23 @@ S.HubSettings = {
       }
       // State minimum wage feeds the Labor tip-credit check; it lives in Labor's
       // data store (loaded at boot, so this never clobbers it), so write it there
-      // and persist. The 'tax' branch pushes no App.data keys, so this is the save.
+      // and persist it directly.
       App.laborData = App.laborData || {};
       App.laborData.settings = App.laborData.settings || {};
       const mwRaw = document.getElementById('hs-minwage')?.value;
       App.laborData.settings.state_min_wage = (mwRaw === '' || mwRaw == null) ? null : (parseFloat(mwRaw) || 0);
       App.saveLabor();
+      return [];
     } else if (which === 'service') {
       const all = this._spCtrl ? this._spCtrl.value() : [];
       const errEl = document.getElementById('hs-sp-err');
       const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
-      if (all.some(p => !(p.name || '').trim())) { showErr('Name your custom period, or turn it off.'); return; }
+      if (all.some(p => !(p.name || '').trim())) { showErr('Name your custom period, or turn it off.'); return null; }
       const periods = all.filter(p => p && p.name);
-      if (!periods.length) { showErr('Pick at least one service period.'); return; }
+      if (!periods.length) { showErr('Pick at least one service period.'); return null; }
       if (errEl) errEl.style.display = 'none';
       App.data.settings.service_periods = periods;
-      keys.push('settings');
+      return ['settings'];
     } else if (which === 'profit') {
       const s = App.data.settings;
       s.targets = Object.assign({}, s.targets, {
@@ -200,7 +221,7 @@ S.HubSettings = {
       // can't disagree with the single labor_cost_pct.
       delete s.targets.bar_labor_cost_pct;
       delete s.targets.food_labor_cost_pct;
-      keys.push('settings');
+      return ['settings'];
     } else if (which === 'revenue') {
       const rs = App.data.revenue_settings = App.data.revenue_settings || {};
       rs.targets = Object.assign({}, rs.targets, {
@@ -215,11 +236,15 @@ S.HubSettings = {
       delete rs.targets.bar_labor_pct;
       delete rs.targets.kitchen_labor_pct;
       delete rs.targets.floor_labor_pct;
-      keys.push('revenue_settings');
-    } else {
-      return;
+      return ['revenue_settings'];
     }
+    return null;
+  },
 
+  // ── Per-section save (Recovery Targets page uses this per card) ─────────────
+  saveSection(which) {
+    const keys = this._writeSection(which);
+    if (keys == null) return;  // validation failed
     Promise.all(keys.map(k => App.saveKey(k))).then(() => {
       this._flashSaved(which);
       App.updatePeriod();
@@ -230,6 +255,22 @@ S.HubSettings = {
         App.markSetupDone('gs_targets');
       }
       if (which === 'service') App.markSetupDone('gs_service_periods');
+    });
+  },
+
+  // ── Business Profile save — one button writes Profile + Service Periods +
+  // Taxes together. Service Periods is validated first so a bad daypart aborts
+  // the whole save (nothing writes half-done). ───────────────────────────────
+  saveBusinessProfile() {
+    const svcKeys = this._writeSection('service');
+    if (svcKeys == null) return;  // service-period validation failed
+    const keys = new Set(svcKeys);
+    (this._writeSection('profile') || []).forEach(k => keys.add(k));
+    (this._writeSection('tax') || []).forEach(k => keys.add(k));
+    Promise.all([...keys].map(k => App.saveKey(k))).then(() => {
+      this._flashSaved('all');
+      App.updatePeriod();
+      App.markSetupDone('gs_service_periods');
     });
   },
 
