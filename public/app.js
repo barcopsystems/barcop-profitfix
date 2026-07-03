@@ -2511,6 +2511,21 @@ const App = {
   tipOutEnabled() {
     return ((this.laborData && this.laborData.lc_positions) || []).some(p => p.tipped && (parseFloat(p.tip_out_pct) || 0) > 0);
   },
+  // How a role's tip-out percent is applied: 'tips' = a percent of the tips they
+  // made (common 10-20%), 'sales' = a percent of their sales (common 1-2%).
+  // Set per position; defaults to 'sales' so older records read the same as before.
+  tipOutBasisFor(s) {
+    const p = this.positionFor(s);
+    return (p && p.tip_out_basis === 'tips') ? 'tips' : 'sales';
+  },
+  // The dollar tip-out a payer owes: their percent applied to the right basis
+  // (their sales, or their gross tips). One place so every entry path agrees.
+  tipOutPaid(s, sales, grossTips) {
+    const pct = this.tipOutPctFor(s);
+    if (pct <= 0) return 0;
+    const base = this.tipOutBasisFor(s) === 'tips' ? (parseFloat(grossTips) || 0) : (parseFloat(sales) || 0);
+    return base > 0 ? base * pct / 100 : 0;
+  },
   // Net tip income for one tip record: gross tips minus any tip-out this person
   // paid out, plus any tip-out they received. This is the honest figure the
   // tip-credit check and payroll worksheet read — Bar Cop computes the amount;
