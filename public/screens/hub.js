@@ -431,17 +431,17 @@ S.Hub = {
       + '</div>'
       + '</div></div>';
 
-    // ── Needs Attention band: the fires (alerts) + section-less cadence nudges
+    // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
     //    card. Condition-gated, so it is never a nag; collapses to All Clear. ──
-    const cadence = [];
+    const dueItems = [];
     (function () {
       const now = new Date();
       if (now.getDate() <= 10) {
         const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lmKey = App.ymdLocal(lm).slice(0, 7);
         const hasLastMo = (pWeeks || []).some(w => (((w.period_end || '') + '').slice(0, 7)) === lmKey);
-        if (hasLastMo) cadence.push({ sev:'due', label:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books', value:'month-end', go:'S.HubBooks&&S.HubBooks.open()' });
+        if (hasLastMo) dueItems.push({ sev:'due', label:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books', value:'month-end', go:'S.HubBooks&&S.HubBooks.open()' });
       }
     })();
     const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
@@ -480,7 +480,7 @@ S.Hub = {
     // ── Needs Attention: operational outliers only (permits, certs, OT, cash,
     //    maintenance, vendor, loss-prevention, month-end Books). Act Now over Keep
     //    An Eye. Audits + recovery leaks live elsewhere. ──
-    const bandItems = this.forwardAlerts().concat(cadence);
+    const bandItems = this.forwardAlerts().concat(dueItems);
     let needsBand;
     if (bandItems.length) {
       const critical = bandItems.filter(a => a.sev === 'bad');

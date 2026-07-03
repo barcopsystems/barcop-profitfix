@@ -110,7 +110,7 @@ S.AuditTracker = {
       AuditUI.sectionBlock(3, NAMES[2], d.S3_SCORE, [
         ['Inventory Variance $',    cur(d.S3_INV_VARIANCE_DOLLAR), d.S3_INV_VARIANCE_DOLLAR > 0 ? 'warn' : ''],
         ['Inventory Variance %',    d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : '', d.S3_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
-        ['Count Cadence',           d.S3_COUNT_CADENCE, /monthly|not counted/i.test(d.S3_COUNT_CADENCE||'') ? 'warn' : (d.S3_COUNT_CADENCE ? 'good' : '')],
+        ['Count Frequency',         d.S3_COUNT_FREQ, /not counted/i.test(d.S3_COUNT_FREQ||'') ? '' : (/monthly/i.test(d.S3_COUNT_FREQ||'') ? 'warn' : (d.S3_COUNT_FREQ ? 'good' : ''))],
         ['Counts This Period',      num(d.S3_COUNTS_IN_PERIOD)],
         ['Spot Checks',             num(d.S3_SPOT_CHECKS)],
         ['Spot Check Variance $',   cur(d.S3_SPOT_VARIANCE_DOLLAR), d.S3_SPOT_VARIANCE_DOLLAR > 300 ? 'warn' : ''],
@@ -267,7 +267,7 @@ S.AuditTracker = {
       [3, NAMES[2], d.S3_SCORE, [
         ['Inventory Variance $',   cur(d.S3_INV_VARIANCE_DOLLAR)],
         ['Inventory Variance %',   d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : ''],
-        ['Count Cadence',          d.S3_COUNT_CADENCE],
+        ['Count Frequency',        d.S3_COUNT_FREQ],
         ['Counts This Period',     num(d.S3_COUNTS_IN_PERIOD)],
         ['Spot Checks',            num(d.S3_SPOT_CHECKS)],
         ['Spot Check Variance $',  cur(d.S3_SPOT_VARIANCE_DOLLAR)],
@@ -440,7 +440,7 @@ S.AuditTracker = {
     // S3 Shrink is diagnostic: its dollar already lives inside the pour and food
     // gaps above, so it surfaces the where (monthly_impact 0, never re-added).
     if (d.S3_INV_VARIANCE_DOLLAR > 0 && (d.S3_INV_VARIANCE_PCT == null || d.S3_INV_VARIANCE_PCT > 2)) items.push({ action: 'Work your inventory variance. $' + Math.round(d.S3_INV_VARIANCE_DOLLAR) + ' of product was used but never rung this period. Count weekly, run the variance report, and chase the biggest negative lines in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
-    if (/monthly|not counted/i.test(d.S3_COUNT_CADENCE || '')) items.push({ action: 'Count more often. Inventory is running ' + String(d.S3_COUNT_CADENCE).toLowerCase() + '. You cannot catch shrink you do not count for. Move to a weekly count.', monthly_impact: 0, gap_id: 'theft-loss' });
+    if (/monthly|not counted/i.test(d.S3_COUNT_FREQ || '')) items.push({ action: 'Count more often. Inventory is running ' + String(d.S3_COUNT_FREQ).toLowerCase() + '. You cannot catch shrink you do not count for. Move to a weekly count.', monthly_impact: 0, gap_id: 'theft-loss' });
     // S4 Theft: void/comp excess is a real distinct dollar.
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S4_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'theft-loss' });
     if (d.S4_SALES_INTEGRITY_FLAGS > 0) items.push({ action: 'Work your Sales Integrity flags. ' + d.S4_SALES_INTEGRITY_FLAGS + ' server' + (d.S4_SALES_INTEGRITY_FLAGS === 1 ? '' : 's') + ' flagged as an outlier worth a closer look. Open the investigation in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
