@@ -261,7 +261,7 @@ S.RevenueMenuItems = {
 
     let body;
     if (!all.length) {
-      body = '<div style="color:var(--t3);font-size:13px;margin-top:8px;">No menu items yet. Add your first one with the form above, or switch to Import File to bring your whole menu in at once.</div>';
+      body = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No menu items yet. Add your first one with the form above, or switch to Import File to bring your whole menu in at once.</div></div>';
     } else {
       const cats = [...new Set(all.map(i => i.category || 'Uncategorized'))]
         .sort((a, b) => {
