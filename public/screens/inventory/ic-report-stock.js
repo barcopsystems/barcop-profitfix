@@ -3,8 +3,8 @@
 /* ── Inventory Control — Stock Report (reads ic_counts + ic_deliveries) ───────
    What you have and where your cash sits, from a chosen count: value by
    category, by location, versus the prior count, ranked high/low, plus dead
-   stock (value on hand that did not move). Rankings by usage live in the
-   Movement Report; consumption in the Usage Report.
+   stock (value on hand that did not move). Rankings by usage and consumption
+   live in the Usage Report.
 
    Tabbed shell mirrors Labor Tip History: a .ch-tabs switcher over a stats
    card, a Filter heading with Export, the controls-only filter card, then the

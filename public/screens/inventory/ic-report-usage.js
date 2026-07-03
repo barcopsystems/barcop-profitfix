@@ -3,8 +3,9 @@
 /* ── Inventory Control — Usage Report (reads ic_counts + ic_deliveries) ───────
    Usage = Starting Stock + Purchases − Ending Stock, measured between two
    consecutive inventory counts. Pure consumption: per-product data, category
-   totals, and period-over-period history. Rankings live in the Movement Report,
-   on-hand value in the Stock Report, leaks in the Variance Report.
+   totals, period-over-period history, and rankings (fast/slow movers, trend,
+   vendor spend). On-hand value lives in the Stock Report, leaks in the Variance
+   Report.
 
    Tabbed shell mirrors Labor Tip History: a .ch-tabs switcher over a stats
    card, a Filter heading with Export, the controls-only filter card, then the
@@ -17,7 +18,7 @@ S.InventoryUsageReport = {
   catFilter: '',
   locFilter: '',
 
-  TABS: [['usage', 'Usage Data'], ['totals', 'Usage Totals'], ['history', 'Usage History']],
+  TABS: [['usage', 'Usage Data'], ['totals', 'Usage Totals'], ['fast', 'Fast Movers'], ['slow', 'Slow Movers'], ['trend', 'Trend vs Prior'], ['vendor', 'Vendor Spend'], ['history', 'Usage History']],
 
   countsAsc() {
     return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
@@ -74,8 +75,10 @@ S.InventoryUsageReport = {
       { p: ['Usage is what you actually burned through between two counts. Bar Cop figures it for you. Starting stock plus what you received minus what was left equals what you used. No POS needed, just your counts. Every product is measured in its own stock unit, so liquor and wine show up in bottles, draft in kegs, and bottle beer in cases.'] },
       { h: 'The Math, Spelled Out', p: ['Take a single product across one period. You counted forty bottles of Tito\'s at the front bar to start. A Republic National delivery brought in two cases, so twenty four bottles in. At the next count you had eighteen bottles left. Usage is forty plus twenty four minus eighteen, which is forty six bottles poured through. Bar Cop runs that for every product and every period off your counts and deliveries. A product only shows up for a period if it was in both the start and the end count; miss it on either one and it drops off that period, since there is no honest way to measure usage on a product you only counted once.'] },
       { h: 'Pick A Period', p: ['Step through your count periods with the arrows up top to choose which two counts to measure between, and the Latest button snaps back to your most recent. Everything on the page recomputes for what you pick. If you count weekly, each period is a week, and the report holds every period you have counted so you can compare a slow Tuesday-to-Tuesday against a festival week.'] },
-      { h: 'The Three Views', p: ['Usage Data is the per-product breakdown, grouped by category, with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
-      { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] }
+      { h: 'The Usage Views', p: ['Usage Data is the per-product breakdown, grouped by category, with the cost and theoretical sales behind each one. Usage Totals rolls the period up by category, so you see at a glance whether liquor or draft moved the most money. Usage History shows usage cost and theoretical profit for every period so you can watch the trend over time.'] },
+      { h: 'What Theoretical Means', p: ['Theoretical sales and profit are what the product you used should have rung up at menu price, before comps and waste. It is the ceiling, the best case if every ounce sold and nothing got spilled, comped, or over-poured. The Variance Report compares it against your real POS sales to find the leaks. A 750ml bottle of Tito\'s poured at a 1.5 oz spec is about seventeen pours, so forty six bottles is your theoretical pour count times your well price. That is the number reality gets measured against.'] },
+      { h: 'Fast And Slow Movers', p: ['Fast Movers are your top products by usage dollars: where the money goes and what to never run out of. Slow Movers are the bottom: cash tied up and candidates to stop over-ordering. Both rank by dollars across every category, so a cheap high-volume item does not outrank your good scotch, and each shows the top ten.'] },
+      { h: 'Trend And Vendor Spend', p: ['Trend vs Prior shows how each product moved this period against the one before, grouped by category with the biggest swing first, so you catch an item taking off or falling off early. Vendor Spend groups your usage cost by vendor, which is your edge when you sit down to negotiate.'] }
     ]);
   },
 
@@ -110,6 +113,23 @@ S.InventoryUsageReport = {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">'
       + esc(msg || 'No products match this period and filter. Both counts must include the same products.') + '</td></tr>';
   },
+  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
+  qtyU(p, n) {
+    if (n == null || isNaN(n)) return '-';
+    const u = p ? App.unitAbbr(App.productUnit(p)) : '';
+    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
+    return u ? (num + ' ' + u) : num;
+  },
+  // Trend tables group by category, so they share a fixed colgroup (Product wide,
+  // the four data columns equal) and line their columns up down the page.
+  trendColgroup() {
+    let cols = '<col style="width:200px;"/>';
+    for (let i = 1; i < 5; i++) cols += '<col/>';
+    return '<colgroup>' + cols + '</colgroup>';
+  },
+  note(text) {
+    return '<div class="card"><div style="font-size:12px;color:var(--t3);padding:8px 0;">' + esc(text) + '</div></div>';
+  },
 
   // ── Render ────────────────────────────────────────────────────────────────
   render(container, actions) {
@@ -135,14 +155,27 @@ S.InventoryUsageReport = {
     const period = this.currentPeriod();
     const rows = this.filtered(period.rows);
 
-    const totCost = rows.reduce((s, r) => s + (r.usageCost || 0), 0);
-    const totSales = rows.reduce((s, r) => s + (r.theoSales || 0), 0);
-    const totProfit = rows.reduce((s, r) => s + (r.theoProfit || 0), 0);
-    const statsCard = this.statsCard(
-      this.statItem('Products', rows.length)
-      + this.statItem('Usage Cost', App.fmtCurrency(totCost))
-      + this.statItem('Theo Sales', App.fmtCurrency(totSales))
-      + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'));
+    // The ranking tabs (fast/slow/trend/vendor) read consumption, so they get the
+    // movement stat strip; the usage tabs keep the usage/theoretical strip.
+    let statsCard;
+    if (['fast', 'slow', 'trend', 'vendor'].indexOf(this.tab) !== -1) {
+      const moved = rows.filter(r => r.usageCost > 0);
+      const totalCost = moved.reduce((s, r) => s + r.usageCost, 0);
+      const vendors = new Set(moved.map(r => (r.product && r.product.vendor) || 'Unassigned')).size;
+      statsCard = this.statsCard(
+        this.statItem('Usage Cost', App.fmtCurrency(totalCost))
+        + this.statItem('Products Moved', moved.length)
+        + this.statItem('Vendors', vendors));
+    } else {
+      const totCost = rows.reduce((s, r) => s + (r.usageCost || 0), 0);
+      const totSales = rows.reduce((s, r) => s + (r.theoSales || 0), 0);
+      const totProfit = rows.reduce((s, r) => s + (r.theoProfit || 0), 0);
+      statsCard = this.statsCard(
+        this.statItem('Products', rows.length)
+        + this.statItem('Usage Cost', App.fmtCurrency(totCost))
+        + this.statItem('Theo Sales', App.fmtCurrency(totSales))
+        + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'));
+    }
 
     // Period = a windowed stepper (‹ prev · current · next ›, like the Build
     // Schedule week selector), so a long count history never becomes a wall of
@@ -214,6 +247,10 @@ S.InventoryUsageReport = {
   tabBody(rows) {
     if (this.tab === 'totals')  return this.tabTotals(rows);
     if (this.tab === 'history') return this.tabHistory();
+    if (this.tab === 'fast')    return this.tabRank(rows, true);
+    if (this.tab === 'slow')    return this.tabRank(rows, false);
+    if (this.tab === 'vendor')  return this.tabVendor(rows);
+    if (this.tab === 'trend')   return this.tabTrend(rows, this.priorPeriod());
     return this.tabUsage(rows);
   },
 
@@ -287,5 +324,102 @@ S.InventoryUsageReport = {
       + '<td>' + App.fmtCurrency(p.cost) + '</td>'
       + '<td class="' + (p.profit >= 0 ? 'pos' : 'neg') + '">' + App.fmtCurrency(p.profit) + '</td></tr>').join('');
     return this.dataCard(headers, body);
+  },
+
+  // ── Rankings (merged from the Movement Report): fast/slow movers ranked by
+  // dollars, period-over-period trend, and usage spend by vendor. ─────────────
+  priorPeriod() {
+    const asc = this.countsAsc();
+    const period = this.currentPeriod();
+    if (!period) return null;
+    const endIdx = asc.findIndex(c => c.id === period.endC.id);
+    if (endIdx < 2) return null;   // need a full period before this one
+    return { startC: asc[endIdx - 2], endC: asc[endIdx - 1] };
+  },
+
+  tabRank(rows, desc) {
+    const headers = '<th>Product</th><th></th><th>Units Used</th><th>Usage Cost</th>';
+    // Only products that actually moved (real dollar usage). Zero usage is dead
+    // stock, not a slow mover.
+    const ranked = [...rows].filter(r => r.usageCost != null && r.usageCost > 0)
+      .sort((a, b) => desc ? b.usageCost - a.usageCost : a.usageCost - b.usageCost).slice(0, 10);
+    if (!ranked.length) return this.dataCard(headers, '<tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products moved in this period. Both counts must include the same products.</td></tr>');
+    const max = Math.max(...ranked.map(r => Math.abs(r.usageCost)), 1);
+    const body = ranked.map(r => {
+      const pct = Math.min(100, Math.abs(r.usageCost) / max * 100);
+      return '<tr><td><div class="val">' + esc(r.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);">' + esc(r.category || '') + '</div></td>'
+        + '<td style="width:40%;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + pct + '%;background:#283742;"></div></div></div></td>'
+        + '<td>' + this.qtyU(r.product, r.used) + '</td>'
+        + '<td class="val">' + App.fmtCurrency(r.usageCost) + '</td></tr>';
+    }).join('');
+    return this.dataCard(headers, body);
+  },
+
+  tabVendor(rows) {
+    const headers = '<th>Vendor</th><th>Products</th><th></th><th>Usage Cost</th><th>% of Total</th>';
+    const byVendor = {};
+    rows.forEach(r => {
+      const v = (r.product && r.product.vendor) || 'Unassigned';
+      byVendor[v] = byVendor[v] || { count: 0, cost: 0 };
+      byVendor[v].count++; byVendor[v].cost += r.usageCost || 0;
+    });
+    const list = Object.keys(byVendor).map(v => ({ vendor: v, ...byVendor[v] }))
+      .filter(x => x.cost > 0).sort((a, b) => b.cost - a.cost);
+    if (!list.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No usage cost to attribute in this period.</td></tr>');
+    const total = list.reduce((s, x) => s + x.cost, 0);
+    const max = list[0].cost || 1;
+    const body = list.map(x => {
+      const pct = Math.min(100, x.cost / max * 100);
+      return '<tr><td><div class="val">' + esc(x.vendor) + '</div></td>'
+        + '<td>' + x.count + '</td>'
+        + '<td style="width:34%;"><div style="display:flex;align-items:center;gap:8px;">'
+        + '<div style="flex:1;height:8px;background:var(--input);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + pct + '%;background:#283742;"></div></div></div></td>'
+        + '<td class="val">' + App.fmtCurrency(x.cost) + '</td>'
+        + '<td>' + (total ? (x.cost / total * 100).toFixed(1) : '0.0') + '%</td></tr>';
+    }).join('');
+    return this.dataCard(headers, body);
+  },
+
+  tabTrend(curRows, prior) {
+    const headers = '<th>Product</th><th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
+    if (!prior) return this.note('Trend needs a prior count period. Submit a third count to compare two periods.');
+    const priorRows = this.computeForPair(prior.startC, prior.endC);
+    const priorMap = {};
+    priorRows.forEach(r => priorMap[r.pid] = r.used);
+    const rows = curRows.map(r => {
+      const prev = priorMap[r.pid];
+      const change = prev != null ? r.used - prev : null;
+      const changePct = prev ? change / prev * 100 : null;
+      return { name: r.name, category: r.category, unit: App.unitAbbr(App.productUnit(r.product)), prev: prev != null ? prev : null, cur: r.used, change, changePct };
+    });
+    if (!rows.length) return this.dataCard(headers, '<tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No products moved in this period.</td></tr>');
+    // Direction shown by an arrow + sign; usage going up or down is an observation
+    // to read, not inherently good or bad, so the value stays neutral (no color).
+    const restHeaders = '<th>Prior Period</th><th>This Period</th><th>Change</th><th>Change %</th>';
+    const rowHtml = r => {
+      const arrow = r.change == null ? '' : r.change > 0.05 ? '&#9650; ' : r.change < -0.05 ? '&#9660; ' : '';
+      const u = r.unit ? ' ' + r.unit : '';
+      return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
+        + '<td>' + (r.prev != null ? esc(r.prev.toFixed(1) + u) : '<span style="color:var(--t4);">new</span>') + '</td>'
+        + '<td>' + esc(r.cur.toFixed(1) + u) + '</td>'
+        + '<td>' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
+        + '<td>' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
+        + '</tr>';
+    };
+    const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
+    const byCat = {};
+    rows.forEach(r => { const c = r.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(r); });
+    const cats = Object.keys(byCat).sort((a, b) => {
+      const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || a.localeCompare(b);
+    });
+    return cats.map(c => {
+      const catRows = byCat[c].slice().sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
+      return this.dataCard('<th>' + esc(c) + '</th>' + restHeaders, catRows.map(rowHtml).join(''), this.trendColgroup());
+    }).join('');
   }
 };

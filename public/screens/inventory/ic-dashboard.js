@@ -432,7 +432,7 @@ S.InventoryDashboard = {
     const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0 || st.menuOver > 0;
     return line('Shrinkage written off (30d)', App.fmtCurrency(st.shrink), 'ic-adjustments', st.shrink > 0)
       + line('Spot-check flags (30d)', String(st.spotFlags), 'ic-spot-check', st.spotFlags > 0)
-      + line('Dead stock items', String(st.deadAll), 'ic-report-movers', st.deadAll > 0)
+      + line('Dead stock items', String(st.deadAll), 'ic-report-usage', st.deadAll > 0)
       + line('Menu items over cost target', String(st.menuOver), 'recipe-cost-analysis', st.menuOver > 0, true)
       + (anyFlag ? '' : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">Nothing flagged in the last 30 days. Clean.</div>')
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Open Variance</button>' + this.markBtn('review', 'Mark Reviewed'));
