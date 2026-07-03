@@ -24,7 +24,7 @@
    PROFIT sections (reworked):
      S1 Pour & Bar Cost   — bar cost % vs target + recipe-costing coverage
      S2 Food Cost         — food cost % vs target + recipe-costing coverage
-     S3 Shrink & Waste    — inventory variance + spot checks + waste + count cadence
+     S3 Shrink & Waste    — inventory variance + spot checks + waste + count frequency
      S4 Theft & Cash Loss — void/comp rate, unauthorized voids, cash shorts,
                             walked tabs, Sales Integrity flags
      S5 Vendor Cost Control — deliveries checked, price drift caught, credit chase
@@ -171,8 +171,8 @@ function computeProfitAudit(appData, controlData) {
   const invCounts = num(cd.inventory_counts) || 0;
   const shrinkDollar = round0((invVarDollar != null ? Math.abs(invVarDollar) : 0) + (wasteTotal != null ? wasteTotal : 0));
   const invVarPct = (invVarDollar != null && totalCogsPeriod > 0) ? round1((Math.abs(invVarDollar) / totalCogsPeriod) * 100) : null;
-  const cadenceRatio = invCounts > 0 ? Math.min(1, invCounts / expectedCounts) : null;
-  const countCadence = invCounts <= 0 ? 'Not counted this period'
+  const freqRatio = invCounts > 0 ? Math.min(1, invCounts / expectedCounts) : null;
+  const countFreq = invCounts <= 0 ? 'Not counted this period'
     : invCounts >= expectedCounts ? 'Weekly'
     : invCounts >= Math.max(1, Math.round(expectedCounts / 2)) ? 'Every other week'
     : 'Monthly or less';
@@ -181,7 +181,7 @@ function computeProfitAudit(appData, controlData) {
   if (haveShrink) {
     const parts = [];
     if (invVarPct != null) parts.push(invVarPct <= 1 ? 90 : invVarPct <= 2 ? 70 : invVarPct <= 3 ? 50 : invVarPct <= 5 ? 35 : 20);
-    if (cadenceRatio != null) parts.push(clampScore(cadenceRatio * 90 + 10)); // weekly -> 100, monthly-in-4wk -> ~32
+    if (freqRatio != null) parts.push(clampScore(freqRatio * 90 + 10)); // weekly -> 100, monthly-in-4wk -> ~32
     if (spotChecks > 0) {
       const spotScore = (spotVarDollar != null && totalCogsPeriod > 0)
         ? Math.max(20, 100 - Math.round((Math.abs(spotVarDollar) / totalCogsPeriod) * 100 * 20))
@@ -307,7 +307,7 @@ function computeProfitAudit(appData, controlData) {
     S3_SPOT_FLAGGED: spotFlagged != null ? round0(spotFlagged) : null,
     S3_WASTE_TOTAL: wasteTotal != null ? round0(wasteTotal) : null,
     S3_COUNTS_IN_PERIOD: invCounts || null,
-    S3_COUNT_CADENCE: countCadence,
+    S3_COUNT_FREQ: countFreq,
     S3_SHRINK_PERIOD: shrinkDollar || null,
     S3_MONTHLY_GAP: 0,
 
@@ -622,7 +622,7 @@ if (require.main === module) {
     ['S2 monthly gap', d.S2_MONTHLY_GAP, expS2Gap],
     ['S3 Shrink scored from variance data', d.S3_SCORE != null && d.S3_SCORE >= 1, true],
     ['S3 shows variance dollar', d.S3_INV_VARIANCE_DOLLAR, 1400],
-    ['S3 count cadence weekly (4 in 4wk)', d.S3_COUNT_CADENCE, 'Weekly'],
+    ['S3 count frequency weekly (4 in 4wk)', d.S3_COUNT_FREQ, 'Weekly'],
     ['S3 adds NO recoverable dollar', d.S3_MONTHLY_GAP, 0],
     ['S4 void/comp pct', d.S4_VOID_COMP_PCT, expVoidPct],
     ['S4 monthly gap', d.S4_MONTHLY_GAP, expS4Gap],
