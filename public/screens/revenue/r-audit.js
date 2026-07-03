@@ -35,11 +35,11 @@ S.RevenueAudit = {
     const cd = this.buildControlData() || {};
     const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
     return [
-      { label: 'This week confirmed in Close The Week', done: cd.check_average != null, go: 'r-dashboard' },
       { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
       { label: 'Menu items priced with covers',        done: costedMenu.length >= 4, go: 'r-menu-items' },
       { label: 'Server checks logged',                 done: (App.data.revenue_server_checks || []).length >= 3, go: 'r-server-check' },
-      { label: 'Events booked',                        done: (App.data.bookings || []).length > 0, go: 'ev-dashboard' }
+      { label: 'Events booked',                        done: (App.data.bookings || []).length > 0, go: 'ev-dashboard' },
+      { label: 'Confirm the week',                     done: cd.check_average != null, go: 'r-dashboard' }
     ];
   },
 
@@ -266,7 +266,7 @@ S.RevenueAudit = {
     App.showHelpModal('How the Revenue Audit Works', [
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
       { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically. Your sales come from the weeks you close, and until the first one is in Bar Cop asks once for last week\'s bar and food sales so the score has real numbers to work from. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
-      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, hours logged, menu items priced with covers, server checks logged, and events booked. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
+      { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: hours logged, menu items priced with covers, server checks logged, events booked, and the week confirmed. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
       { h: 'The steps', p: ['1. Get your week in: confirm the week in Close The Week and log your Control data. 2. Generate. If no week is closed yet, enter last week\'s bar and food sales when Bar Cop asks. Sections with no data show N/A and fill in over time.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run it whenever you want a fresh read; it scores your trailing four weeks, and Bar Cop keeps one record a day so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
