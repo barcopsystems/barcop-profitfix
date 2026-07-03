@@ -92,6 +92,7 @@ S.ShiftChecklists = {
   },
 
   render(container, actions) {
+    if (S.ShiftChecklistTemplates && S.ShiftChecklistTemplates.ensureStarters) S.ShiftChecklistTemplates.ensureStarters();
     this.container = container;
     if (actions) actions.innerHTML = '';
     // Default the toggle to the checklist that fits the time of day, once.

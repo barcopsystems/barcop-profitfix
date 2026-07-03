@@ -24,7 +24,77 @@ S.ShiftChecklistTemplates = {
     return (S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || [];
   },
 
+  // ── Starter checklists ──────────────────────────────────────────────────────
+  // A fresh account should not land on an empty page. Seed a ready-to-use set the
+  // operator can run, print, edit, or delete. Fires once per account (flagged), so
+  // a deleted starter never comes back and an account that already has checklists
+  // (the demo, or a returning user) is left untouched.
+  STAFF_STARTERS: [
+    { name: 'Bar Open', items: [
+      'Unlock and stock the well: liquor, mixers, juices, garnishes', 'Fill ice wells and check the ice machine',
+      'Cut fruit and prep garnishes', 'Brew coffee and stock tea', 'Check draft lines pouring clean, no foam',
+      'Wipe down bar top, rail, and speed racks', 'Stock napkins, straws, picks, and coasters',
+      'Count and set the bar drawer', 'Check glassware stocked and polished', 'Note any 86d bottles or low stock' ] },
+    { name: 'Bar Close', items: [
+      'Last call and close all open tabs', 'Break down and clean the well, no bottles left out',
+      'Empty, rinse, and refill ice wells', 'Wash and dry all glassware and bar tools',
+      'Wipe down bar top, rail, speed racks, and stools', 'Restock liquor, beer, and mixers to par for open',
+      'Rinse soda guns and pour drains', 'Cover garnish tray and store cut fruit',
+      'Pull mats and hose or mop the bar floor', 'Drop the drawer and record over or short',
+      'Turn off TVs, music, and signage; lock liquor storage' ] },
+    { name: 'Kitchen Open', items: [
+      'Turn on the line: grill, fryers, flat top, ovens', 'Check walk-in and reach-in temps and log them',
+      'Pull and date prep from the walk-in', 'Stock the line: proteins, sauces, garnishes',
+      'Fill and heat sanitizer buckets, set test strips', 'Check fryer oil, filter or change if needed',
+      'Stock paper, gloves, and to-go containers', 'Turn on the dish machine, check wash and rinse temps',
+      'Review the 86 list and prep list with the team', 'Set up handwashing stations' ] },
+    { name: 'Kitchen Close', items: [
+      'Break down and clean the line, wrap and date all product', 'Turn off and clean grill, fryers, flat top, ovens',
+      'Filter or change fryer oil per schedule', 'Log final walk-in and reach-in temps',
+      'Run and break down the dish machine, clean filters', 'Empty and sanitize trash, take out to the dumpster',
+      'Sweep and mop the kitchen and dish floors', 'Clean and sanitize prep surfaces and cutting boards',
+      'Restock paper, gloves, and containers for open', 'Update the prep list for tomorrow',
+      'Turn off hood, lights, and equipment; lock the walk-in' ] },
+    { name: 'Server Open', items: [
+      'Clock in and check the floor plan and your section', 'Set and wipe tables: silverware, napkins, condiments',
+      'Stock your station: napkins, straws, to-go boxes', 'Fill water pitchers and stock ice',
+      'Brew coffee and iced tea', 'Check specials, the 86 list, and any menu changes',
+      'Roll silverware to par', 'Wipe down menus and check for damage',
+      'Confirm your POS login and printer', 'Check restrooms stocked and clean' ] },
+    { name: 'Server Close', items: [
+      'Close out all tabs and run your checkout report', 'Wipe down and reset every table in your section',
+      'Restock station: napkins, straws, condiments, to-go', 'Roll silverware to par for open',
+      'Refill salt, pepper, and condiment caddies', 'Wipe down menus and stack them neatly',
+      'Empty and wipe down your station and trash', 'Sweep your section and push in chairs',
+      'Complete your tip-out and record it', 'Check with the manager before you leave' ] },
+    { name: 'Floor Open', items: [
+      'Unlock front doors and turn on the open sign', 'Set lights, music, and TVs to open levels',
+      'Set the host stand: menus, seating chart, pens', 'Wipe down front door glass and entry',
+      'Check dining room tables clean, level, and set', 'Confirm reservations and note large parties',
+      'Check restrooms stocked, clean, and dry', 'Straighten the waiting area and stock to-go menus',
+      'Set the thermostat to service temperature', 'Walk the floor for anything broken or out of place' ] },
+    { name: 'Floor Close', items: [
+      'Lock front doors after the last guest, flip the sign', 'Reset the dining room: tables, chairs, booths',
+      'Wipe down host stand, menus, and entry glass', 'Straighten and stock the waiting area',
+      'Check restrooms cleaned and restocked', 'Turn down or off lights, music, and TVs',
+      'Empty front-of-house trash', 'Sweep and spot-mop the entry and dining room',
+      'Set the thermostat to overnight', 'Final walk: windows, doors, and the back exit locked' ] }
+  ],
+  ensureStarters() {
+    if (!App.shiftData) App.shiftData = {};
+    if (App.shiftData.sc_starter_seeded) return;
+    const list = this.templates();
+    if (list.length > 0) { App.shiftData.sc_starter_seeded = true; return; }   // already has checklists
+    const mk = (name, type, items) => ({ id: App.uid(), name, type, items: (items || []).slice(), created_at: new Date().toISOString() });
+    list.push(mk('Manager Opening', 'Opening', (S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || []));
+    list.push(mk('Manager Closing', 'Closing', (S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || []));
+    this.STAFF_STARTERS.forEach(s => list.push(mk(s.name, 'Print', s.items)));
+    App.shiftData.sc_starter_seeded = true;
+    App.saveShift();
+  },
+
   render(container, actions) {
+    this.ensureStarters();
     this.container = container;
     this.actions = actions;
     if (this.actions) this.actions.innerHTML = '';
