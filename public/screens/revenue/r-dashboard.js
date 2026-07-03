@@ -253,8 +253,7 @@ S.RevenueDashboard = {
     if (k === 'audit') {
       const as = this._auditState();
       if (!as.latest || as.score == null) return this._META.audit.sub;
-      if (as.due) return 'Due now &middot; last scored ' + as.score + (as.daysSince != null ? ', ' + as.daysSince + 'd ago' : '');
-      return 'Current &middot; scored ' + as.score + ' &middot; next due in ' + (7 - as.daysSince) + 'd';
+      return 'Scored ' + as.score + (as.due ? ' &middot; run a fresh one' : '');
     }
     return '';
   },
@@ -347,9 +346,9 @@ S.RevenueDashboard = {
     if (!as.latest || as.score == null) {
       lead = 'Run your first Revenue audit. It scores the whole top line and lists every gap with the dollars a year it costs you, which is what feeds the steps above.';
     } else if (as.due) {
-      lead = 'It has been ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' since your last Revenue audit (scored ' + scored + '). Run a fresh one to rescore the top line and refresh the leak board.';
+      lead = 'Your last Revenue audit scored ' + scored + '. Run a fresh one to rescore the top line and refresh the leak board.';
     } else {
-      lead = 'Your Revenue audit is current, scored ' + scored + ' ' + as.daysSince + ' day' + (as.daysSince === 1 ? '' : 's') + ' ago. You are good here for the week. Run a fresh one anytime you want to rescore the top line.';
+      lead = 'Your Revenue audit is current, scored ' + scored + '. Run a fresh one anytime you want to rescore the top line.';
     }
     return explain(lead)
       + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-audit">' + (as.due ? 'Run Revenue Audit' : 'View Revenue Audit') + '</button><button class="btn btn-ghost btn-sm" data-go="r-fix">Revenue Fix</button>' + this.markBtn('audit', 'Mark Done'));
