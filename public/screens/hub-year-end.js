@@ -45,6 +45,17 @@ S.HubYearEnd = {
 
   // ── Render the picker screen ───────────────────────────────────────────────
   _render(mount) {
+    // No confirmed weeks yet: a new user should not land on a review for a year
+    // before they started. Show one clean guided card, the way the Weekly P&L
+    // Brief does, until there is a year worth reviewing.
+    if (!this._hasData()) {
+      mount.innerHTML = '<div class="screen"><div class="card form-card">'
+        + '<div class="card-title">Annual Review</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard through the year, and your Annual Review builds here, ready to generate.</div>'
+        + '</div></div>';
+      if (App.setHubTopbarActions) App.setHubTopbarActions('');
+      return;
+    }
     const years = this._availableYears();
     const defaultYear = years[0] || String(new Date().getFullYear() - 1);
     const yearOpts = years.map(y =>
@@ -69,7 +80,6 @@ S.HubYearEnd = {
         + '<span id="hy-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
-      + (this._hasData() ? '' : '<div class="card" style="padding:14px 20px;margin-top:16px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard through the year, and your Annual Review fills in here, ready to generate.</div></div>')
       + '</div>';
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');

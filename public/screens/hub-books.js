@@ -35,6 +35,17 @@ S.HubBooks = {
 
   // ── Render the picker screen ───────────────────────────────────────────────
   _render(mount) {
+    // No confirmed weeks yet: a new user should not land on a close-the-month
+    // picker for a month before they started. Show one clean guided card, the
+    // way the Weekly P&L Brief does, until there is something to close.
+    if (!(App.data?.weeks || []).some(w => w && w.period_end)) {
+      mount.innerHTML = '<div class="screen"><div class="card form-card">'
+        + '<div class="card-title">Month-End Books</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard and log your operating expenses, and your Month-End Books build here, ready to close.</div>'
+        + '</div></div>';
+      if (App.setHubTopbarActions) App.setHubTopbarActions('');
+      return;
+    }
     const months = this._availableMonths();
     const defaultMonth = months[0] || this._currentMonthKey();
     const monthOpts = months.map(m =>
@@ -76,28 +87,7 @@ S.HubBooks = {
   //    Generate File worksheet (gated by the export acknowledgment). Rebuilt when
   //    the month changes. ──────────────────────────────────────────────────────
   _reviewBlock(monthKey) {
-    // Day one, a full income statement of zeros reads like something broke, not
-    // like "nothing logged yet." When the month (and year to date) have no data,
-    // show a guided empty state instead of the snapshot.
-    if (!this._monthHasData(monthKey)) {
-      return '<div id="hb-is-content">'
-        + '<div class="sh" style="margin:24px 0 10px;">' + esc(this._monthLabel(monthKey)) + ' Snapshot</div>'
-        + '<div class="card" style="padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No data for ' + esc(this._monthLabel(monthKey)) + ' yet. Confirm your weeks from the Profit dashboard and log your operating expenses, and this month fills in here, month and year to date.</div></div>'
-        + '</div>';
-    }
     return '<div id="hb-is-content">' + this._incomeStatementCard(monthKey) + this._salesTaxCard(monthKey) + '</div>';
-  },
-
-  // Any revenue, cost, labor, or expense on the books for this month or year to
-  // date. Drives the snapshot vs empty-state choice above.
-  _monthHasData(monthKey) {
-    const M = this._aggregateMonth(monthKey), YTD = this._aggregateYTD(monthKey);
-    const opexSum = o => Object.values(o).reduce((s, v) => s + (v || 0), 0);
-    const any = x => x != null && !isNaN(x) && Math.abs(x) > 0.005;
-    return any(M.totalRev) || any(M.totalCogs) || any(M.totalLabor) || any(opexSum(this._opExSums(monthKey, false)))
-        || any(M.maintenance) || any(M.platformFees) || any(M.compsPolicy)
-        || any(YTD.totalRev) || any(YTD.totalCogs) || any(YTD.totalLabor) || any(opexSum(this._opExSums(monthKey, true)))
-        || any(YTD.maintenance) || any(YTD.platformFees) || any(YTD.compsPolicy);
   },
 
   // ── On-screen Income Statement (the same numbers as the export, readable
