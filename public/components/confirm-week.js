@@ -134,7 +134,7 @@ const ConfirmWeek = {
       +   '<div style="min-height:36px;display:flex;align-items:center;font-size:13px;color:var(--t2);">' + (evRev > 0 ? money(evRev) + ' from bookings' : 'None this week') + '</div></div>'
       + '</div>';
 
-    const manual = '<div style="border-top:1px solid var(--b2);margin:2px -20px 16px;"></div>'
+    const manual = '<div style="border-top:1px solid var(--b2);margin:2px 0 16px;"></div>'
       + '<div class="sh" style="margin:0 0 10px;">Optional</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div class="f" style="width:180px;"><label>Ancillary Revenue</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-rev"/></div></div>'
