@@ -190,9 +190,9 @@ S.RevenueDashboard = {
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
     return App.controlGetStarted('Revenue', [
-      { num: 1, label: 'Run your first Revenue Audit', screen: 'r-audit',     done: hasAudit },
-      { num: 2, label: 'Set up Shift Control',         screen: 'sc-dashboard', done: hasShift },
-      { num: 3, label: 'Set up Labor Control',         screen: 'lc-dashboard', done: hasLabor }
+      { num: 1, label: 'Set up Shift Control',         screen: 'sc-dashboard', done: hasShift },
+      { num: 2, label: 'Set up Labor Control',         screen: 'lc-dashboard', done: hasLabor },
+      { num: 3, label: 'Run your first Revenue Audit', screen: 'r-audit',     done: hasAudit }
     ]);
   },
 
