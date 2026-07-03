@@ -3581,7 +3581,11 @@ const App = {
           ? (item.recipe.mode === 'single'
               ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
               : (this.bottleCost(p) != null ? this.bottleCost(p) : (p.unit_cost || 0)))
-          : (p.unit_cost || 0);
+          // Food / Misc: per-piece cost when the product carries a pack size (the
+          // recipe quantity is then in pieces, e.g. 6 wings off a bag of 100), else
+          // the plain unit cost. piecePrice returns unit_cost when there is no pack,
+          // so this is a no-op for every product without a pack size.
+          : (this.piecePrice(p) || 0);
         return unitCost * qty;
       };
 
