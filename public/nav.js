@@ -292,10 +292,6 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="8" width="3" height="5" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="4" width="3" height="9" stroke="currentColor" stroke-width="1.3"/><rect x="11.5" y="10" width="3" height="3" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Stock Report</span>
       </div>
-      <div class="nav-item" data-screen="ic-report-movers" id="nav-ic-report-movers">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11l3.5-3.5 2.5 2.5L13 4M10 4h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Movement</span>
-      </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-screen="ic-vendors" id="nav-ic-vendors">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 4.5v4c0 3.5 5.5 6.5 5.5 6.5s5.5-3 5.5-6.5v-4L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>

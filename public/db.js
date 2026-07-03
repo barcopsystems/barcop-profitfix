@@ -243,7 +243,7 @@ const DB = {
     'ic-adjustments':'inventory-counts',
     'ic-par-suggestions':'inventory-reports',
     'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products','ic-prep-batches':'manage-products',
-    'ic-report-stock':'inventory-reports','ic-report-movers':'inventory-reports',
+    'ic-report-stock':'inventory-reports',
     'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
     'ic-dashboard':'inventory-dashboard','ic-help':'_always',
     // Labor Control
