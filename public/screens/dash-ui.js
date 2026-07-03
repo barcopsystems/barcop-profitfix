@@ -78,7 +78,7 @@ const DashUI = {
       '<div class="db-go" data-go="' + s.go + '"' + (s.cross ? ' data-cross="1"' : '') + ' style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid ' + (s.done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (s.done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
       + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;' + (s.done ? 'background:var(--gold);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (s.done ? '&#10003;' : s.num) + '</span>'
       + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + s.label + '</span></div>';
-    return '<div class="card form-card" style="margin-bottom:14px;">'
+    return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title">Get Started</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + intro + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + steps.map(step).join('') + '</div></div>';
