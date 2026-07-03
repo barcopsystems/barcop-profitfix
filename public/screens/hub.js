@@ -553,8 +553,8 @@ S.Hub = {
       const go = 'event.stopPropagation();' + (objName ? 'S.' + objName + '._openStep=\'' + s.key + '\';' : '') + 'S.Hub._enter(\'' + screen + '\',\'' + (mod || '') + '\')';
       return '<div class="hd-step" onclick="' + go + '" style="display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;background:#0D181E;border-radius:6px;font-size:12px;line-height:1.2;cursor:pointer;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
         + (s.done
-            ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
-            : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
+            ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
+            : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
         + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span>'
         + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>';
     }).join('');
