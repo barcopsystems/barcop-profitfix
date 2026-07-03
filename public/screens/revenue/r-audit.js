@@ -265,9 +265,9 @@ S.RevenueAudit = {
   showHowTo() {
     App.showHelpModal('How the Revenue Audit Works', [
       { p: ['The Revenue Audit scores five areas: Check Average, Labor Efficiency, Menu Performance, Server Performance, and Events. It scores whatever data it can see and shows N/A for anything it cannot.'] },
-      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically, and your annual sales come from your Business Profile in App Settings. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your weekly numbers, schedules, menu items, and servers feed it automatically. Your sales come from the weeks you close, and until the first one is in Bar Cop asks once for last week\'s bar and food sales so the score has real numbers to work from. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: this week confirmed, hours logged, menu items priced with covers, server checks logged, and events booked. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
-      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Set your annual sales in your Business Profile once. 3. Generate. Sections with no data show N/A and fill in over time.'] },
+      { h: 'The steps', p: ['1. Get your week in: confirm Run This Week and log your Control data. 2. Generate. If no week is closed yet, enter last week\'s bar and food sales when Bar Cop asks. Sections with no data show N/A and fill in over time.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each with a Fix This button that drops you into Revenue Fix on that exact gap; an events item sends you to Event Booking instead. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run it whenever you want a fresh read; it scores your trailing four weeks, and Bar Cop keeps one record a day so you can watch the score trend on the audit landing.'] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
     ]);
@@ -282,17 +282,13 @@ S.RevenueAudit = {
     const resetBtn = () => { if (btn) { btn.disabled=false; btn.textContent='Generate New Audit'; btn.style.opacity=''; } };
     if (btn) { btn.disabled=true; btn.textContent='Analyzing...'; btn.style.opacity='0.7'; }
 
-    // No intake form: sales and practices come from App Settings, the scored data
-    // from Control. Nothing to upload.
-    const s = App.data.settings || {};
-    const barRev  = parseFloat(s.annual_bar_revenue)  || 0;
-    const foodRev = parseFloat(s.annual_food_revenue) || 0;
-
-    // Validation — do not run an audit with nothing to analyze.
-    const hasRealData = (App.data.revenue_weeks && App.data.revenue_weeks.length > 0) || barRev > 0 || foodRev > 0;
-    if (!hasRealData) {
-      setStatus('Close a week first in Run This Week, or set your annual sales in App Settings.', 'var(--red)');
+    // Sales come from your closed weeks. Until the first one is in, prompt once
+    // for a weekly sales estimate (keyed to this week) so the first audit still
+    // sizes its dollars off real numbers. A real POS week supersedes it.
+    const hasWeeks = !!(App.data.revenue_weeks && App.data.revenue_weeks.length > 0);
+    if (!hasWeeks && !AuditUI.weekSalesEstimate()) {
       resetBtn();
+      AuditUI.promptWeekSales(() => this.generateAudit());
       return;
     }
 
