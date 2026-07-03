@@ -69,6 +69,7 @@ S.HubYearEnd = {
         + '<span id="hy-status" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-left:6px;display:none;"></span>'
       + '</div>'
       + this._whatsInsideCard()
+      + (this._hasData() ? '' : '<div class="card" style="padding:14px 20px;margin-top:16px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard through the year, and your Annual Review fills in here, ready to generate.</div></div>')
       + '</div>';
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -97,6 +98,11 @@ S.HubYearEnd = {
       + '<div class="card-title">What\'s In the File</div>'
       + '<table style="width:100%;border-collapse:collapse;"><tbody>' + listHtml + '</tbody></table>'
       + '</div>';
+  },
+
+  // Any confirmed weeks on the books at all. Drives the no-data empty state.
+  _hasData() {
+    return (App.data?.weeks || []).some(w => w && w.period_end);
   },
 
   // ── Year list — years with at least one saved week ─────────────────────────

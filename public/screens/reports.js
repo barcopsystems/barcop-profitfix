@@ -17,7 +17,7 @@ S.Reports = {
         mount.innerHTML='<div class="screen">'
           + '<div class="card form-card">'
             + '<div class="card-title">Weekly P&amp;L Brief</div>'
-            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks saved yet. Save at least one week from Profit, This Week before exporting.</div>'
+            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm a week from the Profit dashboard first, and it shows here to export.</div>'
           + '</div>'
         + '</div>';
         return;

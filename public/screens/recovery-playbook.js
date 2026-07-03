@@ -1032,8 +1032,8 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'A monthly number tells you what happened. A weekly number gives you time to do something about it. A 5 point spike on 300,000 in monthly sales is 15,000, gone before you see it if you wait for the accountant. Catch it Monday of week three and you cap the damage at seven days instead of thirty.' },
             { t: 'p', text: 'Two traps. First, labor is not just the wages you paid, it is wages plus payroll taxes plus benefits plus any owner time on the floor. Run prime against wages only and you understate labor 10 to 15 percent and flatter the number. Second, when prime jumps, run the split test: did COGS move more or did labor move more. The bigger mover is your driver. A one-week bump with a reason can wait a week. Three weeks trending up is structural.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'This Week rolls your COGS and labor into prime cost for you every week, after comps and discounts, the way it should be calculated. The Profit dashboard trends it, the Profit Audit and the Hub confirm it, and the Weekly P&L Brief and Month-End Books carry it cleanly to your accountant.' },
-            { t: 'go', label: 'This Week', screen: 'this-week' },
+            { t: 'p', text: 'Confirm the Week rolls your COGS and labor into prime cost for you every week, after comps and discounts, the way it should be calculated. The Profit dashboard trends it, the Profit Audit and the Hub confirm it, and the Weekly P&L Brief and Month-End Books carry it cleanly to your accountant.' },
+            { t: 'go', label: 'Confirm the Week', screen: 'dashboard' },
             { t: 'go', label: 'Prime Cost system', screen: 'profit-fix', focus: 'prime-cost' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [
@@ -1335,8 +1335,8 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Revenue per labor hour is what you get back for every hour you schedule: revenue divided by labor hours. Labor percent answers whether you spent the right share. RPLH answers whether that spend produced what it should. A Saturday at 38 against a 55 target is a 17 dollar gap an hour, and across a season of Saturdays that is real revenue the labor you already pay for is not capturing.' },
             { t: 'p', text: 'Low RPLH has three causes and each needs a different fix: over-scheduling (rebuild from the forecast), check average too low (briefing and upsell), or a revenue miss against forecast (a one-off). Get the diagnosis right, because cutting the schedule to fix a check-average problem just makes service worse. Set your targets off your own baseline plus 10 to 15 percent, not a benchmark copied from a guide that has nothing to do with your concept.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'This Week shows your revenue per labor hour by shift against target, with the trend. You build to that target in Build Schedule, working backward from the revenue the shift is set up for instead of guessing a headcount.' },
-            { t: 'go', label: 'This Week', screen: 'r-this-week' },
+            { t: 'p', text: 'Confirm the Week shows your revenue per labor hour by shift against target, with the trend. You build to that target in Build Schedule, working backward from the revenue the shift is set up for instead of guessing a headcount.' },
+            { t: 'go', label: 'Confirm the Week', screen: 'r-dashboard' },
             { t: 'go', label: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [
