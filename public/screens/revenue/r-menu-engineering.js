@@ -66,6 +66,21 @@ S.RevenueMenuEngineering = {
   },
 
   draw() {
+    // New-user setup: Menu Engineering needs at least four fully-priced items
+    // (price, cost, weekly covers) to rank. Until then, guide the operator to
+    // Menu Items with the standard setup card instead of a bare empty state.
+    const costed = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
+      .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    if (costed.length < 4) {
+      App.setupCard(this.container, {
+        title: 'Menu Engineering',
+        lead: 'Menu Engineering sorts every priced item into Stars, Plowhorses, Puzzles, and Dogs, and names the move plus the number behind it. Price your menu items first.',
+        steps: [
+          { title: 'Add your menu items', desc: 'Price at least four items in a category with their cost and weekly covers in Menu Items. Menu Engineering ranks them here and shows the move for each.', btn: 'Go to Menu Items', screen: 'r-menu-items', done: false }
+        ]
+      });
+      return;
+    }
     const priced = (App.data.menu_items || []).some(i => i.price && i.cost && !i.archived);
     this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '') + this.classificationHtml() + '</div>';
     const c = this.container;
@@ -84,15 +99,10 @@ S.RevenueMenuEngineering = {
   classificationHtml() {
     // Inject the effective cost (auto-computed from recipe when attached, else
     // the manually-entered cost) so the math always sees a current number.
+    // draw() gates on < 4 costed items with the setup card, so this only runs
+    // with a rankable menu.
     const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
-    if (items.length >= 4) App.markSetupDone('gs_r_eng');
-    if (items.length < 4) {
-      return '<div class="card"><div class="empty">'
-        + '<div class="empty-title">Not Enough Data</div>'
-        + '<div class="empty-sub">Add at least 4 menu items with price, cost, and weekly covers to sort your menu into Stars, Plowhorses, Puzzles, and Dogs.</div>'
-        + '<div style="margin-top:14px;"><button class="btn btn-ghost" onclick="App.navigate(\'r-menu-items\')">Go to Menu Items</button></div>'
-        + '</div></div>';
-    }
+    App.markSetupDone('gs_r_eng');
 
     const SINGULAR = { STAR: 'Star', PLOWHORSE: 'Plowhorse', PUZZLE: 'Puzzle', DOG: 'Dog' };
     const MOVE = {}; this.QUAD.forEach(q => { MOVE[q.key] = q.move; });

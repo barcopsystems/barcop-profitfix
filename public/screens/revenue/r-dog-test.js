@@ -145,8 +145,7 @@ S.RevenueDogTest = {
 
     let emptyMsg = '';
     if (!testing.length && !decided.length) {
-      emptyMsg = '<div class="card"><div class="empty"><div class="empty-title">No Dog tests running</div>'
-        + '<div class="empty-sub">A Dog is not always a bad item. Before you pull one, give it 90 days in a better menu slot with a rewritten description, and track whether volume moves. Start a test above.</div></div></div>';
+      emptyMsg = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No Dog tests running. A Dog is not always a bad item. Before you pull one, give it 90 days in a better menu slot with a rewritten description, and track whether volume moves. Start a test above.</div></div>';
     }
 
     this.container.innerHTML = '<div class="screen">' + form + active + history + emptyMsg + '</div>';
