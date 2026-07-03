@@ -353,6 +353,11 @@ S.InventoryTakeInventory = {
       // keg, bottled mixers), and a plain number for food / dry goods counted
       // by weight or unit.
       const isPourable = !!(p.container_size_oz && p.pour_size_oz);
+      // Food / Misc with a pack size (100 wings per bag) count like bottle beer:
+      // full units + loose pieces, reconciled to a decimal of the unit via the
+      // pack size. Same stored on-hand number as a typed decimal, entered more
+      // accurately (1 bag + 40 wings = 1.40 bags).
+      const isPackFood = (p.category === 'Food' || p.category === 'Misc') && p.pack_size && p.pack_size > 0;
       let countInput;
       if (isCaseBeer) {
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
@@ -372,6 +377,21 @@ S.InventoryTakeInventory = {
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
           + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
           + '</div>';
+      } else if (isPackFood) {
+        const un = App.productUnit(p) || 'unit';
+        countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
+            + '<div class="f" style="width:140px;flex-shrink:0;"><label>Full</label>'
+              + '<div class="fw"><input class="suf ti-fulls" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.fulls != null ? c.fulls : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(un) + '</span></div>'
+            + '</div>'
+            + '<div class="f" style="width:140px;flex-shrink:0;"><label>Loose Pieces</label>'
+              + '<div class="fw"><input class="suf ti-looseea" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">ea</span></div>'
+            + '</div>'
+            + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
+              + p.pack_size + ' ea/' + esc(un)
+              + '<div class="ti-echo-pack" data-pid="' + p.id + '" style="color:var(--gold);font-weight:700;margin-top:2px;">= '
+                + ((c.fulls || 0) + (p.pack_size ? (c.loose || 0) / p.pack_size : 0)).toFixed(2) + ' ' + esc(un) + '</div>'
+            + '</div>'
+          + '</div>';
       } else {
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
           + '<div class="f" style="width:220px;flex-shrink:0;"><label>Count</label>'
@@ -382,7 +402,7 @@ S.InventoryTakeInventory = {
       // visible, and Notes collapsed behind a "+ Note" toggle so 200 products
       // are far less scrolling. Notes auto-expand when one already exists.
       const hasNote = !!(c.notes && c.notes.trim());
-      return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" style="margin-bottom:10px;padding:12px 14px;">'
+      return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" data-pack-size="' + (isPackFood ? p.pack_size : 0) + '" style="margin-bottom:10px;padding:12px 14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
         + '<div style="min-width:0;"><span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
         + '<span style="font-size:11px;color:var(--t3);margin-left:8px;">' + esc(p.category || 'Uncategorized') + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</span></div>'
@@ -458,6 +478,30 @@ S.InventoryTakeInventory = {
         this.setCardCounted(pid, true);
       });
     });
+    // Food / Misc pack items: full units + loose pieces, echoed as a decimal of
+    // the unit (fulls + loose / pack size). Mirrors the bottle-beer case+loose.
+    this.container.querySelectorAll('.ti-fulls, .ti-looseea').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const pid = inp.dataset.pid;
+        const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
+        if (!card) return;
+        const fulls = parseInt(card.querySelector('.ti-fulls')?.value) || 0;
+        const loose = parseInt(card.querySelector('.ti-looseea')?.value) || 0;
+        const packSize = parseFloat(card.dataset.packSize) || 0;
+        const echo = card.querySelector('.ti-echo-pack');
+        if (echo) {
+          const un = echo.textContent.replace(/^= [\d.]+ /, '') || '';
+          echo.textContent = '= ' + (fulls + (packSize ? loose / packSize : 0)).toFixed(2) + ' ' + un;
+        }
+        const key = pid + '@@' + grp.location;
+        const prev = this.draft.counts[key] || {};
+        this.draft.counts[key] = { fulls, loose, notes: prev.notes || '' };
+        this.draft._locStep = this.locStep;
+        this.saveDraft();
+        this.updateProgress();
+        this.setCardCounted(pid, true);
+      });
+    });
     // Food / dry-goods plain number input.
     this.container.querySelectorAll('.ti-num').forEach(inp => {
       inp.addEventListener('input', () => {
@@ -498,10 +542,13 @@ S.InventoryTakeInventory = {
         const pid = btn.dataset.pid;
         const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
         const isCaseBeer = !!(card && card.dataset.caseBeer === '1');
+        const isPackFood = !!(card && (parseFloat(card.dataset.packSize) || 0) > 0);
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
         this.draft.counts[key] = isCaseBeer
           ? { cases: 0, loose: 0, notes: prev.notes || '' }
+          : isPackFood
+          ? { fulls: 0, loose: 0, notes: prev.notes || '' }
           : { value: 0, fulls: 0, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
@@ -546,17 +593,21 @@ S.InventoryTakeInventory = {
       const counted = this.draft.counts[_key] != null;
       const c = this.draft.counts[_key] || { value: 0, fulls: 0, notes: '' };
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
+      const isPackFood = (p.category === 'Food' || p.category === 'Misc') && p.pack_size && p.pack_size > 0;
       let total, value;
       if (isCaseBeer) {
         const cases = c.cases || 0;
         const loose = c.loose || 0;
         total = cases + (p.case_size > 0 ? loose / p.case_size : 0);
         value = p.unit_cost != null ? total * p.unit_cost : null;
+      } else if (isPackFood) {
+        total = (c.fulls || 0) + (p.pack_size > 0 ? (c.loose || 0) / p.pack_size : 0);
+        value = p.unit_cost != null ? total * p.unit_cost : null;
       } else {
         total = (c.fulls || 0) + (c.value || 0);
         value = p.unit_cost != null ? total * p.unit_cost : null;
       }
-      out.push({ p, c, total, value, isCaseBeer, location: g.location, counted });
+      out.push({ p, c, total, value, isCaseBeer, isPackFood, location: g.location, counted });
     }));
     return out;
   },
@@ -639,6 +690,23 @@ S.InventoryTakeInventory = {
           fulls:               r.c.cases || 0,   // full cases (total is decimal cases)
           partial:             0,
           total:               r.total,           // on-hand in cases (cases + loose/case_size)
+          unit_cost:           r.p.unit_cost != null ? r.p.unit_cost : null,
+          value:               r.value,
+          notes:               r.c.notes || '',
+          counted:             r.counted
+        };
+      }
+      if (r.isPackFood) {
+        return {
+          product_id: r.p.id,
+          name:       r.p.name,
+          category:   r.p.category || '',
+          location:            r.location,
+          fulls:               r.c.fulls || 0,    // full units (bags/cases)
+          loose:               r.c.loose || 0,    // loose pieces
+          pack_size_at_count:  r.p.pack_size || null,
+          partial:             0,
+          total:               r.total,           // on-hand in units (fulls + loose/pack)
           unit_cost:           r.p.unit_cost != null ? r.p.unit_cost : null,
           value:               r.value,
           notes:               r.c.notes || '',
