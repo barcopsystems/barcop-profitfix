@@ -397,13 +397,15 @@ S.InventoryProducts = {
     const complete = this.isComplete(p);
     const sz  = this.SIZES.find(s => s.oz === p.container_size_oz);
     const szL = p.category === 'Food' || p.category === 'Misc'
-      ? esc(p.unit_type || '-')
+      ? (esc(p.unit_type || '-') + (p.pack_size > 0 ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + p.pack_size + ' ea</span>' : ''))
       : (sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-'));
     const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
     const dim = p.active === false ? 'opacity:0.5;' : '';
     const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
+    const piece = App.piecePrice ? App.piecePrice(p) : null;
     const costDisplay = p.unit_cost != null
       ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
+        + (p.pack_size > 0 && piece != null ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + App.fmtCurrency(piece, piece < 1 ? 3 : 2) + '/ea</span>' : '')
       : '<span style="color:var(--t4);">-</span>';
     const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
     return '<tr style="' + dim + '">'
