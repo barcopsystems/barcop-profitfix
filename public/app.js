@@ -2315,6 +2315,13 @@ const App = {
       const loose = vals.loose != null ? vals.loose : Math.round((total - Math.floor(total)) * caseSize);
       return { full: cases + ' cs', open: loose + ' btls', total: total.toFixed(2) + ' cs' };
     }
+    // Food / Misc with a pack size: full units + loose pieces, total in units.
+    const packSize = vals.packSize != null ? vals.packSize : ((p && p.pack_size) || 0);
+    if (packSize > 0 && (((p && p.category) || vals.category) === 'Food' || ((p && p.category) || vals.category) === 'Misc') && vals.loose != null) {
+      const pu = this.unitAbbr(this.productUnit(p || { category: vals.category, unit_type: vals.unit_type }));
+      const pus = pu ? ' ' + pu : '';
+      return { full: (vals.fulls || 0) + pus, open: (vals.loose || 0) + ' ea', total: total.toFixed(2) + pus };
+    }
     const u = this.unitAbbr(this.productUnit(p || { category: vals.category, unit_type: vals.unit_type }));
     const us = u ? ' ' + u : '';
     return {
