@@ -28,7 +28,7 @@ S.HubSettingsHelp = {
       { q: 'What are service periods and why do they matter?',
         a: 'They are the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. They are not cosmetic: they set every shift-type field across Bar Cop, including the schedule, cash tolerances, and the Recovery daypart breakdowns. Turn on the ones you run, and add a custom one if your venue runs something different.' },
       { q: 'Where do my sales numbers come from?',
-        a: 'From the weeks you close in Run This Week. Until your first week is in, the audits ask once for last week\'s bar and food sales so they have a real number to measure against. After that, your closed weeks drive everything and you are not asked again.' }
+        a: 'From the weeks you close in Close The Week. Until your first week is in, the audits ask once for last week\'s bar and food sales so they have a real number to measure against. After that, your closed weeks drive everything and you are not asked again.' }
     ]},
     { t: 'Recovery Targets', qa: [
       { q: 'What are the targets?',

@@ -37,7 +37,7 @@ S.FlowMap = {
     { id: 'shift', title: 'Shift', go: 'sc-dashboard',
       d: 'Every service logged: sales, cash, drawers, voids, comps. The source of your top line and most of your theft signals.',
       steps: [
-        { id: 'shf-1', label: 'Import sales',   go: 'sc-dashboard',    d: 'Drop the week\'s sales by day. This is your top line, and it rolls straight into Run This Week for all three Recovery sections.' },
+        { id: 'shf-1', label: 'Import sales',   go: 'sc-dashboard',    d: 'Drop the week\'s sales by day. This is your top line, and it rolls straight into Confirm the Week for all three Recovery sections.' },
         { id: 'shf-2', label: 'Reconcile cash', go: 'sc-cash-control', d: 'Get the week\'s over and short in, from your POS cash report or a hand count. Shorts here are the first place theft shows.' },
         { id: 'shf-3', label: 'Log exceptions', go: 'sc-void-comp',    d: 'Waste, spills, and walked tabs off your sheet. Small numbers that add up, and they feed the loss board.' },
         { id: 'shf-4', label: 'Review flags',   go: 'theft-risk',      d: 'Cash shorts, voids, and comps worth a second look. Clear them and the floor side of the week is closed.' }
@@ -94,13 +94,13 @@ S.FlowMap = {
 
   OUTPUTS: [
     { id: 'hub',   title: 'The Hub',       action: 'hub',   d: 'Your cross-system home. Total recovered, your Bar Cop Audit score, and the top exposures across every section, in one read.' },
-    { id: 'books', title: 'Books',         action: 'books', d: 'Month-end financials, the Weekly P&L, and the payroll worksheet. Built from Run This Week, your hours and tips, operating expenses, and permits.' },
+    { id: 'books', title: 'Books',         action: 'books', d: 'Month-end financials, the Weekly P&L, and the payroll worksheet. Built from your confirmed weeks, your hours and tips, operating expenses, and permits.' },
     { id: 'bca',   title: 'Bar Cop Audit', action: 'audit', d: 'The score that answers whether the place is run with discipline, separate from the dollar-hunting audits. Reads all three Control sections and grades six areas.' }
   ],
 
   STAGES: [
     { num: 1, key: 'capture',  title: 'Close your Control sections', sub: 'Put the week\'s raw numbers in. Three closes, worked top to bottom.', cols: 3, list: 'CAPTURE', feeder: true },
-    { num: 2, key: 'recovery', title: 'Work the money in Recovery',  sub: 'Each opens with Run This Week, pulling your Control closes into one read, then it diagnoses, fixes, and scores.', cols: 3, list: 'RECOVERY' },
+    { num: 2, key: 'recovery', title: 'Work the money in Recovery',  sub: 'Each opens with Confirm the Week, pulling your Control closes into one read, then it diagnoses, fixes, and scores.', cols: 3, list: 'RECOVERY' },
     { num: 3, key: 'asneeded', title: 'As needed',                   sub: 'Off the weekly clock. You open these only when the close flags them.', cols: 4, list: 'ASNEEDED' },
     { num: 4, key: 'lands',    title: 'Where it lands',              sub: 'What the week feeds once you have closed it.', cols: 3, list: 'OUTPUTS' }
   ],
