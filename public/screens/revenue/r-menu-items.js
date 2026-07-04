@@ -21,6 +21,8 @@ S.RevenueMenuItems = {
   activeType:       'plate',     // active tile/tab: 'plate' | 'cocktail' | 'inventory'
   _importOpen:      false,       // Upload panel open in place of the list
   _selected:        null,        // Set of item ids checked for bulk delete
+  _recipeOpen:      false,       // recipe builder revealed (allow-but-nudge toggle)
+  _otherPrices:     [],          // alternate menu prices (happy hour, specials)
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
@@ -205,9 +207,9 @@ S.RevenueMenuItems = {
   // its category cards + tabs, so Inventory and the Menu Builder read as one
   // connected surface. Each type's list groups by menu category into sections.
   TYPES: [
-    { key: 'plate',     label: 'Dishes',    add: 'Build Dish Recipe',     imp: 'Dish List',     noun: 'dish' },
-    { key: 'cocktail',  label: 'Cocktails', add: 'Build Cocktail Recipe', imp: 'Cocktail List', noun: 'cocktail' },
-    { key: 'inventory', label: 'No Prep',   add: 'Add Inventory Item',    imp: 'No Prep List',  noun: 'no prep' }
+    { key: 'plate',     label: 'Dishes',    add: 'Add Dish Menu Item',     imp: 'Dish List',     noun: 'dish' },
+    { key: 'cocktail',  label: 'Cocktails', add: 'Add Cocktail Menu Item', imp: 'Cocktail List', noun: 'cocktail' },
+    { key: 'inventory', label: 'No Prep',   add: 'Add Inventory Item',     imp: 'No Prep List',  noun: 'no prep' }
   ],
   catsForType(type) {
     if (type === 'cocktail')  return ['Cocktails'];
@@ -471,10 +473,14 @@ S.RevenueMenuItems = {
     this.formType  = item ? this.classifyItem(item) : (this._presetCat ? this.typeForCategory(this._presetCat) : null);
     this.linkedProductId = item?.linked_product_id || '';
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+    // The recipe is optional (allow-but-nudge): an existing recipe opens expanded,
+    // a new item starts collapsed behind a "+ Build Recipe" toggle with no rows.
+    this._recipeOpen = hasRecipe;
     this.mode = hasRecipe ? item.recipe.mode : (this.formType === 'cocktail' ? 'single' : this.formType === 'plate' ? 'food' : null);
     this.rows = hasRecipe
       ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
-      : ((!item && (this.formType === 'cocktail' || this.formType === 'plate')) ? [{ source: 'product', id: '', quantity: '' }] : []);
+      : [];
+    this._otherPrices = (item && Array.isArray(item.other_prices)) ? item.other_prices.map(o => ({ label: o.label, price: o.price })) : [];
     this._editingIncomplete = !!(item && this.formType && this.missingFields(item, this.formType).size > 0);
 
     // Remove the inline add form (card + buttons) so its ri-* / mi-adaptive ids
@@ -487,8 +493,8 @@ S.RevenueMenuItems = {
     // runs at the prep-batch width (900). Kept in step on category change below.
     const isInv = this.formType === 'inventory';
     const editLbl = { plate: 'Dish', cocktail: 'Cocktail', inventory: 'No Prep Item' }[this.formType] || 'Menu Item';
-    const addTitle = this.formType === 'plate' ? 'Build Dish Recipe'
-      : this.formType === 'cocktail' ? 'Build Cocktail Recipe'
+    const addTitle = this.formType === 'plate' ? 'Add Dish Item'
+      : this.formType === 'cocktail' ? 'Add Cocktail Item'
       : this.formType === 'inventory' ? 'Add No Prep Item' : 'Add Menu Item';
     const title = item ? ('Edit ' + editLbl) : addTitle;
     const html = '<div class="card form-card' + (isInv ? ' narrow-form' : '') + '" id="mi-editor-card" style="margin:0;">'
@@ -613,10 +619,89 @@ S.RevenueMenuItems = {
     if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
     host.innerHTML = this.recipeFields(item);
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
-    const target = item?.target_cost_pct || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
-    this.renderRecipeSection(item, target);
+    this.renderRecipeArea(item);
+    this.renderOtherPrices(item);
     document.getElementById('ri-price')?.addEventListener('input', () => { this.refreshFieldMissing(); this.calcRecipe(); });
-    document.getElementById('ri-cost')?.addEventListener('input', () => this.refreshFieldMissing());
+    // Manual cost edits (no recipe) refresh the alternate-price cost %s too.
+    document.getElementById('ri-cost')?.addEventListener('input', () => { this.refreshFieldMissing(); this.recalcAllPrices(); });
+  },
+
+  // The recipe area toggles: a "+ Build Recipe" button when closed (the item can
+  // be saved with just a manual cost), the full ingredient builder when open.
+  renderRecipeArea(item) {
+    const wrap = document.getElementById('ri-recipe-wrap');
+    if (!wrap) return;
+    if (this._recipeOpen) {
+      wrap.innerHTML = '<div id="ri-recipe-section" style="border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>';
+      const target = item?.target_cost_pct || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
+      this.renderRecipeSection(item, target);
+    } else {
+      wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-build-recipe">+ Build Recipe</button>'
+        + '<span style="font-size:11px;color:var(--t3);margin-left:10px;">Optional. Add a recipe for accurate, auto-updating cost.</span>'
+        + '</div>';
+      document.getElementById('ri-build-recipe')?.addEventListener('click', () => {
+        this._recipeOpen = true;
+        if (!this.rows.length) this.rows = [{ source: 'product', id: '', quantity: '' }];
+        this.renderRecipeArea(item);
+      });
+    }
+  },
+
+  // ── Other Prices (happy hour / specials): one item, several price points ─────
+  // Same recipe cost, each price shows its own cost %, so the operator can see
+  // whether a happy-hour price runs into a loss. Margin visibility only — no
+  // sales-mix blend (that would need POS covers split by price).
+  renderOtherPrices(item) {
+    const wrap = document.getElementById('ri-other-prices-wrap');
+    if (!wrap) return;
+    const rows = (this._otherPrices || []).map((o, i) => this.priceRowHTML(o, i)).join('');
+    wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+        + '<label style="margin:0;">Other Prices <span style="color:var(--t4);font-weight:400;">(happy hour, specials)</span></label>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-add-price">+ Add Price</button>'
+      + '</div>'
+      + '<div id="ri-op-list">' + rows + '</div>'
+      + '</div>';
+    document.getElementById('ri-add-price')?.addEventListener('click', () => {
+      this.syncOtherPrices();
+      this._otherPrices.push({ label: '', price: '' });
+      this.renderOtherPrices(item);
+    });
+    wrap.querySelectorAll('.op-row').forEach(r => this.wirePriceRow(r));
+  },
+  priceRowHTML(o) {
+    o = o || {};
+    return '<div class="op-row" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;">'
+      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Name</label><input type="text" class="op-label" value="' + esc(o.label || '') + '" placeholder="Happy Hour"/></div>'
+      + '<div class="f" style="width:100px;flex-shrink:0;"><label>Price</label><div class="fw"><span class="pre">$</span><input class="pre op-price" type="number" step="0.25" min="0" value="' + (o.price != null && o.price !== '' ? o.price : '') + '"/></div></div>'
+      + '<div style="font-size:11px;color:var(--t3);padding-bottom:9px;white-space:nowrap;">Cost <span class="op-pct" style="font-weight:700;color:var(--t1);">-</span></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm op-del" style="margin-bottom:2px;">Remove</button>'
+      + '</div>';
+  },
+  wirePriceRow(row) {
+    row.querySelector('.op-price')?.addEventListener('input', () => this.recalcPriceRow(row));
+    row.querySelector('.op-del')?.addEventListener('click', () => row.remove());
+    this.recalcPriceRow(row);
+  },
+  recalcPriceRow(row) {
+    if (!row) return;
+    const span = row.querySelector('.op-pct');
+    if (!span) return;
+    const cost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
+    const price = parseFloat(row.querySelector('.op-price')?.value) || 0;
+    const pct = (cost > 0 && price > 0) ? (cost / price * 100) : null;
+    const target = parseFloat(document.getElementById('ri-target-pct')?.value)
+      || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
+    span.textContent = pct != null ? pct.toFixed(1) + '%' : '-';
+    span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : 'var(--green)');
+  },
+  recalcAllPrices() { document.querySelectorAll('.op-row').forEach(r => this.recalcPriceRow(r)); },
+  syncOtherPrices() {
+    this._otherPrices = [...document.querySelectorAll('.op-row')].map(r => ({
+      label: r.querySelector('.op-label')?.value.trim() || '',
+      price: parseFloat(r.querySelector('.op-price')?.value) || ''
+    }));
   },
 
   // The Menu Name field, loaded into #mi-name-slot. Typed for recipe items; for
@@ -632,7 +717,8 @@ S.RevenueMenuItems = {
     return '<div class="f" style="width:100px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
-      + '<div id="ri-recipe-section" style="flex:0 0 100%;border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
+      + '<div id="ri-recipe-wrap" style="flex:0 0 100%;"></div>'
+      + '<div id="ri-other-prices-wrap" style="flex:0 0 100%;"></div>'
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
 
@@ -764,11 +850,13 @@ S.RevenueMenuItems = {
       + '</div>'
       + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
+      // Cost lives in the top Cost cell (auto-filled + locked from the recipe), so
+      // this strip shows only the Recipe Cost %, not a duplicate cost number.
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
         + '<div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">'
-        + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="ri-cps">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="ri-cpct">-</div></div>'
-        + '</div></div>';
+        + '</div></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ri-remove-recipe" style="margin-top:12px;">Remove Recipe</button>';
 
     this.renderRows();
     this.calcRecipe();
@@ -776,6 +864,14 @@ S.RevenueMenuItems = {
     document.getElementById('ri-add-ing')?.addEventListener('click', () => { this.addRow(); this.calcRecipe(); });
     document.getElementById('ri-target-pct')?.addEventListener('input', () => this.calcRecipe());
     document.getElementById('ri-plate-yield')?.addEventListener('input', () => this.calcRecipe());
+    // Remove Recipe collapses back to the "+ Build Recipe" toggle and unlocks the
+    // manual Cost field (calcRecipe frees it when there is no real recipe).
+    document.getElementById('ri-remove-recipe')?.addEventListener('click', () => {
+      this._recipeOpen = false;
+      this.rows = [];
+      this.renderRecipeArea(item);
+      this.calcRecipe();
+    });
   },
 
   renderRows() {
@@ -881,6 +977,7 @@ S.RevenueMenuItems = {
         costInp.disabled = false;
       }
     }
+    this.recalcAllPrices();
     this.refreshFieldMissing();
   },
 
@@ -975,6 +1072,16 @@ S.RevenueMenuItems = {
       }
     }
 
+    // Other Prices (happy hour / specials) on dish + cocktail items: one item,
+    // several price points; same cost, each carries its own margin.
+    const otherPrices = [];
+    if (type === 'plate' || type === 'cocktail') {
+      document.querySelectorAll('.op-row').forEach(r => {
+        const price = parseFloat(r.querySelector('.op-price')?.value);
+        if (!isNaN(price) && price > 0) otherPrices.push({ label: (r.querySelector('.op-label')?.value.trim() || 'Other'), price });
+      });
+    }
+
     // If this is an edit, snapshot the prior weekly_covers before overwriting
     // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
     // update"). Only snapshot when the value actually changes — typing the
@@ -1004,6 +1111,7 @@ S.RevenueMenuItems = {
       linked_product_id:  linkedProductId,
       pour_size_oz:       pourSizeOz,
       portion:            portion,
+      other_prices:       otherPrices,
       target_cost_pct:    targetPct,
       planned_price:      priceChanged ? null : (existing && existing.planned_price != null ? existing.planned_price : null),
       planned_vol_pct:    priceChanged ? null : (existing && existing.planned_vol_pct != null ? existing.planned_vol_pct : null),
