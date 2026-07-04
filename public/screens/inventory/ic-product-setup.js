@@ -373,6 +373,7 @@ S.InventoryProducts = {
         + '<button class="btn btn-ghost btn-sm ip-sel-clear">Clear</button>'
         + (selCount > 0 ? '<button class="btn btn-ghost btn-sm ip-sel-edit">Bulk Edit ' + selCount + ' Selected</button>' : '')
         + (selCount > 0 ? '<button class="btn btn-danger btn-sm ip-sel-del">Delete ' + selCount + ' Selected</button>' : '')
+        + '<button class="btn btn-ghost btn-sm" id="ip-export" style="margin-left:auto;">Export PDF</button>'
         + '</div>';
 
       // Group the list by Sub-Category (Misc Type for Misc) into its own card so a
@@ -387,7 +388,7 @@ S.InventoryProducts = {
           + '</tr></thead><tbody>' + groupRows + '</tbody></table></div>';
       }).join('');
 
-      body = alertBar + toolbar + tables;
+      body = alertBar + toolbar + '<div id="ip-list-export">' + tables + '</div>';
     }
 
     // When an upload is active, the lower area becomes the in-place import
@@ -485,7 +486,9 @@ S.InventoryProducts = {
       const selEdit = ev.target.closest('.ip-sel-edit');
       const selDel  = ev.target.closest('.ip-sel-del');
       const selBox  = ev.target.closest('.ip-sel');
+      const exp     = ev.target.closest('#ip-export');
 
+      if (exp)     { ev.stopPropagation(); App.exportPDF({ title: this.activeCat + ' Products', root: document.getElementById('ip-list-export') }); return; }
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
       if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
