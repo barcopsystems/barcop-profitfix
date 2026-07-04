@@ -14,7 +14,7 @@
 S.RevenueMenuPlanning = {
   container: null,
 
-  SECTION_ORDER: ['Appetizers', 'Entrees', 'Desserts', 'Specials', 'Snacks', 'Cocktails', 'Beer', 'Wine', 'NA Beverages'],
+  SECTION_ORDER: ['Appetizers', 'Entrees', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
   DRINK_CATS: ['Cocktails', 'Beer', 'Wine', 'NA Beverages'],
 
   items() { return (App.data.menu_items || []).filter(i => !i.archived); },
