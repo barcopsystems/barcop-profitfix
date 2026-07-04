@@ -898,23 +898,13 @@ S.InventoryProducts = {
   // ordering (never a recipe ingredient). Mirrors App.recipeBasis on the costing
   // side, so what the form captures is exactly what the Menu Builder reads.
   _divisorRole(unitType, miscType) {
-    if ((App.MISC_SUPPLY_TYPES || []).includes(miscType)) return 'supply';
-    if (App.ozPerUnit(unitType) != null) return 'liquid';        // a volume unit
-    if (String(unitType || '').toLowerCase() === 'each') return 'each';
-    if (miscType === 'Drink Mixer' || miscType === 'NA Beverage') return 'liquid';
-    return 'serving';
+    return App.productRole({ unit_type: unitType, misc_type: miscType });
   },
 
-  // The practical Count By for a product's role: a liquid gets the Fill Slider
-  // (a half jug is eyeballed), an "each" gets a Total Count (just type it), a
-  // countable/supply with a pack breaks into Full + Loose, everything else is a
-  // Total Count. The operator can still override; this only sets the default.
+  // The default Count By for the current form values. Delegates to the shared
+  // App.defaultCountStyle so the form and the count sheet never disagree.
   _defaultCountStyle(unitType, miscType, packV) {
-    const role = this._divisorRole(unitType, miscType);
-    if (role === 'liquid') return 'slider';
-    if (role === 'each') return 'number';
-    const hasPack = packV != null && packV !== '' && parseFloat(packV) > 0;
-    return hasPack ? 'loose' : 'number';
+    return App.defaultCountStyle({ unit_type: unitType, misc_type: miscType, pack_size: packV });
   },
 
   // Common container sizes for a liquid bought in a non-volume unit (a mixer by

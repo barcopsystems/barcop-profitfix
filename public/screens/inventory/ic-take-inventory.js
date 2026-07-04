@@ -20,9 +20,7 @@ S.InventoryTakeInventory = {
   // How a Food/Misc product is counted: an explicit count_style wins; otherwise a
   // pack item defaults to loose (full+loose), everything else to a typed number.
   _countStyle(p) {
-    if (p.count_style) return p.count_style;
-    if ((p.category === 'Food' || p.category === 'Misc') && p.pack_size > 0) return 'loose';
-    return 'number';
+    return App.countStyle(p);
   },
 
   counts() {
