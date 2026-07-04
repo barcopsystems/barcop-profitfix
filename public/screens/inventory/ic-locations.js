@@ -512,9 +512,10 @@ S.InventoryLocations = {
       // The same product menu/list as the landing, all current products pre-checked.
       middle = '<div style="margin-top:18px;"><div id="il-edit-filter">' + this.editProductsHTML() + '</div></div>';
     } else {
-      const arrangeHeading = '<div class="no-print" style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:24px 0 10px;">'
+      const arrangeHeading = '<div class="no-print" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:24px 0 10px;">'
         + '<div class="sh" style="margin:0;">Products In This Location</div>'
         + (assigned.length ? '<span style="font-size:10px;color:var(--t3);">Drag the handle to set the order Take Inventory counts these in.</span>' : '')
+        + (assigned.length ? '<button class="btn btn-ghost btn-sm" id="il-export" style="margin-left:auto;">Export PDF</button>' : '')
         + '</div>';
       const arrangeCard = assigned.length
         ? '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
@@ -533,7 +534,7 @@ S.InventoryLocations = {
         : '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
           + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th></th>'
           + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div>';
-      middle = arrangeHeading + arrangeCard;
+      middle = arrangeHeading + '<div id="il-arrange-export">' + arrangeCard + '</div>';
     }
 
     const updateRow = '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
@@ -600,6 +601,7 @@ S.InventoryLocations = {
     document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.updateLocation(l.id); });
     const ab = document.getElementById('il-arrange-body');
     if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'il-drag', onCommit: ids => this._persistProductOrder(l.name, ids) });
+    document.getElementById('il-export')?.addEventListener('click', () => App.exportPDF({ title: (l.name || 'Location') + ' Products', root: document.getElementById('il-arrange-export') }));
   },
 
   _toggleEdit(id, on) {
