@@ -1054,6 +1054,8 @@ S.HubSettings = {
       ['Key Lime Pie',         'Desserts',    7, 1.70,  30],
       ['Creme Brulee',         'Desserts',    9, 2.10,  44],
       ['Chocolate Torte',      'Desserts',    9, 2.30,  38],
+      ['Bread Pudding',        'Desserts',    8, 2.00,  40],
+      ['Affogato',             'Desserts',    9, 2.60,  24],
       // Cocktail Items tab — composed drinks (category 'Cocktails').
       ['Old Fashioned',        'Cocktails',  12, 2.40, 130],
       ['House Margarita',      'Cocktails',  11, 2.10, 145],
