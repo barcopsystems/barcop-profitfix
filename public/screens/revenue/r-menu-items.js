@@ -350,7 +350,7 @@ S.RevenueMenuItems = {
       + '<div class="card-title">Upload ' + esc(t.label || 'Menu') + ' List</div>'
       + '<div id="mi-csv"></div><div id="mi-imp-result"></div>'
       + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost mi-imp-cancel">Cancel</button></div>'
+      + '<div id="mi-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost mi-imp-cancel">Cancel</button></div>'
       + '<div id="mi-imp-actions" class="no-print" style="margin:0 0 24px;"></div>';
   },
   openImport(type) {
@@ -486,15 +486,20 @@ S.RevenueMenuItems = {
     // two-column form (540); a recipe item carries the ingredient builder, so it
     // runs at the prep-batch width (900). Kept in step on category change below.
     const isInv = this.formType === 'inventory';
+    const editLbl = { plate: 'Dish', cocktail: 'Cocktail', inventory: 'No Prep Item' }[this.formType] || 'Menu Item';
+    const addTitle = this.formType === 'plate' ? 'Build Dish Recipe'
+      : this.formType === 'cocktail' ? 'Build Cocktail Recipe'
+      : this.formType === 'inventory' ? 'Add No Prep Item' : 'Add Menu Item';
+    const title = item ? ('Edit ' + editLbl) : addTitle;
     const html = '<div class="card form-card' + (isInv ? ' narrow-form' : '') + '" id="mi-editor-card" style="margin:0;">'
-      + '<div class="card-title">' + (item ? 'Edit Menu Item' : 'Add Menu Item') + '</div>'
+      + '<div class="card-title">' + title + '</div>'
       + this.formBodyHtml(item)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ri-save">' + (item ? 'Update Item' : 'Save Item') + '</button>'
       + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 900, onClose: () => this.cancelEditor() });
+    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 660, onClose: () => this.cancelEditor() });
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
@@ -513,21 +518,26 @@ S.RevenueMenuItems = {
     const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
     const allCats = scoped || ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
     const selCat = item?.category || this._presetCat || '';
-    const catOpts = '<option value="">Select category...</option>'
-      + allCats.map(c => '<option' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    // Category LEADS the form. What loads next depends on it: a recipe category
-    // shows the typed Menu Name (mi-name-slot); an inventory category shows the
-    // Inventory Product picker (mi-linked-slot) first, then a Menu Name that
-    // auto-fills from the product (still editable). The picker comes before the
-    // name slot in the DOM so inventory reads Category, Product, Menu Name. Then
-    // the adaptive price/cost/covers/pour cells flow into mi-adaptive
-    // (display:contents); the recipe builder and notes carry flex:0 0 100%.
-    return '<div class="form-row">'
-      + '<div class="f" style="width:145px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">' + catOpts + '</select></div>'
-      + '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
-      + '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>'
-      + '<div id="mi-adaptive" style="display:contents;"></div>'
-      + '</div>';
+    const scopeType = item ? this.classifyItem(item) : this._addType;
+    // Cocktails are the only category in their tab, so the picker is hidden (kept
+    // as a fixed value); every other type shows the Category dropdown.
+    const catCell = scopeType === 'cocktail'
+      ? '<input type="hidden" id="ri-cat" value="Cocktails"/>'
+      : '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">'
+        + '<option value="">Select category...</option>'
+        + allCats.map(c => '<option' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
+        + '</select></div>';
+    const nameSlot = '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
+    const linkedSlot = '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
+    const adaptive = '<div id="mi-adaptive" style="display:contents;"></div>';
+    // Recipe types lead with Menu Name then Category; inventory leads with
+    // Category, then the Inventory Product picker, then the Menu Name that
+    // auto-fills from the product. The adaptive price/cost/covers cells flow into
+    // mi-adaptive (display:contents); the recipe builder and notes carry 100%.
+    const order = scopeType === 'inventory'
+      ? (catCell + linkedSlot + nameSlot + adaptive)
+      : (nameSlot + catCell + adaptive);
+    return '<div class="form-row">' + order + '</div>';
   },
 
   // Close the edit modal and return to the calling page — the Menu Items landing
@@ -574,7 +584,7 @@ S.RevenueMenuItems = {
     const isInv = this.formType === 'inventory';
     document.getElementById('mi-editor-card')?.classList.toggle('narrow-form', isInv);
     const box = overlay.firstElementChild;
-    if (box) box.style.maxWidth = (isInv ? 540 : 900) + 'px';
+    if (box) box.style.maxWidth = (isInv ? 540 : 660) + 'px';
   },
 
   renderAdaptive(item) {
@@ -612,7 +622,10 @@ S.RevenueMenuItems = {
   // The Menu Name field, loaded into #mi-name-slot. Typed for recipe items; for
   // inventory items it auto-fills from the chosen product (still editable).
   nameFieldHtml(item) {
-    return '<label>Menu Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="House Margarita"/>';
+    const ph = this.formType === 'plate' ? 'Anchor Burger'
+      : this.formType === 'cocktail' ? 'House Margarita'
+      : 'Auto-fills from the product';
+    return '<label>Menu Name</label><input class="form-input" type="text" id="ri-name" value="' + esc(item?.name || '') + '" placeholder="' + esc(ph) + '"/>';
   },
 
   recipeFields(item) {
@@ -620,7 +633,7 @@ S.RevenueMenuItems = {
       + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + '<div id="ri-recipe-section" style="flex:0 0 100%;border-top:1px solid var(--b2);padding-top:16px;margin-top:6px;"></div>'
-      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 16 }) + '</div>';
+      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
 
   // The inventory-product picker — rendered into the top-row slot (right of
@@ -659,11 +672,16 @@ S.RevenueMenuItems = {
         + '<div class="fw"><input class="form-input suf" type="number" id="ri-portion" value="' + (item?.portion != null ? item.portion : '') + '" step="0.25" min="0" placeholder="1"/><span class="suf" id="ri-portion-unit">' + esc(portionUnit) + '</span></div></div>'
       : '';
     return '<div class="f" style="width:100px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + pourField
       + portionField
-      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 8 }) + '</div>';
+      // Auto-calculated cost + cost % in one strip at the bottom, matching the
+      // recipe forms' Cost Per Serving / Recipe Cost % strip.
+      + '<div style="flex:0 0 100%;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;margin-top:6px;"><div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">'
+        + '<div class="calc-item"><div class="calc-label">Cost</div><div class="calc-val" id="ri-inv-cost">' + (autoCost > 0 ? App.fmtCurrency(autoCost) : '-') + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Cost %</div><div class="calc-val" id="ri-inv-pct">' + (autoCost > 0 && item?.price > 0 ? (autoCost / item.price * 100).toFixed(1) + '%' : '-') + '</div></div>'
+        + '</div></div>'
+      + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
   // Pour Size applies only to products sold by a pour: draft beer and wine by the
   // glass. Bottle beer sells whole, so it carries no pour size.
@@ -679,14 +697,17 @@ S.RevenueMenuItems = {
     // a product change and a pour change.
     const recomputeCost = () => {
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
-      const costInp = document.getElementById('ri-cost');
-      if (!costInp) return;
+      const costEl = document.getElementById('ri-inv-cost');
+      if (!costEl) return;
       // Food / Misc cost by the Portion; beer / wine by the Pour Size.
       const isFoodMisc = p && (p.category === 'Food' || p.category === 'Misc');
       const raw = parseFloat(document.getElementById(isFoodMisc ? 'ri-portion' : 'ri-pour')?.value);
       const amount = (!isNaN(raw) && raw > 0) ? raw : null;
       const bc = p ? (App.menuLinkCost(p, amount) || 0) : 0;
-      costInp.value = bc > 0 ? bc.toFixed(2) : '';
+      costEl.textContent = bc > 0 ? App.fmtCurrency(bc) : '-';
+      const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
+      const pctEl = document.getElementById('ri-inv-pct');
+      if (pctEl) pctEl.textContent = (bc > 0 && price > 0) ? (bc / price * 100).toFixed(1) + '%' : '-';
     };
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
       this.linkedProductId = e.target.value || '';
@@ -717,7 +738,7 @@ S.RevenueMenuItems = {
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
     document.getElementById('ri-portion')?.addEventListener('input', recomputeCost);
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
-    document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
+    document.getElementById('ri-price')?.addEventListener('input', () => { this.refreshFieldMissing(); recomputeCost(); });
   },
 
   // ── Recipe section (used by the adaptive Cocktail + food editor) ─────
@@ -1019,9 +1040,15 @@ S.RevenueMenuItems = {
     const el = document.getElementById('mi-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     const t = this.TYPES.find(x => x.key === this.activeType) || { noun: 'menu' };
+    const dropSub = this.activeType === 'plate'
+      ? 'Needs a column for dish name. Category (Appetizers, Entrees, Sides...), price, and cost come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
+      : this.activeType === 'cocktail'
+      ? 'Needs a column for cocktail name. Price and cost come in if your file has them. Cocktails import without recipes; edit one afterward to build its recipe.'
+      : 'Needs a column for item name. Category (NA Beverages, Snacks), price, and cost come in if your file has them. Edit an item afterward to link its inventory product.';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your ' + t.noun + ' items file here',
-      dropSub: 'Needs a column for menu name. Category, price, cost, and weekly covers come in too if your file has them. Items import without recipes; edit an item afterward to build its recipe or link an inventory product.',
+      dropSub: dropSub,
+      onState: state => { const row = document.getElementById('mi-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
       actionsEl: '#mi-imp-actions',
       fields: [
         { key: 'name',     label: 'Menu Name',    required: true,  match: ['name', 'item', 'item name', 'menu name', 'product', 'description', 'menu item'] },
