@@ -344,9 +344,13 @@ S.InventoryProducts = {
     // Food / Misc show recipe-costing columns (per-unit breakdown + recipe cost)
     // in place of the pour columns that only apply to poured drinks.
     const headerCols = isFoodMisc
-      ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th>Recipe Cost</th><th>Par</th><th></th>'
+      ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th style="white-space:nowrap;">Recipe Cost</th><th>Par</th><th></th>'
       : '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>';
-    const colgroup = '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+    // Food / Misc get their own even column widths (the recipe-costing set), so
+    // Recipe Cost has room to sit on one line instead of borrowing the pour widths.
+    const colgroup = isFoodMisc
+      ? '<colgroup><col style="width:40px;"/><col style="width:210px;"/><col style="width:150px;"/><col style="width:110px;"/><col style="width:115px;"/><col style="width:120px;"/><col style="width:120px;"/><col style="width:100px;"/><col style="width:150px;"/></colgroup>'
+      : '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
 
     let body;
     if (prods.length === 0) {
@@ -613,6 +617,7 @@ S.InventoryProducts = {
 
     // ── Row 2: category-specific size/cost/par fields ─────────────────────
     let row2 = '';
+    let foodStrip = '';   // Food / Misc derived-cost calc strip (below the grid)
     if (spec.sizeGroup && spec.showPour) {
       // Liquor / Wine / Draft Beer
       const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
@@ -680,6 +685,7 @@ S.InventoryProducts = {
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
+      foodStrip = '<div id="ip-divisor-strip">' + this._foodDivisorStripHTML(p, ut, p?.misc_type) + '</div>';
     }
 
     // ── Calc strip (pourable + bottle beer) ───────────────────────────────
@@ -718,6 +724,7 @@ S.InventoryProducts = {
       + '<div class="ip-sec"><div class="ip-sec-label">Purchase &amp; Cost</div>'
         + '<div class="ip-grid3">' + row2 + '</div>'
         + calcStrip
+        + foodStrip
       + '</div>'
       + (soldInner ? '<div class="ip-sec"><div class="ip-sec-label">Sold on the Menu</div>' + soldInner + '</div>' : '')
       + '<div style="margin-top:18px;">' + notes + '</div>'
@@ -906,56 +913,72 @@ S.InventoryProducts = {
     return h;
   },
 
+  // Only the INPUT cells for the grid. The derived cost readouts live in the calc
+  // strip below (see _foodDivisorStripHTML), the way liquor shows its calc strip.
   _divisorFieldsHTML(p, unitType, miscType) {
     const vv = x => (x != null && x !== '' ? x : '');
     const role = this._divisorRole(unitType, miscType);
     const uLabel = (unitType && unitType !== 'custom') ? unitType : 'unit';
-    const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
     if (role === 'liquid') {
-      const volOz = App.ozPerUnit(unitType);
-      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : (volOz || '');
-      const cps = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
-      if (volOz != null) {
-        // Known volume unit — ounces derive from the unit, shown read-only.
-        return '<div class="f" style="width:130px;flex-shrink:0;"><label>Size</label>'
-          + '<div class="f-display">' + volOz + ' oz / ' + esc(uLabel) + '</div>'
-          + '<input type="hidden" id="ip-foz" value="' + volOz + '"/></div>'
-          + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / oz</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
-      }
-      // Non-volume unit (a mixer bought by the bottle): pick the container size.
-      return '<div class="f" style="width:160px;flex-shrink:0;"><label>Container Size</label>'
-        + '<select id="ip-foz">' + this._foodSizeOpts(oz) + '</select></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / oz</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
-    }
-    if (role === 'each') {
-      return '<div class="f" style="width:150px;flex-shrink:0;"><label>Serving Name</label>'
-        + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="each"/></div>'
-        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Cost / Serving</label><div class="f-display" id="ip-div-cps">' + (cost > 0 ? App.fmtCurrency(cost) : '-') + '</div></div>';
+      // A volume unit derives its ounces from the unit (no input); a non-volume
+      // unit (a mixer bought by the bottle) needs the container size picked.
+      if (App.ozPerUnit(unitType) != null) return '';
+      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : '';
+      return '<div class="f"><label>Container Size</label>'
+        + '<select id="ip-foz">' + this._foodSizeOpts(oz) + '</select></div>';
     }
     if (role === 'supply') {
       const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-      const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(cost / packV, 2) : '-';
-      return '<div class="f" style="width:160px;flex-shrink:0;"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Piece</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+      return '<div class="f"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>';
     }
-    // serving (lb / case / bag / dozen)
+    if (role === 'each') {
+      return '<div class="f"><label>Serving Name</label>'
+        + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="each"/></div>';
+    }
+    // serving (lb / case / bag / dozen): servings per unit + the serving noun.
     const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-    const perServ = packV > 0 ? cost / packV : 0;
-    const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(perServ, 2) : '-';
-    return '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
+    return '<div class="f"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 16"/><span class="suf">ea</span></div></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Serving Name</label>'
-      + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Cost / Serving</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+      + '<div class="f"><label>Serving Name</label>'
+      + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>';
   },
 
-  // Re-render the divisor field group in place when Unit Type / Misc Type changes.
+  // The derived cost readout(s) for a Food / Misc product, in ONE calc strip below
+  // the inputs, mirroring liquor's Pours/Bottle · Cost/Pour · Pour Cost % strip.
+  _foodDivisorStripHTML(p, unitType, miscType) {
+    const role = this._divisorRole(unitType, miscType);
+    const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
+    const item = (label, val, id) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val"' + (id ? ' id="' + id + '"' : '') + '>' + val + '</div></div>';
+    let items = '';
+    if (role === 'liquid') {
+      const volOz = App.ozPerUnit(unitType);
+      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : (volOz || 0);
+      const cps = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
+      if (volOz != null) items += item('Ounces / ' + esc(unitType || 'unit'), volOz + ' oz', '');
+      items += item('Cost / oz', cps, 'ip-div-cps');
+    } else if (role === 'supply') {
+      const n = (p && p.pack_size > 0) ? p.pack_size : 0;
+      items += item('Cost / Piece', (cost > 0 && n > 0) ? App.fmtCurrency(cost / n, 2) : '-', 'ip-div-cps');
+    } else {
+      const n = (p && p.pack_size > 0) ? p.pack_size : 0;
+      const per = n > 0 ? cost / n : cost;   // each / unset serving: 1 = the unit
+      items += item('Cost / Serving', cost > 0 ? App.fmtCurrency(per, 2) : '-', 'ip-div-cps');
+    }
+    return '<div style="margin-top:18px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;">'
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+  },
+
+  // Re-render the divisor inputs AND the derived cost strip when Unit / Misc Type
+  // changes.
   _rerenderDivisor() {
-    const wrap = document.getElementById('ip-divisor-wrap');
-    if (!wrap) return;
     const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
-    wrap.innerHTML = this._divisorFieldsHTML(cur, this.getUnitType(), document.getElementById('ip-misctype')?.value || '');
+    const ut = this.getUnitType();
+    const mt = document.getElementById('ip-misctype')?.value || '';
+    const wrap = document.getElementById('ip-divisor-wrap');
+    if (wrap) wrap.innerHTML = this._divisorFieldsHTML(cur, ut, mt);
+    const strip = document.getElementById('ip-divisor-strip');
+    if (strip) strip.innerHTML = this._foodDivisorStripHTML(cur, ut, mt);
     this._wireDivisor();
   },
 
@@ -967,22 +990,22 @@ S.InventoryProducts = {
     this._calcDivisor();
   },
 
-  // Live cost per ounce / serving / piece shown next to the divisor field.
+  // Live derived cost (per ounce / serving / piece) in the calc strip.
   _calcDivisor() {
     const el = document.getElementById('ip-div-cps');
     if (!el) return;
     const cost = parseFloat(document.getElementById('ip-cost')?.value) || 0;
-    const foz = document.getElementById('ip-foz');
-    const pack = document.getElementById('ip-pack');
-    if (foz) {
-      const oz = parseFloat(foz.value) || 0;
-      el.textContent = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
-    } else if (pack) {
-      const n = parseFloat(pack.value) || 0;
-      const per = n > 0 ? cost / n : cost;
-      el.textContent = cost > 0 ? App.fmtCurrency(per, 2) : '-';
+    if (!(cost > 0)) { el.textContent = '-'; return; }
+    const role = this._divisorRole(this.getUnitType(), document.getElementById('ip-misctype')?.value || '');
+    if (role === 'liquid') {
+      const fozEl = document.getElementById('ip-foz');
+      const oz = fozEl ? (parseFloat(fozEl.value) || 0) : (App.ozPerUnit(this.getUnitType()) || 0);
+      el.textContent = oz > 0 ? App.fmtCurrency(cost / oz, 3) : '-';
+    } else if (role === 'each') {
+      el.textContent = App.fmtCurrency(cost, 2);
     } else {
-      el.textContent = cost > 0 ? App.fmtCurrency(cost) : '-';   // each: 1 = the unit
+      const n = parseFloat(document.getElementById('ip-pack')?.value) || 0;
+      el.textContent = n > 0 ? App.fmtCurrency(cost / n, 2) : (role === 'serving' ? App.fmtCurrency(cost, 2) : '-');
     }
   },
 
