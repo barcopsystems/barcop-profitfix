@@ -838,7 +838,7 @@ S.RevenueMenuItems = {
     // No Plates Per Batch: a menu item is one plate, so the recipe is per plate.
     // Target Cost % lives in the stat box (not its own row), next to Recipe Cost %.
     sec.innerHTML = '<div id="ri-ings" style="margin-bottom:10px;"></div>'
-      + '<div style="margin-bottom:14px;"><span id="ri-add-ing" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Add Ingredient</span></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
         + '<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="calc-item"><div class="calc-label">Target Cost %</div>'
