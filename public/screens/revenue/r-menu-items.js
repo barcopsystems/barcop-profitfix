@@ -529,11 +529,11 @@ S.RevenueMenuItems = {
     // as a fixed value); every other type shows the Category dropdown.
     const catCell = scopeType === 'cocktail'
       ? '<input type="hidden" id="ri-cat" value="Cocktails"/>'
-      : '<div class="f" style="width:160px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">'
+      : '<div class="f" style="width:130px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">'
         + '<option value="">Select category...</option>'
         + allCats.map(c => '<option' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
         + '</select></div>';
-    const nameSlot = '<div class="f" id="mi-name-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
+    const nameSlot = '<div class="f" id="mi-name-slot" style="width:150px;flex-shrink:0;display:none;"></div>';
     const linkedSlot = '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
     const adaptive = '<div id="mi-adaptive" style="display:contents;"></div>';
     // Recipe types lead with Menu Name then Category; inventory leads with
@@ -637,8 +637,8 @@ S.RevenueMenuItems = {
       this.renderRecipeSection(item, target);
     } else {
       wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-build-recipe">+ Build Recipe</button>'
-        + '<span style="font-size:11px;color:var(--t3);margin-left:10px;">Optional. Add a recipe for accurate, auto-updating cost.</span>'
+        + '<span id="ri-build-recipe" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Build Recipe</span>'
+        + '<span style="font-size:11px;color:var(--t3);margin-left:12px;">Optional — add a recipe for accurate, auto-updating cost.</span>'
         + '</div>';
       document.getElementById('ri-build-recipe')?.addEventListener('click', () => {
         this._recipeOpen = true;
@@ -659,7 +659,7 @@ S.RevenueMenuItems = {
     wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
         + '<label style="margin:0;">Other Prices <span style="color:var(--t4);font-weight:400;">(happy hour, specials)</span></label>'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-add-price">+ Add Price</button>'
+        + '<span id="ri-add-price" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Add Price</span>'
       + '</div>'
       + '<div id="ri-op-list">' + rows + '</div>'
       + '</div>';
@@ -714,9 +714,9 @@ S.RevenueMenuItems = {
   },
 
   recipeFields(item) {
-    return '<div class="f" style="width:100px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
+    return '<div class="f" style="width:90px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:85px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="width:85px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + '<div id="ri-recipe-wrap" style="flex:0 0 100%;"></div>'
       + '<div id="ri-other-prices-wrap" style="flex:0 0 100%;"></div>'
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
@@ -835,38 +835,31 @@ S.RevenueMenuItems = {
     const sec = document.getElementById('ri-recipe-section');
     if (!sec) return;
     if (!this.mode) this.mode = this.formType === 'cocktail' ? 'single' : 'food';
-    const plateYieldField = this.mode === 'food'
-      ? '<div class="f" style="width:140px;"><label>Plates Per Batch</label>'
-        + '<input class="form-input" type="number" id="ri-plate-yield" value="' + (item?.recipe?.plate_yield || 1) + '" min="1"/></div>'
-      : '';
-
-    sec.innerHTML = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
-        + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Recipe</div>'
-      + '</div>'
-      + '<div class="form-row" style="margin-bottom:12px;">'
-        + '<div class="f" style="width:130px;"><label>Target Cost %</label>'
-          + '<div class="fw"><input class="form-input suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5"/><span class="suf">%</span></div></div>'
-        + plateYieldField
-      + '</div>'
-      + '<div id="ri-ings" style="margin-bottom:12px;"></div>'
-      + '<button class="btn btn-ghost btn-sm" id="ri-add-ing" style="margin-bottom:14px;">+ Add Ingredient</button>'
-      // Cost lives in the top Cost cell (auto-filled + locked from the recipe), so
-      // this strip shows only the Recipe Cost %, not a duplicate cost number.
+    // No Plates Per Batch: a menu item is one plate, so the recipe is per plate.
+    // Target Cost % lives in the stat box (not its own row), next to Recipe Cost %.
+    sec.innerHTML = '<div id="ri-ings" style="margin-bottom:10px;"></div>'
+      + '<div style="margin-bottom:14px;"><span id="ri-add-ing" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Add Ingredient</span></div>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
-        + '<div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">'
+        + '<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-end;">'
+        + '<div class="calc-item"><div class="calc-label">Target Cost %</div>'
+          + '<div class="fw" style="max-width:88px;"><input class="form-input suf" type="number" id="ri-target-pct" value="' + target + '" step="0.5" style="padding:5px 8px;"/><span class="suf">%</span></div></div>'
         + '<div class="calc-item"><div class="calc-label">Recipe Cost %</div><div class="calc-val" id="ri-cpct">-</div></div>'
         + '</div></div>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ri-remove-recipe" style="margin-top:12px;">Remove Recipe</button>';
+      + '<div style="margin-top:12px;"><span id="ri-remove-recipe" style="color:var(--t3);font-size:11px;cursor:pointer;text-decoration:underline;">Remove recipe</span></div>';
 
     this.renderRows();
     this.calcRecipe();
 
     document.getElementById('ri-add-ing')?.addEventListener('click', () => { this.addRow(); this.calcRecipe(); });
     document.getElementById('ri-target-pct')?.addEventListener('input', () => this.calcRecipe());
-    document.getElementById('ri-plate-yield')?.addEventListener('input', () => this.calcRecipe());
-    // Remove Recipe collapses back to the "+ Build Recipe" toggle and unlocks the
-    // manual Cost field (calcRecipe frees it when there is no real recipe).
-    document.getElementById('ri-remove-recipe')?.addEventListener('click', () => {
+    // Remove Recipe is a quiet link, and it confirms first when there are real
+    // ingredients so an accidental click can't wipe a built recipe.
+    document.getElementById('ri-remove-recipe')?.addEventListener('click', async () => {
+      const hasReal = this.rows.some(r => r.id && (parseFloat(r.quantity) || 0) > 0);
+      if (hasReal) {
+        const ok = await App.confirm({ title: 'Remove this recipe?', message: 'The ingredients will be cleared and the item goes back to a manual cost.', confirmText: 'Remove Recipe', danger: true });
+        if (!ok) return;
+      }
       this._recipeOpen = false;
       this.rows = [];
       this.renderRecipeArea(item);
