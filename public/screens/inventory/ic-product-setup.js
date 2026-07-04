@@ -673,33 +673,16 @@ S.InventoryProducts = {
 
     const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
 
-    // ── Resale block (Food + Misc) ────────────────────────────────────────
-    // For packaged items the bar buys and sells whole (bagged chips, bottled
-    // NA), an optional "Sold on the menu" reveal carries a menu price + how many
-    // servings one purchased unit yields, so cost flows to the menu per serving.
-    let resaleBlock = '';
-    if (spec.showUnitType) {
-      const sold = !!p?.sold_on_menu;
-      const initCps = sold ? this._resaleCps(p?.unit_cost, p?.servings_per_unit) : 0;
-      resaleBlock = '<div class="form-row" style="margin-top:16px;">'
-        + '<label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t1);cursor:pointer;">'
-          + '<input type="checkbox" class="bc-check" id="ip-sold"' + (sold ? ' checked' : '') + '/> Sold on the menu as-is (resale item)</label>'
-      + '</div>'
-      + '<div id="ip-resale" style="' + (sold ? '' : 'display:none;') + 'margin-top:10px;">'
-        + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-          + '<div class="f" style="width:130px;flex-shrink:0;"><label>Menu Price</label>'
-            + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-price" value="' + v(p?.menu_price) + '" step="0.25" placeholder="0.00"/></div></div>'
-          + '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings per Unit</label>'
-            + '<input type="number" id="ip-servings" value="' + v(p?.servings_per_unit) + '" step="1" min="1" placeholder="1"/></div>'
-          + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cost / Serving</label>'
-            + '<div class="calc-val" id="ip-cps" style="padding-top:7px;">' + (initCps > 0 ? App.fmtCurrency(initCps) : '-') + '</div></div>'
-        + '</div></div>';
-    }
+    // Food / Misc "sold on the menu" (resale + sides) is NOT set here: each sell
+    // size is a menu item (a portion of this product at a price), built in the Menu
+    // Builder, so cost + usage blend correctly by sales mix. The product form only
+    // captures the atomic cost (the divisor above). Existing resale fields are
+    // carried through untouched on save until they migrate to menu items.
 
     // Sectioned three-column layout: Details, then the category's Purchase & Cost
-    // (spec fields + calc strip), then Sold on the Menu (sizes / resale) and Notes,
-    // each divided by a rule line so the operator fills it in section by section.
-    const soldInner = servingBlock || resaleBlock;
+    // (spec fields + calc strip), then Sold on the Menu (pourable Other Sizes) and
+    // Notes, each divided by a rule line so the form fills in section by section.
+    const soldInner = servingBlock;
     const formCard = '<div class="card form-card ip-form">'
       + header
       + '<div class="ip-sec-label" style="margin-top:6px;">Details</div>'
@@ -801,14 +784,6 @@ S.InventoryProducts = {
     // Food / Misc: live cost per ounce / serving / piece as cost or divisor change.
     document.getElementById('ip-cost')?.addEventListener('input', () => this._calcDivisor());
     this._wireDivisor();
-    // Resale block (Food / Misc): toggle the menu-price fields + live cost/serving.
-    document.getElementById('ip-sold')?.addEventListener('change', e => {
-      const box = document.getElementById('ip-resale');
-      if (box) box.style.display = e.target.checked ? '' : 'none';
-      this._calcResale();
-    });
-    ['ip-cost','ip-price','ip-servings'].forEach(fid =>
-      document.getElementById(fid)?.addEventListener('input', () => this._calcResale()));
     // Field-missing refresh on the other required inputs
     ['ip-name', 'ip-vendor', 'ip-loc1'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this._refreshMissing())
@@ -984,16 +959,11 @@ S.InventoryProducts = {
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
+  // Still used by the CSV import path; the form no longer edits resale directly.
   _resaleCps(cost, servings) {
     const c = parseFloat(cost) || 0;
     const n = parseFloat(servings);
     return (n && n > 0) ? c / n : c;
-  },
-  _calcResale() {
-    const el = document.getElementById('ip-cps');
-    if (!el) return;
-    const cps = this._resaleCps(document.getElementById('ip-cost')?.value, document.getElementById('ip-servings')?.value);
-    el.textContent = cps > 0 ? App.fmtCurrency(cps) : '-';
   },
 
   // Per-bottle cost from the form. For Bottle Beer with case_size > 0, the
@@ -1115,12 +1085,15 @@ S.InventoryProducts = {
     let oz      = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
     const pour  = spec.showPour ? num('ip-pour') : null;
     const cost  = num('ip-cost');
-    // Resale items (Food / Misc) carry a menu price too — read it from the same
-    // ip-price field, gated on the Sold-on-menu checkbox.
-    const soldOnMenu = spec.showUnitType ? !!document.getElementById('ip-sold')?.checked : false;
-    const servingsPerUnit = soldOnMenu ? (parseInt(document.getElementById('ip-servings')?.value) || 1) : null;
-    const price = (spec.showMenuPrice || soldOnMenu) ? num('ip-price') : null;
-    const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
+    // Resale / sell-size data now lives on menu items (Menu Builder), not here, so
+    // the product form carries the product's existing resale fields through
+    // untouched (seeded resale items keep working until they migrate). Pourable
+    // categories still read their menu price from ip-price.
+    const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
+    const soldOnMenu = spec.showUnitType ? (cur ? !!cur.sold_on_menu : false) : false;
+    const servingsPerUnit = spec.showUnitType ? (cur && cur.servings_per_unit != null ? cur.servings_per_unit : null) : null;
+    const costPerServing = spec.showUnitType ? (cur && cur.cost_per_serving != null ? cur.cost_per_serving : null) : null;
+    const price = spec.showMenuPrice ? num('ip-price') : (cur && cur.menu_price != null ? cur.menu_price : null);
     const pours = oz && pour ? oz / pour : null;
     const effCost = this.effectiveBottleCost();
     const cpp   = pours && effCost != null && effCost > 0 ? effCost / pours : null;
