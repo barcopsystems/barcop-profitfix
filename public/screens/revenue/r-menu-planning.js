@@ -7,9 +7,11 @@
    briefing is composed IN CODE from the item's own data, so it is instant, free,
    and can't say anything untrue. It is RANK-AWARE: each item is placed against
    the others in its category (only the actual worst Dog "earns the least"), and
-   the wording varies deterministically by item id, so no two tiles read the
-   same. It sharpens as covers and price history come in. Reuses the Menu
-   Engineering classifier + target/suggested math so the read never drifts. */
+   the wording is drawn from wide phrase pools seeded off the item id, so no two
+   tiles read the same and each stays stable between renders. A quick-glance stat
+   row (Cost / Cost % / Menu Price) sits up top with the cost percent colored by
+   where it lands. Reuses the Menu Engineering classifier + target/suggested math
+   so the read never drifts. */
 
 S.RevenueMenuPlanning = {
   container: null,
@@ -20,30 +22,49 @@ S.RevenueMenuPlanning = {
   items() { return (App.data.menu_items || []).filter(i => !i.archived); },
   nounFor(cat) { return this.DRINK_CATS.indexOf(cat) !== -1 ? 'drink' : 'plate'; },
 
-  // Stable per-item seed so the wording varies item to item but never reshuffles
-  // between renders.
   _seed(id) { let s = 0; const t = String(id || ''); for (let i = 0; i < t.length; i++) s = (s + t.charCodeAt(i)) % 100000; return s; },
   _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; },
 
-  // A rank (1 = best) turned into an honest standing phrase. Only rank 1 / rank n
-  // ever claim the top or the bottom, so no two items claim the same superlative.
-  _rankWord(rank, n, kind) {
-    if (!(n > 1) || !rank) return kind === 'margin' ? 'its margin' : 'its volume';
-    const W = kind === 'margin'
-      ? { best: 'the fattest margin', worst: 'the thinnest margin', best2: 'the second-fattest margin', worst2: 'the second-thinnest margin', up: 'one of the fatter margins', low: 'one of the thinner margins', mid: 'a middling margin' }
-      : { best: 'the top seller', worst: 'the slowest mover', best2: 'the second-best seller', worst2: 'the second-slowest mover', up: 'one of the busier sellers', low: 'one of the slower movers', mid: 'a middling seller' };
-    if (rank === 1) return W.best;
-    if (rank === n) return W.worst;
-    if (rank === 2 && n >= 4) return W.best2;
-    if (rank === n - 1 && n >= 4) return W.worst2;
-    const frac = rank / n;
-    if (frac <= 0.34) return W.up;
-    if (frac >= 0.67) return W.low;
-    return W.mid;
+  // Quick-glance color for the cost % stat: over target reads as a leak, near it
+  // as a watch, comfortably under as a win. Neutral when there is no target.
+  costPctColor(pct, target) {
+    if (pct == null || !target) return '';
+    if (pct > target + 0.5) return 'var(--red)';
+    if (pct >= target - 3) return 'var(--amber)';
+    return 'var(--green)';
   },
 
-  // Per-category yardsticks + a margin rank and a covers rank for every rankable
-  // item (priced with covers). ranked = 4+ rankable items, enough to rank fairly.
+  // A rank (1 = best) turned into an honest standing phrase, drawn from a small
+  // synonym pool by seed so two items at the same standing still read differently.
+  // Only rank 1 / rank n ever claim the top or the bottom.
+  _rankWord(rank, n, kind, seed) {
+    if (!(n > 1) || !rank) return kind === 'margin' ? 'its margin' : 'its volume';
+    const P = kind === 'margin' ? {
+      best: ['the fattest margin', 'the best margin of the bunch', 'the strongest margin here'],
+      worst: ['the thinnest margin', 'the weakest margin of the bunch', 'the skinniest margin here'],
+      best2: ['the second-fattest margin', 'the second-best margin of the group'],
+      worst2: ['the second-thinnest margin', 'the second-weakest margin of the group'],
+      up: ['one of the fatter margins', 'an upper-tier margin', 'a healthy margin for the group'],
+      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin for the group'],
+      mid: ['a middling margin', 'a middle-of-the-pack margin', 'an average margin for the group']
+    } : {
+      best: ['the top seller', 'your busiest of them', 'the volume leader'],
+      worst: ['the slowest mover', 'the least-ordered of them', 'the volume laggard'],
+      best2: ['the second-best seller', 'the second-busiest of them'],
+      worst2: ['the second-slowest mover', 'the second-least-ordered'],
+      up: ['one of the busier sellers', 'an upper-tier seller', 'a strong mover'],
+      low: ['one of the slower movers', 'a bottom-tier seller', 'a soft mover'],
+      mid: ['a middling seller', 'a middle-of-the-pack seller', 'an average mover']
+    };
+    let bucket;
+    if (rank === 1) bucket = P.best;
+    else if (rank === n) bucket = P.worst;
+    else if (rank === 2 && n >= 4) bucket = P.best2;
+    else if (rank === n - 1 && n >= 4) bucket = P.worst2;
+    else { const frac = rank / n; bucket = frac <= 0.34 ? P.up : frac >= 0.67 ? P.low : P.mid; }
+    return bucket[(seed + (kind === 'margin' ? 0 : 5)) % bucket.length];
+  },
+
   categoryStats() {
     const stats = {};
     const byCat = {};
@@ -67,7 +88,6 @@ S.RevenueMenuPlanning = {
     return stats;
   },
 
-  // The single most expensive ingredient in the recipe, per finished plate/drink.
   topCostIngredient(item) {
     if (!item || !item.recipe || !Array.isArray(item.recipe.ingredients) || !item.recipe.ingredients.length) return null;
     const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
@@ -89,7 +109,8 @@ S.RevenueMenuPlanning = {
   },
 
   // The briefing: { lines: [paragraphs], move: '<action text or ''>' }. Every
-  // sentence is composed from this item's own figures and its rank in the group.
+  // sentence is composed from this item's own figures and its rank in the group,
+  // pulled from wide phrase pools by seed so the reads stay distinct.
   briefing(item, cat, cs, quad) {
     const f = v => App.fmtCurrency(v);
     const cost = App.menuItemCost(item) || 0;
@@ -110,11 +131,20 @@ S.RevenueMenuPlanning = {
     const m = cs.mRank[item.id], c = cs.cRank[item.id], rn = cs.rankedN;
     const dwk = (sugg && covers) ? (sugg - price) * covers : 0;
 
+    const bothBottom = (m === rn && c === rn);
+    const dogBucket = bothBottom
+      ? ['It is the one dragging the section hardest.', 'It is the anchor on this section, plain and simple.', 'Nothing here earns and moves less.']
+      : (m === rn || c === rn)
+        ? ['On one measure it is the very bottom of your ' + catLc + '.', 'It hits rock bottom on one of the two here.', 'One of its two numbers is dead last in the group.']
+        : ['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.', 'A few trail it, yet it is still not carrying its spot on the menu.'];
+
     const V = {
       margin: f(margin), covers: covers, noun: noun, cat: catLc, n: cs.n,
-      pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0), dwk: f(dwk),
+      pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0),
       name: drv ? drv.name : '', dcost: drv ? f(drv.cost) : '',
-      mword: this._rankWord(m, rn, 'margin'), cword: this._rankWord(c, rn, 'covers')
+      mword: this._rankWord(m, rn, 'margin', seed), cword: this._rankWord(c, rn, 'covers', seed),
+      tail: dogBucket[seed % dogBucket.length],
+      dwkc: dwk ? ', about ' + f(dwk) + ' more a week if covers hold' : ''
     };
     V.Mword = this._cap(V.mword); V.Cword = this._cap(V.cword);
     const fill = s => s.replace(/\{(\w+)\}/g, (_, k) => (V[k] != null ? String(V[k]) : ''));
@@ -124,29 +154,35 @@ S.RevenueMenuPlanning = {
 
     // ── Read line ─────────────────────────────────────────────────────────
     if (quad && cs.ranked) {
-      const bothBottom = (m === rn && c === rn);
-      const dogTail = bothBottom
-        ? 'It is the one dragging the section hardest.'
-        : (m === rn || c === rn)
-          ? 'On one measure it is the very bottom of your ' + catLc + '.'
-          : pick(['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.'], 3);
       const READ = {
         STAR: ['A Star. It carries {mword} of your {n} {cat} at {margin} a {noun}, and it is {cword} at {covers} a week. Both sides working.',
-               'A Star, and it earns the badge: {mword} in the group at {margin} a {noun}, {cword} at {covers} a week.'],
+               'A Star, and it earns the badge: {mword} in the group at {margin} a {noun}, {cword} at {covers} a week.',
+               'This one is a Star. {Mword} at {margin} a {noun} and {cword} at {covers} a week. It is doing everything you want.',
+               'A Star. Strong on both counts: {mword} at {margin} a {noun} and {cword} at {covers} a week.'],
         PLOWHORSE: ['A Plowhorse. {Cword} at {covers} a week, but it runs {mword} at {margin} a {noun}. The volume is propping up a thin {noun}.',
-                    'A Plowhorse. It moves, {cword} at {covers} a week, but the margin is {mword} of the group at {margin}.'],
+                    'A Plowhorse. It moves, {cword} at {covers} a week, but the margin is {mword} of the group at {margin}.',
+                    'This one is a Plowhorse. People order it, {cword} at {covers} a week, they just are not paying you much for it at {margin} a {noun}.',
+                    'A Plowhorse. {Cword} at {covers} a week on {mword} at {margin} a {noun}. Busy, but thin.'],
         PUZZLE: ['A Puzzle. The margin is there, {mword} at {margin} a {noun}, but it is {cword} at {covers} a week. It pays when it sells, it just is not selling.',
-                 'A Puzzle. {Mword} at {margin} a {noun}, yet only {cword} at {covers} a week. People are not reaching for it.'],
-        DOG: ['A Dog. It runs {mword} at {margin} a {noun} and it is {cword} at {covers} a week. ' + dogTail,
-              'A Dog. {Mword} at {margin} a {noun}, and {cword} at {covers} a week. ' + dogTail]
+                 'A Puzzle. {Mword} at {margin} a {noun}, yet only {cword} at {covers} a week. People are not reaching for it.',
+                 'This one is a Puzzle. Good money at {margin} a {noun}, {mword} of the group, but {cword} at {covers} a week. The plate earns, the menu is hiding it.',
+                 'A Puzzle. {Mword} at {margin} a {noun}, but {cword} at {covers} a week. Solve the covers and it is a winner.'],
+        DOG: ['A Dog. It runs {mword} at {margin} a {noun} and it is {cword} at {covers} a week. {tail}',
+              'A Dog. {Mword} at {margin} a {noun}, and {cword} at {covers} a week. {tail}',
+              'This one is a Dog. {Mword} at {margin} a {noun} paired with {cword} at {covers} a week. {tail}',
+              'A Dog. Low on both: {mword} at {margin} a {noun} and {cword} at {covers} a week. {tail}']
       };
       lines.push(pick(READ[quad] || READ.DOG, 0));
+    } else if (cs.n < 4) {
+      lines.push(pick(['Only {n} priced {cat} so far, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more items and this read sharpens.',
+                       'Just {n} priced {cat} on the menu, not enough to rank it fairly. For now it clears {margin} a {noun}.',
+                       'With only {n} priced {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
+    } else if (!covers) {
+      lines.push(pick(['It clears {margin} a {noun}, but no covers on it yet, so the volume read stays blank until you drop a product mix at the weekly close.',
+                       'Margin is {margin} a {noun}. No covers logged yet, so Bar Cop can read the plate but not the pull.',
+                       'It earns {margin} a {noun}. Once covers come in at the weekly close, the volume side fills in.'], 0));
     } else {
-      if (cs.n < 4) lines.push(pick(['Only {n} priced {cat} so far, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more items and this read sharpens.',
-                                      'Just {n} priced {cat} on the menu, not enough to rank it fairly. For now it clears {margin} a {noun}.'], 0));
-      else if (!covers) lines.push(pick(['It clears {margin} a {noun}, but no covers on it yet, so the volume read stays blank until you drop a product mix at the weekly close.',
-                                         'Margin is {margin} a {noun}. No covers logged yet, so Bar Cop can read the plate but not the pull.'], 0));
-      else lines.push(fill('It clears {margin} a {noun} on {covers} covers a week.'));
+      lines.push(fill('It clears {margin} a {noun} on {covers} covers a week.'));
     }
 
     // ── Cost line ─────────────────────────────────────────────────────────
@@ -154,10 +190,12 @@ S.RevenueMenuPlanning = {
       lines.push(costPct > target + 0.5
         ? pick(['Cost is running {pct}% against your {target}% target, so the margin is the lever here, not the covers.',
                 'At {pct}% cost against a {target}% target, the leak is on the plate, not the volume.',
-                'Cost is {pct}% versus your {target}% target. Fix the {noun} before you chase covers.'], 1)
+                'Cost is {pct}% versus your {target}% target. Fix the {noun} before you chase covers.',
+                'That {pct}% cost against a {target}% target is where the money is slipping. Tighten the recipe.'], 1)
         : pick(['Cost sits at {pct}% against your {target}% target, right where you want it.',
                 'At {pct}% cost against a {target}% target, the margin is clean.',
-                'Cost is {pct}% versus a {target}% target. No complaints there.'], 1));
+                'Cost is {pct}% versus a {target}% target. No complaints there.',
+                'Plate cost is a tidy {pct}% against your {target}% target.'], 1));
     } else {
       lines.push(fill('Cost runs {pct}% of the price.'));
     }
@@ -165,20 +203,26 @@ S.RevenueMenuPlanning = {
     // ── Cost driver ───────────────────────────────────────────────────────
     if (drv) lines.push(pick(['The heaviest cost in it is {name} at {dcost} a {noun}.',
                               '{name} is the biggest single cost, {dcost} a {noun}.',
-                              'Most of the cost is {name}, {dcost} a {noun}.'], 2));
+                              'Most of the cost is {name}, {dcost} a {noun}.',
+                              'Your priciest line in it is {name}, {dcost} a {noun}.'], 2));
 
     // ── The move ──────────────────────────────────────────────────────────
     let move = '';
-    if (sugg) move = pick(['reprice to {sugg} to pull it back to target' + (dwk ? ', about {dwk} more a week if covers hold' : '') + '.',
-                           '{sugg} is the to-target price' + (dwk ? ', roughly {dwk} more a week if the covers hold' : '') + '.'], 4);
+    if (sugg) move = pick(['reprice to {sugg} to pull it back to target{dwkc}.',
+                           '{sugg} is the to-target price{dwkc}.',
+                           'take it up to {sugg}{dwkc}.'], 4);
     else if (quad === 'DOG') move = pick(['rework or cut. Run a 90-day Dog Test before you pull it so it is the data making the call.',
-                                          'fix the recipe or retire it, but Dog Test it 90 days first so you are not guessing.'], 4);
+                                          'fix the recipe or retire it, but Dog Test it 90 days first so you are not guessing.',
+                                          'rework it or cut it. A 90-day Dog Test settles it before you commit.'], 4);
     else if (quad === 'STAR') move = pick(['feature it. Power spot on the menu, and have the floor push it.',
-                                           'protect it and push it. This is one to build the section around.'], 4);
+                                           'protect it and push it. This is one to build the section around.',
+                                           'keep it front and center and have the staff sell it. Do not touch the price.'], 4);
     else if (quad === 'PUZZLE') move = pick(['get it seen. A feature, a special, a server callout. The {noun} already pays.',
-                                             'put it in front of people. It sells itself once it is tried.'], 4);
+                                             'put it in front of people. It sells itself once it is tried.',
+                                             'give it a better spot or a callout. The margin is fine, the visibility is not.'], 4);
     else if (quad === 'PLOWHORSE') move = pick(['it is at target, so trim the plate cost rather than raise the price.',
-                                                'the price is fine, so the lever is shaving cost out of the {noun}.'], 4);
+                                                'the price is fine, so the lever is shaving cost out of the {noun}.',
+                                                'hold the price and find cost to cut in the recipe.'], 4);
 
     return { lines, move };
   },
@@ -229,6 +273,8 @@ S.RevenueMenuPlanning = {
       + stat('Plowhorses', counts.PLOWHORSE) + stat('Dogs', counts.DOG)
       + '</div></div>';
 
+    const sCell = (label, val, color) => '<div class="mp-stat"><span class="mp-stat-lbl">' + label + '</span><span class="mp-stat-val"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</span></div>';
+
     const sections = cats.map(cat => {
       const cs = catStats[cat];
       const list = byCat[cat].slice().sort((a, b) => {
@@ -239,9 +285,17 @@ S.RevenueMenuPlanning = {
         const b = this.briefing(i, cat, cs, classMap[i.id]);
         const body = b.lines.map(p => '<p>' + esc(p) + '</p>').join('');
         const moveBand = b.move ? '<div class="mp-move"><span class="mp-move-lbl">Move:</span> ' + esc(b.move) + '</div>' : '';
+        const cost = App.menuItemCost(i) || 0;
+        const price = i.price || 0;
+        const pct = (price > 0 && cost > 0) ? cost / price * 100 : null;
+        const stats = '<div class="mp-stats">'
+          + sCell('Cost', cost > 0 ? App.fmtCurrency(cost) : '&mdash;')
+          + sCell('Cost %', pct != null ? pct.toFixed(0) + '%' : '&mdash;', this.costPctColor(pct, S.RevenueMenuEngineering.targetPctFor(i)))
+          + sCell('Menu Price', price > 0 ? App.fmtCurrency(price) : '&mdash;')
+          + '</div>';
         return '<div class="mp-tile">'
-          + '<div class="mp-tile-head"><span class="mp-name">' + esc(i.name || 'Unnamed') + '</span>'
-          + '<span class="mp-price">' + (i.price > 0 ? App.fmtCurrency(i.price) : '<span style="color:var(--t4);">No price</span>') + '</span></div>'
+          + '<div class="mp-name">' + esc(i.name || 'Unnamed') + '</div>'
+          + stats
           + '<div class="mp-brief">' + body + '</div>' + moveBand
           + '</div>';
       }).join('');
@@ -255,8 +309,8 @@ S.RevenueMenuPlanning = {
     App.showHelpModal('How Menu Briefing Works', [
       { p: ['Menu Briefing gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
       { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its cost percent against your target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
-      { h: 'Read The Room First', p: ['Items are grouped by section, and inside each section the ones that need a decision come first, your Dogs and anything running over target, then the winners. The counts up top are your menu mix at a glance: how many Stars are pulling their weight and how many Dogs are dragging.'] },
-      { h: 'What To Do', p: ['Each tile ends with the move: reprice an over-target item and the weekly dollars behind it, feature a Star, get a Puzzle seen, or run a Dog through a 90-day Dog Test before you cut it. Make the change in Menu Builder or Menu Engineering and the read updates next time you land here.'] }
+      { h: 'The Numbers Up Top', p: ['Each tile leads with the three that matter at a glance: cost, cost percent, and menu price. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under. The briefing below spells out what those numbers mean and what to do about it.'] },
+      { h: 'What To Do', p: ['Items are grouped by section, and inside each section the ones that need a decision come first. Each tile ends with the move: reprice an over-target item and the weekly dollars behind it, feature a Star, get a Puzzle seen, or run a Dog through a 90-day Dog Test before you cut it. Make the change in Menu Builder or Menu Engineering and the read updates next time you land here.'] }
     ]);
   }
 };
