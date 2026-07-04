@@ -696,16 +696,20 @@ S.InventoryProducts = {
         + '</div></div>';
     }
 
-    const formCard = '<div class="card form-card narrow-form">'
+    // Sectioned three-column layout: Details, then the category's Purchase & Cost
+    // (spec fields + calc strip), then Sold on the Menu (sizes / resale) and Notes,
+    // each divided by a rule line so the operator fills it in section by section.
+    const soldInner = servingBlock || resaleBlock;
+    const formCard = '<div class="card form-card ip-form">'
       + header
-      + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:start;">'
-      + row1
-      + row2
+      + '<div class="ip-sec-label" style="margin-top:6px;">Details</div>'
+      + '<div class="ip-grid3">' + row1 + '</div>'
+      + '<div class="ip-sec"><div class="ip-sec-label">Purchase &amp; Cost</div>'
+        + '<div class="ip-grid3">' + row2 + '</div>'
+        + calcStrip
       + '</div>'
-      + calcStrip
-      + resaleBlock
-      + servingBlock
-      + notes
+      + (soldInner ? '<div class="ip-sec"><div class="ip-sec-label">Sold on the Menu</div>' + soldInner + '</div>' : '')
+      + '<div class="ip-sec">' + notes + '</div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
         + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
@@ -713,7 +717,7 @@ S.InventoryProducts = {
     + '</div>';
     // Popup over the products list (which stays mounted behind), instead of
     // swapping the whole page out. The corner X closes it (and re-renders the landing).
-    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 540, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 660, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
 
     this._wireForm();
   },
