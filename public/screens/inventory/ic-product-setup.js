@@ -1504,9 +1504,10 @@ S.InventoryProducts = {
       ]);
     }
     const tail = [
-      {key:'unit_type',         label:'Unit Type (lb / case / each / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
-      {key:'menu_price',        label:'Menu Price ($, if sold as-is)', required:false, aliases:['price','menu price','sell price','retail','selling price']},
-      {key:'servings_per_unit', label:'Servings per Unit (if sold as-is)', required:false, aliases:['servings','servings per unit','units per','per unit','yield','pack','pack size']},
+      {key:'unit_type',         label:'Unit Type (lb / case / each / gallon / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
+      {key:'container_size_oz', label:'Container Size (oz, for a liquid)', required:false, aliases:['size','container','container size','volume','oz','ounces','bottle size']},
+      {key:'pack_size',         label:'Pieces / Servings per Unit', required:false, aliases:['pack','pack size','servings','servings per unit','pieces','pieces per unit','units per','per unit','yield','count per unit']},
+      {key:'serving_name',      label:'Serving / Piece Name', required:false, aliases:['serving name','serving','piece','piece name','portion name','each name']},
       {key:'par_level',         label:'Par Level',     required:false, aliases:['par','par level','target stock']},
       {key:'reorder_point',     label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum']},
     ];
@@ -1563,6 +1564,14 @@ S.InventoryProducts = {
       const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
       const caseSize = spec.showCaseSize ? (parseInt(val(row, 'case_size')) || null) : null;
       const unitType = spec.showUnitType ? (val(row, 'unit_type').toLowerCase() || spec.defaultUnitType) : null;
+      const miscType = cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '';
+      // Food / Misc: pieces-or-servings per unit, the recipe noun, and the count
+      // method (defaulted from the product's role, exactly like the form).
+      const packSize = spec.showPackSize ? (parseInt(val(row, 'pack_size')) || null) : null;
+      const servingName = spec.showUnitType ? (val(row, 'serving_name') || null) : null;
+      const countStyle = spec.showPackSize
+        ? App.defaultCountStyle({ unit_type: unitType, misc_type: miscType, pack_size: packSize })
+        : null;
       const pours = oz && pour ? oz / pour : null;
       // Per-bottle cost (divides by case_size for Bottle Beer when set).
       const perBottle = (cat === 'Bottle Beer' && caseSize && caseSize > 0)
@@ -1576,10 +1585,13 @@ S.InventoryProducts = {
         brand:               val(row, 'brand'),
         category:            cat,
         sub_category:        cat === 'Misc' ? '' : val(row, 'sub_category'),
-        misc_type:           cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '',
+        misc_type:           miscType,
         vendor:              val(row, 'vendor'),
         container_size_oz:   oz,
         case_size:           caseSize,
+        pack_size:           packSize,
+        serving_name:        servingName,
+        count_style:         countStyle,
         pour_size_oz:        pour,
         unit_type:           unitType,
         unit_cost:           cost,
