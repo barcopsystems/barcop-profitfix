@@ -17,6 +17,14 @@ S.InventoryTakeInventory = {
     const all = (App.inventoryData && App.inventoryData.ic_products) || [];
     return all.filter(p => p.active !== false);
   },
+  // How a Food/Misc product is counted: an explicit count_style wins; otherwise a
+  // pack item defaults to loose (full+loose), everything else to a typed number.
+  _countStyle(p) {
+    if (p.count_style) return p.count_style;
+    if ((p.category === 'Food' || p.category === 'Misc') && p.pack_size > 0) return 'loose';
+    return 'number';
+  },
+
   counts() {
     if (!App.inventoryData) App.inventoryData = {};
     if (!Array.isArray(App.inventoryData.ic_counts)) App.inventoryData.ic_counts = [];
@@ -357,7 +365,9 @@ S.InventoryTakeInventory = {
       // full units + loose pieces, reconciled to a decimal of the unit via the
       // pack size. Same stored on-hand number as a typed decimal, entered more
       // accurately (1 bag + 40 wings = 1.40 bags).
-      const isPackFood = (p.category === 'Food' || p.category === 'Misc') && p.pack_size && p.pack_size > 0;
+      const foodStyle = (p.category === 'Food' || p.category === 'Misc') ? this._countStyle(p) : null;
+      const isPackFood = foodStyle === 'loose' && p.pack_size > 0;
+      const isFoodSlider = foodStyle === 'slider';
       let countInput;
       if (isCaseBeer) {
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
@@ -376,6 +386,10 @@ S.InventoryTakeInventory = {
       } else if (isPourable) {
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
           + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
+          + '</div>';
+      } else if (isFoodSlider) {
+        countInput = '<div style="display:flex;justify-content:center;margin:0;">'
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.count_shape || 'box') })
           + '</div>';
       } else if (isPackFood) {
         const un = App.productUnit(p) || 'unit';
@@ -402,7 +416,7 @@ S.InventoryTakeInventory = {
       // visible, and Notes collapsed behind a "+ Note" toggle so 200 products
       // are far less scrolling. Notes auto-expand when one already exists.
       const hasNote = !!(c.notes && c.notes.trim());
-      return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" data-pack-size="' + (isPackFood ? p.pack_size : 0) + '" style="margin-bottom:10px;padding:12px 14px;">'
+      return '<div class="card ti-pcard" data-pid="' + p.id + '" data-case-beer="' + (isCaseBeer ? '1' : '0') + '" data-case-size="' + (p.case_size || 0) + '" data-pack-size="' + (isPackFood ? p.pack_size : 0) + '" data-count-style="' + (foodStyle || '') + '" style="margin-bottom:10px;padding:12px 14px;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
         + '<div style="min-width:0;"><span style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
         + '<span style="font-size:11px;color:var(--t3);margin-left:8px;">' + esc(p.category || 'Uncategorized') + (p.brand ? ' &middot; ' + esc(p.brand) : '') + '</span></div>'
@@ -447,7 +461,8 @@ S.InventoryTakeInventory = {
     grp.products.forEach(p => {
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       if (isCaseBeer) return; // case + loose inputs handled below, not the slider
-      if (!(p.container_size_oz && p.pour_size_oz)) return; // food/dry: number input, wired below
+      const foodSlider = (p.category === 'Food' || p.category === 'Misc') && this._countStyle(p) === 'slider';
+      if (!(p.container_size_oz && p.pour_size_oz) && !foodSlider) return; // food/dry: number/loose input, wired below
       BottleSlider.mount(p.id, (v) => {
         const key = p.id + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
@@ -542,12 +557,12 @@ S.InventoryTakeInventory = {
         const pid = btn.dataset.pid;
         const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
         const isCaseBeer = !!(card && card.dataset.caseBeer === '1');
-        const isPackFood = !!(card && (parseFloat(card.dataset.packSize) || 0) > 0);
+        const isLoosePack = !!(card && card.dataset.countStyle === 'loose');
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
         this.draft.counts[key] = isCaseBeer
           ? { cases: 0, loose: 0, notes: prev.notes || '' }
-          : isPackFood
+          : isLoosePack
           ? { fulls: 0, loose: 0, notes: prev.notes || '' }
           : { value: 0, fulls: 0, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
@@ -593,7 +608,9 @@ S.InventoryTakeInventory = {
       const counted = this.draft.counts[_key] != null;
       const c = this.draft.counts[_key] || { value: 0, fulls: 0, notes: '' };
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
-      const isPackFood = (p.category === 'Food' || p.category === 'Misc') && p.pack_size && p.pack_size > 0;
+      // Only the loose (full+loose) style totals as fulls + loose/pack; a
+      // slider-counted pack item stores {fulls, value} and totals in the else.
+      const isPackFood = (p.category === 'Food' || p.category === 'Misc') && p.pack_size > 0 && this._countStyle(p) === 'loose';
       let total, value;
       if (isCaseBeer) {
         const cases = c.cases || 0;

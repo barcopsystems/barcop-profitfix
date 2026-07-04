@@ -628,6 +628,8 @@ S.InventoryProducts = {
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
       const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
+      const cstyle = p?.count_style || (packV ? 'loose' : 'number');
+      const cshape = p?.count_shape || 'box';
       row2 = ''
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
@@ -641,6 +643,16 @@ S.InventoryProducts = {
         + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pack Size <span style="color:var(--t4);font-weight:400;">(per unit)</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + v(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Each</label><div class="f-display" id="ip-pack-cps">-</div></div>'
+        // How this product is counted on the count sheet: a typed number, full
+        // units + loose pieces, or a fill slider (pick the silhouette).
+        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Count By</label>'
+        + '<select id="ip-cstyle">'
+        + '<option value="number"' + (cstyle === 'number' ? ' selected' : '') + '>Type a Number</option>'
+        + '<option value="loose"' + (cstyle === 'loose' ? ' selected' : '') + '>Full + Loose</option>'
+        + '<option value="slider"' + (cstyle === 'slider' ? ' selected' : '') + '>Fill Slider</option>'
+        + '</select></div>'
+        + '<div class="f" id="ip-cshape-wrap" style="width:130px;flex-shrink:0;' + (cstyle === 'slider' ? '' : 'display:none;') + '"><label>Shape</label>'
+        + '<select id="ip-cshape">' + ['box','bag','jug','crate','tub','can'].map(s => '<option value="' + s + '"' + (cshape === s ? ' selected' : '') + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>').join('') + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
@@ -788,6 +800,11 @@ S.InventoryProducts = {
     ['ip-cost','ip-pack'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => this._calcPack()));
     this._calcPack();
+    // Count By = Fill Slider reveals the shape picker.
+    document.getElementById('ip-cstyle')?.addEventListener('change', e => {
+      const w = document.getElementById('ip-cshape-wrap');
+      if (w) w.style.display = e.target.value === 'slider' ? '' : 'none';
+    });
     // Resale block (Food / Misc): toggle the menu-price fields + live cost/serving.
     document.getElementById('ip-sold')?.addEventListener('change', e => {
       const box = document.getElementById('ip-resale');
@@ -1023,6 +1040,9 @@ S.InventoryProducts = {
     // Pack size: pieces per unit (Food / Misc). Optional; null when the unit is
     // already the piece. Drives per-piece cost + loose counts.
     const packSize = spec.showPackSize ? (parseInt(document.getElementById('ip-pack')?.value) || null) : null;
+    // How this product is counted: number / loose / slider (+ silhouette).
+    const countStyle = spec.showPackSize ? (document.getElementById('ip-cstyle')?.value || 'number') : null;
+    const countShape = (countStyle === 'slider') ? (document.getElementById('ip-cshape')?.value || 'box') : null;
     // Other sizes sold: each row needs a size and a price to count.
     const servingSizes = [];
     if (spec.showServingSizes) {
@@ -1060,6 +1080,8 @@ S.InventoryProducts = {
       container_size_oz:   oz,
       case_size:           caseSize,
       pack_size:           packSize,
+      count_style:         countStyle,
+      count_shape:         countShape,
       pour_size_oz:        pour,
       unit_type:           unitType,
       unit_cost:           cost,
