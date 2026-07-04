@@ -99,22 +99,17 @@ S.PrepBatches = {
     });
     return h;
   },
-  // For batches, ingredient quantity is in the product's unit (bottle / unit),
-  // so cost basis is unit_cost (not cost_per_pour). Sized bar products
-  // (Liquor/Wine/Beer with case-tracking) use App.bottleCost; everything
-  // else falls back to unit_cost.
-  SIZED_BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
+  // A batch ingredient is measured the same way a recipe measures it, through the
+  // shared engine: liquids by the OUNCE, countable solids by the SERVING, so the
+  // Unit column shows the real unit (oz / slice / lb) and the cost matches what
+  // the Menu Builder would compute for the same ingredient.
   unitCost(prod) {
     if (!prod) return 0;
-    if (this.SIZED_BAR_CATS.includes(prod.category) && App.bottleCost) {
-      const bc = App.bottleCost(prod);
-      if (bc != null) return bc;
-    }
-    return prod.unit_cost || 0;
+    return App.recipeBasis ? (App.recipeBasis(prod).costPerUnit || 0) : (prod.unit_cost || 0);
   },
   unitLabel(prod) {
     if (!prod) return '-';
-    return this.SIZED_BAR_CATS.includes(prod.category) ? 'bottles' : 'units';
+    return App.recipeBasis ? App.recipeBasis(prod).unitLabel : 'units';
   },
 
   computeRows(rows, batch_yield, batch_yield_unit, serving_size, serving_size_unit) {
@@ -166,13 +161,14 @@ S.PrepBatches = {
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Serving Size</label>'
           + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>Servings Per Batch</label>'
-          + '<div class="f-display" id="pb-spb">-</div></div>'
       + '</div>'
       + '<div id="pb-ings" style="margin-top:14px;margin-bottom:12px;"></div>'
       + '<button class="btn btn-ghost btn-sm" id="pb-add-ing" type="button" style="margin-bottom:14px;">+ Add Ingredient</button>'
+      // Servings Per Batch is a derived number, so it lives in the stat box with
+      // the other auto-calculated figures, not as a cell in the input row.
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + '<div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
+        + '<div class="calc-item"><div class="calc-label">Servings Per Batch</div><div class="calc-val" id="pb-spb">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Ingredient Cost</div><div class="calc-val" id="pb-tc">-</div></div>'
         + '<div class="calc-item"><div class="calc-label">Cost Per Serving</div><div class="calc-val" id="pb-cps">-</div></div>'
       + '</div></div>';
@@ -274,7 +270,7 @@ S.PrepBatches = {
         + '<button class="btn btn-primary" id="pb-save">Update Batch</button>'
         + '<span id="pb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 900, onClose: () => this.closeEdit() });
+    const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 660, onClose: () => this.closeEdit() });
     this._scope = overlay;
     this.renderRows();
     this.calc();
