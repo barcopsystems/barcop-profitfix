@@ -3309,6 +3309,29 @@ const App = {
     y += 16;
 
     const ensure = h => { if (y > pageH - 60 - h) { doc.addPage(); y = margin; } };
+
+    // Give every table that shares a column count the SAME column widths, so the
+    // sections line up down the whole export (autoTable otherwise sizes each table
+    // on its own content and they drift). Widths track the widest cell per column.
+    const availW = pageW - 2 * margin;
+    const clen = c => { const s = (c && typeof c === 'object' && c.content != null) ? c.content : c; return String(s == null ? '' : s).length; };
+    const _wGroups = {};
+    blocks.forEach(b => { if (b.type === 'table' && b.cols) (_wGroups[b.cols] = _wGroups[b.cols] || []).push(b); });
+    const _sharedCols = {};
+    Object.keys(_wGroups).forEach(cc => {
+      const n = parseInt(cc), tbls = _wGroups[cc];
+      if (tbls.length < 2) return;   // only align when 2+ tables share the shape
+      const maxLen = new Array(n).fill(1);
+      tbls.forEach(b => {
+        (b.head || []).forEach(hr => (hr || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
+        (b.body || []).forEach(row => (row || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
+      });
+      const total = maxLen.reduce((s, v) => s + v, 0) || 1;
+      const styles = {};
+      maxLen.forEach((v, i) => { styles[i] = { cellWidth: (v / total) * availW }; });
+      _sharedCols[n] = styles;
+    });
+
     blocks.forEach(b => {
       if (b.type === 'heading') {
         // Lead-in space ABOVE the title (separates it from the section above) and
@@ -3330,6 +3353,7 @@ const App = {
         });
         y += 6;
       } else if (b.type === 'table') {
+        const cs = _sharedCols[b.cols];
         doc.autoTable({
           startY: y + 2,
           head: b.head, body: b.body,
@@ -3337,6 +3361,8 @@ const App = {
           styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', lineColor: [225, 225, 225], lineWidth: 0.5 },
           headStyles: { fillColor: [28, 28, 28], textColor: 255, fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [246, 246, 246] },
+          columnStyles: cs || {},
+          tableWidth: cs ? availW : 'auto',
           theme: 'grid'
         });
         y = doc.lastAutoTable.finalY + 16;
