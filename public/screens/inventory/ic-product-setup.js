@@ -242,24 +242,22 @@ S.InventoryProducts = {
     return h;
   },
 
-  // Size dropdown scoped to the form's category group. Adds Saved Custom
-  // Sizes (across all products, not just this category) plus a Custom entry.
+  // Size dropdown scoped to the form's category group. A section's own saved
+  // custom sizes merge INTO the list in ounce order (not a separate bottom group,
+  // which broke the natural flow), and they stay scoped to the group they were
+  // entered in, so a custom liquor size never leaks into wine / beer / draft.
   sizeOpts(sel, group) {
     let h = '<option value="">Select size...</option>';
-    if (group) {
-      h += '<optgroup label="' + esc(group) + '">';
-      this.SIZES.filter(s => s.g === group).forEach(s => {
-        h += '<option value="' + s.oz + '"' + (sel != null && s.oz === sel ? ' selected' : '') + '>' + s.l + '</option>';
+    const items = [];
+    if (group) this.SIZES.filter(s => s.g === group && s.oz != null).forEach(s => items.push({ oz: s.oz, label: s.l }));
+    this.customSizesUsed(group).forEach(oz => { if (!items.some(it => it.oz === oz)) items.push({ oz: oz, label: oz + ' oz' }); });
+    items.sort((a, b) => a.oz - b.oz);
+    if (items.length) {
+      if (group) h += '<optgroup label="' + esc(group) + '">';
+      items.forEach(it => {
+        h += '<option value="' + it.oz + '"' + (sel != null && it.oz === sel ? ' selected' : '') + '>' + esc(it.label) + '</option>';
       });
-      h += '</optgroup>';
-    }
-    const custom = this.customSizesUsed();
-    if (custom.length) {
-      h += '<optgroup label="Saved Custom Sizes">';
-      custom.forEach(oz => {
-        h += '<option value="' + oz + '"' + (sel === oz ? ' selected' : '') + '>' + oz + ' oz</option>';
-      });
-      h += '</optgroup>';
+      if (group) h += '</optgroup>';
     }
     h += '<option value="custom"' + (sel != null && !this.SIZES.find(s => s.oz === sel) ? ' selected' : '') + '>Custom (enter oz)</option>';
     return h;
