@@ -2694,7 +2694,7 @@ const App = {
   // the Food/Misc stock-unit list. Single source so take-inventory,
   // product-setup and the log forms never drift from each other.
   IC_CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
-  IC_FOOD_UNIT_TYPES: ['lb', 'oz', 'each', 'case', 'bag', 'gallon', 'quart', 'pint', 'dozen'],
+  IC_FOOD_UNIT_TYPES: ['lb', 'oz', 'each', 'case', 'bag', 'box', 'gallon', 'quart', 'pint', 'dozen'],
 
   // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
   // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
