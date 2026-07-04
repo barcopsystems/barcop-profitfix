@@ -435,7 +435,7 @@ S.InventoryProducts = {
       const plainCost = p.unit_cost != null
         ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(p.unit_type || 'unit') + '</span>' : dash;
       const recCost = (App.isRecipeIngredient && App.isRecipeIngredient(p) && basis && basis.costPerUnit > 0)
-        ? App.fmtCurrency(basis.costPerUnit, basis.costPerUnit < 1 ? 3 : 2) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(basis.unitLabel) + '</span>'
+        ? App.fmtCurrency(basis.costPerUnit, 2) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(basis.unitLabel) + '</span>'
         : dash;
       tds = '<td>' + esc(p.unit_type || '-') + '</td><td>' + perU + '</td><td>' + plainCost + '</td><td>' + recCost + '</td>';
     } else {
