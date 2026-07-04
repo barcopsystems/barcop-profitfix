@@ -101,7 +101,7 @@ S.RevenueMenuPlanning = {
       const list = byCat[cat].slice().sort((a, b) => this.itemSort(a, b));
       const rows = list.map(i => {
         return '<tr data-id="' + esc(i.id) + '">'
-          + DragReorder.handleCell()
+          + DragReorder.handleCellHTML()
           + '<td>'
           +   '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;">'
           +     '<div style="min-width:0;"><span class="val" style="font-weight:600;">' + esc(i.name || 'Unnamed') + '</span>' + this.chipsFor(i, classMap[i.id]) + '</div>'
