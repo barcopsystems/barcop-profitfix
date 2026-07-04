@@ -678,22 +678,26 @@ S.RevenueMenuItems = {
     // stacks it through the .pill-wrap container query.
     const inModal = !!area.closest('#app-modal-host');
     const wrapOpen = inModal ? '<div style="overflow-x:auto;">' : '<div class="pill-wrap">';
+    // The operator enters a pour (cocktail) or a serving (plate) with the unit
+    // shown inline; they care about the cost of that pour/serving and its % of the
+    // menu price, not the raw stock unit cost. So the row is Ingredient · Amount ·
+    // Cost · Cost %, dropping the old Unit and Unit Cost columns.
+    const amtHdr = this.mode === 'single' ? 'Pour' : 'Serving';
     area.innerHTML = wrapOpen
-      + '<table class="ing-tbl pill"><thead><tr><th>Ingredient</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>'
+      + '<table class="ing-tbl pill"><thead><tr><th>Ingredient</th><th>' + amtHdr + '</th><th>Cost</th><th>Cost %</th><th></th></tr></thead>'
       + '<tbody>' + this.rows.map((r, idx) => {
         const selKey = r.id ? (r.source === 'batch' ? 'b:' : 'p:') + r.id : '';
         const basis = this.ingredientCostBasis(r, this.mode);
         const qty = parseFloat(r.quantity) || 0;
         const lineCost = qty * (basis.costPerUnit || 0);
-        const costD = basis.costPerUnit > 0 ? App.fmtCurrency(basis.costPerUnit) : (r.id ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = lineCost > 0 ? App.fmtCurrency(lineCost) : '-';
+        const unitLbl = (basis.unit && basis.unit !== '-') ? basis.unit : '';
         return '<tr class="mi-ing-line">'
           + '<td data-label="Ingredient" style="min-width:200px;"><select class="form-input ri-ing-src" data-i="' + idx + '" style="width:100%;">' + this.ingredientOptions(selKey, this.mode) + '</select></td>'
-          + '<td data-label="Qty" style="width:90px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:100%;padding:6px 8px;"/></td>'
-          + '<td data-label="Unit" style="width:70px;color:var(--t2);font-size:12px;">' + basis.unit + '</td>'
-          + '<td data-label="Unit Cost" style="width:90px;font-size:12px;">' + costD + '</td>'
-          + '<td data-label="Line Cost" style="width:90px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
-          + '<td data-label="" style="width:80px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '">Delete</button></td>'
+          + '<td data-label="' + amtHdr + '" style="width:130px;"><div style="display:flex;align-items:center;gap:6px;"><input class="form-input ri-ing-qty" type="number" data-i="' + idx + '" value="' + (r.quantity || '') + '" min="0" step="0.25" style="width:74px;padding:6px 8px;"/><span style="color:var(--t3);font-size:11px;white-space:nowrap;">' + esc(unitLbl) + '</span></div></td>'
+          + '<td data-label="Cost" style="width:90px;" class="val" id="ri-lc-' + idx + '">' + lineD + '</td>'
+          + '<td data-label="Cost %" style="width:80px;font-size:12px;color:var(--t2);" id="ri-pct-' + idx + '">-</td>'
+          + '<td data-label="" style="width:70px;"><button class="btn btn-danger btn-sm ri-rm-ing" data-i="' + idx + '">Delete</button></td>'
           + '</tr>';
       }).join('') + '</tbody></table></div>';
 
@@ -733,6 +737,8 @@ S.RevenueMenuItems = {
       const idx = parseInt(el.dataset.i);
       if (this.rows[idx]) this.rows[idx].quantity = parseFloat(el.value) || 0;
     });
+    const py = this.mode === 'food' ? (parseFloat(document.getElementById('ri-plate-yield')?.value) || 1) : 1;
+    const mp  = parseFloat(document.getElementById('ri-price')?.value) || 0;
     let tc = 0;
     this.rows.forEach((r, idx) => {
       const basis = this.ingredientCostBasis(r, this.mode);
@@ -741,10 +747,13 @@ S.RevenueMenuItems = {
       tc += line;
       const le = document.getElementById('ri-lc-' + idx);
       if (le) le.textContent = line > 0 ? App.fmtCurrency(line) : '-';
+      // Per-ingredient cost % of the menu price (per plate for a multi-yield food
+      // recipe) so the operator can spot one pour/portion eating too much.
+      const pe = document.getElementById('ri-pct-' + idx);
+      const perPlate = py > 0 ? line / py : line;
+      if (pe) pe.textContent = (perPlate > 0 && mp > 0) ? (perPlate / mp * 100).toFixed(1) + '%' : '-';
     });
-    const py = this.mode === 'food' ? (parseFloat(document.getElementById('ri-plate-yield')?.value) || 1) : 1;
     const cps = (this.mode === 'food' && py > 0) ? tc / py : tc;
-    const mp  = parseFloat(document.getElementById('ri-price')?.value) || 0;
     const tpct = parseFloat(document.getElementById('ri-target-pct')?.value) || 0;
     const cpct = mp > 0 ? (cps / mp * 100) : null;
     const set = (id, val, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = val; el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
