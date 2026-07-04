@@ -1534,17 +1534,19 @@ S.HubSettings = {
     // Packaged items sold whole, linked to their Inventory product. Cost flows
     // per serving via App.menuLinkCost (cost / servings per unit), so the menu
     // shows an honest per-serving cost, not the per-case purchase cost.
-    const resaleMenuItem = (p, covers) => ({
+    const resaleMenuItem = (p, covers, portion) => ({
       id:uid(), name:p.name,
       category:(App.menuCatForProduct ? (App.menuCatForProduct(p) || 'Snacks') : 'Snacks'),
       price:p.menu_price || 0,
-      cost:+((App.menuLinkCost ? App.menuLinkCost(p) : (p.unit_cost || 0))).toFixed(2),
+      cost:+((App.menuLinkCost ? App.menuLinkCost(p, portion) : (p.unit_cost || 0))).toFixed(2),
       weekly_covers:covers, prev_weekly_covers:null, weekly_covers_updated_at:null, notes:'',
-      recipe:null, linked_product_id:p.id, pour_size_oz:null, target_cost_pct:null,
+      recipe:null, linked_product_id:p.id, pour_size_oz:null, portion:(portion != null ? portion : null), target_cost_pct:null,
       created_at:new Date().toISOString(), updated_at:new Date().toISOString()
     });
-    [ ['Topo Chico', 90], ['House Lemonade', 70], ['Kettle Chips', 110] ]
-      .forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(resaleMenuItem(p, row[1])); });
+    // Topo Chico + Kettle Chips sell whole (1 unit); House Lemonade is a ~10 oz
+    // glass poured from the gallon, so cost = 10 oz x per-ounce.
+    [ ['Topo Chico', 90, 1], ['House Lemonade', 70, 10], ['Kettle Chips', 110, 1] ]
+      .forEach(row => { const p = icByName(row[0]); if (p) rMenu.push(resaleMenuItem(p, row[1], row[2])); });
 
     // ── Recipes attached to menu items + standalone batches ─────────────────
     // Recipes now live EMBEDDED in App.data.menu_items as the optional
@@ -1566,10 +1568,11 @@ S.HubSettings = {
     const ing = (nm, quantity) => ({ source: 'product', id: icp(nm), quantity: quantity });
     attachRecipe('House Margarita', {
       mode: 'single',
+      // Ounces poured, the way a bartender specs a drink (2 oz base, modifiers 0.5-1).
       ingredients: [
-        { source: 'product', id: icProducts[1].id,  quantity: 1 },     // Espolòn Tequila (1 pour)
-        { source: 'product', id: icProducts[16].id, quantity: 0.5 },   // Triple Sec
-        { source: 'product', id: icProducts[17].id, quantity: 0.04 }   // Lime Juice (fraction of qt)
+        { source: 'product', id: icProducts[1].id,  quantity: 2 },     // Espolòn Tequila
+        { source: 'product', id: icProducts[16].id, quantity: 1 },     // Triple Sec
+        { source: 'product', id: icProducts[17].id, quantity: 0.75 }   // Lime Juice
       ],
       plate_yield: null
     });
@@ -1587,9 +1590,8 @@ S.HubSettings = {
     });
     attachRecipe('Old Fashioned', {
       mode: 'single',
-      // Spirit quantity = pours; mixer quantity = fraction of the qt container
-      // (the seed costs Misc mixers off unit_cost, so keep these small/realistic).
-      ingredients: [ ing('Bulleit Bourbon', 1.3), ing('Simple Syrup (qt)', 0.02) ],
+      // All amounts in ounces (2 oz spirit, a 0.25 oz sweetener).
+      ingredients: [ ing('Bulleit Bourbon', 2), ing('Simple Syrup (qt)', 0.25) ],
       plate_yield: null
     });
     // More plate + cocktail recipes, all built from real Inventory products.
@@ -1614,16 +1616,16 @@ S.HubSettings = {
     attachRecipe('Breakfast Tacos', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Large Eggs (dozen)', 0.25), ing('Flour Tortilla (case)', 0.02), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 0.08) ] });
     attachRecipe('Paloma', { mode: 'single', plate_yield: null, ingredients: [
-      ing('Espolòn Tequila Blanco', 1), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02) ] });
+      ing('Espolòn Tequila Blanco', 2), ing('Lime Juice (qt)', 0.5), ing('Simple Syrup (qt)', 0.5) ] });
     // Demo seed for the cost-creep alert: the two highest-volume margaritas both
     // pour Espolòn Tequila Blanco and carry a tight cost target, so they sit just
-    // under it (Margarita ~16% vs 17%, Paloma ~15% vs 16%). A single tequila price
-    // bump on a delivery then visibly tips both over — firing the Receive-Delivery
-    // notice + the cockpit flag.
-    if (rItem('House Margarita')) rItem('House Margarita').target_cost_pct = 17;
-    if (rItem('Paloma'))          rItem('Paloma').target_cost_pct = 16;
+    // under it (Margarita ~21.7% vs 22%, Paloma ~18.7% vs 19%). A single tequila
+    // price bump on a delivery then visibly tips both over — firing the Receive-
+    // Delivery notice + the cockpit flag.
+    if (rItem('House Margarita')) rItem('House Margarita').target_cost_pct = 22;
+    if (rItem('Paloma'))          rItem('Paloma').target_cost_pct = 19;
     attachRecipe('Whiskey Sour', { mode: 'single', plate_yield: null, ingredients: [
-      ing('Bulleit Bourbon', 1.3), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
+      ing('Bulleit Bourbon', 2), ing('Lime Juice (qt)', 0.75), ing('Simple Syrup (qt)', 0.75) ] });
 
     // ── C reseed (2026-05-30): recipe-cost the rest of the menu off real
     // Inventory products so nearly every item is recipe-driven and costs auto-
@@ -1668,41 +1670,34 @@ S.HubSettings = {
     attachRecipe('Chocolate Torte', { mode:'food', plate_yield:1, ingredients:[
       ing('Dark Chocolate (lb)', 0.20), ing('Large Eggs (dozen)', 0.10), ing('Heavy Cream (qt)', 0.05) ] });
     attachRecipe('Espresso Martini', { mode:'single', plate_yield:null, ingredients:[
-      ing("Tito's Handmade Vodka", 1.0), ing('Coffee Liqueur', 0.75), ing('Cold Brew Concentrate (qt)', 0.05) ] });
+      ing("Tito's Handmade Vodka", 1.5), ing('Coffee Liqueur', 0.75), ing('Cold Brew Concentrate (qt)', 1) ] });
     attachRecipe('Negroni', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 0.8), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
+      ing("Hendrick's Gin", 1), ing('Campari', 1), ing('Sweet Vermouth', 1) ] });
     attachRecipe('Manhattan', { mode:'single', plate_yield:null, ingredients:[
-      ing('Bulleit Bourbon', 1.3), ing('Sweet Vermouth', 0.5) ] });
+      ing('Bulleit Bourbon', 2), ing('Sweet Vermouth', 1) ] });
     attachRecipe('Mezcal Mule', { mode:'single', plate_yield:null, ingredients:[
-      ing('Mezcal', 1.0), ing('Lime Juice (qt)', 0.04), ing('Ginger Beer (qt)', 0.13) ] });
+      ing('Mezcal', 1.5), ing('Lime Juice (qt)', 0.75), ing('Ginger Beer (qt)', 3) ] });
     attachRecipe('Spicy Margarita', { mode:'single', plate_yield:null, ingredients:[
-      ing('Espolòn Tequila Blanco', 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.04) ] });
+      ing('Espolòn Tequila Blanco', 2), ing('Triple Sec', 0.75), ing('Lime Juice (qt)', 0.75) ] });
     attachRecipe('French 75', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 0.8), ing('Lime Juice (qt)', 0.03), ing('Simple Syrup (qt)', 0.02), ing('Prosecco', 1) ] });
+      ing("Hendrick's Gin", 1), ing('Lime Juice (qt)', 0.5), ing('Simple Syrup (qt)', 0.5), ing('Prosecco', 2) ] });
     attachRecipe('Mojito', { mode:'single', plate_yield:null, ingredients:[
-      ing('White Rum', 1.5), ing('Lime Juice (qt)', 0.04), ing('Simple Syrup (qt)', 0.03) ] });
+      ing('White Rum', 2), ing('Lime Juice (qt)', 0.75), ing('Simple Syrup (qt)', 0.5) ] });
     attachRecipe('Boulevardier', { mode:'single', plate_yield:null, ingredients:[
-      ing('Bulleit Bourbon', 1.0), ing('Campari', 0.8), ing('Sweet Vermouth', 0.8) ] });
+      ing('Bulleit Bourbon', 1.5), ing('Campari', 1), ing('Sweet Vermouth', 1) ] });
     attachRecipe('Aviation', { mode:'single', plate_yield:null, ingredients:[
-      ing("Hendrick's Gin", 1.0), ing('Maraschino Liqueur', 0.5), ing('Lime Juice (qt)', 0.03) ] });
+      ing("Hendrick's Gin", 2), ing('Maraschino Liqueur', 0.5), ing('Lime Juice (qt)', 0.75) ] });
     attachRecipe('Cosmopolitan', { mode:'single', plate_yield:null, ingredients:[
-      ing("Tito's Handmade Vodka", 1.0), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.03), ing('Cranberry Juice (qt)', 0.1) ] });
+      ing("Tito's Handmade Vodka", 1.5), ing('Triple Sec', 0.5), ing('Lime Juice (qt)', 0.5), ing('Cranberry Juice (qt)', 1) ] });
     // Re-compute cost on items that just got a recipe so the menu engineering
     // numbers stay consistent on first render (before any save fires).
     rMenu.forEach(m => {
-      if (m.recipe && m.recipe.ingredients && m.recipe.ingredients.length) {
-        const tc = m.recipe.ingredients.reduce((s, ing) => {
-          if (ing.source === 'batch') return s; // batches not seeded in cost pre-compute
-          const id = ing.id || ing.product_id;
-          const p = icProducts.find(x => x.id === id);
-          if (!p) return s;
-          const isBar = ['Liquor','Wine','Bottle Beer','Draft Beer'].includes(p.category);
-          const unitCost = isBar
-            ? (m.recipe.mode === 'single' ? (p.cost_per_pour || 0) : (p.unit_cost || 0))
-            : (p.unit_cost || 0);
-          return s + unitCost * (ing.quantity || 0);
-        }, 0);
-        m.cost = m.recipe.mode === 'food' && m.recipe.plate_yield > 0 ? tc / m.recipe.plate_yield : tc;
+      if (m.recipe && m.recipe.ingredients && m.recipe.ingredients.length && App.menuItemCost) {
+        // Cost via the live engine (App.recipeBasis) so the seeded cost matches
+        // exactly what the app recomputes on render — liquids per ounce, solids
+        // per serving. ic_products is already assigned above.
+        const c = App.menuItemCost(m);
+        if (c != null) m.cost = +c.toFixed(2);
       }
     });
 
