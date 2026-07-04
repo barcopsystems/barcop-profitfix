@@ -1338,8 +1338,8 @@ S.HubSettings = {
       { name:'Fryer Oil (jug)',          category:'Misc',        misc_type:'Cleaning & Supplies',        vendor:'Restaurant Depot',                                              unit_cost:28.00, par_level:10,  reorder_point:4,   primary_location:'Kitchen Line' },
       { name:'To-Go Boxes (case)',       category:'Misc',        misc_type:'Paper & To-Go',        vendor:'Restaurant Depot',                                              unit_cost:42.00, par_level:8,   reorder_point:3,   primary_location:'Kitchen Line' },
       { name:'Triple Sec',               category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.75, unit_cost:9.00,  menu_price:7, par_level:12,  reorder_point:5,   primary_location:'Back Bar' },
-      { name:'Lime Juice (qt)',          category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Simple Syrup (qt)',        category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         container_size_oz:32,   pour_size_oz:0.5,  unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
+      { name:'Lime Juice (qt)',          category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Simple Syrup (qt)',        category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
       // Kitchen ingredients (appended so existing index-based recipes stay valid).
       { name:'Brioche Bun (each)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:0.55,  par_level:240, reorder_point:80,  primary_location:'Dry Storage' },
       { name:'Beefsteak Tomato (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
