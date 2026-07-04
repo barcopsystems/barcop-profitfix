@@ -86,20 +86,10 @@ S.RevenueMenuItems = {
     }
     const p = this.prodById(row.id);
     if (!p) return { unit: '-', costPerUnit: 0 };
-    const isLiquorish = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
-    if (isLiquorish && mode === 'single') {
-      return { unit: 'pours', costPerUnit: (p.cost_per_pour != null ? p.cost_per_pour : (App.bottleCost ? (App.bottleCost(p) || 0) : 0)) };
-    }
-    if (isLiquorish) {
-      return { unit: 'bottles', costPerUnit: (App.bottleCost ? (App.bottleCost(p) || 0) : (p.unit_cost || 0)) };
-    }
-    // Food / Misc bought by a container with a pack size: the recipe measures the
-    // ingredient in pieces (6 wings) and costs at the per-piece price. Products
-    // with no pack size keep their plain unit cost.
-    if ((p.category === 'Food' || p.category === 'Misc') && p.pack_size > 0) {
-      return { unit: 'ea', costPerUnit: (App.piecePrice ? (App.piecePrice(p) || 0) : (p.unit_cost || 0)) };
-    }
-    return { unit: 'units', costPerUnit: p.unit_cost || 0 };
+    // The shared engine decides the measure (ounces for a pour, per-serving for a
+    // solid) and its cost, so this preview matches the live menu cost exactly.
+    const b = App.recipeBasis(p);
+    return { unit: b.unitLabel, costPerUnit: b.costPerUnit };
   },
 
   // ── Inventory product picker (Card 3 / Inventory form) ───────────────
