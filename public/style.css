@@ -594,9 +594,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    do NOT get this class (they need the room). */
 .narrow-form .form-row{flex-wrap:wrap!important;}   /* let the half-width cells wrap into 2 columns instead of cramming one line */
 .narrow-form .form-row > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
-/* Menu Items' adaptive cells live one level deeper in #mi-adaptive (display:contents),
-   so the two-column override must reach them too when the inventory form is narrow. */
-.narrow-form .form-row > #mi-adaptive > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
+/* Menu Items' #mi-adaptive and the product form's #ip-divisor-wrap cells live one
+   level deeper (display:contents), so the two-column override must reach them too. */
+.narrow-form .form-row > #mi-adaptive > .f:not([style*="100%"]),
+.narrow-form .form-row > #ip-divisor-wrap > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
 
 /* Data table: title lives on the background as a .sh heading; the column-header row
    is the card's first row (table flush to the card border top and bottom, header
@@ -715,7 +716,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
 .dr-dragging td:last-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset -1px 0 0 0 var(--gold-tint-bord);}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
-.vc-line td,.wl-line td,.tp-row td,.tpe-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td{background:#0D181E;}
+.vc-line td,.wl-line td,.tp-row td,.tpe-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td,.cw-line td{background:#0D181E;}
 /* A flagged delivery line keeps the standard data-row fill; the gold reason text + Flag button carry the flag, not a tinted row. */
 .rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
@@ -1353,9 +1354,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   /* Form rows stack vertically on narrow widths so fields get full width
      instead of squeezing into truncated columns. */
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
-  /* Menu Items adaptive cells live under #mi-adaptive (display:contents), so the
-     rule above (direct children only) misses them; stack them full-width too. */
-  .form-row > #mi-adaptive > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+  /* #mi-adaptive and #ip-divisor-wrap cells live one level deeper (display:contents),
+     so the direct-child rule above misses them; stack them full-width too. */
+  .form-row > #mi-adaptive > .f,
+  .form-row > #ip-divisor-wrap > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
   /* Shrink-to-fit data rows stack on mobile instead of squeezing. */
   .data-row{flex-wrap:wrap;}
   .form-grid{grid-template-columns:1fr;}
