@@ -635,24 +635,34 @@ S.RevenueMenuItems = {
   inventoryRestHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
     const linkedProd = linkedId ? this.prodById(linkedId) : null;
-    const autoCost = linkedProd ? (App.menuLinkCost(linkedProd, item?.pour_size_oz) || 0) : 0;
-    // Pour Size only matters for poured drinks (Beer/Wine). Packaged resale
-    // items (NA beverages, Snacks) are sold whole, so the field is dropped.
     const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
-    // Pour Size only for products SOLD BY A POUR: draft beer (from a keg) and wine
-    // by the glass. Bottle beer, NA, and snacks sell whole, so no pour. The cell is
-    // rendered for the eligible categories but hidden until a poured product is
-    // picked (toggled in the product-change handler).
+    // Poured drinks (Beer/Wine) carry a Pour Size; Food/Misc resale/side items
+    // (NA Beverages, Snacks) carry a Portion in the product's own recipe measure
+    // (servings or ounces), so the cost is portion x per-serving / per-ounce.
     const pourEligible = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
+    const amount = pourEligible ? item?.pour_size_oz : item?.portion;
+    const autoCost = linkedProd ? (App.menuLinkCost(linkedProd, amount) || 0) : 0;
+    // Pour Size only for products SOLD BY A POUR: draft beer (from a keg) and wine
+    // by the glass. Rendered for eligible categories but hidden until a poured
+    // product is picked (toggled in the product-change handler).
     const pourShow = this.pourVisibleFor(menuCat, linkedProd);
     const pourField = pourEligible
       ? '<div class="f" id="ri-pour-cell" style="width:85px;' + (pourShow ? '' : 'display:none;') + '"><label>Pour Size</label>'
         + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : '') + '"/><span class="suf">oz</span></div></div>'
       : '';
+    // Portion (NA Beverages / Snacks): how many servings / ounces of the linked
+    // product this menu item is. A Side of Fries is 1 serving, a Basket is 3.
+    const basis = linkedProd && App.recipeBasis ? App.recipeBasis(linkedProd) : null;
+    const portionUnit = basis ? basis.unitLabel : 'ea';
+    const portionField = !pourEligible
+      ? '<div class="f" id="ri-portion-cell" style="width:120px;"><label>Portion</label>'
+        + '<div class="fw"><input class="form-input suf" type="number" id="ri-portion" value="' + (item?.portion != null ? item.portion : '') + '" step="0.25" min="0" placeholder="1"/><span class="suf" id="ri-portion-unit">' + esc(portionUnit) + '</span></div></div>'
+      : '';
     return '<div class="f" style="width:100px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (autoCost > 0 ? autoCost.toFixed(2) : '') + '" step="0.01" placeholder="0.00" disabled/></div></div>'
       + '<div class="f" style="width:95px;"><label>Avg Covers</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + pourField
+      + portionField
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 8 }) + '</div>';
   },
   // Pour Size applies only to products sold by a pour: draft beer and wine by the
@@ -671,8 +681,11 @@ S.RevenueMenuItems = {
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
       const costInp = document.getElementById('ri-cost');
       if (!costInp) return;
-      const pv = parseFloat(document.getElementById('ri-pour')?.value);
-      const bc = p ? (App.menuLinkCost(p, (!isNaN(pv) && pv > 0) ? pv : null) || 0) : 0;
+      // Food / Misc cost by the Portion; beer / wine by the Pour Size.
+      const isFoodMisc = p && (p.category === 'Food' || p.category === 'Misc');
+      const raw = parseFloat(document.getElementById(isFoodMisc ? 'ri-portion' : 'ri-pour')?.value);
+      const amount = (!isNaN(raw) && raw > 0) ? raw : null;
+      const bc = p ? (App.menuLinkCost(p, amount) || 0) : 0;
       costInp.value = bc > 0 ? bc.toFixed(2) : '';
     };
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
@@ -686,6 +699,10 @@ S.RevenueMenuItems = {
         pourCell.style.display = show ? '' : 'none';
         if (!show) { const pi = document.getElementById('ri-pour'); if (pi) pi.value = ''; }
       }
+      // Update the Portion field's inline unit to the product's recipe measure
+      // (slice / oz / ea) so the operator sees what they're entering.
+      const punit = document.getElementById('ri-portion-unit');
+      if (punit && p && App.recipeBasis) punit.textContent = App.recipeBasis(p).unitLabel;
       recomputeCost();
       // Auto-fill the menu price from the linked product's saved menu price,
       // the same way cost auto-fills. Beer + Wine carry a menu price in
@@ -698,6 +715,7 @@ S.RevenueMenuItems = {
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
+    document.getElementById('ri-portion')?.addEventListener('input', recomputeCost);
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     document.getElementById('ri-price')?.addEventListener('input', () => this.refreshFieldMissing());
   },
@@ -909,9 +927,13 @@ S.RevenueMenuItems = {
       if (!p) { fail('Linked product not found.'); return; }
       if (!name) name = p.name;   // Menu Name auto-fills from the product; fall back if cleared
       category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
-      // Include the pour override so the stored cost is the per-pour cost too.
-      const pv = parseFloat(document.getElementById('ri-pour')?.value);
-      const tmp = { linked_product_id: linkedProductId, pour_size_oz: (!isNaN(pv) && pv > 0) ? pv : null };
+      // Cost from the per-item amount: Food/Misc by Portion, beer/wine by Pour.
+      const isFoodMisc = p.category === 'Food' || p.category === 'Misc';
+      const raw = parseFloat(document.getElementById(isFoodMisc ? 'ri-portion' : 'ri-pour')?.value);
+      const amt = (!isNaN(raw) && raw > 0) ? raw : null;
+      const tmp = isFoodMisc
+        ? { linked_product_id: linkedProductId, portion: amt }
+        : { linked_product_id: linkedProductId, pour_size_oz: amt };
       computedCost = App.menuItemCost(tmp) || 0;
     }
 
@@ -920,9 +942,16 @@ S.RevenueMenuItems = {
     // Phase 7: capture optional pour_size_oz override on direct-pour items
     // (Inventory form only). Drives Variance Report multi-size math.
     let pourSizeOz = null;
+    let portion = null;
     if (type === 'inventory') {
-      const pourVal = parseFloat(document.getElementById('ri-pour')?.value);
-      if (!isNaN(pourVal) && pourVal > 0) pourSizeOz = pourVal;
+      const lp = this.prodById(linkedProductId);
+      if (lp && (lp.category === 'Food' || lp.category === 'Misc')) {
+        const portVal = parseFloat(document.getElementById('ri-portion')?.value);
+        if (!isNaN(portVal) && portVal > 0) portion = portVal;
+      } else {
+        const pourVal = parseFloat(document.getElementById('ri-pour')?.value);
+        if (!isNaN(pourVal) && pourVal > 0) pourSizeOz = pourVal;
+      }
     }
 
     // If this is an edit, snapshot the prior weekly_covers before overwriting
@@ -953,6 +982,7 @@ S.RevenueMenuItems = {
       recipe,
       linked_product_id:  linkedProductId,
       pour_size_oz:       pourSizeOz,
+      portion:            portion,
       target_cost_pct:    targetPct,
       planned_price:      priceChanged ? null : (existing && existing.planned_price != null ? existing.planned_price : null),
       planned_vol_pct:    priceChanged ? null : (existing && existing.planned_vol_pct != null ? existing.planned_vol_pct : null),
