@@ -93,9 +93,6 @@ S.RevenueMenuItems = {
     if (isLiquorish) {
       return { unit: 'bottles', costPerUnit: (App.bottleCost ? (App.bottleCost(p) || 0) : (p.unit_cost || 0)) };
     }
-    if (p.category === 'Misc' && mode === 'single' && p.cost_per_pour != null) {
-      return { unit: 'pours', costPerUnit: p.cost_per_pour };
-    }
     // Food / Misc bought by a container with a pack size: the recipe measures the
     // ingredient in pieces (6 wings) and costs at the per-piece price. Products
     // with no pack size keep their plain unit cost.
