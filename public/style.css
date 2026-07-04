@@ -492,13 +492,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .fj input:last-child:not(:first-child){border-radius:0 var(--r2) var(--r2) 0;width:74px;flex-shrink:0;}
 
 /* Menu Planning — the per-item briefing tiles. */
-.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
-.mp-tile{background:#0D181E;border:1px solid var(--b-edge);border-radius:var(--r2);padding:16px 18px;display:flex;flex-direction:column;}
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:start;}
+.mp-tile{background:#08131A;border:1px solid var(--b-edge);border-radius:var(--r2);padding:16px 18px 0;display:flex;flex-direction:column;overflow:hidden;}
 .mp-tile-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid var(--row-div);padding-bottom:10px;margin-bottom:10px;}
 .mp-name{font-weight:700;color:var(--t1);font-size:14px;}
 .mp-price{font-weight:700;color:var(--t1);flex-shrink:0;}
 .mp-brief p{font-size:12px;line-height:1.6;color:var(--t2);margin:0 0 8px;}
-.mp-brief p:last-child{margin-bottom:0;}
+.mp-brief p:last-child{margin-bottom:12px;}
+.mp-move{background:#0D181E;margin:0 -18px;padding:12px 18px;border-top:1px solid var(--row-div);font-size:12px;line-height:1.6;color:var(--t2);margin-top:auto;}
+.mp-move-lbl{font-weight:700;color:var(--t1);}
 
 /* Read-only display */
 .f-display{background:var(--input);border:1px solid var(--b2);border-radius:var(--r2);padding:8px 10px;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:var(--gold);line-height:1;min-height:36px;display:flex;align-items:center;}
