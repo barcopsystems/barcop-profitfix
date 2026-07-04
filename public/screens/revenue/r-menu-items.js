@@ -20,6 +20,7 @@ S.RevenueMenuItems = {
   entryMode:        'manual',    // inline add-form lane: 'manual' | 'import'
   activeType:       'plate',     // active tile/tab: 'plate' | 'cocktail' | 'inventory'
   _importOpen:      false,       // Upload panel open in place of the list
+  _selected:        null,        // Set of item ids checked for bulk delete
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
@@ -290,20 +291,25 @@ S.RevenueMenuItems = {
       ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);">'
         + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
       : '';
+    // Select All / Clear + bulk delete + Export, same toolbar shape as Add Products.
+    const selCount = this._selected ? this._selected.size : 0;
+    const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;">'
+      + '<button class="btn btn-ghost btn-sm mi-sel-all">Select All</button>'
+      + '<button class="btn btn-ghost btn-sm mi-sel-clear">Clear</button>'
+      + (selCount > 0 ? '<button class="btn btn-danger btn-sm mi-sel-del">Delete ' + selCount + ' Selected</button>' : '')
+      + '<button class="btn btn-ghost btn-sm" id="mi-export" style="margin-left:auto;">Export PDF</button>'
+      + '</div>';
     const sections = cats.map((cat, ci) => {
       const items = typeItems.filter(i => (i.category || 'Uncategorized') === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       const rows = items.map(item => this._itemRowHTML(item)).join('');
-      return (ci === 0
-          ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">' + esc(t.label || 'Menu') + '</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
-          : '')
-        + '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
+      return '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + '<colgroup><col style="width:40px;"/><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
         + '<thead><tr>'
-        + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
+        + '<th></th><th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }).join('');
-    return '<div id="mi-list-export">' + warn + sections + '</div>';
+    return warn + toolbar + '<div id="mi-list-export">' + sections + '</div>';
   },
 
   _itemRowHTML(item) {
@@ -317,7 +323,9 @@ S.RevenueMenuItems = {
     const ok   = item.price && cost;
     const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
     const src  = hasRecipe ? 'from recipe' : (item.linked_product_id ? 'from linked product' : (item.cost ? 'manual cost' : ''));
+    const checked = (this._selected && this._selected.has(item.id)) ? ' checked' : '';
     return '<tr>'
+      + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"' + checked + '/></td>'
       + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
       + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
       + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
@@ -362,9 +370,37 @@ S.RevenueMenuItems = {
       el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
     this.container.querySelectorAll('.mi-card-imp').forEach(el =>
       el.addEventListener('click', () => this.openImport(el.dataset.type)));
-    // Tabs switch the active type.
+    // Tabs switch the active type (and clear any selection).
     this.container.querySelectorAll('.mi-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeType = b.dataset.type; this._importOpen = false; this.renderLanding(); }));
+      b.addEventListener('click', () => { this.activeType = b.dataset.type; this._importOpen = false; this._selected = new Set(); this.renderLanding(); }));
+
+    // Select All / Clear + per-row checkboxes + bulk delete (active type only).
+    this.container.querySelectorAll('.mi-sel-all').forEach(b => b.addEventListener('click', () => {
+      const rows = this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeType);
+      this._selected = new Set(rows.map(i => i.id));
+      this.renderLanding();
+    }));
+    this.container.querySelectorAll('.mi-sel-clear').forEach(b => b.addEventListener('click', () => { this._selected = new Set(); this.renderLanding(); }));
+    this.container.querySelectorAll('.mi-sel').forEach(cb => cb.addEventListener('change', () => {
+      if (!this._selected) this._selected = new Set();
+      if (cb.checked) this._selected.add(cb.dataset.id); else this._selected.delete(cb.dataset.id);
+      this.renderLanding();
+    }));
+    this.container.querySelector('.mi-sel-del')?.addEventListener('click', async () => {
+      const ids = this._selected ? [...this._selected] : [];
+      if (!ids.length) return;
+      const ok = await App.confirm({
+        title: 'Delete ' + ids.length + ' item' + (ids.length > 1 ? 's' : '') + '?',
+        message: 'The selected menu items will be removed. This cannot be undone.',
+        confirmText: 'Delete', danger: true
+      });
+      if (!ok) return;
+      const kill = new Set(ids);
+      App.data.menu_items = this.items().filter(i => !kill.has(i.id));
+      this._selected = new Set();
+      await App.saveKey('menu_items');
+      this.renderLanding();
+    });
 
     if (this._importOpen) {
       this.mountImporter();
