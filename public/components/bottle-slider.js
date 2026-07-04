@@ -22,18 +22,19 @@ const BottleSlider = {
   // One entry per silhouette. range = the fill's y span in the 0..230 viewBox
   // (value 1 at top, 0 at the interior base). clip = the interior the fill paints
   // inside. outline = the visible stroke drawn over the fill. noun/nounPl label
-  // the Full/Open readouts. bottle + keg are the originals, unchanged; the rest
-  // are the Food/Misc containers so a box reads as a box and a jug as a jug.
+  // the Full/Open readouts. Silhouettes: bottle = wine, liquor = the spirits
+  // bottle, keg = draft, jug = a liquid Food/Misc container, box = a solid one.
+  // App.sliderShape(p) maps a product to one of these.
   SHAPES: {
     bottle: { range: { top: 56, bot: 214 }, noun: 'Bottle', nounPl: 'Bottles',
       clip: 'M43 16 L43 53 C43 60 21 66 20 90 L20 208 Q20 218 29 218 L61 218 Q70 218 70 208 L70 90 C69 66 47 60 47 53 L47 16 Z',
       outline: '<rect x="38" y="6" width="14" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
         + '<path d="M40 14 L40 52 C40 58 18 64 16 88 L16 210 Q16 222 28 222 L62 222 Q74 222 74 210 L74 88 C72 64 50 58 50 52 L50 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>' },
     keg: { range: { top: 20, bot: 210 }, noun: 'Keg', nounPl: 'Kegs',
-      clip: 'M21 30 Q21 19 33 19 L57 19 Q69 19 69 30 L69 200 Q69 211 57 211 L33 211 Q21 211 21 200 Z',
-      outline: '<path d="M19 30 Q19 16 33 16 L57 16 Q71 16 71 30 L71 200 Q71 214 57 214 L33 214 Q19 214 19 200 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<line x1="20" x2="70" y1="40" y2="40" stroke="var(--b1)" stroke-width="2"/>'
-        + '<line x1="20" x2="70" y1="190" y2="190" stroke="var(--b1)" stroke-width="2"/>' },
+      clip: 'M13 30 Q13 19 25 19 L65 19 Q77 19 77 30 L77 200 Q77 211 65 211 L25 211 Q13 211 13 200 Z',
+      outline: '<path d="M11 30 Q11 16 25 16 L65 16 Q79 16 79 30 L79 200 Q79 214 65 214 L25 214 Q11 214 11 200 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<line x1="14" x2="76" y1="40" y2="40" stroke="var(--b1)" stroke-width="2"/>'
+        + '<line x1="14" x2="76" y1="190" y2="190" stroke="var(--b1)" stroke-width="2"/>' },
     // One generic container for every Food/Misc slider product. Full reads 1.00
     // when the fill reaches the inner top line (y 60), leaving the rim gap (46-60)
     // as the headspace most containers are never filled into; empty sits just
@@ -43,14 +44,23 @@ const BottleSlider = {
       outline: '<path d="M20 46 L70 46 L70 212 L20 212 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
         + '<path d="M22 46 L14 36 M68 46 L76 36" fill="none" stroke="var(--b1)" stroke-width="2" stroke-linecap="round"/>'
         + '<line x1="20" x2="70" y1="60" y2="60" stroke="var(--b1)" stroke-width="1.5"/>' },
-    // Liquid Food/Misc (oil, cream, mayo, juice bought by the gal/qt/pint). A
-    // squat wide-body jug with a short wide mouth + a handle, so it reads as a
-    // jug rather than the tall liquor bottle. Like the bottle, value 1 fills to
-    // the shoulder (short neck = headspace), value 0 sits just above the base.
-    jug: { range: { top: 48, bot: 206 }, noun: 'Jug', nounPl: 'Jugs',
+    // Liquor bottle. A symmetric squat wide-body bottle with a short wide mouth
+    // (both walls mirror about x45), so it reads as a liquor bottle rather than
+    // the tall narrow wine bottle. Like the wine bottle, value 1 fills to the
+    // shoulder (short neck = headspace), value 0 sits just above the base.
+    liquor: { range: { top: 48, bot: 206 }, noun: 'Bottle', nounPl: 'Bottles',
       clip: 'M37 18 L37 46 C37 54 16 56 16 62 L16 200 Q16 210 26 210 L64 210 Q74 210 74 200 L74 62 C74 56 53 54 53 46 L53 18 Z',
       outline: '<rect x="35" y="6" width="20" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M35 14 L35 46 C35 53 14 55 14 62 L14 200 Q14 212 26 212 L64 212 Q76 212 76 200 L76 62 C76 55 55 53 55 46 L55 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>' }
+        + '<path d="M35 14 L35 46 C35 53 14 55 14 62 L14 200 Q14 212 26 212 L64 212 Q76 212 76 200 L76 62 C76 55 55 53 55 46 L55 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>' },
+    // Liquid Food/Misc (oil, cream, syrup, juice bought by the gal/qt/pint). A
+    // short wide jug with a handle so it reads as a jug, not the liquor bottle.
+    // value 1 fills to the shoulder (short neck = headspace), value 0 sits just
+    // above the base. Symmetric body about x45; the handle is drawn (not filled).
+    jug: { range: { top: 62, bot: 204 }, noun: 'Jug', nounPl: 'Jugs',
+      clip: 'M39 44 L39 60 C39 68 14 70 14 78 L14 198 Q14 208 24 208 L66 208 Q76 208 76 198 L76 78 C76 70 51 68 51 60 L51 44 Z',
+      outline: '<rect x="37" y="34" width="16" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<path d="M37 42 L37 60 C37 67 12 69 12 78 L12 200 Q12 210 24 210 L66 210 Q78 210 78 200 L78 78 C78 69 53 67 53 60 L53 42 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<path d="M78 88 C89 90 89 124 78 126" fill="none" stroke="var(--b1)" stroke-width="2"/>' }
   },
   _shape(s) { return this.SHAPES[s] || this.SHAPES.bottle; },
   _range(shape) { return this._shape(shape).range; },
