@@ -3616,6 +3616,17 @@ const App = {
     return this.ozPerUnit(p.unit_type) != null;
   },
 
+  // Which count-slider silhouette a product uses (BottleSlider SHAPES). One
+  // source so Take Inventory and Spot Check never pick different shapes.
+  sliderShape(p) {
+    const c = p && p.category;
+    if (c === 'Draft Beer') return 'keg';
+    if (c === 'Wine') return 'bottle';
+    if (c === 'Liquor') return 'liquor';
+    // Food / Misc: a jug for liquids (oil, cream, syrup), a box for solids.
+    return this.isLiquidIngredient(p) ? 'jug' : 'box';
+  },
+
   // Ounces in ONE stock unit of a liquid product (a 25.4 oz bottle, a 32 oz
   // quart, a 1984 oz keg). Prefers an explicit container size, else the unit.
   ozPerContainer(p) {
