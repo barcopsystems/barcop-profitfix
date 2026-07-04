@@ -46,6 +46,30 @@ S.RevenueMenuEngineering = {
     return Math.ceil(exact * 4) / 4;                  // round UP to the nearest quarter (a real menu price)
   },
 
+  // Canonical Star/Plowhorse/Puzzle/Dog map for every menu item, so Menu Planning
+  // shows the exact class this page ranks by (same math as classificationHtml).
+  // Returns { [id]: 'STAR'|'PLOWHORSE'|'PUZZLE'|'DOG'|null }; null = the item's
+  // category has fewer than MIN_PER_CAT priced items, so it cannot be ranked yet.
+  classify() {
+    const items = (App.data.menu_items || [])
+      .map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
+      .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    const byCat = {};
+    items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
+    const map = {};
+    Object.keys(byCat).forEach(cat => {
+      const list = byCat[cat];
+      if (list.length < this.MIN_PER_CAT) { list.forEach(i => { map[i.id] = null; }); return; }
+      const avgCM = list.reduce((s, i) => s + (i.price - i.cost), 0) / list.length;
+      const avgCovers = list.reduce((s, i) => s + i.weekly_covers, 0) / list.length;
+      list.forEach(i => {
+        const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCovers;
+        map[i.id] = (hiM && hiV) ? 'STAR' : (!hiM && hiV) ? 'PLOWHORSE' : (hiM && !hiV) ? 'PUZZLE' : 'DOG';
+      });
+    });
+    return map;
+  },
+
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Items.'] },
