@@ -1320,6 +1320,20 @@ S.HubSettings = {
       'Arborio Rice':'Dry Goods', 'Tortilla Chips':'Dry Goods', 'Chickpeas':'Dry Goods', 'Elbow Pasta':'Dry Goods',
       'Quinoa':'Dry Goods', 'Waffle Mix':'Dry Goods', 'Dark Chocolate':'Dry Goods', 'Kettle Chips':'Dry Goods'
     };
+    // Countable food: servings (pieces) per stock unit + the serving noun, so
+    // recipes read "2 slices" / "1 patty" instead of a fraction of a pound. Keyed
+    // by cleaned name. Weight-portioned food (cheese, fish, potato) is left off
+    // and stays priced by the pound.
+    const FOOD_SERVINGS = {
+      'Ground Beef 80/20': { pack:3,   name:'patty' },
+      'Applewood Bacon':   { pack:16,  name:'slice' },
+      'Large Eggs':        { pack:12,  name:'egg' },
+      'Chicken Wings':     { pack:6,   name:'wing' },
+      'Tortilla Chips':    { pack:8,   name:'serving' },
+      'Flour Tortilla':    { pack:200, name:'tortilla' },
+      'Romaine':           { pack:40,  name:'salad' },
+      'Mixed Greens':      { pack:40,  name:'serving' }
+    };
     const icProducts = [
       { name:"Tito's Handmade Vodka",    category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:22.40, menu_price:9,  par_level:24,  reorder_point:10,  primary_location:'Liquor Room' },
       { name:'Espolòn Tequila Blanco',   category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:24.50, menu_price:10, par_level:20,  reorder_point:9,   primary_location:'Liquor Room' },
@@ -1465,6 +1479,8 @@ S.HubSettings = {
         // price changes. Empty on fresh data; populated as deliveries log price moves.
         cost_history:[],
         ...p, name: cleanName, unit_type: unitType,
+        pack_size: (FOOD_SERVINGS[cleanName] ? FOOD_SERVINGS[cleanName].pack : (p.pack_size != null ? p.pack_size : null)),
+        serving_name: (FOOD_SERVINGS[cleanName] ? FOOD_SERVINGS[cleanName].name : (p.serving_name || null)),
         sub_category: p.sub_category || SUBCAT_SEED[cleanName] || '' };
     });
     // Multi-location stocking: bar products live in storage AND at the service
@@ -1579,12 +1595,12 @@ S.HubSettings = {
     attachRecipe('Anchor Burger', {
       mode: 'food',
       ingredients: [
-        ing('Ground Beef 80/20 (lb)', 0.33),
+        ing('Ground Beef 80/20 (lb)', 1),
         ing('Brioche Bun (each)',     1),
         ing('Cheddar Cheese (lb)',    0.12),
-        ing('Applewood Bacon (lb)',   0.10),
+        ing('Applewood Bacon (lb)',   2),
         ing('Beefsteak Tomato (lb)',  0.08),
-        ing('Mixed Greens (case)',    0.03)
+        ing('Mixed Greens (case)',    1)
       ],
       plate_yield: 1
     });
@@ -1598,23 +1614,23 @@ S.HubSettings = {
     // Not every item carries a recipe (by design) — these cover the headline
     // dishes so Recipe Cost Analysis and Menu Engineering have real coverage.
     attachRecipe('Brisket Sandwich', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Beef Brisket (lb)', 0.35), ing('Brioche Bun (each)', 1), ing('Mixed Greens (case)', 0.02) ] });
+      ing('Beef Brisket (lb)', 0.35), ing('Brioche Bun (each)', 1), ing('Mixed Greens (case)', 1) ] });
     attachRecipe('Fish and Chips', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Atlantic Cod (lb)', 0.40), ing('Russet Potato (lb)', 0.50) ] });
     attachRecipe('Chicken Caesar', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Chicken Thigh (lb)', 0.30), ing('Romaine (case)', 0.05), ing('Parmesan (lb)', 0.05) ] });
+      ing('Chicken Thigh (lb)', 0.30), ing('Romaine (case)', 1), ing('Parmesan (lb)', 0.05) ] });
     attachRecipe('Steak Frites', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Beef Brisket (lb)', 0.50), ing('Russet Potato (lb)', 0.45) ] });
     attachRecipe('Shrimp Tacos', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Gulf Shrimp (lb)', 0.42), ing('Flour Tortilla (case)', 0.02), ing('Hass Avocado (each)', 0.5) ] });
+      ing('Gulf Shrimp (lb)', 0.42), ing('Flour Tortilla (case)', 3), ing('Hass Avocado (each)', 0.5) ] });
     attachRecipe('Pan-Seared Salmon', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Salmon Fillet (lb)', 0.58), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 0.03) ] });
+      ing('Salmon Fillet (lb)', 0.58), ing('Arborio Rice (lb)', 0.15), ing('Mixed Greens (case)', 1) ] });
     attachRecipe('Grilled Pork Chop', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Pork Chop (each)', 1), ing('Russet Potato (lb)', 0.40) ] });
     attachRecipe('Mushroom Risotto', { mode: 'food', plate_yield: 1, ingredients: [
       ing('Arborio Rice (lb)', 0.25), ing('Parmesan (lb)', 0.06) ] });
     attachRecipe('Breakfast Tacos', { mode: 'food', plate_yield: 1, ingredients: [
-      ing('Large Eggs (dozen)', 0.25), ing('Flour Tortilla (case)', 0.02), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 0.08) ] });
+      ing('Large Eggs (dozen)', 3), ing('Flour Tortilla (case)', 3), ing('Cheddar Cheese (lb)', 0.06), ing('Applewood Bacon (lb)', 2) ] });
     attachRecipe('Paloma', { mode: 'single', plate_yield: null, ingredients: [
       ing('Espolòn Tequila Blanco', 2), ing('Lime Juice (qt)', 0.5), ing('Simple Syrup (qt)', 0.5) ] });
     // Demo seed for the cost-creep alert: the two highest-volume margaritas both
@@ -1632,43 +1648,43 @@ S.HubSettings = {
     // flow. Five simple/prepared items stay manual-cost by design (Fried
     // Pickles, Pretzel Bites, Truffle Fries, Skillet Cookie, Key Lime Pie).
     attachRecipe('Loaded Nachos', { mode:'food', plate_yield:1, ingredients:[
-      ing('Tortilla Chips (bag)', 0.5), ing('Cheddar Cheese (lb)', 0.30), ing('Ground Beef 80/20 (lb)', 0.30) ] });
+      ing('Tortilla Chips (bag)', 4), ing('Cheddar Cheese (lb)', 0.30), ing('Ground Beef 80/20 (lb)', 1) ] });
     attachRecipe('Smoked Wings', { mode:'food', plate_yield:1, ingredients:[
-      ing('Chicken Wings (lb)', 1.8) ] });
+      ing('Chicken Wings (lb)', 11) ] });
     attachRecipe('Deviled Eggs', { mode:'food', plate_yield:1, ingredients:[
-      ing('Large Eggs (dozen)', 0.5), ing('Mayonnaise (qt)', 0.05) ] });
+      ing('Large Eggs (dozen)', 6), ing('Mayonnaise (qt)', 1.5) ] });
     attachRecipe('Charcuterie Board', { mode:'food', plate_yield:1, ingredients:[
       ing('Charcuterie Selection (lb)', 0.4), ing('Cheddar Cheese (lb)', 0.15), ing('Flatbread (each)', 1) ] });
     attachRecipe('Crispy Brussels', { mode:'food', plate_yield:1, ingredients:[
-      ing('Brussels Sprouts (lb)', 0.6), ing('Applewood Bacon (lb)', 0.12) ] });
+      ing('Brussels Sprouts (lb)', 0.6), ing('Applewood Bacon (lb)', 2) ] });
     attachRecipe('Hummus and Flatbread', { mode:'food', plate_yield:1, ingredients:[
       ing('Chickpeas (lb)', 0.5), ing('Flatbread (each)', 2) ] });
     attachRecipe('Calamari', { mode:'food', plate_yield:1, ingredients:[
-      ing('Calamari (lb)', 0.80), ing('Lime Juice (qt)', 0.02) ] });
+      ing('Calamari (lb)', 0.80), ing('Lime Juice (qt)', 0.5) ] });
     attachRecipe('Street Corn Ribs', { mode:'food', plate_yield:1, ingredients:[
       ing('Sweet Corn (each)', 3), ing('Parmesan (lb)', 0.05) ] });
     attachRecipe('Tuna Poke', { mode:'food', plate_yield:1, ingredients:[
       ing('Ahi Tuna (lb)', 0.30), ing('Hass Avocado (each)', 0.5), ing('Arborio Rice (lb)', 0.10) ] });
     attachRecipe('House Salad', { mode:'food', plate_yield:1, ingredients:[
-      ing('Mixed Greens (case)', 0.05), ing('Beefsteak Tomato (lb)', 0.10) ] });
+      ing('Mixed Greens (case)', 2), ing('Beefsteak Tomato (lb)', 0.10) ] });
     attachRecipe('Mac and Cheese', { mode:'food', plate_yield:1, ingredients:[
-      ing('Elbow Pasta (lb)', 0.30), ing('Cheddar Cheese (lb)', 0.30), ing('Heavy Cream (qt)', 0.06) ] });
+      ing('Elbow Pasta (lb)', 0.30), ing('Cheddar Cheese (lb)', 0.30), ing('Heavy Cream (qt)', 2) ] });
     attachRecipe('Avocado Toast', { mode:'food', plate_yield:1, ingredients:[
-      ing('Hass Avocado (each)', 1.5), ing('Sourdough Loaf (each)', 0.2), ing('Large Eggs (dozen)', 0.17) ] });
+      ing('Hass Avocado (each)', 1.5), ing('Sourdough Loaf (each)', 0.2), ing('Large Eggs (dozen)', 2) ] });
     attachRecipe('Veggie Grain Bowl', { mode:'food', plate_yield:1, ingredients:[
-      ing('Quinoa (lb)', 0.30), ing('Mixed Greens (case)', 0.05), ing('Hass Avocado (each)', 0.5) ] });
+      ing('Quinoa (lb)', 0.30), ing('Mixed Greens (case)', 2), ing('Hass Avocado (each)', 0.5) ] });
     attachRecipe('Braised Short Rib', { mode:'food', plate_yield:1, ingredients:[
       ing('Beef Short Rib (lb)', 1.0), ing('Russet Potato (lb)', 0.40) ] });
     attachRecipe('Chicken and Waffles', { mode:'food', plate_yield:1, ingredients:[
       ing('Chicken Thigh (lb)', 0.6), ing('Waffle Mix (lb)', 0.5) ] });
     attachRecipe('Brunch Burger', { mode:'food', plate_yield:1, ingredients:[
-      ing('Ground Beef 80/20 (lb)', 0.33), ing('Brioche Bun (each)', 1), ing('Applewood Bacon (lb)', 0.10), ing('Large Eggs (dozen)', 0.08), ing('Cheddar Cheese (lb)', 0.08) ] });
+      ing('Ground Beef 80/20 (lb)', 1), ing('Brioche Bun (each)', 1), ing('Applewood Bacon (lb)', 2), ing('Large Eggs (dozen)', 1), ing('Cheddar Cheese (lb)', 0.08) ] });
     attachRecipe('Shakshuka', { mode:'food', plate_yield:1, ingredients:[
-      ing('Large Eggs (dozen)', 0.33), ing('Beefsteak Tomato (lb)', 0.40), ing('Chickpeas (lb)', 0.15) ] });
+      ing('Large Eggs (dozen)', 4), ing('Beefsteak Tomato (lb)', 0.40), ing('Chickpeas (lb)', 0.15) ] });
     attachRecipe('Creme Brulee', { mode:'food', plate_yield:1, ingredients:[
-      ing('Heavy Cream (qt)', 0.25), ing('Large Eggs (dozen)', 0.17) ] });
+      ing('Heavy Cream (qt)', 8), ing('Large Eggs (dozen)', 2) ] });
     attachRecipe('Chocolate Torte', { mode:'food', plate_yield:1, ingredients:[
-      ing('Dark Chocolate (lb)', 0.20), ing('Large Eggs (dozen)', 0.10), ing('Heavy Cream (qt)', 0.05) ] });
+      ing('Dark Chocolate (lb)', 0.20), ing('Large Eggs (dozen)', 1), ing('Heavy Cream (qt)', 1.5) ] });
     attachRecipe('Espresso Martini', { mode:'single', plate_yield:null, ingredients:[
       ing("Tito's Handmade Vodka", 1.5), ing('Coffee Liqueur', 0.75), ing('Cold Brew Concentrate (qt)', 1) ] });
     attachRecipe('Negroni', { mode:'single', plate_yield:null, ingredients:[
