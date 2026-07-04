@@ -3616,6 +3616,37 @@ const App = {
     return this.ozPerUnit(p.unit_type) != null;
   },
 
+  // What a Food/Misc product is, for costing + counting. Mirrors
+  // ic-product-setup's divisor roles so the form and the count sheet agree:
+  // supply (pieces), liquid (ounces), each (the unit is the piece), serving
+  // (a countable solid). One source so nothing drifts.
+  productRole(p) {
+    const ut = p && p.unit_type, mt = p && p.misc_type;
+    if ((this.MISC_SUPPLY_TYPES || []).includes(mt)) return 'supply';
+    if (this.ozPerUnit(ut) != null) return 'liquid';
+    if (String(ut || '').toLowerCase() === 'each') return 'each';
+    if (mt === 'Drink Mixer' || mt === 'NA Beverage') return 'liquid';
+    return 'serving';
+  },
+
+  // The practical Count By for a product's role: a liquid gets the Fill Slider,
+  // an "each" a Total Count, a countable/supply with a pack Full + Loose, else a
+  // Total Count. This is the DEFAULT when a product has no saved count_style.
+  defaultCountStyle(p) {
+    const role = this.productRole(p);
+    if (role === 'liquid') return 'slider';
+    if (role === 'each') return 'number';
+    const pack = p && p.pack_size;
+    return (pack != null && pack !== '' && parseFloat(pack) > 0) ? 'loose' : 'number';
+  },
+
+  // The effective Count By: an explicit saved choice wins, else the role default.
+  // Take Inventory and Spot Check read this so a seeded product (no count_style)
+  // counts the same way the edit form shows it.
+  countStyle(p) {
+    return (p && p.count_style) || this.defaultCountStyle(p);
+  },
+
   // Which count-slider silhouette a product uses (BottleSlider SHAPES). One
   // source so Take Inventory and Spot Check never pick different shapes.
   sliderShape(p) {
