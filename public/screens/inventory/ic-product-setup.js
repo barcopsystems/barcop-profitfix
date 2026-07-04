@@ -337,12 +337,15 @@ S.InventoryProducts = {
     const tabs = this.catTabs();
 
     const spec = this.FORM_SPEC[this.activeCat];
-    const sizeCol = (this.activeCat === 'Food' || this.activeCat === 'Misc') ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
-    const costCol = 'Cost Per';
+    const isFoodMisc = (this.activeCat === 'Food' || this.activeCat === 'Misc');
+    const sizeCol = isFoodMisc ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
     // Column headers + fixed colgroup, shared by the populated list AND the empty
     // state so the headers always show and the empty message sits in the data row.
-    const headerCols = '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th>'
-      + '<th>' + esc(costCol) + '</th><th>Cost %</th><th>Par</th><th></th>';
+    // Food / Misc show recipe-costing columns (per-unit breakdown + recipe cost)
+    // in place of the pour columns that only apply to poured drinks.
+    const headerCols = isFoodMisc
+      ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th>Recipe Cost</th><th>Par</th><th></th>'
+      : '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>';
     const colgroup = '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
 
     let body;
@@ -408,6 +411,34 @@ S.InventoryProducts = {
         + (p.pack_size > 0 && piece != null ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + App.fmtCurrency(piece, piece < 1 ? 3 : 2) + '/ea</span>' : '')
       : '<span style="color:var(--t4);">-</span>';
     const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
+    const dash = '<span style="color:var(--t4);">-</span>';
+    // Per-category data cells. Food / Misc show the recipe-costing breakdown (per
+    // unit servings/oz + the recipe cost); pourable + bottle beer keep pour cols.
+    let tds;
+    if (p.category === 'Food' || p.category === 'Misc') {
+      const basis = App.recipeBasis ? App.recipeBasis(p) : null;
+      const uEach = String(p.unit_type || '').toLowerCase() === 'each';
+      let perU = dash;
+      if (App.isLiquidIngredient && App.isLiquidIngredient(p)) {
+        const oz = App.ozPerContainer(p);
+        if (oz > 0) perU = (oz % 1 === 0 ? oz : oz.toFixed(1)) + ' oz';
+      } else if (p.pack_size > 0) {
+        perU = p.pack_size + ' ' + esc(p.serving_name || 'ea');
+      } else if (uEach) {
+        perU = '1 ' + esc(p.serving_name || 'ea');
+      }
+      const plainCost = p.unit_cost != null
+        ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/unit</span>' : dash;
+      const recCost = (App.isRecipeIngredient && App.isRecipeIngredient(p) && basis && basis.costPerUnit > 0)
+        ? App.fmtCurrency(basis.costPerUnit, basis.costPerUnit < 1 ? 3 : 2) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(basis.unitLabel) + '</span>'
+        : dash;
+      tds = '<td>' + esc(p.unit_type || '-') + '</td><td>' + perU + '</td><td>' + plainCost + '</td><td>' + recCost + '</td>';
+    } else {
+      tds = '<td>' + szL + '</td>'
+        + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : dash) + '</td>'
+        + '<td>' + costDisplay + '</td>'
+        + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : dash) + '</td>';
+    }
     return '<tr style="' + dim + '">'
       + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
       + '<td><div class="val">' + esc(p.name)
@@ -416,10 +447,7 @@ S.InventoryProducts = {
       + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
       + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
       + '<td>' + esc(p.vendor || '-') + '</td>'
-      + '<td>' + szL + '</td>'
-      + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : '<span style="color:var(--t4);">-</span>') + '</td>'
-      + '<td>' + costDisplay + '</td>'
-      + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + tds
       + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td><div class="row-actions">'
       + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
