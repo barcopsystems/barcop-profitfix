@@ -153,13 +153,13 @@ S.PrepBatches = {
   formBodyHTML(b) {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
     return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Name</label>'
+        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
-        + '<div class="f" style="width:170px;flex-shrink:0;"><label>Category</label>'
+        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Category</label>'
           + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Batch Yield</label>'
+        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Serving Size</label>'
+        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Serving Size</label>'
           + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
       + '</div>'
       + '<div id="pb-ings" style="margin-top:14px;margin-bottom:12px;"></div>'
@@ -379,8 +379,8 @@ S.PrepBatches = {
     const inModal = !!area.closest('#pb-edit-modal');
     area.innerHTML = (inModal ? '<div style="overflow-x:auto;margin-bottom:12px;">' : '<div class="pill-wrap" style="margin-bottom:12px;">')
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
-      + '<th style="width:320px;">Ingredient</th><th style="width:90px;">Qty</th><th style="width:80px;">Unit</th>'
-      + '<th style="width:110px;">Unit Cost</th><th style="width:110px;">Line Cost</th><th></th>'
+      + '<th style="width:190px;">Ingredient</th><th style="width:65px;">Qty</th><th style="width:55px;">Unit</th>'
+      + '<th style="width:85px;">Unit Cost</th><th style="width:85px;">Line Cost</th><th></th>'
       + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
         const unit = this.unitLabel(prod);
