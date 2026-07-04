@@ -34,37 +34,15 @@ const BottleSlider = {
       outline: '<path d="M19 30 Q19 16 33 16 L57 16 Q71 16 71 30 L71 200 Q71 214 57 214 L33 214 Q19 214 19 200 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
         + '<line x1="20" x2="70" y1="40" y2="40" stroke="var(--b1)" stroke-width="2"/>'
         + '<line x1="20" x2="70" y1="190" y2="190" stroke="var(--b1)" stroke-width="2"/>' },
-    box: { range: { top: 46, bot: 212 }, noun: 'Box', nounPl: 'Boxes',
+    // One generic container for every Food/Misc slider product. Full reads 1.00
+    // when the fill reaches the inner top line (y 60), leaving the rim gap (46-60)
+    // as the headspace most containers are never filled into; empty sits just
+    // above the base line (bot 206), never flush with it.
+    box: { range: { top: 60, bot: 206 }, noun: 'Unit', nounPl: 'Units',
       clip: 'M20 46 L70 46 L70 212 L20 212 Z',
       outline: '<path d="M20 46 L70 46 L70 212 L20 212 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
         + '<path d="M22 46 L14 36 M68 46 L76 36" fill="none" stroke="var(--b1)" stroke-width="2" stroke-linecap="round"/>'
-        + '<line x1="20" x2="70" y1="60" y2="60" stroke="var(--b1)" stroke-width="1.5"/>' },
-    bag: { range: { top: 54, bot: 212 }, noun: 'Bag', nounPl: 'Bags',
-      clip: 'M28 54 L62 54 L68 205 Q68 214 59 214 L31 214 Q22 214 22 205 Z',
-      outline: '<path d="M28 54 L62 54 L68 205 Q68 214 59 214 L31 214 Q22 214 22 205 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M28 54 Q30 40 45 40 Q60 40 62 54" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<line x1="33" x2="57" y1="49" y2="49" stroke="var(--b1)" stroke-width="1.5"/>' },
-    jug: { range: { top: 66, bot: 212 }, noun: 'Jug', nounPl: 'Jugs',
-      clip: 'M26 66 L64 66 L64 205 Q64 214 55 214 L35 214 Q26 214 26 205 Z',
-      outline: '<path d="M26 66 L64 66 L64 205 Q64 214 55 214 L35 214 Q26 214 26 205 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M38 66 L38 46 L52 46 L52 66" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<rect x="35" y="37" width="20" height="10" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M64 80 Q82 84 82 108 Q82 132 64 134" fill="none" stroke="var(--b1)" stroke-width="2"/>' },
-    crate: { range: { top: 48, bot: 210 }, noun: 'Crate', nounPl: 'Crates',
-      clip: 'M20 48 L70 48 L70 210 L20 210 Z',
-      outline: '<path d="M20 48 L70 48 L70 210 L20 210 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<line x1="20" x2="70" y1="94" y2="94" stroke="var(--b1)" stroke-width="1.5"/>'
-        + '<line x1="20" x2="70" y1="140" y2="140" stroke="var(--b1)" stroke-width="1.5"/>'
-        + '<line x1="20" x2="70" y1="186" y2="186" stroke="var(--b1)" stroke-width="1.5"/>' },
-    tub: { range: { top: 56, bot: 212 }, noun: 'Tub', nounPl: 'Tubs',
-      clip: 'M26 56 L64 56 L60 206 Q60 213 53 213 L37 213 Q30 213 30 206 Z',
-      outline: '<path d="M26 56 L64 56 L60 206 Q60 213 53 213 L37 213 Q30 213 30 206 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M22 50 L68 50 L64 56 L26 56 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>' },
-    can: { range: { top: 54, bot: 208 }, noun: 'Can', nounPl: 'Cans',
-      clip: 'M26 54 L64 54 L64 208 L26 208 Z',
-      outline: '<path d="M26 54 L64 54 L64 208 L26 208 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<ellipse cx="45" cy="54" rx="19" ry="5.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<line x1="26" x2="64" y1="66" y2="66" stroke="var(--b1)" stroke-width="1.5"/>' }
+        + '<line x1="20" x2="70" y1="60" y2="60" stroke="var(--b1)" stroke-width="1.5"/>' }
   },
   _shape(s) { return this.SHAPES[s] || this.SHAPES.bottle; },
   _range(shape) { return this._shape(shape).range; },
@@ -72,7 +50,7 @@ const BottleSlider = {
   // Fill color per category, from the locked palette (no hardcoded hex).
   COLORS: {
     'Liquor':'var(--gold)', 'Spirits':'var(--gold)', 'Wine':'var(--red)',
-    'Bottle Beer':'var(--gold)', 'Draft Beer':'var(--gold)', 'Food':'var(--steel)', 'Misc':'var(--steel)'
+    'Bottle Beer':'var(--gold)', 'Draft Beer':'var(--gold)', 'Food':'var(--amber)', 'Misc':'var(--amber)'
   },
   colorFor(cat) { return this.COLORS[cat] || 'var(--gold)'; },
 
@@ -91,8 +69,10 @@ const BottleSlider = {
     // fill/level mechanic is identical — only the silhouette and the noun
     // ("Keg" vs "Bottle") change.
     const shp   = this._shape(opts.shape);
-    const noun  = shp.noun;
-    const nounPl = shp.nounPl;
+    // A caller can override the Full/Open label (the generic box slider labels
+    // itself with the product's own unit — "Full Jugs", "Open Case").
+    const noun  = opts.noun || shp.noun;
+    const nounPl = opts.nounPl || shp.nounPl;
     const rng   = shp.range;
     const clipD = shp.clip;
     const outline = shp.outline;
