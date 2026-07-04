@@ -3547,6 +3547,104 @@ const App = {
     return (pk > 0) ? c / pk : c;
   },
 
+  // ── Recipe costing engine ────────────────────────────────────────────────
+  // A menu recipe costs each ingredient in its NATURAL measure: liquids by the
+  // OUNCE (a pour), countable/portioned solids by the SERVING (a slice, a patty,
+  // one each). Both reduce to a cost per that measure = purchase cost divided by
+  // how many ounces or servings are in one stock unit. recipeBasis is the single
+  // source both menuItemCost and the Menu Builder read, so they never disagree.
+
+  // Ounces in one of a named volume unit, else null (not a liquid volume unit).
+  // Tolerant of spelled-out and abbreviated forms so seed + user entries map.
+  ozPerUnit(unit) {
+    if (!unit) return null;
+    const u = String(unit).trim().toLowerCase();
+    const MAP = {
+      oz:1, ounce:1, ounces:1, 'fl oz':1, floz:1,
+      cup:8, cups:8,
+      pt:16, pint:16, pints:16,
+      qt:32, quart:32, quarts:32,
+      l:33.814, liter:33.814, litre:33.814, liters:33.814, litres:33.814,
+      gal:128, gallon:128, gallons:128,
+      ml:0.033814, milliliter:0.033814, millilitre:0.033814
+    };
+    return MAP[u] != null ? MAP[u] : null;
+  },
+
+  // Is this product a liquid an operator pours into a drink/recipe by the ounce?
+  isLiquidIngredient(p) {
+    if (!p) return false;
+    if (['Liquor', 'Wine', 'Draft Beer'].includes(p.category)) return true;
+    if (p.category === 'Bottle Beer') return false; // used by the bottle, not a pour
+    if (p.category === 'Misc' && (p.misc_type === 'Drink Mixer' || p.misc_type === 'NA Beverage')) {
+      return (parseFloat(p.container_size_oz) > 0) || this.ozPerUnit(p.unit_type) != null;
+    }
+    // Any Food/Misc bought in a volume unit (mayo by the quart, cream by the qt).
+    return this.ozPerUnit(p.unit_type) != null;
+  },
+
+  // Ounces in ONE stock unit of a liquid product (a 25.4 oz bottle, a 32 oz
+  // quart, a 1984 oz keg). Prefers an explicit container size, else the unit.
+  ozPerContainer(p) {
+    if (!p) return null;
+    const c = parseFloat(p.container_size_oz);
+    if (c > 0) return c;
+    return this.ozPerUnit(p.unit_type);
+  },
+
+  // Cost of one ounce of a liquid ingredient. unit_cost is per stock unit (per
+  // bottle for liquor, per keg for draft, per quart for a mixer); bottle beer
+  // resolves its per-case cost through bottleCost first.
+  costPerOz(p) {
+    if (!p) return null;
+    const oz = this.ozPerContainer(p);
+    if (!(oz > 0)) return null;
+    const base = (p.category === 'Bottle Beer') ? this.bottleCost(p) : parseFloat(p.unit_cost);
+    if (base == null || isNaN(base)) return null;
+    return base / oz;
+  },
+
+  // How many recipe servings come from one stock unit (16 slices per lb, 3
+  // patties per lb); an item with no pack size is 1 serving = 1 stock unit.
+  servingsPerUnit(p) {
+    if (!p) return null;
+    const pk = parseFloat(p.pack_size);
+    return (pk > 0) ? pk : 1;
+  },
+
+  // Cost of one serving of a solid ingredient (piecePrice already = unit_cost /
+  // pack_size, or unit_cost when the stock unit itself is the serving).
+  costPerServing(p) { return this.piecePrice(p); },
+
+  // Products a recipe can use: everything except bottle beer (used whole) and
+  // the non-food supply types (paper, cleaning). Drives the Menu Builder picker.
+  isRecipeIngredient(p) {
+    if (!p) return false;
+    if (p.category === 'Bottle Beer') return false;
+    if ((this.MISC_SUPPLY_TYPES || []).includes(p.misc_type)) return false;
+    return true;
+  },
+
+  // The canonical recipe basis for an ingredient. measure:
+  //   'oz'      → a liquid pour; enter ounces; unitLabel 'oz'.
+  //   'serving' → a countable/portioned solid; enter servings; unitLabel = the
+  //               serving noun (slice/patty), default 'serving' or 'ea'.
+  //   'unit'    → a solid with no serving size set yet; fall back to stock unit.
+  recipeBasis(p) {
+    if (!p) return { measure: 'unit', unitLabel: 'units', costPerUnit: 0 };
+    if (this.isLiquidIngredient(p)) {
+      return { measure: 'oz', unitLabel: 'oz', costPerUnit: this.costPerOz(p) || 0 };
+    }
+    const pk = parseFloat(p.pack_size);
+    const isEach = String(p.unit_type || '').toLowerCase() === 'each';
+    if (pk > 0 || isEach) {
+      const noun = p.serving_name || (isEach ? 'ea' : 'serving');
+      return { measure: 'serving', unitLabel: noun, costPerUnit: this.piecePrice(p) || 0 };
+    }
+    // No serving size configured yet: cost by the stock unit (honest fallback).
+    return { measure: 'unit', unitLabel: (p.unit_type || 'units'), costPerUnit: parseFloat(p.unit_cost) || 0 };
+  },
+
   menuItemCost(item) {
     if (!item) return null;
 
@@ -3561,7 +3659,6 @@ const App = {
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
-      const isBar = p => p && App.BAR_CATS.includes(p.category);
 
       const ingCost = ing => {
         const qty = parseFloat(ing.quantity) || 0;
@@ -3574,19 +3671,12 @@ const App = {
           if (!b) return 0;
           return (b.cost_per_serving || 0) * qty;
         }
-        // product
+        // product: cost the quantity in its natural measure (ounces for a liquid
+        // pour, per-serving for a solid) via the shared recipeBasis, so the live
+        // menu cost and the Menu Builder always agree.
         const p = prods.find(x => x.id === id);
         if (!p) return (parseFloat(ing.cost_per_unit) || 0) * qty;
-        const unitCost = isBar(p)
-          ? (item.recipe.mode === 'single'
-              ? (p.cost_per_pour != null ? p.cost_per_pour : (this.bottleCost(p) || 0))
-              : (this.bottleCost(p) != null ? this.bottleCost(p) : (p.unit_cost || 0)))
-          // Food / Misc: per-piece cost when the product carries a pack size (the
-          // recipe quantity is then in pieces, e.g. 6 wings off a bag of 100), else
-          // the plain unit cost. piecePrice returns unit_cost when there is no pack,
-          // so this is a no-op for every product without a pack size.
-          : (this.piecePrice(p) || 0);
-        return unitCost * qty;
+        return (this.recipeBasis(p).costPerUnit || 0) * qty;
       };
 
       const tc = item.recipe.ingredients.reduce((s, ing) => s + ingCost(ing), 0);
