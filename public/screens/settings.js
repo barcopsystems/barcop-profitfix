@@ -1720,15 +1720,19 @@ S.HubSettings = {
     // Prep batches: made-in-house ingredients. Frozen Margarita Mix is the
     // classic example. Lives in App.inventoryData.ic_prep_batches alongside
     // Products, Locations, Vendors as IC Setup reference data (Rule 21).
+    // A gallon (128 oz) frozen margarita mix, all ingredients in OUNCES like a
+    // recipe: ~88 oz spirits/juice topped to a gallon. Costed per ounce via the
+    // shared engine, so the batch cost matches what the Menu Builder computes.
     const fmIngredients = [
-      { product_id: icProducts[1].id, quantity: 2 },   // Espolòn Tequila
-      { product_id: icProducts[16].id, quantity: 1 },  // Triple Sec
-      { product_id: icProducts[17].id, quantity: 2 },  // Lime Juice
-      { product_id: icProducts[18].id, quantity: 1 }   // Simple Syrup
+      { product_id: icProducts[1].id, quantity: 32 },   // Espolòn Tequila
+      { product_id: icProducts[16].id, quantity: 16 },  // Triple Sec
+      { product_id: icProducts[17].id, quantity: 24 },  // Lime Juice
+      { product_id: icProducts[18].id, quantity: 16 }   // Simple Syrup
     ];
     const fmTotalCost = fmIngredients.reduce((s, ing) => {
       const p = icProducts.find(x => x.id === ing.product_id);
-      return s + (p?.unit_cost || 0) * ing.quantity;
+      const per = (p && App.recipeBasis) ? (App.recipeBasis(p).costPerUnit || 0) : (p?.unit_cost || 0);
+      return s + per * ing.quantity;
     }, 0);
     App.inventoryData.ic_prep_batches = [
       {
