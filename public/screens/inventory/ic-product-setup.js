@@ -927,7 +927,7 @@ S.InventoryProducts = {
     }
     if (role === 'supply') {
       const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-      const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(cost / packV, 3) : '-';
+      const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(cost / packV, 2) : '-';
       return '<div class="f" style="width:160px;flex-shrink:0;"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Piece</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
@@ -935,7 +935,7 @@ S.InventoryProducts = {
     // serving (lb / case / bag / dozen)
     const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
     const perServ = packV > 0 ? cost / packV : 0;
-    const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(perServ, perServ < 1 ? 3 : 2) : '-';
+    const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(perServ, 2) : '-';
     return '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 16"/><span class="suf">ea</span></div></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Serving Name</label>'
@@ -973,7 +973,7 @@ S.InventoryProducts = {
     } else if (pack) {
       const n = parseFloat(pack.value) || 0;
       const per = n > 0 ? cost / n : cost;
-      el.textContent = cost > 0 ? App.fmtCurrency(per, per < 1 ? 3 : 2) : '-';
+      el.textContent = cost > 0 ? App.fmtCurrency(per, 2) : '-';
     } else {
       el.textContent = cost > 0 ? App.fmtCurrency(cost) : '-';   // each: 1 = the unit
     }
