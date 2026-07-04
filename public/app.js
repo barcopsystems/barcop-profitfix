@@ -2723,7 +2723,7 @@ const App = {
   // r-menu-engineering, r-price-calc, r-dog-test, recipe-cost-analysis).
   // Promoted from per-file local arrays so the lists never drift.
   // Plate-side menu categories — what the operator picks on the Plate form.
-  MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Desserts', 'Specials'],
+  MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials'],
   // Inventory Control product categories shown as available recipe ingredients.
   // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
   MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
