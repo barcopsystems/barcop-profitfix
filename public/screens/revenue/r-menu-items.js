@@ -18,6 +18,8 @@ S.RevenueMenuItems = {
   linkedProductId:  '',          // for inventory items
   _saving:          false,
   entryMode:        'manual',    // inline add-form lane: 'manual' | 'import'
+  activeType:       'plate',     // active tile/tab: 'plate' | 'cocktail' | 'inventory'
+  _importOpen:      false,       // Upload panel open in place of the list
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
@@ -198,118 +200,59 @@ S.RevenueMenuItems = {
   // ── Landing: three cards + tabs + filtered table ─────────────────────
   CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
+  // The three menu-item types, shown as tiles + tabs the way Add Products shows
+  // its category cards + tabs, so Inventory and the Menu Builder read as one
+  // connected surface. Each type's list groups by menu category into sections.
+  TYPES: [
+    { key: 'plate',     label: 'Food Recipes',    add: 'Add Recipe',   imp: 'Food List' },
+    { key: 'cocktail',  label: 'Cocktails',       add: 'Add Cocktail', imp: 'Cocktail List' },
+    { key: 'inventory', label: 'Inventory Items', add: 'Add Item',     imp: 'Inventory List' }
+  ],
+  catsForType(type) {
+    if (type === 'cocktail')  return ['Cocktails'];
+    if (type === 'plate')     return this.PLATE_CATEGORIES.slice();
+    if (type === 'inventory') return [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
+    return null;
+  },
+
   renderLanding() {
     const everything = this.items();
     const all = everything.filter(i => !i.archived);
     const archivedItems = everything.filter(i => i.archived);
-    const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
+    if (!this.activeType) this.activeType = 'plate';
 
-    // Inline add form is always-on at the top (edit happens in the modal), so
-    // the add state starts blank on every landing render.
-    this._editItem = null;
-    this.editIdx = null;
-    this.formType = null;
-    this.rows = [];
-    this.mode = null;
-    this.linkedProductId = '';
-    this._editingIncomplete = false;
-    this._editReturn = null;
+    // Reset the shared editor's transient state on every landing render (add
+    // happens in the popup, so the landing itself holds no live form).
+    this._editItem = null; this.editIdx = null; this.formType = null;
+    this.rows = []; this.mode = null; this.linkedProductId = '';
+    this._editingIncomplete = false; this._editReturn = null; this._addType = null;
 
-    // Always-on inline Add form with an Enter Manually / Import File segmented
-    // toggle ([[unified-import-pattern]]). Manual = the shared formBodyHtml()
-    // builder (the same one the edit modal uses, so they never drift); Import =
-    // the shared CSVMapper drop-file. Wrapped so openEditor can remove the whole
-    // thing (card + buttons) before opening the modal — the ri-* ids are
-    // identical, so only one form is ever in the DOM at a time.
-    const segBtn = (mode, label) => {
-      const on = this.entryMode === mode;
-      return '<button type="button" class="btn btn-sm mi-mode" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    };
-    let modeBody, actionRow;
-    if (this.entryMode === 'import') {
-      modeBody  = '<div id="mi-csv"></div><div id="mi-imp-result"></div>';
-      // Empty until a file is dropped; CSVMapper renders its Import / Cancel row
-      // here (below the card) so there is no gap beforehand.
-      actionRow = '<div id="mi-imp-actions" class="no-print" data-collapse-group="mi-add" style="margin:16px 0 24px;"></div>';
-    } else {
-      modeBody  = this.formBodyHtml(null);
-      actionRow = '<div class="no-print" data-collapse-group="mi-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-        + '<button class="btn btn-primary" id="ri-save">Save Item</button>'
-        + '<button class="btn btn-ghost" id="ri-start-over">Start Over</button>'
-        + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+    // ── Three tiles: Food Recipes / Cocktails / Inventory Items ───────────
+    const tiles = this.TYPES.map(t => {
+      const n = all.filter(i => this.classifyItem(i) === t.key).length;
+      return '<div class="ip-card" data-type="' + t.key + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:22px 18px 20px;text-align:center;">'
+        + '<div style="font-size:17px;font-weight:800;color:var(--t1);letter-spacing:0.3px;margin-bottom:4px;">' + esc(t.label) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);">' + n + ' item' + (n === 1 ? '' : 's') + '</div>'
+        + '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:18px;">'
+          + '<span class="mi-card-add" data-type="' + t.key + '" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ ' + esc(t.add) + '</span>'
+          + '<span style="font-size:10px;color:var(--t4);letter-spacing:1px;">or</span>'
+          + '<button type="button" class="mi-card-imp" data-type="' + t.key + '" style="background:none;border:1px solid var(--b1);border-radius:4px;color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;">Upload ' + esc(t.imp) + '</button>'
+        + '</div></div>';
+    }).join('');
+    const tilesBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">' + tiles + '</div>';
+
+    // ── Type tabs ─────────────────────────────────────────────────────────
+    const tabs = '<div style="display:flex;border-bottom:1px solid var(--b-edge);">'
+      + this.TYPES.map(t => {
+          const on = this.activeType === t.key;
+          const n = all.filter(i => this.classifyItem(i) === t.key).length;
+          return '<button type="button" class="mi-tab" data-type="' + t.key + '" style="background:none;border:none;border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';color:' + (on ? 'var(--t1)' : 'var(--t3)') + ';font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 16px;cursor:pointer;">' + esc(t.label) + ' <span style="color:var(--t4);font-weight:400;">' + n + '</span></button>';
+        }).join('')
       + '</div>';
-    }
-    const addWrap = '<div id="mi-add-wrap">'
-      + '<div class="card form-card" style="margin-bottom:0;">'
-        + App.collapsibleCardTitle('mi-add', 'Add Menu Item')
-        + '<div class="collapse-body">'
-          + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
-          + modeBody
-        + '</div>'
-      + '</div>'
-      + actionRow
-    + '</div>';
 
-    let body;
-    if (!all.length) {
-      body = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No menu items yet. Add your first one with the form above, or switch to Import File to bring your whole menu in at once.</div></div>';
-    } else {
-      const cats = [...new Set(all.map(i => i.category || 'Uncategorized'))]
-        .sort((a, b) => {
-          const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
-          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
-        });
-      const warn = incompleteN > 0
-        ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin-bottom:16px;font-size:12px;color:var(--t1);">'
-          + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
-        : '';
-      const sections = cats.map((cat, ci) => {
-        const items = all.filter(i => (i.category || 'Uncategorized') === cat)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        const rows = items.map(item => {
-          const cost = App.menuItemCost(item) || 0;
-          const cm   = (item.price && cost) ? (item.price - cost) : null;
-          const pct  = (item.price && cost) ? (cost / item.price * 100) : null;
-          const cls  = this.classifyItem(item);
-          // Inventory-linked beer/wine/NA have no cocktail/plate cost target, so
-          // leave their Cost % neutral rather than flagging it red vs 22%.
-          const tgt  = item.target_cost_pct || (cls === 'plate' ? App.MENU_TARGET_COST_PCT.plate : cls === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : null);
-          const ok   = item.price && cost;
-          const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-          const src  = hasRecipe ? 'from recipe' : (item.linked_product_id ? 'from linked product' : (item.cost ? 'manual cost' : ''));
-          return '<tr>'
-            + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
-            + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
-            + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
-            + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-            + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
-            + '<td class="' + (pct != null && tgt ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
-            + '<td>' + (cm != null ? App.fmtCurrency(cm) : '-') + '</td>'
-            + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
-            + '<td><div class="row-actions">'
-            + '<button class="btn btn-ghost btn-sm mi-edit" data-id="' + esc(item.id) + '">Edit</button>'
-            + '<button class="btn btn-danger btn-sm mi-del" data-id="' + esc(item.id) + '">Delete</button>'
-            + '</div></td></tr>';
-        }).join('');
-        // No outside titles above the cards — the category lives in the first
-        // column header. The Export PDF button rides a title-less row above the
-        // first card.
-        return (ci === 0
-            ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">Menu Builder</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
-            : '')
-          + '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-          + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
-          + '<thead><tr>'
-          + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
-          + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-      }).join('');
-      body = '<div id="mi-list-export">' + warn + sections + '</div>';
-    }
+    const lower = this._importOpen ? this.importPanelHTML() : this.listHTML(all);
 
-    // Archived items (cut from a Dog Test, or archived here): kept out of the menu
-    // and Menu Engineering, restorable or deletable for good. Mirrors Locations.
+    // Archived items (cut from a Dog Test, or archived here), across all types.
     const archivedSection = archivedItems.length
       ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
@@ -325,24 +268,108 @@ S.RevenueMenuItems = {
         + '</tbody></table></div>'
       : '';
 
-    this.container.innerHTML = '<div class="screen">' + addWrap + body + archivedSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + tilesBlock + tabs + lower + archivedSection + '</div>';
+    this.wireLanding();
+  },
 
-    // Toggle wiring (both lanes)
-    this.container.querySelectorAll('.mi-mode').forEach(b =>
-      b.addEventListener('click', () => this.setEntryMode(b.dataset.mode)));
+  // The active type's items, grouped by menu category into section cards.
+  listHTML(all) {
+    const t = this.TYPES.find(x => x.key === this.activeType) || {};
+    const typeItems = all.filter(i => this.classifyItem(i) === this.activeType);
+    if (!typeItems.length) {
+      return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No ' + esc((t.label || 'items').toLowerCase()) + ' yet. Use <strong>+ ' + esc(t.add || 'Add') + '</strong> above, or Upload to bring your menu in at once.</div></div>';
+    }
+    const incompleteN = typeItems.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
+    const cats = [...new Set(typeItems.map(i => i.category || 'Uncategorized'))]
+      .sort((a, b) => {
+        const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+      });
+    const warn = incompleteN > 0
+      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);">'
+        + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
+      : '';
+    const sections = cats.map((cat, ci) => {
+      const items = typeItems.filter(i => (i.category || 'Uncategorized') === cat)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const rows = items.map(item => this._itemRowHTML(item)).join('');
+      return (ci === 0
+          ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">' + esc(t.label || 'Menu') + '</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
+          : '')
+        + '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
+        + '<thead><tr>'
+        + '<th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Wkly Covers</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }).join('');
+    return '<div id="mi-list-export">' + warn + sections + '</div>';
+  },
 
-    if (this.entryMode === 'import') {
+  _itemRowHTML(item) {
+    const cost = App.menuItemCost(item) || 0;
+    const cm   = (item.price && cost) ? (item.price - cost) : null;
+    const pct  = (item.price && cost) ? (cost / item.price * 100) : null;
+    const cls  = this.classifyItem(item);
+    // Inventory-linked beer/wine/NA have no cocktail/plate cost target, so
+    // leave their Cost % neutral rather than flagging it red vs 22%.
+    const tgt  = item.target_cost_pct || (cls === 'plate' ? App.MENU_TARGET_COST_PCT.plate : cls === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : null);
+    const ok   = item.price && cost;
+    const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
+    const src  = hasRecipe ? 'from recipe' : (item.linked_product_id ? 'from linked product' : (item.cost ? 'manual cost' : ''));
+    return '<tr>'
+      + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
+      + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
+      + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
+      + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
+      + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
+      + '<td class="' + (pct != null && tgt ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
+      + '<td>' + (cm != null ? App.fmtCurrency(cm) : '-') + '</td>'
+      + '<td>' + (item.weekly_covers ? item.weekly_covers : '-') + '</td>'
+      + '<td><div class="row-actions">'
+      + '<button class="btn btn-ghost btn-sm mi-edit" data-id="' + esc(item.id) + '">Edit</button>'
+      + '<button class="btn btn-danger btn-sm mi-del" data-id="' + esc(item.id) + '">Delete</button>'
+      + '</div></td></tr>';
+  },
+
+  // The in-place Upload panel (replaces the list), mirroring Add Products.
+  importPanelHTML() {
+    const t = this.TYPES.find(x => x.key === this.activeType) || {};
+    return '<div class="card" style="margin-top:18px;padding:18px 20px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+        + '<div class="sh" style="margin:0;">Upload ' + esc(t.label || 'Menu') + '</div>'
+        + '<button class="btn btn-ghost btn-sm mi-imp-cancel">Cancel</button>'
+      + '</div>'
+      + '<div id="mi-csv"></div><div id="mi-imp-result"></div>'
+      + '<div id="mi-imp-actions" class="no-print" style="margin:16px 0 0;"></div>'
+      + '</div>';
+  },
+  openImport(type) {
+    if (type) this.activeType = type;
+    this._importOpen = true;
+    this.renderLanding();
+  },
+  closeImport() {
+    this._importOpen = false;
+    this.renderLanding();
+  },
+
+  wireLanding() {
+    // Tiles: + Add opens the popup editor scoped to the type; Upload opens the
+    // in-place import panel for that type.
+    this.container.querySelectorAll('.mi-card-add').forEach(el =>
+      el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
+    this.container.querySelectorAll('.mi-card-imp').forEach(el =>
+      el.addEventListener('click', () => this.openImport(el.dataset.type)));
+    // Tabs switch the active type.
+    this.container.querySelectorAll('.mi-tab').forEach(b =>
+      b.addEventListener('click', () => { this.activeType = b.dataset.type; this._importOpen = false; this.renderLanding(); }));
+
+    if (this._importOpen) {
       this.mountImporter();
-    } else {
-      // Add-form wiring (always-on inline manual form)
-      document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
-      document.getElementById('ri-save')?.addEventListener('click', () => this._save(null));
-      document.getElementById('ri-start-over')?.addEventListener('click', () => this.resetAddForm());
-      document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
-      this.renderAdaptive(null);
+      this.container.querySelector('.mi-imp-cancel')?.addEventListener('click', () => this.closeImport());
     }
 
-    // List wiring (edit opens the modal)
+    // List: Edit opens the popup; Delete removes.
     this.container.querySelectorAll('.mi-edit').forEach(b =>
       b.addEventListener('click', () => this.openEditor(this.items().find(i => i.id === b.dataset.id) || null)));
     this.container.querySelectorAll('.mi-del').forEach(b =>
@@ -353,8 +380,7 @@ S.RevenueMenuItems = {
         await App.saveKey('menu_items');
         this.renderLanding();
       }));
-    // Archived: restore brings the item back to the live menu; delete-permanently
-    // removes it for good (guarded, since there is no undo).
+    // Archived: restore or delete-permanently (guarded, no undo).
     this.container.querySelectorAll('.mi-restore').forEach(b =>
       b.addEventListener('click', async () => {
         const item = this.items().find(i => i.id === b.dataset.id);
@@ -375,11 +401,7 @@ S.RevenueMenuItems = {
         this.renderLanding();
       }));
 
-    // Collapsible Add card (chevron) + the menu PDF export on the first category row.
-    const collapseHead = this.container.querySelector('.card-collapse-head');
-    if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
-    document.getElementById('mi-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Items', root: document.getElementById('mi-list-export') }));
-    App.applyCollapsed(this.container);
+    document.getElementById('mi-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu', root: document.getElementById('mi-list-export') }));
   },
 
   // ── Editor (ONE modal, adapts to the chosen category) ────────────────────
@@ -397,19 +419,24 @@ S.RevenueMenuItems = {
   },
 
   openEditor(item, opts) {
+    opts = opts || {};
     this._editItem = item || null;
     // Optional return callback: a foreign door (Profit > Recipe Cost Analysis)
     // opens this modal IN PLACE over its own page and re-renders itself on close
-    // instead of the Menu Items landing — so no cross-section jump.
-    this._editReturn = (opts && opts.onDone) || null;
+    // instead of the Menu Builder landing — so no cross-section jump.
+    this._editReturn = opts.onDone || null;
+    // A tile "+ Add" passes its type so the new form opens scoped + ready: the
+    // category picker is limited to that type and preset to its first category.
+    this._addType = (!item && opts.type) ? opts.type : null;
+    this._presetCat = this._addType ? ((this.catsForType(this._addType) || [])[0] || '') : '';
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
-    this.formType  = item ? this.classifyItem(item) : null;
+    this.formType  = item ? this.classifyItem(item) : (this._presetCat ? this.typeForCategory(this._presetCat) : null);
     this.linkedProductId = item?.linked_product_id || '';
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
-    this.mode = hasRecipe ? item.recipe.mode : null;
+    this.mode = hasRecipe ? item.recipe.mode : (this.formType === 'cocktail' ? 'single' : this.formType === 'plate' ? 'food' : null);
     this.rows = hasRecipe
       ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
-      : [];
+      : ((!item && (this.formType === 'cocktail' || this.formType === 'plate')) ? [{ source: 'product', id: '', quantity: '' }] : []);
     this._editingIncomplete = !!(item && this.formType && this.missingFields(item, this.formType).size > 0);
 
     // Remove the inline add form (card + buttons) so its ri-* / mi-adaptive ids
@@ -442,10 +469,14 @@ S.RevenueMenuItems = {
   // mi-adaptive ids are identical, so only ONE of the two forms is ever in the DOM
   // at once (openEditor removes the inline form first).
   formBodyHtml(item) {
+    // On a tile "+ Add" the category picker is scoped to that type; on edit it
+    // shows every category so an item can still be recategorized.
+    const scoped = (!item && this._addType) ? this.catsForType(this._addType) : null;
     const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
-    const allCats = ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
+    const allCats = scoped || ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
+    const selCat = item?.category || this._presetCat || '';
     const catOpts = '<option value="">Select category...</option>'
-      + allCats.map(c => '<option' + (item?.category === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+      + allCats.map(c => '<option' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     // Category LEADS the form. What loads next depends on it: a recipe category
     // shows the typed Menu Name (mi-name-slot); an inventory category shows the
     // Inventory Product picker (mi-linked-slot) first, then a Menu Name that
