@@ -636,12 +636,10 @@ S.InventoryProducts = {
         + '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/></div>'
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        // Pack size: how many individual pieces are in one unit (100 wings per bag,
-        // 150 limes per case). Optional — leave blank when the unit IS the piece
-        // (each, lb). Drives the per-piece cost used by recipes and loose counts.
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Pack Size <span style="color:var(--t4);font-weight:400;">(per unit)</span></label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + v(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
-        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Each</label><div class="f-display" id="ip-pack-cps">-</div></div>'
+        // Adaptive divisor: how one stock unit breaks into the measure a recipe
+        // uses (ounces for a liquid, servings for a solid, pieces for a supply).
+        // Swaps live when Unit Type or Misc Type changes (see _rerenderDivisor).
+        + '<span id="ip-divisor-wrap" style="display:contents;">' + this._divisorFieldsHTML(p, ut, p?.misc_type) + '</span>'
         // How this product is counted on the count sheet: a typed number, full
         // units + loose pieces, or a fill slider (pick the silhouette).
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Count By</label>'
@@ -789,14 +787,16 @@ S.InventoryProducts = {
     document.getElementById('ip-unit')?.addEventListener('change', () => {
       const uw = document.getElementById('ip-uw');
       if (uw) uw.style.display = document.getElementById('ip-unit').value === 'custom' ? '' : 'none';
+      this._rerenderDivisor();
     });
+    document.getElementById('ip-unit-custom')?.addEventListener('input', () => this._rerenderDivisor());
+    document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
-    // Food / Misc pack size: live per-piece cost (unit cost / pack size).
-    ['ip-cost','ip-pack'].forEach(fid =>
-      document.getElementById(fid)?.addEventListener('input', () => this._calcPack()));
-    this._calcPack();
+    // Food / Misc: live cost per ounce / serving / piece as cost or divisor change.
+    document.getElementById('ip-cost')?.addEventListener('input', () => this._calcDivisor());
+    this._wireDivisor();
     // Resale block (Food / Misc): toggle the menu-price fields + live cost/serving.
     document.getElementById('ip-sold')?.addEventListener('change', e => {
       const box = document.getElementById('ip-resale');
@@ -873,14 +873,110 @@ S.InventoryProducts = {
     return sel ? sel.value : (document.getElementById('ip-subcat')?.value.trim() || '');
   },
 
-  // Live per-piece cost for a Food / Misc pack: unit cost / pack size. Shown as
-  // Cost / Each so the operator sees, say, $0.20 a wing off a $20 bag of 100.
-  _calcPack() {
-    const el = document.getElementById('ip-pack-cps');
+  // ── Adaptive Food / Misc divisor field ────────────────────────────────────
+  // How one stock unit breaks into the measure a recipe uses. The field shown
+  // adapts to the product: a liquid needs ounces-per-container (cost per oz), a
+  // countable solid needs servings-per-unit (cost per serving), an "each" item
+  // is one serving, and a paper/cleaning supply just needs pieces-per-unit for
+  // ordering (never a recipe ingredient). Mirrors App.recipeBasis on the costing
+  // side, so what the form captures is exactly what the Menu Builder reads.
+  _divisorRole(unitType, miscType) {
+    if ((App.MISC_SUPPLY_TYPES || []).includes(miscType)) return 'supply';
+    if (App.ozPerUnit(unitType) != null) return 'liquid';        // a volume unit
+    if (String(unitType || '').toLowerCase() === 'each') return 'each';
+    if (miscType === 'Drink Mixer' || miscType === 'NA Beverage') return 'liquid';
+    return 'serving';
+  },
+
+  // Common container sizes for a liquid bought in a non-volume unit (a mixer by
+  // the bottle) so the operator picks the ounces instead of typing them.
+  _foodSizeOpts(sel) {
+    const OPTS = [12, 25.4, 32, 33.8, 64, 128];
+    const LBL = { 12:'12 oz', 25.4:'750ml (25.4 oz)', 32:'32 oz (quart)', 33.8:'1L (33.8 oz)', 64:'64 oz (half gal)', 128:'128 oz (gallon)' };
+    let h = '<option value="">Select size...</option>';
+    OPTS.forEach(o => { h += '<option value="' + o + '"' + (parseFloat(sel) === o ? ' selected' : '') + '>' + LBL[o] + '</option>'; });
+    if (sel && !OPTS.includes(parseFloat(sel))) h += '<option value="' + sel + '" selected>' + sel + ' oz</option>';
+    return h;
+  },
+
+  _divisorFieldsHTML(p, unitType, miscType) {
+    const vv = x => (x != null && x !== '' ? x : '');
+    const role = this._divisorRole(unitType, miscType);
+    const uLabel = (unitType && unitType !== 'custom') ? unitType : 'unit';
+    const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
+    if (role === 'liquid') {
+      const volOz = App.ozPerUnit(unitType);
+      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : (volOz || '');
+      const cps = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
+      if (volOz != null) {
+        // Known volume unit — ounces derive from the unit, shown read-only.
+        return '<div class="f" style="width:130px;flex-shrink:0;"><label>Size</label>'
+          + '<div class="f-display">' + volOz + ' oz / ' + esc(uLabel) + '</div>'
+          + '<input type="hidden" id="ip-foz" value="' + volOz + '"/></div>'
+          + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / oz</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+      }
+      // Non-volume unit (a mixer bought by the bottle): pick the container size.
+      return '<div class="f" style="width:160px;flex-shrink:0;"><label>Container Size</label>'
+        + '<select id="ip-foz">' + this._foodSizeOpts(oz) + '</select></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / oz</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+    }
+    if (role === 'each') {
+      return '<div class="f" style="width:150px;flex-shrink:0;"><label>Serving Name</label>'
+        + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="each"/></div>'
+        + '<div class="f" style="width:120px;flex-shrink:0;"><label>Cost / Serving</label><div class="f-display" id="ip-div-cps">' + (cost > 0 ? App.fmtCurrency(cost) : '-') + '</div></div>';
+    }
+    if (role === 'supply') {
+      const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
+      const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(cost / packV, 3) : '-';
+      return '<div class="f" style="width:160px;flex-shrink:0;"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>'
+        + '<div class="f" style="width:110px;flex-shrink:0;"><label>Cost / Piece</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+    }
+    // serving (lb / case / bag / dozen)
+    const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
+    const perServ = packV > 0 ? cost / packV : 0;
+    const cps = (cost > 0 && packV > 0) ? App.fmtCurrency(perServ, perServ < 1 ? 3 : 2) : '-';
+    return '<div class="f" style="width:150px;flex-shrink:0;"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
+      + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 16"/><span class="suf">ea</span></div></div>'
+      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Serving Name</label>'
+      + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>'
+      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Cost / Serving</label><div class="f-display" id="ip-div-cps">' + cps + '</div></div>';
+  },
+
+  // Re-render the divisor field group in place when Unit Type / Misc Type changes.
+  _rerenderDivisor() {
+    const wrap = document.getElementById('ip-divisor-wrap');
+    if (!wrap) return;
+    const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
+    wrap.innerHTML = this._divisorFieldsHTML(cur, this.getUnitType(), document.getElementById('ip-misctype')?.value || '');
+    this._wireDivisor();
+  },
+
+  _wireDivisor() {
+    ['ip-pack', 'ip-foz'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', () => this._calcDivisor()); el.addEventListener('change', () => this._calcDivisor()); }
+    });
+    this._calcDivisor();
+  },
+
+  // Live cost per ounce / serving / piece shown next to the divisor field.
+  _calcDivisor() {
+    const el = document.getElementById('ip-div-cps');
     if (!el) return;
     const cost = parseFloat(document.getElementById('ip-cost')?.value) || 0;
-    const pack = parseInt(document.getElementById('ip-pack')?.value) || 0;
-    el.textContent = (cost > 0 && pack > 0) ? App.fmtCurrency(cost / pack, (cost / pack) < 1 ? 3 : 2) : '-';
+    const foz = document.getElementById('ip-foz');
+    const pack = document.getElementById('ip-pack');
+    if (foz) {
+      const oz = parseFloat(foz.value) || 0;
+      el.textContent = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
+    } else if (pack) {
+      const n = parseFloat(pack.value) || 0;
+      const per = n > 0 ? cost / n : cost;
+      el.textContent = cost > 0 ? App.fmtCurrency(per, per < 1 ? 3 : 2) : '-';
+    } else {
+      el.textContent = cost > 0 ? App.fmtCurrency(cost) : '-';   // each: 1 = the unit
+    }
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -1012,7 +1108,7 @@ S.InventoryProducts = {
     }
 
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
-    const oz    = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
+    let oz      = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
     const pour  = spec.showPour ? num('ip-pour') : null;
     const cost  = num('ip-cost');
     // Resale items (Food / Misc) carry a menu price too — read it from the same
@@ -1029,8 +1125,17 @@ S.InventoryProducts = {
       ? (parseInt(document.getElementById('ip-case-size')?.value) || null)
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
-    // Pack size: pieces per unit (Food / Misc). Optional; null when the unit is
-    // already the piece. Drives per-piece cost + loose counts.
+    const miscTypeVal = cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '';
+    // Food / Misc liquids store ounces-per-container so recipes cost per ounce:
+    // an explicit container size when set, else derived from a volume unit.
+    if (spec.showUnitType && this._divisorRole(unitType, miscTypeVal) === 'liquid') {
+      const fromField = parseFloat(document.getElementById('ip-foz')?.value);
+      oz = (fromField > 0) ? fromField : (App.ozPerUnit(unitType) || null);
+    }
+    // Serving name (Food / Misc): the recipe noun, e.g. slice / patty / each.
+    const servingName = spec.showUnitType ? (document.getElementById('ip-sname')?.value.trim() || null) : null;
+    // Pack size: servings or pieces per unit (Food / Misc). Optional; null when
+    // the unit is already the piece. Drives per-serving cost + loose counts.
     const packSize = spec.showPackSize ? (parseInt(document.getElementById('ip-pack')?.value) || null) : null;
     // How this product is counted: number / loose / slider.
     const countStyle = spec.showPackSize ? (document.getElementById('ip-cstyle')?.value || 'number') : null;
@@ -1071,6 +1176,7 @@ S.InventoryProducts = {
       container_size_oz:   oz,
       case_size:           caseSize,
       pack_size:           packSize,
+      serving_name:        servingName,
       count_style:         countStyle,
       pour_size_oz:        pour,
       unit_type:           unitType,
