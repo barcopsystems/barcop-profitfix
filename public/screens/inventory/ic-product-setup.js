@@ -349,7 +349,7 @@ S.InventoryProducts = {
     // Food / Misc get their own even column widths (the recipe-costing set), so
     // Recipe Cost has room to sit on one line instead of borrowing the pour widths.
     const colgroup = isFoodMisc
-      ? '<colgroup><col style="width:40px;"/><col style="width:210px;"/><col style="width:150px;"/><col style="width:110px;"/><col style="width:115px;"/><col style="width:120px;"/><col style="width:120px;"/><col style="width:100px;"/><col style="width:150px;"/></colgroup>'
+      ? '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:140px;"/><col style="width:75px;"/><col style="width:105px;"/><col style="width:110px;"/><col style="width:110px;"/><col style="width:85px;"/><col style="width:120px;"/></colgroup>'
       : '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
 
     let body;
@@ -433,7 +433,7 @@ S.InventoryProducts = {
         perU = '1 ' + esc(p.serving_name || 'ea');
       }
       const plainCost = p.unit_cost != null
-        ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/unit</span>' : dash;
+        ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(p.unit_type || 'unit') + '</span>' : dash;
       const recCost = (App.isRecipeIngredient && App.isRecipeIngredient(p) && basis && basis.costPerUnit > 0)
         ? App.fmtCurrency(basis.costPerUnit, basis.costPerUnit < 1 ? 3 : 2) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(basis.unitLabel) + '</span>'
         : dash;
