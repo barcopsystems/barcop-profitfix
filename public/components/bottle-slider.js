@@ -48,10 +48,9 @@ const BottleSlider = {
     // jug rather than the tall liquor bottle. Like the bottle, value 1 fills to
     // the shoulder (short neck = headspace), value 0 sits just above the base.
     jug: { range: { top: 48, bot: 206 }, noun: 'Jug', nounPl: 'Jugs',
-      clip: 'M42 18 L42 46 C42 54 16 56 16 62 L16 200 Q16 210 26 210 L64 210 Q74 210 74 200 L74 62 C74 56 58 54 58 46 L58 18 Z',
-      outline: '<rect x="40" y="6" width="20" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M40 14 L40 46 C40 53 14 55 14 62 L14 200 Q14 212 26 212 L64 212 Q76 212 76 200 L76 62 C76 55 60 53 60 46 L60 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>'
-        + '<path d="M74 70 C88 72 88 104 74 106" fill="none" stroke="var(--b1)" stroke-width="2"/>' }
+      clip: 'M37 18 L37 46 C37 54 16 56 16 62 L16 200 Q16 210 26 210 L64 210 Q74 210 74 200 L74 62 C74 56 53 54 53 46 L53 18 Z',
+      outline: '<rect x="35" y="6" width="20" height="9" rx="1.5" fill="none" stroke="var(--b1)" stroke-width="2"/>'
+        + '<path d="M35 14 L35 46 C35 53 14 55 14 62 L14 200 Q14 212 26 212 L64 212 Q76 212 76 200 L76 62 C76 55 55 53 55 46 L55 14 Z" fill="none" stroke="var(--b1)" stroke-width="2"/>' }
   },
   _shape(s) { return this.SHAPES[s] || this.SHAPES.bottle; },
   _range(shape) { return this._shape(shape).range; },
