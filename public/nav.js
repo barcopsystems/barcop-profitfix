@@ -98,6 +98,10 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Menu Builder</span>
       </div>
+      <div class="nav-item" data-screen="r-menu-planning" id="nav-r-menu-planning">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 3.5h12M2.5 7h12M2.5 10.5h7M2.5 14h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 11.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Menu Planning</span>
+      </div>
       <div class="nav-item" data-screen="r-menu-engineering" id="nav-r-menu-engineering">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.7-2-3.7 2 .7-4.3-3.1-3 4.3-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <span class="nav-label">Menu Engineering</span>
