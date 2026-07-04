@@ -659,7 +659,10 @@ S.InventoryProducts = {
       const ut = p?.unit_type || spec.defaultUnitType;
       const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
       const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-      const cstyle = p?.count_style || (packV ? 'loose' : 'number');
+      // Default Count By to the product's role; an existing product keeps its
+      // saved choice (and counts as "touched" so a unit change never overrides).
+      this._countTouched = !!(p?.count_style);
+      const cstyle = p?.count_style || this._defaultCountStyle(ut, p?.misc_type, packV);
       row2 = ''
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
         + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
@@ -675,9 +678,9 @@ S.InventoryProducts = {
         // units + loose pieces, or a fill slider (pick the silhouette).
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Count By</label>'
         + '<select id="ip-cstyle">'
-        + '<option value="number"' + (cstyle === 'number' ? ' selected' : '') + '>Point Count</option>'
-        + '<option value="loose"' + (cstyle === 'loose' ? ' selected' : '') + '>Full Unit + Loose</option>'
-        + '<option value="slider"' + (cstyle === 'slider' ? ' selected' : '') + '>Count Slider</option>'
+        + '<option value="number"' + (cstyle === 'number' ? ' selected' : '') + '>Total Count</option>'
+        + '<option value="loose"' + (cstyle === 'loose' ? ' selected' : '') + '>Full + Loose</option>'
+        + '<option value="slider"' + (cstyle === 'slider' ? ' selected' : '') + '>Fill Slider</option>'
         + '</select></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Par <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-par" value="' + v(p?.par_level) + '" step="1" min="0" placeholder="0"/></div>'
@@ -811,6 +814,8 @@ S.InventoryProducts = {
     });
     document.getElementById('ip-unit-custom')?.addEventListener('input', () => this._rerenderDivisor());
     document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
+    // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
+    document.getElementById('ip-cstyle')?.addEventListener('change', () => { this._countTouched = true; });
     ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
@@ -900,6 +905,18 @@ S.InventoryProducts = {
     return 'serving';
   },
 
+  // The practical Count By for a product's role: a liquid gets the Fill Slider
+  // (a half jug is eyeballed), an "each" gets a Total Count (just type it), a
+  // countable/supply with a pack breaks into Full + Loose, everything else is a
+  // Total Count. The operator can still override; this only sets the default.
+  _defaultCountStyle(unitType, miscType, packV) {
+    const role = this._divisorRole(unitType, miscType);
+    if (role === 'liquid') return 'slider';
+    if (role === 'each') return 'number';
+    const hasPack = packV != null && packV !== '' && parseFloat(packV) > 0;
+    return hasPack ? 'loose' : 'number';
+  },
+
   // Common container sizes for a liquid bought in a non-volume unit (a mixer by
   // the bottle) so the operator picks the ounces instead of typing them.
   _foodSizeOpts(sel) {
@@ -978,6 +995,12 @@ S.InventoryProducts = {
     const strip = document.getElementById('ip-divisor-strip');
     if (strip) strip.innerHTML = this._foodDivisorStripHTML(cur, ut, mt);
     this._wireDivisor();
+    // Follow the role's practical Count By as the unit changes, unless the
+    // operator has already picked one.
+    if (!this._countTouched) {
+      const sel = document.getElementById('ip-cstyle');
+      if (sel) sel.value = this._defaultCountStyle(ut, mt, document.getElementById('ip-pack')?.value || '');
+    }
   },
 
   _wireDivisor() {
