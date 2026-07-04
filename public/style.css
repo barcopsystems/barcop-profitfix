@@ -492,7 +492,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .fj input:last-child:not(:first-child){border-radius:0 var(--r2) var(--r2) 0;width:74px;flex-shrink:0;}
 
 /* Menu Planning — the per-item briefing tiles. */
-.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:start;}
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:stretch;}
 .mp-tile{background:#08131A;border:1px solid var(--b-edge);border-radius:var(--r2);padding:16px 18px 0;display:flex;flex-direction:column;overflow:hidden;}
 .mp-tile-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid var(--row-div);padding-bottom:10px;margin-bottom:10px;}
 .mp-name{font-weight:700;color:var(--t1);font-size:14px;}
