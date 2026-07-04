@@ -198,21 +198,20 @@ S.InventoryProducts = {
     return App.inventoryData.ic_products;
   },
 
-  // Pull unique oz values from existing products that are NOT in the
-  // built-in SIZES list. These get added to a "Saved Custom Sizes" optgroup
-  // so an operator who entered "22.5 oz" once never has to re-type it.
+  // Custom sizes (oz not in the built-in SIZES) used by products in this category
+  // group, each carrying the operator's own name so the dropdown reads "Gallon
+  // (128 oz)" like the presets. Scoped to the group so a custom liquor size never
+  // leaks into wine / beer. Returns [{ oz, name, label }].
   customSizesUsed(group) {
     const builtIn = new Set(this.SIZES.filter(s => s.oz != null).map(s => s.oz));
-    const seen = new Set();
+    const seen = new Map();   // oz -> name
     (this.products() || []).forEach(p => {
-      if (group) {
-        const pg = (this.FORM_SPEC[p.category] || {}).sizeGroup;
-        if (pg !== group) return;
-      }
+      if (group) { const pg = (this.FORM_SPEC[p.category] || {}).sizeGroup; if (pg !== group) return; }
       const oz = parseFloat(p.container_size_oz);
-      if (!isNaN(oz) && oz > 0 && !builtIn.has(oz)) seen.add(oz);
+      if (!isNaN(oz) && oz > 0 && !builtIn.has(oz) && !seen.has(oz)) seen.set(oz, (p.container_size_label || '').trim());
     });
-    return [...seen].sort((a, b) => a - b);
+    return [...seen.entries()].map(([oz, name]) => ({ oz, name, label: name ? (name + ' (' + oz + ' oz)') : (oz + ' oz') }))
+      .sort((a, b) => a.oz - b.oz);
   },
 
   vendorOpts(sel) {
@@ -250,7 +249,7 @@ S.InventoryProducts = {
     let h = '<option value="">Select size...</option>';
     const items = [];
     if (group) this.SIZES.filter(s => s.g === group && s.oz != null).forEach(s => items.push({ oz: s.oz, label: s.l }));
-    this.customSizesUsed(group).forEach(oz => { if (!items.some(it => it.oz === oz)) items.push({ oz: oz, label: oz + ' oz' }); });
+    this.customSizesUsed(group).forEach(c => { if (!items.some(it => it.oz === c.oz)) items.push({ oz: c.oz, label: c.label }); });
     items.sort((a, b) => a.oz - b.oz);
     if (items.length) {
       if (group) h += '<optgroup label="' + esc(group) + '">';
@@ -259,7 +258,7 @@ S.InventoryProducts = {
       });
       if (group) h += '</optgroup>';
     }
-    h += '<option value="custom"' + (sel != null && !this.SIZES.find(s => s.oz === sel) ? ' selected' : '') + '>Custom (enter oz)</option>';
+    h += '<option value="custom"' + (sel === 'custom' ? ' selected' : '') + '>Custom (enter oz)</option>';
     return h;
   },
 
@@ -404,7 +403,7 @@ S.InventoryProducts = {
     const sz  = this.SIZES.find(s => s.oz === p.container_size_oz);
     const szL = p.category === 'Food' || p.category === 'Misc'
       ? (esc(p.unit_type || '-') + (p.pack_size > 0 ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + p.pack_size + ' ea</span>' : ''))
-      : (sz ? sz.l : (p.container_size_oz ? p.container_size_oz + ' oz' : '-'));
+      : (sz ? sz.l : (p.container_size_oz ? (p.container_size_label ? esc(p.container_size_label) + ' (' + p.container_size_oz + ' oz)' : p.container_size_oz + ' oz') : '-'));
     const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
     const dim = p.active === false ? 'opacity:0.5;' : '';
     const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
@@ -621,13 +620,12 @@ S.InventoryProducts = {
     let foodStrip = '';   // Food / Misc derived-cost calc strip (below the grid)
     if (spec.sizeGroup && spec.showPour) {
       // Liquor / Wine / Draft Beer
-      const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
-      const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
+      const sizeSel = p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize;
       row2 = ''
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
+        + '<div class="f" id="ip-cw" style="width:180px;flex-shrink:0;display:none;"><label>Custom Size</label>'
+        + '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + '</label>'
@@ -640,13 +638,12 @@ S.InventoryProducts = {
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
     } else if (spec.showCaseSize) {
       // Bottle Beer
-      const isCustom = p?.container_size_oz != null && !this.SIZES.find(s => s.oz === p.container_size_oz);
-      const sizeSel = isCustom ? null : (p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize);
+      const sizeSel = p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize;
       row2 = ''
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
         + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:90px;flex-shrink:0;' + (isCustom ? '' : 'display:none;') + '"><label>Custom (oz)</label>'
-        + '<div class="fw"><input class="suf" type="number" id="ip-coz" value="' + (isCustom ? p.container_size_oz : '') + '" step="0.1"/><span class="suf">oz</span></div></div>'
+        + '<div class="f" id="ip-cw" style="width:180px;flex-shrink:0;display:none;"><label>Custom Size</label>'
+        + '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Case Size</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
@@ -1135,6 +1132,14 @@ S.InventoryProducts = {
 
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
     let oz      = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
+    // Custom bottle/keg sizes carry the operator's own name (Gallon, 3L Box) so the
+    // dropdown reads "Gallon (128 oz)"; a preset carries none. A newly typed custom
+    // reads its name from ip-cname; an existing saved custom carries its name forward.
+    let sizeLabel = null;
+    if ((spec.sizeGroup || spec.showCaseSize) && oz != null && !this.SIZES.some(s => s.oz === oz)) {
+      const entered = document.getElementById('ip-size')?.value === 'custom' ? (document.getElementById('ip-cname')?.value.trim() || '') : '';
+      sizeLabel = entered || ((this.customSizesUsed(spec.sizeGroup) || []).find(c => c.oz === oz) || {}).name || null;
+    }
     const pour  = spec.showPour ? num('ip-pour') : null;
     const cost  = num('ip-cost');
     // Resale / sell-size data now lives on menu items (Menu Builder), not here, so
@@ -1203,6 +1208,7 @@ S.InventoryProducts = {
       misc_type:           cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '',
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
       container_size_oz:   oz,
+      container_size_label: sizeLabel,
       case_size:           caseSize,
       pack_size:           packSize,
       serving_name:        servingName,
