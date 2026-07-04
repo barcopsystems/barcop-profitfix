@@ -1452,7 +1452,11 @@ S.HubSettings = {
       // "(lb)"-style suffix and strip it from the display name.
       const um = (p.name || '').match(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i);
       const cleanName = um ? p.name.replace(/\s*\((lb|case|each|qt|bag|jug|dozen)\)\s*$/i, '') : p.name;
-      const unitType  = p.unit_type || (um ? um[1].toLowerCase() : null);
+      const rawUnit = p.unit_type || (um ? um[1].toLowerCase() : null);
+      // Canonicalize to the Unit Type dropdown values so no seeded product falls
+      // back to "Custom" on the form (qt -> quart, gal -> gallon, jug -> gallon).
+      const UNIT_CANON = { qt:'quart', gal:'gallon', jug:'gallon', pt:'pint', ea:'each', lbs:'lb' };
+      const unitType = rawUnit ? (UNIT_CANON[rawUnit] || rawUnit) : null;
       return { id:uid(), brand:'', sub_category:'', secondary_location:'', notes:'', active:true,
         container_size_oz:null, pour_size_oz:null, menu_price:null,
         pours_per_container:pours, cost_per_pour:cpp,
