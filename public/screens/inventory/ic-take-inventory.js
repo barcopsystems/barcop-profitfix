@@ -390,8 +390,10 @@ S.InventoryTakeInventory = {
       } else if (isFoodSlider) {
         const un = App.productUnit(p) || 'unit';
         const unPl = /(?:s|x|ch|sh)$/i.test(un) ? un + 'es' : un + 's';
+        // Liquid (gal/qt/pint) → jug silhouette; a solid (bag/case/box) → box.
+        const shp = App.isLiquidIngredient(p) ? 'jug' : 'box';
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: 'box', noun: un, nounPl: unPl })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: shp, noun: un, nounPl: unPl })
           + '</div>';
       } else if (isPackFood) {
         const un = App.productUnit(p) || 'unit';
