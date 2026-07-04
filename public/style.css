@@ -599,6 +599,19 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .narrow-form .form-row > #mi-adaptive > .f:not([style*="100%"]),
 .narrow-form .form-row > #ip-divisor-wrap > .f:not([style*="100%"]){flex:0 1 calc(50% - 8px)!important;width:auto!important;min-width:150px!important;}
 
+/* Product form: three equal columns grouped into labeled sections with divider
+   lines, so every category form matches width and reads section by section. The
+   grid overrides the cells' legacy fixed widths (incl. the #ip-divisor-wrap cells
+   one level deeper via display:contents). */
+.ip-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 16px;align-items:end;}
+.ip-grid3 > .f,
+.ip-grid3 > #ip-divisor-wrap > .f{width:auto!important;min-width:0!important;flex:none!important;}
+.ip-grid3 > .ip-span2{grid-column:span 2;}
+.ip-grid3 > .ip-span3{grid-column:span 3;}
+.ip-sec{border-top:1px solid var(--b-edge);margin-top:20px;padding-top:16px;}
+.ip-sec-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;}
+@media(max-width:600px){ .ip-grid3{grid-template-columns:1fr;} }
+
 /* Data table: title lives on the background as a .sh heading; the column-header row
    is the card's first row (table flush to the card border top and bottom, header
    text centered, header band stays --surface). Data rows #0D181E, hover a hair
