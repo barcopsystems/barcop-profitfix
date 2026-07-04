@@ -297,7 +297,7 @@ S.RevenueMenuItems = {
         // column header. The Export PDF button rides a title-less row above the
         // first card.
         return (ci === 0
-            ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">Menu Items</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
+            ? '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;"><div class="sh" style="margin:0;">Menu Builder</div><button class="btn btn-ghost btn-sm" id="mi-export">Export PDF</button></div>'
             : '')
           + '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
           + '<colgroup><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
