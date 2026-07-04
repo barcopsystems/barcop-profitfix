@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Planning (the data's read on every menu item) ─────
+/* ── Revenue Recovery — Menu Briefing (the data's read on every menu item) ─────
    Independents look at their menu through a personal lens: their recipe, what
    they like to eat. This page takes the emotion out and gives Bar Cop's read on
    each item from the real numbers, operator to operator, no lecture. Every
@@ -204,8 +204,8 @@ S.RevenueMenuPlanning = {
     const items = this.items();
     if (!items.length) {
       App.setupCard(this.container, {
-        title: 'Menu Planning',
-        lead: 'Menu Planning gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
+        title: 'Menu Briefing',
+        lead: 'Menu Briefing gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
         steps: [
           { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as covers and price history come in.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
@@ -252,8 +252,8 @@ S.RevenueMenuPlanning = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Menu Planning Works', [
-      { p: ['Menu Planning gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
+    App.showHelpModal('How Menu Briefing Works', [
+      { p: ['Menu Briefing gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
       { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its cost percent against your target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
       { h: 'Read The Room First', p: ['Items are grouped by section, and inside each section the ones that need a decision come first, your Dogs and anything running over target, then the winners. The counts up top are your menu mix at a glance: how many Stars are pulling their weight and how many Dogs are dragging.'] },
       { h: 'What To Do', p: ['Each tile ends with the move: reprice an over-target item and the weekly dollars behind it, feature a Star, get a Puzzle seen, or run a Dog through a 90-day Dog Test before you cut it. Make the change in Menu Builder or Menu Engineering and the read updates next time you land here.'] }
