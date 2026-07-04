@@ -709,7 +709,7 @@ S.InventoryProducts = {
         + calcStrip
       + '</div>'
       + (soldInner ? '<div class="ip-sec"><div class="ip-sec-label">Sold on the Menu</div>' + soldInner + '</div>' : '')
-      + '<div class="ip-sec">' + notes + '</div>'
+      + '<div style="margin-top:18px;">' + notes + '</div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ip-save">' + (this.editId ? 'Update' : 'Save') + '</button>'
         + '<span id="ip-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
