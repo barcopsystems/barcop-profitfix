@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Briefing (the data's read on every menu item) ─────
+/* ── Revenue Recovery — Menu Rundown (the data's read on every menu item) ─────
    Independents look at their menu through a personal lens: their recipe, what
    they like to eat. This page takes the emotion out and gives Bar Cop's read on
    each item from the real numbers, operator to operator, no lecture. Every
@@ -208,21 +208,21 @@ S.RevenueMenuPlanning = {
 
     // ── The move ──────────────────────────────────────────────────────────
     let move = '';
-    if (sugg) move = pick(['reprice to {sugg} to pull it back to target{dwkc}.',
-                           '{sugg} is the to-target price{dwkc}.',
-                           'take it up to {sugg}{dwkc}.'], 4);
-    else if (quad === 'DOG') move = pick(['rework or cut. Run a 90-day Dog Test before you pull it so it is the data making the call.',
-                                          'fix the recipe or retire it, but Dog Test it 90 days first so you are not guessing.',
-                                          'rework it or cut it. A 90-day Dog Test settles it before you commit.'], 4);
-    else if (quad === 'STAR') move = pick(['feature it. Power spot on the menu, and have the floor push it.',
-                                           'protect it and push it. This is one to build the section around.',
-                                           'keep it front and center and have the staff sell it. Do not touch the price.'], 4);
-    else if (quad === 'PUZZLE') move = pick(['get it seen. A feature, a special, a server callout. The {noun} already pays.',
-                                             'put it in front of people. It sells itself once it is tried.',
-                                             'give it a better spot or a callout. The margin is fine, the visibility is not.'], 4);
-    else if (quad === 'PLOWHORSE') move = pick(['it is at target, so trim the plate cost rather than raise the price.',
-                                                'the price is fine, so the lever is shaving cost out of the {noun}.',
-                                                'hold the price and find cost to cut in the recipe.'], 4);
+    if (sugg) move = pick(['reprice to {sugg} to bring it back to target{dwkc}. Make the change in Menu Engineering so it is logged, roll it out with the next reprint rather than mid-week, and watch that covers hold after.',
+                           '{sugg} is the to-target price{dwkc}. It is a small bump most guests will not blink at, but confirm the volume sticks once it lands before you count the gain.',
+                           'take it up to {sugg}{dwkc}. Log it through Menu Engineering, put it on the menu the next time you print, and keep an eye on covers for a couple of weeks after.'], 4);
+    else if (quad === 'DOG') move = pick(['rework or cut, but run a 90-day Dog Test first so the call comes from the data and not a gut feel. Make one honest change, a better description, a smaller portion, or a price nudge, and if it still lags, pull it clean.',
+                                          'fix it or retire it. Give it 90 days on a Dog Test with a single real change, and if it does not climb on margin or covers, drop it and give the spot to something that earns.',
+                                          'this is a rework-or-cut. Dog Test it for 90 days, try one thing that could move it, and if the numbers do not budge, cut it and free the spot for a Puzzle or a Star.'], 4);
+    else if (quad === 'STAR') move = pick(['feature it. Give it a power spot where the eye lands and make sure the floor knows to push it, because every extra cover here is your best margin working harder. Leave the price alone.',
+                                           'protect it and push it. This is one to build the section around, so put it up top and coach the staff to recommend it, and do not touch a price that is already working.',
+                                           'keep it front and center and have the staff sell it. It earns and it moves, so the only wrong move is burying it on the menu or messing with the price.'], 4);
+    else if (quad === 'PUZZLE') move = pick(['get it seen. The {noun} already pays, so the whole problem is visibility, a feature, a special, a server callout, or a better spot on the menu. Give it a month of real push before you judge it.',
+                                             'put it in front of people. It sells itself once it is tried, so the fix is a sample, a callout, or a menu spot that actually gets read. The margin is already there.',
+                                             'give it a better spot or a callout. The money is fine and the exposure is not, so treat this as a marketing problem, not a menu problem, and push it for a few weeks.'], 4);
+    else if (quad === 'PLOWHORSE') move = pick(['it is at target on price, so trim the plate cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents saved times this many covers adds up fast.',
+                                                'the price is fine, so the lever is cost. Shave it out of the {noun} through portioning or a cheaper spec on the biggest cost line, and the volume does the rest.',
+                                                'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this volume.'], 4);
 
     return { lines, move };
   },
@@ -248,8 +248,8 @@ S.RevenueMenuPlanning = {
     const items = this.items();
     if (!items.length) {
       App.setupCard(this.container, {
-        title: 'Menu Briefing',
-        lead: 'Menu Briefing gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
+        title: 'Menu Rundown',
+        lead: 'Menu Rundown gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
         steps: [
           { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as covers and price history come in.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
@@ -306,8 +306,8 @@ S.RevenueMenuPlanning = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Menu Briefing Works', [
-      { p: ['Menu Briefing gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
+    App.showHelpModal('How Menu Rundown Works', [
+      { p: ['Menu Rundown gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
       { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its cost percent against your target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
       { h: 'The Numbers Up Top', p: ['Each tile leads with the three that matter at a glance: cost, cost percent, and menu price. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under. The briefing below spells out what those numbers mean and what to do about it.'] },
       { h: 'What To Do', p: ['Items are grouped by section, and inside each section the ones that need a decision come first. Each tile ends with the move: reprice an over-target item and the weekly dollars behind it, feature a Star, get a Puzzle seen, or run a Dog through a 90-day Dog Test before you cut it. Make the change in Menu Builder or Menu Engineering and the read updates next time you land here.'] }
