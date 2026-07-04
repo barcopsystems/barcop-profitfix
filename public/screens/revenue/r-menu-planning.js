@@ -1,17 +1,17 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Rundown (the data's read on every menu item) ─────
+/* ── Revenue Recovery — Menu Rundown (the data's read on every menu item) ──────
    Independents look at their menu through a personal lens: their recipe, what
    they like to eat. This page takes the emotion out and gives Bar Cop's read on
    each item from the real numbers, operator to operator, no lecture. Every
    briefing is composed IN CODE from the item's own data, so it is instant, free,
    and can't say anything untrue. It is RANK-AWARE: each item is placed against
-   the others in its category (only the actual worst Dog "earns the least"), and
-   the wording is drawn from wide phrase pools seeded off the item id, so no two
-   tiles read the same and each stays stable between renders. A quick-glance stat
-   row (Cost / Cost % / Menu Price) sits up top with the cost percent colored by
-   where it lands. Reuses the Menu Engineering classifier + target/suggested math
-   so the read never drifts. */
+   the others in its category (only the actual worst Dog "earns the least"), the
+   wording is drawn from wide phrase pools seeded off the item id (no two tiles
+   read alike, stable between renders), and a dry aside lands here and there. It
+   reads the covers TREND (prev vs current), shows each item's MIX share, and each
+   tile carries the one button that acts on its move. Reuses the Menu Engineering
+   classifier + target/suggested math so the read never drifts. */
 
 S.RevenueMenuPlanning = {
   container: null,
@@ -25,8 +25,6 @@ S.RevenueMenuPlanning = {
   _seed(id) { let s = 0; const t = String(id || ''); for (let i = 0; i < t.length; i++) s = (s + t.charCodeAt(i)) % 100000; return s; },
   _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; },
 
-  // Quick-glance color for the cost % stat: over target reads as a leak, near it
-  // as a watch, comfortably under as a win. Neutral when there is no target.
   costPctColor(pct, target) {
     if (pct == null || !target) return '';
     if (pct > target + 0.5) return 'var(--red)';
@@ -34,9 +32,6 @@ S.RevenueMenuPlanning = {
     return 'var(--green)';
   },
 
-  // A rank (1 = best) turned into an honest standing phrase, drawn from a small
-  // synonym pool by seed so two items at the same standing still read differently.
-  // Only rank 1 / rank n ever claim the top or the bottom.
   _rankWord(rank, n, kind, seed) {
     if (!(n > 1) || !rank) return kind === 'margin' ? 'its margin' : 'its volume';
     const P = kind === 'margin' ? {
@@ -80,6 +75,7 @@ S.RevenueMenuPlanning = {
         n: priced.length,
         avgMargin: priced.length ? priced.reduce((s, x) => s + (x.i.price - x.cost), 0) / priced.length : 0,
         avgCovers: rankable.length ? rankable.reduce((s, x) => s + x.i.weekly_covers, 0) / rankable.length : 0,
+        totalCovers: byCat[cat].reduce((s, i) => s + (i.weekly_covers || 0), 0),
         ranked: rankable.length >= 4,
         rankedN: rankable.length,
         mRank, cRank
@@ -108,9 +104,8 @@ S.RevenueMenuPlanning = {
     return (top && top.cost > 0) ? top : null;
   },
 
-  // The briefing: { lines: [paragraphs], move: '<action text or ''>' }. Every
-  // sentence is composed from this item's own figures and its rank in the group,
-  // pulled from wide phrase pools by seed so the reads stay distinct.
+  // { lines: [paragraphs], move: '<action text>' }, all composed from this item's
+  // figures + its rank, pulled from wide pools by seed so the reads stay distinct.
   briefing(item, cat, cs, quad) {
     const f = v => App.fmtCurrency(v);
     const cost = App.menuItemCost(item) || 0;
@@ -185,6 +180,22 @@ S.RevenueMenuPlanning = {
       lines.push(fill('It clears {margin} a {noun} on {covers} covers a week.'));
     }
 
+    // ── Covers trend (prev read vs now) ───────────────────────────────────
+    const prev = item.prev_weekly_covers;
+    if (prev != null && prev > 0 && covers >= 0) {
+      const tr = (covers - prev) / prev * 100;
+      if (tr <= -10 || tr >= 10) {
+        V.tr = Math.round(Math.abs(tr));
+        lines.push(tr < 0
+          ? pick(['Covers are down {tr}% since your last read. Worth a look before it settles in.',
+                  'Volume slipped {tr}% from the last read. Keep an eye on it.',
+                  'Covers fell {tr}% since last time. Not a trend yet, but watch it.'], 7)
+          : pick(['Covers are up {tr}% since your last read. Whatever you changed is working.',
+                  'Volume climbed {tr}% from the last read. Keep doing that.',
+                  'Covers jumped {tr}% since last time. Ride it.'], 7));
+      }
+    }
+
     // ── Cost line ─────────────────────────────────────────────────────────
     if (target) {
       lines.push(costPct > target + 0.5
@@ -206,23 +217,50 @@ S.RevenueMenuPlanning = {
                               'Most of the cost is {name}, {dcost} a {noun}.',
                               'Your priciest line in it is {name}, {dcost} a {noun}.'], 2));
 
+    // ── An occasional dry aside (operator to operator, ~1 in 4) ───────────
+    if (quad && cs.ranked && (seed % 4 === 0)) {
+      const HUMOR = {
+        STAR: ['The kind of plate you quietly thank at close.', 'If everything pulled like this, you would sleep at night.', 'It earns its real estate, which is rarer than it should be.'],
+        PLOWHORSE: ['Everybody\'s favorite, nobody\'s down payment.', 'It keeps the lights on and the margin humble.', 'The crowd loves it, the P&L tolerates it.'],
+        PUZZLE: ['Great {noun}, terrible at introducing itself.', 'The wallflower with the best numbers in the room.', 'All dressed up and nobody ordering it.'],
+        DOG: ['It has stayed on the menu out of loyalty, not math.', 'If it were on payroll, you would have had the talk by now.', 'The only thing it moves is the needle the wrong way.']
+      };
+      const h = HUMOR[quad];
+      if (h) lines.push(fill(h[(seed + 6) % h.length]));
+    }
+
     // ── The move ──────────────────────────────────────────────────────────
     let move = '';
-    if (sugg) move = pick(['reprice to {sugg} to bring it back to target{dwkc}. Make the change in Menu Engineering so it is logged, roll it out with the next reprint rather than mid-week, and watch that covers hold after.',
-                           '{sugg} is the to-target price{dwkc}. It is a small bump most guests will not blink at, but confirm the volume sticks once it lands before you count the gain.',
-                           'take it up to {sugg}{dwkc}. Log it through Menu Engineering, put it on the menu the next time you print, and keep an eye on covers for a couple of weeks after.'], 4);
-    else if (quad === 'DOG') move = pick(['rework or cut, but run a 90-day Dog Test first so the call comes from the data and not a gut feel. Make one honest change, a better description, a smaller portion, or a price nudge, and if it still lags, pull it clean.',
-                                          'fix it or retire it. Give it 90 days on a Dog Test with a single real change, and if it does not climb on margin or covers, drop it and give the spot to something that earns.',
-                                          'this is a rework-or-cut. Dog Test it for 90 days, try one thing that could move it, and if the numbers do not budge, cut it and free the spot for a Puzzle or a Star.'], 4);
-    else if (quad === 'STAR') move = pick(['feature it. Give it a power spot where the eye lands and make sure the floor knows to push it, because every extra cover here is your best margin working harder. Leave the price alone.',
-                                           'protect it and push it. This is one to build the section around, so put it up top and coach the staff to recommend it, and do not touch a price that is already working.',
-                                           'keep it front and center and have the staff sell it. It earns and it moves, so the only wrong move is burying it on the menu or messing with the price.'], 4);
-    else if (quad === 'PUZZLE') move = pick(['get it seen. The {noun} already pays, so the whole problem is visibility, a feature, a special, a server callout, or a better spot on the menu. Give it a month of real push before you judge it.',
-                                             'put it in front of people. It sells itself once it is tried, so the fix is a sample, a callout, or a menu spot that actually gets read. The margin is already there.',
-                                             'give it a better spot or a callout. The money is fine and the exposure is not, so treat this as a marketing problem, not a menu problem, and push it for a few weeks.'], 4);
-    else if (quad === 'PLOWHORSE') move = pick(['it is at target on price, so trim the plate cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents saved times this many covers adds up fast.',
+    if (sugg) move = pick(['reprice to {sugg} to bring it back to target{dwkc}. Log it in Menu Engineering, roll it out on the next reprint, and watch covers hold after.',
+                           '{sugg} is the to-target price{dwkc}. Most guests will not blink at a bump this size, but confirm the volume sticks before you count the win.',
+                           'take it up to {sugg}{dwkc}. Put it on the next printed menu rather than mid-week, and keep an eye on covers for a couple weeks.',
+                           'walk it to {sugg}{dwkc}. Small move, real money at this count, just make sure the covers do not flinch once it lands.',
+                           'set it at {sugg}{dwkc}. Log the change so Recovery tracks it, then let the next menu print carry it in quietly.',
+                           'nudge it to {sugg}{dwkc}. A quarter here and there, but across this many covers it stacks up, so hold the line once it is on.'], 4);
+    else if (quad === 'DOG') move = pick(['rework or cut, but run a 90-day Dog Test first so the call is the data and not a hunch. Make one honest change, and if it still lags, pull it clean.',
+                                          'fix it or retire it. Give it 90 days on a Dog Test with a single real change, and if margin or covers do not move, drop it and hand the spot to something that earns.',
+                                          'this is a rework-or-cut. Dog Test it 90 days, try one thing that might move it, and if the numbers sit still, cut it and free the slot.',
+                                          'put it on a 90-day Dog Test before you touch it. One change, one fair shot, and if it flops, it comes off without the second-guessing.',
+                                          'rework the recipe or the price, then Dog Test it 90 days. If it will not climb, retire it and give a Puzzle that room instead.',
+                                          'give it 90 days on a Dog Test with one honest fix. If it does not earn its keep by then, it has told you what to do.'], 4);
+    else if (quad === 'STAR') move = pick(['feature it. Give it a power spot where the eye lands and have the floor push it, because every extra cover here is your best margin working harder. Leave the price alone.',
+                                           'protect it and push it. Build the section around it, put it up top, and coach the staff to recommend it. Do not touch a price that is already working.',
+                                           'keep it front and center and let the staff sell it. It earns and it moves, so the only wrong move is burying it or messing with the price.',
+                                           'lead with it. This is the one you want guests to see first, so give it the real estate and the staff mention, and hold the price steady.',
+                                           'showcase it and let it work. It carries the section, so the play is more eyes on it, not a single change to the plate or the price.',
+                                           'put it where people look and keep it there. A Star like this wants attention, not adjustment, so resist the urge to tinker.'], 4);
+    else if (quad === 'PUZZLE') move = pick(['get it seen. The {noun} already pays, so the whole problem is visibility, a feature, a special, a server callout, or a better spot. Give it a month of real push.',
+                                             'put it in front of people. It sells itself once it is tried, so the fix is a sample, a callout, or a spot on the menu that actually gets read.',
+                                             'give it a better spot or a callout. The money is fine and the exposure is not, so treat it as a marketing problem, not a menu problem.',
+                                             'push it hard for a few weeks. The margin is there, it just needs eyes, so feature it, name it on the specials, or have servers mention it.',
+                                             'move it up the menu and have the floor talk it up. The plate earns when it sells, so the only job is getting people to try it.',
+                                             'feature it and see what happens. A {noun} this profitable that nobody orders is usually a placement problem, not a recipe one.'], 4);
+    else if (quad === 'PLOWHORSE') move = pick(['it is at target on price, so trim the plate cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents times this many covers adds up fast.',
                                                 'the price is fine, so the lever is cost. Shave it out of the {noun} through portioning or a cheaper spec on the biggest cost line, and the volume does the rest.',
-                                                'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this volume.'], 4);
+                                                'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this count.',
+                                                'leave the price and tighten the plate. At this volume, a dime saved on the recipe beats a quarter added to the price that scares covers off.',
+                                                'work the cost, not the price. Portion control or a smarter spec on the heaviest ingredient buys margin without touching what guests pay.',
+                                                'do not raise it, cut cost into it. This many covers means small recipe savings stack up, so start with the priciest line and the portion.'], 4);
 
     return { lines, move };
   },
@@ -236,6 +274,15 @@ S.RevenueMenuPlanning = {
     if (quad === 'PLOWHORSE') return 3;
     if (quad === 'STAR') return 4;
     return 5;
+  },
+
+  // The one button a tile carries, matched to its move.
+  actionFor(item, quad) {
+    const cost = App.menuItemCost(item) || 0;
+    const sugg = (item.price > 0 && cost > 0) ? S.RevenueMenuEngineering.suggested(item, cost) : null;
+    if (sugg) return { act: 'reprice', label: 'Reprice' };
+    if (quad === 'DOG') return { act: 'dogtest', label: 'Dog Test' };
+    return { act: 'edit', label: 'Edit Item' };
   },
 
   render(container, actions) {
@@ -282,17 +329,24 @@ S.RevenueMenuPlanning = {
         return d || (b.weekly_covers || 0) - (a.weekly_covers || 0) || (a.name || '').localeCompare(b.name || '');
       });
       const tiles = list.map(i => {
-        const b = this.briefing(i, cat, cs, classMap[i.id]);
+        const quad = classMap[i.id];
+        const b = this.briefing(i, cat, cs, quad);
         const body = b.lines.map(p => '<p>' + esc(p) + '</p>').join('');
-        const moveBand = b.move ? '<div class="mp-move"><span class="mp-move-lbl">Move:</span> ' + esc(b.move) + '</div>' : '';
         const cost = App.menuItemCost(i) || 0;
         const price = i.price || 0;
         const pct = (price > 0 && cost > 0) ? cost / price * 100 : null;
+        const mix = (cs.totalCovers > 0 && i.weekly_covers > 0) ? i.weekly_covers / cs.totalCovers * 100 : null;
         const stats = '<div class="mp-stats">'
           + sCell('Cost', cost > 0 ? App.fmtCurrency(cost) : '&mdash;')
           + sCell('Cost %', pct != null ? pct.toFixed(0) + '%' : '&mdash;', this.costPctColor(pct, S.RevenueMenuEngineering.targetPctFor(i)))
           + sCell('Menu Price', price > 0 ? App.fmtCurrency(price) : '&mdash;')
+          + sCell('Menu Mix', mix != null ? mix.toFixed(0) + '%' : '&mdash;')
           + '</div>';
+        const a = this.actionFor(i, quad);
+        const moveBand = b.move
+          ? '<div class="mp-move"><div class="mp-move-txt"><span class="mp-move-lbl">Move:</span> ' + esc(b.move) + '</div>'
+            + '<button class="btn btn-ghost btn-sm mp-act" data-id="' + esc(i.id) + '" data-act="' + a.act + '">' + a.label + '</button></div>'
+          : '';
         return '<div class="mp-tile">'
           + '<div class="mp-name">' + esc(i.name || 'Unnamed') + '</div>'
           + stats
@@ -303,14 +357,21 @@ S.RevenueMenuPlanning = {
     }).join('');
 
     this.container.innerHTML = '<div class="screen">' + statStrip + sections + '</div>';
+
+    this.container.querySelectorAll('.mp-act').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.dataset.id, act = btn.dataset.act;
+      if (act === 'reprice') { App._menuRepricePreselect = id; App.navigate('r-menu-engineering'); }
+      else if (act === 'dogtest') { App._dogTestPreselect = id; App.navigate('r-dog-test'); }
+      else { App._menuItemFocus = id; App.navigate('r-menu-items'); }
+    }));
   },
 
   showHowTo() {
     App.showHelpModal('How Menu Rundown Works', [
       { p: ['Menu Rundown gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
-      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its cost percent against your target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
-      { h: 'The Numbers Up Top', p: ['Each tile leads with the three that matter at a glance: cost, cost percent, and menu price. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under. The briefing below spells out what those numbers mean and what to do about it.'] },
-      { h: 'What To Do', p: ['Items are grouped by section, and inside each section the ones that need a decision come first. Each tile ends with the move: reprice an over-target item and the weekly dollars behind it, feature a Star, get a Puzzle seen, or run a Dog through a 90-day Dog Test before you cut it. Make the change in Menu Builder or Menu Engineering and the read updates next time you land here.'] }
+      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its covers trend since your last read, its cost percent against target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
+      { h: 'The Numbers Up Top', p: ['Each tile leads with cost, cost percent, menu price, and menu mix, that item\'s share of its category\'s covers. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under.'] },
+      { h: 'Read, Then Act', p: ['Items are grouped by section, the ones that need a decision first. Each tile ends with the move and a button that takes you straight to it: Reprice opens the change in Menu Engineering, Dog Test opens the 90-day test, and Edit Item opens Menu Builder. Make the change and the read updates next time you land here.'] }
     ]);
   }
 };

@@ -117,6 +117,12 @@ S.RevenueMenuEngineering = {
     document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
     if (priced) this.mountCoversImport();
+    // Deep-link from Menu Rundown: open the reprice modal for the passed item.
+    if (App._menuRepricePreselect) {
+      const rid = App._menuRepricePreselect;
+      App._menuRepricePreselect = null;
+      if (c.querySelector('.me-reprice[data-id="' + rid + '"]')) this.openReprice(rid);
+    }
   },
 
   // ── The page: diagnosis (quadrant) + prescription (suggested price + action) ─
