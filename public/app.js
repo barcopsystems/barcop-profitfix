@@ -4275,7 +4275,7 @@ const App = {
         'week-history':           ['Week History', 'Weekly Recovery'],
         'r-server-check':         ['Server Check', ''],
         'r-menu-items':           ['Menu Builder', ''],
-        'r-menu-planning':        ['Menu Briefing', ''],
+        'r-menu-planning':        ['Menu Rundown', ''],
         'r-menu-engineering':     ['Menu Engineering', ''],
         'r-dog-test':             ['Dog Test Tracker', ''],
         'r-help':                 ['Help and FAQ', ''],
