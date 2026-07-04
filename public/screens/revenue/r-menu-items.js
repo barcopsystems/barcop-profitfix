@@ -204,9 +204,9 @@ S.RevenueMenuItems = {
   // its category cards + tabs, so Inventory and the Menu Builder read as one
   // connected surface. Each type's list groups by menu category into sections.
   TYPES: [
-    { key: 'plate',     label: 'Food Recipes',    add: 'Add Recipe',   imp: 'Food List' },
-    { key: 'cocktail',  label: 'Cocktails',       add: 'Add Cocktail', imp: 'Cocktail List' },
-    { key: 'inventory', label: 'Inventory Items', add: 'Add Item',     imp: 'Inventory List' }
+    { key: 'plate',     label: 'Dishes',    add: 'Build Dish Recipe',     imp: 'Dish List',     noun: 'dish' },
+    { key: 'cocktail',  label: 'Cocktails', add: 'Build Cocktail Recipe', imp: 'Cocktail List', noun: 'cocktail' },
+    { key: 'inventory', label: 'No Prep',   add: 'Add Inventory Item',    imp: 'No Prep List',  noun: 'no prep' }
   ],
   catsForType(type) {
     if (type === 'cocktail')  return ['Cocktails'];
@@ -242,11 +242,12 @@ S.RevenueMenuItems = {
     const tilesBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">' + tiles + '</div>';
 
     // ── Type tabs ─────────────────────────────────────────────────────────
-    const tabs = '<div style="display:flex;border-bottom:1px solid var(--b-edge);">'
+    const tabs = '<div class="ch-tabs no-print">'
       + this.TYPES.map(t => {
           const on = this.activeType === t.key;
           const n = all.filter(i => this.classifyItem(i) === t.key).length;
-          return '<button type="button" class="mi-tab" data-type="' + t.key + '" style="background:none;border:none;border-bottom:2px solid ' + (on ? 'var(--gold)' : 'transparent') + ';color:' + (on ? 'var(--t1)' : 'var(--t3)') + ';font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 16px;cursor:pointer;">' + esc(t.label) + ' <span style="color:var(--t4);font-weight:400;">' + n + '</span></button>';
+          return '<button class="ch-tab mi-tab' + (on ? ' on' : '') + '" data-type="' + t.key + '">'
+            + esc(t.label) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
         }).join('')
       + '</div>';
 
@@ -334,14 +335,15 @@ S.RevenueMenuItems = {
   // The in-place Upload panel (replaces the list), mirroring Add Products.
   importPanelHTML() {
     const t = this.TYPES.find(x => x.key === this.activeType) || {};
-    return '<div class="card" style="margin-top:18px;padding:18px 20px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-        + '<div class="sh" style="margin:0;">Upload ' + esc(t.label || 'Menu') + '</div>'
-        + '<button class="btn btn-ghost btn-sm mi-imp-cancel">Cancel</button>'
-      + '</div>'
+    // Same layout as Add Products: the drop area lives inside the card, the Cancel
+    // button sits on its own row below-left outside the card, and CSVMapper renders
+    // its Import button into the actions row under that.
+    return '<div class="card form-card">'
+      + '<div class="card-title">Upload ' + esc(t.label || 'Menu') + ' List</div>'
       + '<div id="mi-csv"></div><div id="mi-imp-result"></div>'
-      + '<div id="mi-imp-actions" class="no-print" style="margin:16px 0 0;"></div>'
-      + '</div>';
+      + '</div>'
+      + '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost mi-imp-cancel">Cancel</button></div>'
+      + '<div id="mi-imp-actions" class="no-print" style="margin:0 0 24px;"></div>';
   },
   openImport(type) {
     if (type) this.activeType = type;
@@ -950,8 +952,9 @@ S.RevenueMenuItems = {
   mountImporter() {
     const el = document.getElementById('mi-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
+    const t = this.TYPES.find(x => x.key === this.activeType) || { noun: 'menu' };
     CSVMapper.mount(el, {
-      dropTitle: 'Drop your menu items file here',
+      dropTitle: 'Drop your ' + t.noun + ' items file here',
       dropSub: 'Needs a column for menu name. Category, price, cost, and weekly covers come in too if your file has them. Items import without recipes; edit an item afterward to build its recipe or link an inventory product.',
       actionsEl: '#mi-imp-actions',
       fields: [
