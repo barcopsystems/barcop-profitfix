@@ -385,15 +385,13 @@ S.InventoryTakeInventory = {
           + '</div>';
       } else if (isPourable) {
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p) })
           + '</div>';
       } else if (isFoodSlider) {
         const un = App.productUnit(p) || 'unit';
         const unPl = /(?:s|x|ch|sh)$/i.test(un) ? un + 'es' : un + 's';
-        // Liquid (gal/qt/pint) → jug silhouette; a solid (bag/case/box) → box.
-        const shp = App.isLiquidIngredient(p) ? 'jug' : 'box';
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: shp, noun: un, nounPl: unPl })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p), noun: un, nounPl: unPl })
           + '</div>';
       } else if (isPackFood) {
         const un = App.productUnit(p) || 'unit';
