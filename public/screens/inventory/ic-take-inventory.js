@@ -388,8 +388,10 @@ S.InventoryTakeInventory = {
           + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') })
           + '</div>';
       } else if (isFoodSlider) {
+        const un = App.productUnit(p) || 'unit';
+        const unPl = /(?:s|x|ch|sh)$/i.test(un) ? un + 'es' : un + 's';
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: (p.count_shape || 'box') })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: 'box', noun: un, nounPl: unPl })
           + '</div>';
       } else if (isPackFood) {
         const un = App.productUnit(p) || 'unit';
