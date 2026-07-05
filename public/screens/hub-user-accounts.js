@@ -249,9 +249,12 @@ S.HubUserAccounts = {
         const msg = document.getElementById('ua-billing-msg');
         const showErr = (t) => { if (msg) { msg.textContent = t; msg.style.display = 'block'; } };
         try {
+          const headers = await this._teamAuthHeaders();
+          if (!headers) return;
+          const accountId = await DB._ensureAccountId();
           const r = await fetch('/api/billing-portal', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: DB._user?.id })
+            method: 'POST', headers,
+            body: JSON.stringify({ accountId })
           });
           const data = await r.json();
           if (data.url) { window.location.href = data.url; return; }
@@ -381,7 +384,10 @@ S.HubUserAccounts = {
 
     const rows = members.map(m => {
       const isSelf = m.is_self;
-      const roleCell = !isSelf
+      const isOwner = m.is_owner;
+      const roleCell = isOwner
+        ? '<span style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;font-size:11px;">Owner</span>'
+        : !isSelf
         ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel" style="font-size:12px;padding:4px 8px;">'
             + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
             + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
@@ -392,13 +398,15 @@ S.HubUserAccounts = {
       const statusBadge = m.confirmed ? ''
         : '<span style="font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Pending</span>';
 
-      const editPermsBtn = (!isSelf && m.role === 'staff')
+      const editPermsBtn = (!isOwner && !isSelf && m.role === 'staff')
         ? '<button class="btn btn-ghost btn-sm ua-team-perms" data-mid="' + esc(m.id) + '" data-perms="' + esc(JSON.stringify(m.permissions || {})) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Edit Access</button>'
         : '';
 
-      const removeBtn = !isSelf
-        ? '<button class="btn btn-ghost btn-sm ua-team-remove" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Remove</button>'
-        : '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;">You</span>';
+      const removeBtn = isSelf
+        ? '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;">You</span>'
+        : isOwner
+        ? ''
+        : '<button class="btn btn-ghost btn-sm ua-team-remove" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Remove</button>';
 
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
         +   '<div style="flex:1;min-width:160px;font-size:13px;color:var(--t1);">' + esc(m.email) + statusBadge + '</div>'
