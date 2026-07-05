@@ -939,14 +939,21 @@ S.HubSettings = {
     const rSrvWeight   = [0.30, 0.26, 0.24, 0.20];
     const rSrvCheckMul = [1.14, 1.04, 0.96, 0.86];
 
+    // Fixed salaried pay is the one GM ($68k) — see the roster below. Hourly
+    // (schedulable) labor = total labor minus that fixed salary, so the recovery
+    // engine dollarizes only what scheduling can move (matches App.salariedCost).
+    const WEEKLY_GM_SALARY = 68000 / 52;
     App.data.revenue_weeks = window.ANCHOR.weeks.map(a => {
       const dep   = window.ANCHOR.laborDepts(a);
       const hours = a.bar_labor/16 + dep.kitchen/15 + dep.floor/14;
+      const totalLabor  = a.bar_labor + a.food_labor;
+      const hourlyLabor = Math.max(0, totalLabor - WEEKLY_GM_SALARY);
       return {
         id:uid(), week_num:a.wk, period_end:dateStr(sunOff + window.ANCHOR.endAgo(a)),
         bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
-        total_labor_cost:a.bar_labor + a.food_labor, total_hours:+hours.toFixed(1),
-        labor_pct_blended:a.labor_pct_blended, rplh_blended:+(a.total_rev / hours).toFixed(2),
+        total_labor_cost:totalLabor, hourly_labor_cost:+hourlyLabor.toFixed(2), total_hours:+hours.toFixed(1),
+        labor_pct_blended:a.labor_pct_blended, hourly_labor_pct:+(hourlyLabor / a.total_rev * 100).toFixed(2),
+        rplh_blended:+(a.total_rev / hours).toFixed(2),
         notes:'', saved_at:new Date().toISOString()
       };
     });
