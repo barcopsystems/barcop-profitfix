@@ -1442,6 +1442,49 @@ app.post('/api/transfer-ownership', async (req, res) => {
   }
 });
 
+// ── Add another bar (Phase 2 owner tier, multi-location Option A) ──────────────
+// An existing owner spins up a second bar = its own account + subscription. The
+// on_auth_user_created trigger only provisions for brand-new USERS, so an
+// existing owner needs this explicit create (service role): new account owned by
+// the caller + their admin membership. The client then sends them to checkout
+// for the new account. onboarding_complete defaults false so the new bar
+// onboards on first entry.
+app.post('/api/add-account', async (req, res) => {
+  try {
+    const { name } = req.body || {};
+    const barName = (name && String(name).trim()) || 'My Bar';
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const userId = userData.user.id;
+
+    const { data: acct, error: acctErr } = await supabaseAdmin
+      .from('accounts')
+      .insert({ name: barName, owner_user_id: userId })
+      .select('id')
+      .single();
+    if (acctErr || !acct) return res.status(500).json({ error: acctErr?.message || 'Could not create the bar.' });
+
+    const { error: memErr } = await supabaseAdmin
+      .from('memberships')
+      .insert({ account_id: acct.id, user_id: userId, role: 'admin' });
+    if (memErr) {
+      // Roll back the orphan account so a retry starts clean.
+      await supabaseAdmin.from('accounts').delete().eq('id', acct.id);
+      return res.status(500).json({ error: memErr.message });
+    }
+
+    res.json({ ok: true, accountId: acct.id });
+  } catch (e) {
+    console.error('add-account exception:', e);
+    res.status(500).json({ error: e.message || 'Add account failed' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
