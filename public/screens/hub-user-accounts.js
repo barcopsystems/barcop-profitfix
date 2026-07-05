@@ -84,6 +84,11 @@ S.HubUserAccounts = {
       + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
       + sh('Subscription')
       + '<div id="ua-sub-content"></div>'
+      + (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()
+          ? sh('Your Bars')
+            + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Run more than one location? Add another bar. Each bar is its own subscription and its own set of books, and you can switch between them up top.</div>'
+            + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>'
+          : '')
       + sh('Data and Backup')
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, in one file you keep offsite. Restore from a backup to recover your data or move it.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
@@ -187,6 +192,7 @@ S.HubUserAccounts = {
     document.getElementById('ua-export-data')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('ua-import-btn')?.addEventListener('click', () => document.getElementById('ua-import-file')?.click());
     document.getElementById('ua-import-file')?.addEventListener('change', (e) => this.importBackup(e));
+    document.getElementById('ua-add-bar')?.addEventListener('click', () => this._addBar());
     document.getElementById('ua-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('ua-clear-all')?.addEventListener('click', () => this.clearAll());
     document.getElementById('ua-reset-ob')?.addEventListener('click', async () => {
@@ -619,6 +625,87 @@ S.HubUserAccounts = {
         }
       }
     });
+  },
+
+  // Add Another Bar (owner tier, multi-location Option A): name + plan → create
+  // the account (server) → checkout for it. Each bar is its own subscription.
+  _addBar() {
+    const planOpt = (plan, label, note) =>
+      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
+      + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
+    const bodyHTML =
+        '<div class="f" style="margin-bottom:14px;"><label>Bar Name</label><input type="text" id="ua-newbar-name" placeholder="Your bar\'s name"/></div>'
+      + '<label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>'
+      + '<div id="ua-newbar-plan" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;">'
+      +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
+      +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
+      + '</div>'
+      + '<div id="ua-newbar-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;"></div>';
+    const box = this._teamModal({
+      title: 'Add Another Bar',
+      bodyHTML,
+      buttons: [
+        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
+        { label: 'Continue to Payment', act: 'ok', kind: 'primary' }
+      ],
+      onAction: (act, boxEl) => {
+        if (act !== 'ok') return;   // Cancel closes normally
+        this._addBarSubmit(boxEl);
+        return false;               // keep the modal open; submit redirects or shows an error
+      }
+    });
+    // Wire the plan picker inside this dynamically-built modal.
+    const opts = Array.from(box.querySelectorAll('#ua-newbar-plan .plan-opt'));
+    const selectOpt = (el) => opts.forEach(o => {
+      const on = o === el;
+      o.classList.toggle('plan-selected', on);
+      o.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
+      o.style.background   = on ? 'rgba(219,171,70,0.08)' : 'transparent';
+    });
+    opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
+    if (opts[0]) selectOpt(opts[0]);
+  },
+
+  async _addBarSubmit(box) {
+    const name = (box.querySelector('#ua-newbar-name')?.value || '').trim();
+    const err  = box.querySelector('#ua-newbar-err');
+    const sel  = box.querySelector('#ua-newbar-plan .plan-opt.plan-selected');
+    const plan = (sel && sel.dataset.plan) || 'monthly';
+    const btn  = box.querySelector('button[data-act="ok"]');
+    const showErr = (t) => { if (err) { err.textContent = t; err.style.display = 'block'; } };
+    if (err) err.style.display = 'none';
+    if (!name) return showErr('Enter a name for the bar.');
+    if (btn) { btn.disabled = true; btn.textContent = 'Setting up...'; }
+    try {
+      const headers = await this._teamAuthHeaders();
+      if (!headers) { if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; } return; }
+      const r = await fetch('/api/add-account', {
+        method: 'POST', headers, body: JSON.stringify({ name })
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok || !data.accountId) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+        return showErr(data.error || 'Could not create the bar. Try again.');
+      }
+      // Start checkout for the new bar.
+      const cr = await fetch('/api/create-checkout-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: DB._user?.id, accountId: data.accountId, plan })
+      });
+      const cd = await cr.json();
+      if (cd.url) {
+        // Make the new bar active so the post-checkout return + onboarding land
+        // on it. Store only (no reload) since we are about to leave for Stripe.
+        DB._setStoredActiveAccountId(data.accountId);
+        window.location.href = cd.url;
+        return;
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+      showErr(cd.error || 'The bar was created, but checkout could not start. Try again, or contact support.');
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+      showErr('Connection error. Try again.');
+    }
   },
 
   _teamEditPerms(membershipId, email, currentPerms) {
