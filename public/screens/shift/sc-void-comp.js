@@ -233,7 +233,7 @@ S.ShiftVoidComp = {
       const compPct = rangeSales > 0 ? giveAway / rangeSales * 100 : null;
       const pctCol = compPct == null ? 'var(--t3)' : compPct > compTarget + 0.3 ? 'var(--red)' : compPct >= compTarget - 1 ? 'var(--amber)' : 'var(--green)';
       const compRead = giveAway > 0
-        ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;line-height:1.6;">' + App.fmtCurrency(giveAway) + ' in customer comps this range'
+        ? '<div style="margin-top:14px;border:1px solid var(--b-edge);background:var(--surface);border-radius:var(--r2);padding:11px 14px;font-size:12px;color:var(--t3);line-height:1.6;">' + App.fmtCurrency(giveAway) + ' in customer comps this range'
           + (compPct != null ? ', ' + compPct.toFixed(1) + '% of sales, ' + (compPct > compTarget + 0.3 ? 'over' : compPct >= compTarget - 1 ? 'right around' : 'under') + ' your ' + compTarget + '% line' : ', log your weekly sales to read this as a share of the top line')
           + '. Not every comp is a leak; the question is whether it is buying loyalty or giving away margin.</div>'
         : '';
