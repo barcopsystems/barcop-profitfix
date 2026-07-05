@@ -68,6 +68,31 @@ S.ShiftDashboard = {
   },
 
   ORDER: ['import', 'cash', 'exc', 'review'],
+
+  // Which week the read surfaces (Hub card stat strip + Where You Stand hero)
+  // should show. The current week is empty until the close import, and neither the
+  // Hub card nor the section hero may ever sit empty / disappear on a fresh week
+  // (a live user hits that every week). So: the current week if it has sales, else
+  // the most recent week that does, flagged "last wk". ONE resolver so the Hub and
+  // the section can never disagree. The step flow + week selector stay on the
+  // current week separately; this only drives the read.
+  _statWeek() {
+    const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    const sv = this._weekEnd;
+    try {
+      this._weekEnd = cur;
+      if (this.shifts().some(s => this.inWeek(s.date))) return { end: cur, lastWk: false };
+      const dates = this.shifts().map(s => String(s.date || '').slice(0, 10)).filter(Boolean).sort();
+      const latest = dates.length ? dates[dates.length - 1] : '';
+      if (!latest) return { end: cur, lastWk: false };
+      const ws = App.weekStartFor(latest);
+      if (!ws) return { end: cur, lastWk: false };
+      const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6);
+      const sun = App.ymdLocal(d);
+      return (sun && sun !== cur) ? { end: sun, lastWk: true } : { end: cur, lastWk: false };
+    } finally { this._weekEnd = sv; }
+  },
+
   // Compact step summary for the Hub Shift card; mirrors this page exactly.
   hubSteps() {
     const cur = (App.nextSunday ? App.nextSunday() : App.todayLocal());
@@ -75,22 +100,10 @@ S.ShiftDashboard = {
     try {
       const done = this.stepDone();
       const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
-      // The step checklist stays on the CURRENT week (mirrors the section cockpit).
-      // The stat strip shows the current week's numbers, but a fresh week is empty
-      // until the close import, and the Hub card must not sit at $0 next to a
-      // "Sales through ..." footer. So when the current week has no sales yet, fall
-      // back to the most recent week that does and flag it "last wk".
-      let lastWk = false;
-      if (!this.shifts().some(s => this.inWeek(s.date))) {
-        const dates = this.shifts().map(s => String(s.date || '').slice(0, 10)).filter(Boolean).sort();
-        const latest = dates.length ? dates[dates.length - 1] : '';
-        let sun = '';
-        if (latest) {
-          const ws = App.weekStartFor(latest);
-          if (ws) { const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6); sun = App.ymdLocal(d); }
-        }
-        if (sun && sun !== cur) { this._weekEnd = sun; lastWk = true; }
-      }
+      // Step checklist stays on the CURRENT week; the stat strip uses _statWeek so
+      // it never sits empty on a fresh week (falls back to the last week with data).
+      const sw = this._statWeek();
+      this._weekEnd = sw.end;
       const wkS = this.shifts().filter(s => this.inWeek(s.date));
       const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
       const voidTot = this.voidComps().filter(r => this.inWeek(r.date) && r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
@@ -100,7 +113,7 @@ S.ShiftDashboard = {
         { label: 'Voids', value: App.fmtCurrency(voidTot) },
         { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
       ];
-      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk };
+      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
   },
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -298,15 +311,22 @@ S.ShiftDashboard = {
 
   // ── Where You Stand state (the week's floor headline + reads) ────────────────
   _wys() {
-    const wkS = this.shifts().filter(s => this.inWeek(s.date));
-    const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
-    const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
-    const checkAvg = covers > 0 ? rev / covers : null;
-    const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
-    const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
-    const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
-    const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
-    return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, days: wkS.length, hasSales: wkS.length > 0 };
+    // Reads through the shared _statWeek resolver so the hero shows the current
+    // week when it has sales and otherwise the last week that does (never blank).
+    const sw = this._statWeek();
+    const sv = this._weekEnd;
+    try {
+      this._weekEnd = sw.end;
+      const wkS = this.shifts().filter(s => this.inWeek(s.date));
+      const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+      const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
+      const checkAvg = covers > 0 ? rev / covers : null;
+      const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
+      const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+      const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
+      const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
+      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
+    } finally { this._weekEnd = sv; }
   },
 
   // ── Where You Stand (floor headline + three-stat read + Briefing) ────────────
@@ -318,6 +338,7 @@ S.ShiftDashboard = {
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
       +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + App.fmtCurrency(st.rev, 0) + '</span>'
       +   '<span style="font-size:13px;color:var(--t2);">in sales</span>'
+      +   (st.lastWk ? '<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);border:1px solid var(--b-edge);border-radius:4px;padding:2px 6px;">last wk</span>' : '')
       + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + sub + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
