@@ -643,8 +643,8 @@ Return this exact JSON (all values calculated):
 // Per-bar billing, two prices on the one "Bar Cop" product. IDs come from env
 // so the test→live swap is an env change, not a code edit. The fallbacks are the
 // SANDBOX price IDs (safe test money); set the env vars to the LIVE IDs at launch.
-const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || 'price_1TpwZ1Gow04S066UBcwhEPNK'; // $249/mo
-const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || 'price_1TpwYXGow04S066UQ8BSpauR'; // $2,490/yr
+const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || 'price_1TpwYXGow04S066UQ8BSpauR'; // $249/mo
+const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || 'price_1TpwZ1Gow04S066UBcwhEPNK'; // $2,490/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
