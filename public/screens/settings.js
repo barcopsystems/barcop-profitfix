@@ -448,22 +448,6 @@ S.HubSettings = {
       const pct   = cpp / p.menu_price * 100;
       return { ...p, pours_per_bottle: pours, cost_per_pour: cpp, pour_cost_pct: pct, created_at: new Date().toISOString() };
     });
-    App.data.bar_products = bp;
-
-    // ── Kitchen Products ──
-    const kp = [
-      { id:uid(), name:'Chicken Breast',      category:'Protein',    vendor:'Sysco',  unit:'lb',   cost_per_unit:3.20 },
-      { id:uid(), name:'Beef Brisket',        category:'Protein',    vendor:'Sysco',  unit:'lb',   cost_per_unit:5.80 },
-      { id:uid(), name:'Romaine Lettuce',     category:'Produce',    vendor:'Sysco',  unit:'head', cost_per_unit:1.50 },
-      { id:uid(), name:'Lime Juice',          category:'Mixer/Supply',vendor:'Sysco', unit:'qt',   cost_per_unit:4.50 },
-      { id:uid(), name:'Triple Sec',          category:'Mixer/Supply',vendor:'RNDC',  unit:'bottle',cost_per_unit:8.99 },
-      { id:uid(), name:'Simple Syrup',        category:'Mixer/Supply',vendor:'Sysco', unit:'qt',   cost_per_unit:3.25 },
-      { id:uid(), name:'Burger Patties 8oz',  category:'Protein',    vendor:'Sysco',  unit:'each', cost_per_unit:2.80 },
-      { id:uid(), name:'Cheddar Cheese',      category:'Dairy',      vendor:'Sysco',  unit:'lb',   cost_per_unit:4.20 },
-      { id:uid(), name:'Nacho Chips',         category:'Dry Goods',  vendor:'Sysco',  unit:'bag',  cost_per_unit:3.50 },
-      { id:uid(), name:'Queso Sauce',         category:'Dairy',      vendor:'Sysco',  unit:'qt',   cost_per_unit:5.00 },
-    ].map(p => ({ ...p, created_at: new Date().toISOString() }));
-    App.data.kitchen_products = kp;
 
     // Recipes are built further down, once ic_products exists — see
     // "── Recipes" after the Inventory Control block.
@@ -587,13 +571,6 @@ S.HubSettings = {
     // ── Dead-array seeds removed (shifts / reconciliations / vendor_log):
     //    cash recon now lives in Shift Control; these were vestigial. ──
 
-    // ── Theft Scores ──
-    App.data.theft_scores = [
-      { id:uid(), date:dateStr(60), scores:{0:3,1:4,2:3,3:4,4:3,5:4,6:3,7:4,8:3,9:3,10:4,11:4}, total:42, rating:'High Risk: Immediate Action' },
-      { id:uid(), date:dateStr(30), scores:{0:2,1:3,2:2,3:3,4:2,5:3,6:2,7:3,8:2,9:2,10:3,11:3}, total:30, rating:'Moderate Risk: Tighten Controls' },
-      { id:uid(), date:new Date().toISOString(),  scores:{0:1,1:2,2:1,3:2,4:1,5:2,6:1,7:2,8:1,9:2,10:2,11:2}, total:19, rating:'Low Risk: Strong Controls' },
-    ];
-    App.data.last_theft_score_date = new Date().toISOString();
 
     // ── Sample Audit Records (Profit + Revenue) ──
     // Three months of audits each, telling The Anchor Bar's recovery story.
