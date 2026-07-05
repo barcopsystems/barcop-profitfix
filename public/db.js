@@ -97,10 +97,16 @@ const DB = {
       return { status: 'inactive', plan: null, active_modules: [], period_end: null };
     }
     try {
+      // Billing is per bar: the subscription lives on the account, not the user.
+      // An owner of two bars has two subscription rows, keyed by account_id.
+      const accountId = await this._ensureAccountId();
+      if (!accountId) {
+        return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+      }
       const { data, error } = await this._sb
         .from('subscriptions')
         .select('subscription_status, subscription_plan, active_modules, current_period_end')
-        .eq('user_id', this._user.id)
+        .eq('account_id', accountId)
         .single();
 
       if (error || !data) {
