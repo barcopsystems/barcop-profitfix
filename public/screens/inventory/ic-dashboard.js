@@ -282,8 +282,7 @@ S.InventoryDashboard = {
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
-      + (st.latest ? this.whereYouStand(st) : '')
-      + this.getStartedBox()
+      + (st.latest ? this.whereYouStand(st) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
