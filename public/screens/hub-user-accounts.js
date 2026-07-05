@@ -239,7 +239,7 @@ S.HubUserAccounts = {
     const sub = App.subscription || { status: 'inactive', plan: null };
     const isOwner = !!(window.DB && DB.isOwner && DB.isOwner());
     if (sub.status === 'active') {
-      el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Bar Cop Recovery Platform · '
+      el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Bar Cop · '
         + 'Status: <span style="color:var(--green);font-weight:700;">Active</span></div>'
         + (isOwner
             ? '<div style="margin-top:10px;"><button class="btn btn-ghost" id="ua-billing-portal">Manage Billing</button></div>'
