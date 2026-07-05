@@ -134,7 +134,7 @@ S.CashDashboard = {
 
     const gs = this.getStartedDone();
     container.innerHTML = '<div class="screen">'
-      + (gs.all ? this.scoreboard(st) : this.getStartedBox(gs))
+      + (gs.any ? this.scoreboard(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -178,7 +178,7 @@ S.CashDashboard = {
     const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;
-    return { hasOpening, hasInv, hasShift, hasLabor, all: hasOpening && hasInv && hasShift && hasLabor };
+    return { hasOpening, hasInv, hasShift, hasLabor, all: hasOpening && hasInv && hasShift && hasLabor, any: hasOpening || hasInv || hasShift || hasLabor };
   },
   getStartedBox(d) {
     return DashUI.dayOneStrip(
