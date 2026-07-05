@@ -84,6 +84,48 @@ const DB = {
     return res;
   },
 
+  // Fresh JWT headers for authed server endpoints (rename, etc.).
+  async _authHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    try {
+      const cur = await this._sb?.auth.getSession();
+      const token = cur?.data?.session?.access_token;
+      if (token) h['Authorization'] = 'Bearer ' + token;
+    } catch (e) {}
+    return h;
+  },
+
+  // The active account's display name (accounts.name), from the cached list.
+  // Used to pre-fill onboarding and detect a still-default name (email/"My Bar").
+  activeAccountName() {
+    const id = this._accountId || this._getStoredActiveAccountId();
+    const a = (this._accountsCache || []).find(x => x.id === id);
+    return a ? a.name : null;
+  },
+
+  // Sync accounts.name (the bar switcher's label) with the in-app bar name.
+  // Called from onboarding + Business Profile save. Owner/admin only (enforced
+  // server-side). Updates the cached list so the switcher reflects it at once.
+  async setAccountName(name) {
+    if (!this._sb || !this._user || !name || !String(name).trim()) return { ok: false };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false };
+    try {
+      const headers = await this._authHeaders();
+      const r = await fetch('/api/set-account-name', {
+        method: 'POST', headers, body: JSON.stringify({ accountId, name: String(name).trim() })
+      });
+      const data = await r.json();
+      if (data.ok && Array.isArray(this._accountsCache)) {
+        const a = this._accountsCache.find(x => x.id === accountId);
+        if (a) a.name = String(name).trim();
+      }
+      return data;
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
   // Clickwrap: record a Terms/Privacy acceptance (who / when / which version).
   // Called right after signUp, while the session is live so RLS insert-self
   // (user_id = auth.uid()) passes. Best-effort: a failure here never blocks the
