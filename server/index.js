@@ -644,17 +644,21 @@ const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { userId } = req.body;
+  const { userId, accountId } = req.body;
   if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    // Billing is per bar: the account_id ties the subscription to the bar the
+    // webhook activates. The signup / Add-Another-Bar flow supplies it.
+    const metadata = { user_id: userId };
+    if (accountId) metadata.account_id = accountId;
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: BARCOP_PRICE_ID, quantity: 1 }],
       success_url: 'https://app.barcop.com/?checkout=success',
       cancel_url:  'https://app.barcop.com/?checkout=cancelled',
-      metadata: { user_id: userId }
+      metadata
     });
     res.json({ url: session.url });
   } catch (e) {
@@ -696,7 +700,7 @@ app.post('/api/billing-portal', async (req, res) => {
     const { data, error } = await supabaseAdmin
       .from('subscriptions')
       .select('stripe_customer_id')
-      .eq('user_id', acct.owner_user_id)
+      .eq('account_id', accountId)
       .single();
 
     if (error || !data?.stripe_customer_id) {
@@ -744,7 +748,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const customerId = session.customer;
       const email      = session.customer_details?.email || session.customer_email;
 
-      let userId = session.metadata?.user_id || null;
+      let userId    = session.metadata?.user_id || null;
+      let accountId = session.metadata?.account_id || null;
 
       if (!userId && email) {
         const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
@@ -766,8 +771,22 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         }
       }
 
-      if (userId) {
+      // Billing is per bar (per account). The signup flow passes account_id in
+      // metadata; if it is missing (e.g. a raw payment link), fall back to the
+      // account this user owns.
+      if (!accountId && userId) {
+        const { data: acct } = await supabaseAdmin
+          .from('accounts')
+          .select('id')
+          .eq('owner_user_id', userId)
+          .limit(1)
+          .maybeSingle();
+        accountId = acct?.id || null;
+      }
+
+      if (accountId) {
         await supabaseAdmin.from('subscriptions').upsert({
+          account_id:          accountId,
           user_id:             userId,
           stripe_customer_id:  customerId,
           subscription_status: 'active',
@@ -775,7 +794,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           active_modules:      ALL_MODULES,
           current_period_end:  null,
           updated_at:          new Date().toISOString(),
-        }, { onConflict: 'user_id' });
+        }, { onConflict: 'account_id' });
+      } else {
+        console.error('checkout.session.completed: no account_id resolved for customer', customerId);
       }
     }
 
