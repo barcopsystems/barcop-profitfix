@@ -57,6 +57,7 @@ S.Hub = {
       shield:  '<path d="M8.5 2L3 4v5c0 3 2.5 5 5.5 6 3-1 5.5-3 5.5-6V4l-5.5-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M6.5 8.5l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
       expense: '<path d="M3.5 2v13l1.5-1 1.5 1 1.5-1 1.5 1 1.5-1 1.5 1V2H3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 5.5v5M10 6.5H7.5a1 1 0 0 0 0 2H9.5a1 1 0 0 1 0 2H7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
       history: '<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
+      breakeven: '<path d="M2 12.5l4-4 3 2 5.5-6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 8.5h13" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2 2"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       support: '<path d="M2.5 3.8h12v7.5H7.8l-3 2.3v-2.3H2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M5.3 6.6h6.4M5.3 8.7h4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
@@ -66,6 +67,8 @@ S.Hub = {
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
         + '<span class="nav-label">' + name + '</span></div>';
     return ''
+      + '<div class="nav-section"></div>'
+      + row('breakeven', 'Break-Even', 'breakeven')
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
@@ -397,8 +400,14 @@ S.Hub = {
     const pfCurrent= (wkMods.find(m => m.name === 'Profit')  || {}).current;
     const rvCurrent= (wkMods.find(m => m.name === 'Revenue') || {}).current;
 
-    // ── Top card: the money line (Opportunity · Recovered · Trapped Cash) on the
-    //    left, the Bar Cop Audit health score pushed right under the Briefing. ──
+    // ── Top card: the money line (Opportunity · Recovered · Trapped Cash ·
+    //    Break-Even) on the left, the Bar Cop Audit health score pushed right. ──
+    const beSum = (S.HubBreakEven && S.HubBreakEven.summary) ? S.HubBreakEven.summary() : { hasData: false };
+    const beVal = beSum.hasData ? App.fmtCurrency(beSum.breakEven, 0) : 'No data';
+    const beCol = beSum.hasData ? (beSum.ok ? 'var(--green)' : 'var(--red)') : 'var(--t4)';
+    const beSub = !beSum.hasData ? 'Set your costs to surface this'
+      : (beSum.ok ? 'Cleared by ' + App.fmtCurrency(beSum.delta, 0) + ' last week'
+                  : App.fmtCurrency(Math.abs(beSum.delta), 0) + ' short last week');
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
@@ -417,7 +426,9 @@ S.Hub = {
       + tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
-      // The three figures above are dollars (the money line); the Bar Cop Audit is
+      + statDiv
+      + '<div style="cursor:pointer;" onclick="S.HubBreakEven.open()" title="Open Break-Even">' + tile('Break-Even', beVal, beCol, beSub) + '</div>'
+      // The four figures above are dollars (the money line); the Bar Cop Audit is
       // a health score, not money, so a flex spacer pushes it to the right under
       // the Briefing button — money line left, operation-health read right. The
       // cell's width is matched to the Briefing button after mount (see below) so
@@ -1259,6 +1270,7 @@ S.Hub = {
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'books-home')         S.HubBooksHome?.open?.();
+      else if (action === 'breakeven')          S.HubBreakEven?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
