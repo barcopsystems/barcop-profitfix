@@ -70,10 +70,27 @@ S.ShiftDashboard = {
   ORDER: ['import', 'cash', 'exc', 'review'],
   // Compact step summary for the Hub Shift card; mirrors this page exactly.
   hubSteps() {
-    const sv = this._weekEnd; this._weekEnd = (App.nextSunday ? App.nextSunday() : App.todayLocal());
+    const cur = (App.nextSunday ? App.nextSunday() : App.todayLocal());
+    const sv = this._weekEnd; this._weekEnd = cur;
     try {
       const done = this.stepDone();
       const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
+      // The step checklist stays on the CURRENT week (mirrors the section cockpit).
+      // The stat strip shows the current week's numbers, but a fresh week is empty
+      // until the close import, and the Hub card must not sit at $0 next to a
+      // "Sales through ..." footer. So when the current week has no sales yet, fall
+      // back to the most recent week that does and flag it "last wk".
+      let lastWk = false;
+      if (!this.shifts().some(s => this.inWeek(s.date))) {
+        const dates = this.shifts().map(s => String(s.date || '').slice(0, 10)).filter(Boolean).sort();
+        const latest = dates.length ? dates[dates.length - 1] : '';
+        let sun = '';
+        if (latest) {
+          const ws = App.weekStartFor(latest);
+          if (ws) { const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6); sun = App.ymdLocal(d); }
+        }
+        if (sun && sun !== cur) { this._weekEnd = sun; lastWk = true; }
+      }
       const wkS = this.shifts().filter(s => this.inWeek(s.date));
       const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
       const voidTot = this.voidComps().filter(r => this.inWeek(r.date) && r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
@@ -83,7 +100,7 @@ S.ShiftDashboard = {
         { label: 'Voids', value: App.fmtCurrency(voidTot) },
         { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
       ];
-      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
+      return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk };
     } finally { this._weekEnd = sv; }
   },
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -98,8 +115,7 @@ S.ShiftDashboard = {
     const wys = this._wys();
 
     container.innerHTML = '<div class="screen">'
-      + (wys.hasSales ? this.whereYouStand(wys) : '')
-      + this.getStartedBox()
+      + (wys.hasSales ? this.whereYouStand(wys) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
