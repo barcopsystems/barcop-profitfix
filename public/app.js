@@ -3918,7 +3918,7 @@ const App = {
       table: 'core_events',
       data: () => App.data,
       kinds: {
-        week: 'weeks', theft_score: 'theft_scores',
+        week: 'weeks',
         variance_investigation: 'variance_investigations',
         sales_review: 'sales_reviews',
         vendor_discrepancy: 'vendor_discrepancies', audit: 'audits', cash_audit: 'cash_audits', cash_outflow: 'cash_outflows',

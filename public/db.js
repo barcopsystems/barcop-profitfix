@@ -867,14 +867,12 @@ const DB = {
         // set on the Add Register form). See App.drawerTolerance().
         onboarding_complete: false
       },
-      bar_products: [], kitchen_products: [],
       // Menu items: the unified store for everything sellable on the menu.
       // Recipes live embedded as the optional `recipe` field on each item.
       // Edited from r-menu-items (Revenue Recovery) — the single edit
       // surface. Profit Recovery's Recipe Cost Analysis is read-only.
       menu_items: [],
       weeks: [],
-      theft_scores: [], last_theft_score_date: null,
       vendor_discrepancies: [],
       variance_investigations: [],
       sales_reviews: [],
