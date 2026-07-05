@@ -136,6 +136,7 @@ S.HubSettings = {
       + '<div class="f" style="width:130px;"><label>Dinner RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rd" value="' + (rt.rplh_dinner ?? 75) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Bar RPLH</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-r-rb" value="' + (rt.rplh_bar ?? 65) + '"/></div></div>'
       + '<div class="f" style="width:130px;"><label>Event Close Rate</label><div class="fw"><input class="suf" type="number" id="hs-r-ec" value="' + (rt.event_close_rate ?? 40) + '" step="1"/><span class="suf">%</span></div></div>'
+      + '<div class="f" style="width:130px;"><label>Comp Target</label><div class="fw"><input class="suf" type="number" id="hs-r-cp" value="' + (rt.comp_pct ?? 3) + '" step="0.5"/><span class="suf">%</span></div></div>'
       + '</div>';
   },
 
@@ -225,7 +226,8 @@ S.HubSettings = {
         rplh_lunch:        numOr('hs-r-rl', 50),
         rplh_dinner:       numOr('hs-r-rd', 75),
         rplh_bar:          numOr('hs-r-rb', 65),
-        event_close_rate:  numOr('hs-r-ec', 40)
+        event_close_rate:  numOr('hs-r-ec', 40),
+        comp_pct:          numOr('hs-r-cp', 3)
       });
       // Labor % is now the single settings.targets.labor_cost_pct (App.laborTargetPct);
       // drop the old per-department copies so they can't drift.
