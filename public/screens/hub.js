@@ -415,17 +415,23 @@ S.Hub = {
       +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
       + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
-      + tile('Total Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
+      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'dashboard\',\'profit\')" title="Open Profit Close The Week">'
+      +   tile('Total Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
              anyAudit ? 'On the table to recover' : 'Run an audit to surface this')
+      + '</div>'
       + statDiv
-      + tile('Recovered', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
+      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'r-dashboard\',\'revenue\')" title="Open Revenue Close The Week">'
+      +   tile('Recovered', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') : 'Mark a fix to start')
+      + '</div>'
       + statDiv
-      + tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
+      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'c-dashboard\',\'cash\')" title="Open Cash Close The Week">'
+      +   tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
+      + '</div>'
       + statDiv
       + '<div style="cursor:pointer;" onclick="S.HubBreakEven.open()" title="Open Break-Even">' + tile('Break-Even', beVal, beCol, beSub) + '</div>'
       // The four figures above are dollars (the money line); the Bar Cop Audit is
@@ -436,9 +442,11 @@ S.Hub = {
       + '<div style="flex:1 1 16px;min-width:0;"></div>'
       + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
       +   '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin-right:30px;"></div>'
+      +   '<div style="cursor:pointer;" onclick="S.HubBarCopAudit.open()" title="Open the Bar Cop Audit">'
       +   tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
+      +   '</div>'
       + '</div>'
       + '</div></div>';
 
@@ -572,7 +580,13 @@ S.Hub = {
     const richCard = (o) => {
       const sum = o.sum;
       const cardGo = (o.objName ? 'S.' + o.objName + '._openStep=null;' : '') + 'S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')';
-      const body = statStrip(o.stats)
+      const strip = o.statNote
+        ? '<div style="display:flex;align-items:flex-start;gap:8px;">'
+            + '<div style="flex:1;min-width:0;">' + statStrip(o.stats) + '</div>'
+            + '<span style="flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(o.statNote) + '</span>'
+          + '</div>'
+        : statStrip(o.stats);
+      const body = strip
         + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
                  + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps, o.objName, o.screen, o.mod) + '</div>' : '')
         + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
@@ -587,7 +601,7 @@ S.Hub = {
     const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date']);
     const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', objName:'InventoryDashboard', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
     const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', objName:'LaborDashboard', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
-    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
+    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, statNote: (scSum && scSum.lastWk) ? 'last wk' : '', footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
     // Recovery: stat strip + progress bar + step checklist (from each Close The
     // Week page's hubSteps()) + audit line, same shape as the Control cards.
     const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
