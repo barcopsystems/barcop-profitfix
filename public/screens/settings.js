@@ -265,10 +265,17 @@ S.HubSettings = {
     const keys = new Set(svcKeys);
     (this._writeSection('profile') || []).forEach(k => keys.add(k));
     (this._writeSection('tax') || []).forEach(k => keys.add(k));
-    Promise.all([...keys].map(k => App.saveKey(k))).then(() => {
+    Promise.all([...keys].map(k => App.saveKey(k))).then(async () => {
       this._flashSaved('all');
       App.updatePeriod();
       App.markSetupDone('gs_service_periods');
+      // Keep the bar switcher (accounts.name) in sync with the bar name.
+      try {
+        if (window.DB && DB.setAccountName && App.data.settings.bar_name) {
+          await DB.setAccountName(App.data.settings.bar_name);
+          if (App.renderAccountSwitcher) await App.renderAccountSwitcher();
+        }
+      } catch (e) { console.error('account name sync', e); }
     });
   },
 
