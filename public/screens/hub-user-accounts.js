@@ -372,13 +372,13 @@ S.HubUserAccounts = {
         box.innerHTML = '<div style="color:var(--t3);">' + esc(data.error || 'Could not load members.') + '</div>';
         return;
       }
-      this._teamRenderMembers(data.members || []);
+      this._teamRenderMembers(data.members || [], !!data.requesterIsOwner);
     } catch (e) {
       box.innerHTML = '<div style="color:var(--t3);">Connection error.</div>';
     }
   },
 
-  _teamRenderMembers(members) {
+  _teamRenderMembers(members, viewerIsOwner) {
     const box = document.getElementById('ua-team-members');
     if (!box) return;
 
@@ -408,10 +408,16 @@ S.HubUserAccounts = {
         ? ''
         : '<button class="btn btn-ghost btn-sm ua-team-remove" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Remove</button>';
 
+      // Only the current owner can hand ownership to another existing member.
+      const makeOwnerBtn = (viewerIsOwner && !isOwner && !isSelf)
+        ? '<button class="btn btn-ghost btn-sm ua-team-makeowner" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Make Owner</button>'
+        : '';
+
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
         +   '<div style="flex:1;min-width:160px;font-size:13px;color:var(--t1);">' + esc(m.email) + statusBadge + '</div>'
         +   '<div style="width:130px;">' + roleCell + '</div>'
         +   '<div style="width:100px;text-align:right;">' + editPermsBtn + '</div>'
+        +   '<div style="width:110px;text-align:right;">' + makeOwnerBtn + '</div>'
         +   '<div style="width:90px;text-align:right;">' + removeBtn + '</div>'
         + '</div>';
     }).join('');
@@ -423,6 +429,9 @@ S.HubUserAccounts = {
     });
     box.querySelectorAll('.ua-team-remove').forEach(btn => {
       btn.addEventListener('click', () => this._teamRemove(btn.dataset.mid, btn.dataset.email));
+    });
+    box.querySelectorAll('.ua-team-makeowner').forEach(btn => {
+      btn.addEventListener('click', () => this._teamMakeOwner(btn.dataset.mid, btn.dataset.email));
     });
     box.querySelectorAll('.ua-team-perms').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -571,6 +580,42 @@ S.HubUserAccounts = {
         } catch (e) {
           this._teamModal({ message: 'Connection error.', tone: 'error' });
           this._teamRefresh();
+        }
+      }
+    });
+  },
+
+  async _teamMakeOwner(membershipId, email) {
+    this._teamModal({
+      title: 'Transfer ownership',
+      message: 'Make ' + (email || 'this member') + ' the owner of this account? '
+        + 'They take over billing and become an admin. You stay on as an admin but lose owner control, '
+        + 'and only the new owner can transfer it back. This takes effect right away.',
+      buttons: [
+        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
+        { label: 'Transfer Ownership', act: 'ok', kind: 'danger' }
+      ],
+      onAction: async (act) => {
+        if (act !== 'ok') return;
+        const accountId = await DB._ensureAccountId();
+        if (!accountId) return;
+        try {
+          const headers = await this._teamAuthHeaders();
+          if (!headers) return;
+          const r = await fetch('/api/transfer-ownership', {
+            method: 'POST', headers,
+            body: JSON.stringify({ accountId, membershipId })
+          });
+          const data = await r.json();
+          if (!r.ok || !data.ok) {
+            this._teamModal({ message: data.error || 'Could not transfer ownership.', tone: 'error' });
+            return;
+          }
+          // Ownership drives billing + owner-tier gating app-wide; reload so
+          // every cached owner check (DB._ownerUserId, the billing card) is fresh.
+          window.location.reload();
+        } catch (e) {
+          this._teamModal({ message: 'Connection error.', tone: 'error' });
         }
       }
     });
