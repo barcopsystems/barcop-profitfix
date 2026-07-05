@@ -106,7 +106,10 @@ S.RevenueMenuPlanning = {
 
   // { lines: [paragraphs], move: '<action text>' }, all composed from this item's
   // figures + its rank, pulled from wide pools by seed so the reads stay distinct.
-  briefing(item, cat, cs, quad) {
+  // `used` is a page-wide Set so a dry aside is woven into the read at most once,
+  // never repeated across tiles.
+  briefing(item, cat, cs, quad, used) {
+    used = used || new Set();
     const f = v => App.fmtCurrency(v);
     const cost = App.menuItemCost(item) || 0;
     const price = item.price || 0;
@@ -217,16 +220,21 @@ S.RevenueMenuPlanning = {
                               'Most of the cost is {name}, {dcost} a {noun}.',
                               'Your priciest line in it is {name}, {dcost} a {noun}.'], 2));
 
-    // ── An occasional dry aside (operator to operator, ~1 in 4) ───────────
-    if (quad && cs.ranked && (seed % 4 === 0)) {
+    // ── An occasional dry aside, woven onto the end of the read line (~1 in 4),
+    // and never the same one twice across the page (page-wide `used` set keyed on
+    // the raw template so the same joke can't repeat as a plate and a drink). ──
+    if (quad && cs.ranked && (seed % 4 === 0) && lines.length) {
       const HUMOR = {
-        STAR: ['The kind of plate you quietly thank at close.', 'If everything pulled like this, you would sleep at night.', 'It earns its real estate, which is rarer than it should be.'],
-        PLOWHORSE: ['Everybody\'s favorite, nobody\'s down payment.', 'It keeps the lights on and the margin humble.', 'The crowd loves it, the P&L tolerates it.'],
-        PUZZLE: ['Great {noun}, terrible at introducing itself.', 'The wallflower with the best numbers in the room.', 'All dressed up and nobody ordering it.'],
-        DOG: ['It has stayed on the menu out of loyalty, not math.', 'If it were on payroll, you would have had the talk by now.', 'The only thing it moves is the needle the wrong way.']
+        STAR: ['The kind of {noun} you quietly thank at close.', 'If everything pulled like this, you would sleep at night.', 'It earns its spot, which is rarer than it should be.', 'This is the one carrying the quiet load.'],
+        PLOWHORSE: ['Everybody\'s favorite, nobody\'s down payment.', 'It keeps the lights on and the margin humble.', 'The crowd loves it, the P&L just tolerates it.', 'A workhorse that forgot to ask for a raise.'],
+        PUZZLE: ['Great {noun}, terrible at introducing itself.', 'The wallflower with the best numbers in the room.', 'All dressed up and nobody ordering it.', 'It is hiding in plain sight on your own menu.'],
+        DOG: ['It has stayed on the menu out of loyalty, not math.', 'If it were on payroll, you would have had the talk by now.', 'The only thing it moves is the needle the wrong way.', 'It is taking up a seat and not tipping.']
       };
-      const h = HUMOR[quad];
-      if (h) lines.push(fill(h[(seed + 6) % h.length]));
+      const pool = HUMOR[quad] || [];
+      for (let k = 0; k < pool.length; k++) {
+        const raw = pool[(seed + 6 + k) % pool.length];
+        if (!used.has(raw)) { used.add(raw); lines[0] = lines[0] + ' ' + fill(raw); break; }
+      }
     }
 
     // ── The move ──────────────────────────────────────────────────────────
@@ -322,6 +330,7 @@ S.RevenueMenuPlanning = {
 
     const sCell = (label, val, color) => '<div class="mp-stat"><span class="mp-stat-lbl">' + label + '</span><span class="mp-stat-val"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</span></div>';
 
+    const usedHumor = new Set();
     const sections = cats.map(cat => {
       const cs = catStats[cat];
       const list = byCat[cat].slice().sort((a, b) => {
@@ -330,7 +339,7 @@ S.RevenueMenuPlanning = {
       });
       const tiles = list.map(i => {
         const quad = classMap[i.id];
-        const b = this.briefing(i, cat, cs, quad);
+        const b = this.briefing(i, cat, cs, quad, usedHumor);
         const body = b.lines.map(p => '<p>' + esc(p) + '</p>').join('');
         const cost = App.menuItemCost(i) || 0;
         const price = i.price || 0;
@@ -345,7 +354,7 @@ S.RevenueMenuPlanning = {
         const a = this.actionFor(i, quad);
         const moveBand = b.move
           ? '<div class="mp-move"><div class="mp-move-txt"><span class="mp-move-lbl">Move:</span> ' + esc(b.move) + '</div>'
-            + '<button class="btn btn-ghost btn-sm mp-act" data-id="' + esc(i.id) + '" data-act="' + a.act + '">' + a.label + '</button></div>'
+            + '<span class="mp-act" role="button" tabindex="0" data-id="' + esc(i.id) + '" data-act="' + a.act + '">+ ' + a.label + '</span></div>'
           : '';
         return '<div class="mp-tile">'
           + '<div class="mp-name">' + esc(i.name || 'Unnamed') + '</div>'
