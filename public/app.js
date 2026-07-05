@@ -249,6 +249,13 @@ const App = {
   shiftData: null,       // sc_ keys — sc_data table
   subscription: { status: 'inactive', plan: null, active_modules: [], period_end: null },
 
+  // Clickwrap: the current Terms/Privacy version stamped on acceptance at signup.
+  // Bump this string when the hosted Terms change to force a re-accept.
+  TOS_VERSION:     '2026-04-08',
+  TOS_TERMS_URL:   'https://www.barcop.com/pages/terms-of-use',
+  TOS_PRIVACY_URL: 'https://www.barcop.com/pages/privacy-policy',
+  _signupInProgress: false,  // guards the SIGNED_IN handler from booting mid-signup
+
   async init() {
     await DB.init();
     window.onerror = (msg, src, line, col, err) => {
@@ -324,6 +331,16 @@ const App = {
       this._bootedUserId = session.user?.id || null;
       await this.loadAllData();
       this.subscription = await DB.getSubscription();
+      // Returning from Stripe checkout: the webhook that flips the subscription
+      // to active is async, so poll a few seconds before the paywall gate runs,
+      // otherwise a just-paid owner briefly bounces back to Finish-your-subscription.
+      const checkoutReturn = new URLSearchParams(window.location.search).get('checkout') === 'success';
+      if (checkoutReturn) {
+        if (this.subscription?.status !== 'active') {
+          this.subscription = await this._pollSubscriptionActive();
+        }
+        window.history.replaceState({}, '', '/');
+      }
       this.boot();
     } else {
       this.showAuth();
@@ -342,6 +359,9 @@ const App = {
           if (el) el.style.display = x === 'auth-set-password' ? '' : 'none';
         });
       } else if (event === 'SIGNED_IN' && session) {
+        // Signup owns its own flow (record ToS, then redirect to Stripe). Don't
+        // let the signUp-fired SIGNED_IN boot into the paywall mid-flow.
+        if (this._signupInProgress) return;
         // Supabase v2 re-emits SIGNED_IN whenever the tab regains visibility
         // (e.g., closing a print pop-up). Without this guard, the handler
         // re-runs boot() and bounces the operator back to Hub Dashboard,
@@ -423,6 +443,12 @@ const App = {
   },
 
   boot() {
+    // Hard paywall: a real (non-demo) account with no active subscription cannot
+    // enter the app. Show the Finish-your-subscription screen instead of booting.
+    if (!this.demoMode && this.subscription?.status !== 'active') {
+      this.showPaywall();
+      return;
+    }
     document.getElementById('auth-screen').style.display = 'none';
     this.updatePeriod();
     // Recurring operating expenses: fill in any elapsed months on load so Books
@@ -2060,6 +2086,55 @@ const App = {
     if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
     // Clean up the URL
     if (params.get('checkout')) window.history.replaceState({}, '', '/');
+  },
+
+  // Hard paywall: signed in, but the account has no active subscription. Shows
+  // the Finish-your-subscription panel (plan picker + checkout) over the auth
+  // screen, hiding every other panel and the app.
+  showPaywall() {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').classList.add('hidden');
+    document.body.classList.remove('chrome-on');
+    document.getElementById('ob-overlay').classList.add('hidden');
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
+    ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
+      const el = document.getElementById(x);
+      if (el) el.style.display = x === 'auth-paywall' ? '' : 'none';
+    });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout')) window.history.replaceState({}, '', '/');
+  },
+
+  // After a Stripe checkout return, the webhook that activates the subscription
+  // is async. Poll getSubscription a few times (showing a confirming state) so a
+  // just-paid owner doesn't bounce to the paywall before the webhook lands.
+  async _pollSubscriptionActive(tries = 8, delayMs = 1500) {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').classList.add('hidden');
+    const hw = document.getElementById('hub-wrapper');
+    if (hw) hw.style.display = 'none';
+    ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
+      const el = document.getElementById(x);
+      if (el) el.style.display = 'none';
+    });
+    const panel = document.querySelector('.auth-panel');
+    let note = null;
+    if (panel) {
+      note = document.createElement('div');
+      note.id = 'auth-confirming';
+      note.innerHTML = '<div class="auth-heading">Confirming Your Payment</div>'
+        + '<div class="auth-sub">One moment while we activate your subscription.</div>';
+      panel.appendChild(note);
+    }
+    let sub = this.subscription;
+    for (let i = 0; i < tries; i++) {
+      await new Promise(r => setTimeout(r, delayMs));
+      sub = await DB.getSubscription();
+      if (sub?.status === 'active') break;
+    }
+    if (note) note.remove();
+    return sub;
   },
 
   // Both save paths persist config only: the 19 unbounded recovery/hub logs
@@ -5382,11 +5457,119 @@ function reviewedNote(iso) {
 
 /* ── Auth UI ── */
 function wireAuth() {
+  const AUTH_PANELS = ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'];
   const show = (id) => {
-    ['auth-login','auth-reset'].forEach(x => document.getElementById(x).style.display = x===id?'':'none');
+    AUTH_PANELS.forEach(x => { const el = document.getElementById(x); if (el) el.style.display = x===id?'':'none'; });
   };
   document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
   document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
+  document.getElementById('show-signup')?.addEventListener('click', () => show('auth-signup'));
+  document.getElementById('show-login-from-signup')?.addEventListener('click', () => show('auth-login'));
+
+  // Plan pickers (signup + paywall): click a card to select it. Selection is
+  // read back off the card carrying the .plan-selected marker.
+  const wirePlanPicker = (pickerId) => {
+    const picker = document.getElementById(pickerId);
+    if (!picker) return;
+    const opts = Array.from(picker.querySelectorAll('.plan-opt'));
+    const select = (el) => opts.forEach(o => {
+      const on = o === el;
+      o.classList.toggle('plan-selected', on);
+      o.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
+      o.style.background   = on ? 'rgba(219,171,70,0.08)' : 'transparent';
+    });
+    opts.forEach(o => o.addEventListener('click', () => select(o)));
+    if (opts[0]) select(opts[0]);  // default to Monthly
+  };
+  wirePlanPicker('signup-plan-picker');
+  wirePlanPicker('paywall-plan-picker');
+  const selectedPlan = (pickerId) => {
+    const sel = document.querySelector('#' + pickerId + ' .plan-opt.plan-selected');
+    return (sel && sel.dataset.plan) || 'monthly';
+  };
+
+  // Shared: create a checkout session for the signed-in owner and go to Stripe.
+  const goToCheckout = async (plan, onErr) => {
+    const accountId = await DB._ensureAccountId();
+    const r = await fetch('/api/create-checkout-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: DB._user?.id, accountId, plan })
+    });
+    const data = await r.json();
+    if (data.url) { window.location.href = data.url; return true; }
+    onErr(data.error || 'Could not start checkout. Try again, or contact support.');
+    return false;
+  };
+
+  document.getElementById('signup-btn')?.addEventListener('click', async () => {
+    const email = document.getElementById('signup-email').value.trim();
+    const pw1   = document.getElementById('signup-pw1').value;
+    const pw2   = document.getElementById('signup-pw2').value;
+    const tos   = document.getElementById('signup-tos').checked;
+    const err   = document.getElementById('signup-error');
+    const btn   = document.getElementById('signup-btn');
+    const showErr = (t) => { err.textContent = t; err.style.display = 'block'; };
+    err.style.display = 'none';
+    if (!email || email.indexOf('@') < 1) return showErr('Enter a valid email address.');
+    if (!pw1 || pw1.length < 8) return showErr('Password must be at least 8 characters.');
+    if (pw1 !== pw2) return showErr('Passwords do not match.');
+    if (!tos) return showErr('Please agree to the Terms of Use and Privacy Policy to continue.');
+    const plan = selectedPlan('signup-plan-picker');
+
+    btn.textContent = 'Creating account...'; btn.disabled = true;
+    App._signupInProgress = true;
+    try {
+      const { error: signErr } = await DB.signUp(email, pw1);
+      if (signErr) {
+        App._signupInProgress = false;
+        btn.textContent = 'Start Subscription'; btn.disabled = false;
+        return showErr(signErr.message || 'Could not create the account.');
+      }
+      // Resolve the trigger-provisioned account (retry briefly for commit lag).
+      let accountId = null;
+      for (let i = 0; i < 5 && !accountId; i++) {
+        accountId = await DB._ensureAccountId();
+        if (!accountId) await new Promise(r => setTimeout(r, 400));
+      }
+      // Record the clickwrap acceptance (best-effort; never blocks checkout).
+      try { await DB.recordTosAcceptance(accountId, App.TOS_VERSION, App.TOS_TERMS_URL, App.TOS_PRIVACY_URL); }
+      catch (e) { console.error('ToS record failed', e); }
+
+      btn.textContent = 'Going to checkout...';
+      const ok = await goToCheckout(plan, showErr);
+      if (!ok) {
+        // Account exists but checkout could not start. Drop them on the paywall
+        // so they can retry payment instead of being stuck on the signup form.
+        App._signupInProgress = false;
+        btn.textContent = 'Start Subscription'; btn.disabled = false;
+      }
+    } catch (e) {
+      App._signupInProgress = false;
+      btn.textContent = 'Start Subscription'; btn.disabled = false;
+      showErr('Connection error. Try again.');
+    }
+  });
+
+  document.getElementById('paywall-btn')?.addEventListener('click', async () => {
+    const err = document.getElementById('paywall-error');
+    const btn = document.getElementById('paywall-btn');
+    const showErr = (t) => { err.textContent = t; err.style.display = 'block'; };
+    err.style.display = 'none';
+    btn.textContent = 'Going to checkout...'; btn.disabled = true;
+    try {
+      const ok = await goToCheckout(selectedPlan('paywall-plan-picker'), showErr);
+      if (!ok) { btn.textContent = 'Continue to Payment'; btn.disabled = false; }
+    } catch (e) {
+      btn.textContent = 'Continue to Payment'; btn.disabled = false;
+      showErr('Connection error. Try again.');
+    }
+  });
+
+  document.getElementById('paywall-signout')?.addEventListener('click', async () => {
+    await DB.signOut();
+    show('auth-login');
+    App.showAuth();
+  });
 
   document.getElementById('login-btn')?.addEventListener('click', async () => {
     const email = document.getElementById('login-email').value.trim();

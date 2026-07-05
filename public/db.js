@@ -70,7 +70,33 @@ const DB = {
 
   async signUp(email, password) {
     if (!this._sb) return { error: { message: 'Not connected' } };
-    return await this._sb.auth.signUp({ email, password });
+    // Email confirmations are OFF (Stripe verifies the email at payment), so a
+    // successful signUp returns a live session. Adopt it immediately and clear
+    // any cached account/role so _ensureAccountId re-resolves the freshly
+    // trigger-provisioned account (owner_user_id = this new user).
+    const res = await this._sb.auth.signUp({ email, password });
+    if (res.data?.user) this._user = res.data.user;
+    this._accountId = null;
+    this._role = null;
+    this._ownerUserId = null;
+    this._permissions = null;
+    this._accountsCache = null;
+    return res;
+  },
+
+  // Clickwrap: record a Terms/Privacy acceptance (who / when / which version).
+  // Called right after signUp, while the session is live so RLS insert-self
+  // (user_id = auth.uid()) passes. Best-effort: a failure here never blocks the
+  // paid signup, but it should essentially never fail.
+  async recordTosAcceptance(accountId, version, termsUrl, privacyUrl) {
+    if (!this._sb || !this._user) return { error: { message: 'Not signed in' } };
+    return await this._sb.from('tos_acceptances').insert({
+      user_id:     this._user.id,
+      account_id:  accountId || null,
+      tos_version: version,
+      terms_url:   termsUrl || null,
+      privacy_url: privacyUrl || null
+    });
   },
 
   async signOut() {
