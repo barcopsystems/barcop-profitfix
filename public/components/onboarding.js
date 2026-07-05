@@ -33,8 +33,15 @@ const Onboarding = {
     const parts = (s.city_state || '').split(',').map(p => p.trim());
     const v = x => (x != null && x !== '') ? x : '';
 
+    // Pre-fill the name: for a bar added via Add Another Bar, the modal already
+    // set accounts.name, so seed it here (unless a real bar_name is already set).
+    // Skip a still-default account name (the signup email or "My Bar").
+    const acctName = (window.DB && DB.activeAccountName) ? DB.activeAccountName() : null;
+    const acctNameReal = acctName && acctName.indexOf('@') < 0 && acctName !== 'My Bar';
+    const prefillName = s.bar_name || (acctNameReal ? acctName : '');
+
     const basics = '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:2;min-width:170px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(s.bar_name || '') + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="flex:2;min-width:170px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(prefillName) + '" placeholder="The Rusty Nail"/></div>'
       + '<div class="f" style="flex:1.2;min-width:110px;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
       + '</div>';
@@ -91,6 +98,14 @@ const Onboarding = {
     s.service_periods     = periods;
     s.onboarding_complete = true;
     await App.saveKey('settings');
+
+    // Keep the bar switcher (accounts.name) in sync with the name just set.
+    try {
+      if (window.DB && DB.setAccountName) {
+        await DB.setAccountName(s.bar_name);
+        if (App.renderAccountSwitcher) await App.renderAccountSwitcher();
+      }
+    } catch (e) { console.error('account name sync', e); }
 
     document.getElementById('ob-overlay').classList.add('hidden');
     App.showHub();
