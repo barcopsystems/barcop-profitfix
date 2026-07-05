@@ -5,6 +5,7 @@ const DB = {
   _user: null,
   _accountId: null,  // resolved lazily on first read/write after signin (Phase 2)
   _role: null,       // 'admin' | 'staff' | 'viewer' — resolved alongside _accountId
+  _ownerUserId: null, // accounts.owner_user_id for the active account (the Owner tier)
   _permissions: null, // { groupKey: 'view' | 'add' | 'edit' } — staff granular permissions
   _accountsCache: null,  // last-known accounts list for the current user (Phase 2)
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
@@ -29,6 +30,7 @@ const DB = {
     this._user = data?.session?.user || null;
     this._accountId = null;
     this._role = null;
+    this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;  // force re-resolve on next read/write
     return data?.session || null;
@@ -46,6 +48,7 @@ const DB = {
       if (prevUserId !== newUserId) {
         this._accountId = null;
         this._role = null;
+        this._ownerUserId = null;
         this._permissions = null;
         this._accountsCache = null;
       }
@@ -59,6 +62,7 @@ const DB = {
     if (data?.user) this._user = data.user;
     this._accountId = null;
     this._role = null;
+    this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;
     return { data, error };
@@ -75,6 +79,7 @@ const DB = {
     this._user = null;
     this._accountId = null;
     this._role = null;
+    this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;
   },
@@ -146,13 +151,14 @@ const DB = {
       if (stored) {
         const { data: m, error: e1 } = await this._sb
           .from('memberships')
-          .select('account_id, role, permissions')
+          .select('account_id, role, permissions, accounts(owner_user_id)')
           .eq('user_id', this._user.id)
           .eq('account_id', stored)
           .maybeSingle();
         if (!e1 && m) {
           this._accountId = m.account_id;
           this._role = m.role || 'admin';
+          this._ownerUserId = (m.accounts && m.accounts.owner_user_id) || null;
           this._permissions = m.permissions || {};
           return this._accountId;
         }
@@ -161,13 +167,14 @@ const DB = {
       }
       const { data, error } = await this._sb
         .from('memberships')
-        .select('account_id, role, permissions')
+        .select('account_id, role, permissions, accounts(owner_user_id)')
         .eq('user_id', this._user.id)
         .limit(1)
         .single();
       if (error || !data) return null;
       this._accountId = data.account_id;
       this._role = data.role || 'admin';
+      this._ownerUserId = (data.accounts && data.accounts.owner_user_id) || null;
       this._permissions = data.permissions || {};
       return this._accountId;
     } catch (e) {
@@ -222,6 +229,11 @@ const DB = {
   isStaff()  { return this._role === 'staff'; },
   isViewer() { return this._role === 'viewer'; },
   canWrite() { return this._role !== 'viewer'; },
+  // Owner = the accounts.owner_user_id for the active account. Ownership lives on the
+  // account (not as a membership role), so isOwner compares the signed-in user to it.
+  // The Owner holds billing + can transfer ownership; admins cannot touch either.
+  ownerUserId() { return this._ownerUserId; },
+  isOwner() { return !!(this._user && this._ownerUserId && this._user.id === this._ownerUserId); },
 
   // ── Granular permission system (Phase 2 Item 25b) ───────────────────────────
   // Each screen maps to a permission group. The user's permissions object
