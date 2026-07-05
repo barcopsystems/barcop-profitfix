@@ -1485,6 +1485,49 @@ app.post('/api/add-account', async (req, res) => {
   }
 });
 
+// ── Set an account's display name (owner tier) ────────────────────────────────
+// Keeps accounts.name (what the bar switcher shows) in sync with the in-app bar
+// name (settings.bar_name), which onboarding + Business Profile write. Caller
+// must be an owner or admin of the account.
+app.post('/api/set-account-name', async (req, res) => {
+  try {
+    const { accountId, name } = req.body || {};
+    if (!accountId || !name || !String(name).trim()) {
+      return res.status(400).json({ error: 'accountId and name required' });
+    }
+    const barName = String(name).trim().slice(0, 120);
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const userId = userData.user.id;
+
+    const { data: acct } = await supabaseAdmin
+      .from('accounts').select('owner_user_id').eq('id', accountId).single();
+    if (!acct) return res.status(404).json({ error: 'Account not found' });
+
+    let allowed = acct.owner_user_id === userId;
+    if (!allowed) {
+      const { data: mem } = await supabaseAdmin
+        .from('memberships').select('role').eq('account_id', accountId).eq('user_id', userId).single();
+      allowed = !!(mem && mem.role === 'admin');
+    }
+    if (!allowed) return res.status(403).json({ error: 'Not allowed to rename this account' });
+
+    const { error: upErr } = await supabaseAdmin
+      .from('accounts').update({ name: barName }).eq('id', accountId);
+    if (upErr) return res.status(500).json({ error: upErr.message });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('set-account-name exception:', e);
+    res.status(500).json({ error: e.message || 'Rename failed' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
