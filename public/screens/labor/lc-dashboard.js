@@ -115,8 +115,7 @@ S.LaborDashboard = {
     const wys = this._wys();
 
     container.innerHTML = '<div class="screen">'
-      + (wys.hasHours ? this.whereYouStand(wys) : '')
-      + this.getStartedBox()
+      + (wys.hasHours ? this.whereYouStand(wys) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
