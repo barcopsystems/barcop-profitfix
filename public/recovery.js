@@ -82,7 +82,12 @@ window.Recovery = {
     },
     'labor-scheduling': {
       series: 'revenue_weeks', label: 'Labor Cost', lowerBetter: true,
+      // Status band (gapImpact) reads TOTAL labor % vs your total labor target.
+      // Recovery dollars (compute) read HOURLY labor % only: salaried pay is fixed,
+      // so labor is recovered by scheduling hours, not by diluting a fixed salary as
+      // sales grow (that dilution would double-count with check-average growth).
       value: w => w.labor_pct_blended,
+      recoverValue: w => (w.hourly_labor_pct != null ? w.hourly_labor_pct : w.labor_pct_blended),
       base:  w => (w.bar_revenue || 0) + (w.floor_revenue || 0), baseKind: 'pts',
       target: () => App.laborTargetPct(),
       fmt: v => v.toFixed(1) + '%'
@@ -115,11 +120,15 @@ window.Recovery = {
     const m = entry && this.METRICS[entry.gap_id];
     if (!m || !entry.date) return { status: 'untracked' };
 
+    // Recovery dollars use the metric's recoverValue when defined (labor dollarizes
+    // HOURLY labor %, not total), falling back to value for every other metric.
+    const vf = m.recoverValue || m.value;
+
     // The weeks the operator has run SINCE the system started, earliest first.
     // The baseline is their own first weeks, not a pre-start history a new user
     // never has.
     const operating = this._series(m.series)
-      .filter(w => w.period_end && w.period_end >= entry.date && m.value(w) != null)
+      .filter(w => w.period_end && w.period_end >= entry.date && vf(w) != null)
       .slice()
       .sort((a, b) => a.period_end.localeCompare(b.period_end));
 
@@ -132,8 +141,8 @@ window.Recovery = {
     const allMeasure   = operating.slice(B);                 // every week since the baseline
     const recentMeasure = allMeasure.slice(-this.WINDOW);    // recent weeks, for the current rate
 
-    const bAvg = this._avg(baselineW.map(m.value));
-    const cAvg = this._avg(recentMeasure.map(m.value));      // current sustained performance
+    const bAvg = this._avg(baselineW.map(vf));
+    const cAvg = this._avg(recentMeasure.map(vf));           // current sustained performance
     const mN   = allMeasure.length;
     if (bAvg == null || cAvg == null || mN < this.MIN_MEASURE) {
       return { status: 'building', weeksIn: operating.length, baselineWeeks: B };
@@ -146,7 +155,7 @@ window.Recovery = {
     // (net slipping below your starting point).
     let dollars = 0, counted = 0;
     allMeasure.forEach(w => {
-      const v = m.value(w), base = m.base(w);
+      const v = vf(w), base = m.base(w);
       if (v == null || base == null) return;
       const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
       dollars += (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
