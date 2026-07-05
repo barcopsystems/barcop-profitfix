@@ -12,13 +12,15 @@
 
 S.HubBreakEven = {
   container: null,
-  _wf: null,   // what-if working values
+  _wf: null,
+  // Shared column layout so The Nut and The Last 8 Weeks line up column for
+  // column: Per Month sits under Sales, Per Week under Break-Even.
+  COLS: '<colgroup><col style="width:31%"><col style="width:23%"><col style="width:23%"><col style="width:23%"></colgroup>',
 
   open() {
     App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this.render(mount); }, 'breakeven');
   },
 
-  // ── Sidebar-page building blocks (match the Cash Recovery pages) ────────────
   _statItem(label, val, colorStyle) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg"' + (colorStyle ? ' style="' + colorStyle + '"' : '') + '>' + val + '</div></div>';
   },
@@ -31,7 +33,6 @@ S.HubBreakEven = {
       : '<div class="sh" style="margin:24px 0 10px;">' + t + '</div>';
   },
 
-  // ── Core computation (shared by the page + the Hub tile) ────────────────────
   _compute() {
     const HB = S.HubBooks;
     const curKey = (HB && HB._currentMonthKey) ? HB._currentMonthKey()
@@ -40,7 +41,7 @@ S.HubBreakEven = {
     const netRev = YTD ? ((YTD.totalRev || 0) - (YTD.compsLoss || 0)) : 0;
     const cogs   = YTD ? (YTD.totalCogs || 0) : 0;
     const labor  = YTD ? (YTD.totalLabor || 0) : 0;
-    const varRate = netRev > 0 ? (cogs + labor) / netRev : null;   // prime-cost share
+    const varRate = netRev > 0 ? (cogs + labor) / netRev : null;
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);
@@ -105,7 +106,8 @@ S.HubBreakEven = {
       return;
     }
 
-    const wf = this._wf || { sales: Math.round(c.lastSales || c.breakEven || 0), nut: Math.round(c.weeklyNut), rate: +(c.varRate * 100).toFixed(1) };
+    const defaults = { sales: Math.round(c.lastSales || c.breakEven || 0), nut: Math.round(c.weeklyNut), rate: +(c.varRate * 100).toFixed(1) };
+    const wf = this._wf || defaults;
     this._wf = wf;
 
     const delta = (c.lastSales != null) ? c.lastSales - c.breakEven : null;
@@ -115,7 +117,7 @@ S.HubBreakEven = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (color || 'var(--t1)') + ';">' + val + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
 
-    // ── 1. Top stats strip (the where-you-stand info, sidebar style) ────────
+    // ── 1. Top stats strip ─────────────────────────────────────────────────
     const topStrip = this._statsCard(
       this._statItem('Break-Even / Week', f(c.breakEven))
       + this._statItem('Last Week', c.lastSales != null ? f(c.lastSales) : '-')
@@ -125,19 +127,20 @@ S.HubBreakEven = {
     const readText = (delta == null) ? 'Log a week and Bar Cop shows how you tracked against your break-even.'
       : (delta >= 0 ? 'Last week you did ' + f(c.lastSales) + ' and cleared break-even by ' + f(delta) + '. That is your profit.'
                     : 'Last week you did ' + f(c.lastSales) + ', ' + f(Math.abs(delta)) + ' short of break-even.');
-    const readLine = '<div style="font-size:12px;color:var(--t3);margin:12px 2px 18px;line-height:1.6;">' + readText + '</div>';
 
     // ── 2. What If (up top) ────────────────────────────────────────────────
     const wfInput = (id, label, val, suffix, pre) => '<div class="f" style="width:170px;flex-shrink:0;"><label>' + label + '</label>'
       + '<div class="fw">' + (pre ? '<span class="pre">' + pre + '</span>' : '') + '<input' + (pre ? ' class="pre"' : (suffix ? ' class="suf"' : '')) + ' type="number" id="' + id + '" value="' + val + '" step="' + (suffix ? '0.1' : '100') + '"/>' + (suffix ? '<span class="suf">' + suffix + '</span>' : '') + '</div></div>';
     const whatIfCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">What If</div>'
-      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Move any lever and watch break-even and your profit shift. Nothing here is saved, it is a sandbox.</div>'
-      + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;">'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Move any lever and watch break-even and your profit shift. Nothing here is saved.</div>'
+      + '<div class="form-row" style="gap:16px 20px;flex-wrap:wrap;align-items:flex-end;">'
       +   wfInput('be-wf-sales', 'Weekly Sales', wf.sales, '', '$')
       +   wfInput('be-wf-nut', 'Weekly Nut', wf.nut, '', '$')
       +   wfInput('be-wf-rate', 'Variable Rate', wf.rate, '%')
+      +   '<div style="flex-shrink:0;"><button class="btn btn-ghost btn-sm" id="be-wf-reset">Reset</button></div>'
       + '</div>'
       + '<div id="be-wf-out" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);"></div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-top:14px;line-height:1.6;">' + readText + '</div>'
       + '</div>';
 
     // ── 3. Your Cost Structure (above The Nut) ─────────────────────────────
@@ -154,12 +157,12 @@ S.HubBreakEven = {
     const byCat = {};
     c.recurring.forEach(r => { const k = r.category || 'Other'; byCat[k] = (byCat[k] || 0) + (parseFloat(r.amount) || 0); });
     const nutRows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(k =>
-      '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + f2(byCat[k] * 12 / 52) + '</td></tr>').join('')
-      + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(c.weeklyNut) + '</td></tr>';
-    const opexBtn = '<button class="btn btn-ghost btn-sm" id="be-opex">Operating Expenses</button>';
-    const nutCard = this._sh('The Nut', opexBtn)
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
-      + '<thead><tr><th>Fixed Cost</th><th>Per Month</th><th>Per Week</th></tr></thead><tbody>' + nutRows + '</tbody></table></div>';
+      '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + f2(byCat[k] * 12 / 52) + '</td><td></td></tr>').join('')
+      + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(c.weeklyNut) + '</td><td></td></tr>';
+    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="be-export">Export PDF</button>';
+    const nutCard = this._sh('The Nut', exportBtn)
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + this.COLS
+      + '<thead><tr><th>Fixed Cost</th><th>Per Month</th><th>Per Week</th><th></th></tr></thead><tbody>' + nutRows + '</tbody></table></div>';
 
     // ── 5. The Last 8 Weeks (last) ─────────────────────────────────────────
     const recent = c.weeks.slice(-8);
@@ -171,13 +174,14 @@ S.HubBreakEven = {
         + '<td style="color:' + (d >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + (d >= 0 ? 'Cleared ' + f(d) : 'Short ' + f(Math.abs(d))) + '</td></tr>';
     }).join('');
     const trendCard = this._sh('The Last 8 Weeks')
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + this.COLS
       + '<thead><tr><th>Week Ending</th><th>Sales</th><th>Break-Even</th><th>Result</th></tr></thead>'
       + '<tbody>' + (trendRows || '<tr><td colspan="4" style="color:var(--t3);">No weeks logged yet.</td></tr>') + '</tbody></table></div>';
 
-    mount.innerHTML = '<div class="screen">' + topStrip + readLine + whatIfCard + structCard + nutCard + trendCard + '</div>';
+    mount.innerHTML = '<div class="screen">' + topStrip + whatIfCard + structCard
+      + '<div id="be-export-root">' + nutCard + trendCard + '</div></div>';
 
-    document.getElementById('be-opex')?.addEventListener('click', () => S.HubOperatingExpenses?.open?.());
+    document.getElementById('be-export')?.addEventListener('click', () => App.exportPDF({ title: 'Break-Even', root: document.getElementById('be-export-root') }));
 
     const drawWf = () => {
       const sales = parseFloat(document.getElementById('be-wf-sales')?.value) || 0;
@@ -194,6 +198,12 @@ S.HubBreakEven = {
         + mini(profit >= 0 ? 'Profit at That Volume' : 'Shortfall', (profit >= 0 ? '' : '-') + f(Math.abs(profit)), profit >= 0 ? 'var(--green)' : 'var(--red)')
         + '</div>';
     };
+    document.getElementById('be-wf-reset')?.addEventListener('click', () => {
+      const si = document.getElementById('be-wf-sales'); if (si) si.value = defaults.sales;
+      const ni = document.getElementById('be-wf-nut');   if (ni) ni.value = defaults.nut;
+      const ri = document.getElementById('be-wf-rate');  if (ri) ri.value = defaults.rate;
+      drawWf();
+    });
     ['be-wf-sales', 'be-wf-nut', 'be-wf-rate'].forEach(id => document.getElementById(id)?.addEventListener('input', drawWf));
     drawWf();
   },
@@ -203,7 +213,7 @@ S.HubBreakEven = {
       { p: ['Break-Even is the one number that runs the business: the sales you need each week to cover your costs. Below it you are losing money, above it you are making it. Bar Cop already holds every input, so it just draws the line.'] },
       { h: 'How It Is Built', p: ['Your fixed costs, the nut, are your recurring operating-expense bills like rent, insurance, and utilities, spread to a weekly number. Your variable rate is the share of every sales dollar that goes to product and labor, read from your real logged weeks. Break-even is the nut divided by the dollars left after variable costs. Keep your operating expenses and weekly closes current and the number stays honest.'] },
       { h: 'Tracking Against It', p: ['The strip up top shows last week against the line, cleared it and the amount is your profit, short and that is your gap, plus the day of the week you cross break-even at last week\'s pace. The 8-week table at the bottom shows the streak.'] },
-      { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Nothing there is saved.'] }
+      { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Hit Reset to snap back to your real numbers.'] }
     ]);
   }
 };
