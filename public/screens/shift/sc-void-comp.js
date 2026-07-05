@@ -218,12 +218,33 @@ S.ShiftVoidComp = {
       const comps = filtered.filter(r => r.type === 'Comp');
       const voidTot = voids.reduce((t, r) => t + (r.amount || 0), 0);
       const compTot = comps.reduce((t, r) => t + (r.amount || 0), 0);
+      // Given Away = the customer-facing comps (App.compReasonIsLoss), read against
+      // sales for this SAME date range so the operator sees what they hand out on
+      // purpose as a share of the top line, not just a raw total. Staff meals and
+      // shift drinks are policy expense, not a give-away, so they drop out here.
+      const { from: rFrom, to: rTo } = this.effectiveRange();
+      const giveAway = comps.filter(r => App.compReasonIsLoss(r.reason)).reduce((t, r) => t + (r.amount || 0), 0);
+      const rangeSales = ((App.data && App.data.revenue_weeks) || []).reduce((t, w) => {
+        const end = String(w.period_end || '').slice(0, 10);
+        if (!end || (rFrom && end < rFrom) || (rTo && end > rTo)) return t;
+        return t + (w.bar_revenue || 0) + (w.floor_revenue || 0);
+      }, 0);
+      const compTarget = parseFloat(App.data.revenue_settings && App.data.revenue_settings.targets && App.data.revenue_settings.targets.comp_pct) || 3;
+      const compPct = rangeSales > 0 ? giveAway / rangeSales * 100 : null;
+      const pctCol = compPct == null ? 'var(--t3)' : compPct > compTarget + 0.3 ? 'var(--red)' : compPct >= compTarget - 1 ? 'var(--amber)' : 'var(--green)';
+      const compRead = giveAway > 0
+        ? '<div style="font-size:12px;color:var(--t3);margin-top:12px;line-height:1.6;">' + App.fmtCurrency(giveAway) + ' in customer comps this range'
+          + (compPct != null ? ', ' + compPct.toFixed(1) + '% of sales, ' + (compPct > compTarget + 0.3 ? 'over' : compPct >= compTarget - 1 ? 'right around' : 'under') + ' your ' + compTarget + '% line' : ', log your weekly sales to read this as a share of the top line')
+          + '. Not every comp is a leak; the question is whether it is buying loyalty or giving away margin.</div>'
+        : '';
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val lg">' + voids.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val lg warn">' + App.fmtCurrency(voidTot) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Comps</div><div class="calc-val lg">' + comps.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Comp Total</div><div class="calc-val lg warn">' + App.fmtCurrency(compTot) + '</div></div>'
-        + '</div></div>';
+        + '<div class="calc-item"><div class="calc-label">Given Away</div><div class="calc-val lg">' + App.fmtCurrency(giveAway) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">% of Sales</div><div class="calc-val lg" style="color:' + pctCol + ';">' + (compPct == null ? '-' : compPct.toFixed(1) + '%') + '</div></div>'
+        + '</div>' + compRead + '</div>';
 
       let listHtml;
       if (filtered.length === 0) {
