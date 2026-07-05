@@ -2531,7 +2531,7 @@ S.HubSettings = {
       { name:'Busser',    department:'Front of House', default_wage:11,                  tipped:true,  tip_out_pct:0 },
       { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
       { name:'Manager',   department:'Management',     pay_type:'Salary', default_salary:68000, tipped:false },
-      { name:'Assistant Manager', department:'Management', pay_type:'Salary', default_salary:52000, tipped:false },
+      { name:'Assistant Manager', department:'Management', default_wage:24, tipped:false },
     ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
@@ -2573,8 +2573,8 @@ S.HubSettings = {
       mkStaff('Owen L.',    'Host',      12.5, 80),
       mkStaff('Tara W.',    'Busser',    11,   90),
       mkStaff('Diego S.',   'Busser',    11,   55),
-      mkSalaried('Carlos P.', 'Manager',           68000, 520),
-      mkSalaried('Renee K.',  'Assistant Manager', 52000, 300),
+      mkSalaried('Carlos P.', 'Manager',           68000, 520),   // the one salaried GM
+      mkStaff('Renee K.',     'Assistant Manager', 24,    300),   // hourly assistant manager
     ];
     App.laborData.lc_staff = lcStaff;
     // Recurring days off for a few staff (feeds Build Schedule's day-off block).
@@ -2584,6 +2584,8 @@ S.HubSettings = {
     setOff('Priya N.', ['Mon', 'Tue']);
     setOff('Owen L.',  ['Tue']);
     setOff('Ashley B.', ['Wed']);
+    // Two hourly key employees (shift leads) who run the floor when the GM is off.
+    ['Maria G.', 'Jessica M.'].forEach(nm => { const st = lcStaff.find(s => s.name === nm); if (st) st.shift_lead = true; });
 
     // Time off, all in NEXT week (no schedule posted there yet) so the demo shows
     // no conflicts on load; the warning fires when the operator builds next week.
@@ -2919,28 +2921,33 @@ S.HubSettings = {
         }
       });
     };
-    // Salaried (exempt) managers are FIXED weekly labor (annual / 52), not hourly.
-    // The blended labor % from the profile is the TOTAL labor target, so the hourly
-    // crew carries only (total - salaried) and the managers' pay is added back as
-    // fixed salary by App.salariedCost everywhere labor is read. This keeps total
-    // labor consistent (hourly actuals + salary = the blended %) instead of loading
-    // the whole labor budget onto the hourly crew and stacking salary on top.
-    const salariedStaff  = lcStaff.filter(s => s.pay_type === 'Salary');
-    const weeklySalaried = salariedStaff.reduce((sum, s) => sum + ((parseFloat(s.annual_salary) || 0) / 52), 0);
-    // Managers log their week for coverage + RPLH at 0 hourly cost (the fixed salary
-    // is added by App.salariedCost at every rollup, so it is never double-counted).
-    const seedMgrDays = (baseAgo) => salariedStaff.forEach(st => {
-      for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' });
-    });
+    // Management is ONE salaried GM plus an HOURLY assistant manager. The blended
+    // labor % from the profile is the TOTAL labor target, so the hourly crew + the AM
+    // carry (total - GM salary), and the GM's fixed pay is added back by
+    // App.salariedCost everywhere labor is read. Keeps total labor consistent (hourly
+    // actuals + salary = the blended %) AND realistic (a lean recovered crew, not the
+    // whole budget loaded onto hourly with salary stacked on top).
+    const gmStaff  = lcStaff.filter(s => s.pay_type === 'Salary');   // the one salaried GM
+    const weeklySalaried = gmStaff.reduce((sum, s) => sum + ((parseFloat(s.annual_salary) || 0) / 52), 0);
+    const amStaff  = lcStaff.find(s => s.name === 'Renee K.');        // hourly assistant manager
+    const amHrs    = 6.5;                                             // her shift length, 5 days
+    const amWeekly = amStaff ? +(amStaff.wage * amHrs * 5).toFixed(2) : 0;
+    // The GM logs coverage hours at 0 hourly cost (salary added by salariedCost); the
+    // hourly AM logs real hours/cost, carved out of the food labor budget below.
+    const seedLeaders = (baseAgo) => {
+      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); });
+      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
+    };
     ANCHL.weeks.forEach(a => {
-      const baseAgo = sunOff + ANCHS.endAgo(a);
-      const totLab  = a.bar_labor + a.food_labor;
-      const barSal  = totLab > 0 ? weeklySalaried * (a.bar_labor / totLab) : 0;
-      const foodSal = weeklySalaried - barSal;
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, a.bar_labor - barSal),           baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       Math.max(0, (a.food_labor - foodSal) * 0.5), baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], Math.max(0, (a.food_labor - foodSal) * 0.5), baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
-      seedMgrDays(baseAgo);
+      const baseAgo  = sunOff + ANCHS.endAgo(a);
+      const totLab   = a.bar_labor + a.food_labor;
+      const barSal   = totLab > 0 ? weeklySalaried * (a.bar_labor / totLab) : 0;
+      const foodSal  = weeklySalaried - barSal;
+      const foodCrew = Math.max(0, a.food_labor - foodSal - amWeekly);   // AM carved out of food
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, a.bar_labor - barSal), baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       foodCrew * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], foodCrew * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      seedLeaders(baseAgo);
     });
     // Current week, mid-close: the operator has imported this week's hours, so
     // Labor's Close The Week shows the full week with step 1 done. Live: zero
@@ -2948,13 +2955,14 @@ S.HubSettings = {
     const curL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
     const curLBase = sunOff - 7;
     if (curL) {
-      const cTot     = curL.bar_labor + curL.food_labor;
-      const cBarSal  = cTot > 0 ? weeklySalaried * (curL.bar_labor / cTot) : 0;
-      const cFoodSal = weeklySalaried - cBarSal;
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, curL.bar_labor - cBarSal),           curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       Math.max(0, (curL.food_labor - cFoodSal) * 0.5), curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], Math.max(0, (curL.food_labor - cFoodSal) * 0.5), curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
-      seedMgrDays(curLBase);
+      const cTot      = curL.bar_labor + curL.food_labor;
+      const cBarSal   = cTot > 0 ? weeklySalaried * (curL.bar_labor / cTot) : 0;
+      const cFoodSal  = weeklySalaried - cBarSal;
+      const cFoodCrew = Math.max(0, curL.food_labor - cFoodSal - amWeekly);
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, curL.bar_labor - cBarSal), curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       cFoodCrew * 0.5, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], cFoodCrew * 0.5, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      seedLeaders(curLBase);
     }
     App.laborData.lc_actuals   = lcActuals;
 
@@ -2993,6 +3001,9 @@ S.HubSettings = {
       'Manager':   [
         { days:['Mon','Tue','Wed','Fri'],       start:'09:00', end:'17:00', hours:8 },   // opener
         { days:['Thu','Fri','Sat','Sun'],       start:'15:00', end:'23:00', hours:8 },   // closer
+      ],
+      'Assistant Manager': [
+        { days:['Tue','Wed','Thu','Fri','Sat'], start:'15:30', end:'22:00', hours:6.5 }, // hourly AM, dinner floor
       ],
     };
     const posNameOf = id => (lcPositions.find(p => p.id === id) || {}).name;
