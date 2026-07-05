@@ -25,7 +25,7 @@ S.RevenueMenuEngineering = {
   MIN_PER_CAT: 4,
 
   // Menu order for the per-category sections (same order Menu Items uses).
-  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
+  CAT_ORDER: ['Appetizers', 'Entrees', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
   // The item's margin target: its own override, else the category default. Null
   // for beverages / inventory items with no set target, so no price is suggested.
@@ -149,6 +149,7 @@ S.RevenueMenuEngineering = {
     const cands = this.batchCandidates();
     const repriceCount = cands.length;
     const upside = cands.reduce((s, c) => s + (c.dwk || 0), 0);
+    const plannedCount = items.filter(i => i.planned_price > 0).length;
     const unranked = [];
 
     // Build the prescription cells (Suggested, Delta/wk, Action) for one item.
@@ -186,6 +187,7 @@ S.RevenueMenuEngineering = {
       let btns = '';
       if (!actionsPlaced) {
         btns = (repriceCount > 0 ? '<button class="btn btn-primary btn-sm no-print" id="me-batch" style="margin-right:8px;">Reprice to Target (' + repriceCount + ')</button>' : '')
+          + (plannedCount > 0 ? '<button class="btn btn-ghost btn-sm no-print" id="me-marklive-all" style="margin-right:8px;">Mark All Live (' + plannedCount + ')</button>' : '')
           + '<button class="btn btn-ghost btn-sm no-print" id="me-export">Export PDF</button>';
         actionsPlaced = true;
       }
@@ -247,19 +249,13 @@ S.RevenueMenuEngineering = {
     // ── Stat box — menu-wide rollups + the reprice headline + bulk actions ─────
     const avgCMall = items.reduce((s, i) => s + (i.price - i.cost), 0) / items.length;
     const avgCostPct = items.reduce((s, i) => s + (i.cost / i.price * 100), 0) / items.length;
-    const plannedCount = items.filter(i => i.planned_price > 0).length;
     const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    const actionsRow = (plannedCount > 0)
-      ? '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;"><button class="btn btn-ghost btn-sm" id="me-marklive-all">Mark All Live (' + plannedCount + ')</button></div>'
-      : '';
     const statBox = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + calcItem('Items Analyzed', items.length)
       + calcItem('Avg Cost %', avgCostPct.toFixed(1) + '%')
       + calcItem('To Reprice', repriceCount)
       + calcItem('Weekly Upside', '<span style="color:var(--gold);">+' + f(upside) + '</span>')
-      + '</div>'
-      + actionsRow
-      + '</div>';
+      + '</div></div>';
 
     return '<div id="me-export-root">' + statBox + cards + unrankedCard + this.reviewLogHtml() + '</div>';
   },
