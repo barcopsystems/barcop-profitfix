@@ -72,7 +72,8 @@ S.HubSettingsHome = {
       kvRow('Pour Cost', (t.bar_pour_cost_pct ?? 22) + '%'),
       kvRow('Food Cost', (t.food_cost_pct ?? 32) + '%'),
       kvRow('Labor Cost', (t.labor_cost_pct ?? 30) + '%'),
-      kvRow('Check Average', fmt$0(rt.check_avg ?? 35))
+      kvRow('Check Average', fmt$0(rt.check_avg ?? 35)),
+      kvRow('Comp Target', (rt.comp_pct ?? 3) + '%')
     ];
     const targetCard = card('Recovery Targets', 'settings-targets', 'Edit', targetRows);
 
