@@ -53,7 +53,7 @@ S.HubBooksHome = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
 
     mount.innerHTML = '<div class="screen">'
-      + (gs.all ? this.whereYouStand(st) : this.getStartedBox(gs))
+      + (gs.hasWeeks ? this.whereYouStand(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')

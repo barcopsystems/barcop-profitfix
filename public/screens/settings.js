@@ -3695,7 +3695,11 @@ S.HubSettings = {
     await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
     App.updatePeriod();
 
-    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. All six systems populated. Go test!'; }
+    // Reload so the app re-renders against a fully hydrated state (like Clear
+    // Data does). Without it, navigating mid-load could catch a half-built store
+    // and, e.g., flash a Get Started card next to Where You Stand.
+    if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. Reloading...'; }
+    setTimeout(() => window.location.reload(), 800);
   },
 
   async clearAll() {
