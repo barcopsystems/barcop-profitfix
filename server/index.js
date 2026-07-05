@@ -640,22 +640,27 @@ Return this exact JSON (all values calculated):
 }
 
 // ── Stripe checkout session ───────────────────────────────────────────────────
-const BARCOP_PRICE_ID = 'price_1TZA54Gow04S066UjWZIRAlL';
+// Per-bar billing, two prices on the one "Bar Cop" product. IDs come from env
+// so the test→live swap is an env change, not a code edit. The fallbacks are the
+// SANDBOX price IDs (safe test money); set the env vars to the LIVE IDs at launch.
+const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || 'price_1TpwZ1Gow04S066UBcwhEPNK'; // $249/mo
+const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || 'price_1TpwYXGow04S066UQ8BSpauR'; // $2,490/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { userId, accountId } = req.body;
+  const { userId, accountId, plan } = req.body;
   if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
     // Billing is per bar: the account_id ties the subscription to the bar the
     // webhook activates. The signup / Add-Another-Bar flow supplies it.
     const metadata = { user_id: userId };
     if (accountId) metadata.account_id = accountId;
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: BARCOP_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: 'https://app.barcop.com/?checkout=success',
       cancel_url:  'https://app.barcop.com/?checkout=cancelled',
       metadata
