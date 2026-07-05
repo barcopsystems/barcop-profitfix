@@ -2919,11 +2919,28 @@ S.HubSettings = {
         }
       });
     };
+    // Salaried (exempt) managers are FIXED weekly labor (annual / 52), not hourly.
+    // The blended labor % from the profile is the TOTAL labor target, so the hourly
+    // crew carries only (total - salaried) and the managers' pay is added back as
+    // fixed salary by App.salariedCost everywhere labor is read. This keeps total
+    // labor consistent (hourly actuals + salary = the blended %) instead of loading
+    // the whole labor budget onto the hourly crew and stacking salary on top.
+    const salariedStaff  = lcStaff.filter(s => s.pay_type === 'Salary');
+    const weeklySalaried = salariedStaff.reduce((sum, s) => sum + ((parseFloat(s.annual_salary) || 0) / 52), 0);
+    // Managers log their week for coverage + RPLH at 0 hourly cost (the fixed salary
+    // is added by App.salariedCost at every rollup, so it is never double-counted).
+    const seedMgrDays = (baseAgo) => salariedStaff.forEach(st => {
+      for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' });
+    });
     ANCHL.weeks.forEach(a => {
       const baseAgo = sunOff + ANCHS.endAgo(a);
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       a.bar_labor,        baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       a.food_labor * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], a.food_labor * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      const totLab  = a.bar_labor + a.food_labor;
+      const barSal  = totLab > 0 ? weeklySalaried * (a.bar_labor / totLab) : 0;
+      const foodSal = weeklySalaried - barSal;
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, a.bar_labor - barSal),           baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       Math.max(0, (a.food_labor - foodSal) * 0.5), baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], Math.max(0, (a.food_labor - foodSal) * 0.5), baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      seedMgrDays(baseAgo);
     });
     // Current week, mid-close: the operator has imported this week's hours, so
     // Labor's Close The Week shows the full week with step 1 done. Live: zero
@@ -2931,9 +2948,13 @@ S.HubSettings = {
     const curL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
     const curLBase = sunOff - 7;
     if (curL) {
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       curL.bar_labor,        curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       curL.food_labor * 0.5, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], curL.food_labor * 0.5, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      const cTot     = curL.bar_labor + curL.food_labor;
+      const cBarSal  = cTot > 0 ? weeklySalaried * (curL.bar_labor / cTot) : 0;
+      const cFoodSal = weeklySalaried - cBarSal;
+      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, curL.bar_labor - cBarSal),           curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       Math.max(0, (curL.food_labor - cFoodSal) * 0.5), curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], Math.max(0, (curL.food_labor - cFoodSal) * 0.5), curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      seedMgrDays(curLBase);
     }
     App.laborData.lc_actuals   = lcActuals;
 

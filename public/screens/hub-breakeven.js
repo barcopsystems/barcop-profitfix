@@ -5,8 +5,8 @@
    and how you're tracking against it. Bar Cop already holds every input, so it
    just draws the line. FIXED costs (the nut) = your recurring operating-expense
    bills PLUS salaried (exempt) pay, which does not flex with sales. VARIABLE costs
-   = COGS + HOURLY labor as a share of sales (the S.HubBooks labor figure is hourly
-   only, so the rate already reflects it; salaried is handled as fixed above).
+   = COGS + HOURLY labor as a share of sales (S.HubBooks labor includes salaried, so
+   it is peeled back out here for the rate; salaried sits in the nut above).
    Break-even = nut / (1 - variable rate). Sidebar page, so it uses a plain top stats strip
    (not the landing-only Where You Stand card). Opened from the Hub Break-Even
    tile and the Books sidebar. */
@@ -42,16 +42,23 @@ S.HubBreakEven = {
     const netRev = YTD ? ((YTD.totalRev || 0) - (YTD.compsLoss || 0)) : 0;
     const cogs   = YTD ? (YTD.totalCogs || 0) : 0;
     const labor  = YTD ? (YTD.totalLabor || 0) : 0;
-    const varRate = netRev > 0 ? (cogs + labor) / netRev : null;
+    // Books labor now includes salaried; peel it back so the VARIABLE rate reflects
+    // only hourly labor (what flexes with sales). salariedYTD reconstructs exactly
+    // what the aggregator folded in, week by week.
+    const _yr = curKey.slice(0, 4), _mn = parseInt(curKey.slice(5, 7), 10);
+    const _inYTD = d => d && String(d).slice(0, 4) === _yr && parseInt(String(d).slice(5, 7), 10) <= _mn;
+    const salariedYTD = ((App.data && App.data.weeks) || [])
+      .filter(w => _inYTD(w.period_end))
+      .reduce((s, w) => s + (App.salariedCost ? (App.salariedCost(App.weekStartFor(w.period_end), w.period_end).total || 0) : 0), 0);
+    const hourlyLabor = Math.max(0, labor - salariedYTD);
+    const varRate = netRev > 0 ? (cogs + hourlyLabor) / netRev : null;
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);
     const monthlyOpex = recurring.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     const weeklyOpex = monthlyOpex * 12 / 52;
-    // Labor splits by how the cost behaves: HOURLY flexes with the week (already in
-    // the variable rate, since the Books labor figure is hourly only), SALARIED
-    // (exempt) pay is fixed every week like rent, so it belongs in the nut. One full
-    // week through the canonical salariedCost so this ties to what Labor and Cash show.
+    // The nut also carries salaried (exempt) pay: fixed every week like rent. One
+    // full week through the canonical salariedCost so it ties to Labor and Cash.
     const beEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
     const weeklySalaried = (App.salariedCost ? App.salariedCost(App.weekStartFor(beEnd), beEnd).total : 0) || 0;
     const salariedMonthly = weeklySalaried * 52 / 12;
@@ -67,7 +74,7 @@ S.HubBreakEven = {
     const lastSales = lastWk ? salesOf(lastWk) : null;
 
     return {
-      curKey, netRev, cogs, labor, varRate, recurring,
+      curKey, netRev, cogs, labor, hourlyLabor, varRate, recurring,
       monthlyOpex, weeklyOpex, weeklySalaried, salariedMonthly, monthlyFixed, weeklyNut, breakEven,
       weeks, salesOf, lastWk, lastSales,
       hasOpex: monthlyOpex > 0, hasRev: netRev > 0
@@ -161,7 +168,7 @@ S.HubBreakEven = {
       + 'Salaried pay does not flex with sales, so it sits in the nut below, not here. That leftover is what has to add up to your ' + f(c.weeklyNut) + ' weekly nut before you make a dime.</div>'
       + '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);display:flex;flex-wrap:wrap;">'
       +   mini('COGS', c.netRev ? (c.cogs / c.netRev * 100).toFixed(1) + '%' : '-') + vdiv
-      +   mini('Hourly Labor', c.netRev ? (c.labor / c.netRev * 100).toFixed(1) + '%' : '-')
+      +   mini('Hourly Labor', c.netRev ? (c.hourlyLabor / c.netRev * 100).toFixed(1) + '%' : '-')
       + '</div></div>';
 
     // ── 4. The Nut (2nd to last) ───────────────────────────────────────────
