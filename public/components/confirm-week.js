@@ -280,6 +280,10 @@ const ConfirmWeek = {
     const rw = (App.data.revenue_weeks || []).find(w => (w.period_end || '').slice(0, 10) === pe) || null;
     const laborCost = bLab + fLab;
     const hours = this._hours || 0;
+    // Hourly (schedulable) labor = total labor minus the fixed salaried pay, so the
+    // labor-scheduling recovery leak dollarizes only what scheduling can move.
+    const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(pe), pe).total || 0) : 0;
+    const hourlyLabor = Math.max(0, laborCost - salaried);
     const rweek = {
       id: rw ? rw.id : App.uid(),
       week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).length + 1),
@@ -289,8 +293,10 @@ const ConfirmWeek = {
       covers: covers,
       check_avg: covers > 0 ? parseFloat((totRev / covers).toFixed(2)) : 0,
       total_labor_cost: laborCost,
+      hourly_labor_cost: parseFloat(hourlyLabor.toFixed(2)),
       total_hours: hours,
       labor_pct_blended: totRev > 0 ? parseFloat((laborCost / totRev * 100).toFixed(2)) : 0,
+      hourly_labor_pct: totRev > 0 ? parseFloat((hourlyLabor / totRev * 100).toFixed(2)) : 0,
       rplh_blended: hours > 0 ? parseFloat((totRev / hours).toFixed(2)) : 0,
       notes: notes,
       saved_at: new Date().toISOString()
