@@ -4,9 +4,10 @@
    The one number that runs the business: the sales you need to cover your costs,
    and how you're tracking against it. Bar Cop already holds every input, so it
    just draws the line. FIXED costs (the nut) = your recurring operating-expense
-   bills. VARIABLE costs = COGS + labor as a share of sales (your real prime-cost
-   ratio from S.HubBooks, the same aggregator the Books P&L uses). Break-even =
-   nut / (1 - variable rate). Sidebar page, so it uses a plain top stats strip
+   bills PLUS salaried (exempt) pay, which does not flex with sales. VARIABLE costs
+   = COGS + HOURLY labor as a share of sales (the S.HubBooks labor figure is hourly
+   only, so the rate already reflects it; salaried is handled as fixed above).
+   Break-even = nut / (1 - variable rate). Sidebar page, so it uses a plain top stats strip
    (not the landing-only Where You Stand card). Opened from the Hub Break-Even
    tile and the Books sidebar. */
 
@@ -45,8 +46,17 @@ S.HubBreakEven = {
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);
-    const monthlyFixed = recurring.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    const weeklyNut = monthlyFixed * 12 / 52;
+    const monthlyOpex = recurring.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const weeklyOpex = monthlyOpex * 12 / 52;
+    // Labor splits by how the cost behaves: HOURLY flexes with the week (already in
+    // the variable rate, since the Books labor figure is hourly only), SALARIED
+    // (exempt) pay is fixed every week like rent, so it belongs in the nut. One full
+    // week through the canonical salariedCost so this ties to what Labor and Cash show.
+    const beEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    const weeklySalaried = (App.salariedCost ? App.salariedCost(App.weekStartFor(beEnd), beEnd).total : 0) || 0;
+    const salariedMonthly = weeklySalaried * 52 / 12;
+    const monthlyFixed = monthlyOpex + salariedMonthly;
+    const weeklyNut = weeklyOpex + weeklySalaried;
 
     const breakEven = (varRate != null && varRate < 1 && weeklyNut > 0) ? weeklyNut / (1 - varRate) : null;
 
@@ -57,9 +67,10 @@ S.HubBreakEven = {
     const lastSales = lastWk ? salesOf(lastWk) : null;
 
     return {
-      curKey, netRev, cogs, labor, varRate, recurring, monthlyFixed, weeklyNut, breakEven,
+      curKey, netRev, cogs, labor, varRate, recurring,
+      monthlyOpex, weeklyOpex, weeklySalaried, salariedMonthly, monthlyFixed, weeklyNut, breakEven,
       weeks, salesOf, lastWk, lastSales,
-      hasOpex: monthlyFixed > 0, hasRev: netRev > 0
+      hasOpex: monthlyOpex > 0, hasRev: netRev > 0
     };
   },
 
@@ -146,18 +157,22 @@ S.HubBreakEven = {
     // ── 3. Your Cost Structure (above The Nut) ─────────────────────────────
     const cents = Math.round(c.varRate * 100);
     const structCard = '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Your Cost Structure</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;">Of every sales dollar, <span style="color:var(--t1);font-weight:700;">' + cents + '&cent;</span> goes to product and labor, leaving <span style="color:var(--green);font-weight:700;">' + (100 - cents) + '&cent;</span> to cover the nut and drop to profit. '
-      + 'That leftover is what has to add up to your ' + f(c.weeklyNut) + ' weekly nut before you make a dime.</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;">Of every sales dollar, <span style="color:var(--t1);font-weight:700;">' + cents + '&cent;</span> goes to product and hourly labor, leaving <span style="color:var(--green);font-weight:700;">' + (100 - cents) + '&cent;</span> to cover the nut and drop to profit. '
+      + 'Salaried pay does not flex with sales, so it sits in the nut below, not here. That leftover is what has to add up to your ' + f(c.weeklyNut) + ' weekly nut before you make a dime.</div>'
       + '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);display:flex;flex-wrap:wrap;">'
       +   mini('COGS', c.netRev ? (c.cogs / c.netRev * 100).toFixed(1) + '%' : '-') + vdiv
-      +   mini('Labor', c.netRev ? (c.labor / c.netRev * 100).toFixed(1) + '%' : '-')
+      +   mini('Hourly Labor', c.netRev ? (c.labor / c.netRev * 100).toFixed(1) + '%' : '-')
       + '</div></div>';
 
     // ── 4. The Nut (2nd to last) ───────────────────────────────────────────
     const byCat = {};
     c.recurring.forEach(r => { const k = r.category || 'Other'; byCat[k] = (byCat[k] || 0) + (parseFloat(r.amount) || 0); });
+    const salRow = c.weeklySalaried > 0
+      ? '<tr><td><div class="val">Salaried Labor</div></td><td>' + f2(c.salariedMonthly) + '</td><td class="val">' + f2(c.weeklySalaried) + '</td><td></td></tr>'
+      : '';
     const nutRows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + f2(byCat[k] * 12 / 52) + '</td><td></td></tr>').join('')
+      + salRow
       + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(c.weeklyNut) + '</td><td></td></tr>';
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="be-export">Export PDF</button>';
     const nutCard = this._sh('The Nut', exportBtn)
@@ -211,7 +226,7 @@ S.HubBreakEven = {
   showHowTo() {
     App.showHelpModal('How Break-Even Works', [
       { p: ['Break-Even is the one number that runs the business: the sales you need each week to cover your costs. Below it you are losing money, above it you are making it. Bar Cop already holds every input, so it just draws the line.'] },
-      { h: 'How It Is Built', p: ['Your fixed costs, the nut, are your recurring operating-expense bills like rent, insurance, and utilities, spread to a weekly number. Your variable rate is the share of every sales dollar that goes to product and labor, read from your real logged weeks. Break-even is the nut divided by the dollars left after variable costs. Keep your operating expenses and weekly closes current and the number stays honest.'] },
+      { h: 'How It Is Built', p: ['Your fixed costs, the nut, are your recurring operating-expense bills like rent, insurance, and utilities, plus your salaried (exempt) pay, which is the same every week no matter how sales move, spread to a weekly number. Your variable rate is the share of every sales dollar that goes to product and hourly labor, read from your real logged weeks. Break-even is the nut divided by the dollars left after variable costs. Keep your operating expenses, salaries, and weekly closes current and the number stays honest.'] },
       { h: 'Tracking Against It', p: ['The strip up top shows last week against the line, cleared it and the amount is your profit, short and that is your gap, plus the day of the week you cross break-even at last week\'s pace. The 8-week table at the bottom shows the streak.'] },
       { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Hit Reset to snap back to your real numbers.'] }
     ]);
