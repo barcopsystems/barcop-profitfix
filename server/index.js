@@ -1349,6 +1349,73 @@ app.post('/api/remove-member', async (req, res) => {
   }
 });
 
+// ── Transfer account ownership (Phase 2 owner tier) ───────────────────────────
+// Only the current owner can call. Reassigns accounts.owner_user_id to another
+// existing member and makes that member an admin (an owner needs full access).
+// The old owner keeps their membership/role. Ownership is the transferable tier
+// that holds billing, so this is the only path that moves owner_user_id.
+app.post('/api/transfer-ownership', async (req, res) => {
+  try {
+    const { accountId, membershipId } = req.body || {};
+    if (!accountId || !membershipId) {
+      return res.status(400).json({ error: 'accountId and membershipId required' });
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    // Requester must be the CURRENT owner of this account.
+    const { data: acct } = await supabaseAdmin
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .single();
+    if (!acct || !acct.owner_user_id || acct.owner_user_id !== requesterUserId) {
+      return res.status(403).json({ error: 'Only the account owner can transfer ownership.' });
+    }
+
+    // Target must be an existing member of this account.
+    const { data: target } = await supabaseAdmin
+      .from('memberships')
+      .select('id, user_id, role')
+      .eq('id', membershipId)
+      .eq('account_id', accountId)
+      .single();
+    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
+    if (target.user_id === requesterUserId) {
+      return res.status(400).json({ error: 'You already own this account.' });
+    }
+
+    // Reassign ownership.
+    const { error: ownErr } = await supabaseAdmin
+      .from('accounts')
+      .update({ owner_user_id: target.user_id })
+      .eq('id', accountId);
+    if (ownErr) return res.status(500).json({ error: ownErr.message });
+
+    // Make the new owner an admin (owners need full access).
+    if (target.role !== 'admin') {
+      await supabaseAdmin
+        .from('memberships')
+        .update({ role: 'admin' })
+        .eq('id', target.id)
+        .eq('account_id', accountId);
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('transfer-ownership exception:', e);
+    res.status(500).json({ error: e.message || 'Transfer ownership failed' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
