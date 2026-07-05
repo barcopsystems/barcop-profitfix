@@ -664,22 +664,39 @@ app.post('/api/create-checkout-session', async (req, res) => {
 });
 
 // ── Stripe billing portal ─────────────────────────────────────────────────────
+// Owner-only. Verifies the caller's JWT (never trusts a client-supplied user id)
+// and confirms they own the target account before opening the portal. Billing
+// lives with the account owner, so the subscription is looked up by owner id.
 app.post('/api/billing-portal', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  const { accountId } = req.body || {};
+  if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
 
   try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const { createClient: mkClient } = require('@supabase/supabase-js');
-    const adminDb = mkClient(
-      'https://plpikfpintruksclkwyb.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
 
-    const { data, error } = await adminDb
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+    const requesterUserId = userData.user.id;
+
+    const { data: acct } = await supabaseAdmin
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .single();
+
+    if (!acct || !acct.owner_user_id || acct.owner_user_id !== requesterUserId) {
+      return res.status(403).json({ error: 'Only the account owner can manage billing.' });
+    }
+
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const { data, error } = await supabaseAdmin
       .from('subscriptions')
       .select('stripe_customer_id')
-      .eq('user_id', userId)
+      .eq('user_id', acct.owner_user_id)
       .single();
 
     if (error || !data?.stripe_customer_id) {
@@ -1067,6 +1084,15 @@ app.post('/api/list-members', async (req, res) => {
       return res.status(403).json({ error: 'Not a member of this account' });
     }
 
+    // The account owner (accounts.owner_user_id) is the Owner tier — protected
+    // in the UI (no role dropdown, no Remove) and on the server.
+    const { data: acct } = await supabaseAdmin
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .single();
+    const ownerUserId = acct?.owner_user_id || null;
+
     const { data: memberships, error: listError } = await supabaseAdmin
       .from('memberships')
       .select('id, user_id, role, permissions, created_at')
@@ -1090,7 +1116,8 @@ app.post('/api/list-members', async (req, res) => {
           permissions: m.permissions || {},
           confirmed: !!u?.user?.confirmed_at,
           created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
+          is_self: m.user_id === requesterUserId,
+          is_owner: !!ownerUserId && m.user_id === ownerUserId
         });
       } catch (e) {
         members.push({
@@ -1101,12 +1128,13 @@ app.post('/api/list-members', async (req, res) => {
           permissions: m.permissions || {},
           confirmed: false,
           created_at: m.created_at,
-          is_self: m.user_id === requesterUserId
+          is_self: m.user_id === requesterUserId,
+          is_owner: !!ownerUserId && m.user_id === ownerUserId
         });
       }
     }
 
-    res.json({ ok: true, members, requesterRole: requesterMembership.role });
+    res.json({ ok: true, members, requesterRole: requesterMembership.role, ownerUserId, requesterIsOwner: !!ownerUserId && requesterUserId === ownerUserId });
   } catch (e) {
     console.error('list-members exception:', e);
     res.status(500).json({ error: e.message || 'List members failed' });
@@ -1157,6 +1185,17 @@ app.post('/api/update-member-role', async (req, res) => {
     if (!target) return res.status(404).json({ error: 'Member not found in this account' });
     if (target.user_id === requesterUserId) {
       return res.status(400).json({ error: 'You cannot change your own role' });
+    }
+
+    // Owner protection: the account owner's role cannot be changed here. Ownership
+    // moves only through Transfer Ownership, which reassigns owner_user_id.
+    const { data: acctRole } = await supabaseAdmin
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .single();
+    if (acctRole?.owner_user_id && target.user_id === acctRole.owner_user_id) {
+      return res.status(400).json({ error: "The account owner's role cannot be changed. Use Transfer Ownership." });
     }
 
     // Last-admin protection: if demoting an admin, ensure another admin exists
@@ -1274,6 +1313,16 @@ app.post('/api/remove-member', async (req, res) => {
     if (!target) return res.status(404).json({ error: 'Member not found in this account' });
     if (target.user_id === requesterUserId) {
       return res.status(400).json({ error: 'You cannot remove yourself' });
+    }
+
+    // Owner protection: the account owner cannot be removed. Transfer ownership first.
+    const { data: acctOwn } = await supabaseAdmin
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .single();
+    if (acctOwn?.owner_user_id && target.user_id === acctOwn.owner_user_id) {
+      return res.status(400).json({ error: 'The account owner cannot be removed. Transfer ownership first.' });
     }
 
     if (target.role === 'admin') {
