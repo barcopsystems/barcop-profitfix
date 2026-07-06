@@ -379,8 +379,8 @@ window.CashEngine = {
   //    your opening cash, the low-point week, and your runway. The stress lever
   //    (slow-season sales adjust + scenario costs) powers "Can I Afford It". ─────
   _OPENING_KEY: 'cash_opening_balance',
-  openingCash() { const v = parseFloat(localStorage.getItem(this._OPENING_KEY)); return isNaN(v) ? null : v; },
-  setOpeningCash(v) { try { if (v == null || v === '') localStorage.removeItem(this._OPENING_KEY); else localStorage.setItem(this._OPENING_KEY, String(v)); } catch (e) {} },
+  openingCash() { const v = parseFloat(localStorage.getItem(this._key(this._OPENING_KEY))); return isNaN(v) ? null : v; },
+  setOpeningCash(v) { try { const k = this._key(this._OPENING_KEY); if (v == null || v === '') localStorage.removeItem(k); else localStorage.setItem(k, String(v)); } catch (e) {} },
 
   // Event balance payments collected around the event date (the deposit is
   // already in hand). Booked + completed only.
@@ -510,12 +510,23 @@ window.CashEngine = {
   //    Your balance, minus the money that isn't yours (the tax you collected and
   //    owe, plus tips held), minus the reserve you should keep. Config is light
   //    and kept on this device. ──────────────────────────────────────────────
-  _cfgNum(key, def) { const v = parseFloat(localStorage.getItem(key)); return isNaN(v) ? def : v; },
-  _cfgSet(key, v) { try { if (v == null || v === '') localStorage.removeItem(key); else localStorage.setItem(key, String(v)); } catch (e) {} },
+  // Cash config is PER BAR, but it lives device-local in localStorage. Scope
+  // every key by the active account (or 'demo') so a browser that held one bar's
+  // numbers — or the demo's — never leaks them into another bar or a fresh
+  // signup. A brand-new account has no scoped key, so it reads clean defaults.
+  _acctScope() {
+    if (window.App && App.demoMode) return 'demo';
+    return (window.DB && DB._accountId)
+      || (window.DB && DB._getStoredActiveAccountId && DB._getStoredActiveAccountId())
+      || 'none';
+  },
+  _key(base) { return base + '::' + this._acctScope(); },
+  _cfgNum(key, def) { const v = parseFloat(localStorage.getItem(this._key(key))); return isNaN(v) ? def : v; },
+  _cfgSet(key, v) { try { const k = this._key(key); if (v == null || v === '') localStorage.removeItem(k); else localStorage.setItem(k, String(v)); } catch (e) {} },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
   setSalesTaxRate(v) { this._cfgSet('cash_sales_tax_rate', v); },
-  taxFrequency()   { return localStorage.getItem('cash_tax_freq') || 'monthly'; },
-  setTaxFrequency(v) { try { localStorage.setItem('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); } catch (e) {} },
+  taxFrequency()   { return localStorage.getItem(this._key('cash_tax_freq')) || 'monthly'; },
+  setTaxFrequency(v) { try { localStorage.setItem(this._key('cash_tax_freq'), v === 'quarterly' ? 'quarterly' : 'monthly'); } catch (e) {} },
   payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
   setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
   reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },

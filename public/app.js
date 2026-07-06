@@ -256,6 +256,28 @@ const App = {
   TOS_PRIVACY_URL: 'https://www.barcop.com/pages/privacy-policy',
   _signupInProgress: false,  // guards the SIGNED_IN handler from booting mid-signup
 
+  // The builder's own operating accounts. Gates dev/testing tools (Load Sample
+  // Data / Clear All Data / Reset Onboarding) so real paying customers never see
+  // them. NOT the throwaway test-customer accounts — those should see exactly
+  // what a real customer sees.
+  DEV_EMAILS: ['kyleodom@yahoo.com', 'barcopsystems@gmail.com'],
+  isDevAccount() {
+    const email = ((window.DB && DB._user && DB._user.email) || '').toLowerCase();
+    return this.DEV_EMAILS.indexOf(email) !== -1;
+  },
+
+  // Suffix that scopes a device-local (localStorage) key to the active bar, so
+  // per-week cockpit "done" stamps never leak across accounts — or from the
+  // sample seed into a fresh signup — on the same browser. Also makes each bar's
+  // weekly-close state independent. Demo scopes to its own bucket.
+  acctScopeSuffix() {
+    if (this.demoMode) return '::demo';
+    const id = (window.DB && DB._accountId)
+      || (window.DB && DB._getStoredActiveAccountId && DB._getStoredActiveAccountId())
+      || 'none';
+    return '::' + id;
+  },
+
   async init() {
     await DB.init();
     window.onerror = (msg, src, line, col, err) => {
