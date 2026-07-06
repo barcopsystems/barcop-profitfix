@@ -728,7 +728,7 @@ const App = {
     this._newBarFlow = {
       originAccountId: (window.DB && (DB._accountId || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId()))) || null
     };
-    if (window.Onboarding) Onboarding.start({ newBar: true });
+    if (typeof Onboarding !== 'undefined') Onboarding.start({ newBar: true });
   },
 
   // Create the new bar, stash the onboarding draft for the post-payment return,
