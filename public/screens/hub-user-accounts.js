@@ -70,7 +70,7 @@ S.HubUserAccounts = {
     const showTeam    = group !== 'account' && isAdmin;
     const showAccount = group !== 'team' || !showTeam;   // non-admin 'team' falls back to account
 
-    const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:18px 0 12px;">' + txt + '</div>';
+    const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 12px;">' + txt + '</div>';
     const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
 
     const accountCard = '<div class="card form-card" style="margin-bottom:16px;">'
@@ -87,11 +87,11 @@ S.HubUserAccounts = {
       + '<div id="ua-sub-content"></div>'
       + (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()
           ? sh('Your Bars')
-            + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Run more than one location? Add another bar. Each bar is its own subscription and its own set of books, and you can switch between them up top.</div>'
+            + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
             + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>'
           : '')
       + sh('Data and Backup')
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export a full backup of everything in your account: settings, weekly numbers, audits, and your Inventory, Labor, and Shift Control records, in one file you keep offsite. Restore from a backup to recover your data or move it.</div>'
+      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export everything to one file you keep offsite. Restore to recover or move your data.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
       +   '<button class="btn btn-ghost" id="ua-export-data">Export Backup</button>'
       +   '<button class="btn btn-ghost" id="ua-import-btn">Restore from Backup</button>'
@@ -100,7 +100,7 @@ S.HubUserAccounts = {
       + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
       + ((App.demoMode || !(App.isDevAccount && App.isDevAccount())) ? '' :
           sh('Testing Tools')
-          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every system to test calculations and layouts. Clear All Data wipes every record across Bar Cop and the Inventory, Labor, and Shift Control stores, and starts fresh.</div>'
+          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
           +   '<button class="btn btn-ghost" id="ua-load-sample">Load Sample Data</button>'
           +   '<button class="btn btn-danger" id="ua-clear-all">Clear All Data</button>'
@@ -116,7 +116,7 @@ S.HubUserAccounts = {
       + sh('Members').replace('margin:18px', 'margin:2px')
       + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:8px;">Loading...</div>'
       + sh('Invite a Member')
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Send an invite email. Admin sees everything. Viewer is read-only on all data, useful for a bookkeeper. Staff gets only the sections you check below, with optional edit and delete on each.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Admin sees everything. Viewer is read-only (good for a bookkeeper). Staff gets only the sections you check below.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="bartender@email.com" autocomplete="off"/></div>'
       +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div>'
@@ -148,7 +148,7 @@ S.HubUserAccounts = {
       byModule[g.module].push(g);
     });
 
-    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:0 0 10px;">Permissions (Staff role only)</div>';
+    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 10px;">Permissions (Staff role only)</div>';
     html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Check Access to grant the user that section. Check Allow Edit/Delete to additionally let them modify existing entries. Unchecked Allow Edit means they can only add new entries, not change past ones.</div>';
     html += '<div class="ua-perms-grid" style="border:1px solid var(--b2);border-radius:4px;background:var(--input);padding:14px 16px;">';
 
