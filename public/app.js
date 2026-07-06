@@ -710,6 +710,10 @@ const App = {
 
   showPlanGate() {
     if (document.getElementById('plan-gate')) return;
+    const barName = ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
+    const acctLine = barName
+      ? 'Your account for <b style="color:var(--t1);">' + esc(barName) + '</b> is now set up.'
+      : 'Your account is now set up.';
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
@@ -717,18 +721,16 @@ const App = {
     m.id = 'plan-gate';
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
+      + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">Choose Your Plan</div>'
-      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">Your account is set up. Pick a plan to unlock Bar Cop and get instant access.</div>'
+      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + acctLine + '<br>Start your subscription plan for instant access.</div>'
       + '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
       +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
       +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
       + '</div>'
       + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">Continue to Payment</button>'
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
-      + '<div style="display:flex;gap:18px;justify-content:center;margin-top:18px;">'
-      +   '<button class="auth-link" id="gate-change-email" style="font-size:11px;">Change email</button>'
-      +   '<button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel account</button>'
-      + '</div>'
+      + '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button></div>'
       + '</div>';
     document.body.appendChild(m);
     const opts = Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt'));
@@ -749,7 +751,6 @@ const App = {
       const ok = await this.startCheckout(plan, gateErr);
       if (!ok) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
     });
-    document.getElementById('gate-change-email').addEventListener('click', () => this.abandonAndRestart());
     document.getElementById('gate-cancel').addEventListener('click', () => this.abandonAndRestart());
   },
 
@@ -776,7 +777,7 @@ const App = {
     // back to signup. The gate only drops once the auth screen is showing.
     const ok = await this.confirm({
       title: 'Discard this account?',
-      message: 'This deletes the account you just created (no payment was made) and takes you back to sign up with a different email.',
+      message: 'This deletes the account you just created and takes you back to the create-account page, in case you want to use a different email before choosing your subscription.',
       confirmText: 'Discard & Start Over', cancelText: 'Keep It', z: 9800
     });
     if (!ok) return;  // gate is still up; nothing to restore
