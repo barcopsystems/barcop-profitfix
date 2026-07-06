@@ -2150,14 +2150,18 @@ const App = {
       const el = document.getElementById(x);
       if (el) el.style.display = 'none';
     });
-    const panel = document.querySelector('.auth-panel');
+    const screen = document.getElementById('auth-screen');
     let note = null;
-    if (panel) {
+    if (screen) {
       note = document.createElement('div');
       note.id = 'auth-confirming';
-      note.innerHTML = '<div class="auth-heading">Confirming Your Payment</div>'
-        + '<div class="auth-sub">One moment while we activate your subscription.</div>';
-      panel.appendChild(note);
+      note.className = 'auth-view';
+      note.innerHTML = '<div class="auth-card">'
+        + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+        + '<div class="auth-heading">Confirming Your Payment</div>'
+        + '<div class="auth-sub">One moment while we activate your subscription.</div>'
+        + '</div>';
+      screen.appendChild(note);
     }
     let sub = this.subscription;
     for (let i = 0; i < tries; i++) {

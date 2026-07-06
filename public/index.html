@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Bar Cop</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=254"/>
+<link rel="stylesheet" href="style.css?v=255"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -38,70 +38,98 @@
 
 <!-- AUTH -->
 <div id="auth-screen" class="auth-screen" style="display:none;">
-  <div class="auth-panel">
-    <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
-    <div id="auth-login">
-      <div id="checkout-success-msg" style="background:rgba(219,171,70,0.1);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;text-align:center;">
-        Your Bar Cop account is ready. Enter your email below and click Forgot Password to set your password and access your Recovery Hub.
+    <div id="auth-login" class="auth-view">
+      <div class="auth-card">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div id="checkout-success-msg" style="background:rgba(219,171,70,0.1);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;text-align:center;">
+          Your Bar Cop account is ready. Enter your email below and click Forgot Password to set your password and access your Recovery Hub.
+        </div>
+        <div class="auth-heading">Log In to Bar Cop</div>
+        <div class="auth-sub">Enter your email and password to access your account.</div>
+        <div class="auth-inputs">
+          <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+          <div class="f"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
+        </div>
+        <button class="btn btn-primary" id="login-btn" style="width:100%;">Log In</button>
+        <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
       </div>
-      <div class="auth-heading">Sign In</div>
-      <div class="auth-sub">Enter your email and password to access your account.</div>
-      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="login-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
-      <div class="f" style="margin-bottom:18px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/></div>
-      <button class="btn btn-primary" id="login-btn" style="width:100%;">Sign In</button>
-      <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:12px;"><button class="auth-link" id="show-reset" style="font-size:11px;">Forgot password?</button></div>
-      <div style="text-align:center;margin-top:14px;border-top:1px solid var(--b2);padding-top:14px;"><button class="auth-link" id="show-signup" style="font-size:11px;">New to Bar Cop? Start your subscription</button></div>
-    </div>
-    <div id="auth-signup" style="display:none;">
-      <div class="auth-heading">Start Your Subscription</div>
-      <div class="auth-sub">Create your account and pick a plan. You go straight to secure checkout.</div>
-      <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
-      <div class="f" style="margin-bottom:10px;"><label>Password</label><input type="password" id="signup-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
-      <div class="f" style="margin-bottom:14px;"><label>Confirm Password</label><input type="password" id="signup-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
-      <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
-      <div id="signup-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-        <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
-        <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+      <div class="auth-foot">
+        <div><button class="auth-link" id="show-reset">Forgot password?</button></div>
+        <div style="font-size:12px;color:var(--t2);">New to Bar Cop? <button class="auth-link" id="show-signup">Start your subscription</button></div>
       </div>
-      <label style="display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--t2);line-height:1.5;cursor:pointer;">
-        <input type="checkbox" id="signup-tos" style="margin-top:2px;flex-shrink:0;"/>
-        <span>I agree to the <a href="https://www.barcop.com/pages/terms-of-use" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a> and <a href="https://www.barcop.com/pages/privacy-policy" target="_blank" rel="noopener" style="color:var(--gold);">Privacy Policy</a>.</span>
-      </label>
-      <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Start Subscription</button>
-      <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:12px;"><button class="auth-link" id="show-login-from-signup" style="font-size:11px;">Already have an account? Sign in</button></div>
     </div>
-    <div id="auth-paywall" style="display:none;">
-      <div class="auth-heading">Finish Your Subscription</div>
-      <div class="auth-sub">This bar needs an active subscription to use Bar Cop. Pick a plan to continue to checkout.</div>
-      <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
-      <div id="paywall-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-        <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
-        <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+    <div id="auth-signup" class="auth-view" style="display:none;">
+      <div class="auth-card">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Start Your Subscription</div>
+        <div class="auth-sub">Create your account and pick a plan. You go straight to secure checkout.</div>
+        <div class="auth-inputs">
+          <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+          <div class="f" style="margin-bottom:10px;"><label>Password</label><input type="password" id="signup-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
+          <div class="f"><label>Confirm Password</label><input type="password" id="signup-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
+        </div>
+        <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
+        <div id="signup-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
+          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--t2);line-height:1.5;cursor:pointer;">
+          <input type="checkbox" id="signup-tos" style="margin-top:2px;flex-shrink:0;"/>
+          <span>I agree to the <a href="https://www.barcop.com/pages/terms-of-use" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a> and <a href="https://www.barcop.com/pages/privacy-policy" target="_blank" rel="noopener" style="color:var(--gold);">Privacy Policy</a>.</span>
+        </label>
+        <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Start Subscription</button>
+        <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
       </div>
-      <button class="btn btn-primary" id="paywall-btn" style="width:100%;">Continue to Payment</button>
-      <div id="paywall-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="paywall-different-email" style="font-size:11px;">Wrong email? Start over with a different one</button></div>
-      <div style="text-align:center;margin-top:10px;"><button class="auth-link" id="paywall-signout" style="font-size:11px;">Sign out</button></div>
+      <div class="auth-foot">
+        <div style="font-size:12px;color:var(--t2);">Already have an account? <button class="auth-link" id="show-login-from-signup">Sign in</button></div>
+      </div>
     </div>
-    <div id="auth-reset" style="display:none;">
-      <div class="auth-heading">Reset Password</div>
-      <div class="auth-sub">Enter your email for a reset link.</div>
-      <div class="f" style="margin-bottom:18px;"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
-      <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
-      <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
-      <div style="text-align:center;margin-top:14px;"><button class="auth-link" id="show-login2">Back to sign in</button></div>
+    <div id="auth-paywall" class="auth-view" style="display:none;">
+      <div class="auth-card">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Finish Your Subscription</div>
+        <div class="auth-sub">This bar needs an active subscription to use Bar Cop. Pick a plan to continue to checkout.</div>
+        <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
+        <div id="paywall-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
+          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+        </div>
+        <button class="btn btn-primary" id="paywall-btn" style="width:100%;">Continue to Payment</button>
+        <div id="paywall-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      </div>
+      <div class="auth-foot">
+        <div><button class="auth-link" id="paywall-different-email">Wrong email? Start over with a different one</button></div>
+        <div><button class="auth-link" id="paywall-signout">Sign out</button></div>
+      </div>
     </div>
-    <div id="auth-set-password" style="display:none;">
-      <div class="auth-heading">Set Your Password</div>
-      <div class="auth-sub">Choose a password to access your Bar Cop account.</div>
-      <div class="f" style="margin-bottom:10px;"><label>New Password</label><input type="password" id="set-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
-      <div class="f" style="margin-bottom:18px;"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
-      <button class="btn btn-primary" id="set-pw-btn" style="width:100%;">Set Password and Sign In</button>
-      <div id="set-pw-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+    <div id="auth-reset" class="auth-view" style="display:none;">
+      <div class="auth-card">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Reset Password</div>
+        <div class="auth-sub">Enter your email for a reset link.</div>
+        <div class="auth-inputs">
+          <div class="f"><label>Email</label><input type="email" id="reset-email" placeholder="you@yourbar.com"/></div>
+        </div>
+        <button class="btn btn-primary" id="reset-btn" style="width:100%;">Send Reset Link</button>
+        <div id="reset-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      </div>
+      <div class="auth-foot">
+        <div><button class="auth-link" id="show-login2">Back to sign in</button></div>
+      </div>
     </div>
-  </div>
+    <div id="auth-set-password" class="auth-view" style="display:none;">
+      <div class="auth-card">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Set Your Password</div>
+        <div class="auth-sub">Choose a password to access your Bar Cop account.</div>
+        <div class="auth-inputs">
+          <div class="f" style="margin-bottom:10px;"><label>New Password</label><input type="password" id="set-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
+          <div class="f"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
+        </div>
+        <button class="btn btn-primary" id="set-pw-btn" style="width:100%;">Set Password and Sign In</button>
+        <div id="set-pw-msg" style="font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
+      </div>
+    </div>
 </div>
 
 <!-- ONBOARDING -->
@@ -329,6 +357,6 @@
 <script src="components/service-periods.js?v=7"></script>
 <script src="components/onboarding.js?v=28"></script>
 <script src="db.js?v=105"></script>
-<script src="app.js?v=561"></script>
+<script src="app.js?v=562"></script>
 </body>
 </html>

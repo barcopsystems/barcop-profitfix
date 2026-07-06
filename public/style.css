@@ -1139,12 +1139,18 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* ══ AUTH ══ */
 .auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
-.auth-panel{width:400px;background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
+.auth-view{width:400px;}
+.auth-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
 .auth-logo{display:flex;justify-content:center;margin-bottom:24px;}
-.auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
-.auth-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5;}
-.auth-link{background:none;border:none;color:var(--steel);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
-.auth-link:hover{color:var(--w);}
+.auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;text-align:center;}
+.auth-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5;text-align:center;}
+/* Inputs grouped in a #0D181E panel so the fields read as one block. */
+.auth-inputs{background:#0D181E;border-radius:6px;padding:14px;margin-bottom:16px;}
+/* Footer links sit OUTSIDE the card, on the page background. */
+.auth-foot{text-align:center;margin-top:16px;}
+.auth-foot > div + div{margin-top:10px;}
+.auth-link{background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
+.auth-link:hover{color:var(--gold-h);}
 
 /* ══ ING TABLE ══ */
 .ing-tbl{width:100%;border-collapse:collapse;}
