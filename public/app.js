@@ -395,7 +395,6 @@ const App = {
     this.shiftData     = {};
     this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','cash'], period_end:null };
     await S.HubSettings.loadSample();
-    window.print = function () { App.demoBlock('Exporting to PDF'); };
     this._mountDemoBanner();
     this.showHub();
   },
@@ -408,6 +407,7 @@ const App = {
     style.textContent =
       'body.demo #app{margin-top:40px;height:calc(100vh - 40px);}'
       + 'body.demo #hub-wrapper{top:40px !important;}'
+      + 'body.demo #tn-settings{display:none;}'   // App Settings is off in the demo
       + '#demo-banner{position:fixed;top:0;left:0;right:0;height:40px;z-index:200;'
       + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--gold);'
       + 'color:#000;box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
@@ -415,23 +415,24 @@ const App = {
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
-      + 'Bar Cop demo. Explore every screen freely. Running audits, exporting PDFs, and AI insights are sign-up only.</span>'
+      + 'Bar Cop demo. Poke at everything and change whatever you want. Nothing you do is saved, and it all resets when you leave.</span>'
       + '<button id="demo-signup-btn" style="background:#000;color:var(--gold);border:none;border-radius:3px;'
       + 'font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:7px 16px;cursor:pointer;flex-shrink:0;">Sign Up Now</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
   },
 
-  // Gate a paid-value action in demo mode. Returns true (and shows a sign-up
-  // prompt) when blocked, false when the action may proceed.
-  demoBlock(actionLabel) {
+  // The public demo is fully functional EXCEPT App Settings, which stays locked
+  // so a visitor can't rename the sample bar as their own (and then brand
+  // exported PDFs with it). Called from the two Settings entry points. Returns
+  // true (and shows a sign-up notice) when blocked in demo, false otherwise.
+  demoBlock() {
     if (!this.demoMode) return false;
     const m = document.createElement('div');
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
-      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">Sign Up to Continue</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(actionLabel)
-      + ' is part of the full Bar Cop platform. The demo lets you explore every screen freely, with sample data, before you sign up.</div>'
+      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">Settings Is Off in the Demo</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">App Settings is locked in the demo so the sample bar stays put. Sign up to set up your own bar and make it yours.</div>'
       + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Sign Up Now</button>'
       + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
       + '</div>';
