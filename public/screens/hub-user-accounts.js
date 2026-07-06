@@ -640,40 +640,44 @@ S.HubUserAccounts = {
   // the account (server) → checkout for it. Each bar is its own subscription.
   _addBar() {
     this._pendingBarAccountId = null;   // fresh modal: no bar created yet
+    // Matches the auth / plan-gate look: logo, centered white heading, the name
+    // in an .auth-inputs wrapper, plan-gate plan colors, full-width Continue,
+    // Cancel as a centered gold link below it.
     const planOpt = (plan, label, note) =>
-      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
+      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
-    const bodyHTML =
-        '<div class="f" style="margin-bottom:14px;"><label>Bar Name</label><input type="text" id="ua-newbar-name" placeholder="Your bar\'s name"/></div>'
+    const m = document.createElement('div');
+    m.id = 'addbar-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;justify-content:center;overflow-y:auto;padding:24px 16px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;margin:auto;">'
+      + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+      + '<div class="auth-heading" style="margin-bottom:18px;">Add Another Bar</div>'
+      + '<div class="auth-inputs"><div class="f"><label>Bar Name</label><input type="text" id="ua-newbar-name" placeholder="Your bar\'s name"/></div></div>'
       + '<label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>'
       + '<div id="ua-newbar-plan" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;">'
       +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
       +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
       + '</div>'
-      + '<div id="ua-newbar-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;"></div>';
-    const box = this._teamModal({
-      title: 'Add Another Bar',
-      bodyHTML,
-      buttons: [
-        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
-        { label: 'Continue to Payment', act: 'ok', kind: 'primary' }
-      ],
-      onAction: (act, boxEl) => {
-        if (act !== 'ok') return;   // Cancel closes normally
-        this._addBarSubmit(boxEl);
-        return false;               // keep the modal open; submit redirects or shows an error
-      }
-    });
-    // Wire the plan picker inside this dynamically-built modal.
-    const opts = Array.from(box.querySelectorAll('#ua-newbar-plan .plan-opt'));
+      + '<div id="ua-newbar-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
+      + '<button class="btn btn-primary" data-act="ok" id="ua-newbar-go" style="width:100%;padding:14px 20px;font-size:12px;margin-top:16px;">Continue to Payment</button>'
+      + '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="ua-newbar-cancel" style="font-size:12px;">Cancel</button></div>'
+      + '</div>';
+    document.body.appendChild(m);
+    // Wire the plan picker with plan-gate colors (selected #1E2B34, else #0D181E).
+    const opts = Array.from(m.querySelectorAll('#ua-newbar-plan .plan-opt'));
     const selectOpt = (el) => opts.forEach(o => {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
-      o.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
-      o.style.background   = on ? 'rgba(219,171,70,0.08)' : 'transparent';
+      o.style.borderColor = 'var(--b-edge)';
+      o.style.background   = on ? '#1E2B34' : '#0D181E';
     });
     opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
     if (opts[0]) selectOpt(opts[0]);
+    // Continue keeps the modal open (submit opens checkout or shows an error);
+    // Cancel and backdrop click close it.
+    m.querySelector('#ua-newbar-go').addEventListener('click', () => this._addBarSubmit(m));
+    m.querySelector('#ua-newbar-cancel').addEventListener('click', () => m.remove());
+    m.addEventListener('click', ev => { if (ev.target === m) m.remove(); });
   },
 
   async _addBarSubmit(box) {
