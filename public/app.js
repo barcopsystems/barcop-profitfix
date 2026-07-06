@@ -5745,11 +5745,18 @@ function wireAuth() {
     const err   = document.getElementById('login-error');
     const btn   = document.getElementById('login-btn');
     if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
-    btn.textContent='Signing in...'; btn.disabled=true;
+    btn.textContent='Logging in...'; btn.disabled=true;
     const {error} = await DB.signIn(email, pass);
-    btn.textContent='Sign In'; btn.disabled=false;
-    if (error) { err.textContent=error.message; err.style.display='block'; }
-    else err.style.display='none';
+    if (error) {
+      btn.textContent='Log In'; btn.disabled=false;
+      err.textContent=error.message; err.style.display='block';
+    } else {
+      // Success: keep the button in its loading state. boot() (fired by the
+      // SIGNED_IN handler) replaces the whole screen, so "Logging in..." holds
+      // steady until the Hub appears — no flip back to "Log In" during the
+      // async loadAllData/boot handoff, and nothing clickable mid-boot.
+      err.style.display='none';
+    }
   });
 
   ['login-email','login-password'].forEach(id => {
