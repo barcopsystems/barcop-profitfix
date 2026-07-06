@@ -32,40 +32,13 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// ── Claude API proxy ──────────────────────────────────────────────────────────
-app.post('/api/claude', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const body = JSON.stringify(req.body);
-  const options = {
-    hostname: 'api.anthropic.com',
-    path:     '/v1/messages',
-    method:   'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Length':    Buffer.byteLength(body)
-    }
-  };
-
-  const proxyReq = https.request(options, proxyRes => {
-    res.status(proxyRes.statusCode);
-    proxyRes.pipe(res);
-  });
-  proxyReq.on('error', err => {
-    console.error('Claude proxy error:', err);
-    res.status(502).json({ error: 'Proxy request failed' });
-  });
-  proxyReq.write(body);
-  proxyReq.end();
-});
+// (Removed the /api/claude proxy — the app makes no Anthropic API calls anymore;
+//  audits are computed and narrated entirely in code. Left no unauthenticated
+//  passthrough to Claude.)
 
 // ── Profit audit — JSON only, no PDF ──────────────────────────────────────────
 app.post('/api/generate-profit-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;   // unused now; audit is code-only
 
   const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
   form.parse(req, async (err, fields, files) => {
@@ -109,7 +82,10 @@ app.post('/api/generate-profit-audit', (req, res) => {
    4. MERGE: computed numbers overwrite anything the model returned, so code's
       figures are always authoritative. See memory: audit-honesty-rebuild. */
 async function generateProfitAudit(apiKey, files, appData, practices, controlData) {
-  const extracted = await extractProfitInputs(apiKey, files);
+  // Audits no longer intake uploaded files, so nothing is extracted from them.
+  // This keeps xlsx out of the request path (no ReDoS surface) and makes no
+  // Anthropic API call. Scores come purely from in-app + Control data.
+  const extracted = {};
   // Honest-by-construction: the audit scores solely on measured data. Self-reported
   // operating practices are intentionally ignored (nothing sends them) so a claim
   // can never override, or inflate past, what the data actually shows.
@@ -196,8 +172,7 @@ async function callClaudeForJSON(apiKey, content, maxTokens) {
 
 // ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-revenue-audit', (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;   // unused now; audit is code-only
 
   const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
   form.parse(req, async (err, fields, files) => {
@@ -235,7 +210,9 @@ app.post('/api/generate-revenue-audit', (req, res) => {
    EXTRACT (files -> raw input numbers) -> COMPUTE (code) -> NARRATE (prose) ->
    MERGE with computed numbers authoritative. */
 async function generateRevenueAudit(apiKey, files, appData, practices, controlData) {
-  const extracted = await extractRevenueInputs(apiKey, files);
+  // No file intake anymore — keeps xlsx out of the request path and makes no
+  // Anthropic API call. Scores come purely from in-app + Control data.
+  const extracted = {};
   // Honest-by-construction: scores solely on measured data; self-reported practices
   // are intentionally ignored (nothing sends them) and never override the numbers.
   const numbers = computeRevenueAudit(appData, controlData, extracted);
