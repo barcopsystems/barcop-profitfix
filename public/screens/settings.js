@@ -39,17 +39,22 @@ S.HubSettings = {
 
     let inner;
     if (group === 'business-profile') {
-      // All sections in ONE card, separated by full-bleed divider lines, with a
-      // single gold Save Data button outside the card (bottom-left) that saves
-      // every section at once.
-      const parts = secs.map((s, i) =>
-        (i > 0 ? '<div style="border-top:1px solid var(--b2);margin:22px -20px 20px;"></div>' : '')
-        + '<div data-section="' + s.id + '">'
-        + '<div class="sh">' + esc(s.title) + '</div>'
+      // Each section in its own dark wrapper (same as the onboarding page), white
+      // section titles, no divider lines. One gold Save Data button saves them all.
+      const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:12px;';
+      const help = 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;';
+      const EXPLAIN = {
+        service: 'Tap on the service periods you run and set the times.',
+        tax:     'Set these once. Cash, Books, and Labor read them.'
+      };
+      const parts = secs.map((s) =>
+        '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:16px;">'
+        + '<div style="' + secLabel + '">' + esc(s.title) + '</div>'
+        + (EXPLAIN[s.id] ? '<div style="' + help + '">' + EXPLAIN[s.id] + '</div>' : '')
         + s.body
         + '</div>'
       ).join('');
-      inner = '<div class="card form-card" style="margin-bottom:0;">' + parts + '</div>'
+      inner = parts
         + '<div style="display:flex;align-items:center;gap:12px;margin:16px 0 24px;">'
         +   '<button class="btn btn-primary hs-save-all">Save Data</button>'
         +   '<span class="hs-msg" data-msg="all" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
@@ -108,8 +113,7 @@ S.HubSettings = {
       + '<div class="f" style="width:160px;"><label>Sales tax filing</label><select class="form-input" id="hs-freq">' + opt('monthly', 'Monthly') + opt('quarterly', 'Quarterly') + '</select></div>'
       + '<div class="f" style="width:150px;"><label>Payroll tax</label><div class="fw"><input class="suf" type="number" id="hs-burden" value="' + (burden || '') + '" step="0.1" placeholder="0"/><span class="suf">%</span></div></div>'
       + '<div class="f" style="width:160px;"><label>State minimum wage</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hs-minwage" min="0" step="0.01" value="' + (mw === '' ? '' : mw) + '" placeholder="0.00"/></div></div>'
-      + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-top:8px;">Set these once. Cash, Books, and Events read the tax and payroll figures; Labor uses the minimum wage for the Pay Periods tip-credit check.</div>';
+      + '</div>';
   },
 
   // Service Periods — which dayparts the operator runs. Mounts the shared
