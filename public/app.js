@@ -691,6 +691,7 @@ const App = {
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
     this.enforcePaywall();   // no active subscription → locked "Choose your plan" popup over the Hub
+    this.maybeShowWelcome(); // first Hub load after payment → one-time "You're All Set" popup
   },
 
   // ── Subscription gate (in-app "Choose your plan" popup over the Hub) ──────────
@@ -707,6 +708,34 @@ const App = {
   },
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
+
+  // One-time "You're All Set" celebration, shown on the first Hub load after the
+  // subscription goes active (right after payment). Flagged in settings so it
+  // never shows again. Demo and unpaid accounts never see it.
+  maybeShowWelcome() {
+    if (this.demoMode) return;
+    if (!this.subscription || this.subscription.status !== 'active') return;
+    const s = this.data && this.data.settings;
+    if (!s || !s.onboarding_complete || s.welcome_shown) return;
+    s.welcome_shown = true;
+    this.saveKey('settings');
+    this.showWelcome();
+  },
+
+  showWelcome() {
+    if (document.getElementById('welcome-gate')) return;
+    const m = document.createElement('div');
+    m.id = 'welcome-gate';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
+      + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">You\'re All Set</div>'
+      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">You\'re a Bar Cop member now. This is your Hub. Your setup steps are waiting right below: get your Control sections in and run your first audit to see where your money is leaking.</div>'
+      + '<button class="btn btn-primary" id="welcome-go" style="width:100%;padding:14px 20px;font-size:12px;">Go to Hub</button>'
+      + '</div>';
+    document.body.appendChild(m);
+    document.getElementById('welcome-go').addEventListener('click', () => m.remove());
+  },
 
   showPlanGate() {
     if (document.getElementById('plan-gate')) return;
