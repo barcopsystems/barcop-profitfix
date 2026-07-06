@@ -1534,6 +1534,57 @@ app.post('/api/set-account-name', async (req, res) => {
   }
 });
 
+// ── Abandon a just-created, unpaid account (signup "use a different email") ───
+// A signup creates the account BEFORE payment (we need to set a password Stripe
+// can't collect). If the user backs out of checkout to use a different email,
+// this discards the abandoned account so nothing accumulates. Owner-only, and
+// REFUSES if the account has an active subscription (never deletes a paid bar).
+// If the user has no other memberships afterward, their auth user is deleted too
+// so the email is free to sign up again.
+app.post('/api/abandon-account', async (req, res) => {
+  try {
+    const { accountId } = req.body || {};
+    if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const userId = userData.user.id;
+
+    const { data: acct } = await supabaseAdmin
+      .from('accounts').select('owner_user_id').eq('id', accountId).single();
+    if (!acct || acct.owner_user_id !== userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    // Safety: never discard an account that is actually paying.
+    const { data: sub } = await supabaseAdmin
+      .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
+    if (sub && sub.subscription_status === 'active') {
+      return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
+    }
+
+    // Delete the account (memberships + subscription cascade via FK ON DELETE CASCADE).
+    const { error: delErr } = await supabaseAdmin.from('accounts').delete().eq('id', accountId);
+    if (delErr) return res.status(500).json({ error: delErr.message });
+
+    // If this was their only account, delete the auth user too so the email frees up.
+    const { count } = await supabaseAdmin
+      .from('memberships').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+    if (!count) {
+      try { await supabaseAdmin.auth.admin.deleteUser(userId); } catch (e) { console.error('abandon deleteUser:', e); }
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('abandon-account exception:', e);
+    res.status(500).json({ error: e.message || 'Could not discard the account' });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
