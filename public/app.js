@@ -770,12 +770,15 @@ const App = {
 
   // Discard the just-created unpaid account (frees the email) → fresh signup.
   async abandonAndRestart() {
+    // Drop the gate first so the confirm dialog (lower z-index) is on top and
+    // clickable; bring the gate back if they decide to keep the account.
+    this._removePlanGate();
     const ok = await this.confirm({
       title: 'Discard this account?',
       message: 'This deletes the account you just created (no payment was made) and takes you back to sign up with a different email.',
       confirmText: 'Discard & Start Over', cancelText: 'Keep It'
     });
-    if (!ok) return;
+    if (!ok) { this.showPlanGate(); return; }
     try {
       const headers = await DB._authHeaders();
       const accountId = await DB._ensureAccountId();
