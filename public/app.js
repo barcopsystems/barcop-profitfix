@@ -255,6 +255,7 @@ const App = {
   TOS_TERMS_URL:   'https://www.barcop.com/pages/terms-of-use',
   TOS_PRIVACY_URL: 'https://www.barcop.com/pages/privacy-policy',
   _signupInProgress: false,  // guards the SIGNED_IN handler from booting mid-signup
+  _newBarFlow: null,         // { originAccountId, accountId?, draft? } during Add Another Bar
 
   // The builder's own operating accounts. Gates dev/testing tools (Load Sample
   // Data / Clear All Data / Reset Onboarding) so real paying customers never see
@@ -351,6 +352,11 @@ const App = {
     const session = await DB.getSession();
     if (session) {
       this._bootedUserId = session.user?.id || null;
+      // Returning from a Stripe checkout, the return_url carries ?bar=<id> so we
+      // load the bar that was just paid for (the just-added one, for Add Another
+      // Bar). Membership is still verified downstream, so this can't grant access.
+      const barParam = new URLSearchParams(window.location.search).get('bar');
+      if (barParam && DB._setStoredActiveAccountId) DB._setStoredActiveAccountId(barParam);
       await this.loadAllData();
       this.subscription = await DB.getSubscription();
       // Returning from Stripe checkout: the webhook that flips the subscription
@@ -516,6 +522,9 @@ const App = {
     // enforcePaywall(), and the database blocks all operational data until the
     // subscription is active, so an unpaid account is a hollow shell either way.
     document.getElementById('auth-screen').style.display = 'none';
+    // A just-paid new bar carries its onboarding entries in localStorage across
+    // the Stripe return; apply them to this bar before the onboarding gate below.
+    this._applyPendingNewBarDraft();
     this.updatePeriod();
     // Recurring operating expenses: fill in any elapsed months on load so Books
     // reflects them even if the operator never opens the Operating Expenses page.
@@ -709,6 +718,98 @@ const App = {
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
 
+  // ── Add Another Bar (unified flow) ───────────────────────────────────────────
+  // Kicked off from the User Account page: onboarding (new-bar mode) → plan gate
+  // → Stripe → the new bar's Hub. The bar's account is created only at Continue
+  // to Payment (a subscription must attach to an existing account), so cancelling
+  // anywhere before that leaves nothing behind, and cancelling Stripe discards
+  // the just-created bar. Any cancel drops the operator back on User Accounts.
+  startAddBar() {
+    this._newBarFlow = {
+      originAccountId: (window.DB && (DB._accountId || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId()))) || null
+    };
+    if (window.Onboarding) Onboarding.start({ newBar: true });
+  },
+
+  // Create the new bar, stash the onboarding draft for the post-payment return,
+  // then open the embedded checkout for it.
+  async startNewBarCheckout(plan, draft, onErr) {
+    try {
+      const headers = await DB._authHeaders();
+      const r = await fetch('/api/add-account', { method: 'POST', headers, body: JSON.stringify({ name: draft.bar_name }) });
+      const data = await r.json();
+      if (!r.ok || !data.ok || !data.accountId) { onErr(data.error || 'Could not create the bar. Try again.'); return false; }
+      const newId = data.accountId;
+      try { localStorage.setItem('newbar_draft_' + newId, JSON.stringify(draft)); } catch (e) {}
+      if (this._newBarFlow) { this._newBarFlow.accountId = newId; this._newBarFlow.draft = draft; }
+      const cr = await fetch('/api/create-checkout-session', { method: 'POST', headers, body: JSON.stringify({ accountId: newId, plan }) });
+      const cd = await cr.json();
+      if (!cd.clientSecret) {
+        // Roll the bar back so a failed checkout leaves nothing behind.
+        try { await fetch('/api/abandon-account', { method: 'POST', headers: await DB._authHeaders(), body: JSON.stringify({ accountId: newId }) }); } catch (e) {}
+        try { localStorage.removeItem('newbar_draft_' + newId); } catch (e) {}
+        if (this._newBarFlow) this._newBarFlow.accountId = null;
+        onErr(cd.error || 'Could not start checkout. Try again, or contact support.');
+        return false;
+      }
+      // Don't switch the active bar yet — the Stripe return_url carries the new
+      // bar id, so we only land on it after actual payment. A tab-close mid-
+      // checkout leaves the operator on their existing bar, not this unpaid one.
+      return await this.openEmbeddedCheckout(cd, onErr, { newBar: true });
+    } catch (e) { onErr('Connection error. Try again.'); return false; }
+  },
+
+  // Cancel a new bar after its account was created (Stripe backed out): delete
+  // the bar, restore the bar they came from, and return to User Accounts.
+  async discardNewBar() {
+    const flow = this._newBarFlow || {};
+    const newId = flow.accountId || null;
+    const origin = flow.originAccountId || null;
+    if (newId) {
+      try { const headers = await DB._authHeaders(); await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId: newId }) }); } catch (e) {}
+      try { localStorage.removeItem('newbar_draft_' + newId); } catch (e) {}
+    }
+    if (origin && DB._setStoredActiveAccountId) DB._setStoredActiveAccountId(origin);
+    await this._returnToUserAccounts();
+  },
+
+  // Tear down the new-bar overlays and drop back on the User Account page.
+  async _returnToUserAccounts() {
+    this._newBarFlow = null;
+    const ov = document.getElementById('ob-overlay'); if (ov) ov.classList.add('hidden');
+    this._removePlanGate();
+    const cm = document.getElementById('checkout-modal'); if (cm) cm.remove();
+    document.getElementById('app').classList.remove('hidden');
+    this.showHub();
+    try { if (window.S && S.HubUserAccounts) await S.HubUserAccounts.open('account'); } catch (e) {}
+  },
+
+  // A just-paid new bar carried its onboarding entries in localStorage across the
+  // Stripe redirect. Apply them to the now-active bar so it skips onboarding and
+  // shows the right name. Persist first, then sync the name + clear the draft
+  // (so an early reload re-applies rather than losing the entries).
+  _applyPendingNewBarDraft() {
+    try {
+      const acctId = (window.DB && (DB._accountId || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId()))) || null;
+      if (!acctId) return;
+      const raw = localStorage.getItem('newbar_draft_' + acctId);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const s = this.data && this.data.settings;
+      if (!draft || !s) { try { localStorage.removeItem('newbar_draft_' + acctId); } catch (e) {} return; }
+      if (draft.bar_name) s.bar_name = draft.bar_name;
+      if (draft.city_state != null) s.city_state = draft.city_state;
+      if (Array.isArray(draft.service_periods) && draft.service_periods.length) s.service_periods = draft.service_periods;
+      s.onboarding_complete = true;
+      this.saveKey('settings').then(async () => {
+        try {
+          if (window.DB && DB.setAccountName && s.bar_name) { await DB.setAccountName(s.bar_name); if (this.renderAccountSwitcher) await this.renderAccountSwitcher(); }
+        } catch (e) {}
+        try { localStorage.removeItem('newbar_draft_' + acctId); } catch (e) {}
+      }).catch(() => {});
+    } catch (e) { console.error('new bar draft', e); }
+  },
+
   // One-time "You're All Set" celebration, shown on the first Hub load after the
   // subscription goes active (right after payment). Flagged in settings so it
   // never shows again. Demo and unpaid accounts never see it.
@@ -737,12 +838,18 @@ const App = {
     document.getElementById('welcome-go').addEventListener('click', () => m.remove());
   },
 
-  showPlanGate() {
+  // ctx = { newBar:true, draft } → Add Another Bar (single Cancel, and Continue
+  // creates the bar). No ctx → the signed-in account must pay (Start Over / Sign
+  // Out exits, Continue bills the current account).
+  showPlanGate(ctx) {
     if (document.getElementById('plan-gate')) return;
-    const barName = ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
-    const acctLine = barName
-      ? 'Your account for <b style="color:var(--t1);">' + esc(barName) + '</b> is now set up.'
-      : 'Your account is now set up.';
+    const isNewBar = !!(ctx && ctx.newBar);
+    const barName = isNewBar
+      ? (ctx.draft.bar_name || '').trim()
+      : ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
+    const acctLine = isNewBar
+      ? (barName ? 'Your new bar <b style="color:var(--t1);">' + esc(barName) + '</b> is set up.' : 'Your new bar is set up.')
+      : (barName ? 'Your account for <b style="color:var(--t1);">' + esc(barName) + '</b> is now set up.' : 'Your account is now set up.');
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
@@ -759,9 +866,11 @@ const App = {
       + '</div>'
       + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">Continue to Payment</button>'
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
-      + '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
-      +   '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
-      +   '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
+      + (isNewBar
+          ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel</button></div>'
+          : '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
+            + '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
+            + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
       + '</div>';
     document.body.appendChild(m);
     const opts = Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt'));
@@ -779,16 +888,20 @@ const App = {
       const plan = (sel && sel.dataset.plan) || 'monthly';
       const btn = document.getElementById('gate-pay');
       btn.disabled = true; btn.textContent = 'Going to checkout...';
-      await this.startCheckout(plan, gateErr);
+      if (isNewBar) await this.startNewBarCheckout(plan, ctx.draft, gateErr);
+      else await this.startCheckout(plan, gateErr);
       // The embedded checkout modal (if it opened) now covers this button, so
       // resetting it is invisible; on cancel the gate is revealed ready to retry.
       btn.disabled = false; btn.textContent = 'Continue to Payment';
     });
-    document.getElementById('gate-cancel').addEventListener('click', () => this.abandonAndRestart());
-    // Non-destructive exit: sign out (account + email kept) and land on the
-    // login page. Signing back in re-shows this gate, so they can finish payment
-    // later without losing anything.
-    document.getElementById('gate-signout').addEventListener('click', async () => {
+    // New bar: Cancel drops back to User Accounts (no account exists yet).
+    // Signup: Start Over discards the account and returns to signup.
+    document.getElementById('gate-cancel').addEventListener('click', () =>
+      isNewBar ? this._returnToUserAccounts() : this.abandonAndRestart());
+    // Non-destructive exit (signup only): sign out (account + email kept) and land
+    // on the login page. Signing back in re-shows this gate, so they can finish
+    // payment later without losing anything.
+    document.getElementById('gate-signout')?.addEventListener('click', async () => {
       // Keep the gate up as the cover through the async signOut, then swap to the
       // login screen and only then drop it — so the Hub never flashes uncovered.
       try { await DB.signOut(); } catch (e) {}
@@ -821,7 +934,8 @@ const App = {
   // { clientSecret, publishableKey } from create-checkout-session. On completion
   // Stripe redirects the page to return_url (?checkout=success); Cancel closes
   // the modal and leaves the plan gate underneath ready to retry.
-  async openEmbeddedCheckout(resp, onErr) {
+  async openEmbeddedCheckout(resp, onErr, ctx) {
+    ctx = ctx || {};
     if (document.getElementById('checkout-modal')) return true;
     if (!resp || !resp.clientSecret || !resp.publishableKey || typeof Stripe === 'undefined') {
       if (onErr) onErr('Could not open checkout. Try again, or contact support.');
@@ -829,8 +943,10 @@ const App = {
     }
     const modal = document.createElement('div');
     modal.id = 'checkout-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9800;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px;';
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:20px;max-width:520px;width:100%;">'
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9800;display:flex;justify-content:center;overflow-y:auto;padding:24px 16px;';
+    // margin:auto on a flex child centers it when it fits and falls back to
+    // top-aligned + scrollable when the form is taller than the viewport.
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:20px;max-width:520px;width:100%;margin:auto;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
       +   '<img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/>'
       +   '<button class="auth-link" id="checkout-close" style="font-size:12px;">Cancel</button>'
@@ -842,9 +958,12 @@ const App = {
       const stripe = Stripe(resp.publishableKey);
       const checkout = await stripe.initEmbeddedCheckout({ clientSecret: resp.clientSecret });
       checkout.mount('#checkout-embed');
-      document.getElementById('checkout-close').addEventListener('click', () => {
+      document.getElementById('checkout-close').addEventListener('click', async () => {
         try { checkout.destroy(); } catch (e) {}
         modal.remove();
+        // Cancelling a new bar's checkout discards the just-created bar and
+        // returns to User Accounts; a normal checkout just reveals the gate.
+        if (ctx.newBar) await this.discardNewBar();
       });
       return true;
     } catch (e) {
@@ -1064,8 +1183,11 @@ const App = {
   // Called from boot(), showApp(), and the Hub render.
   async renderAccountSwitcher() {
     if (!window.DB || !DB.listMyAccounts) return;
-    const accounts = await DB.listMyAccounts();
+    const allAccounts = await DB.listMyAccounts();
     const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
+    // Only list PAID bars (plus whichever one they're currently in), so a bar
+    // that is mid-signup (created but not yet paid) never pops the switcher.
+    const accounts = (allAccounts || []).filter(a => a.active || a.id === activeId);
     const isMulti  = !!(accounts && accounts.length > 1);
     // Cache for the mobile drawer's location chip (built synchronously).
     this._acctList = accounts || [];

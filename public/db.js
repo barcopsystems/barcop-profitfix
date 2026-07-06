@@ -287,12 +287,18 @@ const DB = {
     try {
       const { data, error } = await this._sb
         .from('memberships')
-        .select('account_id, role, accounts(id, name)')
+        .select('account_id, role, accounts(id, name, subscriptions(subscription_status))')
         .eq('user_id', this._user.id);
       if (error || !data) { this._accountsCache = []; return []; }
       const list = data
         .filter(m => m.accounts)
-        .map(m => ({ id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role }));
+        .map(m => {
+          const subs = m.accounts.subscriptions;
+          const sub = Array.isArray(subs) ? subs[0] : subs;
+          // active = paid bar. Used to keep the switcher from listing a bar that
+          // is mid-signup (created but not yet paid for).
+          return { id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role, active: !!(sub && sub.subscription_status === 'active') };
+        });
       this._accountsCache = list;
       return list;
     } catch (e) {
