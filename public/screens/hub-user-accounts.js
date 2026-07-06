@@ -51,6 +51,7 @@ S.HubUserAccounts = {
   // does not push everything down one scroll: 'account' = Your Account, 'team'
   // = Team Members (admin only). No group = both (backward compatible).
   async open(group) {
+    if (App.demoBlock && App.demoBlock()) return;   // App Settings (incl. Your Account) is off in the demo
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
     const meta = {
       account: { title: 'Your Account',  action: 'user-account' },
@@ -378,7 +379,11 @@ S.HubUserAccounts = {
         box.innerHTML = '<div style="color:var(--t3);">' + esc(data.error || 'Could not load members.') + '</div>';
         return;
       }
-      this._teamRenderMembers(data.members || [], !!data.requesterIsOwner);
+      // Fall back to the client's own owner knowledge if the server flag is
+      // missing (e.g. an old server during a deploy window) so owner-row
+      // protection never silently drops.
+      const viewerIsOwner = !!data.requesterIsOwner || !!(window.DB && DB.isOwner && DB.isOwner());
+      this._teamRenderMembers(data.members || [], viewerIsOwner);
     } catch (e) {
       box.innerHTML = '<div style="color:var(--t3);">Connection error.</div>';
     }
@@ -388,9 +393,13 @@ S.HubUserAccounts = {
     const box = document.getElementById('ua-team-members');
     if (!box) return;
 
+    // Client-side owner id as a fallback, so a missing server is_owner flag never
+    // strips the owner-row protection (no Remove / no role dropdown).
+    const ownerId = (window.DB && DB.ownerUserId && DB.ownerUserId()) || null;
+
     const rows = members.map(m => {
       const isSelf = m.is_self;
-      const isOwner = m.is_owner;
+      const isOwner = m.is_owner || (!!ownerId && m.user_id === ownerId);
       const roleCell = isOwner
         ? '<span style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;font-size:11px;">Owner</span>'
         : !isSelf
@@ -630,6 +639,7 @@ S.HubUserAccounts = {
   // Add Another Bar (owner tier, multi-location Option A): name + plan → create
   // the account (server) → checkout for it. Each bar is its own subscription.
   _addBar() {
+    this._pendingBarAccountId = null;   // fresh modal: no bar created yet
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
@@ -679,24 +689,31 @@ S.HubUserAccounts = {
     try {
       const headers = await this._teamAuthHeaders();
       if (!headers) { if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; } return; }
-      const r = await fetch('/api/add-account', {
-        method: 'POST', headers, body: JSON.stringify({ name })
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok || !data.accountId) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
-        return showErr(data.error || 'Could not create the bar. Try again.');
+      // Create the bar only once. If checkout failed on a prior attempt the bar
+      // already exists — reuse its id so a retry never creates a duplicate bar.
+      let accountId = this._pendingBarAccountId || null;
+      if (!accountId) {
+        const r = await fetch('/api/add-account', {
+          method: 'POST', headers, body: JSON.stringify({ name })
+        });
+        const data = await r.json();
+        if (!r.ok || !data.ok || !data.accountId) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+          return showErr(data.error || 'Could not create the bar. Try again.');
+        }
+        accountId = data.accountId;
+        this._pendingBarAccountId = accountId;
       }
-      // Start checkout for the new bar.
+      // Start checkout for the new bar (headers carry the JWT the endpoint needs).
       const cr = await fetch('/api/create-checkout-session', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: DB._user?.id, accountId: data.accountId, plan })
+        method: 'POST', headers,
+        body: JSON.stringify({ accountId, plan })
       });
       const cd = await cr.json();
       if (cd.url) {
         // Make the new bar active so the post-checkout return + onboarding land
         // on it. Store only (no reload) since we are about to leave for Stripe.
-        DB._setStoredActiveAccountId(data.accountId);
+        DB._setStoredActiveAccountId(accountId);
         window.location.href = cd.url;
         return;
       }
