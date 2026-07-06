@@ -722,7 +722,7 @@ const App = {
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
       + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">Choose Your Plan</div>'
+      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">You\'re Almost Ready</div>'
       + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + acctLine + '<br>Start your subscription plan for instant access.</div>'
       + '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
       +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
