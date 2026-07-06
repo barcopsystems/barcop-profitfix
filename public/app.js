@@ -397,6 +397,7 @@ const App = {
     await S.HubSettings.loadSample();
     this._mountDemoBanner();
     this.showHub();
+    this._wireChrome();   // demo skips boot(), so wire the top-nav (i-help, logo, mobile menu) here
   },
 
   _mountDemoBanner() {
@@ -447,32 +448,20 @@ const App = {
     return true;
   },
 
-  boot() {
-    // Hard paywall: a real (non-demo) account with no active subscription cannot
-    // enter the app. Show the Finish-your-subscription screen instead of booting.
-    if (!this.demoMode && this.subscription?.status !== 'active') {
-      this.showPaywall();
-      return;
-    }
-    document.getElementById('auth-screen').style.display = 'none';
-    this.updatePeriod();
-    // Recurring operating expenses: fill in any elapsed months on load so Books
-    // reflects them even if the operator never opens the Operating Expenses page.
-    try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
-    // Sidebar toggle — assign (not addEventListener) so repeated boot() calls
-    // don't stack handlers and cancel each other out
+  // Wire the shared shell chrome (sidebar collapse, top-nav help/logo/date, and
+  // the mobile off-canvas nav). Called by boot() AND startDemo() — the demo
+  // renders through showHub() and skips boot(), so without this the demo's top
+  // nav (the "i" help button especially) has no click handlers. Uses .onclick
+  // assignment so repeated calls never stack handlers.
+  _wireChrome() {
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
-    // Proto top-nav collapse toggle (same behavior as the sidebar-logo toggle,
-    // which is hidden in the proto shell).
     const tnCollapse = document.getElementById('tn-collapse');
     if (tnCollapse) tnCollapse.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
-    // Proto top-nav: mobile menu burger opens the off-canvas sidebar; the two
-    // utility icon buttons open the Hub Settings / Help views.
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
     const tnSettings = document.getElementById('tn-settings');
@@ -483,10 +472,6 @@ const App = {
     if (tnDate) tnDate.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const tnLogo = document.querySelector('.tn-logo');
     if (tnLogo) { tnLogo.style.cursor = 'pointer'; tnLogo.title = 'Go to The Hub'; tnLogo.onclick = () => this.showHub(); }
-    // Mobile sidebar: hamburger button in the topbar opens the off-canvas
-    // sidebar below the 768px breakpoint. Backdrop click closes it. Module
-    // nav clicks also close it (wired in _renderNav). No-op on desktop where
-    // the sidebar-open class is never set.
     const hbBtn = document.getElementById('topbar-hamburger');
     if (hbBtn) hbBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-open');
@@ -499,6 +484,21 @@ const App = {
     if (closeBtn) closeBtn.onclick = () => {
       document.getElementById('app').classList.remove('sidebar-open');
     };
+  },
+
+  boot() {
+    // Hard paywall: a real (non-demo) account with no active subscription cannot
+    // enter the app. Show the Finish-your-subscription screen instead of booting.
+    if (!this.demoMode && this.subscription?.status !== 'active') {
+      this.showPaywall();
+      return;
+    }
+    document.getElementById('auth-screen').style.display = 'none';
+    this.updatePeriod();
+    // Recurring operating expenses: fill in any elapsed months on load so Books
+    // reflects them even if the operator never opens the Operating Expenses page.
+    try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
+    this._wireChrome();
     // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
     // (a simplified tile view of their accessible tasks across all modules).
     // Admin and viewer get the normal flow.
