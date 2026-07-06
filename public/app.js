@@ -2259,6 +2259,14 @@ const App = {
     document.getElementById('ob-overlay').classList.add('hidden');
     const hw = document.getElementById('hub-wrapper');
     if (hw) hw.style.display = 'none';
+    // Restore any auth button left in its loading state. A successful login/
+    // signup holds "Logging in..." / "Creating account..." and relies on boot to
+    // swap the screen; on sign-out we land back on this static panel, so reset
+    // the buttons (and clear errors) or they stay stuck from the prior submit.
+    const lb = document.getElementById('login-btn'); if (lb) { lb.textContent = 'Log In'; lb.disabled = false; }
+    const sb = document.getElementById('signup-btn'); if (sb) { sb.textContent = 'Create Account'; sb.disabled = false; }
+    const le = document.getElementById('login-error'); if (le) le.style.display = 'none';
+    const se = document.getElementById('signup-error'); if (se) se.style.display = 'none';
     // Show success banner if landing from Stripe checkout
     const params = new URLSearchParams(window.location.search);
     const banner = document.getElementById('checkout-success-msg');
