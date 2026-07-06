@@ -81,6 +81,10 @@ const DB = {
     this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;
+    // A brand-new signup must not resolve a prior user's account left in
+    // localStorage from an earlier session on this browser — clear it so
+    // _ensureAccountId lands on the freshly provisioned account.
+    this._setStoredActiveAccountId(null);
     return res;
   },
 
@@ -177,7 +181,17 @@ const DB = {
         .eq('account_id', accountId)
         .single();
 
-      if (error || !data) {
+      if (error) {
+        // PGRST116 = no matching row = genuinely no subscription on this bar.
+        if (error.code === 'PGRST116') {
+          return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+        }
+        // Any other error = we could not READ the subscription (transient DB/RLS
+        // hiccup). Report 'unknown' so the paywall never locks out a paying
+        // customer over a momentary read failure.
+        return { status: 'unknown', plan: null, active_modules: [], period_end: null };
+      }
+      if (!data) {
         return { status: 'inactive', plan: null, active_modules: [], period_end: null };
       }
       return {
@@ -188,7 +202,8 @@ const DB = {
       };
     } catch (e) {
       console.error('getSubscription error:', e);
-      return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+      // Couldn't reach the backend at all — treat as unknown, not unpaid.
+      return { status: 'unknown', plan: null, active_modules: [], period_end: null };
     }
   },
 

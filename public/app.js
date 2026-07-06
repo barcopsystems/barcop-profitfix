@@ -381,9 +381,11 @@ const App = {
   },
 
   /* ── Demo mode ────────────────────────────────────────────────────────────
-     ?demo=1 boots a sandboxed, fully populated demo: no auth, no persistence,
-     resets on every load. Paid-value actions (running audits, PDF export, AI
-     insights) are gated behind sign-up via demoBlock(). */
+     ?demo=1 boots a sandboxed, fully populated demo: no auth, no persistence
+     (DB._demo makes every write a no-op), resets on every load. The demo is
+     fully functional — audits, PDF exports, everything works — EXCEPT App
+     Settings and the two email forms (Report a Bug / Contact Support), which are
+     gated via demoBlock() so a visitor can't rename the bar or reach our inbox. */
   demoMode: false,
 
   async startDemo() {
@@ -488,8 +490,11 @@ const App = {
 
   boot() {
     // Hard paywall: a real (non-demo) account with no active subscription cannot
-    // enter the app. Show the Finish-your-subscription screen instead of booting.
-    if (!this.demoMode && this.subscription?.status !== 'active') {
+    // enter the app. 'unknown' means we couldn't READ the subscription (transient
+    // error) — fail open there so a momentary hiccup never locks out a paying
+    // customer; only a confirmed non-active status shows the paywall.
+    const subStatus = this.subscription?.status;
+    if (!this.demoMode && subStatus !== 'active' && subStatus !== 'unknown') {
       this.showPaywall();
       return;
     }
@@ -5494,11 +5499,14 @@ function wireAuth() {
   };
 
   // Shared: create a checkout session for the signed-in owner and go to Stripe.
+  // Sends the JWT — the endpoint verifies the caller owns the account (the server
+  // derives user_id from the token, ignoring anything in the body).
   const goToCheckout = async (plan, onErr) => {
     const accountId = await DB._ensureAccountId();
+    const headers = await DB._authHeaders();
     const r = await fetch('/api/create-checkout-session', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: DB._user?.id, accountId, plan })
+      method: 'POST', headers,
+      body: JSON.stringify({ accountId, plan })
     });
     const data = await r.json();
     if (data.url) { window.location.href = data.url; return true; }
@@ -5543,10 +5551,13 @@ function wireAuth() {
       btn.textContent = 'Going to checkout...';
       const ok = await goToCheckout(plan, showErr);
       if (!ok) {
-        // Account exists but checkout could not start. Drop them on the paywall
-        // so they can retry payment instead of being stuck on the signup form.
+        // Account exists and we're signed in, but checkout couldn't start (or the
+        // account wasn't resolvable yet). Send them to the paywall to retry
+        // payment — re-submitting signup would fail "already registered". The
+        // paywall's Continue button re-resolves the account and retries checkout.
         App._signupInProgress = false;
-        btn.textContent = 'Start Subscription'; btn.disabled = false;
+        App.subscription = await DB.getSubscription();
+        App.showPaywall();
       }
     } catch (e) {
       App._signupInProgress = false;
