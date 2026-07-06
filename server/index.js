@@ -648,22 +648,43 @@ const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || 'price_1TpwZ1Go
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { userId, accountId, plan } = req.body;
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  const { accountId, plan } = req.body || {};
+  if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
 
   try {
+    // Verify the caller via their JWT and confirm they own/administer the target
+    // account. Never trust a client-supplied user id, and never let a caller
+    // start billing (which the webhook keys by account_id) for an account they
+    // are not entitled to — otherwise an outsider could bind or overwrite a
+    // subscription on someone else's bar.
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const userId = userData.user.id;
+
+    const { data: acct } = await supabaseAdmin
+      .from('accounts').select('owner_user_id').eq('id', accountId).single();
+    if (!acct) return res.status(404).json({ error: 'Account not found' });
+
+    let allowed = acct.owner_user_id === userId;
+    if (!allowed) {
+      const { data: mem } = await supabaseAdmin
+        .from('memberships').select('role').eq('account_id', accountId).eq('user_id', userId).single();
+      allowed = !!(mem && mem.role === 'admin');
+    }
+    if (!allowed) return res.status(403).json({ error: 'Not allowed to start billing for this account.' });
+
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
-    // Billing is per bar: the account_id ties the subscription to the bar the
-    // webhook activates. The signup / Add-Another-Bar flow supplies it.
-    const metadata = { user_id: userId };
-    if (accountId) metadata.account_id = accountId;
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: 'https://app.barcop.com/?checkout=success',
       cancel_url:  'https://app.barcop.com/?checkout=cancelled',
-      metadata
+      metadata: { user_id: userId, account_id: accountId }
     });
     res.json({ url: session.url });
   } catch (e) {
@@ -1419,21 +1440,24 @@ app.post('/api/transfer-ownership', async (req, res) => {
       return res.status(400).json({ error: 'You already own this account.' });
     }
 
+    // Promote the target to admin FIRST (owners need full access). Doing this
+    // before the ownership reassign means a failure here never leaves the account
+    // with an owner who is only a staff/viewer and can't manage the team.
+    if (target.role !== 'admin') {
+      const { error: promErr } = await supabaseAdmin
+        .from('memberships')
+        .update({ role: 'admin' })
+        .eq('id', target.id)
+        .eq('account_id', accountId);
+      if (promErr) return res.status(500).json({ error: promErr.message });
+    }
+
     // Reassign ownership.
     const { error: ownErr } = await supabaseAdmin
       .from('accounts')
       .update({ owner_user_id: target.user_id })
       .eq('id', accountId);
     if (ownErr) return res.status(500).json({ error: ownErr.message });
-
-    // Make the new owner an admin (owners need full access).
-    if (target.role !== 'admin') {
-      await supabaseAdmin
-        .from('memberships')
-        .update({ role: 'admin' })
-        .eq('id', target.id)
-        .eq('account_id', accountId);
-    }
 
     res.json({ ok: true });
   } catch (e) {
