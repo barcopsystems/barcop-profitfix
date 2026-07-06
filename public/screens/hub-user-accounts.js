@@ -73,41 +73,53 @@ S.HubUserAccounts = {
     const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 12px;">' + txt + '</div>';
     const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
 
-    const accountCard = '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title">Your Account</div>'
-      + (userEmail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '')
-      + sh('Password')
-      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+    // Section bodies (the title lives in the wrapper, added below).
+    const pwBody = '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       +   '<div class="f" style="width:220px;"><label>New Password</label><div class="fw"><input class="suf" type="password" id="ua-pw1" placeholder="Enter new password" autocomplete="new-password"/>' + eye('ua-pw1') + '</div></div>'
       +   '<div class="f" style="width:220px;"><label>Confirm Password</label><div class="fw"><input class="suf" type="password" id="ua-pw2" placeholder="Confirm new password" autocomplete="new-password"/>' + eye('ua-pw2') + '</div></div>'
       +   '<div style="display:flex;align-items:flex-end;padding-bottom:1px;"><button class="btn btn-ghost" id="ua-pw-btn">Update Password</button></div>'
       + '</div>'
-      + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>'
-      + sh('Subscription')
-      + '<div id="ua-sub-content"></div>'
-      + (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()
-          ? sh('Your Bars')
-            + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
-            + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>'
-          : '')
-      + sh('Data and Backup')
-      + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export everything to one file you keep offsite. Restore to recover or move your data.</div>'
+      + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
+    const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
+      + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>';
+    const backupBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export everything to one file you keep offsite. Restore to recover or move your data.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
       +   '<button class="btn btn-ghost" id="ua-export-data">Export Backup</button>'
       +   '<button class="btn btn-ghost" id="ua-import-btn">Restore from Backup</button>'
       +   '<input type="file" id="ua-import-file" accept="application/json,.json" style="display:none;"/>'
       + '</div>'
-      + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      + ((App.demoMode || !(App.isDevAccount && App.isDevAccount())) ? '' :
-          sh('Testing Tools')
-          + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
-          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-          +   '<button class="btn btn-ghost" id="ua-load-sample">Load Sample Data</button>'
-          +   '<button class="btn btn-danger" id="ua-clear-all">Clear All Data</button>'
-          +   '<button class="btn btn-ghost" id="ua-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
-          + '</div>'
-          + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>')
-      + '</div>';
+      + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
+    const testBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +   '<button class="btn btn-ghost" id="ua-load-sample">Load Sample Data</button>'
+      +   '<button class="btn btn-danger" id="ua-clear-all">Clear All Data</button>'
+      +   '<button class="btn btn-ghost" id="ua-reset-ob" style="margin-left:auto;">Reset Onboarding</button>'
+      + '</div>'
+      + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
+
+    const sections = [
+      { title: 'Password',        body: pwBody },
+      { title: 'Subscription',    body: '<div id="ua-sub-content"></div>' }
+    ];
+    if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Your Bars', body: barsBody });
+    sections.push({ title: 'Data and Backup', body: backupBody });
+    if (!App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
+
+    // Each section wrapped in the same dark box + grey title as Business Profile
+    // and Recovery Targets, all inside one page card (last section's margin
+    // trimmed so the card's bottom padding stays even).
+    const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;';
+    const cardInner = sections.map((s, i) =>
+      '<div class="auth-inputs" style="text-align:left;margin-bottom:' + (i === sections.length - 1 ? '0' : '16') + 'px;">'
+      + '<div style="' + secLabel + '">' + s.title + '</div>'
+      + s.body
+      + '</div>'
+    ).join('');
+
+    // "Your Account" + Signed-in-as is the only part NOT wrapped in the card.
+    const accountCard = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">Your Account</div>'
+      + (userEmail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '')
+      + '<div class="card form-card" style="margin-bottom:16px;">' + cardInner + '</div>';
 
     const teamCard = showTeam ? '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
