@@ -5653,13 +5653,26 @@ function wireAuth() {
 
     btn.textContent = 'Creating account...'; btn.disabled = true;
     try {
-      const { error: signErr } = await DB.signUp(email, pw1);
+      const { data: suData, error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
         btn.textContent = 'Create Account'; btn.disabled = false;
         const already = (signErr.message || '').toLowerCase().includes('registered');
         return showErr(already
           ? 'That email already has an account. Log in to Bar Cop instead.'
           : (signErr.message || 'Could not create the account.'));
+      }
+      // Anti-enumeration: signing up an email that already exists returns NO
+      // error but an obfuscated user with empty identities and no session
+      // (email confirmations are OFF, so a real new signup ALWAYS returns a
+      // live session). Without this guard the handler falls through, SIGNED_IN
+      // never fires, and the button hangs on "Creating account..." forever.
+      if (!suData || !suData.session) {
+        btn.textContent = 'Create Account'; btn.disabled = false;
+        const already = Array.isArray(suData && suData.user && suData.user.identities)
+          && suData.user.identities.length === 0;
+        return showErr(already
+          ? 'That email already has an account. Log in to Bar Cop instead.'
+          : 'Could not start your account. Try again, or contact support.');
       }
       // Record the clickwrap acceptance (best-effort). Then the SIGNED_IN handler
       // boots into onboarding, then the Hub with the locked "Choose your plan"

@@ -75,16 +75,22 @@ const DB = {
     // any cached account/role so _ensureAccountId re-resolves the freshly
     // trigger-provisioned account (owner_user_id = this new user).
     const res = await this._sb.auth.signUp({ email, password });
-    if (res.data?.user) this._user = res.data.user;
-    this._accountId = null;
-    this._role = null;
-    this._ownerUserId = null;
-    this._permissions = null;
-    this._accountsCache = null;
-    // A brand-new signup must not resolve a prior user's account left in
-    // localStorage from an earlier session on this browser — clear it so
-    // _ensureAccountId lands on the freshly provisioned account.
-    this._setStoredActiveAccountId(null);
+    // Only adopt the identity when signUp actually created a session. An
+    // existing-email signUp (Supabase anti-enumeration) returns an obfuscated
+    // user with NO session; adopting it would leave DB pointed at a phantom
+    // user with no account/membership.
+    if (res.data?.session && res.data?.user) {
+      this._user = res.data.user;
+      this._accountId = null;
+      this._role = null;
+      this._ownerUserId = null;
+      this._permissions = null;
+      this._accountsCache = null;
+      // A brand-new signup must not resolve a prior user's account left in
+      // localStorage from an earlier session on this browser — clear it so
+      // _ensureAccountId lands on the freshly provisioned account.
+      this._setStoredActiveAccountId(null);
+    }
     return res;
   },
 
