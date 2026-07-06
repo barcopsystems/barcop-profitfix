@@ -730,7 +730,9 @@ const App = {
       + '</div>'
       + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">Continue to Payment</button>'
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
-      + '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button></div>'
+      + '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
+      +   '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
+      +   '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
       + '</div>';
     document.body.appendChild(m);
     const opts = Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt'));
@@ -752,6 +754,17 @@ const App = {
       if (!ok) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
     });
     document.getElementById('gate-cancel').addEventListener('click', () => this.abandonAndRestart());
+    // Non-destructive exit: sign out (account + email kept) and land on the
+    // login page. Signing back in re-shows this gate, so they can finish payment
+    // later without losing anything.
+    document.getElementById('gate-signout').addEventListener('click', async () => {
+      this._removePlanGate();
+      try { await DB.signOut(); } catch (e) {}
+      this.showAuth();
+      ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
+        const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-login') ? '' : 'none';
+      });
+    });
   },
 
   // Create a Stripe checkout session for the signed-in owner and go to Stripe.
