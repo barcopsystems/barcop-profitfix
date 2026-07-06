@@ -792,6 +792,10 @@ const App = {
     });
     ['signup-email','signup-pw1','signup-pw2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const tos = document.getElementById('signup-tos'); if (tos) tos.checked = false;
+    // Reset the signup button — the prior signUp left it "Creating account..."
+    // and disabled, and we're navigating back to the form without a reload.
+    const sbtn = document.getElementById('signup-btn'); if (sbtn) { sbtn.textContent = 'Create Account'; sbtn.disabled = false; }
+    const serr = document.getElementById('signup-error'); if (serr) serr.style.display = 'none';
   },
 
   // ── Hub overlay modal (Phase 2 polish) ──────────────────────────────────────
