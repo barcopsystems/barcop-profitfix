@@ -36,8 +36,12 @@ const Onboarding = {
     // Pre-fill the name: for a bar added via Add Another Bar, the modal already
     // set accounts.name, so seed it here (unless a real bar_name is already set).
     // Skip a still-default account name (the signup email or "My Bar").
+    // The signup trigger names a fresh account after the user's email, and
+    // add-account defaults to "My Bar" — skip those, but pre-fill any real name
+    // (compare to the actual email, so a bar legitimately named "Bar @ 5th" fills).
     const acctName = (window.DB && DB.activeAccountName) ? DB.activeAccountName() : null;
-    const acctNameReal = acctName && acctName.indexOf('@') < 0 && acctName !== 'My Bar';
+    const userEmail = (window.DB && DB._user && DB._user.email) || '';
+    const acctNameReal = acctName && acctName !== userEmail && acctName !== 'My Bar';
     const prefillName = s.bar_name || (acctNameReal ? acctName : '');
 
     const basics = '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
