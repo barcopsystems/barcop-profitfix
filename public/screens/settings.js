@@ -3724,6 +3724,10 @@ S.HubSettings = {
     // Reload so the app re-renders against a fully hydrated state (like Clear
     // Data does). Without it, navigating mid-load could catch a half-built store
     // and, e.g., flash a Get Started card next to Where You Stand.
+    // The demo seeds through this same path, but a reload there would re-run
+    // startDemo (?demo=1 still in the URL) and loop forever. The demo renders the
+    // Hub itself, so only the interactive Re-Load Sample button needs the reload.
+    if (App.demoMode) return;
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. Reloading...'; }
     setTimeout(() => window.location.reload(), 800);
   },

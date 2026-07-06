@@ -13,7 +13,15 @@ S.HubReportBug = {
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows "REPORT A BUG | Back to Dashboard".
+  _demoGate() {
+    return App.demoBlock && App.demoBlock({
+      title: 'Not in the Demo',
+      body: 'Report a Bug goes straight to our support inbox, so it is off in the demo. Sign up and you can send us anything, anytime.'
+    });
+  },
+
   open() {
+    if (this._demoGate()) return;
     this._state = 'form';
     this._modal = false;
     App.openHubFullPage('Report a Bug', (mount) => this.render(mount), 'report-bug');
@@ -23,6 +31,7 @@ S.HubReportBug = {
   // section they are working in. Same form, submit, and success states,
   // rendered into a modal instead of the Hub full page.
   openModal() {
+    if (this._demoGate()) return;
     this._state = 'form';
     this._modal = true;
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Report a Bug</div>'

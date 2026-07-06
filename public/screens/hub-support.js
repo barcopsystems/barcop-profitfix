@@ -13,8 +13,16 @@ S.HubSupport = {
   _submitting: false,
   _modal: false,      // true when opened as a popup
 
+  _demoGate() {
+    return App.demoBlock && App.demoBlock({
+      title: 'Not in the Demo',
+      body: 'Contact Support goes straight to our inbox, so it is off in the demo. Sign up and we are one message away.'
+    });
+  },
+
   // Full-page fallback (sidebar stays mounted, content area swaps).
   open() {
+    if (this._demoGate()) return;
     this._state = 'form';
     this._modal = false;
     App.openHubFullPage('Contact Bar Cop', (mount) => this.render(mount), 'contact-support');
@@ -23,6 +31,7 @@ S.HubSupport = {
   // Popup — the primary entry. Same form, submit, and success states, rendered
   // into a modal (the corner X closes it) instead of the Hub full page.
   openModal() {
+    if (this._demoGate()) return;
     this._state = 'form';
     this._modal = true;
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Contact Support</div>'
