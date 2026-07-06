@@ -385,13 +385,17 @@ S.HubSettings = {
     // the survival forecast, Cash Position, and Safe to Spend. The Anchor runs a
     // realistic operating balance for a roughly $1M bar: profitable but cash-tight,
     // the exact bar Cash Recovery is built for.
+    // Through CashEngine's setters so these land on the account-scoped keys (the
+    // demo scopes to 'demo'); writing raw keys would leak across bars / signups.
     try {
-      localStorage.setItem('cash_opening_balance', '45000');
-      localStorage.setItem('cash_sales_tax_rate', '8.25');
-      localStorage.setItem('cash_tax_freq', 'monthly');
-      localStorage.setItem('cash_reserve_weeks', '8');
-      localStorage.setItem('cash_available_credit', '40000');
-      localStorage.setItem('cash_gift_card_liability', '6500');
+      if (window.CashEngine) {
+        CashEngine.setOpeningCash(45000);
+        CashEngine.setSalesTaxRate(8.25);
+        CashEngine.setTaxFrequency('monthly');
+        CashEngine.setReserveWeeks(8);
+        CashEngine.setAvailableCredit(40000);
+        CashEngine.setGiftCardLiability(6500);
+      }
     } catch (e) {}
 
     // A history of closed-out weeks so the demo shows the operator has been doing
@@ -403,7 +407,7 @@ S.HubSettings = {
       const _curMon = _mon(new Date());
       for (let w = 1; w <= 8; w++) {
         const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
-        localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
+        localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m) + App.acctScopeSuffix(), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
       }
       // Control sections, current week mid-close: the first two close steps are
       // done, the last two still to do. Keyed to each page's own done-key (the
@@ -3773,7 +3777,21 @@ S.HubSettings = {
     // or a wiped account keeps the seeded opening balance, tax rate, and reserve
     // and reads as if the opening balance is already set (Cash Audit step 1 checks
     // off, Cash Position pre-fills). A real fresh signup never has these.
-    try { ['cash_opening_balance', 'cash_sales_tax_rate', 'cash_tax_freq', 'cash_payroll_burden', 'cash_reserve_weeks', 'cash_available_credit', 'cash_gift_card_liability', 'events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    // Cash config now lives on account-scoped keys, so clear it through the
+    // setters (raw removeItem would miss the scoped keys). Event ack flags are
+    // still flat keys.
+    try {
+      if (window.CashEngine) {
+        CashEngine.setOpeningCash(null);
+        CashEngine.setSalesTaxRate(null);
+        CashEngine.setTaxFrequency('monthly');
+        CashEngine.setPayrollBurden(null);
+        CashEngine.setReserveWeeks(null);
+        CashEngine.setAvailableCredit(null);
+        CashEngine.setGiftCardLiability(null);
+      }
+    } catch (e) {}
+    try { ['events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }

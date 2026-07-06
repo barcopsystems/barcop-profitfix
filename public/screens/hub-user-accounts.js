@@ -98,7 +98,7 @@ S.HubUserAccounts = {
       +   '<input type="file" id="ua-import-file" accept="application/json,.json" style="display:none;"/>'
       + '</div>'
       + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
-      + (App.demoMode ? '' :
+      + ((App.demoMode || !(App.isDevAccount && App.isDevAccount())) ? '' :
           sh('Testing Tools')
           + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load realistic sample data across every system to test calculations and layouts. Clear All Data wipes every record across Bar Cop and the Inventory, Labor, and Shift Control stores, and starts fresh.</div>'
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'

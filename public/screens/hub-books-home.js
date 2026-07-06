@@ -29,7 +29,7 @@ S.HubBooksHome = {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   },
-  _doneKey() { return 'books_close_done_' + this._curKey(); },
+  _doneKey() { return 'books_close_done_' + this._curKey() + App.acctScopeSuffix(); },
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 

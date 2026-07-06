@@ -44,7 +44,7 @@ S.Dashboard = {
   },
 
   // ── Per-week step-done stamps (operator-controlled, local to the device) ────
-  _doneKey() { return 'pf_cockpit_done_' + this.weekEnd(); },
+  _doneKey() { return 'pf_cockpit_done_' + this.weekEnd() + App.acctScopeSuffix(); },
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
