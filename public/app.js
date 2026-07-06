@@ -758,12 +758,14 @@ const App = {
     // login page. Signing back in re-shows this gate, so they can finish payment
     // later without losing anything.
     document.getElementById('gate-signout').addEventListener('click', async () => {
-      this._removePlanGate();
+      // Keep the gate up as the cover through the async signOut, then swap to the
+      // login screen and only then drop it — so the Hub never flashes uncovered.
       try { await DB.signOut(); } catch (e) {}
       this.showAuth();
       ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
         const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-login') ? '' : 'none';
       });
+      this._removePlanGate();
     });
   },
 
