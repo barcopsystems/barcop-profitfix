@@ -43,7 +43,7 @@ S.HubSettings = {
       // Each section in its own dark wrapper (same as the onboarding page), white
       // section titles, no divider lines, all inside one page card. One gold Save
       // Data button (outside the card) saves every section in the group.
-      const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:12px;';
+      const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;';
       const help = 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;';
       const EXPLAIN = {
         service: 'Tap on the service periods you run and set the times.',
