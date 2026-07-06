@@ -62,7 +62,7 @@ S.LaborDashboard = {
   },
 
   // ── Per-week step-done stamps (operator-controlled, local to the device) ─────
-  _doneKey() { return 'lc_cockpit_done_' + this.weekStart(); },
+  _doneKey() { return 'lc_cockpit_done_' + this.weekStart() + App.acctScopeSuffix(); },
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
