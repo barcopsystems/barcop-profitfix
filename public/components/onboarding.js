@@ -33,9 +33,9 @@ const Onboarding = {
     const prefillName = s.bar_name || (acctNameReal ? acctName : '');
 
     const basics = '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:2;min-width:170px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(prefillName) + '" placeholder="The Rusty Nail"/></div>'
+      + '<div class="f" style="flex:1.4;min-width:150px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(prefillName) + '" placeholder="The Rusty Nail"/></div>'
       + '<div class="f" style="flex:1.2;min-width:110px;"><label>City</label><input type="text" id="ob-city" value="' + esc(parts[0] || '') + '" placeholder="Austin"/></div>'
-      + '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
+      + '<div class="f" style="flex:0 0 132px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
       + '</div>';
 
     // Onboarding always opens with Lunch / Dinner / Late Night on (Breakfast and
