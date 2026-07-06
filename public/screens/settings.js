@@ -54,7 +54,9 @@ S.HubSettings = {
         + s.body
         + '</div>'
       ).join('');
-      inner = parts
+      // The three wrapped sections sit inside the standard page card (no header,
+      // no dividers); the Save Data button stays outside/below it.
+      inner = '<div class="card form-card" style="margin-bottom:0;">' + parts + '</div>'
         + '<div style="display:flex;align-items:center;gap:12px;margin:16px 0 24px;">'
         +   '<button class="btn btn-primary hs-save-all">Save Data</button>'
         +   '<span class="hs-msg" data-msg="all" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
