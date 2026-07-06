@@ -5511,8 +5511,8 @@ function wireAuth() {
     const select = (el) => opts.forEach(o => {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
-      o.style.borderColor = on ? 'var(--gold)' : 'var(--b1)';
-      o.style.background   = on ? 'rgba(219,171,70,0.08)' : 'transparent';
+      o.style.borderColor = 'var(--b-edge)';
+      o.style.background   = on ? '#1E2B34' : '#0D181E';
     });
     opts.forEach(o => o.addEventListener('click', () => select(o)));
     if (opts[0]) select(opts[0]);  // default to Monthly
@@ -5561,7 +5561,7 @@ function wireAuth() {
       const { error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
         App._signupInProgress = false;
-        btn.textContent = 'Start Subscription'; btn.disabled = false;
+        btn.textContent = 'Sign up now'; btn.disabled = false;
         return showErr(signErr.message || 'Could not create the account.');
       }
       // Resolve the trigger-provisioned account (retry briefly for commit lag).

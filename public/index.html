@@ -61,8 +61,8 @@
     <div id="auth-signup" class="auth-view" style="display:none;">
       <div class="auth-card">
         <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
-        <div class="auth-heading">Start Your Subscription</div>
-        <div class="auth-sub">Create your account and pick a plan. You go straight to secure checkout.</div>
+        <div class="auth-heading">Sign up now</div>
+        <div class="auth-sub">Create your log in details, choose your plan, and complete secure checkout for instant access to your new Bar Cop account.</div>
         <div class="auth-inputs">
           <div class="f" style="margin-bottom:10px;"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
           <div class="f" style="margin-bottom:10px;"><label>Password</label><input type="password" id="signup-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
@@ -70,18 +70,18 @@
         </div>
         <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
         <div id="signup-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
-          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
+          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
         </div>
         <label style="display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--t2);line-height:1.5;cursor:pointer;">
-          <input type="checkbox" id="signup-tos" style="margin-top:2px;flex-shrink:0;"/>
+          <input type="checkbox" id="signup-tos" class="bc-check" style="margin-top:2px;flex-shrink:0;"/>
           <span>I agree to the <a href="https://www.barcop.com/pages/terms-of-use" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a> and <a href="https://www.barcop.com/pages/privacy-policy" target="_blank" rel="noopener" style="color:var(--gold);">Privacy Policy</a>.</span>
         </label>
-        <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Start Subscription</button>
+        <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Sign up now</button>
         <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
       </div>
       <div class="auth-foot">
-        <div style="font-size:12px;color:var(--t2);">Already have an account? <button class="auth-link" id="show-login-from-signup">Sign in</button></div>
+        <div style="font-size:12px;color:var(--t2);">Already have an account? <button class="auth-link" id="show-login-from-signup">Log in to Bar Cop</button></div>
       </div>
     </div>
     <div id="auth-paywall" class="auth-view" style="display:none;">
@@ -91,8 +91,8 @@
         <div class="auth-sub">This bar needs an active subscription to use Bar Cop. Pick a plan to continue to checkout.</div>
         <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
         <div id="paywall-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
-          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b1);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $249/mo</span></div>
+          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $2,490/yr</span><span style="font-size:11px;color:var(--gold);">save $498</span></div>
         </div>
         <button class="btn btn-primary" id="paywall-btn" style="width:100%;">Continue to Payment</button>
         <div id="paywall-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
@@ -358,6 +358,6 @@
 <script src="components/service-periods.js?v=7"></script>
 <script src="components/onboarding.js?v=28"></script>
 <script src="db.js?v=105"></script>
-<script src="app.js?v=562"></script>
+<script src="app.js?v=563"></script>
 </body>
 </html>
