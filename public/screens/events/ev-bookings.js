@@ -836,7 +836,6 @@ S.EventsBookings = {
   // ── Quote PDF ────────────────────────────────────────────────────────────
   quotePDF(b) {
     if (!b) return;
-    if (App.demoBlock && App.demoBlock('Quote PDF')) return;
     const money = n => App.fmtCurrency(n);
     const lines = [];
     lines.push(['Event', this.title(b)]);
@@ -929,7 +928,6 @@ S.EventsBookings = {
 
   printRunSheet(b) {
     if (!b) return;
-    if (App.demoBlock && App.demoBlock('Run Sheet')) return;
     const dayc = [b.day_contact_name || '', b.day_contact_phone || ''].filter(Boolean).join(' · ');
     const det = [];
     if (b.event_type) det.push(['Type', b.event_type]);
@@ -997,7 +995,6 @@ S.EventsBookings = {
 
   printAgreement(b, terms) {
     if (!b) return;
-    if (App.demoBlock && App.demoBlock('Event Agreement')) return;
     const barName = (App.data && App.data.settings && App.data.settings.bar_name) || 'Our Venue';
     const p = this.quoteParts(b);
     const money = n => App.fmtCurrency(n);
