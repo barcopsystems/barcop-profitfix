@@ -422,17 +422,21 @@ const App = {
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
   },
 
-  // The public demo is fully functional EXCEPT App Settings, which stays locked
-  // so a visitor can't rename the sample bar as their own (and then brand
-  // exported PDFs with it). Called from the two Settings entry points. Returns
-  // true (and shows a sign-up notice) when blocked in demo, false otherwise.
-  demoBlock() {
+  // The public demo is fully functional EXCEPT App Settings (a visitor can't
+  // rename the sample bar and brand exported PDFs) and the two forms that email
+  // us (Report a Bug / Contact Support). Called from those entry points. Pass
+  // {title, body} to override the copy; defaults to the Settings message.
+  // Returns true (and shows a sign-up notice) when blocked in demo, false else.
+  demoBlock(opts) {
     if (!this.demoMode) return false;
+    opts = opts || {};
+    const title = opts.title || 'Settings Is Off in the Demo';
+    const body  = opts.body  || 'App Settings is locked in the demo so the sample bar stays put. Sign up to set up your own bar and make it yours.';
     const m = document.createElement('div');
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
-      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">Settings Is Off in the Demo</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">App Settings is locked in the demo so the sample bar stays put. Sign up to set up your own bar and make it yours.</div>'
+      + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">' + esc(title) + '</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(body) + '</div>'
       + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Sign Up Now</button>'
       + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
       + '</div>';
