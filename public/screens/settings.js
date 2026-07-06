@@ -36,16 +36,20 @@ S.HubSettings = {
     const secs = grp ? grp.ids.map(id => allSecs.find(s => s.id === id)).filter(Boolean)
                      : allSecs;
     container.scrollTop = 0;
+    this._activeSecs = secs.map(s => s.id);   // the Save-all button saves these
 
     let inner;
-    if (group === 'business-profile') {
+    if (group === 'business-profile' || group === 'recovery-targets') {
       // Each section in its own dark wrapper (same as the onboarding page), white
-      // section titles, no divider lines. One gold Save Data button saves them all.
+      // section titles, no divider lines, all inside one page card. One gold Save
+      // Data button (outside the card) saves every section in the group.
       const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:12px;';
       const help = 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;';
       const EXPLAIN = {
         service: 'Tap on the service periods you run and set the times.',
-        tax:     'Set these once. Cash, Books, and Labor read them.'
+        tax:     'Set these once. Cash, Books, and Labor read them.',
+        profit:  'Your cost goals. Profit Recovery measures your actuals against them.',
+        revenue: 'Your sales goals. Revenue Recovery measures your actuals against them.'
       };
       const parts = secs.map((s, i) =>
         '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:' + (i === secs.length - 1 ? '0' : '16px') + ';">'
@@ -157,7 +161,7 @@ S.HubSettings = {
       btn.addEventListener('click', () => this.saveSection(btn.dataset.save));
     });
     const saveAll = container.querySelector('.hs-save-all');
-    if (saveAll) saveAll.addEventListener('click', () => this.saveBusinessProfile());
+    if (saveAll) saveAll.addEventListener('click', () => this.saveGroup(this._activeSecs || []));
     const spMount = container.querySelector('#hs-sp-mount');
     if (spMount && window.ServicePeriods) {
       this._spCtrl = ServicePeriods.mount(spMount, { selected: App.servicePeriods() });
@@ -263,26 +267,34 @@ S.HubSettings = {
     });
   },
 
-  // ── Business Profile save — one button writes Profile + Service Periods +
-  // Taxes together. Service Periods is validated first so a bad daypart aborts
-  // the whole save (nothing writes half-done). ───────────────────────────────
-  saveBusinessProfile() {
-    const svcKeys = this._writeSection('service');
-    if (svcKeys == null) return;  // service-period validation failed
-    const keys = new Set(svcKeys);
-    (this._writeSection('profile') || []).forEach(k => keys.add(k));
-    (this._writeSection('tax') || []).forEach(k => keys.add(k));
+  // ── Save-all for the combined pages (Business Profile, Recovery Targets) —
+  // one button writes every section in the group. Service Periods is validated
+  // first so a bad daypart aborts the whole save (nothing writes half-done). ──
+  saveGroup(ids) {
+    ids = ids || [];
+    const keys = new Set();
+    if (ids.includes('service')) {
+      const svcKeys = this._writeSection('service');
+      if (svcKeys == null) return;  // service-period validation failed
+      svcKeys.forEach(k => keys.add(k));
+    }
+    ids.filter(id => id !== 'service').forEach(id => {
+      (this._writeSection(id) || []).forEach(k => keys.add(k));
+    });
     Promise.all([...keys].map(k => App.saveKey(k))).then(async () => {
       this._flashSaved('all');
       App.updatePeriod();
-      App.markSetupDone('gs_service_periods');
+      if (ids.includes('service')) App.markSetupDone('gs_service_periods');
+      if (ids.includes('profit') || ids.includes('revenue')) App.markSetupDone('gs_targets');
       // Keep the bar switcher (accounts.name) in sync with the bar name.
-      try {
-        if (window.DB && DB.setAccountName && App.data.settings.bar_name) {
-          await DB.setAccountName(App.data.settings.bar_name);
-          if (App.renderAccountSwitcher) await App.renderAccountSwitcher();
-        }
-      } catch (e) { console.error('account name sync', e); }
+      if (ids.includes('profile')) {
+        try {
+          if (window.DB && DB.setAccountName && App.data.settings.bar_name) {
+            await DB.setAccountName(App.data.settings.bar_name);
+            if (App.renderAccountSwitcher) await App.renderAccountSwitcher();
+          }
+        } catch (e) { console.error('account name sync', e); }
+      }
     });
   },
 
