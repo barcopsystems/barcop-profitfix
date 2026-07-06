@@ -770,23 +770,24 @@ const App = {
 
   // Discard the just-created unpaid account (frees the email) → fresh signup.
   async abandonAndRestart() {
-    // Drop the gate first so the confirm dialog (lower z-index) is on top and
-    // clickable; bring the gate back if they decide to keep the account.
-    this._removePlanGate();
+    // Keep the plan gate up as a full-screen cover the whole time. The confirm
+    // renders ABOVE it (z 9800) and the gate stays put through the async delete
+    // + signout, so the Hub is never exposed or clickable during the hand-off
+    // back to signup. The gate only drops once the auth screen is showing.
     const ok = await this.confirm({
       title: 'Discard this account?',
       message: 'This deletes the account you just created (no payment was made) and takes you back to sign up with a different email.',
-      confirmText: 'Discard & Start Over', cancelText: 'Keep It'
+      confirmText: 'Discard & Start Over', cancelText: 'Keep It', z: 9800
     });
-    if (!ok) { this.showPlanGate(); return; }
+    if (!ok) return;  // gate is still up; nothing to restore
     try {
       const headers = await DB._authHeaders();
       const accountId = await DB._ensureAccountId();
       if (accountId) await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
     } catch (e) {}
-    this._removePlanGate();
     try { await DB.signOut(); } catch (e) {}
     this.showAuth();
+    this._removePlanGate();
     ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
       const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-signup') ? '' : 'none';
     });
@@ -5319,7 +5320,8 @@ const App = {
     const danger      = opts.danger !== false; // default to danger (red) confirm button
     return new Promise(resolve => {
       const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+      // z defaults to 9500; callers layering over the plan gate (9700) pass higher.
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:' + (opts.z || 9500) + ';display:flex;align-items:center;justify-content:center;padding:20px;';
       overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
         + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
