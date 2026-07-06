@@ -657,10 +657,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
     const sessionArgs = {
+      ui_mode: 'embedded',
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: 'https://app.barcop.com/?checkout=success',
-      cancel_url:  'https://app.barcop.com/?checkout=cancelled',
+      // Embedded checkout stays on app.barcop.com; on completion Stripe redirects
+      // the page to return_url, where the existing ?checkout=success boot flow
+      // (webhook poll + activation) takes over.
+      return_url: 'https://app.barcop.com/?checkout=success',
       metadata: { user_id: userId, account_id: accountId }
     };
     // Pre-fill the checkout with the account's own email so Stripe Link can't
@@ -668,7 +671,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // browser. (Billing still keys to account_id in the webhook regardless.)
     if (userData.user.email) sessionArgs.customer_email = userData.user.email;
     const session = await stripe.checkout.sessions.create(sessionArgs);
-    res.json({ url: session.url });
+    res.json({ clientSecret: session.client_secret, publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
   } catch (e) {
     console.error('Checkout session error:', e);
     res.status(500).json({ error: e.message });
