@@ -636,98 +636,12 @@ S.HubUserAccounts = {
     });
   },
 
-  // Add Another Bar (owner tier, multi-location Option A): name + plan → create
-  // the account (server) → checkout for it. Each bar is its own subscription.
+  // Add Another Bar (owner tier, multi-location Option A). Runs the same flow as
+  // the first bar: onboarding → plan gate → Stripe → the new bar's Hub. The bar's
+  // account is created only at payment, so any cancel before then leaves nothing
+  // behind and drops back here. See App.startAddBar / startNewBarCheckout.
   _addBar() {
-    this._pendingBarAccountId = null;   // fresh modal: no bar created yet
-    // Matches the auth / plan-gate look: logo, centered white heading, the name
-    // in an .auth-inputs wrapper, plan-gate plan colors, full-width Continue,
-    // Cancel as a centered gold link below it.
-    const planOpt = (plan, label, note) =>
-      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
-      + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
-    const m = document.createElement('div');
-    m.id = 'addbar-modal';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;justify-content:center;overflow-y:auto;padding:24px 16px;';
-    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;margin:auto;">'
-      + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-      + '<div class="auth-heading" style="margin-bottom:18px;">Add Another Bar</div>'
-      + '<div class="auth-inputs"><div class="f"><label>Bar Name</label><input type="text" id="ua-newbar-name" placeholder="Your bar\'s name"/></div></div>'
-      + '<label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>'
-      + '<div id="ua-newbar-plan" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;">'
-      +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
-      +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
-      + '</div>'
-      + '<div id="ua-newbar-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
-      + '<button class="btn btn-primary" data-act="ok" id="ua-newbar-go" style="width:100%;padding:14px 20px;font-size:12px;margin-top:16px;">Continue to Payment</button>'
-      + '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="ua-newbar-cancel" style="font-size:12px;">Cancel</button></div>'
-      + '</div>';
-    document.body.appendChild(m);
-    // Wire the plan picker with plan-gate colors (selected #1E2B34, else #0D181E).
-    const opts = Array.from(m.querySelectorAll('#ua-newbar-plan .plan-opt'));
-    const selectOpt = (el) => opts.forEach(o => {
-      const on = o === el;
-      o.classList.toggle('plan-selected', on);
-      o.style.borderColor = 'var(--b-edge)';
-      o.style.background   = on ? '#1E2B34' : '#0D181E';
-    });
-    opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
-    if (opts[0]) selectOpt(opts[0]);
-    // Continue keeps the modal open (submit opens checkout or shows an error);
-    // Cancel and backdrop click close it.
-    m.querySelector('#ua-newbar-go').addEventListener('click', () => this._addBarSubmit(m));
-    m.querySelector('#ua-newbar-cancel').addEventListener('click', () => m.remove());
-    m.addEventListener('click', ev => { if (ev.target === m) m.remove(); });
-  },
-
-  async _addBarSubmit(box) {
-    const name = (box.querySelector('#ua-newbar-name')?.value || '').trim();
-    const err  = box.querySelector('#ua-newbar-err');
-    const sel  = box.querySelector('#ua-newbar-plan .plan-opt.plan-selected');
-    const plan = (sel && sel.dataset.plan) || 'monthly';
-    const btn  = box.querySelector('button[data-act="ok"]');
-    const showErr = (t) => { if (err) { err.textContent = t; err.style.display = 'block'; } };
-    if (err) err.style.display = 'none';
-    if (!name) return showErr('Enter a name for the bar.');
-    if (btn) { btn.disabled = true; btn.textContent = 'Setting up...'; }
-    try {
-      const headers = await this._teamAuthHeaders();
-      if (!headers) { if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; } return; }
-      // Create the bar only once. If checkout failed on a prior attempt the bar
-      // already exists — reuse its id so a retry never creates a duplicate bar.
-      let accountId = this._pendingBarAccountId || null;
-      if (!accountId) {
-        const r = await fetch('/api/add-account', {
-          method: 'POST', headers, body: JSON.stringify({ name })
-        });
-        const data = await r.json();
-        if (!r.ok || !data.ok || !data.accountId) {
-          if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
-          return showErr(data.error || 'Could not create the bar. Try again.');
-        }
-        accountId = data.accountId;
-        this._pendingBarAccountId = accountId;
-      }
-      // Start checkout for the new bar (headers carry the JWT the endpoint needs).
-      const cr = await fetch('/api/create-checkout-session', {
-        method: 'POST', headers,
-        body: JSON.stringify({ accountId, plan })
-      });
-      const cd = await cr.json();
-      if (cd.clientSecret) {
-        // Make the new bar active so the post-checkout return (?checkout=success)
-        // + onboarding land on it. Then open the embedded checkout in place.
-        DB._setStoredActiveAccountId(accountId);
-        if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
-        await App.openEmbeddedCheckout(cd, showErr);
-        return;
-      }
-      if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
-      showErr(cd.error || 'The bar was created, but checkout could not start. Try again, or contact support.');
-    } catch (e) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
-      showErr('Connection error. Try again.');
-    }
+    App.startAddBar();
   },
 
   _teamEditPerms(membershipId, email, currentPerms) {
