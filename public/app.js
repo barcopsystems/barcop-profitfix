@@ -5609,6 +5609,27 @@ function wireAuth() {
     App.showAuth();
   });
 
+  // "Wrong email? Start over": discard the just-created unpaid account (frees the
+  // email) and drop back on a fresh signup so they can use a different email.
+  document.getElementById('paywall-different-email')?.addEventListener('click', async () => {
+    const ok = await App.confirm({
+      title: 'Start over with a different email?',
+      message: 'This discards the account you just started. No payment was made. You will go back to sign up with a different email.',
+      confirmText: 'Start Over', cancelText: 'Cancel'
+    });
+    if (!ok) return;
+    try {
+      const headers = await DB._authHeaders();
+      const accountId = await DB._ensureAccountId();
+      if (accountId) await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
+    } catch (e) { /* best-effort cleanup; still sign out to the fresh signup */ }
+    try { await DB.signOut(); } catch (e) {}
+    ['signup-email','signup-pw1','signup-pw2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const tos = document.getElementById('signup-tos'); if (tos) tos.checked = false;
+    App.showAuth();
+    show('auth-signup');
+  });
+
   document.getElementById('login-btn')?.addEventListener('click', async () => {
     const email = document.getElementById('login-email').value.trim();
     const pass  = document.getElementById('login-password').value;
