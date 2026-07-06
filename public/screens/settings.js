@@ -47,8 +47,8 @@ S.HubSettings = {
         service: 'Tap on the service periods you run and set the times.',
         tax:     'Set these once. Cash, Books, and Labor read them.'
       };
-      const parts = secs.map((s) =>
-        '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:16px;">'
+      const parts = secs.map((s, i) =>
+        '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:' + (i === secs.length - 1 ? '0' : '16px') + ';">'
         + '<div style="' + secLabel + '">' + esc(s.title) + '</div>'
         + (EXPLAIN[s.id] ? '<div style="' + help + '">' + EXPLAIN[s.id] + '</div>' : '')
         + s.body
