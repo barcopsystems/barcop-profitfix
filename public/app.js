@@ -5561,7 +5561,7 @@ function wireAuth() {
       const { error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
         App._signupInProgress = false;
-        btn.textContent = 'Sign up now'; btn.disabled = false;
+        btn.textContent = 'Create Account'; btn.disabled = false;
         return showErr(signErr.message || 'Could not create the account.');
       }
       // Resolve the trigger-provisioned account (retry briefly for commit lag).
