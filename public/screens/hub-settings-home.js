@@ -10,6 +10,7 @@
 S.HubSettingsHome = {
 
   open() {
+    if (App.demoBlock && App.demoBlock()) return;   // App Settings is off in the demo
     App.openHubFullPage('Settings', (mount) => { this.container = mount; this.render(mount); }, 'settings-home');
   },
 
