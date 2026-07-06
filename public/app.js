@@ -779,8 +779,10 @@ const App = {
       const plan = (sel && sel.dataset.plan) || 'monthly';
       const btn = document.getElementById('gate-pay');
       btn.disabled = true; btn.textContent = 'Going to checkout...';
-      const ok = await this.startCheckout(plan, gateErr);
-      if (!ok) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+      await this.startCheckout(plan, gateErr);
+      // The embedded checkout modal (if it opened) now covers this button, so
+      // resetting it is invisible; on cancel the gate is revealed ready to retry.
+      btn.disabled = false; btn.textContent = 'Continue to Payment';
     });
     document.getElementById('gate-cancel').addEventListener('click', () => this.abandonAndRestart());
     // Non-destructive exit: sign out (account + email kept) and land on the
@@ -798,7 +800,8 @@ const App = {
     });
   },
 
-  // Create a Stripe checkout session for the signed-in owner and go to Stripe.
+  // Create a Stripe checkout session for the signed-in owner and open the
+  // embedded checkout on top of the Hub (no redirect out to Stripe).
   async startCheckout(plan, onErr) {
     try {
       const accountId = await DB._ensureAccountId();
@@ -807,10 +810,48 @@ const App = {
         method: 'POST', headers, body: JSON.stringify({ accountId, plan })
       });
       const data = await r.json();
-      if (data.url) { window.location.href = data.url; return true; }
+      if (data.clientSecret) return await this.openEmbeddedCheckout(data, onErr);
       onErr(data.error || 'Could not start checkout. Try again, or contact support.');
       return false;
     } catch (e) { onErr('Connection error. Try again.'); return false; }
+  },
+
+  // Mount Stripe's embedded checkout inside a Bar Cop modal so payment happens on
+  // app.barcop.com instead of a redirect to a Stripe-hosted page. resp carries
+  // { clientSecret, publishableKey } from create-checkout-session. On completion
+  // Stripe redirects the page to return_url (?checkout=success); Cancel closes
+  // the modal and leaves the plan gate underneath ready to retry.
+  async openEmbeddedCheckout(resp, onErr) {
+    if (document.getElementById('checkout-modal')) return true;
+    if (!resp || !resp.clientSecret || !resp.publishableKey || typeof Stripe === 'undefined') {
+      if (onErr) onErr('Could not open checkout. Try again, or contact support.');
+      return false;
+    }
+    const modal = document.createElement('div');
+    modal.id = 'checkout-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9800;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px;';
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:20px;max-width:520px;width:100%;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+      +   '<img src="assets/logo.png" alt="Bar Cop" style="height:26px;"/>'
+      +   '<button class="auth-link" id="checkout-close" style="font-size:12px;">Cancel</button>'
+      + '</div>'
+      + '<div id="checkout-embed"></div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    try {
+      const stripe = Stripe(resp.publishableKey);
+      const checkout = await stripe.initEmbeddedCheckout({ clientSecret: resp.clientSecret });
+      checkout.mount('#checkout-embed');
+      document.getElementById('checkout-close').addEventListener('click', () => {
+        try { checkout.destroy(); } catch (e) {}
+        modal.remove();
+      });
+      return true;
+    } catch (e) {
+      modal.remove();
+      if (onErr) onErr('Could not open checkout. Try again, or contact support.');
+      return false;
+    }
   },
 
   // Discard the just-created unpaid account (frees the email) → fresh signup.
