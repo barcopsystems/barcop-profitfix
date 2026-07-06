@@ -662,8 +662,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       // Embedded checkout stays on app.barcop.com; on completion Stripe redirects
       // the page to return_url, where the existing ?checkout=success boot flow
-      // (webhook poll + activation) takes over.
-      return_url: 'https://app.barcop.com/?checkout=success',
+      // (webhook poll + activation) takes over. The bar id makes the return land
+      // on the bar that was just paid for (needed for Add Another Bar).
+      return_url: 'https://app.barcop.com/?checkout=success&bar=' + accountId,
       metadata: { user_id: userId, account_id: accountId }
     };
     // Pre-fill the checkout with the account's own email so Stripe Link can't
