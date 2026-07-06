@@ -730,8 +730,8 @@ const App = {
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
       + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">You\'re All Set</div>'
-      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">You\'re a Bar Cop member now. This is your Hub. Your setup steps are waiting right below: get your Control sections in and run your first audit to see where your money is leaking.</div>'
-      + '<button class="btn btn-primary" id="welcome-go" style="width:100%;padding:14px 20px;font-size:12px;">Go to Hub</button>'
+      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">You\'re a Bar Cop member now. This is your Hub. Your setup steps are waiting below. Start with the Control sections, then run your first audit to find your biggest money leaks.</div>'
+      + '<button class="btn btn-primary" id="welcome-go" style="width:100%;padding:14px 20px;font-size:12px;">Let\'s Go</button>'
       + '</div>';
     document.body.appendChild(m);
     document.getElementById('welcome-go').addEventListener('click', () => m.remove());
