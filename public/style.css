@@ -1151,6 +1151,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .auth-foot > div + div{margin-top:10px;}
 .auth-link{background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
 .auth-link:hover{color:var(--gold-h);}
+/* Taller, more prominent auth buttons (scoped so the rest of the app is untouched). */
+.auth-view .btn{padding:14px 20px;font-size:12px;}
+.auth-hint{font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;text-align:center;}
 
 /* ══ ING TABLE ══ */
 .ing-tbl{width:100%;border-collapse:collapse;}
