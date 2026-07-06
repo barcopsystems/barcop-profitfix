@@ -710,11 +710,12 @@ S.HubUserAccounts = {
         body: JSON.stringify({ accountId, plan })
       });
       const cd = await cr.json();
-      if (cd.url) {
-        // Make the new bar active so the post-checkout return + onboarding land
-        // on it. Store only (no reload) since we are about to leave for Stripe.
+      if (cd.clientSecret) {
+        // Make the new bar active so the post-checkout return (?checkout=success)
+        // + onboarding land on it. Then open the embedded checkout in place.
         DB._setStoredActiveAccountId(accountId);
-        window.location.href = cd.url;
+        if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+        await App.openEmbeddedCheckout(cd, showErr);
         return;
       }
       if (btn) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
