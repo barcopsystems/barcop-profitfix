@@ -10,16 +10,20 @@ const Onboarding = {
   _spCtrl: null,
   _help: 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;',
 
-  start() {
+  // opts.newBar = true → adding a bar to an existing account. The form starts
+  // blank, gets a Cancel, and Continue goes to the plan gate instead of saving
+  // to the current bar (nothing persists until they pay for the new bar).
+  start(opts) {
+    this._newBar = !!(opts && opts.newBar);
     document.getElementById('ob-overlay').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
     this.render();
   },
 
   render() {
+    const nb = this._newBar;
     const s = App.data.settings;
-    const parts = (s.city_state || '').split(',').map(p => p.trim());
-    const v = x => (x != null && x !== '') ? x : '';
+    const parts = nb ? [] : (s.city_state || '').split(',').map(p => p.trim());
 
     // Pre-fill the name: for a bar added via Add Another Bar, the modal already
     // set accounts.name, so seed it here (unless a real bar_name is already set).
@@ -27,10 +31,11 @@ const Onboarding = {
     // The signup trigger names a fresh account after the user's email, and
     // add-account defaults to "My Bar" — skip those, but pre-fill any real name
     // (compare to the actual email, so a bar legitimately named "Bar @ 5th" fills).
+    // A brand-new bar (nb) always starts blank.
     const acctName = (window.DB && DB.activeAccountName) ? DB.activeAccountName() : null;
     const userEmail = (window.DB && DB._user && DB._user.email) || '';
     const acctNameReal = acctName && acctName !== userEmail && acctName !== 'My Bar';
-    const prefillName = s.bar_name || (acctNameReal ? acctName : '');
+    const prefillName = nb ? '' : (s.bar_name || (acctNameReal ? acctName : ''));
 
     const basics = '<div class="ob-row" style="display:flex;gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="flex:1.4;min-width:150px;"><label>Bar / Restaurant Name</label><input type="text" id="ob-name" value="' + esc(prefillName) + '" placeholder="The Rusty Nail"/></div>'
@@ -39,8 +44,9 @@ const Onboarding = {
       + '</div>';
 
     // Onboarding always opens with Lunch / Dinner / Late Night on (Breakfast and
-    // Custom off) unless the account already saved its own service periods.
-    const savedSP = s.service_periods;
+    // Custom off) unless the account already saved its own service periods. A
+    // brand-new bar always starts from the defaults.
+    const savedSP = nb ? null : s.service_periods;
     const defaultSP = App.SERVICE_PERIOD_PRESETS
       .filter(p => p.name !== 'Breakfast')
       .map(p => ({ id: 'sp_ob_' + p.name.toLowerCase().replace(/[^a-z]/g, ''), name: p.name, start: p.start, end: p.end }));
@@ -58,12 +64,20 @@ const Onboarding = {
       + '<div id="ob-sp-mount"></div>'
       + '</div>';
 
+    const heading = nb ? 'Set Up Your New Bar' : 'Welcome to Bar Cop';
+    const sub     = nb ? 'Enter the basics for this location.' : 'Your POS rings the sales. Bar Cop runs the business.';
+    const btnText = nb ? 'Continue' : 'Continue to Bar Cop';
+    const cancelHTML = nb
+      ? '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="ob-cancel" style="font-size:12px;">Cancel</button></div>'
+      : '';
+
     document.getElementById('ob-content').innerHTML =
-      '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;text-align:center;">Your POS rings the sales. Bar Cop runs the business.</div>'
+      '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">' + heading + '</div>'
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">' + sub + '</div>'
       + wrapper
       + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;text-align:center;"></div>'
-      + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary" style="width:100%;padding:14px 20px;font-size:12px;" id="ob-finish">Continue to Bar Cop</button></div>';
+      + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary" style="width:100%;padding:14px 20px;font-size:12px;" id="ob-finish">' + btnText + '</button></div>'
+      + cancelHTML;
 
     this._spCtrl = window.ServicePeriods
       ? ServicePeriods.mount(document.getElementById('ob-sp-mount'), { selected: initialSP })
@@ -71,6 +85,7 @@ const Onboarding = {
 
     document.getElementById('ob-name')?.focus();
     document.getElementById('ob-finish')?.addEventListener('click', () => this.finish());
+    document.getElementById('ob-cancel')?.addEventListener('click', () => { if (App._returnToUserAccounts) App._returnToUserAccounts(); });
     ['ob-name', 'ob-city', 'ob-state'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', e => e.target.closest('.f')?.classList.remove('ob-invalid'));
     });
@@ -98,12 +113,26 @@ const Onboarding = {
 
     if (firstBad || unnamed || !periods.length) { firstBad?.focus(); return; }
 
-    const s = App.data.settings;
     const city  = document.getElementById('ob-city').value.trim();
     const state = document.getElementById('ob-state').value.trim();
-    s.bar_name            = document.getElementById('ob-name').value.trim();
-    s.city_state          = city && state ? city + ', ' + state : city || state || '';
-    s.service_periods     = periods;
+    const draft = {
+      bar_name:        document.getElementById('ob-name').value.trim(),
+      city_state:      city && state ? city + ', ' + state : city || state || '',
+      service_periods: periods
+    };
+
+    // New bar: nothing is saved to any account yet. Hand the draft to the plan
+    // gate; the bar is created + these settings applied only after payment.
+    if (this._newBar) {
+      document.getElementById('ob-overlay').classList.add('hidden');
+      App.showPlanGate({ newBar: true, draft });
+      return;
+    }
+
+    const s = App.data.settings;
+    s.bar_name            = draft.bar_name;
+    s.city_state          = draft.city_state;
+    s.service_periods     = draft.service_periods;
     s.onboarding_complete = true;
     await App.saveKey('settings');
 
