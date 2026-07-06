@@ -654,6 +654,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
     }
     if (!allowed) return res.status(403).json({ error: 'Not allowed to start billing for this account.' });
 
+    // Defense in depth: never start a second subscription for a bar that already
+    // has one active. The UI gates this, but a duplicate/direct call must not
+    // create a second Stripe subscription and double-charge the customer.
+    const { data: existingSub } = await supabaseAdmin
+      .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
+    if (existingSub && existingSub.subscription_status === 'active') {
+      return res.status(409).json({ error: 'This bar already has an active subscription.' });
+    }
+
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
     const sessionArgs = {
