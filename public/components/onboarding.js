@@ -16,18 +16,6 @@ const Onboarding = {
     this.render();
   },
 
-  // A section = the numbered gold circle in its own left column, with the title
-  // and everything else aligned to its right (nothing sits under the circle).
-  _section(n, title, body) {
-    return '<div style="margin-top:34px;">'
-      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
-      +   '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">' + n + '</div>'
-      +   '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);">' + title + '</div>'
-      + '</div>'
-      + '<div style="margin-left:36px;">' + body + '</div>'
-      + '</div>';
-  },
-
   render() {
     const s = App.data.settings;
     const parts = (s.city_state || '').split(',').map(p => p.trim());
@@ -50,19 +38,35 @@ const Onboarding = {
       + '<div class="f" style="flex:0.8;min-width:90px;"><label>State / Province</label><input type="text" id="ob-state" value="' + esc(parts[1] || '') + '" placeholder="TX"/></div>'
       + '</div>';
 
-    const service = '<div style="' + this._help + '">Turn on the services you run. Tap one to set its hours.</div>'
-      + '<div id="ob-sp-mount"></div>';
+    // Onboarding always opens with Lunch / Dinner / Late Night on (Breakfast and
+    // Custom off) unless the account already saved its own service periods.
+    const savedSP = s.service_periods;
+    const defaultSP = App.SERVICE_PERIOD_PRESETS
+      .filter(p => p.name !== 'Breakfast')
+      .map(p => ({ id: 'sp_ob_' + p.name.toLowerCase().replace(/[^a-z]/g, ''), name: p.name, start: p.start, end: p.end }));
+    const initialSP = (Array.isArray(savedSP) && savedSP.length) ? savedSP : defaultSP;
+
+    // The Basics + Service Periods share one dark wrapper (same as the login
+    // email/password box), split by a divider, no numbered circles.
+    const secLabel = 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);margin-bottom:12px;';
+    const wrapper = '<div class="auth-inputs" style="text-align:left;">'
+      + '<div style="' + secLabel + '">The Basics</div>'
+      + basics
+      + '<div style="border-top:1px solid var(--b-edge);margin:18px 0;"></div>'
+      + '<div style="' + secLabel + '">Service Periods</div>'
+      + '<div style="' + this._help + '">Tap on the service periods you run and set the times.</div>'
+      + '<div id="ob-sp-mount"></div>'
+      + '</div>';
 
     document.getElementById('ob-content').innerHTML =
       '<div class="ob-heading" style="text-align:center;margin-bottom:8px;">Welcome to Bar Cop</div>'
-      + '<div class="ob-sub" style="max-width:none;text-align:center;">Bar Cop finds where your profit and revenue are leaking and shows you what to fix.<br>Set your basics below and you are ready to go.</div>'
-      + this._section(1, 'The Basics', basics)
-      + this._section(2, 'Service Periods', service)
+      + '<div class="ob-sub" style="max-width:none;text-align:center;">Your POS rings the sales. Bar Cop runs the business.</div>'
+      + wrapper
       + '<div id="ob-err" style="color:var(--red);font-size:12px;margin:16px 0 0;display:none;text-align:center;"></div>'
-      + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary btn-lg" style="width:100%;" id="ob-finish">Continue to Bar Cop</button></div>';
+      + '<div class="ob-actions" style="margin-top:24px;justify-content:flex-start;"><button class="btn btn-primary" style="width:100%;padding:14px 20px;font-size:12px;" id="ob-finish">Continue to Bar Cop</button></div>';
 
     this._spCtrl = window.ServicePeriods
-      ? ServicePeriods.mount(document.getElementById('ob-sp-mount'), { selected: App.servicePeriods() })
+      ? ServicePeriods.mount(document.getElementById('ob-sp-mount'), { selected: initialSP })
       : null;
 
     document.getElementById('ob-name')?.focus();
