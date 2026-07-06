@@ -511,15 +511,10 @@ const App = {
   },
 
   boot() {
-    // Hard paywall: a real (non-demo) account with no active subscription cannot
-    // enter the app. 'unknown' means we couldn't READ the subscription (transient
-    // error) — fail open there so a momentary hiccup never locks out a paying
-    // customer; only a confirmed non-active status shows the paywall.
-    const subStatus = this.subscription?.status;
-    if (!this.demoMode && subStatus !== 'active' && subStatus !== 'unknown') {
-      this.showPaywall();
-      return;
-    }
+    // A no-subscription account still boots (create account + onboarding are the
+    // free tier). The Hub then shows the locked "Choose your plan" popup via
+    // enforcePaywall(), and the database blocks all operational data until the
+    // subscription is active, so an unpaid account is a hollow shell either way.
     document.getElementById('auth-screen').style.display = 'none';
     this.updatePeriod();
     // Recurring operating expenses: fill in any elapsed months on load so Books
@@ -695,6 +690,105 @@ const App = {
     this._renderProtoTopnav('hub');               // Hub link active, no section active
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
+    this.enforcePaywall();   // no active subscription → locked "Choose your plan" popup over the Hub
+  },
+
+  // ── Subscription gate (in-app "Choose your plan" popup over the Hub) ──────────
+  // A no-subscription account boots into the free tier (create account +
+  // onboarding) and lands on the Hub with this popup. It can't be dismissed via
+  // the UI, and the database blocks all operational data until the subscription
+  // is active, so an unpaid account is a hollow shell until they pay. On payment
+  // the popup clears and the data unlocks. Demo bypasses.
+  enforcePaywall() {
+    if (this.demoMode) return;
+    const s = this.subscription && this.subscription.status;
+    if (s === 'active' || s === 'unknown') { this._removePlanGate(); return; }
+    this.showPlanGate();
+  },
+
+  _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
+
+  showPlanGate() {
+    if (document.getElementById('plan-gate')) return;
+    const planOpt = (plan, label, note) =>
+      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
+      + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
+    const m = document.createElement('div');
+    m.id = 'plan-gate';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
+      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">Choose Your Plan</div>'
+      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">Your account is set up. Pick a plan to unlock Bar Cop and get instant access.</div>'
+      + '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
+      +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
+      +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
+      + '</div>'
+      + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">Continue to Payment</button>'
+      + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
+      + '<div style="display:flex;gap:18px;justify-content:center;margin-top:18px;">'
+      +   '<button class="auth-link" id="gate-change-email" style="font-size:11px;">Change email</button>'
+      +   '<button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel account</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(m);
+    const opts = Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt'));
+    const selectOpt = (el) => opts.forEach(o => {
+      const on = o === el;
+      o.classList.toggle('plan-selected', on);
+      o.style.borderColor = 'var(--b-edge)';
+      o.style.background = on ? '#1E2B34' : '#0D181E';
+    });
+    opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
+    if (opts[0]) selectOpt(opts[0]);
+    const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
+    document.getElementById('gate-pay').addEventListener('click', async () => {
+      const sel = m.querySelector('#gate-plan-picker .plan-opt.plan-selected');
+      const plan = (sel && sel.dataset.plan) || 'monthly';
+      const btn = document.getElementById('gate-pay');
+      btn.disabled = true; btn.textContent = 'Going to checkout...';
+      const ok = await this.startCheckout(plan, gateErr);
+      if (!ok) { btn.disabled = false; btn.textContent = 'Continue to Payment'; }
+    });
+    document.getElementById('gate-change-email').addEventListener('click', () => this.abandonAndRestart());
+    document.getElementById('gate-cancel').addEventListener('click', () => this.abandonAndRestart());
+  },
+
+  // Create a Stripe checkout session for the signed-in owner and go to Stripe.
+  async startCheckout(plan, onErr) {
+    try {
+      const accountId = await DB._ensureAccountId();
+      const headers = await DB._authHeaders();
+      const r = await fetch('/api/create-checkout-session', {
+        method: 'POST', headers, body: JSON.stringify({ accountId, plan })
+      });
+      const data = await r.json();
+      if (data.url) { window.location.href = data.url; return true; }
+      onErr(data.error || 'Could not start checkout. Try again, or contact support.');
+      return false;
+    } catch (e) { onErr('Connection error. Try again.'); return false; }
+  },
+
+  // Discard the just-created unpaid account (frees the email) → fresh signup.
+  async abandonAndRestart() {
+    const ok = await this.confirm({
+      title: 'Discard this account?',
+      message: 'This deletes the account you just created (no payment was made) and takes you back to sign up with a different email.',
+      confirmText: 'Discard & Start Over', cancelText: 'Keep It'
+    });
+    if (!ok) return;
+    try {
+      const headers = await DB._authHeaders();
+      const accountId = await DB._ensureAccountId();
+      if (accountId) await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
+    } catch (e) {}
+    this._removePlanGate();
+    try { await DB.signOut(); } catch (e) {}
+    this.showAuth();
+    ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
+      const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-signup') ? '' : 'none';
+    });
+    ['signup-email','signup-pw1','signup-pw2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const tos = document.getElementById('signup-tos'); if (tos) tos.checked = false;
   },
 
   // ── Hub overlay modal (Phase 2 polish) ──────────────────────────────────────
@@ -5553,41 +5647,30 @@ function wireAuth() {
     if (!pw1 || pw1.length < 8) return showErr('Password must be at least 8 characters.');
     if (pw1 !== pw2) return showErr('Passwords do not match.');
     if (!tos) return showErr('Please agree to the Terms of Use and Privacy Policy to continue.');
-    const plan = selectedPlan('signup-plan-picker');
 
     btn.textContent = 'Creating account...'; btn.disabled = true;
-    App._signupInProgress = true;
     try {
       const { error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
-        App._signupInProgress = false;
         btn.textContent = 'Create Account'; btn.disabled = false;
-        return showErr(signErr.message || 'Could not create the account.');
+        const already = (signErr.message || '').toLowerCase().includes('registered');
+        return showErr(already
+          ? 'That email already has an account. Log in to Bar Cop instead.'
+          : (signErr.message || 'Could not create the account.'));
       }
-      // Resolve the trigger-provisioned account (retry briefly for commit lag).
+      // Record the clickwrap acceptance (best-effort). Then the SIGNED_IN handler
+      // boots into onboarding, then the Hub with the locked "Choose your plan"
+      // popup. The account exists but stays LOCKED (server-side) until payment,
+      // so backing out of Stripe never strands anyone — they just land back here.
       let accountId = null;
       for (let i = 0; i < 5 && !accountId; i++) {
         accountId = await DB._ensureAccountId();
         if (!accountId) await new Promise(r => setTimeout(r, 400));
       }
-      // Record the clickwrap acceptance (best-effort; never blocks checkout).
       try { await DB.recordTosAcceptance(accountId, App.TOS_VERSION, App.TOS_TERMS_URL, App.TOS_PRIVACY_URL); }
       catch (e) { console.error('ToS record failed', e); }
-
-      btn.textContent = 'Going to checkout...';
-      const ok = await goToCheckout(plan, showErr);
-      if (!ok) {
-        // Account exists and we're signed in, but checkout couldn't start (or the
-        // account wasn't resolvable yet). Send them to the paywall to retry
-        // payment — re-submitting signup would fail "already registered". The
-        // paywall's Continue button re-resolves the account and retries checkout.
-        App._signupInProgress = false;
-        App.subscription = await DB.getSubscription();
-        App.showPaywall();
-      }
     } catch (e) {
-      App._signupInProgress = false;
-      btn.textContent = 'Start Subscription'; btn.disabled = false;
+      btn.textContent = 'Create Account'; btn.disabled = false;
       showErr('Connection error. Try again.');
     }
   });
