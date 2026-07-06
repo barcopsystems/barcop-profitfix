@@ -295,9 +295,12 @@ const DB = {
         .map(m => {
           const subs = m.accounts.subscriptions;
           const sub = Array.isArray(subs) ? subs[0] : subs;
-          // active = paid bar. Used to keep the switcher from listing a bar that
-          // is mid-signup (created but not yet paid for).
-          return { id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role, active: !!(sub && sub.subscription_status === 'active') };
+          const st = sub && sub.subscription_status;
+          // "active" for the switcher = a real bar the operator set up and paid
+          // for. Include trialing/past_due (a transient failed retry) so such a
+          // bar never vanishes from the switcher; exclude a never-paid mid-signup
+          // bar (no row / inactive / incomplete / canceled).
+          return { id: m.accounts.id, name: m.accounts.name || 'My Bar', role: m.role, active: st === 'active' || st === 'trialing' || st === 'past_due' };
         });
       this._accountsCache = list;
       return list;

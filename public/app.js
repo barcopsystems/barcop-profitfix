@@ -734,29 +734,35 @@ const App = {
   // Create the new bar, stash the onboarding draft for the post-payment return,
   // then open the embedded checkout for it.
   async startNewBarCheckout(plan, draft, onErr) {
+    let newId = null;
+    // Roll the just-created bar back so ANY failure after creation (a network
+    // throw, no client secret, or a checkout that won't mount) leaves nothing
+    // behind — otherwise retries stack up orphan unpaid bars.
+    const rollback = async () => {
+      if (!newId) return;
+      try { await fetch('/api/abandon-account', { method: 'POST', headers: await DB._authHeaders(), body: JSON.stringify({ accountId: newId }) }); } catch (e) {}
+      try { localStorage.removeItem('newbar_draft_' + newId); } catch (e) {}
+      if (this._newBarFlow) this._newBarFlow.accountId = null;
+      newId = null;
+    };
     try {
       const headers = await DB._authHeaders();
       const r = await fetch('/api/add-account', { method: 'POST', headers, body: JSON.stringify({ name: draft.bar_name }) });
       const data = await r.json();
       if (!r.ok || !data.ok || !data.accountId) { onErr(data.error || 'Could not create the bar. Try again.'); return false; }
-      const newId = data.accountId;
+      newId = data.accountId;
       try { localStorage.setItem('newbar_draft_' + newId, JSON.stringify(draft)); } catch (e) {}
       if (this._newBarFlow) { this._newBarFlow.accountId = newId; this._newBarFlow.draft = draft; }
       const cr = await fetch('/api/create-checkout-session', { method: 'POST', headers, body: JSON.stringify({ accountId: newId, plan }) });
       const cd = await cr.json();
-      if (!cd.clientSecret) {
-        // Roll the bar back so a failed checkout leaves nothing behind.
-        try { await fetch('/api/abandon-account', { method: 'POST', headers: await DB._authHeaders(), body: JSON.stringify({ accountId: newId }) }); } catch (e) {}
-        try { localStorage.removeItem('newbar_draft_' + newId); } catch (e) {}
-        if (this._newBarFlow) this._newBarFlow.accountId = null;
-        onErr(cd.error || 'Could not start checkout. Try again, or contact support.');
-        return false;
-      }
+      if (!cd.clientSecret) { await rollback(); onErr(cd.error || 'Could not start checkout. Try again, or contact support.'); return false; }
       // Don't switch the active bar yet — the Stripe return_url carries the new
       // bar id, so we only land on it after actual payment. A tab-close mid-
       // checkout leaves the operator on their existing bar, not this unpaid one.
-      return await this.openEmbeddedCheckout(cd, onErr, { newBar: true });
-    } catch (e) { onErr('Connection error. Try again.'); return false; }
+      const opened = await this.openEmbeddedCheckout(cd, onErr, { newBar: true });
+      if (!opened) { await rollback(); return false; }   // openEmbeddedCheckout already surfaced the error
+      return true;
+    } catch (e) { await rollback(); onErr('Connection error. Try again.'); return false; }
   },
 
   // Cancel a new bar after its account was created (Stripe backed out): delete
@@ -5962,6 +5968,10 @@ function wireAuth() {
     const btn   = document.getElementById('login-btn');
     if (!email || !pass) { err.textContent='Enter email and password.'; err.style.display='block'; return; }
     btn.textContent='Logging in...'; btn.disabled=true;
+    // Clear any stale boot marker so the SIGNED_IN that follows a successful
+    // login always boots (a failed prior sign-out could leave it set, which
+    // would make the guard early-return and hang the button on "Logging in...").
+    App._bootedUserId = null;
     const {error} = await DB.signIn(email, pass);
     if (error) {
       btn.textContent='Log In'; btn.disabled=false;
@@ -6006,7 +6016,10 @@ function wireAuth() {
       msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block';
     } else {
       msg.style.color='var(--gold)'; msg.textContent='Password set. Signing you in...'; msg.style.display='block';
-      // Manually boot since SIGNED_IN may not re-fire after updateUser
+      // Manually boot since SIGNED_IN may not re-fire after updateUser. Mark the
+      // booted user so a later tab-focus SIGNED_IN doesn't re-boot and bounce the
+      // operator back to the Hub.
+      App._bootedUserId = (DB._user && DB._user.id) || null;
       await App.loadAllData();
       App.subscription = await DB.getSubscription();
       App.boot();
