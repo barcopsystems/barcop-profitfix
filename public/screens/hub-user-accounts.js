@@ -80,8 +80,7 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-pw-btn">Update Password</button></div>'
       + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
-    const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
-      + '<div id="ua-bars-list" style="margin-bottom:14px;"></div>'
+    const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
       + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>';
     const backupBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export everything to one file you keep offsite. Restore to recover or move your data.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
@@ -102,7 +101,7 @@ S.HubUserAccounts = {
       { title: 'Password',        body: pwBody },
       { title: 'Subscription',    body: '<div id="ua-sub-content"></div>' }
     ];
-    if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Your Bars', body: barsBody });
+    if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Multiple Locations', body: barsBody });
     sections.push({ title: 'Data and Backup', body: backupBody });
     if (!App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
 
@@ -148,27 +147,8 @@ S.HubUserAccounts = {
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
-    if (showAccount) { this.renderSubscription(); this._renderBarsList(); }
+    if (showAccount) this.renderSubscription();
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
-  },
-
-  // Quick-glance list of the owner's bars under "Your Bars" (only the current
-  // account's bars are shown; a mid-signup unpaid bar is excluded). Filled async
-  // from the same account list the switcher uses.
-  async _renderBarsList() {
-    const el = document.getElementById('ua-bars-list');
-    if (!el) return;
-    let accounts = [];
-    try { accounts = await DB.listMyAccounts(); } catch (e) {}
-    const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
-    const bars = (accounts || []).filter(a => a.active || a.id === activeId);
-    if (!bars.length) { el.innerHTML = ''; return; }
-    el.innerHTML = bars.map((b, i) =>
-      '<div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:var(--input);border-radius:var(--r2);margin-bottom:6px;font-size:12px;">'
-      + '<span style="color:var(--t3);font-weight:700;width:16px;flex-shrink:0;">' + (i + 1) + '</span>'
-      + '<span style="color:var(--t1);font-weight:600;">' + esc(b.name) + '</span>'
-      + '</div>'
-    ).join('');
   },
 
   renderPermsGrid(currentPerms, mode) {
