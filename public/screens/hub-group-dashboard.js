@@ -42,19 +42,42 @@ S.HubGroupDashboard = {
   async _fetchAccountData(accounts) {
     if (!accounts || !accounts.length) return {};
     const ids = accounts.map(a => a.id);
+    const map = {};
+    // 1) The config blob (settings + targets) for each bar.
     try {
       const { data, error } = await DB._sb
         .from('user_data')
         .select('account_id, data')
         .in('account_id', ids);
       if (error) { console.error('Group dashboard fetch error:', error); return {}; }
-      const map = {};
       (data || []).forEach(row => { map[row.account_id] = row.data || {}; });
-      return map;
     } catch (e) {
       console.error('Group dashboard fetch exception:', e);
       return {};
     }
+    // 2) The headline numbers (weekly figures + audit scores) live row-per-record
+    // in core_events, NOT the blob, so pull the kinds the metrics read for every
+    // bar. Without this a non-active bar shows dashes (the active bar is fine only
+    // because the caller overrides it with in-memory App.data).
+    try {
+      const kindKey = { week: 'weeks', revenue_week: 'revenue_weeks', bar_cop_audit: 'bar_cop_audits' };
+      const { data: evs, error: evErr } = await DB._sb
+        .from('core_events')
+        .select('account_id, kind, payload')
+        .in('account_id', ids)
+        .in('kind', Object.keys(kindKey));
+      if (evErr) { console.error('Group dashboard events fetch error:', evErr); }
+      else (evs || []).forEach(r => {
+        const key = kindKey[r.kind];
+        if (!key || !r.payload) return;
+        if (!map[r.account_id]) map[r.account_id] = {};
+        if (!Array.isArray(map[r.account_id][key])) map[r.account_id][key] = [];
+        map[r.account_id][key].push(r.payload);
+      });
+    } catch (e) {
+      console.error('Group dashboard events fetch exception:', e);
+    }
+    return map;
   },
 
   // Extract the headline numbers from one account's user_data blob.
