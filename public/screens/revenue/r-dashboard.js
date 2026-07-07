@@ -103,7 +103,10 @@ S.RevenueDashboard = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
-    const hasData = this.weeks().length || this.audits().length;
+    // Flip to Where You Stand when its hero number (recoverable revenue) can be
+    // read — when an audit has run, the last Get Started step. A logged week alone
+    // fills only the metric strip, not the hero, so it stays on Get Started.
+    const hasData = this.audits().length;
     const insightsBtn = '<button class="btn btn-ghost btn-sm" id="r-insights-btn" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
@@ -158,15 +161,14 @@ S.RevenueDashboard = {
     const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Numbers Stand</div>'
       + inner + '</div>';
-    if (!latest) {
-      return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Log a week of sales, covers, and labor and Bar Cop shows your check average, labor percent, and revenue per labor hour against target right here.</div>');
-    }
+    // No week yet: the same stat design with dashes (metricsRows on an empty week
+    // yields all '-'), never explainer text.
     const mini = m => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + m.label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (m.good == null ? 'var(--t1)' : m.good ? 'var(--green)' : 'var(--red)') + ';">' + m.value + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
     return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
-      + this.metricsRows(latest).map(mini).join(vdiv)
+      + this.metricsRows(latest || {}).map(mini).join(vdiv)
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="r-forecast">Revenue Forecast</button></div>');
   },
