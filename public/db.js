@@ -325,8 +325,9 @@ const DB = {
     window.location.reload();
   },
 
-  // Current user's role in their active account. 'admin' | 'staff' | 'viewer' |
-  // null if not yet resolved. Resolved lazily as a side effect of any read/write.
+  // Current user's role in their active account. 'admin' | 'staff' | null if not
+  // yet resolved. Resolved lazily as a side effect of any read/write. (The owner
+  // holds an 'admin' membership plus accounts.owner_user_id — see isOwner.)
   role() { return this._role; },
   permissions() { return this._permissions || {}; },
   isAdmin()  { return this._role === 'admin'; },
@@ -340,15 +341,16 @@ const DB = {
   isOwner() { return !!(this._user && this._ownerUserId && this._user.id === this._ownerUserId); },
 
   // ── Permission system — access by OPERATING AREA ────────────────────────────
-  // Each screen maps to one of the 8 operating areas. A Staff member's
-  // permissions object stores a level per area: 'view' (read-only), 'add'
-  // (view + create new), or 'edit' (view + create + edit + delete). Missing =
-  // no access. This matches how the rest of the app is organized (by area), so
-  // an owner grants "Inventory: Edit" instead of toggling 40 individual screens.
+  // Each screen maps to one of the 8 operating areas. A member's permissions
+  // object stores a level per area: 'view' (read-only) or 'edit' (Full Access:
+  // create + edit + delete). Missing = No Access. This matches how the rest of
+  // the app is organized (by area), so the owner grants "Inventory: Full Access"
+  // instead of toggling 40 individual screens.
   //
-  // Admin: implicit 'edit' on all areas (bypasses the map) — the GM role.
-  // Viewer: implicit 'view' on all areas (read-only) — the bookkeeper.
-  // Staff: looks up the screen's area in their permissions object.
+  // Owner: full access to everything (bypasses the map) — also holds billing.
+  // Admin + Staff: look up the screen's area in their OWN permissions object,
+  //   set by the owner (Admin additionally gets Settings; Staff only their
+  //   password). There is no longer an implicit-everything role below the owner.
   // Help screens (mapped to '_always'): accessible to anyone signed in.
   SCREEN_GROUPS: {
     // Inventory
@@ -396,18 +398,18 @@ const DB = {
 
   canAccessLevel(screen) {
     if (!this._role) return 'edit';  // not yet resolved (e.g., demo mode) — open
-    if (this._role === 'admin') return 'edit';
     const group = this.SCREEN_GROUPS[screen];
     if (group === '_always') return 'view';  // help screens always accessible
-    if (this._role === 'viewer') return 'view';
+    if (this.isOwner()) return 'edit';        // Owner = full access to everything
     if (!group) return null;
     const perms = this._permissions || {};
-    return perms[group] || null;
+    const lvl = perms[group];
+    return (lvl === 'view' || lvl === 'edit') ? lvl : null;   // anything else = No Access
   },
 
   screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
-  screenCanAdd(screen)  { const l = this.canAccessLevel(screen); return l === 'add' || l === 'edit'; },
-  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },
+  screenCanAdd(screen)  { return this.canAccessLevel(screen) === 'edit'; },   // create = Full Access
+  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // edit/delete = Full Access
 
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
