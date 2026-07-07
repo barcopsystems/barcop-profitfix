@@ -12,37 +12,18 @@ S.HubUserAccounts = {
   // member (Access + Allow Edit/Delete).
   // No pre-selected defaults. Admin explicitly checks every box for every
   // staff invite. Protects ownership from accidental over-permissioning.
-  PERMISSION_GROUPS: [
-    // Inventory Control
-    { module: 'Inventory Control', key: 'inventory-dashboard', label: 'Inventory Overview (Dashboard)' },
-    { module: 'Inventory Control', key: 'take-inventory',   label: 'Take Inventory' },
-    { module: 'Inventory Control', key: 'receive-delivery', label: 'Receive Deliveries' },
-    { module: 'Inventory Control', key: 'place-orders',     label: 'Place Orders' },
-    { module: 'Inventory Control', key: 'spot-check',       label: 'Spot Checks' },
-    { module: 'Inventory Control', key: 'manage-products',  label: 'Manage Products & Vendors' },
-    { module: 'Inventory Control', key: 'inventory-reports',label: 'Inventory Reports' },
-    // Labor Control
-    { module: 'Labor Control',     key: 'labor-dashboard',  label: 'Labor Overview (Dashboard)' },
-    { module: 'Labor Control',     key: 'log-hours',        label: 'Log Hours' },
-    { module: 'Labor Control',     key: 'log-tips',         label: 'Log Tips' },
-    { module: 'Labor Control',     key: 'view-schedule',    label: 'View Schedule' },
-    { module: 'Labor Control',     key: 'manage-schedule',  label: 'Manage Schedule' },
-    { module: 'Labor Control',     key: 'manage-staff',     label: 'Manage Staff & Positions' },
-    { module: 'Labor Control',     key: 'call-out-log',     label: 'Call-Out Log' },
-    { module: 'Labor Control',     key: 'time-off',         label: 'Time Off' },
-    { module: 'Labor Control',     key: 'labor-reports',    label: 'Labor History' },
-    // Shift Control
-    { module: 'Shift Control',     key: 'shift-dashboard',  label: 'Shift Overview (Dashboard)' },
-    { module: 'Shift Control',     key: 'cash-mgmt',        label: 'Cash Management' },
-    { module: 'Shift Control',     key: 'checklists',       label: 'Checklists' },
-    { module: 'Shift Control',     key: 'void-comp',        label: 'Void / Comp Log' },
-    { module: 'Shift Control',     key: 'maintenance',      label: 'Maintenance Log' },
-    { module: 'Shift Control',     key: 'waste',            label: 'Waste / Spill Log' },
-    // Recovery
-    { module: 'Recovery',          key: 'profit-recovery',  label: 'Profit Recovery (all)' },
-    { module: 'Recovery',          key: 'revenue-recovery', label: 'Revenue Recovery (all)' },
-    { module: 'Recovery',          key: 'cash-recovery',    label: 'Cash Recovery (all)' },
-    { module: 'Events',            key: 'events',           label: 'Events (all)' }
+  // Permissions are granted by OPERATING AREA (matching how the whole app is
+  // organized), each set to a level: View / Add / Edit & Delete. Owner grants
+  // "Inventory: Edit" instead of toggling 40 individual screens.
+  AREAS: [
+    { key: 'inventory', label: 'Inventory Control' },
+    { key: 'labor',     label: 'Labor Control' },
+    { key: 'shift',     label: 'Shift Control' },
+    { key: 'profit',    label: 'Profit Recovery' },
+    { key: 'revenue',   label: 'Revenue Recovery' },
+    { key: 'cash',      label: 'Cash Recovery' },
+    { key: 'events',    label: 'Events' },
+    { key: 'books',     label: 'Books' }
   ],
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
@@ -122,16 +103,16 @@ S.HubUserAccounts = {
       + (userEmail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
     const accountCard = '<div class="card form-card" style="margin-bottom:16px;">' + accountHeader + cardInner + '</div>';
 
-    const teamCard = showTeam ? '<div class="hs-card" style="background:var(--surface);border:1px solid var(--b1);border-radius:4px;padding:22px 24px;margin-bottom:16px;">'
-      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);">'
-      +   '<div style="flex:1;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">Team</div>'
-      + '</div>'
-      + sh('Members').replace('margin:18px', 'margin:2px')
-      + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:8px;">Loading...</div>'
-      + sh('Invite a Member')
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Admin sees everything. Viewer is read-only (good for a bookkeeper). Staff gets only the sections you check below.</div>'
+    // Team Members heading + the member list sit on the card background (like
+    // Your Account); a divider separates them from Invite a Member below.
+    const teamCard = showTeam ? '<div class="card form-card" style="margin-bottom:16px;">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">Team Members</div>'
+      + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:2px;">Loading...</div>'
+      + '<div style="border-top:1px solid var(--b-edge);margin:18px 0;"></div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">Invite a Member</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Admin sees everything. Viewer is read-only. Staff gets only the areas you set below.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
-      +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="bartender@email.com" autocomplete="off"/></div>'
+      +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
       +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div>'
       +   '<div><button class="btn btn-primary" id="ua-team-invite">Send Invite</button></div>'
       + '</div>'
@@ -151,51 +132,39 @@ S.HubUserAccounts = {
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
+  // One dropdown per operating area: No Access / View Only / Add / Edit & Delete.
+  // currentPerms = { area: 'view'|'add'|'edit' } (empty {} = all No Access).
   renderPermsGrid(currentPerms, mode) {
-    // Always starts from currentPerms (empty {} for new invites = all unchecked).
-    // Admin explicitly chooses every section for every invite.
-    const groups = this.PERMISSION_GROUPS;
-    const byModule = {};
-    groups.forEach(g => {
-      if (!byModule[g.module]) byModule[g.module] = [];
-      byModule[g.module].push(g);
+    const perms = currentPerms || {};
+    const LEVELS = [
+      { v: '',     t: 'No Access' },
+      { v: 'view', t: 'View Only' },
+      { v: 'add',  t: 'Add' },
+      { v: 'edit', t: 'Edit & Delete' }
+    ];
+    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions (Staff role only)</div>';
+    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Set what this member can do in each area. View = read-only, Add = create new but not change past entries, Edit & Delete = full control.</div>';
+    html += '<div style="background:#0F1A21;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
+    this.AREAS.forEach((a, i) => {
+      const cur = perms[a.key] || '';
+      const opts = LEVELS.map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (i < this.AREAS.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + '<span style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</span>'
+        + '<select class="ua-perm-level form-input" data-key="' + esc(a.key) + '" style="width:155px;flex-shrink:0;">' + opts + '</select>'
+        + '</div>';
     });
-
-    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 10px;">Permissions (Staff role only)</div>';
-    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">Check Access to grant the user that section. Check Allow Edit/Delete to additionally let them modify existing entries. Unchecked Allow Edit means they can only add new entries, not change past ones.</div>';
-    html += '<div class="ua-perms-grid" style="border:1px solid var(--b2);border-radius:4px;background:var(--input);padding:14px 16px;">';
-
-    Object.keys(byModule).forEach(mod => {
-      html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin:8px 0 6px;border-bottom:1px solid var(--b2);padding-bottom:4px;">' + esc(mod) + '</div>';
-      byModule[mod].forEach(g => {
-        const current = (currentPerms || {})[g.key] || null;
-        const access = current === 'add' || current === 'edit';
-        const edit = current === 'edit';
-        html += '<div style="display:flex;align-items:center;gap:12px;padding:5px 0;">'
-          +   '<div style="flex:1;font-size:12px;color:var(--t1);">' + esc(g.label) + '</div>'
-          +   '<label style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:5px;cursor:pointer;width:90px;"><input type="checkbox" class="ua-perm-access" data-key="' + esc(g.key) + '"' + (access ? ' checked' : '') + '/>Access</label>'
-          +   '<label style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:5px;cursor:pointer;width:140px;"><input type="checkbox" class="ua-perm-edit" data-key="' + esc(g.key) + '"' + (edit ? ' checked' : '') + (access ? '' : ' disabled') + '/>Allow Edit/Delete</label>'
-          + '</div>';
-      });
-    });
-
     html += '</div>';
     return html;
   },
 
-  // Read the current state of the permissions grid into a permissions object.
-  // root scopes the query to a specific container (modal box or invite wrap),
-  // so when both the invite form AND the edit modal are in the DOM we don't
-  // mix their checkbox states.
+  // Read the per-area dropdowns into a permissions object { area: level }.
+  // root scopes the query so the invite form and the edit modal never mix.
   collectPerms(root) {
     const scope = root || document;
     const out = {};
-    scope.querySelectorAll('.ua-perm-access').forEach(box => {
-      const key = box.dataset.key;
-      if (box.checked) {
-        const editBox = scope.querySelector('.ua-perm-edit[data-key="' + key + '"]');
-        out[key] = (editBox && editBox.checked) ? 'edit' : 'add';
-      }
+    scope.querySelectorAll('.ua-perm-level').forEach(sel => {
+      const key = sel.dataset.key;
+      if (key && sel.value) out[key] = sel.value;
     });
     return out;
   },
@@ -224,22 +193,9 @@ S.HubUserAccounts = {
     this._wirePermsGrid(inviteWrap);
   },
 
-  _wirePermsGrid(root) {
-    const scope = root || document;
-    scope.querySelectorAll('.ua-perm-access').forEach(box => {
-      box.addEventListener('change', () => {
-        const editBox = scope.querySelector('.ua-perm-edit[data-key="' + box.dataset.key + '"]');
-        if (editBox) {
-          if (box.checked) {
-            editBox.disabled = false;
-          } else {
-            editBox.checked = false;
-            editBox.disabled = true;
-          }
-        }
-      });
-    });
-  },
+  // The area dropdowns are self-contained (each is one control), so there is no
+  // cross-checkbox wiring to do. Kept as a no-op so existing callers are safe.
+  _wirePermsGrid(root) {},
 
   _teamRoleChange() {
     const role = document.getElementById('ua-team-role')?.value || 'staff';
