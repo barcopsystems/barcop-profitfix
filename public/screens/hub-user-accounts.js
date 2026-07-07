@@ -169,17 +169,19 @@ S.HubUserAccounts = {
       html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any areas you can grant. Ask the owner to expand your access first.</div>';
       return html;
     }
-    html += '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
-    grantable.forEach((a, i) => {
+    // Each area is its own #0D181E data-row pill (the .pnl-list row look used on
+    // the App Settings landing): area label left, the access dropdown right.
+    html += '<table class="pnl-list"><tbody>';
+    grantable.forEach((a) => {
       const cur = perms[a.key] ? 'edit' : '';   // any stored access = Full
       const opts = LEVELS
         .map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (i < grantable.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-        + '<span style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</span>'
-        + '<select class="ua-perm-level form-input" data-key="' + esc(a.key) + '" style="width:155px;flex-shrink:0;">' + opts + '</select>'
-        + '</div>';
+      html += '<tr>'
+        + '<td style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</td>'
+        + '<td style="text-align:right;"><select class="ua-perm-level" data-key="' + esc(a.key) + '" style="width:155px;">' + opts + '</select></td>'
+        + '</tr>';
     });
-    html += '</div>';
+    html += '</tbody></table>';
     return html;
   },
 
@@ -407,7 +409,7 @@ S.HubUserAccounts = {
       const roleCell = isOwner
         ? '<span style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;font-size:11px;">Owner</span>'
         : (viewerIsOwner && !isSelf)
-        ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel at-qsel" style="font-size:12px;">'
+        ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel">'
             + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
             + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
           + '</select>'
@@ -656,10 +658,8 @@ S.HubUserAccounts = {
       + this.renderPermsGrid(currentPerms, 'edit')
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="ua-perms-save">Save Permissions</button>'
-      +   '<button class="btn btn-ghost" id="ua-perms-cancel">Cancel</button>'
       + '</div></div>';
     const overlay = App.openModal(html, { id, maxWidth: 560 });
-    document.getElementById('ua-perms-cancel')?.addEventListener('click', () => App.closeModal(id));
     document.getElementById('ua-perms-save')?.addEventListener('click', async () => {
       const btn = document.getElementById('ua-perms-save');
       // Scope to this modal so we read only its dropdowns, not the invite grid.
