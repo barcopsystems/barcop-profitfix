@@ -91,16 +91,11 @@ S.LaborDashboard = {
   },
   // A step is done if it carries an explicit operator stamp, else it falls back to
   // what the week's data shows (hours logged, tips logged, next week scheduled).
+  // A step is done ONLY when the operator marks it — never auto-checked off data.
   stepDone() {
     const dm = this.doneMap();
-    const derive = {
-      hours:    false,   // operator-marked (or set by a cockpit import); logging one staff's hours should not auto-complete the week
-      tips:     this.tips().some(t => this.inWeek(t.date)),
-      schedule: this.schedules().some(s => s.week_start === this.nextWeekStart()),
-      review:   false
-    };
     const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    this.ORDER.forEach(k => { r[k] = !!dm[k]; });
     return r;
   },
 
@@ -443,7 +438,8 @@ S.LaborDashboard = {
     }
     const ok = await PosIngest.commit(type, toAdd);
     if (!ok) { setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
-    this.setDone(type, true);   // a cockpit import is a deliberate "the week is in" action
+    // The import updates the status (flash + step sub-text); the operator marks
+    // the step done themselves when the week's hours/tips are fully in.
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (skipped.length ? ' (' + skipped.length + ' skipped, no roster match)' : '')
       + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
