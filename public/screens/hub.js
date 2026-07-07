@@ -344,6 +344,20 @@ S.Hub = {
         <div style="font-size:10px;color:${subColor||'var(--t3)'};margin-top:7px;">${sub}</div>
       </div>`;
 
+    // Staff with an area locked see the hero/card in place but with its numbers
+    // blanked to a dash and the click routed to the no-access notice — the Hub
+    // grid never reflows, the section just reads as unavailable. For non-staff
+    // (Owner/Admin/Viewer) canAccess is always true, so nothing changes. A null
+    // screen = a management-only page (Bar Cop Audit) locked to all Staff.
+    const lockArea = (scr) => scr ? !App.canAccess(scr) : ((window.DB && DB.role && DB.role()) === 'staff');
+    const heroTile = (scr, openJs, title, label, big, bigColor, sub) => {
+      const lk = lockArea(scr);
+      return '<div style="cursor:pointer;" onclick="' + (lk ? 'App.showNoAccess()' : openJs) + '"'
+        + (lk ? '' : ' title="' + title + '"') + '>'
+        + tile(label, lk ? '-' : big, lk ? 'var(--t4)' : bigColor, lk ? 'Request access from the owner' : sub)
+        + '</div>';
+    };
+
     // Top row answers the three owner questions: money available, money gotten
     // back, operation health. Opportunity (white) · Recovered (gold = the hero,
     // proven dollars) · Bar Cop Audit (the operation-health score). The recovery
@@ -415,25 +429,22 @@ S.Hub = {
       +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
       + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
-      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'dashboard\',\'profit\')" title="Open Profit Close The Week">'
-      +   tile('Total Opportunity', anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
+      + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
+             anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
              anyAudit ? 'On the table to recover' : 'Run an audit to surface this')
-      + '</div>'
       + statDiv
-      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'r-dashboard\',\'revenue\')" title="Open Revenue Close The Week">'
-      +   tile('Recovered', recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
+      + heroTile('r-dashboard', "S.Hub._enter('r-dashboard','revenue')", 'Open Revenue Close The Week', 'Recovered',
+             recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') : 'Mark a fix to start')
-      + '</div>'
       + statDiv
-      + '<div style="cursor:pointer;" onclick="S.Hub._enter(\'c-dashboard\',\'cash\')" title="Open Cash Close The Week">'
-      +   tile('Trapped Cash', trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
+      + heroTile('c-dashboard', "S.Hub._enter('c-dashboard','cash')", 'Open Cash Close The Week', 'Trapped Cash',
+             trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
-      + '</div>'
       + statDiv
-      + '<div style="cursor:pointer;" onclick="S.HubBreakEven.open()" title="Open Break-Even">' + tile('Break-Even', beVal, beCol, beSub) + '</div>'
+      + heroTile('hub-books-home', "S.HubBreakEven.open()", 'Open Break-Even', 'Break-Even', beVal, beCol, beSub)
       // The four figures above are dollars (the money line); the Bar Cop Audit is
       // a health score, not money, so a flex spacer pushes it to the right under
       // the Briefing button — money line left, operation-health read right. The
@@ -442,11 +453,10 @@ S.Hub = {
       + '<div style="flex:1 1 16px;min-width:0;"></div>'
       + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
       +   '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin-right:30px;"></div>'
-      +   '<div style="cursor:pointer;" onclick="S.HubBarCopAudit.open()" title="Open the Bar Cop Audit">'
-      +   tile('Bar Cop Audit', bcScore != null ? bcScore : 'None',
+      +   heroTile(null, "S.HubBarCopAudit.open()", 'Open the Bar Cop Audit', 'Bar Cop Audit',
+             bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
-      +   '</div>'
       + '</div>'
       + '</div></div>';
 
@@ -578,18 +588,27 @@ S.Hub = {
         + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>';
     }).join('');
     const richCard = (o) => {
-      const sum = o.sum;
-      const cardGo = (o.objName ? 'S.' + o.objName + '._openStep=null;' : '') + 'S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')';
-      const strip = o.statNote
+      // A locked section keeps its card in the same grid cell (no reflow) but
+      // blanks the stats to dashes, drops the weekly-close steps, and routes the
+      // whole card to the no-access notice. Non-staff never lock, so the card
+      // renders exactly as before.
+      const lk = lockArea(o.screen);
+      const sum = lk ? null : o.sum;
+      const stats = lk ? (o.stats || []).map(s => ({ label: s.label, value: '-', color: 'var(--t4)' })) : o.stats;
+      const statNote = lk ? '' : o.statNote;
+      const footer = lk ? 'Request access from the owner' : o.footer;
+      const cardGo = lk ? 'App.showNoAccess()'
+        : (o.objName ? 'S.' + o.objName + '._openStep=null;' : '') + 'S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')';
+      const strip = statNote
         ? '<div style="display:flex;align-items:flex-start;gap:8px;">'
-            + '<div style="flex:1;min-width:0;">' + statStrip(o.stats) + '</div>'
-            + '<span style="flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(o.statNote) + '</span>'
+            + '<div style="flex:1;min-width:0;">' + statStrip(stats) + '</div>'
+            + '<span style="flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(statNote) + '</span>'
           + '</div>'
-        : statStrip(o.stats);
+        : statStrip(stats);
       const body = strip
         + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
                  + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps, o.objName, o.screen, o.mod) + '</div>' : '')
-        + (o.footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + o.footer + '</div>' : '');
+        + (footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + footer + '</div>' : '');
       return '<div style="display:flex;flex-direction:column;min-width:0;">'
         + '<div class="sh" style="margin:0 0 10px;">' + esc(o.title) + '</div>'
         + '<div class="hd-row" onclick="' + cardGo + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
