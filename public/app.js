@@ -1280,6 +1280,20 @@ const App = {
     return (window.DB && DB.screenAllowed) ? DB.screenAllowed(screenId) : true;
   },
 
+  // Hub-level pages (Books, Bar Cop Audit, Settings, Workflow) open directly via
+  // openHubFullPage, bypassing the screen router's access check — so they gate
+  // here. Returns true (and bounces a Staff member back to their hub) when the
+  // page isn't allowed. `screen` = a representative screen to area-check via
+  // canAccess (e.g. Books); omit for management-only pages that block all Staff.
+  // Owner / Admin / Viewer always pass.
+  _hubBlocked(screen) {
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role !== 'staff') return false;
+    if (screen && this.canAccess(screen)) return false;
+    if (this.showStaffHub) this.showStaffHub();
+    return true;
+  },
+
   canSeeModule(module) {
     // A module is visible if the user has access to at least one screen in it.
     if (!window.DB || !DB.SCREEN_GROUPS) return true;
