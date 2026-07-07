@@ -125,9 +125,8 @@ S.HubUserAccounts = {
     const teamCard = showTeam ? '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">Team Members</div>'
       + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:2px;">Loading...</div>'
-      + '<div style="border-top:1px solid var(--b-edge);margin:18px 0;"></div>'
-      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">Invite a Member</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set what each member can reach below. Admin can also change your bar settings (not billing); Staff cannot.</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t3);margin:24px 0 6px;">Invite a Member</div>'
+      + '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">Set what each member can reach below. Admin can also change your bar settings (not billing); Staff cannot.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
       +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option>' + (isOwnerNow ? '<option value="admin">Admin</option>' : '') + '</select></div>'
@@ -162,13 +161,15 @@ S.HubUserAccounts = {
       { v: 'edit', t: 'Full Access' }
     ];
     let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions</div>';
-    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Choose which areas this member can use. Full Access = see and change everything in that area. No Access = the area is hidden from them.</div>';
+    if (mode !== 'edit') {   // the Edit Access popup carries no explainer text
+      html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Choose which areas this member can use. Full Access = see and change everything in that area. No Access = the area is hidden from them.</div>';
+    }
     const grantable = this.AREAS.filter(a => isOwner || myPerms[a.key]);
     if (!grantable.length) {
       html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any areas you can grant. Ask the owner to expand your access first.</div>';
       return html;
     }
-    html += '<div style="background:#0F1A21;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
+    html += '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
     grantable.forEach((a, i) => {
       const cur = perms[a.key] ? 'edit' : '';   // any stored access = Full
       const opts = LEVELS
@@ -406,7 +407,7 @@ S.HubUserAccounts = {
       const roleCell = isOwner
         ? '<span style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;font-size:11px;">Owner</span>'
         : (viewerIsOwner && !isSelf)
-        ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel" style="font-size:12px;padding:4px 8px;">'
+        ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel at-qsel" style="font-size:12px;">'
             + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
             + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
           + '</select>'
@@ -647,42 +648,43 @@ S.HubUserAccounts = {
   },
 
   _teamEditPerms(membershipId, email, currentPerms) {
-    const gridHTML = this.renderPermsGrid(currentPerms, 'edit');
-    const box = this._teamModal({
-      title: 'Edit Access for ' + email,
-      wide: true,
-      bodyHTML: gridHTML,
-      buttons: [
-        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
-        { label: 'Save Permissions', act: 'ok', kind: 'primary' }
-      ],
-      onAction: async (act, modalBox) => {
-        if (act !== 'ok') return;
-        // Scope to the modal so we read only the modal's checkboxes, not the
-        // invite form's grid that lives elsewhere on the same page.
-        const newPerms = this.collectPerms(modalBox);
-        const accountId = await DB._ensureAccountId();
-        if (!accountId) return;
-        try {
-          const headers = await this._teamAuthHeaders();
-          if (!headers) return;
-          const r = await fetch('/api/update-member-permissions', {
-            method: 'POST', headers,
-            body: JSON.stringify({ accountId, membershipId, permissions: newPerms })
-          });
-          const data = await r.json();
-          if (!r.ok || !data.ok) {
-            await App.confirm({ title: 'Could not save', message: data.error || 'Could not save permissions.', confirmText: 'OK', cancelText: '' });
-          }
-          this._teamRefresh();
-        } catch (e) {
-          await App.confirm({ title: 'Connection error', message: 'Could not reach the server. Try again.', confirmText: 'OK', cancelText: '' });
-          this._teamRefresh();
+    // Standard form popup: full-bleed header + footer, standard card border, the
+    // #0D181E permissions wrapper (no explainer), Save / Cancel on the left.
+    const id = 'ua-edit-perms';
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Edit Access for ' + esc(email) + '</div>'
+      + this.renderPermsGrid(currentPerms, 'edit')
+      + '<div class="card-actions">'
+      +   '<button class="btn btn-primary" id="ua-perms-save">Save Permissions</button>'
+      +   '<button class="btn btn-ghost" id="ua-perms-cancel">Cancel</button>'
+      + '</div></div>';
+    const overlay = App.openModal(html, { id, maxWidth: 560 });
+    document.getElementById('ua-perms-cancel')?.addEventListener('click', () => App.closeModal(id));
+    document.getElementById('ua-perms-save')?.addEventListener('click', async () => {
+      const btn = document.getElementById('ua-perms-save');
+      // Scope to this modal so we read only its dropdowns, not the invite grid.
+      const newPerms = this.collectPerms(overlay);
+      const accountId = await DB._ensureAccountId();
+      if (!accountId) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+      try {
+        const headers = await this._teamAuthHeaders();
+        if (!headers) { if (btn) { btn.disabled = false; btn.textContent = 'Save Permissions'; } return; }
+        const r = await fetch('/api/update-member-permissions', {
+          method: 'POST', headers,
+          body: JSON.stringify({ accountId, membershipId, permissions: newPerms })
+        });
+        const data = await r.json();
+        App.closeModal(id);
+        if (!r.ok || !data.ok) {
+          await App.confirm({ title: 'Could not save', message: data.error || 'Could not save permissions.', confirmText: 'OK', cancelText: '' });
         }
+        this._teamRefresh();
+      } catch (e) {
+        App.closeModal(id);
+        await App.confirm({ title: 'Connection error', message: 'Could not reach the server. Try again.', confirmText: 'OK', cancelText: '' });
+        this._teamRefresh();
       }
     });
-    // Wire the modal's checkboxes (scoped) so toggling Access enables/disables
-    // the matching Allow Edit/Delete checkbox in the modal only.
-    this._wirePermsGrid(box);
   }
 };
