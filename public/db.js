@@ -339,67 +339,59 @@ const DB = {
   ownerUserId() { return this._ownerUserId; },
   isOwner() { return !!(this._user && this._ownerUserId && this._user.id === this._ownerUserId); },
 
-  // ── Granular permission system (Phase 2 Item 25b) ───────────────────────────
-  // Each screen maps to a permission group. The user's permissions object
-  // stores per-group access levels: 'add' (view + create new) or 'edit'
-  // (view + create + edit + delete). Missing key = no access.
+  // ── Permission system — access by OPERATING AREA ────────────────────────────
+  // Each screen maps to one of the 8 operating areas. A Staff member's
+  // permissions object stores a level per area: 'view' (read-only), 'add'
+  // (view + create new), or 'edit' (view + create + edit + delete). Missing =
+  // no access. This matches how the rest of the app is organized (by area), so
+  // an owner grants "Inventory: Edit" instead of toggling 40 individual screens.
   //
-  // Admin: implicit 'edit' on all groups (bypasses the map).
-  // Viewer: implicit 'view' on all groups (read-only, blocked at write).
-  // Staff: looks up the screen's group in their permissions object.
+  // Admin: implicit 'edit' on all areas (bypasses the map) — the GM role.
+  // Viewer: implicit 'view' on all areas (read-only) — the bookkeeper.
+  // Staff: looks up the screen's area in their permissions object.
   // Help screens (mapped to '_always'): accessible to anyone signed in.
   SCREEN_GROUPS: {
-    // Inventory Control
-    'ic-take-inventory':'take-inventory','ic-count-history':'take-inventory',
-    'ic-receive-delivery':'receive-delivery','ic-delivery-history':'receive-delivery',
-    'ic-order-sheet':'place-orders','ic-order-history':'place-orders',
-    'ic-spot-check':'spot-check',
-    'ic-transfers':'inventory-counts',
-    'ic-empties':'inventory-counts',
-    'ic-adjustments':'inventory-counts',
-    'ic-par-suggestions':'inventory-reports',
-    'ic-product-setup':'manage-products','ic-locations':'manage-products','ic-vendors':'manage-products','ic-prep-batches':'manage-products',
-    'ic-report-stock':'inventory-reports',
-    'ic-report-usage':'inventory-reports','ic-report-variance':'inventory-reports',
-    'ic-dashboard':'inventory-dashboard','ic-help':'_always',
-    // Labor Control
-    'lc-log-hours':'log-hours',
-    'lc-tip-log':'log-tips','lc-tip-history':'log-tips',
-    'lc-schedule-history':'view-schedule',
-    'lc-build-schedule':'manage-schedule',
-    'lc-staff-roster':'manage-staff','lc-positions':'manage-staff','lc-training':'manage-staff',
-    'lc-callout-log':'call-out-log','lc-time-off':'time-off',
-    'lc-reports':'labor-reports','lc-overtime-watch':'labor-reports','lc-pay-periods':'labor-reports','lc-payroll-export':'labor-reports',
-    'lc-dashboard':'labor-dashboard','lc-help':'_always',
-    // Shift Control
-    'sc-cash-history':'cash-mgmt',
-    'sc-cash-control':'cash-mgmt','sc-drawers':'cash-mgmt',
-    'sc-checklists':'checklists','sc-checklist-templates':'checklists',
-    'sc-void-comp':'void-comp',
-    'sc-maintenance':'maintenance',
-    'sc-incidents':'incident',
-    'sc-waste':'waste',
-    'sc-walked-tabs':'cash-mgmt',
-    'sc-dashboard':'shift-dashboard','sc-help':'_always',
-    // Profit Recovery (root + profit module screens)
-    'dashboard':'profit-recovery','this-week':'profit-recovery',
-    'audit-tracker':'profit-recovery','profit-fix':'profit-recovery',
-    'cash-recon':'profit-recovery','theft-risk':'profit-recovery','sales-integrity':'profit-recovery',
-    'recipe-cost-analysis':'profit-recovery','profit-experiments':'profit-recovery','vendor-tracker':'profit-recovery',
-    'vendor-watch':'profit-recovery','vendor-scorecard':'profit-recovery','vendor-discrepancy':'profit-recovery',
-    'profit-forecast':'profit-recovery','help':'_always',
+    // Inventory
+    'ic-take-inventory':'inventory','ic-count-history':'inventory',
+    'ic-receive-delivery':'inventory','ic-delivery-history':'inventory',
+    'ic-order-sheet':'inventory','ic-order-history':'inventory',
+    'ic-spot-check':'inventory',
+    'ic-transfers':'inventory','ic-empties':'inventory','ic-adjustments':'inventory',
+    'ic-par-suggestions':'inventory',
+    'ic-product-setup':'inventory','ic-locations':'inventory','ic-vendors':'inventory','ic-prep-batches':'inventory',
+    'ic-report-stock':'inventory','ic-report-usage':'inventory','ic-report-variance':'inventory',
+    'ic-dashboard':'inventory','ic-help':'_always',
+    // Labor
+    'lc-log-hours':'labor',
+    'lc-tip-log':'labor','lc-tip-history':'labor',
+    'lc-schedule-history':'labor','lc-build-schedule':'labor',
+    'lc-staff-roster':'labor','lc-positions':'labor','lc-training':'labor',
+    'lc-callout-log':'labor','lc-time-off':'labor',
+    'lc-reports':'labor','lc-overtime-watch':'labor','lc-pay-periods':'labor','lc-payroll-export':'labor',
+    'lc-dashboard':'labor','lc-help':'_always',
+    // Shift
+    'sc-cash-history':'shift','sc-cash-control':'shift','sc-drawers':'shift',
+    'sc-checklists':'shift','sc-checklist-templates':'shift',
+    'sc-void-comp':'shift','sc-maintenance':'shift','sc-incidents':'shift','sc-waste':'shift','sc-walked-tabs':'shift',
+    'sc-dashboard':'shift','sc-help':'_always',
+    // Profit Recovery
+    'dashboard':'profit','this-week':'profit','audit-tracker':'profit','profit-fix':'profit',
+    'cash-recon':'profit','theft-risk':'profit','sales-integrity':'profit',
+    'recipe-cost-analysis':'profit','profit-experiments':'profit','vendor-tracker':'profit',
+    'vendor-watch':'profit','vendor-scorecard':'profit','vendor-discrepancy':'profit',
+    'profit-forecast':'profit','help':'_always',
     // Revenue Recovery
-    'r-dashboard':'revenue-recovery','r-this-week':'revenue-recovery','r-forecast':'revenue-recovery',
-    'r-audit':'revenue-recovery','r-fix':'revenue-recovery',
-    'r-server-check':'revenue-recovery','r-menu-items':'revenue-recovery',
-    'r-menu-engineering':'revenue-recovery',
-    'r-dog-test':'revenue-recovery','r-experiments':'revenue-recovery',
-    'r-help':'_always',
+    'r-dashboard':'revenue','r-this-week':'revenue','r-forecast':'revenue',
+    'r-audit':'revenue','r-fix':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
+    'r-menu-engineering':'revenue','r-menu-planning':'revenue',
+    'r-dog-test':'revenue','r-experiments':'revenue','r-help':'_always',
     // Cash Recovery
-    'c-dashboard':'cash-recovery','c-audit':'cash-recovery','c-playbook':'cash-recovery','c-fix':'cash-recovery','c-trapped':'cash-recovery','c-purchasing':'cash-recovery','c-capital':'cash-recovery','c-forecast':'cash-recovery','c-position':'cash-recovery','c-bridge':'cash-recovery','c-experiments':'cash-recovery','c-help':'_always',
+    'c-dashboard':'cash','c-audit':'cash','c-playbook':'cash','c-fix':'cash','c-trapped':'cash','c-purchasing':'cash','c-capital':'cash','c-forecast':'cash','c-position':'cash','c-bridge':'cash','c-experiments':'cash','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
-    'ev-regulars':'events','ev-pricing':'events','ev-help':'_always'
+    'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
+    // Books
+    'hub-books':'books','hub-books-home':'books','hub-breakeven':'books'
   },
 
   canAccessLevel(screen) {
