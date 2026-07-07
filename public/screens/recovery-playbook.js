@@ -836,7 +836,7 @@ S.RecoveryPlaybook = {
             { t: 'cross', rows: [
               { leak: 'Pour cost', capture: 'Take Inventory weekly count + product costs in Inventory', show: 'Profit dashboard pour cost + Variance Report', fixLabel: 'Pour Cost system', screen: 'profit-fix', focus: 'pour-cost' },
               { leak: 'Theft and loss', capture: 'Void and Comp Log, Cash Control, and spot checks in Shift', show: 'Loss Prevention', fixLabel: 'Theft and Loss system', screen: 'profit-fix', focus: 'theft-loss' },
-              { leak: 'Food cost', capture: 'Menu Items recipes, food counts, Waste and Spill Log', show: 'Recipe Summary + Profit dashboard food cost', fixLabel: 'Food Cost system', screen: 'profit-fix', focus: 'food-cost' },
+              { leak: 'Food cost', capture: 'Menu Builder recipes, food counts, Waste and Spill Log', show: 'Recipe Summary + Profit dashboard food cost', fixLabel: 'Food Cost system', screen: 'profit-fix', focus: 'food-cost' },
               { leak: 'Vendor control', capture: 'Receive Delivery checked against the order', show: 'Vendor Tracker', fixLabel: 'Vendor Control system', screen: 'profit-fix', focus: 'vendor-control' },
               { leak: 'Prime cost', capture: 'This Week rolls up COGS and labor for you', show: 'This Week + Profit Audit + the Hub', fixLabel: 'Prime Cost system', screen: 'profit-fix', focus: 'prime-cost' }
             ] },
@@ -977,8 +977,8 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'What you pay per pound at delivery and what you actually use per pound are two different numbers. A tenderloin bought at 18 dollars a pound with 70 percent usable yield after trim truly costs 25.71 a pound. Cost your cards against purchase price instead of yield and every protein item is understated. Build your costs on the highest-volume items first: a 4 dollar over-cost on a bestseller running 200 covers a week is over 40,000 a year.' },
             { t: 'p', text: 'Portion drift is not theft, it is eyes. Cooks plate by eye and eyes vary cook to cook and hour to hour. A 1.5 ounce average overage on your top protein at 200 covers can run 40,000 a year on one item. And a waste entry without a reason code is just a count. With reason codes (over-production, spoilage, prep error, return, quality) it is a diagnosis you can act on.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'You build recipes on Menu Items and they cost out automatically off your product prices, yield included. Take Inventory food counts feed your real food cost to the Profit dashboard and This Week. The Waste and Spill Log captures waste with reason codes. Recipe Summary shows every item priced below its floor so you can move a price or change a recipe.' },
-            { t: 'go', label: 'Menu Items', screen: 'r-menu-items' },
+            { t: 'p', text: 'You build recipes on Menu Builder and they cost out automatically off your product prices, yield included. Take Inventory food counts feed your real food cost to the Profit dashboard and This Week. The Waste and Spill Log captures waste with reason codes. Recipe Summary shows every item priced below its floor so you can move a price or change a recipe.' },
+            { t: 'go', label: 'Menu Builder', screen: 'r-menu-items' },
             { t: 'go', label: 'Recipe Summary', screen: 'recipe-cost-analysis' },
             { t: 'go', label: 'Food Cost system', screen: 'profit-fix', focus: 'food-cost' },
             { t: 'h', text: 'Quick Reference' },
@@ -1200,8 +1200,8 @@ S.RecoveryPlaybook = {
             { t: 'lead', text: 'The old way was a folder full of spreadsheets you had to keep alive by hand, abandoned by week three. Bar Cop runs the whole thing for you. You capture the work in your sections, Bar Cop diagnoses where the top line is leaking, and the Fix System walks you into the exact screen that closes it.' },
             { t: 'p', text: 'Here is the map. Every gap, where you capture it, where Bar Cop shows it to you, and where you fix it. Tap any Fix button to jump straight there.' },
             { t: 'cross', rows: [
-              { leak: 'Menu mix', capture: 'Menu Items recipes and costs', show: 'Menu Engineering + Dog Test Tracker', fixLabel: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
-              { leak: 'Pricing', capture: 'Menu Items costs by ingredient', show: 'Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
+              { leak: 'Menu mix', capture: 'Menu Builder recipes and costs', show: 'Menu Engineering + Dog Test Tracker', fixLabel: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
+              { leak: 'Pricing', capture: 'Menu Builder costs by ingredient', show: 'Menu Engineering', fixLabel: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
               { leak: 'Labor cost', capture: 'Build Schedule + Revenue Forecast', show: 'Labor History + Overtime Watch', fixLabel: 'Labor Cost and Scheduling system', screen: 'r-fix', focus: 'labor-scheduling' },
               { leak: 'Labor productivity', capture: 'Build Schedule hours against the week', show: 'This Week revenue per labor hour', fixLabel: 'Labor Productivity system', screen: 'r-fix', focus: 'rplh' },
               { leak: 'Check average', capture: 'Server Check covers and sales', show: 'Server Check scorecard', fixLabel: 'Check Average system', screen: 'r-fix', focus: 'check-average' },
@@ -1272,7 +1272,7 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Food cost percent tells you whether an item is in line with its price. Contribution margin in dollars is what hits the bottom line. Most operators promote by volume, not by margin per plate, and that is exactly backwards. Promotion is not the same as margin. Filling your best menu positions with anything other than your best-margin items is opportunity walking out the door.' },
             { t: 'p', text: 'Every item lands in one of four spots. Stars are high margin and high volume: feature them and put them in the briefing. Plowhorses are high volume, low margin: reprice toward the floor or rework the recipe. Puzzles are high margin, low volume: usually a visibility problem, so reposition and rewrite the description. Dogs are low and low: rework or cut. A box or a strong description moves selection 20 to 30 percent, which is revenue with no kitchen change.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'You set every item up in Menu Items with its real cost. Menu Engineering plots the four quadrants for you off your live sales, ranked by contribution margin in dollars, not food cost percent. The Dog Test Tracker watches the items on a 90-day test so a cut is a decision, not a guess.' },
+            { t: 'p', text: 'You set every item up in Menu Builder with its real cost. Menu Engineering plots the four quadrants for you off your live sales, ranked by contribution margin in dollars, not food cost percent. The Dog Test Tracker watches the items on a 90-day test so a cut is a decision, not a guess.' },
             { t: 'go', label: 'Menu Engineering', screen: 'r-menu-engineering' },
             { t: 'go', label: 'Menu Engineering system', screen: 'r-fix', focus: 'menu-engineering' },
             { t: 'h', text: 'Quick Reference' },
@@ -1293,7 +1293,7 @@ S.RecoveryPlaybook = {
             { t: 'p', text: 'Most operators do not have a pricing strategy, they have a pricing history. Prices were set at opening, nudged when costs got painful, and otherwise left alone because raising feels risky. Reactive pricing always lags the cost curve. The fix is a quarterly review on a fixed calendar that catches the increase in April instead of finding it on the May statement.' },
             { t: 'p', text: 'Do not price off the bar down the street. Their supplier discount, their lease, their prep cook are not yours. Their 16 dollar burger hits 28 percent food cost; yours at 16 might hit 34. Price to your own cost floor: ingredient cost divided by your target food-cost percent. And guest resistance is wildly overestimated. A surgical 1 to 2 dollar bump on a mid-menu item during a normal reprint almost never gets noticed. The 1.50 you are afraid to add is real money every year you do not.' },
             { t: 'h', text: 'How Bar Cop runs it' },
-            { t: 'p', text: 'Menu Items holds your real ingredient costs and shows the price floor for every item. Menu Engineering hands you the plowhorse list that should go through pricing first, and its Reprice step runs a proposed change and shows the break-even before you print.' },
+            { t: 'p', text: 'Menu Builder holds your real ingredient costs and shows the price floor for every item. Menu Engineering hands you the plowhorse list that should go through pricing first, and its Reprice step runs a proposed change and shows the break-even before you print.' },
             { t: 'go', label: 'Menu Engineering', screen: 'r-menu-engineering' },
             { t: 'go', label: 'Pricing system', screen: 'r-fix', focus: 'pricing' },
             { t: 'h', text: 'Quick Reference' },
@@ -1423,7 +1423,7 @@ S.RecoveryPlaybook = {
           blocks: [
             { t: 'lead', text: 'A bar owner in Asheville, 78 seats, three months in. Check average up 3.80 from baseline at 110 covers a night. Nine private events in October against four the month before. Floor labor running 22 percent against a 29 percent habit-schedule baseline. She said she could not believe none of it was complicated. It was not. She just never had a system that made her look at it every week.' },
             { t: 'p', text: 'What separates bars that capture their revenue from bars that leave it on the table is not location, concept, or talent. It is measurement and a system instead of a feeling. A briefing before every service. A schedule built from a revenue number. A rate card that goes out within two hours. None of it is complicated. All of it requires a system.' },
-            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Menu Items and set up your top sellers with real costs. Read your check average by server in Server Check. Build next week from your Revenue Forecast instead of last week schedule. Then open your Revenue Fix System and do the first step, so Bar Cop logs the day and starts measuring what you capture.' },
+            { t: 'box', tone: 'gold', label: 'Do these tonight', text: 'Open Menu Builder and set up your top sellers with real costs. Read your check average by server in Server Check. Build next week from your Revenue Forecast instead of last week schedule. Then open your Revenue Fix System and do the first step, so Bar Cop logs the day and starts measuring what you capture.' },
             { t: 'p', text: 'The gap between what you are making and what you should be making is not a market problem. It is a systems problem. Start building the system tonight.' },
             { t: 'go', label: 'Revenue Fix System', screen: 'r-fix', focus: 'menu-engineering' }
           ]

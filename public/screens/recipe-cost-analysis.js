@@ -77,7 +77,7 @@ S.RecipeCostAnalysis = {
         title: 'Recipe Summary',
         lead: 'This page ranks every plate and drink by recipe cost percentage and flags what is running over target. Set up your menu first, then come back.',
         steps: [
-          { title: 'Add your menu items', desc: 'Build your cocktails and food with prices and recipes, and link your beer, wine, and NA pours so cost flows in automatically.', btn: 'Go to Menu Items', screen: 'r-menu-items', done: false }
+          { title: 'Add your menu items', desc: 'Build your cocktails and food with prices and recipes, and link your beer, wine, and NA pours so cost flows in automatically.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
       });
       // setupCard wires App.navigate (same module); Menu Items lives in Revenue,
@@ -170,7 +170,7 @@ S.RecipeCostAnalysis = {
       { h: 'Items With Recipes', p: ['Cost per serving computes automatically from current product prices, so when a vendor raises a price these update on their own. Cost percent is the cost against the menu price, and over-target items are flagged and sorted to the top. Export PDF saves the full analysis.'] },
       { h: 'Missing a Recipe', p: ['These items carry a hand-entered cost. Edit one and add an ingredient recipe to switch it to live, ingredient-based costing that tracks your real prices.'] },
       { h: 'Linked Inventory Items', p: ['Direct-pour beer, wine, and NA beverages. Cost flows straight from the linked inventory product, no recipe needed, and it updates whenever that product price changes.'] },
-      { h: 'Work', p: ['Work takes you to Menu Items and opens that item\'s editor, where menu items are built and changed. Update the recipe or price there, then come back to Recipe Summary to see the new cost percent.'] }
+      { h: 'Work', p: ['Work takes you to Menu Builder and opens that item\'s editor, where menu items are built and changed. Update the recipe or price there, then come back to Recipe Summary to see the new cost percent.'] }
     ]);
   }
 };

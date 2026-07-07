@@ -75,7 +75,7 @@ S.Help = {
       { q: 'What does Vendor Tracker do?',
         a: 'One screen with three tabs. Scorecard is the per-vendor read: spend, price drift, short counts, open and recovered credits. Price Changes is every delivery line where the price moved, annualized to a real dollar using your usage. Discrepancies is a read-only rollup of open and recovered credits, their age, and what is still due. It is fed automatically from Inventory Control deliveries. You file a discrepancy and chase the credit over in Inventory Control, at the dock in Receive Delivery or the Credits to Chase worklist there; this tab is the read on where each one stands.' },
       { q: 'What is Recipe Summary?',
-        a: 'A read-only diagnostic that ranks every menu item with a recipe by its cost percentage against target, worst first. Ingredient costs flow from your live Inventory Control prices, so when a vendor price moves the recipe cost updates on its own. You edit a recipe on Menu Items in Revenue Recovery; this screen is the read.' }
+        a: 'A read-only diagnostic that ranks every menu item with a recipe by its cost percentage against target, worst first. Ingredient costs flow from your live Inventory Control prices, so when a vendor price moves the recipe cost updates on its own. You edit a recipe on Menu Builder in Revenue Recovery; this screen is the read.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Inventory Control into Profit Recovery?',
