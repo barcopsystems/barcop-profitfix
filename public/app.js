@@ -447,7 +447,7 @@ const App = {
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
       + 'Bar Cop demo. Poke at everything and change whatever you want. Nothing you do is saved, and it all resets when you leave.</span>'
-      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Sign Up Now</button>';
+      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Create Account</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
   },
