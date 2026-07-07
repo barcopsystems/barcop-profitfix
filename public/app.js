@@ -525,6 +525,7 @@ const App = {
     // A just-paid new bar carries its onboarding entries in localStorage across
     // the Stripe return; apply them to this bar before the onboarding gate below.
     this._applyPendingNewBarDraft();
+    this._startPermObserver();   // enforce Add/View write limits on list screens
     this.updatePeriod();
     // Recurring operating expenses: fill in any elapsed months on load so Books
     // reflects them even if the operator never opens the Operating Expenses page.
@@ -1292,6 +1293,39 @@ const App = {
     if (screen && this.canAccess(screen)) return false;
     if (this.showStaffHub) this.showStaffHub();
     return true;
+  },
+
+  // Central write-permission enforcement for list screens. On a screen the
+  // current member can't EDIT (View/Add levels, or the Viewer role), strip the
+  // Edit/Delete controls from every .row-actions (the shared per-row button
+  // wrapper used on all list screens), leaving View/Open read actions. Applied
+  // to whatever is currently rendered; re-run by the observer below so it
+  // survives screens re-rendering themselves after an action. Full-edit users
+  // (Owner/Admin, or 'edit' level) short-circuit, so there is zero overhead for
+  // them. This is UI enforcement for a trusted-manager team — member
+  // permissions are not an adversarial boundary.
+  _applyPermChrome() {
+    const screen = this._currentScreenId;
+    if (!screen || this.canEdit(screen)) return;
+    const content = document.getElementById('content-area');
+    if (!content) return;
+    content.querySelectorAll('.row-actions button, .row-actions a').forEach(b => {
+      const keep = /^(view|open|details|history)$/i.test((b.textContent || '').trim());
+      if (!keep) b.style.display = 'none';
+    });
+  },
+
+  // Watch the module content host so the strip re-applies after any re-render
+  // (childList only, so toggling display never re-triggers it). rAF-debounced.
+  _startPermObserver() {
+    if (this._permObserver) return;
+    const content = document.getElementById('content-area');
+    if (!content || typeof MutationObserver === 'undefined') return;
+    this._permObserver = new MutationObserver(() => {
+      if (this._permRAF) return;
+      this._permRAF = requestAnimationFrame(() => { this._permRAF = null; this._applyPermChrome(); });
+    });
+    this._permObserver.observe(content, { childList: true, subtree: true });
   },
 
   canSeeModule(module) {
