@@ -1024,7 +1024,7 @@ app.post('/api/invite-user', async (req, res) => {
     // the area's absence, so it is filtered out here).
     const cleanPerms = (permissions && typeof permissions === 'object')
       ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'edit')
+          Object.entries(permissions).filter(([k, v]) => v === 'edit')
         )
       : {};
 
@@ -1304,7 +1304,7 @@ app.post('/api/update-member-permissions', async (req, res) => {
     }
     const cleanPerms = (permissions && typeof permissions === 'object')
       ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'edit')
+          Object.entries(permissions).filter(([k, v]) => v === 'edit')
         )
       : {};
 
