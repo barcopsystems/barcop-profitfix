@@ -981,12 +981,12 @@ app.post('/api/invite-user', async (req, res) => {
     if (!email || !accountId) {
       return res.status(400).json({ error: 'email and accountId required' });
     }
-    // Permissions: optional JSON object { areaKey: 'view' | 'add' | 'edit' } for
-    // staff role. Sanitized so only known levels are stored (No Access is simply
+    // Permissions: optional JSON object { areaKey: 'view' | 'edit' } for Admin and
+    // Staff members. Sanitized so only known levels are stored (No Access is simply
     // the area's absence, so it is filtered out here).
     const cleanPerms = (permissions && typeof permissions === 'object')
       ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'add' || v === 'edit')
+          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'edit')
         )
       : {};
 
@@ -1277,7 +1277,7 @@ app.post('/api/update-member-permissions', async (req, res) => {
     }
     const cleanPerms = (permissions && typeof permissions === 'object')
       ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'add' || v === 'edit')
+          Object.entries(permissions).filter(([k, v]) => v === 'view' || v === 'edit')
         )
       : {};
 
