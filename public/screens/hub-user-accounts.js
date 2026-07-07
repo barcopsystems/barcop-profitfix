@@ -608,7 +608,7 @@ S.HubUserAccounts = {
     this._teamModal({
       title: 'Transfer ownership',
       message: 'Make ' + (email || 'this member') + ' the owner of this account? '
-        + 'They take over billing and become an admin. You stay on as an admin but lose owner control, '
+        + 'They take over billing and full owner control. You stay on as an admin but lose owner control, '
         + 'and only the new owner can transfer it back. This takes effect right away.',
       buttons: [
         { label: 'Cancel', act: 'cancel', kind: 'ghost' },
