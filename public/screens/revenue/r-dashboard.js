@@ -62,13 +62,11 @@ S.RevenueDashboard = {
     audit:   { n: 4, title: 'Run your Revenue audit',            sub: 'Score the top line and refresh your leaks' }
   },
 
+  // A step is done ONLY when the operator marks it — never auto-checked off data.
   stepDone() {
     const dm = this.doneMap();
-    const entered = !!this.savedWeek(this.weekEnd());
-    const as = this._auditState();
-    const derive = { week: entered, numbers: false, leaks: false, audit: !as.due };
     const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    this.ORDER.forEach(k => { r[k] = !!dm[k]; });
     return r;
   },
 
