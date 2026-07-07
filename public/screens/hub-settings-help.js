@@ -35,10 +35,22 @@ S.HubSettingsHelp = {
         a: 'The benchmarks Bar Cop grades you against: pour cost, food cost, labor, and prime cost percentages for Profit; check average and revenue per labor hour for Revenue. Industry benchmarks are pre-filled so you can start day one, but you should adjust them to your own operation.' }
     ]},
     { t: 'Account', qa: [
-      { q: 'How do I change my password or get a backup?',
-        a: 'On Your Account. Set a new password, and export a full backup of everything in your account (settings, weekly numbers, audits, and all your Control records) in one file you keep offsite. Restore from a backup to recover or move your data.' },
-      { q: 'How do roles and permissions work?',
-        a: 'On Team Members, invite people by email with a role. Admin sees everything. Viewer is read-only on all data, which is useful for a bookkeeper. Staff gets only the sections you check, with optional edit and delete on each, so a bartender sees what they need and nothing more. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.' }
+      { q: 'How do I change my password?',
+        a: 'On Your Account, under Password. Everyone on the team can change their own password there, whatever their role.' },
+      { q: 'Who can see billing and backups?',
+        a: 'Only the owner. Your Account shows the subscription, Manage Billing, Add Another Bar, and the full Data Backup to the account owner alone. A backup is the entire account in one file, so it stays with the owner. Admins and staff see just their password on that page.' }
+    ]},
+    { t: 'Team and Access', qa: [
+      { q: 'What are the roles?',
+        a: 'Three. Owner is you, or whoever holds the card: full access to everything, holds billing, and controls the whole team. Admin runs the bar day to day and gets the areas you grant plus your bar settings (Business Profile and Recovery Targets), but never billing. Staff gets only the areas you grant, plus their own password. You invite people on Team Members by email; if they already have a Bar Cop login they join with no email, otherwise they get a link to set a password.' },
+      { q: 'How does access to each area work?',
+        a: 'Every area is either No Access or Full Access, set per person. Full Access means they see and change everything in that area; No Access hides it completely, both on the Hub and in the menus. The areas are Inventory, Labor, Shift, Profit, Revenue, Cash, Events, Books, and the Bar Cop Audit. There is no view-only middle setting on purpose: either someone runs an area or they do not see it, which keeps access simple and honest.' },
+      { q: 'Can an admin invite and manage their own people?',
+        a: 'Yes, within their own reach. An admin can invite Staff (not other admins), can only grant areas they hold themselves, and can only edit or remove the people they personally invited. Anyone you invited, the admins included, stays under your control alone. So you set an admin\'s ceiling once, and everything they can hand out flows from that. Only the owner changes roles.' },
+      { q: 'How do I hand the account to someone else?',
+        a: 'On Team Members, use Make Owner on that person\'s row (owner only). Ownership, including billing, moves to them and you stay on as an admin. This is how you fix the common case where a manager signed up with the owner\'s card.' },
+      { q: 'Does Bar Cop ask for sensitive employee data?',
+        a: 'No. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder. It is a management tool, not payroll or HR software.' }
     ]}
   ],
 
