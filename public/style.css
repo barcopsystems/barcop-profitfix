@@ -1083,6 +1083,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .card-collapse-head:hover .card-chevron{color:var(--gold);}
 .card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:14px;line-height:1;flex-shrink:0;transition:transform 0.18s,color 0.12s;}
 .card.collapsed .card-chevron{transform:rotate(-90deg);}
+/* Weekly-cockpit step-row chevrons (Profit/Revenue/Cash/Inventory/Labor/Shift/Events/Books)
+   match the Fix-system head chevron: down when open, rotate to point right when collapsed, gold on hover. */
+.pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron{color:var(--gold);}
+.pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 .collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
