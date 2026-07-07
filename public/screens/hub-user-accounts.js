@@ -33,13 +33,21 @@ S.HubUserAccounts = {
   // = Team Members (admin only). No group = both (backward compatible).
   async open(group) {
     if (App.demoBlock && App.demoBlock()) return;   // App Settings (incl. Your Account) is off in the demo
-    if (App._hubBlocked && App._hubBlocked()) return;   // Your Account / Team — not for Staff
-    if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
     const meta = {
       account: { title: 'Your Account',  action: 'user-account' },
       team:    { title: 'Team Members',  action: 'user-team' }
     };
     const g = meta[group] ? group : 'account';
+    // Staff can reach Your Account (to change their password — the page renders
+    // password-only for them) but nothing else here. Everyone else uses the
+    // standard management-only gate.
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') {
+      if (g !== 'account') { App.showNoAccess(); return; }
+    } else if (App._hubBlocked && App._hubBlocked()) {
+      return;
+    }
+    if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
     App.openHubFullPage(meta[g].title, (mount) => {
       this.container = mount;
       this.render(mount, g);
@@ -79,13 +87,16 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
 
-    const sections = [
-      { title: 'Password',        body: pwBody },
-      { title: 'Subscription',    body: '<div id="ua-sub-content"></div>' }
-    ];
-    if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Multiple Locations', body: barsBody });
-    sections.push({ title: 'Data and Backup', body: backupBody });
-    if (!App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
+    // Staff get Your Account for one reason: to change their own password. Every
+    // other section (subscription, locations, backup, testing) is management-only.
+    const isStaff = (window.DB && DB.role && DB.role()) === 'staff';
+    const sections = [{ title: 'Password', body: pwBody }];
+    if (!isStaff) {
+      sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
+      if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Multiple Locations', body: barsBody });
+      sections.push({ title: 'Data and Backup', body: backupBody });
+      if (!App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
+    }
 
     // Each section wrapped in the same dark box + grey title as Business Profile
     // and Recovery Targets, all inside one page card (last section's margin
@@ -129,7 +140,7 @@ S.HubUserAccounts = {
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
-    if (showAccount) this.renderSubscription();
+    if (showAccount && !isStaff) this.renderSubscription();   // no Subscription section for Staff
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
