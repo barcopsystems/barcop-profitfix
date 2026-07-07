@@ -366,7 +366,9 @@ S.Hub = {
     const bcA      = last(data.bar_cop_audits || []);
     const bcScore  = bcA ? bcA.overall_score : null;
     const bcDays   = bcA && bcA.date ? daysSince(bcA.date) : null;
-    const bcNextTxt = bcDays != null ? ' · next in ' + Math.max(0, 7 - bcDays) + 'd' : '';
+    // Audits run anytime with no limit, so the sub is the last-run date, not a
+    // countdown to a next allowed run.
+    const bcNextTxt = bcDays != null ? ' · run ' + (bcDays === 0 ? 'today' : bcDays === 1 ? 'yesterday' : bcDays + 'd ago') : '';
     // Faint vertical divider between the stats (desktop only; hidden on mobile
     // where the stats stack — see .hub-stat-div in the hub style block).
     const statDiv = '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 10px;"></div>';
@@ -550,7 +552,7 @@ S.Hub = {
         + '</div>');
     } else {
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
-        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:10px;">'
+        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;flex:1;display:flex;align-items:center;gap:10px;">'
         + '<span style="color:var(--green);font-weight:800;font-size:15px;">&#10003;</span>'
         + '<span style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</span></div></div>';
     }
@@ -1141,7 +1143,7 @@ S.Hub = {
     //    week. Cards are content-height (no fixed rows), so the page breathes. ──
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${topCard}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;">${priorityCard}${needsBand}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">${priorityCard}${needsBand}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
         </div>`;

@@ -30,7 +30,6 @@ S.HubBarCopAudit = {
   WINDOW_DAYS:           30,   // scoring window for most sub-scores
   CONSISTENCY_WEEKS:     8,    // weeks of history for Operational Consistency
   MIN_DATA_DAYS:         60,   // before this much history exists, empty state
-  AUDIT_INTERVAL_DAYS:   7,    // run weekly; the scoring window (WINDOW_DAYS) stays at 30 so discipline reads over a trailing month
   RETENTION_CAP:         12,   // keep last 12 audits (1 year), match recovery audits
   MIN_SUBS_FOR_OVERALL:  3,    // need this many of 6 sub-scores covered for an honest overall
 
@@ -128,15 +127,6 @@ S.HubBarCopAudit = {
     if (subs.some(s => s && s.score != null)) return true;
     if (subs.some(s => s && (s.detail || []).some(c => !c.na && c.ratio != null && !isNaN(c.ratio)))) return true;
     return this._topExposures().length > 0;
-  },
-  _canRunAudit() {
-    const a = this.audits();
-    if (!a.length) return { ok: true, daysUntil: 0 };
-    const latest = App.latestEvent(a);
-    const since = this._daysSince(latest.date);
-    if (since == null) return { ok: true, daysUntil: 0 };
-    const remaining = this.AUDIT_INTERVAL_DAYS - since;
-    return remaining > 0 ? { ok: false, daysUntil: remaining } : { ok: true, daysUntil: 0 };
   },
 
   // ── Sub-score engines ───────────────────────────────────────────────────
