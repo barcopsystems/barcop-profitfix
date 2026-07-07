@@ -100,9 +100,9 @@ FIX.profit = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Build yield-adjusted recipe cost cards',
-          detail: 'In Menu Items, open each menu item and attach an ingredient recipe. Costs pull from your products and prep batches. Make sure yield loss is in each cost, not just purchase price.' },
+          detail: 'In Menu Builder, open each menu item and attach an ingredient recipe. Costs pull from your products and prep batches. Make sure yield loss is in each cost, not just purchase price.' },
         { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
           title: 'Count food on the same weekly schedule as the bar',
           detail: 'Run a Kitchen or Full count in Take Inventory, the same day every week, valued at cost.' },

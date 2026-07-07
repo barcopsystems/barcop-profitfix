@@ -17,18 +17,18 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Set up the menu data',
-          detail: 'In Menu Items, enter every item with its name, category, current price, and yield-adjusted food cost. Update an item\'s cost whenever a vendor price moves more than 5%.' },
+          detail: 'In Menu Builder, enter every item with its name, category, current price, and yield-adjusted food cost. Update an item\'s cost whenever a vendor price moves more than 5%.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Read the quadrant and record a decision on every item',
           detail: 'Open Menu Engineering the first week of January, April, July, and October. Rank items by dollar margin and volume, not cost percent, and work the four groups top to bottom. Move Stars and high-margin Puzzles into prime menu positions, and flag any Dog that might just be in a bad slot with a weak description. Export PDF gives you the worked quadrant to take into the menu meeting.' },
         { kind: 'action', target: 'r-dog-test', targetLabel: 'Dog Test Tracker',
           title: 'Put each Dog on a 90-day test before you pull it',
           detail: 'In the Dog Test Tracker, start a 90-day test on each Dog: record its baseline weekly volume, move it to a better slot with a rewritten description, and update the volume as it runs. Keep or cut it on the day-90 number.' },
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Reprice the Plowhorses',
-          detail: 'In Menu Items, raise the Plowhorse prices one item at a time. A $2 bump on five Plowhorses beats a 6% raise across the whole menu.' },
+          detail: 'In Menu Builder, raise the Plowhorse prices one item at a time. A $2 bump on five Plowhorses beats a 6% raise across the whole menu.' },
         { kind: 'action', target: 'sc-preshift', targetLabel: 'Pre-Shift Briefing',
           title: 'Brief servers off the Stars list',
           detail: 'Open Pre-Shift Briefing in Shift. Bar Cop builds it from tonight\'s Stars, your check average target, and the cover forecast. Feature only the Stars it lists, read it at line-up, and print it if you want a copy on the pass.' }
@@ -53,21 +53,21 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Keep ingredient costs current',
-          detail: 'In Menu Items, update the yield-adjusted ingredient cost on every item whenever a vendor price moves. Make sure yield loss is in the cost before you recost the item.' },
-        { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Items',
+          detail: 'In Menu Builder, update the yield-adjusted ingredient cost on every item whenever a vendor price moves. Make sure yield loss is in the cost before you recost the item.' },
+        { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Read which items are priced below their floor',
-          detail: 'In Menu Items, sort to the items running well over their target cost percent. Fix the worst offenders first.' },
+          detail: 'In Menu Builder, sort to the items running well over their target cost percent. Fix the worst offenders first.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Weigh the margin dollars before you reprice',
           detail: 'Open Menu Engineering and sort the items you flagged by dollar margin. Start with the biggest-dollar leaks, not the highest cost percent.' },
         { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Model the change in Menu Engineering',
           detail: 'In Menu Engineering, click Reprice on the item. Enter the price you are considering and an expected volume change, and read the new margin, the weekly impact, and the break-even volume drop. Do not move the price until you have that break-even number. Save it as planned or mark it live, and Bar Cop checks it against the real result three weeks later in the Pricing Review Log.' },
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Items',
-          title: 'Apply the change directly on Menu Items',
-          detail: 'Once you have the number, open the item in Menu Items and update the price. Bar Cop logs the change to the Pricing system on your Recovery Scoreboard, then watches check average and revenue for the eight weeks after. Nothing to mark done.' },
+        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
+          title: 'Apply the change directly on Menu Builder',
+          detail: 'Once you have the number, open the item in Menu Builder and update the price. Bar Cop logs the change to the Pricing system on your Recovery Scoreboard, then watches check average and revenue for the eight weeks after. Nothing to mark done.' },
         { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Run the full pricing review every quarter',
           detail: 'The first week of each quarter, work the whole menu in Menu Engineering: refresh costs, reprice the items over target, set the menu print date, and confirm servers were briefed before the new menu goes live. The Pricing Review Log at the bottom checks each change against the real result three weeks on.' }
