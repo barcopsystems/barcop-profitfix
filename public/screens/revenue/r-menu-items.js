@@ -176,7 +176,7 @@ S.RevenueMenuItems = {
   },
 
   showHowTo() {
-    App.showHelpModal('How Menu Items Works', [
+    App.showHelpModal('How Menu Builder Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly covers, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
       { h: 'Adding an Item', p: ['Pick a category and the form fills in. Cocktails and food (Appetizers, Entrees, Desserts, Specials) get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. Beer, Wine, NA, and Snacks link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). The product list shows only the products that fit the category you picked, so there is nothing to scroll past. Snacks are packaged items you buy and sell whole (bagged chips, bottled NA), marked Sold on the menu in Inventory; their cost comes in per serving. Enter covers so Menu Engineering can weight the item by how often it sells.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
@@ -1121,7 +1121,7 @@ S.RevenueMenuItems = {
     // the one canonical pricing logger (no prediction — that is a Menu
     // Engineering reprice thing) so the Pricing Review Log and Recovery pick it up.
     if (priceChanged) {
-      await App.logPriceChange(entry, existing.price, price, { reason: 'Direct edit on Menu Items', source: 'menu-items-edit' });
+      await App.logPriceChange(entry, existing.price, price, { reason: 'Direct edit on Menu Builder', source: 'menu-items-edit' });
     }
     App.markSetupDone('gs_r_menu');
     if (recipe) App.markSetupDone('gs_p_recipes');

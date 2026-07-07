@@ -72,7 +72,7 @@ S.RevenueMenuEngineering = {
 
   showHowTo() {
     App.showHelpModal('How Menu Engineering Works', [
-      { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Items.'] },
+      { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Builder.'] },
       { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
       { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Covers refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh covers between closes, the Re-import Covers drop at the top of this page takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
@@ -100,7 +100,7 @@ S.RevenueMenuEngineering = {
         title: 'Menu Engineering',
         lead: 'Menu Engineering sorts every priced item into Stars, Plowhorses, Puzzles, and Dogs, and names the move plus the number behind it. Price your menu items first.',
         steps: [
-          { title: 'Add your menu items', desc: 'Price at least four items in a category with their cost and weekly covers in Menu Items. Menu Engineering ranks them here and shows the move for each.', btn: 'Go to Menu Items', screen: 'r-menu-items', done: false }
+          { title: 'Add your menu items', desc: 'Price at least four items in a category with their cost and weekly covers in Menu Builder. Menu Engineering ranks them here and shows the move for each.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
       });
       return;
@@ -532,13 +532,13 @@ S.RevenueMenuEngineering = {
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
         + (fl.updated ? 'Updated covers on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
         + '</div>'
-        + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Items or rename to match.</div>' : '');
+        + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Builder or rename to match.</div>' : '');
     }
     return '<div class="card form-card no-print">'
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Covers</span>' + App.freqTag('As needed') + '</div>'
       + '<div id="me-cov-csv"></div>' + flash
-      + '<div id="me-cov-actions" style="margin-top:12px;"></div>'
-      + '</div>';
+      + '</div>'
+      + '<div id="me-cov-actions" style="margin-top:12px;"></div>';
   },
 
   mountCoversImport() {

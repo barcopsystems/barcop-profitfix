@@ -24,9 +24,9 @@ S.RevenueDogTest = {
   showHowTo() {
     App.showHelpModal('How the Dog Test Tracker Works', [
       { p: ['A Dog (low margin and low volume in the Menu Engineering groups) is not always a bad dish. Some are good items buried in a bad menu slot with a weak description. Before you pull one, give it a fair 90-day test in a better position with a rewritten description and watch whether volume moves.'] },
-      { h: 'Starting a Test', p: ['Pick the menu item and Bar Cop auto-fills the baseline from its current weekly covers on Menu Items. Note what you changed (new position, new description) and start. The test runs 90 days.'] },
-      { h: 'Tracking It', p: ['Current weekly volume reads live from that item\'s weekly covers on the Menu Items screen, so keep that number current as service data comes in. The card shows the lift against baseline and counts down the 90 days.'] },
-      { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Cut It to pull it off the menu. Either way the decision snapshots the final volume and lands in Test History. A kept item stays on the menu and shows as Kept back in Menu Engineering; a cut item moves to Archived on Menu Items, where you can restore it or delete it for good.'] }
+      { h: 'Starting a Test', p: ['Pick the menu item and Bar Cop auto-fills the baseline from its current weekly covers on Menu Builder. Note what you changed (new position, new description) and start. The test runs 90 days.'] },
+      { h: 'Tracking It', p: ['Current weekly volume reads live from that item\'s weekly covers on the Menu Builder screen, so keep that number current as service data comes in. The card shows the lift against baseline and counts down the 90 days.'] },
+      { h: 'Deciding', p: ['When the test completes, Keep It if volume moved enough to justify the slot, or Cut It to pull it off the menu. Either way the decision snapshots the final volume and lands in Test History. A kept item stays on the menu and shows as Kept back in Menu Engineering; a cut item moves to Archived on Menu Builder, where you can restore it or delete it for good.'] }
     ]);
   },
 
