@@ -62,11 +62,15 @@ S.RevenueDashboard = {
     audit:   { n: 4, title: 'Run your Revenue audit',            sub: 'Score the top line and refresh your leaks' }
   },
 
-  // A step is done ONLY when the operator marks it — never auto-checked off data.
+  // Steps are operator-marked, with ONE exception: Confirm the Week. Confirming
+  // the week in the popup IS the completion (it writes the revenue_week record),
+  // so this step's done-state derives from that record — the same signal the
+  // Confirm/Edit button uses — instead of a manual stamp. Others stay manual.
   stepDone() {
     const dm = this.doneMap();
     const r = {};
     this.ORDER.forEach(k => { r[k] = !!dm[k]; });
+    r.week = !!this.savedWeek(this.weekEnd());
     return r;
   },
 
