@@ -440,14 +440,14 @@ const App = {
       + 'body.demo #hub-wrapper{top:40px !important;}'
       + 'body.demo #tn-settings{display:none;}'   // App Settings is off in the demo
       + '#demo-banner{position:fixed;top:0;left:0;right:0;height:40px;z-index:200;'
-      + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--gold);'
-      + 'color:#000;box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
+      + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:#1E2B34;'
+      + 'color:var(--w);box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
     document.head.appendChild(style);
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
       + 'Bar Cop demo. Poke at everything and change whatever you want. Nothing you do is saved, and it all resets when you leave.</span>'
-      + '<button id="demo-signup-btn" style="background:#000;color:var(--gold);border:none;border-radius:3px;'
+      + '<button id="demo-signup-btn" style="background:var(--gold);color:var(--bg);border:none;border-radius:3px;'
       + 'font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:7px 16px;cursor:pointer;flex-shrink:0;">Sign Up Now</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
@@ -572,11 +572,11 @@ const App = {
     if (!DB.hasPendingSync() || document.getElementById('sync-banner')) return;
     const bar = document.createElement('div');
     bar.id = 'sync-banner';
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:var(--gold);'
-      + 'color:#000;display:flex;align-items:center;gap:14px;padding:9px 18px;'
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:#1E2B34;'
+      + 'color:var(--w);display:flex;align-items:center;gap:14px;padding:9px 18px;'
       + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
-    const btnDark = 'background:#000;color:var(--gold);border:none;';
-    const btnGhost = 'background:transparent;border:1px solid rgba(0,0,0,0.45);color:#000;';
+    const btnDark = 'background:var(--gold);color:var(--bg);border:none;';
+    const btnGhost = 'background:transparent;border:1px solid var(--b1);color:var(--w);';
     const btnBase = 'border-radius:3px;font-size:11px;font-weight:800;letter-spacing:1px;'
       + 'text-transform:uppercase;padding:6px 14px;cursor:pointer;flex-shrink:0;';
     bar.innerHTML = '<span style="flex:1;">Changes you saved on this device while offline have not reached the server yet.</span>'
@@ -645,7 +645,7 @@ const App = {
       if (existing) existing.remove();
       const toast = document.createElement('div');
       toast.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
-        + 'background:var(--gold);color:#000;border-radius:3px;padding:7px 16px;'
+        + 'background:#1E2B34;color:var(--w);border-radius:3px;padding:7px 16px;'
         + 'font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;'
         + 'box-shadow:0 2px 10px rgba(0,0,0,0.5);';
       toast.textContent = 'Synced ' + r.synced + ' offline ' + (r.synced === 1 ? 'change.' : 'changes.');
