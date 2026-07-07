@@ -64,7 +64,7 @@ S.RecipeCostAnalysis = {
 
   dataCard(rowsHtml) {
     return '<div class="card" style="overflow-x:auto;">'
-      + '<table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;min-width:880px;">'
       + this.COLGROUP + this.THEAD + '<tbody>' + rowsHtml + '</tbody></table></div>';
   },
 
