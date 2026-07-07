@@ -1248,16 +1248,26 @@ S.Hub = {
     // Line the Bar Cop Audit divider up flush with the Briefing button's left
     // edge: both right-anchor to the card's right padding, so a right margin sized
     // to the width difference shifts the whole audit cell (divider + score, gap
-    // intact) left until the divider sits under the button's left edge. rAF so the
-    // button is laid out before we measure.
-    requestAnimationFrame(() => {
+    // intact) left until the divider sits under the button's left edge.
+    // Recompute whenever the button or the score settles its size — a single
+    // measurement races the async briefing mount and the web-font load, so it can
+    // land stale depending on tab/load timing (the demo-vs-app misalignment).
+    const alignAudit = () => {
       const slot = document.getElementById('hub-briefing-slot');
       const cell = document.getElementById('hub-audit-cell');
       if (slot && cell && slot.offsetWidth) {
         const extra = slot.offsetWidth - cell.offsetWidth;
         cell.style.marginRight = (extra > 0 ? extra : 0) + 'px';
       }
-    });
+    };
+    requestAnimationFrame(alignAudit);
+    if (typeof ResizeObserver !== 'undefined') {
+      const _ro = new ResizeObserver(() => requestAnimationFrame(alignAudit));
+      if (_bSlot) _ro.observe(_bSlot);
+      const _cell = document.getElementById('hub-audit-cell');
+      if (_cell) _ro.observe(_cell);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignAudit);
 
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
