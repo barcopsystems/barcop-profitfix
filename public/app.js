@@ -2681,7 +2681,7 @@ const App = {
     const numWord = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' }[steps.length] || steps.length;
     const chip = s =>
       '<div data-go="' + s.screen + '" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid '
-      + (s.done ? 'var(--b2)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (s.done ? 'var(--input)' : 'var(--gold-tint)') + ';">'
+      + (s.done ? 'var(--b-edge)' : 'var(--gold-tint-bord)') + ';border-radius:8px;background:' + (s.done ? 'var(--sel-active-bg)' : 'var(--gold-tint)') + ';">'
       + '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
       + (s.done ? 'background:var(--green);color:var(--bg);' : 'border:1px solid var(--t3);color:var(--t3);') + '">' + (s.done ? '&#10003;' : s.num) + '</span>'
       + '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + esc(s.label) + '</span></div>';
