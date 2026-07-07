@@ -17,9 +17,9 @@ S.RecipeCostAnalysis = {
   // (table-layout:fixed + one colgroup is the only way separate tables align).
   COLGROUP:
     '<colgroup>'
-    + '<col style="width:22%;"><col style="width:12%;"><col style="width:9%;">'
-    + '<col style="width:10%;"><col style="width:11%;"><col style="width:9%;">'
-    + '<col style="width:8%;"><col style="width:11%;"><col style="width:8%;">'
+    + '<col style="width:20%;"><col style="width:11%;"><col style="width:9%;">'
+    + '<col style="width:9%;"><col style="width:10%;"><col style="width:9%;">'
+    + '<col style="width:8%;"><col style="width:10%;"><col style="width:14%;">'
     + '</colgroup>',
   THEAD:
     '<thead><tr><th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th>'
@@ -64,7 +64,7 @@ S.RecipeCostAnalysis = {
 
   dataCard(rowsHtml) {
     return '<div class="card" style="overflow-x:auto;">'
-      + '<table class="row-list" style="table-layout:fixed;width:100%;min-width:880px;">'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;">'
       + this.COLGROUP + this.THEAD + '<tbody>' + rowsHtml + '</tbody></table></div>';
   },
 
