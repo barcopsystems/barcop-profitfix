@@ -122,10 +122,10 @@ S.HubUserAccounts = {
       + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:2px;">Loading...</div>'
       + '<div style="border-top:1px solid var(--b-edge);margin:18px 0;"></div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">Invite a Member</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Admin sees everything. Viewer is read-only. Staff gets only the areas you set below.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set what each member can reach below. Admin can also change your bar settings (not billing); Staff cannot.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
-      +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div>'
+      +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>'
       +   '<div><button class="btn btn-primary" id="ua-team-invite">Send Invite</button></div>'
       + '</div>'
       + '<div id="ua-team-perms-wrap" style="margin-top:16px;">' + this.renderPermsGrid({}, 'invite') + '</div>'
@@ -151,11 +151,10 @@ S.HubUserAccounts = {
     const LEVELS = [
       { v: '',     t: 'No Access' },
       { v: 'view', t: 'View Only' },
-      { v: 'add',  t: 'Add' },
-      { v: 'edit', t: 'Edit & Delete' }
+      { v: 'edit', t: 'Full Access' }
     ];
-    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions (Staff role only)</div>';
-    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Set what this member can do in each area. View = read-only, Add = create new but not change past entries, Edit & Delete = full control.</div>';
+    let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions</div>';
+    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Set what this member can do in each area. View Only = see it but change nothing. Full Access = add, edit, and delete.</div>';
     html += '<div style="background:#0F1A21;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
     this.AREAS.forEach((a, i) => {
       const cur = perms[a.key] || '';
@@ -210,10 +209,11 @@ S.HubUserAccounts = {
   _wirePermsGrid(root) {},
 
   _teamRoleChange() {
-    const role = document.getElementById('ua-team-role')?.value || 'staff';
+    // Both Admin and Staff carry an owner-set area grid now, so the grid shows
+    // for either role (only the owner is grid-less, and the owner is not an
+    // invitable role).
     const wrap = document.getElementById('ua-team-perms-wrap');
-    if (!wrap) return;
-    wrap.style.display = (role === 'staff') ? '' : 'none';
+    if (wrap) wrap.style.display = '';
   },
 
   // ── Subscription rendering — same logic as the old App Settings card ─────
@@ -387,14 +387,13 @@ S.HubUserAccounts = {
         ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel" style="font-size:12px;padding:4px 8px;">'
             + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
             + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
-            + '<option value="viewer"' + (m.role === 'viewer' ? ' selected' : '') + '>Viewer</option>'
           + '</select>'
         : '<span style="text-transform:capitalize;font-weight:600;color:var(--t1);">' + esc(m.role) + '</span>';
 
       const statusBadge = m.confirmed ? ''
         : '<span style="font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Pending</span>';
 
-      const editPermsBtn = (!isOwner && !isSelf && m.role === 'staff')
+      const editPermsBtn = (!isOwner && !isSelf && (m.role === 'staff' || m.role === 'admin'))
         ? '<button class="btn btn-ghost btn-sm ua-team-perms" data-mid="' + esc(m.id) + '" data-perms="' + esc(JSON.stringify(m.permissions || {})) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Edit Access</button>'
         : '';
 
@@ -495,7 +494,7 @@ S.HubUserAccounts = {
     }
 
     const inviteWrap = document.getElementById('ua-team-perms-wrap');
-    const permissions = (role === 'staff') ? this.collectPerms(inviteWrap) : {};
+    const permissions = this.collectPerms(inviteWrap);   // Admin + Staff both carry a grid
 
     if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
 
