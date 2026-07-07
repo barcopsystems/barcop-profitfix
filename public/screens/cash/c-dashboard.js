@@ -126,8 +126,13 @@ S.CashDashboard = {
     const flash = this._flash; this._flash = null;
 
     const gs = this.getStartedDone();
+    // Flip to Where You Stand the moment its hero number (trapped cash) can be
+    // read — i.e. inventory has been counted — regardless of which Get Started
+    // steps are done. Setting the Cash Position alone does NOT produce that number,
+    // so it stays on Get Started (with step 1 checked) until there is a real read.
+    const wysReady = !!(st.trapped && st.trapped.hasData);
     container.innerHTML = '<div class="screen">'
-      + (gs.any ? this.scoreboard(st) : this.getStartedBox(gs))
+      + (wysReady ? this.scoreboard(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -223,12 +228,20 @@ S.CashDashboard = {
     const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Will You Make It To Next Quarter?</div>'
       + inner + '</div>';
-    if (!sf || !sf.hasData) {
-      return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your sales, schedule, and bills and Bar Cop projects your cash thirteen weeks out, with your runway and the week that runs thin.</div>');
-    }
     const mini = (label, val, col) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    const vdivEmpty = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
+    // No forecast yet: show the same stat design with dashes (Safe to Spend fills
+    // in from the Cash Position if set), never a wall of explainer text.
+    if (!sf || !sf.hasData) {
+      return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
+        + mini('Runway', '-') + vdivEmpty
+        + mini('Tightest Week', '-') + vdivEmpty
+        + mini('Safe to Spend', (pos && pos.hasOpening) ? App.fmtCurrency(pos.safe, 0) : '-', (pos && pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)')
+        + '</div>'
+        + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
+    }
     if (!sf.hasOpening) {
       const tw = sf.tightWeeks;
       return wrap('<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">'
