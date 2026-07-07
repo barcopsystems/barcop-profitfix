@@ -430,10 +430,17 @@ S.HubSettings = {
       // Control sections, current week mid-close: the first two close steps are
       // done, the last two still to do. Keyed to each page's own done-key (the
       // current week), so it rolls forward week to week with no stale dates.
+      // Cockpit steps are now purely operator-marked (nothing auto-derives), so
+      // the sample must stamp its own mid-close state for every cockpit or the
+      // demo would read 0/4 everywhere. Each = most of the week's steps done, the
+      // last one or two still open so there is visible work to do.
       if (window.S) {
-        if (S.InventoryDashboard) localStorage.setItem(S.InventoryDashboard._doneKey(), JSON.stringify({ deliveries: true }));
-        if (S.LaborDashboard)     localStorage.setItem(S.LaborDashboard._doneKey(),     JSON.stringify({ hours: true, tips: true }));
+        if (S.InventoryDashboard) localStorage.setItem(S.InventoryDashboard._doneKey(), JSON.stringify({ count: true, deliveries: true, orders: true }));
+        if (S.LaborDashboard)     localStorage.setItem(S.LaborDashboard._doneKey(),     JSON.stringify({ hours: true, tips: true, schedule: true }));
         if (S.ShiftDashboard)     localStorage.setItem(S.ShiftDashboard._doneKey(),     JSON.stringify({ import: true, cash: true }));
+        if (S.Dashboard)          localStorage.setItem(S.Dashboard._doneKey(),          JSON.stringify({ week: true, costs: true }));
+        if (S.RevenueDashboard)   localStorage.setItem(S.RevenueDashboard._doneKey(),   JSON.stringify({ week: true, numbers: true }));
+        if (S.CashDashboard)      localStorage.setItem(S.CashDashboard._doneKey(),      JSON.stringify({ trapped: true, week: true }));
       }
     } catch (e) {}
 

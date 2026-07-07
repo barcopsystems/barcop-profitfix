@@ -59,18 +59,12 @@ S.Dashboard = {
   // Enter-this-week and run-the-audit complete off data; check-costs and work-leaks
   // are operator-acknowledged (you cannot infer "I worked it" from a number). An
   // explicit stamp (true/false) always wins so any step can be unmarked.
+  // A step is done ONLY when the operator marks it. The week's data + audit
+  // status drive the step's status text, but never check the box automatically.
   stepDone() {
     const dm = this.doneMap();
-    const entered = !!this.savedWeek(this.weekEnd());
-    // The audit runs on a 7-day cadence (audit-tracker canRun = daysSince >= 7),
-    // so the step is "done" while the audit is current (not due) and only flips
-    // to action-needed the week it comes due. That keeps a real operator from
-    // re-running it every week, and reads true on the seeded demo (the recent
-    // audit is current, which is exactly why it can't be re-run).
-    const as = this._auditState();
-    const derive = { week: entered, costs: false, leaks: false, audit: !as.due };
     const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    this.ORDER.forEach(k => { r[k] = !!dm[k]; });
     return r;
   },
 
