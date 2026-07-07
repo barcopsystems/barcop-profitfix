@@ -1320,24 +1320,50 @@ const App = {
     document.addEventListener('keydown', onKey);
   },
 
-  // Central write-permission enforcement for list screens. On a screen the
-  // current member can't EDIT (View/Add levels, or the Viewer role), strip the
-  // Edit/Delete controls from every .row-actions (the shared per-row button
-  // wrapper used on all list screens), leaving View/Open read actions. Applied
-  // to whatever is currently rendered; re-run by the observer below so it
-  // survives screens re-rendering themselves after an action. Full-edit users
-  // (Owner/Admin, or 'edit' level) short-circuit, so there is zero overhead for
-  // them. This is UI enforcement for a trusted-manager team — member
-  // permissions are not an adversarial boundary.
+  // Central read-only enforcement. On a screen the current member can only VIEW
+  // (View Only level), turn the screen read-only: strip per-row Edit/Delete, hide
+  // every write button (Save / Add / Delete / etc.), and drop a "View only"
+  // banner at the top. Read controls (Export, Print, View/Open, Cancel, filters,
+  // week pickers, search) are left working so they can still browse. Applied to
+  // whatever is currently rendered; re-run by the observer below so it survives a
+  // screen re-rendering itself after an action. Full-access members (Owner, or
+  // 'edit' level on this area) short-circuit, so there is zero overhead for them.
+  // This is UI enforcement for a trusted-manager team, not an adversarial
+  // boundary (member permissions are not RLS-enforced).
+  // Button text that signals a WRITE action — hidden for a View-only member.
+  _WRITE_BTN_RE: /\b(save|update|add|new|create|edit|place|submit|log|record|confirm|send|invite|remove|delete|clear|import|restore|receive|post|generate|reset|mark|run|enter)\b/i,
   _applyPermChrome() {
+    // Always clear a prior banner first so it never lingers on a screen the
+    // member CAN edit or after navigating away.
+    const oldBanner = document.getElementById('view-only-banner');
+    if (oldBanner) oldBanner.remove();
     const screen = this._currentScreenId;
     if (!screen || this.canEdit(screen)) return;
     const content = document.getElementById('content-area');
     if (!content) return;
+    // 1) Per-row actions: keep only the read actions.
     content.querySelectorAll('.row-actions button, .row-actions a').forEach(b => {
       const keep = /^(view|open|details|history)$/i.test((b.textContent || '').trim());
       if (!keep) b.style.display = 'none';
     });
+    // 2) Write buttons anywhere else on the screen: hide Save/Add/Delete/etc so a
+    //    View-only member can look but not commit. Danger buttons are always a
+    //    write; other buttons are matched on their label.
+    content.querySelectorAll('button, a.btn').forEach(b => {
+      if (b.closest('.row-actions')) return;   // handled above
+      const txt = (b.textContent || '').trim();
+      if (b.classList.contains('btn-danger') || this._WRITE_BTN_RE.test(txt)) b.style.display = 'none';
+    });
+    // 3) Read-only banner at the top of the content scroller (outside #content-area
+    //    so a screen re-render does not wipe it and the observer does not re-fire).
+    const scroller = content.closest('.content') || content.parentElement;
+    if (scroller && !document.getElementById('view-only-banner')) {
+      const bn = document.createElement('div');
+      bn.id = 'view-only-banner';
+      bn.style.cssText = 'margin:0 0 14px;padding:8px 14px;border-radius:6px;background:var(--gold-tint);border:1px solid var(--b-edge);color:var(--t2);font-size:12px;line-height:1.4;';
+      bn.innerHTML = '<span style="font-weight:700;color:var(--t1);">View only.</span> You can see this area but not make changes. Ask the owner for access.';
+      scroller.insertBefore(bn, scroller.firstChild);
+    }
   },
 
   // Watch the module content host so the strip re-applies after any re-render
