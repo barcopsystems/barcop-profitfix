@@ -35,6 +35,7 @@ S.HubSettingsHome = {
     const s       = (App.data && App.data.settings) || {};
     const email   = (window.DB && DB._user && DB._user.email) || (App.demoMode ? 'Demo account' : '');
     const isAdmin = !!(window.DB && DB.isAdmin && DB.isAdmin());
+    const isOwnerHere = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());   // billing status is owner-only
     const sub     = App.subscription || {};
     const planVal = App.demoMode ? 'Demo'
       : (sub.status === 'active' ? '<span style="color:var(--green);font-weight:700;">Active</span>'
@@ -48,8 +49,8 @@ S.HubSettingsHome = {
     const acctRows = [
       kvRow('Operation', esc(s.bar_name || 'Your operation')),
       email ? kvRow('Signed in', esc(email)) : '',
-      kvRow('Plan', planVal),
-      renewVal ? kvRow('Renews', esc(renewVal)) : '',
+      isOwnerHere ? kvRow('Plan', planVal) : '',
+      isOwnerHere && renewVal ? kvRow('Renews', esc(renewVal)) : '',
       isAdmin ? kvRow('Team', '<button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button>') : ''
     ];
     const acctCard = card('Account', 'user-account', 'Manage', acctRows);

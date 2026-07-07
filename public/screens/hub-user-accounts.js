@@ -88,16 +88,19 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
 
-    // Staff get Your Account for one reason: to change their own password. Every
-    // other section (subscription, locations, backup, testing) is management-only.
+    // Password is for everyone. Billing (Subscription + Multiple Locations) and
+    // account-wide Data & Backup are OWNER-ONLY (a restricted admin must not be
+    // able to export the whole account). Staff get password only; a non-owner
+    // admin gets password here (their bar config lives on the Settings pages).
+    // Testing Tools stays dev-account only.
     const isStaff = (window.DB && DB.role && DB.role()) === 'staff';
     const sections = [{ title: 'Password', body: pwBody }];
-    if (!isStaff) {
+    if (isOwnerNow) {
       sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
-      if (!App.demoMode && window.DB && DB.isOwner && DB.isOwner()) sections.push({ title: 'Multiple Locations', body: barsBody });
+      if (!App.demoMode) sections.push({ title: 'Multiple Locations', body: barsBody });
       sections.push({ title: 'Data and Backup', body: backupBody });
-      if (!App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
     }
+    if (!isStaff && !App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
 
     // Each section wrapped in the same dark box + grey title as Business Profile
     // and Recovery Targets, all inside one page card (last section's margin
@@ -141,7 +144,7 @@ S.HubUserAccounts = {
 
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire();
-    if (showAccount && !isStaff) this.renderSubscription();   // no Subscription section for Staff
+    if (showAccount && isOwnerNow) this.renderSubscription();   // Subscription section is owner-only
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
