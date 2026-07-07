@@ -18,8 +18,7 @@ S.HubGroupDashboard = {
   // Standard centered card modal: App.openModal supplies the chrome, the corner
   // close X, and the centering. Kept wide (1100px) for the comparison table.
   async open() {
-    App.openModal(this._wrap('<div style="font-size:13px;color:var(--t3);padding:4px 2px;">Loading bars...</div>'), { id: 'gd-modal', maxWidth: 1100, noClose: true });
-    this._wireClose();
+    App.openModal(this._wrap('<div style="font-size:13px;color:var(--t3);padding:4px 2px;">Loading bars...</div>'), { id: 'gd-modal', maxWidth: 1100 });
     const accounts = await DB.listMyAccounts();
     const dataByAccount = await this._fetchAccountData(accounts);
     // The active bar's data lives in memory (App.data) and is the source of
@@ -27,23 +26,17 @@ S.HubGroupDashboard = {
     // data that never synced), so always use it for the active bar's row.
     const activeId = (window.DB && DB._accountId) || null;
     if (activeId && App.data) dataByAccount[activeId] = App.data;
-    App.openModal(this._wrap(this._body(accounts, dataByAccount)), { id: 'gd-modal', maxWidth: 1100, noClose: true });
-    this._wireClose();
+    App.openModal(this._wrap(this._body(accounts, dataByAccount)), { id: 'gd-modal', maxWidth: 1100 });
     this._wireRows();
   },
 
-  // The standard card shell: a form-card with a banded card-title and a footer
-  // Close button (no corner X — noClose is passed to openModal).
+  // The standard card shell: a form-card with a banded card-title. The corner X
+  // that App.openModal supplies is the only close control.
   _wrap(bodyHtml) {
     return '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Group Dashboard</div>'
       + bodyHtml
-      + '<div class="card-actions"><button class="btn btn-ghost" id="gd-close-btn">Close</button></div>'
       + '</div>';
-  },
-
-  _wireClose() {
-    document.getElementById('gd-close-btn')?.addEventListener('click', () => App.closeModal('gd-modal'));
   },
 
   async _fetchAccountData(accounts) {
@@ -170,7 +163,7 @@ S.HubGroupDashboard = {
         + '<td style="' + numCell + 'color:' + this._bandColor(laborBand) + ';">' + this._fmtPct(m.laborPct) + '</td>'
         + '</tr>';
     }).join('');
-    return '<div class="card card-bleed data-card" style="margin:0;"><div class="card-bleed-tbl"><table class="tbl">' + header + '<tbody>' + rows + '</tbody></table></div></div>';
+    return '<div class="card" style="margin:0;overflow-x:auto;"><table class="row-list">' + header + '<tbody>' + rows + '</tbody></table></div>';
   },
 
   _wireRows() {
