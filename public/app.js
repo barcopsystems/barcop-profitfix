@@ -5460,6 +5460,64 @@ const App = {
     return { per_day: perDay, total: total };
   },
 
+  // Auto-defaults for a coming week's COVER goal, same method as
+  // forecastDefaultsFor but on shift covers instead of revenue: sum covers per
+  // date first (a day can run several services), then the weighted 8-week
+  // same-weekday average. Returns per-day covers plus the total.
+  coverDefaultsFor(weekStart) {
+    const ws = this.weekStartFor(weekStart);
+    if (!ws) return { per_day: {}, total: 0 };
+    const shifts = (this.shiftData && this.shiftData.sc_shifts) || [];
+    const covByDate = {};
+    shifts.forEach(s => {
+      if (!s || !s.date || s.covers == null) return;
+      covByDate[s.date] = (covByDate[s.date] || 0) + (parseFloat(s.covers) || 0);
+    });
+    const start = new Date(ws + 'T00:00:00');
+    const perDay = {};
+    let total = 0;
+    this.DAYS_MON_FIRST.forEach((day, idx) => {
+      const target = new Date(start.getTime());
+      target.setDate(target.getDate() + idx);
+      const samples = [];
+      for (let back = 1; back <= 8; back++) {
+        const probe = new Date(target.getTime());
+        probe.setDate(probe.getDate() - back * 7);
+        const key = this.ymdLocal(probe);
+        if (covByDate[key] != null) samples.push(covByDate[key]);
+      }
+      let avg = 0;
+      if (samples.length) {
+        let wsum = 0, vsum = 0;
+        samples.forEach((v, i) => { const w = samples.length - i; vsum += v * w; wsum += w; });
+        avg = wsum > 0 ? Math.round(vsum / wsum) : 0;
+      }
+      perDay[day] = avg;
+      total += avg;
+    });
+    return { per_day: perDay, total: total };
+  },
+
+  // The EFFECTIVE forecast Bar Cop uses for a week: the operator's saved
+  // override if there is one, otherwise the computed baseline (weighted 8-week
+  // same-weekday average of revenue and covers). This is what the schedule
+  // builder, This Week, Pre-Shift, and Cash read, so a week always carries a
+  // forecast without the operator having to save one. `source` is 'saved' or
+  // 'auto'; total is 0 only when there is no shift history to average yet.
+  effectiveForecast(weekStart) {
+    const ws = this.weekStartFor(weekStart);
+    if (!ws) return null;
+    const saved = this.forecastForWeek(ws);
+    if (saved) return Object.assign({ source: 'saved' }, saved);
+    const rev = this.forecastDefaultsFor(ws);
+    const cov = this.coverDefaultsFor(ws);
+    return {
+      source: 'auto', week_start: ws,
+      per_day: rev.per_day, total: rev.total,
+      covers_per_day: cov.per_day, total_covers: cov.total
+    };
+  },
+
   // Generate a blank worksheet as a clean PDF (header + an empty grid the
   // operator prints and fills by hand during the shift, then keys into Bar Cop
   // after close). Same engine + Save flow as exportPDF, so output and filename
