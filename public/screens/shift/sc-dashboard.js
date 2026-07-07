@@ -131,8 +131,8 @@ S.ShiftDashboard = {
 
     if (this._openStep === 'import') {
       this.mountImport();
-      this.mountServer();
-      this.mountPmix();
+      if (this._optOpen && this._optOpen.server) this.mountServer();
+      if (this._optOpen && this._optOpen.pmix) this.mountPmix();
     }
     if (this._openStep === 'cash') this.mountCashImport();
     this.wire();
@@ -244,14 +244,17 @@ S.ShiftDashboard = {
       ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
       : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
   },
-  // Step-1 optional sales cut (per-server / product mix): its own labeled
-  // dropzone, always shown under the required daily drop. Same one-sitting
-  // import, extra fan-out.
-  optDrop(id, title, sub) {
+  // Step-1 optional sales cut (per-server / product mix): collapsed to a gold
+  // "+ Add POS Report" link under its title. Clicking opens its dropzone (link
+  // flips to "+ Close POS Report"); once a file is dropped the mapping takes over
+  // with its own Cancel and the link hides (see _toggleOptLink via onState).
+  optDrop(id, title, sub, key) {
+    const open = !!(this._optOpen && this._optOpen[key]);
     return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></span>' + App.freqTag('Weekly') + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">' + sub + '</div>'
-      + '<div id="' + id + '"></div><div id="' + id + '-res"></div></div>';
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + sub + '</div>'
+      + '<span class="sc-opt-link" data-opt="' + key + '" id="' + key + '-optlink" style="font-size:12px;color:var(--gold);cursor:pointer;">' + (open ? '+ Close POS Report' : '+ Add POS Report') + '</span>'
+      + '<div id="' + id + '" style="margin-top:10px;' + (open ? '' : 'display:none;') + '"></div><div id="' + id + '-res"></div></div>';
   },
   workspace(k, isDone) {
     this._isDone = isDone;
@@ -259,8 +262,8 @@ S.ShiftDashboard = {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.freqTag('Weekly') + '</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
-        + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.')
-        + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.')
+        + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.', 'server')
+        + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering covers.', 'pmix')
         + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
@@ -404,6 +407,9 @@ S.ShiftDashboard = {
   // Hide a step's own buttons while the column-mapper is open so they do not
   // stack under the mapper's Import/Cancel row; show them again on cancel.
   _toggleBtns(id, st) { const b = document.getElementById(id); if (b) b.style.display = (st === 'map') ? 'none' : 'flex'; },
+  // Hide the "+ Close POS Report" link once a file is dropped and the mapping (with
+  // its own Cancel) takes over; show it again when the mapper returns to the drop zone.
+  _toggleOptLink(key, st) { const l = document.getElementById(key + '-optlink'); if (l) l.style.display = (st === 'map') ? 'none' : ''; },
 
   // ── Inline sales import (step 1) ─────────────────────────────────────────────
   mountImport() {
@@ -448,7 +454,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Server, Date, Covers, and Total Sales column. One row per server, per day.',
       fields: PosIngest.FIELDS.server,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('sc-ck-import-btns', st),
+      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); },
       onComplete: rows => this.importServer(rows)
     });
   },
@@ -465,6 +471,7 @@ S.ShiftDashboard = {
     this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '') + '.';
+    if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
   },
@@ -480,7 +487,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs an Item Name and Units Sold column. One row per menu item for the week.',
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('sc-ck-import-btns', st),
+      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('pmix', st); },
       onComplete: rows => this.importPmix(rows)
     });
   },
@@ -495,6 +502,7 @@ S.ShiftDashboard = {
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
     this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
       + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '') + '.';
+    if (this._optOpen) this._optOpen.pmix = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
   },
@@ -592,6 +600,8 @@ S.ShiftDashboard = {
   wire() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
+      const opt = ev.target.closest('[data-opt]');
+      if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
