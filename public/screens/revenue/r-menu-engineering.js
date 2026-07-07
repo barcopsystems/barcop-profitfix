@@ -196,7 +196,7 @@ S.RevenueMenuEngineering = {
         + '<div style="display:flex;align-items:center;flex-shrink:0;">' + btns + '</div></div>';
     };
 
-    const colgroup = '<colgroup><col style="width:20%;"/><col style="width:16%;"/><col style="width:10%;"/><col style="width:13%;"/><col style="width:14%;"/><col style="width:14%;"/><col style="width:13%;"/></colgroup>';
+    const colgroup = '<colgroup><col style="width:18%;"/><col style="width:16%;"/><col style="width:14%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:13%;"/></colgroup>';
 
     // ── Ranked category cards ──────────────────────────────────────────────────
     const cards = Object.keys(byCat).sort(catSort).map(cat => {
