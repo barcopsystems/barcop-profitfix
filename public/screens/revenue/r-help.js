@@ -29,7 +29,7 @@ S.RevenueHelp = {
     ]},
     { t: 'How It Connects', qa: [
       { q: 'What flows from Shift Control into Revenue Recovery?',
-        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering covers, off the same sitting.' },
+        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering units sold, off the same sitting.' },
       { q: 'What flows from Labor Control into Revenue Recovery?',
         a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
       { q: 'What flows from Inventory Control into Revenue Recovery?',

@@ -74,12 +74,12 @@ S.RevenueMenuEngineering = {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Builder.'] },
       { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
-      { h: 'Keeping Covers Current', p: ['Everything here runs on each item\'s weekly covers, so the page is only as accurate as those numbers. Covers refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh covers between closes, the Re-import Covers drop at the top of this page takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
+      { h: 'Keeping Units Sold Current', p: ['Everything here runs on each item\'s weekly units sold, so the page is only as accurate as those numbers. Units sold refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. If you need to refresh them between closes, the Re-import Units Sold drop at the top of this page takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
       { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
       { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
       { h: 'Repricing', p: ['The Reprice step models the new margin, cost percent, and weekly impact, and shows how far volume can fall before the raise stops paying off. Add an expected volume change if you want Bar Cop to hold you to a prediction. Save it as planned or mark it live on the spot.'] },
-      { h: 'Pricing Review Log', p: ['Every change you make lands in the Pricing Review Log at the bottom, the one record of every price move. Once three weeks of covers come in, Bar Cop checks the real weekly margin swing against what you predicted, so your pricing instincts sharpen over time. Pricing is tracked as a logged change with its date, not a recovered-dollar figure, because a raise only pays if volume holds; that is why the dashboard shows Pricing as a Review row rather than a dollar.'] }
+      { h: 'Pricing Review Log', p: ['Every change you make lands in the Pricing Review Log at the bottom, the one record of every price move. Once three weeks of units sold come in, Bar Cop checks the real weekly margin swing against what you predicted, so your pricing instincts sharpen over time. Pricing is tracked as a logged change with its date, not a recovered-dollar figure, because a raise only pays if volume holds; that is why the dashboard shows Pricing as a Review row rather than a dollar.'] }
     ]);
   },
 
@@ -100,7 +100,7 @@ S.RevenueMenuEngineering = {
         title: 'Menu Engineering',
         lead: 'Menu Engineering sorts every priced item into Stars, Plowhorses, Puzzles, and Dogs, and names the move plus the number behind it. Price your menu items first.',
         steps: [
-          { title: 'Add your menu items', desc: 'Price at least four items in a category with their cost and weekly covers in Menu Builder. Menu Engineering ranks them here and shows the move for each.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
+          { title: 'Add your menu items', desc: 'Price at least four items in a category with their cost and weekly units sold in Menu Builder. Menu Engineering ranks them here and shows the move for each.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
       });
       return;
@@ -223,7 +223,7 @@ S.RevenueMenuEngineering = {
       return heading(cat + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Class</th><th>Covers/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Class</th><th>Sold/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
@@ -244,7 +244,7 @@ S.RevenueMenuEngineering = {
       unrankedCard = heading('Too Few to Rank')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Category</th><th>Covers/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Category</th><th>Sold/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + urows + '</tbody></table></div>';
     }
 
@@ -526,18 +526,18 @@ S.RevenueMenuEngineering = {
   // pricing checks). Covers normally refresh when the product-mix report drops at
   // the Shift weekly close; this on-page drop is the between-closes door to
   // re-import just covers. Matches each row to a menu item by name and upserts
-  // weekly_covers. Directions live in the nav-i help (Keeping Covers Current).
+  // weekly_covers. Directions live in the nav-i help (Keeping Units Sold Current).
   coversImportHtml() {
     const fl = this._coversFlash; this._coversFlash = null;
     let flash = '';
     if (fl) {
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
-        + (fl.updated ? 'Updated covers on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
+        + (fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
         + '</div>'
         + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Builder or rename to match.</div>' : '');
     }
     return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Covers</span>' + App.freqTag('As needed') + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
       + '<div id="me-cov-csv"></div>' + flash
       + '</div>'
       + '<div id="me-cov-actions" style="margin:16px 0 24px;"></div>';
@@ -548,10 +548,10 @@ S.RevenueMenuEngineering = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS product-mix (PMIX) report here',
-      dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly covers.',
+      dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly units sold.',
       actionsEl: '#me-cov-actions',
       fields: PosIngest.FIELDS.pmix,
-      confirmLabel: 'Update Covers',
+      confirmLabel: 'Update Units Sold',
       onComplete: rows => this.applyCoversImport(rows)
     });
   },
@@ -612,7 +612,7 @@ S.RevenueMenuEngineering = {
         : 'no prediction on file';
       vCell = '<div style="font-weight:700;color:' + tone + ';">'
         + (v.actualWeekly > 0 ? '+' : '') + App.fmtCurrency(v.actualWeekly) + '/wk actual</div>'
-        + '<div style="font-size:10px;color:var(--t3);">covers ' + v.coversThen + ' to ' + v.coversNow + ', ' + pred + '</div>';
+        + '<div style="font-size:10px;color:var(--t3);">sold ' + v.coversThen + ' to ' + v.coversNow + ', ' + pred + '</div>';
     } else if (v.status === 'pending') {
       vCell = '<span style="color:var(--t3);">Measuring, week ' + v.weeks + ' of 3</span>';
     } else {

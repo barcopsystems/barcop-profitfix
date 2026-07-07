@@ -190,12 +190,12 @@ S.RevenueMenuPlanning = {
       if (tr <= -10 || tr >= 10) {
         V.tr = Math.round(Math.abs(tr));
         lines.push(tr < 0
-          ? pick(['Covers are down {tr}% since your last read. Worth a look before it settles in.',
+          ? pick(['Units sold are down {tr}% since your last read. Worth a look before it settles in.',
                   'Volume slipped {tr}% from the last read. Keep an eye on it.',
-                  'Covers fell {tr}% since last time. Not a trend yet, but watch it.'], 7)
-          : pick(['Covers are up {tr}% since your last read. Whatever you changed is working.',
+                  'Units sold fell {tr}% since last time. Not a trend yet, but watch it.'], 7)
+          : pick(['Units sold are up {tr}% since your last read. Whatever you changed is working.',
                   'Volume climbed {tr}% from the last read. Keep doing that.',
-                  'Covers jumped {tr}% since last time. Ride it.'], 7));
+                  'Units sold jumped {tr}% since last time. Ride it.'], 7));
       }
     }
 
@@ -306,7 +306,7 @@ S.RevenueMenuPlanning = {
         title: 'Menu Rundown',
         lead: 'Menu Rundown gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
         steps: [
-          { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as covers and price history come in.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
+          { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as units sold and price history come in.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
       });
       return;
@@ -378,8 +378,8 @@ S.RevenueMenuPlanning = {
   showHowTo() {
     App.showHelpModal('How Menu Rundown Works', [
       { p: ['Menu Rundown gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
-      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its covers trend since your last read, its cost percent against target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as covers and price history pile up.'] },
-      { h: 'The Numbers Up Top', p: ['Each tile leads with cost, cost percent, menu price, and menu mix, that item\'s share of its category\'s covers. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under.'] },
+      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its category, where it ranks in the group, its units-sold trend since your last read, its cost percent against target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as units sold and price history pile up.'] },
+      { h: 'The Numbers Up Top', p: ['Each tile leads with cost, cost percent, menu price, and menu mix, that item\'s share of its category\'s units sold. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under.'] },
       { h: 'Read, Then Act', p: ['Items are grouped by section, the ones that need a decision first. Each tile ends with the move and a button that takes you straight to it: Reprice opens the change in Menu Engineering, Dog Test opens the 90-day test, and Edit Item opens Menu Builder. Make the change and the read updates next time you land here.'] }
     ]);
   }
