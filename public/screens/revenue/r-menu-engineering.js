@@ -538,7 +538,7 @@ S.RevenueMenuEngineering = {
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Covers</span>' + App.freqTag('As needed') + '</div>'
       + '<div id="me-cov-csv"></div>' + flash
       + '</div>'
-      + '<div id="me-cov-actions" style="margin:12px 0 16px;"></div>';
+      + '<div id="me-cov-actions" style="margin:16px 0 24px;"></div>';
   },
 
   mountCoversImport() {
