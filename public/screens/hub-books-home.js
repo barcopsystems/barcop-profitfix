@@ -14,6 +14,7 @@ S.HubBooksHome = {
   _openStep: null,
 
   open() {
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     App.openHubFullPage('Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
   },
 

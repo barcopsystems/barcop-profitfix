@@ -33,6 +33,7 @@ S.HubUserAccounts = {
   // = Team Members (admin only). No group = both (backward compatible).
   async open(group) {
     if (App.demoBlock && App.demoBlock()) return;   // App Settings (incl. Your Account) is off in the demo
+    if (App._hubBlocked && App._hubBlocked()) return;   // Your Account / Team — not for Staff
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
     const meta = {
       account: { title: 'Your Account',  action: 'user-account' },

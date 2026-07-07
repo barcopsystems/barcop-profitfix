@@ -19,6 +19,7 @@ S.HubSettings = {
   // Full-page Hub screen. Sidebar stays mounted, content area swaps.
   open(group) {
     if (App.demoBlock && App.demoBlock()) return;   // App Settings is off in the demo
+    if (App._hubBlocked && App._hubBlocked()) return;   // Business Profile / Targets — not for Staff
     const g = this._GROUPS[group] ? group : 'business-profile';
     const meta = this._GROUPS[g];
     App.openHubFullPage(meta.title, (mount) => this.render(mount, g), meta.action);

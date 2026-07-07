@@ -29,6 +29,7 @@ S.HubBooks = {
   // shows "MONTH-END BOOKS | Back to Dashboard". Action buttons live next to
   // the Close Month dropdown inside the picker card.
   open() {
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     if (App.stampFixView) App.stampFixView('books');
     App.openHubFullPage('Month-End Books', (mount) => this._render(mount), 'books');
   },

@@ -106,6 +106,7 @@ S.FlowMap = {
   ],
 
   open() {
+    if (App._hubBlocked && App._hubBlocked()) return;   // app-wide orientation map — not for Staff
     App.openHubFullPage('Workflow', (mount) => {
       this.container = mount;
       this._sel = null;

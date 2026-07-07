@@ -19,6 +19,7 @@ S.HubBreakEven = {
   COLS: '<colgroup><col style="width:31%"><col style="width:23%"><col style="width:23%"><col style="width:23%"></colgroup>',
 
   open() {
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this.render(mount); }, 'breakeven');
   },
 

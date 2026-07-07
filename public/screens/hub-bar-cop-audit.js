@@ -65,6 +65,7 @@ S.HubBarCopAudit = {
   // shows "BAR COP AUDIT | Back to Dashboard" mirroring the module shell
   // pattern. Sidebar stays mounted + interactive on the left.
   open() {
+    if (App._hubBlocked && App._hubBlocked()) return;   // management page — not for Staff
     App.openHubFullPage('Bar Cop Audit', (mount) => {
       this.container = mount;
       this._viewingId = null;

@@ -11,6 +11,7 @@ S.HubSettingsHome = {
 
   open() {
     if (App.demoBlock && App.demoBlock()) return;   // App Settings is off in the demo
+    if (App._hubBlocked && App._hubBlocked()) return;   // Settings — not for Staff
     App.openHubFullPage('Settings', (mount) => { this.container = mount; this.render(mount); }, 'settings-home');
   },
 
