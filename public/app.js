@@ -3715,7 +3715,7 @@ const App = {
   // sub-headers, and tables — in document order, skipping no-print chrome.
   _collectPDFBlocks(root) {
     const blocks = [];
-    root.querySelectorAll('.card-title, .sh, .pdf-para, .calc-item, table.tbl, table.row-list, table.pnl-list, .empty-title, .empty-sub, .alert-text').forEach(node => {
+    root.querySelectorAll('.card-title, .sh, .pdf-para, .pdf-fine, .calc-item, table.tbl, table.row-list, table.pnl-list, .empty-title, .empty-sub, .alert-text').forEach(node => {
       if (node.closest('.no-print')) return;
       if (node.matches('table.tbl, table.row-list, table.pnl-list')) {
         const t = this._pdfTableData(node);
@@ -3734,6 +3734,9 @@ const App = {
       } else if (node.matches('.pdf-para')) {
         const text = this._pdfNodeText(node);
         if (text) blocks.push({ type: 'para', text });
+      } else if (node.matches('.pdf-fine')) {
+        const text = this._pdfNodeText(node);
+        if (text) blocks.push({ type: 'fine', text });
       } else {
         const text = this._pdfNodeText(node);
         if (text) blocks.push({ type: 'note', text });
@@ -3834,6 +3837,12 @@ const App = {
           doc.splitTextToSize(seg || ' ', pageW - 2 * margin).forEach(ln => { ensure(13); doc.text(ln, margin, y); y += 12.5; });
         });
         y += 6;
+      } else if (b.type === 'fine') {
+        y += 4; doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
+        this._pdfSafe(b.text).split('\n').forEach(seg => {
+          doc.splitTextToSize(seg || ' ', pageW - 2 * margin).forEach(ln => { ensure(11); doc.text(ln, margin, y); y += 10; });
+        });
+        doc.setFont('helvetica', 'normal'); y += 4;
       } else if (b.type === 'table') {
         const cs = _sharedCols[b.cols];
         doc.autoTable({
