@@ -112,18 +112,16 @@ S.ShiftPreShift = {
     return this.n(t.check_avg);
   },
 
-  // The day's cover forecast from the week's revenue forecast (covers_per_day).
+  // The day's cover forecast for today's week: the saved override if set, else
+  // Bar Cop's computed baseline (App.effectiveForecast), read per weekday.
   coversToday() {
-    const fc = (App.data && App.data.revenue_forecasts) || [];
-    if (!fc.length) return null;
+    if (!App.effectiveForecast) return null;
+    const fc = App.effectiveForecast(App.todayLocal());
+    if (!fc || !fc.covers_per_day) return null;
     const d = new Date(App.todayLocal() + 'T00:00:00');
     const wd = (d.getDay() + 6) % 7;                       // Mon=0
-    const mon = new Date(d); mon.setDate(d.getDate() - wd);
-    const monStr = App.ymdLocal(mon);
     const abbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][wd];
-    const rec = fc.find(f => f.week_start === monStr) || fc.slice().sort((a, b) => (b.week_start || '').localeCompare(a.week_start || ''))[0];
-    const cpd = rec && rec.covers_per_day;
-    return (cpd && cpd[abbr] != null) ? cpd[abbr] : null;
+    return fc.covers_per_day[abbr] != null ? fc.covers_per_day[abbr] : null;
   },
 
   // ── Render ──────────────────────────────────────────────────────────────────
