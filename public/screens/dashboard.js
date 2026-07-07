@@ -101,7 +101,11 @@ S.Dashboard = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
-    const hasData = this.weeks().length || this.audits().length;
+    // Flip to Where You Stand when its hero number (recoverable profit) can be
+    // read — that is when an audit has run, the last Get Started step. A logged
+    // week alone fills only the cost strip, not the hero, so it stays on Get
+    // Started until the audit gives it a real headline number.
+    const hasData = this.audits().length;
     const insightsBtn = '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
@@ -159,10 +163,8 @@ S.Dashboard = {
     const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Costs Stand</div>'
       + inner + '</div>';
-    if (!latest) {
-      return wrap('<div style="font-size:12px;color:var(--t3);line-height:1.6;">Log a week of sales and costs and Bar Cop shows your pour, food, and prime cost against target right here.</div>');
-    }
-    const rows = this._costRows(latest);
+    // No week yet: show the same stat design with dashes, never explainer text.
+    const rows = latest ? this._costRows(latest) : [{ val: null }, { val: null }, { val: null }];
     const mini = (label, r) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (r.val == null ? 'var(--t3)' : r.over ? 'var(--red)' : 'var(--green)') + ';">' + (r.val == null ? '-' : App.fmtPct(r.val)) + '</div></div>';
