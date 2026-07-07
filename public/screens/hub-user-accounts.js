@@ -57,6 +57,7 @@ S.HubUserAccounts = {
   render(container, group) {
     const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
     const isAdmin = (window.DB && DB.isAdmin && DB.isAdmin());
+    const isOwnerNow = !!(window.DB && DB.isOwner && DB.isOwner());   // only the owner invites admins
     const showTeam    = group !== 'account' && isAdmin;
     const showAccount = group !== 'team' || !showTeam;   // non-admin 'team' falls back to account
 
@@ -125,7 +126,7 @@ S.HubUserAccounts = {
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set what each member can reach below. Admin can also change your bar settings (not billing); Staff cannot.</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
-      +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>'
+      +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option>' + (isOwnerNow ? '<option value="admin">Admin</option>' : '') + '</select></div>'
       +   '<div><button class="btn btn-primary" id="ua-team-invite">Send Invite</button></div>'
       + '</div>'
       + '<div id="ua-team-perms-wrap" style="margin-top:16px;">' + this.renderPermsGrid({}, 'invite') + '</div>'
@@ -144,10 +145,16 @@ S.HubUserAccounts = {
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
-  // One dropdown per operating area: No Access / View Only / Add / Edit & Delete.
-  // currentPerms = { area: 'view'|'add'|'edit' } (empty {} = all No Access).
+  // One dropdown per operating area: No Access / View Only / Full Access.
+  // currentPerms = { area: 'view'|'edit' } (empty {} = all No Access). The grid
+  // reflects the CURRENT user's power to grant: the owner can grant any area at
+  // any level; a non-owner admin only sees areas they hold, capped to their own
+  // level (they can't hand out more access than they have).
   renderPermsGrid(currentPerms, mode) {
     const perms = currentPerms || {};
+    const isOwner = !!(window.DB && DB.isOwner && DB.isOwner());
+    const myPerms = (window.DB && DB.permissions) ? DB.permissions() : {};
+    const RANK = { view: 1, edit: 2 };
     const LEVELS = [
       { v: '',     t: 'No Access' },
       { v: 'view', t: 'View Only' },
@@ -155,11 +162,19 @@ S.HubUserAccounts = {
     ];
     let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions</div>';
     html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Set what this member can do in each area. View Only = see it but change nothing. Full Access = add, edit, and delete.</div>';
+    const grantable = this.AREAS.filter(a => isOwner || myPerms[a.key]);
+    if (!grantable.length) {
+      html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any areas you can grant. Ask the owner to expand your access first.</div>';
+      return html;
+    }
     html += '<div style="background:#0F1A21;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
-    this.AREAS.forEach((a, i) => {
+    grantable.forEach((a, i) => {
       const cur = perms[a.key] || '';
-      const opts = LEVELS.map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (i < this.AREAS.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+      const own = myPerms[a.key];
+      const opts = LEVELS
+        .filter(l => isOwner || !l.v || RANK[l.v] <= RANK[own])
+        .map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (i < grantable.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
         + '<span style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</span>'
         + '<select class="ua-perm-level form-input" data-key="' + esc(a.key) + '" style="width:155px;flex-shrink:0;">' + opts + '</select>'
         + '</div>';
@@ -377,13 +392,21 @@ S.HubUserAccounts = {
     // Client-side owner id as a fallback, so a missing server is_owner flag never
     // strips the owner-row protection (no Remove / no role dropdown).
     const ownerId = (window.DB && DB.ownerUserId && DB.ownerUserId()) || null;
+    const myId = (window.DB && DB._user && DB._user.id) || null;
 
     const rows = members.map(m => {
       const isSelf = m.is_self;
       const isOwner = m.is_owner || (!!ownerId && m.user_id === ownerId);
+      // can_manage from the server (owner manages everyone; a non-owner admin
+      // manages only Staff they invited). Fall back to a client compute if an
+      // old server didn't send it (deploy window).
+      const canManage = (m.can_manage != null) ? m.can_manage
+        : (viewerIsOwner ? (!isOwner && !isSelf)
+                         : (!!myId && m.invited_by === myId && m.role === 'staff'));
+      // Only the owner changes roles; everyone else sees the role as a label.
       const roleCell = isOwner
         ? '<span style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;font-size:11px;">Owner</span>'
-        : !isSelf
+        : (viewerIsOwner && !isSelf)
         ? '<select data-mid="' + esc(m.id) + '" class="ua-team-role-sel" style="font-size:12px;padding:4px 8px;">'
             + '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>Admin</option>'
             + '<option value="staff"' + (m.role === 'staff' ? ' selected' : '') + '>Staff</option>'
@@ -393,15 +416,15 @@ S.HubUserAccounts = {
       const statusBadge = m.confirmed ? ''
         : '<span style="font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Pending</span>';
 
-      const editPermsBtn = (!isOwner && !isSelf && (m.role === 'staff' || m.role === 'admin'))
+      const editPermsBtn = canManage
         ? '<button class="btn btn-ghost btn-sm ua-team-perms" data-mid="' + esc(m.id) + '" data-perms="' + esc(JSON.stringify(m.permissions || {})) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Edit Access</button>'
         : '';
 
       const removeBtn = isSelf
         ? '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;">You</span>'
-        : isOwner
-        ? ''
-        : '<button class="btn btn-ghost btn-sm ua-team-remove" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Remove</button>';
+        : canManage
+        ? '<button class="btn btn-ghost btn-sm ua-team-remove" data-mid="' + esc(m.id) + '" data-email="' + esc(m.email) + '" style="font-size:10px;padding:3px 9px;">Remove</button>'
+        : '';
 
       // Only the current owner can hand ownership to another existing member.
       const makeOwnerBtn = (viewerIsOwner && !isOwner && !isSelf)
