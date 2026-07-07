@@ -41,7 +41,13 @@ S.LaborBuildSchedule = {
 
   // Forecast lives in Revenue Recovery (one canonical store, revenue_forecasts).
   forecastForWeek(weekStart) { return (weekStart && App.forecastForWeek) ? App.forecastForWeek(weekStart) : null; },
-  forecastTotal(weekStart) { const f = this.forecastForWeek(weekStart); return f && f.total != null ? Number(f.total) || 0 : 0; },
+  // Saved override if the operator set one, otherwise Bar Cop's computed
+  // baseline, so a week always builds toward a real number without a manual save.
+  forecastTotal(weekStart) {
+    const f = this.forecastForWeek(weekStart);
+    if (f && f.total != null) return Number(f.total) || 0;
+    return (weekStart && App.forecastDefaultsFor) ? (App.forecastDefaultsFor(weekStart).total || 0) : 0;
+  },
 
   // ── Week helpers ──────────────────────────────────────────────────────────
   mondayOf(dateStr) {
@@ -359,12 +365,14 @@ S.LaborBuildSchedule = {
       budgetCard = '<div class="card"><div style="font-size:13px;color:var(--t3);">Use the week selector below to pick a week, then set a forecast and labor budget.</div></div>';
     } else if (fc <= 0) {
       budgetCard = '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-        + '<div style="font-size:13px;color:var(--t2);">No revenue forecast set for this week.</div>'
+        + '<div style="font-size:13px;color:var(--t2);">No revenue history yet to project this week. Type a forecast to build a budget.</div>'
         + '<button class="btn btn-primary btn-sm" id="bs-fc">Set Forecast</button></div></div>';
     } else {
       const leftCls = left >= 0 ? 'good' : 'warn';
+      const fcAuto = !this.forecastForWeek(d.week_start);
+      const fcTag = fcAuto ? ' <span style="font-size:10px;color:var(--t3);letter-spacing:.5px;vertical-align:middle;">COMPUTED</span>' : '';
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
+        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc) + fcTag
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Labor Budget</div><div class="calc-val lg">' + App.fmtCurrency(budget)
         + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
