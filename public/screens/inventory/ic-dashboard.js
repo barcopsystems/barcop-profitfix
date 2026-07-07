@@ -162,18 +162,13 @@ S.InventoryDashboard = {
       return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
     } finally { this._weekStart = sv; }
   },
-  // A step is done if it carries an operator stamp, else it falls back to what
-  // the week's data shows: a count taken this week, or nothing left to reorder.
+  // A step is done ONLY when the operator marks it. The week's data drives the
+  // status text (counted date, everything at par) but never checks the box for
+  // them — marking a step complete for the week is a deliberate manual action.
   stepDone(st) {
     const dm = this.doneMap();
-    const derive = {
-      count:      st.hasCountThisWeek,
-      deliveries: false,
-      orders:     st.reorderCount === 0 && st.hasReorderBasis,
-      review:     false
-    };
     const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    this.ORDER.forEach(k => { r[k] = !!dm[k]; });
     return r;
   },
 
