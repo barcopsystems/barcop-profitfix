@@ -244,7 +244,7 @@ S.RevenueServerCheck = {
       // A small, unobtrusive "+ note" link on every row logs a manager note on
       // that server's record in Labor Control.
       const coachBtn = r.staff_id
-        ? '<span class="rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:11px;color:var(--t3);cursor:pointer;white-space:nowrap;">+ note</span>' : '';
+        ? '<span class="rsc-coach" data-sid="' + esc(r.staff_id) + '" style="font-size:11px;color:var(--t3);cursor:pointer;white-space:nowrap;">+ coaching note</span>' : '';
       return '<tr>'
         + '<td style="font-weight:700;color:var(--t1);">' + esc(r.name) + tag + '</td>'
         + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--t1)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
