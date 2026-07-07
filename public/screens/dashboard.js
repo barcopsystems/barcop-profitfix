@@ -56,15 +56,17 @@ S.Dashboard = {
     audit: { n: 4, title: 'Run your Profit audit',           sub: 'Score the operation and refresh your leaks' }
   },
 
-  // Enter-this-week and run-the-audit complete off data; check-costs and work-leaks
-  // are operator-acknowledged (you cannot infer "I worked it" from a number). An
-  // explicit stamp (true/false) always wins so any step can be unmarked.
-  // A step is done ONLY when the operator marks it. The week's data + audit
-  // status drive the step's status text, but never check the box automatically.
+  // Steps are operator-marked (you cannot infer "I reviewed costs / worked the
+  // leak" from a number), with ONE exception: Confirm the Week. Confirming the
+  // week in the popup IS the completion — it writes the week record — so there is
+  // no separate acknowledgment to make. Its done-state therefore derives from that
+  // record (the same signal the Confirm/Edit button uses), keeping the check and
+  // the button in sync. Every other step stays a pure manual stamp.
   stepDone() {
     const dm = this.doneMap();
     const r = {};
     this.ORDER.forEach(k => { r[k] = !!dm[k]; });
+    r.week = !!this.savedWeek(this.weekEnd());
     return r;
   },
 
