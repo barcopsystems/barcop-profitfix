@@ -63,18 +63,11 @@ S.CashDashboard = {
   // Cash steps are reviewed and acted on, then marked. Nothing auto-completes
   // off data (you cannot infer "I ran down the dead stock" from a number), so
   // every step waits on an operator stamp. Honest by default.
+  // A step is done ONLY when the operator marks it — never auto-checked off data.
   stepDone() {
     const dm = this.doneMap();
     const r = {};
     this.ORDER.forEach(k => { r[k] = !!dm[k]; });
-    // The audit step completes off data: a Cash audit runs once a week, so if one
-    // was run within the week being viewed, this step is done. The operator can
-    // still mark it by hand. Every other step waits on a manual stamp.
-    if (!r.audit) {
-      const ws = this.weekStart(), we = this.weekEnd();
-      const ran = (App.data.cash_audits || []).some(a => { const d = ('' + ((a && a.date) || '')).slice(0, 10); return d && d >= ws && d <= we; });
-      if (ran) r.audit = true;
-    }
     return r;
   },
 
