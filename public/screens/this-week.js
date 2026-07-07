@@ -570,7 +570,7 @@ S.ThisWeek = {
     put('tw-prime-sub', 'target ' + primeTarget + '%' + (prime != null ? (prime > primeTarget ? ' · over' : ' · on target') : ''), prime != null && prime > primeTarget ? 'var(--red)' : 'var(--t3)');
     put('tw-over', totRev > 0 ? App.fmtCurrency(overTarget) : '-', overTarget > 0 ? 'var(--red)' : 'var(--gold)');
 
-    const fc = (this._weekEnd && App.forecastForWeek) ? App.forecastForWeek(this._weekEnd) : null;
+    const fc = (this._weekEnd && App.effectiveForecast) ? App.effectiveForecast(this._weekEnd) : null;
     const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
     const fcGap = fcTotal > 0 && totRev > 0 ? totRev - fcTotal : null;
     put('tw-fcgap', fcGap != null ? ((fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcGap >= 0 ? 'var(--green)' : 'var(--red)'));
