@@ -811,18 +811,35 @@ const DB = {
       const accountId = await this._ensureAccountId();
       if (accountId) {
         try {
-          let q = this._sb.from(table).select('payload,date')
-            .eq('account_id', accountId).eq('kind', kind)
-            .order('date', { ascending: false, nullsFirst: false });
-          // Default = the rolling window; include null-date rows so a record
-          // missing a business date is never hidden.
-          if (opts.before) q = q.lt('date', opts.before);
-          else q = q.or('date.gte.' + this._windowStartDate() + ',date.is.null');
-          if (opts.limit) q = q.limit(opts.limit);
-          const { data, error } = await q;
-          if (!error && Array.isArray(data)) {
-            const recs = data.map(r => r.payload).filter(Boolean);
-            if (!opts.before) this._cacheEvents(table, kind, recs);
+          // One page of the query. Secondary order by id keeps pagination stable
+          // when many rows share a date.
+          const page = (from, to) => {
+            let q = this._sb.from(table).select('payload,date')
+              .eq('account_id', accountId).eq('kind', kind)
+              .order('date', { ascending: false, nullsFirst: false })
+              .order('id', { ascending: false });
+            // Default = the rolling window; include null-date rows so a record
+            // missing a business date is never hidden.
+            if (opts.before) q = q.lt('date', opts.before);
+            else q = q.or('date.gte.' + this._windowStartDate() + ',date.is.null');
+            return q.range(from, to);
+          };
+          if (opts.limit) {
+            const { data, error } = await page(0, opts.limit - 1);
+            if (!error && Array.isArray(data)) return data.map(r => r.payload).filter(Boolean);
+          } else {
+            // Fetch EVERY row in the window, paging past Supabase's 1000-row cap
+            // (a full year of logged hours / tips / voids blows past it). Without
+            // this the oldest records silently stop loading.
+            const PAGE = 1000; const recs = []; let from = 0;
+            for (;;) {
+              const { data, error } = await page(from, from + PAGE - 1);
+              if (error || !Array.isArray(data)) { if (from === 0) throw (error || new Error('loadEvents')); break; }
+              for (const r of data) { if (r && r.payload) recs.push(r.payload); }
+              if (data.length < PAGE) break;
+              from += PAGE;
+            }
+            this._cacheEvents(table, kind, recs);
             return recs;
           }
         } catch (e) { /* fall through to cache */ }

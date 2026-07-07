@@ -4451,21 +4451,35 @@ const App = {
 
   // Seed a module's event rows from the current in-memory arrays (sample data).
   // Clears existing rows first so a reload replaces rather than accumulates.
+  // Returns { ok } so loadSample can tell the operator if a persist failed rather
+  // than reloading into half-written data (the class that lost logged hours: a
+  // transient write failure was logged and silently swallowed).
   async seedEventStores(mod) {
     const store = this.EVENT_STORES[mod];
-    if (!store) return;
+    if (!store) return { ok: true };
     const dataObj = store.data();
-    if (!dataObj) return;
+    if (!dataObj) return { ok: true };
     await DB.clearEvents(store.table);
+    let ok = true;
     for (const kind of Object.keys(store.kinds)) {
       const recs = dataObj[store.kinds[kind]] || [];
       // Defensive: an event row with no id is silently dropped by putEventsBulk
       // (this is what lost the audits on reload). Assign one in place so
       // the in-memory record and the seeded row stay in sync.
       recs.forEach(r => { if (r && r.id == null) r.id = this.uid(); });
-      const res = await DB.putEventsBulk(store.table, kind, recs);
-      if (res && res.ok === false) console.error('seedEventStores ' + mod + '/' + kind + ' failed', res.error);
+      if (!recs.length) continue;
+      // Retry a failed persist a couple times so a transient hiccup (DO/Supabase
+      // flakiness) does not clear the rows and leave nothing written.
+      let res = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        res = await DB.putEventsBulk(store.table, kind, recs);
+        if (!res || res.ok !== false) break;
+        console.error('seedEventStores ' + mod + '/' + kind + ' attempt ' + attempt + ' failed', res.error);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 500));
+      }
+      if (res && res.ok === false) ok = false;
     }
+    return { ok };
   },
 
   // Add or update one event record: updates the in-memory array AND persists one
