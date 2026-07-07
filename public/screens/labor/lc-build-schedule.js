@@ -448,6 +448,7 @@ S.LaborBuildSchedule = {
       + this.weekSelector()
       + '<div class="no-print" style="display:flex;gap:8px;">'
       + '<button class="btn btn-ghost btn-sm" id="bs-new">New Schedule</button>'
+      + '<button class="btn btn-ghost btn-sm" id="bs-export">Export PDF</button>'
       + '<button class="btn btn-ghost btn-sm" id="bs-worksheet">Worksheet</button></div></div>'
       + lastWeekNudge
       + '<div class="bs-gridview"><div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
@@ -599,6 +600,7 @@ S.LaborBuildSchedule = {
     });
     document.getElementById('bs-cancel')?.addEventListener('click', () => { this.editId = null; App.navigate('lc-schedule-history'); });
     document.getElementById('bs-from-last')?.addEventListener('click', () => this.startFromLastWeek());
+    document.getElementById('bs-export')?.addEventListener('click', () => this.exportSchedulePDF());
     document.getElementById('bs-worksheet')?.addEventListener('click', () => this.printWorksheet());
 
     // Grid cell clicks: edit a block, or add to a cell.
@@ -631,6 +633,39 @@ S.LaborBuildSchedule = {
       columns: [{ label: 'Staff', width: '20%' },
         { label: 'Mon' }, { label: 'Tue' }, { label: 'Wed' }, { label: 'Thu' }, { label: 'Fri' }, { label: 'Sat' }, { label: 'Sun' }]
     });
+  },
+
+  // Export the built schedule as a PDF (staff x days grid) the manager can print
+  // and post. Built from the schedule data (not the interactive grid, whose cells
+  // are buttons), rendered off-screen as a .tbl so App.exportPDF styles it like
+  // every other export. Only staff with a shift this week appear.
+  exportSchedulePDF() {
+    const d = this.draft;
+    if (!d.week_start) { alert('Pick a week first.'); return; }
+    const days = this.DAYS;
+    const cellFor = (id, day) => (d.shifts || [])
+      .filter(x => x.staff_id === id && x.day === day && x.start && x.end)
+      .map(x => this._fmtTime(x.start) + '-' + this._fmtTime(x.end)).join(', ');
+    // Same order as the grid: department, then name — but only scheduled staff.
+    const groups = {};
+    this.activeStaff().forEach(s => { const dep = this.deptOf(s.id); (groups[dep] = groups[dep] || []).push(s); });
+    const orderedDepts = this.DEPT_ORDER.filter(x => groups[x]).concat(Object.keys(groups).filter(x => this.DEPT_ORDER.indexOf(x) < 0));
+    const rows = [];
+    orderedDepts.forEach(dep => {
+      groups[dep].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
+        if ((d.shifts || []).some(x => x.staff_id === s.id && x.start && x.end)) rows.push(s);
+      });
+    });
+    if (!rows.length) { alert('No shifts on this schedule yet.'); return; }
+    const head = '<tr><th>Staff</th>' + days.map((day, i) => { const dd = this.dayDate(d.week_start, i); return '<th>' + day + (dd ? ' ' + dd : '') + '</th>'; }).join('') + '</tr>';
+    const bodyRows = rows.map(s => '<tr><td>' + esc(s.name || 'Staff') + '</td>'
+      + days.map(day => '<td>' + esc(cellFor(s.id, day) || '-') + '</td>').join('') + '</tr>').join('');
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;';
+    holder.innerHTML = '<div class="screen"><table class="tbl"><thead>' + head + '</thead><tbody>' + bodyRows + '</tbody></table></div>';
+    document.body.appendChild(holder);
+    App.exportPDF({ title: 'Schedule - Week of ' + this.weekLabel(d.week_start), root: holder, orientation: 'landscape' })
+      .catch(() => {}).finally(() => holder.remove());
   },
 
   // Carry the most recent prior posted schedule's shifts onto the current
