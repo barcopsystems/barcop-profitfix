@@ -622,17 +622,17 @@ S.RevenueMenuEngineering = {
       + '<td><div class="val">' + esc(entry.item_name || '') + '</div></td>'
       + '<td>' + App.fmtCurrency(entry.old_price) + '</td>'
       + '<td>' + App.fmtCurrency(entry.new_price) + '</td>'
-      + '<td colspan="2" style="font-size:11px;">' + vCell + '</td></tr>';
+      + '<td colspan="3" style="font-size:11px;">' + vCell + '</td></tr>';
   },
 
   reviewLogHtml() {
     const log = (App.data.revenue_price_log || []).slice().reverse();
     const rows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
-      || '<tr><td colspan="6" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
+      || '<tr><td colspan="7" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Pricing Review Log</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:22%;"/><col style="width:18%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>'
-      + '<thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th colspan="2">Verification</th></tr></thead>'
+      + '<colgroup><col style="width:18%;"/><col style="width:16%;"/><col style="width:14%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:13%;"/></colgroup>'
+      + '<thead><tr><th>Date</th><th>Item</th><th>Old Price</th><th>New Price</th><th colspan="3">Verification</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + App.showOlderBar('core', 'revenue_price_log', log, false);
   }
