@@ -397,7 +397,7 @@ S.RevenueThisWeek = {
     const laborPct = totalRev > 0 && laborCost > 0 ? laborCost / totalRev * 100 : null;
     const rplh = laborHrs > 0 && totalRev > 0 ? totalRev / laborHrs : null;
 
-    const fc = (this._weekEnd && App.forecastForWeek) ? App.forecastForWeek(this._weekEnd) : null;
+    const fc = (this._weekEnd && App.effectiveForecast) ? App.effectiveForecast(this._weekEnd) : null;
     const fcTotal = fc && fc.total != null ? Number(fc.total) || 0 : 0;
     const fcGap = fcTotal > 0 && totalRev > 0 ? totalRev - fcTotal : null;
 

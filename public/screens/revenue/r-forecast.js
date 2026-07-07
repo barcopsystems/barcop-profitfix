@@ -1,13 +1,16 @@
 'use strict';
 
 /* ── Revenue Recovery — Revenue Forecast (writes revenue_forecasts) ──────────
-   Set next week's revenue expectation by day so Labor Control can build the
-   schedule against a real number instead of a guess. Per-day inputs default to a
-   weighted average of the same weekday from the last 8 weeks of sc_shifts; the
-   operator overrides any cell. Save writes a record keyed by week_start (Monday);
-   the schedule builder and the weekly confirm read it. Brought to the Control
-   entry-page standard: stat strip → week-chip selector → framed grid → Save +
-   Start Over below → Forecast Accuracy history. */
+   Read-mostly. Bar Cop projects each day from a weighted 8-week same-weekday
+   average of sc_shifts revenue and covers (App.forecastDefaultsFor /
+   coverDefaultsFor), and every reader (Build Schedule, This Week, Pre-Shift,
+   Cash) pulls App.effectiveForecast, which returns that computed baseline unless
+   the operator has saved an override for the week. So the forecast is always
+   live without a manual save. The operator only adjusts a day for something the
+   average cannot see (event, holiday, closure); Save records that override
+   (keyed by week_start Monday) and feeds Forecast Accuracy. Layout: explainer →
+   stat strip → week-chip selector → framed grid (COMPUTED tag / Computed+Reset
+   per row) → optional Save + Start Over → Forecast Accuracy history. */
 
 S.RevenueForecast = {
   weekStart: null,
@@ -48,38 +51,11 @@ S.RevenueForecast = {
   // "Jun 8 - Jun 14" for the Mon-Sun week starting `ws`.
   weekRangeLabel(ws) { return App.dateRangeLabel(ws, App.periodEndFor(ws)); },
 
-  // Same-weekday cover defaults from sc_shifts: SUM covers per date first (a day
-  // can run several services), then average the last 8 same-weekday dates —
-  // mirrors App.forecastDefaultsFor for revenue, so the suggestion is a per-day
-  // total, not a per-shift average.
+  // Same-weekday cover defaults, computed once in App.coverDefaultsFor so the
+  // page and every downstream reader (schedule builder, Pre-Shift, This Week)
+  // use one baseline.
   _coverDefaults() {
-    const shifts = (App.shiftData?.sc_shifts || []).filter(s => s && s.date && s.covers != null);
-    const covByDate = {};
-    shifts.forEach(s => { covByDate[s.date] = (covByDate[s.date] || 0) + (parseFloat(s.covers) || 0); });
-    const start = new Date(this.weekStart + 'T00:00:00');
-    const per_day = {};
-    let total = 0;
-    this.DAYS.forEach((day, idx) => {
-      const target = new Date(start.getTime());
-      target.setDate(target.getDate() + idx);
-      const samples = [];
-      for (let back = 1; back <= 8; back++) {
-        const probe = new Date(target.getTime());
-        probe.setDate(probe.getDate() - back * 7);
-        const key = App.ymdLocal(probe);
-        if (covByDate[key] != null) samples.push(covByDate[key]);
-      }
-      let avg = 0;
-      if (samples.length) {
-        // Newest sample first; weight newer higher (linear), like the revenue defaults.
-        let wsum = 0, vsum = 0;
-        samples.forEach((v, i) => { const w = samples.length - i; vsum += v * w; wsum += w; });
-        avg = wsum > 0 ? Math.round(vsum / wsum) : 0;
-      }
-      per_day[day] = avg;
-      total += avg;
-    });
-    return { per_day, total };
+    return App.coverDefaultsFor(this.weekStart);
   },
 
   hydrate(weekStart) {
@@ -123,11 +99,12 @@ S.RevenueForecast = {
 
   showHowTo() {
     App.showHelpModal('How Revenue Forecast Works', [
-      { p: ['Set what you expect to bring in next week, day by day, so Labor Control builds the schedule against a real number instead of a guess. Each day pre-fills from a weighted average of the same weekday over your last eight weeks of shifts; you adjust any day.'] },
-      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 8 - Jun 14. Step forward with the arrows to plan ahead, or back to revise; This Week snaps to the current week, tagged NOW. The forecast you save is keyed to the selected week, and both the schedule builder and the weekly confirm read it.'] },
-      { h: 'The Numbers', p: ['Forecast Total is the sum of your daily numbers, shown live against your last confirmed week and against the suggested total. Cover Goal Total is the covers you need to hit, not just the dollars, and it feeds the cover target on Build Schedule.'] },
-      { h: 'Filling It In', p: ['Use Suggested for All Days drops the same-weekday averages into every row at once; the Use button on a single row fills just that day. Override any number by hand. Start Over resets the week to where it began.'] },
-      { h: 'Forecast Accuracy', p: ['Once a week you forecast has its actual confirmed, it lands in the Forecast Accuracy table at the bottom: each row pairs your forecast against the actual, with the gap in dollars and percent. Average Error is how far off you have run across the matched weeks, and Matched Weeks counts how many pairs it has to work with. Export PDF saves the table. Watch it tighten as you learn your room.'] }
+      { p: ['Bar Cop projects next week day by day from a weighted average of the same weekday over your last eight weeks of sales and covers, and uses that projection automatically. Build Schedule and your weekly numbers already read it, so you do not have to do anything here for it to work.'] },
+      { h: 'When to Touch It', p: ['Adjust a day only when you know something the average cannot see: a private event, a holiday, a closure, a festival in town. Type your number over the computed one on that day. Every other day stays on the computed baseline, tagged COMPUTED, and once you change a day it shows the computed number beside it with a Reset to snap back.'] },
+      { h: 'The Week Selector', p: ['Each chip shows a week as its date range, for example Jun 8 - Jun 14. Step forward with the arrows to plan ahead, or back to revise; This Week snaps to the current week, tagged NOW.'] },
+      { h: 'The Numbers', p: ['Forecast Total is the sum of your daily numbers, shown live against your last confirmed week and against the computed total. Cover Goal Total is the covers you need to hit, not just the dollars, and it feeds the cover target on Build Schedule and the Pre-Shift Briefing.'] },
+      { h: 'Saving', p: ['Saving is optional. Bar Cop already uses the computed forecast everywhere, so Save is only there to lock in an adjustment you made and to record the week so it shows up in Forecast Accuracy below. Reset to Computed clears your changes back to the baseline; Start Over reloads the week as it was.'] },
+      { h: 'Forecast Accuracy', p: ['Every week you save has its actual confirmed later and lands in the Forecast Accuracy table: each row pairs your forecast against the actual, with the gap in dollars and percent. Average Error is how far off you have run across the matched weeks, and Matched Weeks counts how many pairs it has to work with. Export PDF saves the table. Watch it tighten as you learn your room.'] }
     ]);
   },
 
@@ -159,7 +136,7 @@ S.RevenueForecast = {
     return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
       + '<div class="calc-item"><div class="calc-label">Forecast Total</div><div class="calc-val lg" id="rf-total">' + this.fmt(total) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">vs Last Confirmed</div><div class="calc-val lg" id="rf-vsprior">' + vsPrior + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (prior != null ? 'last confirmed ' + this.fmt(prior) : 'no prior week') + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">vs Suggested</div><div class="calc-val lg" id="rf-vssug">' + vsSug + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (sugTotal > 0 ? 'suggested ' + this.fmt(sugTotal) : 'no shift history') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">vs Computed</div><div class="calc-val lg" id="rf-vssug">' + vsSug + '</div><div style="font-size:11px;color:var(--t3);margin-top:3px;">' + (sugTotal > 0 ? 'computed ' + this.fmt(sugTotal) : 'no shift history') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Cover Goal Total</div><div class="calc-val lg" id="rf-covertotal">' + this.totalCovers() + '</div></div>'
       + '</div></div>';
   },
@@ -183,17 +160,25 @@ S.RevenueForecast = {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
       + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + '<div style="display:flex;gap:8px;">'
-      + (sugTotal > 0 ? '<button class="btn btn-ghost btn-sm" id="rf-reset">Use Suggested for All Days</button>' : '')
+      + (sugTotal > 0 ? '<button class="btn btn-ghost btn-sm" id="rf-reset">Reset to Computed</button>' : '')
       + '</div></div>';
+  },
+
+  // The computed-baseline hint beside each input. On the baseline it is a quiet
+  // COMPUTED tag; once the operator overrides a day it shows the computed number
+  // with a Reset action to snap back. Never a competing "pick one" number.
+  sugInner(sug, cellVal, cls, day, money) {
+    if (!(sug > 0)) return '<span style="font-size:10px;color:var(--t4);white-space:nowrap;">No history</span>';
+    const shown = money ? this.fmt(sug) : String(Math.round(sug));
+    if (Math.round(Number(cellVal) || 0) === Math.round(sug)) {
+      return '<span style="font-size:10px;color:var(--t4);letter-spacing:.5px;white-space:nowrap;">COMPUTED</span>';
+    }
+    return '<span style="font-size:10px;color:var(--t3);white-space:nowrap;">Computed ' + shown
+      + ' <button class="' + cls + '" data-day="' + day + '" data-val="' + sug + '" style="background:none;border:none;color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:0;">RESET</button></span>';
   },
 
   // ── Daily forecast grid (form-card + framed ing-tbl) ────────────────────────
   rowsHtml() {
-    // Single-line rows: a sized input with its "Use" suggestion beside it (not
-    // stacked below), so the grid stays compact.
-    const useBtn = (cls, day, val, label) => val > 0
-      ? '<button class="' + cls + '" data-day="' + day + '" data-val="' + val + '" style="background:none;border:none;color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:0;white-space:nowrap;flex-shrink:0;">' + label + '</button>'
-      : '<span style="font-size:10px;color:var(--t4);white-space:nowrap;flex-shrink:0;">No history</span>';
     return this.DAYS.map((d, i) => {
       const v = this.per_day[d] || 0;
       const cv = this.covers_per_day[d] || 0;
@@ -203,11 +188,11 @@ S.RevenueForecast = {
         + '<td data-label=""><div class="val">' + esc(this.dayLabel(i)) + '</div></td>'
         + '<td data-label="Forecast Revenue"><div style="display:flex;align-items:center;gap:10px;">'
         +   '<div class="fw" style="flex:1;max-width:200px;"><span class="pre">$</span><input class="form-input pre rf-val" type="number" min="0" step="0.01" inputmode="decimal" value="' + v + '" style="width:100%;"/></div>'
-        +   useBtn('rf-apply', d, sug, '+ Use ' + this.fmt(sug))
+        +   '<span class="rf-sugwrap" data-day="' + d + '" style="flex-shrink:0;">' + this.sugInner(sug, v, 'rf-apply', d, true) + '</span>'
         + '</div></td>'
         + '<td data-label="Cover Goal"><div style="display:flex;align-items:center;gap:10px;">'
         +   '<input class="form-input rf-cval" type="number" min="0" inputmode="numeric" value="' + cv + '" style="flex:1;max-width:120px;"/>'
-        +   useBtn('rf-capply', d, csug, '+ Use ' + csug)
+        +   '<span class="rf-csugwrap" data-day="' + d + '" style="flex-shrink:0;">' + this.sugInner(csug, cv, 'rf-capply', d, false) + '</span>'
         + '</div></td>'
         + '</tr>';
     }).join('');
@@ -224,7 +209,11 @@ S.RevenueForecast = {
   },
 
   draw() {
+    const statusLine = this.savedId
+      ? 'This week uses your saved override. Bar Cop already applies it to Build Schedule and your weekly numbers.'
+      : 'This week is on Bar Cop\'s computed forecast, already applied to Build Schedule and your weekly numbers. Saving is optional: it locks in an adjustment and records the week for Forecast Accuracy below.';
     this.container.innerHTML = '<div class="screen">'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Bar Cop projects each day from your last 8 weeks of sales and covers, and uses it automatically. Adjust a day only when you know something the average cannot see, a private event, a holiday, a closure, then save the override.</div>'
       + this.heroStrip()
       + this.selectorRow()
       + this.gridCard()
@@ -234,6 +223,7 @@ S.RevenueForecast = {
       + '<span id="rf-status" style="font-size:12px;color:var(--gold);font-weight:700;margin-left:8px;display:none;">Saved.</span>'
       + '<span id="rf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:4px;">' + statusLine + '</div>'
       + this.accuracyBlock()
       + '</div>';
     this.wire();
@@ -347,10 +337,17 @@ S.RevenueForecast = {
     set('rf-vsprior', prior != null ? (total - prior >= 0 ? '+' : '') + this.fmt(total - prior) : '-');
     set('rf-vssug', sugTotal > 0 ? (total - sugTotal >= 0 ? '+' : '') + this.fmt(total - sugTotal) : '-');
     set('rf-covertotal', String(this.totalCovers()));
+    // Refresh each row's computed/reset tag against the current cell values.
+    this.DAYS.forEach(d => {
+      const rw = document.querySelector('.rf-sugwrap[data-day="' + d + '"]');
+      if (rw) rw.innerHTML = this.sugInner(this.defaults.per_day[d] || 0, this.per_day[d] || 0, 'rf-apply', d, true);
+      const cw = document.querySelector('.rf-csugwrap[data-day="' + d + '"]');
+      if (cw) cw.innerHTML = this.sugInner(this.cover_defaults.per_day[d] || 0, this.covers_per_day[d] || 0, 'rf-capply', d, false);
+    });
   },
 
   startOver() {
-    App.confirm({ title: 'Start over?', message: this.savedId ? 'This drops your unsaved changes and reloads the saved forecast for this week.' : 'This clears your numbers and re-pulls the suggested forecast for this week.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
+    App.confirm({ title: 'Start over?', message: this.savedId ? 'This drops your unsaved changes and reloads the saved forecast for this week.' : 'This clears your changes and re-pulls Bar Cop\'s computed forecast for this week.', confirmText: 'Start Over', cancelText: 'Keep' }).then(ok => {
       if (!ok) return;
       this.hydrate(this.weekStart);
       this.draw();
