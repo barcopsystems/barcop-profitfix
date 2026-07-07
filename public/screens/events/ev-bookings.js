@@ -175,7 +175,7 @@ S.EventsBookings = {
     const rows = people.map(p =>
       '<tr><td>' + esc(p.name) + '</td><td>' + p.hours.toFixed(1) + 'h</td><td style="color:var(--t3);">' + (p.logged ? 'logged' : 'scheduled') + '</td><td>' + App.fmtCurrency(p.cost) + '</td></tr>'
     ).join('');
-    return '<div class="tbl-wrap"><table class="tbl eb-staff-tbl"><thead><tr><th>Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return '<table class="row-list"><thead><tr><th>Event Staff</th><th>Hours</th><th>Source</th><th>Cost</th></tr></thead><tbody>' + rows + '</tbody></table>';
   },
 
   async patch(id, fields) {
@@ -530,15 +530,17 @@ S.EventsBookings = {
     } else if (viewStep === 'Booked') {
       const bal = this.balanceDue(b);
       card2 = '<div class="card form-card">' + this.subLabel('Collect the Deposit')
-        + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
-          + '<div class="f" style="width:160px;flex-shrink:0;"><label>Deposit Amount</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-dep" value="' + (b.deposit_amount != null && b.deposit_amount !== 0 ? b.deposit_amount : '') + '"/></div></div>'
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-            + '<button class="btn btn-primary btn-sm" id="eb-dep-save">Save Deposit</button>'
-            + (b.deposit_amount && !b.deposit_paid_date ? '<button class="btn btn-ghost btn-sm" id="eb-dep-paid">Mark Deposit Paid</button>' : '')
-            + (!b.balance_paid_date && bal > 0 ? '<button class="btn btn-ghost btn-sm" id="eb-bal-paid">Mark Balance Paid</button>' : '')
+        + '<div class="f" style="width:auto;"><label>Deposit Amount</label>'
+          + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">'
+            + '<div class="fw" style="width:160px;flex-shrink:0;"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-dep" value="' + (b.deposit_amount != null && b.deposit_amount !== 0 ? b.deposit_amount : '') + '"/></div>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+              + '<button class="btn btn-primary btn-sm" id="eb-dep-save">Save Deposit</button>'
+              + (b.deposit_amount && !b.deposit_paid_date ? '<button class="btn btn-ghost btn-sm" id="eb-dep-paid">Mark Deposit Paid</button>' : '')
+              + (!b.balance_paid_date && bal > 0 ? '<button class="btn btn-ghost btn-sm" id="eb-bal-paid">Mark Balance Paid</button>' : '')
+            + '</div>'
           + '</div>'
         + '</div>'
-        + this.divider() + this.subLabel('Staffing')
+        + this.divider()
         + this.staffingHtml(b)
         + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" id="eb-staff">Schedule Staff for this Event</button></div>'
         + this.divider() + this.subLabel('Run Sheet')
@@ -553,7 +555,7 @@ S.EventsBookings = {
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Bar Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-bar" value="' + (b.event_bar_cost != null && b.event_bar_cost !== 0 ? b.event_bar_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Other Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-other" value="' + (b.event_other_cost != null && b.event_other_cost !== 0 ? b.event_other_cost : '') + '"/></div></div>'
         + '</div>'
-        + this.divider() + this.subLabel('Event Staff') + this.staffingHtml(b)
+        + this.divider() + this.staffingHtml(b)
         + '</div>';
     }
 
@@ -858,7 +860,7 @@ S.EventsBookings = {
       + '<div class="card-title" style="margin-bottom:10px;">Event Quote</div>'
       + '<div class="pdf-para">Prepared ' + this.fmtDate(App.todayLocal()) + (b.contact_name ? ' for ' + esc(b.contact_name) : '') + '</div>'
       + '<table class="tbl"><tbody>' + rowsHtml + '</tbody></table>'
-      + '<div class="pdf-para">This is a quote worksheet, an estimate prepared from your package pricing. Final charges may vary with headcount and selections. Not a contract.</div>'
+      + '<div class="pdf-fine">This quote is an estimate based on current package pricing and the details provided. Final pricing is confirmed on a signed event agreement and may adjust with final guest count and selections.</div>'
       + '</div></div>';
     document.body.appendChild(wrap);
     Promise.resolve(App.exportPDF({ title: 'Event Quote - ' + this.title(b), root: wrap })).finally(() => wrap.remove());
