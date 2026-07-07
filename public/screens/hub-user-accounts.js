@@ -148,23 +148,20 @@ S.HubUserAccounts = {
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
   },
 
-  // One dropdown per operating area: No Access / View Only / Full Access.
-  // currentPerms = { area: 'view'|'edit' } (empty {} = all No Access). The grid
-  // reflects the CURRENT user's power to grant: the owner can grant any area at
-  // any level; a non-owner admin only sees areas they hold, capped to their own
-  // level (they can't hand out more access than they have).
+  // One dropdown per operating area: No Access / Full Access. currentPerms =
+  // { area: 'edit' } (empty {} = all No Access). A non-owner admin only sees the
+  // areas they themselves hold (they can't grant an area they don't have); the
+  // owner sees all areas.
   renderPermsGrid(currentPerms, mode) {
     const perms = currentPerms || {};
     const isOwner = !!(window.DB && DB.isOwner && DB.isOwner());
     const myPerms = (window.DB && DB.permissions) ? DB.permissions() : {};
-    const RANK = { view: 1, edit: 2 };
     const LEVELS = [
       { v: '',     t: 'No Access' },
-      { v: 'view', t: 'View Only' },
       { v: 'edit', t: 'Full Access' }
     ];
     let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions</div>';
-    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Set what this member can do in each area. View Only = see it but change nothing. Full Access = add, edit, and delete.</div>';
+    html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Choose which areas this member can use. Full Access = see and change everything in that area. No Access = the area is hidden from them.</div>';
     const grantable = this.AREAS.filter(a => isOwner || myPerms[a.key]);
     if (!grantable.length) {
       html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any areas you can grant. Ask the owner to expand your access first.</div>';
@@ -172,10 +169,8 @@ S.HubUserAccounts = {
     }
     html += '<div style="background:#0F1A21;border:1px solid var(--b-edge);border-radius:6px;padding:4px 14px;">';
     grantable.forEach((a, i) => {
-      const cur = perms[a.key] || '';
-      const own = myPerms[a.key];
+      const cur = perms[a.key] ? 'edit' : '';   // any stored access = Full
       const opts = LEVELS
-        .filter(l => isOwner || !l.v || RANK[l.v] <= RANK[own])
         .map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
       html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;' + (i < grantable.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
         + '<span style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</span>'
