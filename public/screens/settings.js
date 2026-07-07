@@ -439,8 +439,11 @@ S.HubSettings = {
         if (S.InventoryDashboard) localStorage.setItem(S.InventoryDashboard._doneKey(), JSON.stringify({ count: true, deliveries: true, orders: true }));
         if (S.LaborDashboard)     localStorage.setItem(S.LaborDashboard._doneKey(),     JSON.stringify({ hours: true, tips: true, schedule: true }));
         if (S.ShiftDashboard)     localStorage.setItem(S.ShiftDashboard._doneKey(),     JSON.stringify({ import: true, cash: true }));
-        if (S.Dashboard)          localStorage.setItem(S.Dashboard._doneKey(),          JSON.stringify({ week: true, costs: true }));
-        if (S.RevenueDashboard)   localStorage.setItem(S.RevenueDashboard._doneKey(),   JSON.stringify({ week: true, numbers: true }));
+        // Profit + Revenue: no stamp. Their step 1 (Confirm the Week) now derives
+        // its done-state from the confirmed-week record, and the current in-progress
+        // week has none yet, so the cockpit honestly opens on "Confirm the Week".
+        // (costs/numbers can't be reviewed until the week is confirmed, so nothing
+        // downstream is pre-marked either.)
         if (S.CashDashboard)      localStorage.setItem(S.CashDashboard._doneKey(),      JSON.stringify({ trapped: true, week: true }));
       }
     } catch (e) {}
