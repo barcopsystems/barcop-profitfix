@@ -196,7 +196,7 @@ S.RevenueMenuEngineering = {
         + '<div style="display:flex;align-items:center;flex-shrink:0;">' + btns + '</div></div>';
     };
 
-    const colgroup = '<colgroup><col style="width:22%;"/><col style="width:18%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:16%;"/><col style="width:14%;"/></colgroup>';
+    const colgroup = '<colgroup><col style="width:20%;"/><col style="width:16%;"/><col style="width:10%;"/><col style="width:13%;"/><col style="width:14%;"/><col style="width:14%;"/><col style="width:13%;"/></colgroup>';
 
     // ── Ranked category cards ──────────────────────────────────────────────────
     const cards = Object.keys(byCat).sort(catSort).map(cat => {
@@ -214,6 +214,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, i.quad);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td><div class="val">' + SINGULAR[i.quad] + '</div><div style="font-size:10px;color:var(--t3);">' + esc(MOVE[i.quad]) + '</div></td>'
+          + '<td>' + Math.round(i.weekly_covers) + '</td>'
           + '<td>' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
@@ -222,7 +223,7 @@ S.RevenueMenuEngineering = {
       return heading(cat + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Class</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Class</th><th>Covers/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>';
     }).join('');
 
@@ -234,6 +235,7 @@ S.RevenueMenuEngineering = {
         const x = cellsFor(i, null);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
           + '<td>' + esc(i.category || '') + '</td>'
+          + '<td>' + Math.round(i.weekly_covers) + '</td>'
           + '<td>' + f(i.price) + '</td>'
           + '<td>' + x.suggCell + '</td>'
           + '<td>' + x.dwkCell + '</td>'
@@ -242,7 +244,7 @@ S.RevenueMenuEngineering = {
       unrankedCard = heading('Too Few to Rank')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
-        + '<thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
+        + '<thead><tr><th>Item</th><th>Category</th><th>Covers/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
         + '<tbody>' + urows + '</tbody></table></div>';
     }
 
