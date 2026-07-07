@@ -41,12 +41,13 @@ S.LaborBuildSchedule = {
 
   // Forecast lives in Revenue Recovery (one canonical store, revenue_forecasts).
   forecastForWeek(weekStart) { return (weekStart && App.forecastForWeek) ? App.forecastForWeek(weekStart) : null; },
-  // Saved override if the operator set one, otherwise Bar Cop's computed
-  // baseline, so a week always builds toward a real number without a manual save.
+  // The effective forecast (saved override, else computed baseline plus any
+  // events booked that week), so a week always builds toward a real, event-aware
+  // number without a manual save.
   forecastTotal(weekStart) {
-    const f = this.forecastForWeek(weekStart);
-    if (f && f.total != null) return Number(f.total) || 0;
-    return (weekStart && App.forecastDefaultsFor) ? (App.forecastDefaultsFor(weekStart).total || 0) : 0;
+    if (!weekStart || !App.effectiveForecast) return 0;
+    const f = App.effectiveForecast(weekStart);
+    return f && f.total != null ? Number(f.total) || 0 : 0;
   },
 
   // ── Week helpers ──────────────────────────────────────────────────────────
