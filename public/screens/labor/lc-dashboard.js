@@ -285,28 +285,52 @@ S.LaborDashboard = {
     return { over, approaching, otPremium };
   },
 
+  // Resolve the week the read shows: the current week if it has logged hours,
+  // else the most recent week that does (flagged lastWk). Mirrors the Shift
+  // _statWeek resolver — hours are imported weekly AFTER the week, so the current
+  // week is empty mid-week even for a running bar, and the read must not fall back
+  // to the Get Started card once the operator has ever logged a week.
+  _statWeekStart() {
+    const cur = this.todayMonday();
+    const sv = this._weekStart;
+    try {
+      this._weekStart = cur;
+      if (this.actuals().some(a => this.inWeek(a.date))) return { start: cur, lastWk: false };
+      const dates = this.actuals().map(a => String(a.date || '').slice(0, 10)).filter(Boolean).sort();
+      const latest = dates.length ? dates[dates.length - 1] : '';
+      if (!latest) return { start: cur, lastWk: false };
+      const ms = this.mondayOf(new Date(latest + 'T00:00:00'));
+      return (ms && ms !== cur) ? { start: ms, lastWk: true } : { start: cur, lastWk: false };
+    } finally { this._weekStart = sv; }
+  },
+
   // ── Where You Stand state (the week's labor headline + reads) ────────────────
   _wys() {
-    const wkStart = this.weekStart(), wkEnd = this.weekEnd();
-    const today = App.todayLocal();
-    const endCap = wkEnd < today ? wkEnd : today;
-    const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
-    const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
-    const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
-    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
-    const p = this.weekProjection();
-    // Labor % and RPLH read actual revenue for the week (sc_shifts), not a forecast,
-    // so they read "-" until the week's sales are imported rather than dressing a
-    // projection as actual.
-    const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
-      .filter(s => this.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
-    const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
-    const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
-    return {
-      wkStart, wkEnd, wkHours, wkCost, weekRevenue, laborPct, rplh,
-      over: p.over, approaching: p.approaching, otRisk: p.over + p.approaching, otPremium: p.otPremium,
-      hasHours: wkActuals.length > 0
-    };
+    const p = this.weekProjection();   // OT projection stays on the real current/next week
+    const sw = this._statWeekStart();
+    const sv = this._weekStart;
+    try {
+      this._weekStart = sw.start;
+      const wkStart = this.weekStart(), wkEnd = this.weekEnd();
+      const today = App.todayLocal();
+      const endCap = wkEnd < today ? wkEnd : today;
+      const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
+      const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
+      const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
+      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+      // Labor % and RPLH read actual revenue for the week (sc_shifts), not a forecast,
+      // so they read "-" until the week's sales are imported rather than dressing a
+      // projection as actual.
+      const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
+        .filter(s => this.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+      const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
+      const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
+      return {
+        wkStart, wkEnd, wkHours, wkCost, weekRevenue, laborPct, rplh, lastWk: sw.lastWk,
+        over: p.over, approaching: p.approaching, otRisk: p.over + p.approaching, otPremium: p.otPremium,
+        hasHours: wkActuals.length > 0
+      };
+    } finally { this._weekStart = sv; }
   },
 
   // ── Where You Stand (labor headline + three-stat read + Briefing) ────────────
@@ -314,7 +338,7 @@ S.LaborDashboard = {
     const target = App.laborTargetPct ? App.laborTargetPct() : 29;
     const fmtRange = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
     const sub = st.hasHours
-      ? st.wkHours.toFixed(1) + ' hrs logged &middot; week of ' + fmtRange(st.wkStart)
+      ? st.wkHours.toFixed(1) + ' hrs logged &middot; week of ' + fmtRange(st.wkStart) + (st.lastWk ? ' <span style="color:var(--t4);">(last week)</span>' : '')
       : 'import this week\'s hours to fill this in';
     const hero = '<div style="padding:2px 0;">'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
