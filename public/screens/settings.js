@@ -3419,11 +3419,11 @@ S.HubSettings = {
     // ── Save everything — App.data plus all three Control stores ──
     await App.save();
     await App.saveInventory();           // config only (products, locations, vendors, batches, par/variance settings)
-    await App.seedEventStores('ic');     // inventory event logs -> ic_events rows
+    const seedIc = await App.seedEventStores('ic');     // inventory event logs -> ic_events rows
     await App.saveLabor();               // config only (staff, positions, schedule templates, certs, notes)
-    await App.seedEventStores('lc');     // labor event logs -> lc_events rows
+    const seedLc = await App.seedEventStores('lc');     // labor event logs -> lc_events rows
     await App.saveShift();               // config only (settings, drawers, checklist templates)
-    await App.seedEventStores('sc');     // shift event logs -> sc_events rows
+    const seedSc = await App.seedEventStores('sc');     // shift event logs -> sc_events rows
 
     // ── Bar Cop Audit — the Hub executive audit across the first 90 days ───────
     // Three monthly snapshots on the cadence: the first runs at day 30 (the engine
@@ -3751,7 +3751,7 @@ S.HubSettings = {
       }
     }
 
-    await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
+    const seedCore = await App.seedEventStores('core');   // recovery event logs (weeks, audits, theft scores, discrepancies, investigations) -> core_events rows
     App.updatePeriod();
 
     // Reload so the app re-renders against a fully hydrated state (like Clear
@@ -3761,6 +3761,14 @@ S.HubSettings = {
     // startDemo (?demo=1 still in the URL) and loop forever. The demo renders the
     // Hub itself, so only the interactive Re-Load Sample button needs the reload.
     if (App.demoMode) return;
+    // If any event store failed to persist (even after retries), do NOT reload —
+    // that would drop into half-written data (the class that lost logged hours).
+    // Tell the operator to run it again instead.
+    const seedOk = [seedIc, seedLc, seedSc, seedCore].every(r => !r || r.ok !== false);
+    if (!seedOk) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Some sample data did not save (connection hiccup). Click Load Sample Data again.'; }
+      return;
+    }
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ Sample data loaded. Reloading...'; }
     setTimeout(() => window.location.reload(), 800);
   },
