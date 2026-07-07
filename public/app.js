@@ -495,7 +495,14 @@ const App = {
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
     const tnSettings = document.getElementById('tn-settings');
-    if (tnSettings) tnSettings.onclick = () => { if (window.S && S.HubSettingsHome) S.HubSettingsHome.open(); };
+    if (tnSettings) tnSettings.onclick = () => {
+      // Settings is management-only, but a Staff member still needs to reach Your
+      // Account to change their password — send them straight there (the page
+      // renders password-only for Staff).
+      const role = (window.DB && DB.role && DB.role()) || null;
+      if (role === 'staff') { if (window.S && S.HubUserAccounts) S.HubUserAccounts.open('account'); return; }
+      if (window.S && S.HubSettingsHome) S.HubSettingsHome.open();
+    };
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     const tnDate = document.getElementById('tn-date');
