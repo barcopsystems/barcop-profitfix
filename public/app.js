@@ -447,8 +447,7 @@ const App = {
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
       + 'Bar Cop demo. Poke at everything and change whatever you want. Nothing you do is saved, and it all resets when you leave.</span>'
-      + '<button id="demo-signup-btn" style="background:var(--gold);color:var(--bg);border:none;border-radius:3px;'
-      + 'font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:7px 16px;cursor:pointer;flex-shrink:0;">Sign Up Now</button>';
+      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Sign Up Now</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
   },
@@ -575,13 +574,9 @@ const App = {
     bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9500;background:#1E2B34;'
       + 'color:var(--w);display:flex;align-items:center;gap:14px;padding:9px 18px;'
       + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
-    const btnDark = 'background:var(--gold);color:var(--bg);border:none;';
-    const btnGhost = 'background:transparent;border:1px solid var(--b1);color:var(--w);';
-    const btnBase = 'border-radius:3px;font-size:11px;font-weight:800;letter-spacing:1px;'
-      + 'text-transform:uppercase;padding:6px 14px;cursor:pointer;flex-shrink:0;';
     bar.innerHTML = '<span style="flex:1;">Changes you saved on this device while offline have not reached the server yet.</span>'
-      + '<button id="sync-now" style="' + btnDark + btnBase + '">Sync Now</button>'
-      + '<button id="sync-later" style="' + btnGhost + btnBase + '">Later</button>';
+      + '<button id="sync-now" class="btn btn-primary btn-sm" style="flex-shrink:0;">Sync Now</button>'
+      + '<button id="sync-later" class="btn btn-ghost btn-sm" style="flex-shrink:0;">Later</button>';
     document.body.appendChild(bar);
     document.getElementById('sync-later').onclick = () => bar.remove();
     document.getElementById('sync-now').onclick = async () => {
