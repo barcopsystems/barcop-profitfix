@@ -562,7 +562,8 @@ S.Hub = {
     //    into that section. The whole card is the deep link. ──
     const auditLine = (a) => {
       if (!a || a.overall_score == null) return '<span style="color:var(--t4);">No audit yet, run it for a baseline</span>';
-      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b> · run a fresh one anytime';
+      const when = a.date ? shortDate(a.date) : null;
+      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b>' + (when ? ' · last run ' + when : '');
     };
     // ── Section card: a snapshot of the section (3-stat strip from its own
     //    dashboard) over the weekly-close checklist. Control cards carry the
