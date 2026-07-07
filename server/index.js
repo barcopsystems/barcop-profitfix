@@ -970,11 +970,49 @@ app.post('/api/support-message-notify', async (req, res) => {
   }
 });
 
+// ── Delegated-admin helpers ───────────────────────────────────────────────────
+// Access model: Owner (accounts.owner_user_id) has full control of everyone. A
+// non-owner Admin can only manage Staff members THEY invited, can only grant
+// areas they themselves hold, and never above their own level. These helpers
+// keep those rules identical across invite / update-permissions / remove.
+const PERM_RANK = { view: 1, edit: 2 };
+// Clamp a requested permissions object to what the granting admin may hand out:
+// drop any area the admin lacks, and cap each level to the admin's own. The
+// owner grants freely (no clamp).
+function clampPermsToGranter(requested, granterPerms, granterIsOwner) {
+  if (granterIsOwner) return requested || {};
+  const own = granterPerms || {};
+  const out = {};
+  for (const [area, lvl] of Object.entries(requested || {})) {
+    const mine = own[area];
+    if (!mine) continue;                                   // admin can't grant an area they lack
+    out[area] = (PERM_RANK[lvl] <= PERM_RANK[mine]) ? lvl : mine;   // cap to admin's level
+  }
+  return out;
+}
+// Resolve the requester's membership (role + permissions) and owner status for
+// an account from their JWT. Returns null if the token is bad or they are not a
+// member. { userId, role, permissions, isOwner }.
+async function resolveRequester(accountId, jwt) {
+  if (!jwt) return null;
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+  if (userError || !userData?.user) return null;
+  const userId = userData.user.id;
+  const { data: membership } = await supabaseAdmin
+    .from('memberships').select('role, permissions')
+    .eq('account_id', accountId).eq('user_id', userId).single();
+  if (!membership) return { userId, role: null, permissions: {}, isOwner: false };
+  const { data: acct } = await supabaseAdmin
+    .from('accounts').select('owner_user_id').eq('id', accountId).single();
+  const isOwner = !!(acct?.owner_user_id && acct.owner_user_id === userId);
+  return { userId, role: membership.role, permissions: membership.permissions || {}, isOwner };
+}
+
 // ── Invite user to an account (Phase 2 multi-user) ────────────────────────────
 // Admin sends an invite from App Settings → Team. Recipient gets a Supabase
 // magic-link email. When they sign up, the 24a trigger reads the metadata
-// (invited_to_account_id + invited_role) and links them to this account
-// instead of creating a new one for them.
+// (invited_to_account_id + invited_role + invited_by) and links them to this
+// account instead of creating a new one for them.
 app.post('/api/invite-user', async (req, res) => {
   try {
     const { email, accountId, role, permissions } = req.body || {};
@@ -995,26 +1033,19 @@ app.post('/api/invite-user', async (req, res) => {
     const jwt = authHeader.replace(/^Bearer\s+/, '');
     if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
 
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    if (!(requester.isOwner || requester.role === 'admin')) {
+      return res.status(403).json({ error: 'Only the owner or an admin can send invites' });
     }
-    const inviterUserId = userData.user.id;
+    const inviterUserId = requester.userId;
 
-    // Inviter must be an admin of the target account
-    const { data: membership, error: memberError } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', inviterUserId)
-      .single();
-
-    if (memberError || !membership || membership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can send invites' });
-    }
-
-    const validRoles = ['admin', 'staff', 'viewer'];
-    const inviteRole = validRoles.includes(role) ? role : 'staff';
+    // Only the owner can create another Admin; a non-owner admin invites Staff.
+    const validRoles = ['admin', 'staff'];
+    let inviteRole = validRoles.includes(role) ? role : 'staff';
+    if (!requester.isOwner) inviteRole = 'staff';
+    // Clamp the granted areas/levels to what this inviter may hand out.
+    const grantPerms = clampPermsToGranter(cleanPerms, requester.permissions, requester.isOwner);
     const cleanEmail = String(email).toLowerCase().trim();
 
     const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
@@ -1023,7 +1054,8 @@ app.post('/api/invite-user', async (req, res) => {
         data: {
           invited_to_account_id: accountId,
           invited_role: inviteRole,
-          invited_permissions: cleanPerms
+          invited_permissions: grantPerms,
+          invited_by: inviterUserId
         },
         redirectTo: 'https://app.barcop.com/'
       }
@@ -1064,7 +1096,7 @@ app.post('/api/invite-user', async (req, res) => {
 
         const { error: insertError } = await supabaseAdmin
           .from('memberships')
-          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: cleanPerms });
+          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: grantPerms, invited_by: inviterUserId });
 
         if (insertError) {
           return res.status(500).json({ error: insertError.message });
@@ -1118,7 +1150,7 @@ app.post('/api/list-members', async (req, res) => {
 
     const { data: requesterMembership } = await supabaseAdmin
       .from('memberships')
-      .select('role')
+      .select('role, permissions')
       .eq('account_id', accountId)
       .eq('user_id', requesterUserId)
       .single();
@@ -1135,10 +1167,11 @@ app.post('/api/list-members', async (req, res) => {
       .eq('id', accountId)
       .single();
     const ownerUserId = acct?.owner_user_id || null;
+    const requesterIsOwner = !!ownerUserId && requesterUserId === ownerUserId;
 
     const { data: memberships, error: listError } = await supabaseAdmin
       .from('memberships')
-      .select('id, user_id, role, permissions, created_at')
+      .select('id, user_id, role, permissions, created_at, invited_by')
       .eq('account_id', accountId)
       .order('created_at', { ascending: true });
 
@@ -1146,38 +1179,41 @@ app.post('/api/list-members', async (req, res) => {
       return res.status(500).json({ error: listError.message });
     }
 
+    // can_manage = whether the requester may Edit Access / Remove this member.
+    // Owner manages everyone but themselves/the owner row; a non-owner admin
+    // manages only the Staff members they personally invited.
+    const canManage = (m) => {
+      if (!!ownerUserId && m.user_id === ownerUserId) return false;   // never the owner row
+      if (m.user_id === requesterUserId) return false;               // never yourself
+      if (requesterIsOwner) return true;
+      return m.invited_by === requesterUserId && m.role === 'staff';
+    };
+
     // Resolve emails via admin API
     const members = [];
     for (const m of memberships || []) {
+      let email = '(unknown)', confirmed = false;
       try {
         const { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: u?.user?.email || '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: !!u?.user?.confirmed_at,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId,
-          is_owner: !!ownerUserId && m.user_id === ownerUserId
-        });
-      } catch (e) {
-        members.push({
-          id: m.id,
-          user_id: m.user_id,
-          email: '(unknown)',
-          role: m.role,
-          permissions: m.permissions || {},
-          confirmed: false,
-          created_at: m.created_at,
-          is_self: m.user_id === requesterUserId,
-          is_owner: !!ownerUserId && m.user_id === ownerUserId
-        });
-      }
+        email = u?.user?.email || '(unknown)';
+        confirmed = !!u?.user?.confirmed_at;
+      } catch (e) { /* keep defaults */ }
+      members.push({
+        id: m.id,
+        user_id: m.user_id,
+        email,
+        role: m.role,
+        permissions: m.permissions || {},
+        confirmed,
+        created_at: m.created_at,
+        invited_by: m.invited_by || null,
+        is_self: m.user_id === requesterUserId,
+        is_owner: !!ownerUserId && m.user_id === ownerUserId,
+        can_manage: canManage(m)
+      });
     }
 
-    res.json({ ok: true, members, requesterRole: requesterMembership.role, ownerUserId, requesterIsOwner: !!ownerUserId && requesterUserId === ownerUserId });
+    res.json({ ok: true, members, requesterRole: requesterMembership.role, requesterPermissions: requesterMembership.permissions || {}, ownerUserId, requesterIsOwner });
   } catch (e) {
     console.error('list-members exception:', e);
     res.status(500).json({ error: e.message || 'List members failed' });
@@ -1192,7 +1228,7 @@ app.post('/api/update-member-role', async (req, res) => {
     if (!accountId || !membershipId || !newRole) {
       return res.status(400).json({ error: 'accountId, membershipId, newRole required' });
     }
-    const validRoles = ['admin', 'staff', 'viewer'];
+    const validRoles = ['admin', 'staff'];
     if (!validRoles.includes(newRole)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
@@ -1201,22 +1237,13 @@ app.post('/api/update-member-role', async (req, res) => {
     const jwt = authHeader.replace(/^Bearer\s+/, '');
     if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
 
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    // Only the owner sets roles (creating/removing admins is an owner-level act).
+    if (!requester.isOwner) {
+      return res.status(403).json({ error: 'Only the owner can change member roles' });
     }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change roles' });
-    }
+    const requesterUserId = requester.userId;
 
     const { data: target } = await supabaseAdmin
       .from('memberships')
@@ -1285,26 +1312,33 @@ app.post('/api/update-member-permissions', async (req, res) => {
     const jwt = authHeader.replace(/^Bearer\s+/, '');
     if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
 
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    if (!(requester.isOwner || requester.role === 'admin')) {
+      return res.status(403).json({ error: 'Only the owner or an admin can change permissions' });
     }
-    const requesterUserId = userData.user.id;
 
-    const { data: requesterMembership } = await supabaseAdmin
+    // Load the target so a non-owner admin can only touch a Staff member they
+    // personally invited (provenance), and never the owner or another admin.
+    const { data: target } = await supabaseAdmin
       .from('memberships')
-      .select('role')
+      .select('id, user_id, role, invited_by')
+      .eq('id', membershipId)
       .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
       .single();
+    if (!target) return res.status(404).json({ error: 'Member not found in this account' });
 
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can change permissions' });
+    if (!requester.isOwner) {
+      if (target.invited_by !== requester.userId || target.role !== 'staff') {
+        return res.status(403).json({ error: 'You can only change access for staff members you invited' });
+      }
     }
+    // Clamp to what this requester may grant (owner grants freely).
+    const grantPerms = clampPermsToGranter(cleanPerms, requester.permissions, requester.isOwner);
 
     const { error: updateError } = await supabaseAdmin
       .from('memberships')
-      .update({ permissions: cleanPerms })
+      .update({ permissions: grantPerms })
       .eq('id', membershipId)
       .eq('account_id', accountId);
 
@@ -1329,26 +1363,16 @@ app.post('/api/remove-member', async (req, res) => {
     const jwt = authHeader.replace(/^Bearer\s+/, '');
     if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
 
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid auth token' });
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    if (!(requester.isOwner || requester.role === 'admin')) {
+      return res.status(403).json({ error: 'Only the owner or an admin can remove members' });
     }
-    const requesterUserId = userData.user.id;
-
-    const { data: requesterMembership } = await supabaseAdmin
-      .from('memberships')
-      .select('role')
-      .eq('account_id', accountId)
-      .eq('user_id', requesterUserId)
-      .single();
-
-    if (!requesterMembership || requesterMembership.role !== 'admin') {
-      return res.status(403).json({ error: 'Only account admins can remove members' });
-    }
+    const requesterUserId = requester.userId;
 
     const { data: target } = await supabaseAdmin
       .from('memberships')
-      .select('id, user_id, role')
+      .select('id, user_id, role, invited_by')
       .eq('id', membershipId)
       .eq('account_id', accountId)
       .single();
@@ -1356,6 +1380,13 @@ app.post('/api/remove-member', async (req, res) => {
     if (!target) return res.status(404).json({ error: 'Member not found in this account' });
     if (target.user_id === requesterUserId) {
       return res.status(400).json({ error: 'You cannot remove yourself' });
+    }
+
+    // A non-owner admin can only remove a Staff member they personally invited.
+    if (!requester.isOwner) {
+      if (target.invited_by !== requesterUserId || target.role !== 'staff') {
+        return res.status(403).json({ error: 'You can only remove staff members you invited' });
+      }
     }
 
     // Owner protection: the account owner cannot be removed. Transfer ownership first.
