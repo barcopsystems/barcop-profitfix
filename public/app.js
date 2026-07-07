@@ -5498,22 +5498,50 @@ const App = {
     return { per_day: perDay, total: total };
   },
 
+  // Expected revenue from confirmed events (Booked or Completed) landing in the
+  // Mon-Sun week starting ws, pulled straight from the Events bookings. Uses the
+  // pre-tax receipts (F&B subtotal + service charge, tax excluded) so it lines up
+  // with the net-sales baseline. Added on top of the computed forecast so an
+  // event week's number and its labor budget reflect the booking with no manual
+  // entry. Returns 0 when Events is unavailable or nothing is booked that week.
+  bookedEventRevenueForWeek(weekStart) {
+    const ws = this.weekStartFor(weekStart);
+    const EB = window.S && S.EventsBookings;
+    if (!ws || !EB || typeof EB.quoteParts !== 'function') return 0;
+    const end = this.periodEndFor(ws);
+    const list = (this.data && Array.isArray(this.data.bookings)) ? this.data.bookings : [];
+    return list.reduce((sum, b) => {
+      if (!b || (b.stage !== 'Booked' && b.stage !== 'Completed')) return sum;
+      const d = String(b.event_date || '').slice(0, 10);
+      if (!d || d < ws || d > end) return sum;
+      const q = EB.quoteParts(b);
+      return sum + (q.subtotal || 0) + (q.service || 0);
+    }, 0);
+  },
+
   // The EFFECTIVE forecast Bar Cop uses for a week: the operator's saved
-  // override if there is one, otherwise the computed baseline (weighted 8-week
-  // same-weekday average of revenue and covers). This is what the schedule
-  // builder, This Week, Pre-Shift, and Cash read, so a week always carries a
-  // forecast without the operator having to save one. `source` is 'saved' or
-  // 'auto'; total is 0 only when there is no shift history to average yet.
+  // override if there is one (used as-is), otherwise the computed baseline
+  // (weighted 8-week same-weekday average of revenue and covers) PLUS the
+  // revenue of any events booked that week. This is what the schedule builder,
+  // This Week, and the Revenue Forecast page read, so a week always carries a
+  // real forecast, event-aware, without the operator saving anything. Cash reads
+  // the plain baseline (forecastDefaultsFor) instead, since it books event cash
+  // separately. `source` is 'saved' or 'auto'; on 'auto', base_total is the
+  // baseline and events_total is the booked-event add. total is 0 only when
+  // there is no shift history to average and nothing booked.
   effectiveForecast(weekStart) {
     const ws = this.weekStartFor(weekStart);
     if (!ws) return null;
     const saved = this.forecastForWeek(ws);
-    if (saved) return Object.assign({ source: 'saved' }, saved);
+    if (saved) return Object.assign({ source: 'saved', base_total: Number(saved.total) || 0, events_total: 0 }, saved);
     const rev = this.forecastDefaultsFor(ws);
     const cov = this.coverDefaultsFor(ws);
+    const events = this.bookedEventRevenueForWeek(ws);
     return {
       source: 'auto', week_start: ws,
-      per_day: rev.per_day, total: rev.total,
+      per_day: rev.per_day,
+      base_total: rev.total, events_total: events,
+      total: rev.total + events,
       covers_per_day: cov.per_day, total_covers: cov.total
     };
   },
