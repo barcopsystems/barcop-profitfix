@@ -1158,6 +1158,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .auth-foot > div + div{margin-top:10px;}
 .auth-link{background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
 .auth-link:hover{color:var(--gold-h);}
+/* Any clickable inline gold TEXT link hovers to the darker gold, matching the
+   login links — covers the help footer, the "+ Add" action links, and other
+   inline gold links across the app without tagging each one individually. */
+[style*="color:var(--gold)"][style*="pointer"]:hover,
+[style*="color: var(--gold)"][style*="pointer"]:hover{color:var(--gold-h)!important;}
 /* Taller, more prominent auth buttons (scoped so the rest of the app is untouched). */
 .auth-view .btn{padding:14px 20px;font-size:12px;}
 .auth-hint{font-size:11px;color:var(--t3);line-height:1.5;margin-top:12px;text-align:center;}

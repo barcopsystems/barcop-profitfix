@@ -3418,9 +3418,9 @@ const App = {
   helpFooter() {
     return '<div style="border-top:1px solid var(--b2);margin-top:26px;padding-top:16px;font-size:12px;color:var(--t3);line-height:1.7;">'
       + 'Still stuck? '
-      + '<span onclick="S.HubReportBug.openModal();" style="color:var(--gold);cursor:pointer;font-weight:600;">Report a bug</span>'
+      + '<span onclick="S.HubReportBug.openModal();" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Report a bug</span>'
       + ' &middot; '
-      + '<span onclick="S.HubSupport.openModal();" style="color:var(--gold);cursor:pointer;font-weight:600;">Contact support</span>'
+      + '<span onclick="S.HubSupport.openModal();" style="color:var(--gold);cursor:pointer;text-decoration:underline;">Contact support</span>'
       + '</div>';
   },
 
