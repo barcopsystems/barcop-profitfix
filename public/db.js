@@ -341,17 +341,20 @@ const DB = {
   isOwner() { return !!(this._user && this._ownerUserId && this._user.id === this._ownerUserId); },
 
   // ── Permission system — access by OPERATING AREA ────────────────────────────
-  // Each screen maps to one of the 8 operating areas. A member's permissions
-  // object stores a level per area: 'view' (read-only) or 'edit' (Full Access:
-  // create + edit + delete). Missing = No Access. This matches how the rest of
-  // the app is organized (by area), so the owner grants "Inventory: Full Access"
-  // instead of toggling 40 individual screens.
+  // Access is No Access / Full Access per area: a member's permissions object
+  // holds { area: 'edit' } for each area they can use; a missing area = No Access.
+  // (There is no read-only tier — that was dropped as unenforceable across every
+  // screen for a trusted team.) This matches how the app is organized (by area),
+  // so the owner grants "Inventory" once instead of toggling 40 screens.
   //
   // Owner: full access to everything (bypasses the map) — also holds billing.
   // Admin + Staff: look up the screen's area in their OWN permissions object,
   //   set by the owner (Admin additionally gets Settings; Staff only their
-  //   password). There is no longer an implicit-everything role below the owner.
+  //   password). There is no implicit-everything role below the owner.
   // Help screens (mapped to '_always'): accessible to anyone signed in.
+  // A screen not listed below resolves its area from its id PREFIX (see
+  // _areaOf), so a newly added screen never falsely blocks a member who has its
+  // section — only the odd cross-section screens need an explicit entry here.
   SCREEN_GROUPS: {
     // Inventory
     'ic-take-inventory':'inventory','ic-count-history':'inventory',
@@ -396,20 +399,33 @@ const DB = {
     'hub-books':'books','hub-books-home':'books','hub-breakeven':'books'
   },
 
+  // Resolve a screen's operating area: an explicit SCREEN_GROUPS entry wins
+  // (needed for help '_always', Books hub pages, and the prefix-less Profit
+  // screens); otherwise fall back to the id prefix so every section screen maps
+  // to its area automatically and no unlisted screen can falsely block a member.
+  _areaOf(screen) {
+    const g = this.SCREEN_GROUPS[screen];
+    if (g) return g;
+    if (/^ic-/.test(screen)) return 'inventory';
+    if (/^lc-/.test(screen)) return 'labor';
+    if (/^sc-/.test(screen)) return 'shift';
+    if (/^ev-/.test(screen)) return 'events';
+    if (/^r-/.test(screen))  return 'revenue';
+    if (/^c-/.test(screen))  return 'cash';
+    return 'profit';   // Profit screens carry no common prefix
+  },
+
   canAccessLevel(screen) {
     if (!this._role) return 'edit';  // not yet resolved (e.g., demo mode) — open
-    const group = this.SCREEN_GROUPS[screen];
-    if (group === '_always') return 'view';  // help screens always accessible
+    if (this.SCREEN_GROUPS[screen] === '_always') return 'view';  // help — always readable
     if (this.isOwner()) return 'edit';        // Owner = full access to everything
-    if (!group) return null;
-    const perms = this._permissions || {};
-    const lvl = perms[group];
-    return (lvl === 'view' || lvl === 'edit') ? lvl : null;   // anything else = No Access
+    const area = this._areaOf(screen);
+    return (this._permissions || {})[area] ? 'edit' : null;   // granted = Full Access, else No Access
   },
 
   screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
-  screenCanAdd(screen)  { return this.canAccessLevel(screen) === 'edit'; },   // create = Full Access
-  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // edit/delete = Full Access
+  screenCanAdd(screen)  { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
+  screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
 
   // ── Data ──────────────────────────────────────────────────────────────────
   async readData() {
