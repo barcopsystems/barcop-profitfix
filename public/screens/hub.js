@@ -1350,21 +1350,27 @@ S.Hub = {
   // inline (no module shell); everything else routes to the module shell.
   _enter(screen, module) {
     if (module === 'hub') {
+      // Hub-owned pages self-gate via App._hubBlocked in their own open().
       if (screen === 'permits' && S.HubPermits)              { S.HubPermits.open(); return; }
       if (screen === 'operating-expenses' && S.HubOperatingExpenses) { S.HubOperatingExpenses.open(); return; }
       if (screen === 'bar-cop-audit' && S.HubBarCopAudit)    { S.HubBarCopAudit.open(); return; }
     }
+    // Gate BEFORE showApp so a locked target shows the notice and never swaps
+    // the section shell behind it (Priority Actions / Needs Attention route here).
+    if (!App.canAccess(screen)) { App.showNoAccess(); return; }
     App.showApp(module || 'profit');
     App.navigate(screen);
   },
 
   // Deep-link from the weekly readout into a module's Fix screen at a gap-area.
   _enterFix(module, gapId) {
-    App.showApp(module || 'profit');
-    if (gapId) App._fixFocus = gapId;
     const scr = module === 'revenue' ? 'r-fix'
               : module === 'cash' ? 'c-fix'
               : 'profit-fix';
+    // Gate BEFORE showApp (see _enter) so a locked Fix screen never swaps the shell.
+    if (!App.canAccess(scr)) { App.showNoAccess(); return; }
+    App.showApp(module || 'profit');
+    if (gapId) App._fixFocus = gapId;
     App.navigate(scr);
   },
 
