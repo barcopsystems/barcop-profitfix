@@ -396,7 +396,9 @@ const DB = {
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
     // Books
-    'hub-books':'books','hub-books-home':'books','hub-breakeven':'books'
+    'hub-books':'books','hub-books-home':'books','hub-breakeven':'books',
+    // Bar Cop Audit (the cross-section meta-audit — its own grantable area)
+    'bar-cop-audit':'audit'
   },
 
   // Resolve a screen's operating area: an explicit SCREEN_GROUPS entry wins
