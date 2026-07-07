@@ -51,19 +51,11 @@ S.ShiftDashboard = {
   doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
   setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
 
-  // A step is done if it carries an explicit operator stamp (true/false in the
-  // done map, so a step can be UNMARKED), otherwise it falls back to what the
-  // week's data shows (sales imported, a drawer reconciled).
+  // A step is done ONLY when the operator marks it — never auto-checked off data.
   stepDone() {
     const dm = this.doneMap();
-    const derive = {
-      import: false,   // operator-marked (or set by a cockpit import); a few imported days should not auto-complete the week
-      cash:   this.variances().some(v => this.inWeek(v.date)),
-      exc:    false,
-      review: false
-    };
     const r = {};
-    this.ORDER.forEach(k => { r[k] = (dm[k] != null) ? !!dm[k] : derive[k]; });
+    this.ORDER.forEach(k => { r[k] = !!dm[k]; });
     return r;
   },
 
