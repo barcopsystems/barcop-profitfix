@@ -453,7 +453,7 @@ S.Hub = {
       + '<div style="flex:1 1 16px;min-width:0;"></div>'
       + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
       +   '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin-right:30px;"></div>'
-      +   heroTile(null, "S.HubBarCopAudit.open()", 'Open the Bar Cop Audit', 'Bar Cop Audit',
+      +   heroTile('bar-cop-audit', "S.HubBarCopAudit.open()", 'Open the Bar Cop Audit', 'Bar Cop Audit',
              bcScore != null ? bcScore : 'None',
              bcScore != null ? softScore(bcScore) : 'var(--t4)',
              bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
