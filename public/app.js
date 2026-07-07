@@ -1283,9 +1283,18 @@ const App = {
   // canAccess (e.g. Books); omit for management-only pages that block all Staff.
   // Owner / Admin / Viewer always pass.
   _hubBlocked(screen) {
+    // Owner sees everything.
+    if (window.DB && DB.isOwner && DB.isOwner()) return false;
     const role = (window.DB && DB.role && DB.role()) || null;
-    if (role !== 'staff') return false;
-    if (screen && this.canAccess(screen)) return false;
+    if (screen) {
+      // Area-scoped hub page (e.g. Books): the member's permission grid is the
+      // gate for BOTH admin and staff, so a restricted admin is held out too.
+      if (this.canAccess(screen)) return false;
+    } else {
+      // Management-only page (Settings, Team, Bar Cop Audit, Workflow): an admin
+      // configures the bar, so they pass; staff are blocked.
+      if (role === 'admin') return false;
+    }
     this.showNoAccess();
     return true;
   },
