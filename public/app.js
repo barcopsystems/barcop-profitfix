@@ -531,15 +531,10 @@ const App = {
     // reflects them even if the operator never opens the Operating Expenses page.
     try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
     this._wireChrome();
-    // Staff role: skip Hub and onboarding entirely, land on the Staff Hub
-    // (a simplified tile view of their accessible tasks across all modules).
-    // Admin and viewer get the normal flow.
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (role === 'staff') {
-      this.showStaffHub();
-      this._promptSync();
-      return;
-    }
+    // Every member (Staff/Viewer included) lands on the real Hub. Sections a
+    // member can't access are shown in place but blanked + gated with a friendly
+    // no-access notice (see S.Hub.render + App.showNoAccess), so there is no
+    // separate simplified landing anymore.
     if (!this.data.settings.onboarding_complete) {
       Onboarding.start();
     } else {
@@ -668,13 +663,6 @@ const App = {
         this.closeHubOverlay();
         return;
       }
-    }
-    // Staff role: real Hub shows financial data they shouldn't see. Redirect
-    // to the Staff Hub (tile view of their accessible tasks).
-    const role = (window.DB && DB.role && DB.role()) || null;
-    if (role === 'staff') {
-      this.showStaffHub();
-      return;
     }
     // Full screen hub - hide the app shell, show a standalone container
     document.getElementById('auth-screen').style.display = 'none';
@@ -1291,8 +1279,29 @@ const App = {
     const role = (window.DB && DB.role && DB.role()) || null;
     if (role !== 'staff') return false;
     if (screen && this.canAccess(screen)) return false;
-    if (this.showStaffHub) this.showStaffHub();
+    this.showNoAccess();
     return true;
+  },
+
+  // Friendly notice shown when a member taps a section, card, step, or nav link
+  // they don't have access to. Informational only — there is no in-app request
+  // mechanism, they ask the owner directly. A light modal so it never navigates
+  // the member away from where they are.
+  showNoAccess() {
+    if (document.getElementById('no-access-modal')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'no-access-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:9600;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:400px;width:100%;text-align:center;">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:10px;">You don\'t have access to this section</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:20px;">Request access from the owner.</div>'
+      + '<button class="btn btn-primary" data-act="ok">Got It</button>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    const cleanup = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') cleanup(); };
+    overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('[data-act]')) cleanup(); });
+    document.addEventListener('keydown', onKey);
   },
 
   // Central write-permission enforcement for list screens. On a screen the
@@ -1536,6 +1545,9 @@ const App = {
     if (key === 'hub') { this.showHub(); return; }
     const screen = this._SECTION_DASH[key];
     if (!screen) return;
+    // Gate before swapping the shell so a locked section shows the notice and
+    // leaves the member where they were (no half-loaded module shell flash).
+    if (!this.canAccess(screen)) { this.showNoAccess(); return; }
     this.showApp(key);
     this.navigate(screen);
   },
@@ -1580,20 +1592,16 @@ const App = {
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
     }
-    // Rewire nav click handlers, filtering out items the current role can't access
+    // Rewire nav click handlers. Links a member can't access stay VISIBLE (no
+    // reflow); navigate() shows the no-access notice and leaves them put.
     nav.querySelectorAll('.nav-item[data-screen]').forEach(el => {
-      if (!App.canAccess(el.dataset.screen)) {
-        el.style.display = 'none';
-        el.classList.add('role-hidden');
-      } else {
-        el.addEventListener('click', () => {
-          // Close the mobile sidebar after the click so the navigated screen
-          // gets full width on phones. No-op on desktop where the class is
-          // never set.
-          document.getElementById('app')?.classList.remove('sidebar-open');
-          App.navigate(el.dataset.screen);
-        });
-      }
+      el.addEventListener('click', () => {
+        // Close the mobile sidebar after the click so the navigated screen
+        // gets full width on phones. No-op on desktop where the class is
+        // never set.
+        document.getElementById('app')?.classList.remove('sidebar-open');
+        App.navigate(el.dataset.screen);
+      });
     });
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
       el.addEventListener('click', () => App.showHub());
@@ -2341,6 +2349,9 @@ const App = {
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
     if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
+    // Gate before swapping the shell so a locked screen shows the notice and
+    // leaves the member where they were (mobile drawer routes through here).
+    if (!this.canAccess(id)) { this.showNoAccess(); return; }
     const mod = this._moduleOf(id);
     // Show the app shell if we're not already in it (e.g., coming from a Hub
     // overlay modal, where the app shell is hidden). showApp also closes any
@@ -4674,18 +4685,9 @@ const App = {
   },
 
   navigate(id) {
-    // Role-based block: staff can't navigate to disallowed screens.
-    // Bounce them to the Staff Hub so they can pick something they CAN do.
-    if (!this.canAccess(id)) {
-      const role = (window.DB && DB.role && DB.role()) || null;
-      if (role === 'staff') { this.showStaffHub(); return; }
-      const land = this.staffLanding();
-      if (this._activeModule !== land.module) {
-        this.showApp(land.module);
-        return;
-      }
-      id = land.screen;
-    }
+    // Role-based block: a member can't navigate to a screen they don't have
+    // access to. Show the no-access notice and stay put (no bounce).
+    if (!this.canAccess(id)) { this.showNoAccess(); return; }
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
