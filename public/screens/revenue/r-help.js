@@ -25,7 +25,7 @@ S.RevenueHelp = {
       { q: 'What is Revenue Recovery, and how is it different from Profit Recovery?',
         a: 'Profit Recovery is about cost control: pour cost, food cost, theft, vendor pricing, prime cost. Revenue Recovery is about what your team actually collects from every guest. Two operations can run the same food costs and completely different revenues depending on how well their servers sell, how well their menu is priced, and how efficiently labor is scheduled against volume. Revenue Recovery tracks check average by server, RPLH against forecast, and menu contribution margin by item. One question: how much money are you capable of making versus how much you are actually making.' },
       { q: 'Do I need every screen?',
-        a: 'No. Start with three running every week and you have most of the value: Menu Builder (your priced catalog), Revenue Forecast (next week\'s revenue and cover goals so the schedule has a number to build against), and Server Check (per-server check average tracking). Add Menu Engineering once your item list is built, and the Dog Test Tracker for items you are deciding whether to cut. The Revenue Audit works with whatever data exists.' }
+        a: 'No. Start with three and you have most of the value: Menu Builder (your priced catalog), Revenue Forecast (next week\'s revenue and cover goals, projected for you automatically so the schedule has a number to build against), and Server Check (per-server check average tracking). Add Menu Engineering once your item list is built, and the Dog Test Tracker for items you are deciding whether to cut. The Revenue Audit works with whatever data exists.' }
     ]},
     { t: 'How It Connects', qa: [
       { q: 'What flows from Shift Control into Revenue Recovery?',
