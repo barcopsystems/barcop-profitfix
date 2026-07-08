@@ -150,16 +150,20 @@ S.PrepBatches = {
 
   // The form body (header fields + ingredient builder + live cost), shared by the
   // inline add card and the edit pop-up. b = the batch being edited (null = add).
-  formBodyHTML(b) {
+  formBodyHTML(b, inline) {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
+    // On the on-page (inline) form, Batch Yield + Serving Size are fixed-width so
+    // they do not stretch across the form; the edit pop-up keeps its original layout.
+    const yw = inline ? 'flex:0 0 175px;' : 'flex:1 1 130px;min-width:0;';
+    const catBlank = inline ? 'Select category...' : 'Select...';
     return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Category' + App.manageListLink('prep_category') + '</label>'
-          + App.customSelect({ id: 'pb-cat', key: 'prep_category', builtin: this.CATEGORIES, selected: (b ? b.category : ''), blank: true, blankLabel: 'Select...' }) + '</div>'
-        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Yield</label>'
+          + App.customSelect({ id: 'pb-cat', key: 'prep_category', builtin: this.CATEGORIES, selected: (b ? b.category : ''), blank: true, blankLabel: catBlank }) + '</div>'
+        + '<div class="f" style="' + yw + '"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
-        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Serving Size</label>'
+        + '<div class="f" style="' + yw + '"><label>Serving Size</label>'
           + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
       + '</div>'
       + '<div id="pb-ings" style="margin-top:14px;margin-bottom:12px;"></div>'
@@ -179,7 +183,7 @@ S.PrepBatches = {
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('ic-prep-batches', 'Add a Prep Batch')
       + '<div class="collapse-body">'
-      + this.formBodyHTML(null)
+      + this.formBodyHTML(null, true)
       + '</div></div>'
       + '<div class="no-print" data-collapse-group="ic-prep-batches" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
         + '<button class="btn btn-primary" id="pb-save">Save Batch</button>'
@@ -380,7 +384,7 @@ S.PrepBatches = {
     const inModal = !!area.closest('#pb-edit-modal');
     area.innerHTML = (inModal ? '<div style="overflow-x:auto;margin-bottom:12px;">' : '<div class="pill-wrap" style="margin-bottom:12px;">')
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
-      + '<th style="width:190px;">Ingredient</th><th style="width:65px;">Qty</th><th style="width:55px;">Unit</th>'
+      + '<th style="width:' + (inModal ? 190 : 290) + 'px;">Ingredient</th><th style="width:65px;">Qty</th><th style="width:55px;">Unit</th>'
       + '<th style="width:85px;">Unit Cost</th><th style="width:85px;">Line Cost</th><th></th>'
       + '</tr></thead><tbody>' + this.rows.map((ing, idx) => {
         const prod = ing.product_id ? this.prodById(ing.product_id) : null;
