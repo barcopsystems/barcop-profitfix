@@ -202,8 +202,6 @@ S.InventoryOrderSheet = {
         return;
       }
       if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
-      const topoff = ev.target.closest('.os-topoff');
-      if (topoff) { this.topOff(topoff.closest('.os-vcard')); return; }
       if (ev.target.closest('.os-co-toggle')) {
         this.customOpen = !this.customOpen;
         if (!this.customOpen) this.closeCustomOrder();
@@ -632,14 +630,12 @@ S.InventoryOrderSheet = {
       + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
       + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
-      // Add Item on the left; the vendor order-minimum / delivery-fee readout on the
-      // right, vertically aligned with the button (filled by recalcVendor; hidden when
-      // the vendor has none set). Top Off adds their next below-par items.
-      + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      // Add Item on the left; the vendor order-minimum / delivery-fee readout sits
+      // right beside it (filled by recalcVendor; hidden when the vendor has none set).
+      + '<div style="margin-top:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
       +   '<button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button>'
-      +   '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;">'
+      +   '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;">'
       +     '<span class="os-min"></span>'
-      +     '<button type="button" class="btn btn-ghost btn-sm os-topoff" style="display:none;">Top Off To Minimum</button>'
       +   '</div>'
       + '</div>'
       + '<div style="margin-top:14px;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
@@ -647,6 +643,7 @@ S.InventoryOrderSheet = {
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
       + parNudge
+      + '</div>'
       + '</div>'
       + '</div>'
       + '<div class="os-create-row" data-vendor="' + this.cssEsc(vendor) + '" style="margin:16px 0 32px;display:flex;align-items:center;gap:8px;">'
@@ -671,11 +668,10 @@ S.InventoryOrderSheet = {
         + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
           + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
-        + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div style="margin-top:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
           + '<button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button>'
-          + '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;">'
+          + '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;">'
             + '<span class="os-min"></span>'
-            + '<button type="button" class="btn btn-ghost btn-sm os-topoff" style="display:none;">Top Off To Minimum</button>'
           + '</div>'
         + '</div>'
         + '<div style="margin-top:14px;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
@@ -724,27 +720,9 @@ S.InventoryOrderSheet = {
   _qtyStr(x) { return Number.isInteger(x) ? String(x) : (Math.round(x * 100) / 100); },
   // How this order measures against the minimum: dollars for a '$' minimum, else the
   // raw quantity of units ordered.
-  _orderMeasure(card, money) {
-    let t = 0, q = 0;
-    card.querySelectorAll('.os-line').forEach(line => {
-      const inp = line.querySelector('.os-qty');
-      const qty = parseFloat(inp.value) || 0;
-      t += qty * (parseFloat(inp.dataset.cost) || 0); q += qty;
-    });
-    return money ? t : q;
-  },
-  _topOffCandidates(card) {
-    const vendor = card.dataset.vendor || '';
-    const data = this.belowParByVendor();
-    if (!data || !data.groups[vendor]) return [];
-    const onCard = new Set([...card.querySelectorAll('.os-line .os-qty')].map(i => i.dataset.productId).filter(Boolean));
-    return data.groups[vendor].filter(g => !onCard.has(g.product.id))
-      .sort((a, b) => (b.par - b.on_hand) - (a.par - a.on_hand));   // biggest gap first
-  },
   _updateMinReadout(card, total, qtyTotal) {
     const row = card.querySelector('.os-min-row');
     const minEl = card.querySelector('.os-min');
-    const topBtn = card.querySelector('.os-topoff');
     if (!row || !minEl) return;
     const info = this._vendorInfo(card.dataset.vendor || '');
     if (!info || (info.min == null && info.fee == null && info.free == null)) { row.style.display = 'none'; return; }
@@ -768,25 +746,6 @@ S.InventoryOrderSheet = {
     }
     minEl.innerHTML = parts.join(' <span style="color:var(--t4);">&middot;</span> ');
     row.style.display = 'flex';
-    if (topBtn) topBtn.style.display = (under > 0.001 && this._topOffCandidates(card).length > 0) ? '' : 'none';
-  },
-  // Add the vendor's next below-par items (biggest gap first) until the order clears
-  // the minimum, so the operator hits it in one delivery instead of two.
-  topOff(card) {
-    if (typeof card === 'string') card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(card) + '"]');
-    if (!card) return;
-    const info = this._vendorInfo(card.dataset.vendor || '');
-    if (!info || info.min == null) return;
-    const money = info.unit === '$';
-    const tbody = card.querySelector('.os-lines-tbody');
-    if (!tbody) return;
-    for (const g of this._topOffCandidates(card)) {
-      if (this._orderMeasure(card, money) >= info.min - 0.001) break;
-      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(g.product, g.suggested, g.on_hand, g.par));
-      this.recalcVendor(card);
-    }
-    this.recalcVendor(card);
-    this._captureCard(card);
   },
 
   // ── Draft persistence (suggested vendor cards + the custom order panel) ────

@@ -120,18 +120,18 @@ S.InventoryVendors = {
       + '<div class="f" style="flex:1 1 110px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
       + '<div class="f" style="flex:1 1 110px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
-      // Divider between contact fields and the delivery-day picker.
-      + '<div style="border-top:1px solid var(--b2);margin:14px 0 0;"></div>'
-      // Delivery Days (chip picker, full-width row).
-      + '<div class="form-row" style="gap:12px;margin-top:14px;">' + this.deliveryDayChipsHTML(v) + '</div>'
+      // Divider between contact fields and the ordering details.
+      + '<div style="border-top:1px solid var(--b2);margin:16px 0 0;"></div>'
       // Ordering economics: minimum (+ any unit), delivery fee, free-delivery threshold.
-      + '<div class="form-row" style="gap:12px;margin-top:12px;align-items:flex-end;">'
+      + '<div class="form-row" style="gap:12px;margin-top:16px;align-items:flex-end;">'
       +   '<div class="f" style="flex:0 0 130px;"><label>Order Minimum</label><input type="number" id="iv-min" min="0" step="1" value="' + numVal(v?.order_minimum) + '" placeholder="0"/></div>'
       +   '<div class="f" style="flex:0 0 120px;"><label>Unit' + App.manageListLink('order_min_unit') + '</label>' + App.customSelect({ id: 'iv-min-unit', key: 'order_min_unit', builtin: this.MIN_UNITS, selected: minUnit }) + '</div>'
       +   '<div class="f" style="flex:0 0 130px;"><label>Delivery Fee</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-fee" min="0" step="0.01" value="' + numVal(v?.delivery_fee) + '" placeholder="0.00"/></div></div>'
       +   '<div class="f" style="flex:0 0 160px;"><label>Free Delivery Over</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-free" min="0" step="1" value="' + numVal(v?.free_delivery_over) + '" placeholder="0"/></div></div>'
       + '</div>'
-      + App.noteField({ id: 'iv-notes', value: v?.notes, mt: 12 });
+      // Delivery Days (chip picker) — last row.
+      + '<div class="form-row" style="gap:12px;margin-top:18px;">' + this.deliveryDayChipsHTML(v) + '</div>'
+      + App.noteField({ id: 'iv-notes', value: v?.notes, mt: 18 });
   },
 
   // ── Landing: add form on top, vendor list below ────────────────────────────
