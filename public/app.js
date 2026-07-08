@@ -2791,9 +2791,11 @@ const App = {
   // Built-in defaults live on each screen and are registered into _listBuiltins
   // the first time that list's customSelect renders. Saved with saveKey.
   _listBuiltins: {},
-  // Keys whose options carry a numeric value (a bottle size in oz). Their config
-  // stores added=[{label,v}] and hidden=[v...]; the editor shows a Name + oz pair.
-  _listMeta: {},
+  // Per-key list metadata. `valued` = options carry a numeric value (bottle size in
+  // oz). `methoded` = each option carries a tracking method (unit_type: count/oz),
+  // shown + chosen in the editor.
+  _listMeta: { unit_type: { methoded: true } },
+  _listIsMethoded(key) { return !!(this._listMeta[key] && this._listMeta[key].methoded); },
   _listLabels: {
     expense_category: 'Expense Categories', permit_type: 'Permit Types',
     department: 'Departments', cert_type: 'Certification Types',
@@ -2816,7 +2818,21 @@ const App = {
     const c = this.data.list_config[key] = this.data.list_config[key] || {};
     c.added = c.added || [];
     c.hidden = c.hidden || [];
+    c.methods = c.methods || {};   // unit_type only: name -> 'count' | 'oz'
     return c;
+  },
+  // Add a unit type with its tracking method (Edit Unit Types popup). The name goes
+  // in added like any option; the method is stored alongside so unitMethod() finds it.
+  listAddUnit(name, method) {
+    name = (name == null ? '' : String(name)).trim();
+    if (!name) return;
+    const c = this.listConfig('unit_type');
+    const lc = name.toLowerCase();
+    c.hidden = c.hidden.filter(h => String(h).toLowerCase() !== lc);
+    const isBuiltin = this.IC_FOOD_UNITS.some(u => u.name.toLowerCase() === lc);
+    if (!isBuiltin && !c.added.some(a => String(a).toLowerCase() === lc)) c.added.push(name);
+    if (!isBuiltin) c.methods[lc] = (method === 'oz') ? 'oz' : 'count';
+    this.saveKey('list_config');
   },
   // The live option list for a key: built-ins + added, minus hidden, minus Other.
   listOptions(key) {
@@ -2852,6 +2868,8 @@ const App = {
     c.added = c.added.filter(a => a.toLowerCase() !== lc);
     if (c.added.length === before && (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc)) {
       if (!c.hidden.some(h => String(h).toLowerCase() === lc)) c.hidden.push(val);
+    } else if (c.methods) {
+      delete c.methods[lc];   // a deleted custom unit drops its stored method
     }
     this.saveKey('list_config');
   },
@@ -2959,14 +2977,18 @@ const App = {
     const rowStyle = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;';
     const linkStyle = 'color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;';
     const valued = this._listIsValued(key);
+    const methoded = this._listIsMethoded(key);
+    const methodTag = name => '<span style="color:var(--t3);font-weight:400;font-size:11px;margin-left:8px;">'
+      + (this.unitMethod(name) === 'oz' ? 'By ounces' : 'By count') + '</span>';
     const render = () => {
       // Rows: string list rows carry the value in data-v; valued (size) rows carry
-      // the ounces in data-v and show the size label.
+      // the ounces in data-v and show the size label; methoded (unit) rows show the
+      // tracking method next to the name.
       const rows = valued ? this.listValuedOptions(key) : this.listOptions(key).map(v => ({ label: v, v }));
       const rowsHtml = rows.length
         ? rows.map(o =>
             '<div style="' + rowStyle + '">'
-            + '<span>' + esc(o.label) + '</span>'
+            + '<span>' + esc(o.label) + (methoded ? methodTag(o.v) : '') + '</span>'
             + '<span class="ll-del" data-v="' + esc(String(o.v)) + '" style="' + linkStyle + '">Remove</span>'
             + '</div>').join('')
         : '<div style="color:var(--t3);font-size:12px;padding:6px 0 10px;">No options yet. Add one below.</div>';
@@ -2987,6 +3009,12 @@ const App = {
         ? '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
           +   '<input type="text" id="ll-add" class="form-input" placeholder="Name (' + esc(this._listNameHints[key] || 'e.g. Gallon') + ')" style="flex:1;"/>'
           +   '<input type="number" id="ll-add-oz" class="form-input" placeholder="oz" step="0.1" min="0" style="width:90px;"/>'
+          +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          + '</div>'
+        : methoded
+        ? '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
+          +   '<input type="text" id="ll-add" class="form-input" placeholder="Add a unit" style="flex:1;"/>'
+          +   '<select id="ll-add-method" class="form-input" style="width:130px;"><option value="count">By count</option><option value="oz">By ounces</option></select>'
           +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
           + '</div>'
         : '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
@@ -3021,6 +3049,9 @@ const App = {
           const oz = parseFloat(ozInp.value);
           if (isNaN(oz) || oz <= 0) { ozInp.focus(); return; }
           this.listAddValued(key, addInp.value, oz);
+        } else if (methoded) {
+          const v = (addInp.value || '').trim(); if (!v) return;
+          this.listAddUnit(v, (root.querySelector('#ll-add-method') || {}).value);
         } else {
           const v = (addInp.value || '').trim(); if (!v) return;
           this.listAddOption(key, v);
@@ -3525,7 +3556,26 @@ const App = {
   // the Food/Misc stock-unit list. Single source so take-inventory,
   // product-setup and the log forms never drift from each other.
   IC_CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
-  IC_FOOD_UNIT_TYPES: ['lb', 'each', 'case', 'bag', 'box', 'gallon', 'quart', 'pint', 'dozen'],
+  // Food/Misc unit types carry a tracking method: 'count' (servings/pieces, total
+  // or full+loose count) or 'oz' (recipe-costed by the ounce, fill-slider count).
+  // Volume units are 'oz'; everything countable is 'count'. Operator-added units
+  // choose their method in the Edit Unit Types popup.
+  IC_FOOD_UNITS: [
+    { name: 'lb', method: 'count' }, { name: 'each', method: 'count' }, { name: 'case', method: 'count' },
+    { name: 'bag', method: 'count' }, { name: 'box', method: 'count' }, { name: 'gallon', method: 'oz' },
+    { name: 'quart', method: 'oz' }, { name: 'pint', method: 'oz' }, { name: 'dozen', method: 'count' },
+  ],
+  get IC_FOOD_UNIT_TYPES() { return this.IC_FOOD_UNITS.map(u => u.name); },
+  // The tracking method for a unit name: a built-in's fixed method, else the
+  // operator-set method stored on the unit_type list, else 'count'.
+  unitMethod(name) {
+    if (!name) return 'count';
+    const lc = String(name).trim().toLowerCase();
+    const b = this.IC_FOOD_UNITS.find(u => u.name.toLowerCase() === lc);
+    if (b) return b.method;
+    const c = this.listConfig('unit_type');
+    return (c.methods && c.methods[lc]) || 'count';
+  },
 
   // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
   // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
