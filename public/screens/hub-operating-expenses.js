@@ -396,7 +396,7 @@ S.HubOperatingExpenses = {
       bodyInner = segToggle
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
-        +   '<div class="f" style="width:230px;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES }) + '</div>'
+        +   '<div class="f" style="width:230px;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
         +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
@@ -651,7 +651,7 @@ S.HubOperatingExpenses = {
       + '<div class="card-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
-      +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category }) + '</div>'
+      +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>'
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
