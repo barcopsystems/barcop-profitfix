@@ -1331,9 +1331,8 @@ S.InventoryProducts = {
         + '</select>';
     }
     if (def.type === 'size') {
-      return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup)
-        + '<option value="custom">Custom (enter oz)</option></select>'
-        + '<div id="be-cw" style="display:none;margin-top:6px;"><div class="fw"><input class="suf be-input" type="number" id="be-coz" step="0.1" data-key="size"/><span class="suf">oz</span></div></div>';
+      // Sizes are managed only through the single-product form's "| Edit" list now.
+      return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup) + '</select>';
     }
     if (def.type === 'oz')   return '<div class="fw"><input class="suf be-input" type="number" id="be-' + k + '" step="0.25" data-key="' + k + '"/><span class="suf">oz</span></div>';
     if (def.type === 'money') return '<div class="fw"><span class="pre">$</span><input class="pre be-input" type="number" id="be-' + k + '" step="0.25" data-key="' + k + '" placeholder="0.00"/></div>';
@@ -1343,11 +1342,11 @@ S.InventoryProducts = {
         : '<input type="number" class="be-input" id="be-' + k + '" step="1" min="0" data-key="' + k + '"/>';
     }
     if (def.type === 'unit') {
+      // Unit types are managed only through the single-product form's "| Edit" list.
+      App._listBuiltins['unit_type'] = App.IC_FOOD_UNIT_TYPES;
       let opts = '<option value="">Select unit...</option>';
-      this.UNIT_TYPES.forEach(u => { opts += '<option value="' + u + '">' + u + '</option>'; });
-      opts += '<option value="custom">Custom (type one)</option>';
-      return '<select id="be-unit" class="be-input" data-key="unit">' + opts + '</select>'
-        + '<div id="be-uw" style="display:none;margin-top:6px;"><input type="text" class="be-input" id="be-unit-custom" placeholder="gal, dozen, etc." data-key="unit"/></div>';
+      App.listOptions('unit_type').forEach(u => { opts += '<option value="' + esc(u) + '">' + esc(u) + '</option>'; });
+      return '<select id="be-unit" class="be-input" data-key="unit">' + opts + '</select>';
     }
     if (def.type === 'vendor')   return '<select id="be-vendor" class="be-input" data-key="vendor">' + this.vendorOpts(null) + '</select>';
     if (def.type === 'location') return '<select id="be-loc" class="be-input" data-key="loc">' + this.locationOpts(null) + '</select>';
@@ -1382,12 +1381,6 @@ S.InventoryProducts = {
 
   _wireBulk(cat, spec, ids) {
     document.getElementById('be-apply-btn')?.addEventListener('click', () => this.applyBulk(ids));
-    document.getElementById('be-size')?.addEventListener('change', e => {
-      const cw = document.getElementById('be-cw'); if (cw) cw.style.display = e.target.value === 'custom' ? '' : 'none';
-    });
-    document.getElementById('be-unit')?.addEventListener('change', e => {
-      const uw = document.getElementById('be-uw'); if (uw) uw.style.display = e.target.value === 'custom' ? '' : 'none';
-    });
     // Touching a field auto-checks its Apply box (automate the obvious step).
     document.querySelectorAll('.be-input').forEach(inp => {
       inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
@@ -1408,15 +1401,9 @@ S.InventoryProducts = {
     const num = id => { const el = document.getElementById(id); if (!el) return null; const n = parseFloat(el.value); return isNaN(n) ? null : n; };
     const intVal = id => { const el = document.getElementById(id); if (!el) return null; const n = parseInt(el.value); return isNaN(n) ? null : n; };
     const getSize = () => {
-      const v = document.getElementById('be-size')?.value;
-      if (v === 'custom') return num('be-coz');
-      const n = parseFloat(v); return isNaN(n) ? null : n;
+      const n = parseFloat(document.getElementById('be-size')?.value); return isNaN(n) ? null : n;
     };
-    const getUnit = () => {
-      const v = document.getElementById('be-unit')?.value;
-      if (v === 'custom') return (document.getElementById('be-unit-custom')?.value || '').trim() || null;
-      return v || null;
-    };
+    const getUnit = () => document.getElementById('be-unit')?.value || null;
     const idSet = new Set(ids);
     this.products().forEach(p => {
       if (!idSet.has(p.id)) return;
