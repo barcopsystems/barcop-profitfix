@@ -2792,12 +2792,21 @@ const App = {
   // Built-in defaults live on each screen and are registered into _listBuiltins
   // the first time that list's customSelect renders. Saved with saveKey.
   _listBuiltins: {},
+  // Keys whose options carry a numeric value (a bottle size in oz). Their config
+  // stores added=[{label,v}] and hidden=[v...]; the editor shows a Name + oz pair.
+  _listMeta: {},
   _listLabels: {
     expense_category: 'Expense Categories', permit_type: 'Permit Types',
     department: 'Departments', cert_type: 'Certification Types',
     payment_term: 'Payment Terms', prep_category: 'Prep Categories',
-    incident_type: 'Incident Types',
+    incident_type: 'Incident Types', unit_type: 'Unit Types', misc_type: 'Misc Types',
+    subcat_liquor: 'Liquor Sub-Categories', subcat_wine: 'Wine Sub-Categories',
+    subcat_bottle_beer: 'Bottle Beer Sub-Categories', subcat_draft_beer: 'Draft Beer Sub-Categories',
+    subcat_food: 'Food Sub-Categories',
+    size_spirits: 'Liquor Sizes', size_wine: 'Wine Sizes', size_beer: 'Beer Sizes',
+    size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes',
   },
+  _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
   listConfig(key) {
     this.data.list_config = this.data.list_config || {};
     const c = this.data.list_config[key] = this.data.list_config[key] || {};
@@ -2847,6 +2856,51 @@ const App = {
     this.data.list_config[key] = { added: [], hidden: [] };
     this.saveKey('list_config');
   },
+  // ── Valued lists (bottle sizes: each option is {label, v} where v = ounces) ──
+  // Live options for a valued key: built-ins + added minus hidden, sorted by v.
+  listValuedOptions(key) {
+    const c = this.listConfig(key);
+    const hid = c.hidden.map(h => String(h));
+    const out = [];
+    const push = o => {
+      if (!o || o.v == null) return;
+      const vs = String(o.v);
+      if (!hid.includes(vs) && !out.some(x => String(x.v) === vs)) out.push({ label: o.label, v: o.v });
+    };
+    (this._listBuiltins[key] || []).forEach(push);
+    c.added.forEach(push);
+    out.sort((a, b) => a.v - b.v);
+    return out;
+  },
+  listAddValued(key, label, v) {
+    v = parseFloat(v);
+    if (isNaN(v) || v <= 0) return;
+    const c = this.listConfig(key);
+    const vs = String(v);
+    c.hidden = c.hidden.filter(h => String(h) !== vs);
+    const lbl = (label || '').trim() || (v + ' oz');
+    const existing = c.added.find(a => String(a.v) === vs);
+    const isBuiltin = (this._listBuiltins[key] || []).some(b => String(b.v) === vs);
+    if (existing) existing.label = lbl;
+    else if (!isBuiltin) c.added.push({ label: lbl, v });
+    this.saveKey('list_config');
+  },
+  listRemoveValued(key, v) {
+    const c = this.listConfig(key);
+    const vs = String(v);
+    const before = c.added.length;
+    c.added = c.added.filter(a => String(a.v) !== vs);
+    if (c.added.length === before && (this._listBuiltins[key] || []).some(b => String(b.v) === vs)) {
+      if (!c.hidden.some(h => String(h) === vs)) c.hidden.push(v);
+    }
+    this.saveKey('list_config');
+  },
+  listRestoreValued(key, v) {
+    const c = this.listConfig(key);
+    const vs = String(v);
+    c.hidden = c.hidden.filter(h => String(h) !== vs);
+    this.saveKey('list_config');
+  },
   // The "| Edit" affordance that sits after a keyed dropdown's <label> text. The
   // pipe inherits the label's colour/size (reads as part of the title); only the
   // word "Edit" is gold. The gold + pointer inline style picks up the global
@@ -2859,19 +2913,27 @@ const App = {
   // Rebuild every on-screen keyed select for a list after the Manage editor
   // changes it, preserving each select's current value (and its blank option).
   _refreshListSelects(key) {
-    const opts = this.listOptions(key);
+    const valued = this._listIsValued(key);
+    const opts = valued ? this.listValuedOptions(key) : this.listOptions(key);
     document.querySelectorAll('.cs-select').forEach(sel => {
       if (sel.getAttribute('data-cs-key') !== key) return;
       const cur = sel.value;
       const hadBlank = sel.options.length && sel.options[0].value === '';
       const blankLabel = hadBlank ? sel.options[0].textContent : '';
-      const list = opts.slice();
-      const curLc = (cur || '').toLowerCase();
-      // A record already on a now-hidden/removed value keeps that value selectable
-      // so it never orphans.
-      if (cur && !list.some(v => v.toLowerCase() === curLc)) list.push(cur);
       let html = hadBlank ? '<option value="">' + esc(blankLabel) + '</option>' : '';
-      html += list.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+      if (valued) {
+        const list = opts.slice();
+        const curN = parseFloat(cur);
+        // A product already on a now-hidden/removed size keeps it selectable.
+        if (cur && !isNaN(curN) && !list.some(o => o.v === curN)) list.push({ label: curN + ' oz', v: curN });
+        list.sort((a, b) => a.v - b.v);
+        html += list.map(o => '<option value="' + o.v + '"' + (String(o.v) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
+      } else {
+        const list = opts.slice();
+        const curLc = (cur || '').toLowerCase();
+        if (cur && !list.some(v => v.toLowerCase() === curLc)) list.push(cur);
+        html += list.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+      }
       sel.innerHTML = html;
       sel.value = cur || '';
       sel._csPrev = sel.value;
@@ -2887,31 +2949,45 @@ const App = {
     const id = 'list-mgr';
     const rowStyle = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;';
     const linkStyle = 'color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;';
+    const valued = this._listIsValued(key);
     const render = () => {
-      const opts = this.listOptions(key);
-      const hidden = this.listConfig(key).hidden.slice();
-      const rowsHtml = opts.length
-        ? opts.map(v =>
+      // Rows: string list rows carry the value in data-v; valued (size) rows carry
+      // the ounces in data-v and show the size label.
+      const rows = valued ? this.listValuedOptions(key) : this.listOptions(key).map(v => ({ label: v, v }));
+      const rowsHtml = rows.length
+        ? rows.map(o =>
             '<div style="' + rowStyle + '">'
-            + '<span>' + esc(v) + '</span>'
-            + '<span class="ll-del" data-v="' + esc(v) + '" style="' + linkStyle + '">Remove</span>'
+            + '<span>' + esc(o.label) + '</span>'
+            + '<span class="ll-del" data-v="' + esc(String(o.v)) + '" style="' + linkStyle + '">Remove</span>'
             + '</div>').join('')
         : '<div style="color:var(--t3);font-size:12px;padding:6px 0 10px;">No options yet. Add one below.</div>';
+      // Hidden built-ins available to restore (valued ones are looked up for a label).
+      const hiddenRaw = this.listConfig(key).hidden.slice();
+      const hidden = valued
+        ? hiddenRaw.map(hv => { const b = (this._listBuiltins[key] || []).find(x => String(x.v) === String(hv)); return { label: b ? b.label : (hv + ' oz'), v: hv }; })
+        : hiddenRaw.map(v => ({ label: v, v }));
       const hiddenHtml = hidden.length
         ? '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:16px 0 8px;">Hidden</div>'
-          + hidden.map(v =>
+          + hidden.map(o =>
             '<div style="' + rowStyle + 'color:var(--t3);">'
-            + '<span>' + esc(v) + '</span>'
-            + '<span class="ll-restore" data-v="' + esc(v) + '" style="' + linkStyle + '">Restore</span>'
+            + '<span>' + esc(o.label) + '</span>'
+            + '<span class="ll-restore" data-v="' + esc(String(o.v)) + '" style="' + linkStyle + '">Restore</span>'
             + '</div>').join('')
         : '';
+      const addRow = valued
+        ? '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
+          +   '<input type="text" id="ll-add" class="form-input" placeholder="Name (e.g. Gallon)" style="flex:1;"/>'
+          +   '<input type="number" id="ll-add-oz" class="form-input" placeholder="oz" step="0.1" min="0" style="width:90px;"/>'
+          +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          + '</div>'
+        : '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
+          +   '<input type="text" id="ll-add" class="form-input" placeholder="Add an option" style="flex:1;"/>'
+          +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          + '</div>';
       const html = '<div class="card form-card" style="margin:0;">'
         + '<div class="card-title">Edit ' + esc(label) + '</div>'
         + '<div style="max-height:340px;overflow:auto;">' + rowsHtml + hiddenHtml + '</div>'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
-        +   '<input type="text" id="ll-add" class="form-input" placeholder="Add an option" style="flex:1;"/>'
-        +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
-        + '</div>'
+        + addRow
         + '<div class="card-actions">'
         +   '<button class="btn btn-ghost" id="ll-reset">Reset to Defaults</button>'
         + '</div>'
@@ -2920,15 +2996,31 @@ const App = {
       const root = document.getElementById(id);
       if (!root) return;
       root.querySelectorAll('.ll-del').forEach(x => x.addEventListener('click', () => {
-        this.listRemoveOption(key, x.getAttribute('data-v')); render();
+        if (valued) this.listRemoveValued(key, x.getAttribute('data-v'));
+        else this.listRemoveOption(key, x.getAttribute('data-v'));
+        render();
       }));
       root.querySelectorAll('.ll-restore').forEach(x => x.addEventListener('click', () => {
-        this.listAddOption(key, x.getAttribute('data-v')); render();
+        if (valued) this.listRestoreValued(key, x.getAttribute('data-v'));
+        else this.listAddOption(key, x.getAttribute('data-v'));
+        render();
       }));
       const addInp = root.querySelector('#ll-add');
-      const doAdd = () => { const v = (addInp.value || '').trim(); if (!v) return; this.listAddOption(key, v); render(); };
+      const ozInp = root.querySelector('#ll-add-oz');
+      const doAdd = () => {
+        if (valued) {
+          const oz = parseFloat(ozInp.value);
+          if (isNaN(oz) || oz <= 0) { ozInp.focus(); return; }
+          this.listAddValued(key, addInp.value, oz);
+        } else {
+          const v = (addInp.value || '').trim(); if (!v) return;
+          this.listAddOption(key, v);
+        }
+        render();
+      };
       root.querySelector('#ll-add-btn').addEventListener('click', doAdd);
-      addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+      addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); valued ? ozInp.focus() : doAdd(); } });
+      if (ozInp) ozInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
       root.querySelector('#ll-reset').addEventListener('click', () => {
         this.confirm({
           title: 'Reset to defaults?',
