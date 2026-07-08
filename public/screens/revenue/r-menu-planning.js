@@ -101,6 +101,30 @@ S.RevenueMenuPlanning = {
     } catch (e) { return ''; }
   },
 
+  // A tight one-liner for compact spots (Pre-Shift featured list): the item's
+  // class plus the single sharpest fact, e.g. "A Plowhorse. Top seller, thin
+  // margin." Distinct per item off its category ranks. '' if it can't be read.
+  shortReadFor(item) {
+    if (!item) return '';
+    try {
+      const cat = item.category || 'Uncategorized';
+      const cs = this.categoryStats()[cat];
+      const quad = (window.S && S.RevenueMenuEngineering && S.RevenueMenuEngineering.classify)
+        ? S.RevenueMenuEngineering.classify()[item.id] : null;
+      const QN = { STAR: 'A Star', PLOWHORSE: 'A Plowhorse', PUZZLE: 'A Puzzle', DOG: 'A Dog' };
+      const head = QN[quad];
+      if (!head || !cs || !cs.ranked || !cs.mRank[item.id]) {
+        const cost = App.menuItemCost(item);
+        return (item.price != null && cost != null) ? 'Strong ' + App.fmtCurrency(item.price - cost) + ' margin.' : 'Feature it.';
+      }
+      const rn = cs.rankedN;
+      const band = r => r === 1 ? 'top' : r <= Math.ceil(rn * 0.34) ? 'high' : r >= Math.ceil(rn * 0.67) ? 'low' : 'mid';
+      const vol = { top: 'Top seller', high: 'Strong seller', mid: 'Steady seller', low: 'Slow mover' }[band(cs.cRank[item.id])];
+      const mar = { top: 'top margin', high: 'fat margin', mid: 'average margin', low: 'thin margin' }[band(cs.mRank[item.id])];
+      return head + '. ' + vol + ', ' + mar + '.';
+    } catch (e) { return ''; }
+  },
+
   topCostIngredient(item) {
     if (!item || !item.recipe || !Array.isArray(item.recipe.ingredients) || !item.recipe.ingredients.length) return null;
     const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
