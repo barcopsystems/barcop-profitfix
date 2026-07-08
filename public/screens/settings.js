@@ -1340,8 +1340,8 @@ S.HubSettings = {
       { name:'Fryer Oil (jug)',          category:'Misc',        misc_type:'Cleaning & Supplies',        vendor:'Restaurant Depot',                                              unit_cost:28.00, par_level:10,  reorder_point:4,   primary_location:'Kitchen Line' },
       { name:'To-Go Boxes (case)',       category:'Misc',        misc_type:'Paper & To-Go',        vendor:'Restaurant Depot',                                              unit_cost:42.00, par_level:8,   reorder_point:3,   primary_location:'Kitchen Line' },
       { name:'Triple Sec',               category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.75, unit_cost:9.00,  menu_price:7, par_level:12,  reorder_point:5,   primary_location:'Back Bar' },
-      { name:'Lime Juice (qt)',          category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Simple Syrup (qt)',        category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
+      { name:'Lime Juice (qt)',          category:'Misc',        misc_type:'Drink Mixer',   unit_type:'quart', container_size_oz:32, vendor:'Sysco Foods',         unit_cost:4.50,  par_level:18,  reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Simple Syrup (qt)',        category:'Misc',        misc_type:'Drink Mixer',   unit_type:'quart', container_size_oz:32, vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12,  reorder_point:4,   primary_location:'Back Bar' },
       // Kitchen ingredients (appended so existing index-based recipes stay valid).
       { name:'Brioche Bun (each)',       category:'Food',        vendor:'Sysco Foods',         unit_cost:0.55,  par_level:240, reorder_point:80,  primary_location:'Dry Storage' },
       { name:'Beefsteak Tomato (lb)',    category:'Food',        vendor:'Local Produce Co.',   unit_cost:2.40,  par_level:40,  reorder_point:14,  primary_location:'Walk-in Cooler' },
@@ -1383,9 +1383,9 @@ S.HubSettings = {
       { name:'Prosecco',                 category:'Wine',        vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:2.0, unit_cost:12.00, menu_price:10, par_level:18, reorder_point:6, primary_location:'Walk-in Cooler' },
       { name:'White Rum',                category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:1.5, unit_cost:14.00, menu_price:8, par_level:8,  reorder_point:3, primary_location:'Liquor Room' },
       { name:'Maraschino Liqueur',       category:'Liquor',      vendor:'Republic National',   container_size_oz:25.4, pour_size_oz:0.5, unit_cost:24.00, menu_price:9, par_level:4,  reorder_point:2, primary_location:'Back Bar' },
-      { name:'Cold Brew Concentrate (qt)',category:'Misc',       misc_type:'NA Beverage',       vendor:'Sysco Foods',         unit_cost:9.00,  par_level:8,  reorder_point:3,   primary_location:'Walk-in Cooler' },
-      { name:'Ginger Beer (qt)',         category:'Misc',        misc_type:'NA Beverage',        vendor:"Glazer's Beer & Bev", unit_cost:3.00,  par_level:18, reorder_point:6,   primary_location:'Walk-in Cooler' },
-      { name:'Cranberry Juice (qt)',     category:'Misc',        misc_type:'Drink Mixer',        vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
+      { name:'Cold Brew Concentrate (qt)',category:'Misc',       misc_type:'NA Beverage',   unit_type:'quart', container_size_oz:32, vendor:'Sysco Foods',         unit_cost:9.00,  par_level:8,  reorder_point:3,   primary_location:'Walk-in Cooler' },
+      { name:'Ginger Beer (qt)',         category:'Misc',        misc_type:'NA Beverage',   unit_type:'quart', container_size_oz:32, vendor:"Glazer's Beer & Bev", unit_cost:3.00,  par_level:18, reorder_point:6,   primary_location:'Walk-in Cooler' },
+      { name:'Cranberry Juice (qt)',     category:'Misc',        misc_type:'Drink Mixer',   unit_type:'quart', container_size_oz:32, vendor:'Sysco Foods',         unit_cost:3.50,  par_level:12, reorder_point:4,   primary_location:'Back Bar' },
       // ── Expanded bar stock (full lineup for a craft cocktail bar) ──────────
       { name:'Ketel One',                category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:28.00, menu_price:11, par_level:6, reorder_point:3, primary_location:'Liquor Room' },
       { name:'Grey Goose',               category:'Liquor', vendor:'Republic National', container_size_oz:25.4, pour_size_oz:1.5, unit_cost:34.00, menu_price:13, par_level:5, reorder_point:2, primary_location:'Liquor Room' },
@@ -1431,7 +1431,7 @@ S.HubSettings = {
       { name:'Seasonal Rotating Tap',    category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:185.00, menu_price:7, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
       // ── Resale items (bought + sold whole, marked Sold on the menu) ─────────
       { name:'Topo Chico (each)',        category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.95, menu_price:4,    servings_per_unit:1,  cost_per_serving:0.95, par_level:48, reorder_point:24, primary_location:'Walk-in Cooler' },
-      { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gal', vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
+      { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gal', container_size_oz:128, vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
       { name:'Kettle Chips (bag)',       category:'Food', sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.85, menu_price:3.5, servings_per_unit:1, cost_per_serving:0.85, par_level:60, reorder_point:24, primary_location:'Dry Storage' },
       // ── Top-shelf bottles that overstocked and barely move: a few thousand in
       //    cash sitting on the shelf. They carry zero usage between counts, so they
