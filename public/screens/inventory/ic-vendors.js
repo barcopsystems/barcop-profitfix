@@ -75,7 +75,7 @@ S.InventoryVendors = {
       + ' data-on="' + (isOn ? '1' : '0') + '" style="' + (isOn ? this._chipOn : this._chipOff) + '">' + label + '</button>';
     return '<div style="flex:1 1 100%;min-width:0;">'
       + '<label>Delivery Days</label>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
       +   this.DAY_NAMES.map(dn => chip('iv-day-chip', 'data-day="' + dn + '"', dn, on(dn))).join('')
       +   chip('iv-pickup-chip', '', 'Pickup', pickup)
       + '</div></div>';
@@ -114,14 +114,16 @@ S.InventoryVendors = {
     const numVal = x => (x != null && x !== '' ? x : '');
     return '<div class="form-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.7 1 160px;"><label>Vendor Name</label><input type="text" id="iv-name" value="' + esc(v?.name || '') + '" placeholder="Republic National"/></div>'
-      + '<div class="f" style="flex:1 1 100px;"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
+      + '<div class="f" style="flex:1 1 110px;"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
       + '<div class="f" style="flex:1 1 110px;"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
-      + '<div class="f" style="flex:1.4 1 140px;"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
-      + '<div class="f" style="flex:0.7 1 78px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
-      + '<div class="f" style="flex:1 1 100px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
+      + '<div class="f" style="flex:1 1 110px;"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
+      + '<div class="f" style="flex:1 1 110px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
+      + '<div class="f" style="flex:1 1 110px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
+      // Divider between contact fields and the delivery-day picker.
+      + '<div style="border-top:1px solid var(--b2);margin:14px 0 0;"></div>'
       // Delivery Days (chip picker, full-width row).
-      + '<div class="form-row" style="gap:12px;margin-top:12px;">' + this.deliveryDayChipsHTML(v) + '</div>'
+      + '<div class="form-row" style="gap:12px;margin-top:14px;">' + this.deliveryDayChipsHTML(v) + '</div>'
       // Ordering economics: minimum (+ any unit), delivery fee, free-delivery threshold.
       + '<div class="form-row" style="gap:12px;margin-top:12px;align-items:flex-end;">'
       +   '<div class="f" style="flex:0 0 130px;"><label>Order Minimum</label><input type="number" id="iv-min" min="0" step="1" value="' + numVal(v?.order_minimum) + '" placeholder="0"/></div>'

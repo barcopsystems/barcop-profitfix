@@ -203,7 +203,7 @@ S.InventoryOrderSheet = {
       }
       if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
       const topoff = ev.target.closest('.os-topoff');
-      if (topoff) { this.topOff(topoff.dataset.vendor); return; }
+      if (topoff) { this.topOff(topoff.closest('.os-vcard')); return; }
       if (ev.target.closest('.os-co-toggle')) {
         this.customOpen = !this.customOpen;
         if (!this.customOpen) this.closeCustomOrder();
@@ -241,7 +241,7 @@ S.InventoryOrderSheet = {
       + (visibleVendors.length === 0
           ? '<div style="font-size:13px;color:var(--t2);">Nothing left to order from this count.</div>'
           : '<div style="font-size:13px;color:var(--t1);line-height:1.6;"><strong>' + visibleVendors.length + ' vendor' + (visibleVendors.length === 1 ? '' : 's') + '</strong> &middot; ' + stillCount + ' item' + (stillCount === 1 ? '' : 's') + ' &middot; <strong style="color:var(--gold);">' + App.fmtCurrency(stillTotal) + '</strong> to order</div>')
-      + (underMin > 0 ? '<div style="font-size:12px;color:var(--amber);margin-top:6px;"><strong>' + underMin + ' vendor' + (underMin === 1 ? '' : 's') + '</strong> under order minimum &middot; top off on the vendor card</div>' : '')
+      + (underMin > 0 ? '<div style="font-size:12px;color:var(--amber);margin-top:6px;"><strong>' + underMin + ' vendor' + (underMin === 1 ? '' : 's') + '</strong> under order minimum &middot; top off on the vendor order</div>' : '')
       + '</div>';
 
     const openOrders = hiddenVendors.map(v => this.openOrderForVendor(v)).filter(Boolean);
@@ -616,7 +616,7 @@ S.InventoryOrderSheet = {
     const parOff = this.parIssueCount(products || []);
     const parNudge = parOff > 0
       ? '<div class="os-par-nudge" style="margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;max-width:540px;">'
-        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--amber);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> ' + (parOff === 1 ? 'looks' : 'look') + ' off versus your real usage. Tuning ' + (parOff === 1 ? 'it' : 'them') + ' sharpens these reorder numbers.</span>'
+        + '<span style="font-size:12px;color:var(--t1);line-height:1.5;text-align:right;"><strong style="color:var(--amber);">' + parOff + ' par' + (parOff === 1 ? '' : 's') + '</strong> ' + (parOff === 1 ? 'looks' : 'look') + ' off vs usage.</span>'
         + '<span style="font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap;">Dynamic Pars &rsaquo;</span></div>'
       : '';
     const title = isEdit
@@ -632,19 +632,21 @@ S.InventoryOrderSheet = {
       + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
       + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
-      + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
+      // Add Item on the left; the vendor order-minimum / delivery-fee readout on the
+      // right, vertically aligned with the button (filled by recalcVendor; hidden when
+      // the vendor has none set). Top Off adds their next below-par items.
+      + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      +   '<button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button>'
+      +   '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;">'
+      +     '<span class="os-min"></span>'
+      +     '<button type="button" class="btn btn-ghost btn-sm os-topoff" style="display:none;">Top Off To Minimum</button>'
+      +   '</div>'
+      + '</div>'
       + '<div style="margin-top:14px;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
       + parNudge
-      + '</div>'
-      // Vendor order-minimum / delivery-fee readout (filled by recalcVendor; hidden
-      // when the vendor has none set). Top Off adds their next below-par items.
-      + '<div class="os-min-row" style="display:none;align-items:center;gap:12px;margin-top:12px;font-size:12px;flex-wrap:wrap;">'
-      +   '<span class="os-min"></span>'
-      +   '<button type="button" class="btn btn-ghost btn-sm os-topoff" data-vendor="' + this.cssEsc(vendor) + '" style="display:none;">Top Off To Minimum</button>'
-      + '</div>'
       + '</div>'
       + '</div>'
       + '<div class="os-create-row" data-vendor="' + this.cssEsc(vendor) + '" style="margin:16px 0 32px;display:flex;align-items:center;gap:8px;">'
@@ -669,7 +671,13 @@ S.InventoryOrderSheet = {
         + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
           + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
-        + '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button></div>'
+        + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+          + '<button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button>'
+          + '<div class="os-min-row" style="display:none;align-items:center;gap:12px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;">'
+            + '<span class="os-min"></span>'
+            + '<button type="button" class="btn btn-ghost btn-sm os-topoff" style="display:none;">Top Off To Minimum</button>'
+          + '</div>'
+        + '</div>'
         + '<div style="margin-top:14px;background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
         + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
           + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
@@ -764,10 +772,10 @@ S.InventoryOrderSheet = {
   },
   // Add the vendor's next below-par items (biggest gap first) until the order clears
   // the minimum, so the operator hits it in one delivery instead of two.
-  topOff(vendor) {
-    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
+  topOff(card) {
+    if (typeof card === 'string') card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(card) + '"]');
     if (!card) return;
-    const info = this._vendorInfo(vendor);
+    const info = this._vendorInfo(card.dataset.vendor || '');
     if (!info || info.min == null) return;
     const money = info.unit === '$';
     const tbody = card.querySelector('.os-lines-tbody');
