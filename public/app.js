@@ -2806,6 +2806,7 @@ const App = {
     subcat_food: 'Food Sub-Categories',
     size_spirits: 'Liquor Sizes', size_wine: 'Wine Sizes', size_beer: 'Beer Sizes',
     size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes', order_min_unit: 'Order Minimum Units',
+    menu_category: 'Menu Categories',
   },
   _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
   // Category-appropriate example for the "Name" field on a valued (size) list.
@@ -3603,8 +3604,16 @@ const App = {
   // Menu category groupings used across Revenue Recovery (r-menu-items,
   // r-menu-engineering, r-price-calc, r-dog-test, recipe-cost-analysis).
   // Promoted from per-file local arrays so the lists never drift.
-  // Plate-side menu categories — what the operator picks on the Plate form.
+  // Plate-side menu categories — the starter food sections. Kept for the recipe
+  // ingredient/target-cost logic; the operator's live menu sections now come from
+  // the customizable menu_category list (MENU_ALL_CATEGORIES builtins below).
   MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials'],
+  // The shared, operator-customizable menu SECTION list (the | Edit popup key
+  // 'menu_category'). Any menu item — dish, cocktail, or no-prep — can sit in any
+  // of these. Builtins are the classic sections in menu order; the operator adds
+  // their own (Happy Hour, Featured, Brunch...) which then show on every form and
+  // as real sections on the menu pages. Item TYPE is stored separately on the item.
+  MENU_ALL_CATEGORIES: ['Cocktails', 'Beer', 'Wine', 'Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'NA Beverages', 'Snacks'],
   // Inventory Control product categories shown as available recipe ingredients.
   // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
   MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
