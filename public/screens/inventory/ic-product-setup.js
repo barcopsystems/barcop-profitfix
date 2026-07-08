@@ -276,38 +276,52 @@ S.InventoryProducts = {
 
   // ── In-place custom cells (size / unit) ─────────────────────────────────────
   // Picking "Custom" hides the dropdown and shows the custom field(s) in its own
-  // spot (no new column), with a Back link to the presets. The select's value
-  // stays "custom" while custom is showing, so the save logic below is unchanged.
-  _backBtn(id, label) {
-    return '<button type="button" id="' + id + '" style="background:none;border:none;color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:3px 0 0;">&lsaquo; ' + label + '</button>';
-  },
+  // spot (no new column). Type it and press Enter: the value is added as a real
+  // option, selected, and the dropdown comes back (Escape or an empty commit
+  // reverts to the presets). An existing custom size/unit is already a real
+  // option, so editing never enters this mode.
   _sizeCellHtml(spec, sizeSel) {
     return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
       + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select>'
       + '<div id="ip-cw" style="display:none;">'
-      +   '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div>'
-      +   this._backBtn('ip-cw-back', 'BACK TO SIZES')
+      +   '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz, Enter"/></div>'
       + '</div></div>';
   },
-  _unitCellHtml(ut, isCustomUnit) {
+  _unitCellHtml(ut) {
     return '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
-      + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select>'
-      + '<div id="ip-uw" style="' + (isCustomUnit ? '' : 'display:none;') + '">'
-      +   '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/>'
-      +   this._backBtn('ip-uw-back', 'BACK TO UNITS')
+      + '<select id="ip-unit">' + this.unitTypeOpts(ut) + '</select>'
+      + '<div id="ip-uw" style="display:none;">'
+      +   '<input type="text" id="ip-unit-custom" placeholder="gal, dozen, then Enter"/>'
       + '</div></div>';
   },
   _toggleSizeCustom(on) {
     const sel = document.getElementById('ip-size'), cw = document.getElementById('ip-cw');
     if (sel) sel.style.display = on ? 'none' : '';
     if (cw) cw.style.display = on ? '' : 'none';
-    if (on) document.getElementById('ip-cname')?.focus();
+    if (on) {
+      const n = document.getElementById('ip-cname'), o = document.getElementById('ip-coz');
+      if (n) n.value = ''; if (o) o.value = '';
+      n?.focus();
+    }
   },
   _toggleUnitCustom(on) {
     const sel = document.getElementById('ip-unit'), uw = document.getElementById('ip-uw');
     if (sel) sel.style.display = on ? 'none' : '';
     if (uw) uw.style.display = on ? '' : 'none';
-    if (on) document.getElementById('ip-unit-custom')?.focus();
+    if (on) { const c = document.getElementById('ip-unit-custom'); if (c) c.value = ''; c?.focus(); }
+  },
+  // Bail out of custom entry back to the presets.
+  _sizeBack() {
+    const sel = document.getElementById('ip-size');
+    if (sel && sel.options[0]) sel.value = sel.options[0].value === 'custom' ? '' : sel.options[0].value;
+    this._toggleSizeCustom(false);
+    this.calcProduct(); this._refreshMissing();
+  },
+  _unitBack() {
+    const sel = document.getElementById('ip-unit');
+    if (sel && sel.options[0]) sel.value = sel.options[0].value === 'custom' ? '' : sel.options[0].value;
+    this._toggleUnitCustom(false);
+    this._rerenderDivisor();
   },
 
   // ── Entry point ───────────────────────────────────────────────────────────
@@ -687,14 +701,13 @@ S.InventoryProducts = {
     } else if (spec.showUnitType) {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
-      const isCustomUnit = ut && !this.UNIT_TYPES.includes(ut);
       const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
       // Default Count By to the product's role; an existing product keeps its
       // saved choice (and counts as "touched" so a unit change never overrides).
       this._countTouched = !!(p?.count_style);
       const cstyle = p?.count_style || this._defaultCountStyle(ut, p?.misc_type, packV);
       row2 = ''
-        + this._unitCellHtml(ut, isCustomUnit)
+        + this._unitCellHtml(ut)
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
         // Adaptive divisor: how one stock unit breaks into the measure a recipe
@@ -828,30 +841,54 @@ S.InventoryProducts = {
     document.getElementById('ip-save')?.addEventListener('click', () => this.save());
     document.getElementById('ip-name')?.focus();
 
+    // ── Size: pick "Custom (enter oz)" → swap to name+oz in place; Enter commits
+    // it as a real "Name (oz oz)" option and returns to the dropdown; Escape (or an
+    // invalid oz on Enter) reverts to the presets.
+    const commitSize = () => {
+      const sel = document.getElementById('ip-size');
+      const oz = parseFloat(document.getElementById('ip-coz')?.value);
+      const name = (document.getElementById('ip-cname')?.value || '').trim();
+      if (!sel || isNaN(oz) || oz <= 0) { this._sizeBack(); return; }
+      const addOpt = [...sel.options].find(o => o.value === 'custom');
+      let opt = [...sel.options].find(o => parseFloat(o.value) === oz && o.value !== 'custom');
+      if (!opt) { opt = document.createElement('option'); opt.value = String(oz); sel.insertBefore(opt, addOpt); }
+      opt.textContent = name ? (name + ' (' + oz + ' oz)') : (oz + ' oz');
+      opt.dataset.name = name;
+      sel.value = opt.value;
+      this._toggleSizeCustom(false);
+      this.calcProduct(); this._refreshMissing();
+    };
     document.getElementById('ip-size')?.addEventListener('change', () => {
       this._toggleSizeCustom(document.getElementById('ip-size').value === 'custom');
       this.calcProduct();
       this._refreshMissing();
     });
-    document.getElementById('ip-cw-back')?.addEventListener('click', () => {
-      const sel = document.getElementById('ip-size');
-      if (sel && sel.options[0]) sel.value = sel.options[0].value;
-      this._toggleSizeCustom(false);
-      this.calcProduct(); this._refreshMissing();
-    });
+    ['ip-cname', 'ip-coz'].forEach(fid => document.getElementById(fid)?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commitSize(); }
+      else if (e.key === 'Escape') { e.preventDefault(); this._sizeBack(); }
+    }));
+    // ── Unit: pick "Custom (type one)" → swap to a text field; Enter (or tabbing
+    // away with a value) commits it as an option; Escape / empty reverts.
+    const commitUnit = () => {
+      const sel = document.getElementById('ip-unit');
+      const val = (document.getElementById('ip-unit-custom')?.value || '').trim();
+      if (!sel) return;
+      if (!val) { this._unitBack(); return; }
+      const addOpt = [...sel.options].find(o => o.value === 'custom');
+      let opt = [...sel.options].find(o => o.value.toLowerCase() === val.toLowerCase() && o.value !== 'custom');
+      if (!opt) { opt = document.createElement('option'); opt.value = val; opt.textContent = val; sel.insertBefore(opt, addOpt); }
+      sel.value = opt.value;
+      this._toggleUnitCustom(false);
+      this._rerenderDivisor();
+    };
     document.getElementById('ip-unit')?.addEventListener('change', () => {
       this._toggleUnitCustom(document.getElementById('ip-unit').value === 'custom');
       this._rerenderDivisor();
     });
-    document.getElementById('ip-uw-back')?.addEventListener('click', () => {
-      const sel = document.getElementById('ip-unit');
-      if (sel && sel.options[0]) sel.value = sel.options[0].value;
-      this._toggleUnitCustom(false);
-      this._rerenderDivisor();
+    document.getElementById('ip-unit-custom')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commitUnit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); this._unitBack(); }
     });
-    // Apply the initial swap state (an existing custom unit opens in custom mode).
-    this._toggleSizeCustom(document.getElementById('ip-size')?.value === 'custom');
-    this._toggleUnitCustom(document.getElementById('ip-unit')?.value === 'custom');
     document.getElementById('ip-unit-custom')?.addEventListener('input', () => this._rerenderDivisor());
     document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
     // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
@@ -1190,7 +1227,9 @@ S.InventoryProducts = {
     // reads its name from ip-cname; an existing saved custom carries its name forward.
     let sizeLabel = null;
     if ((spec.sizeGroup || spec.showCaseSize) && oz != null && !this.SIZES.some(s => s.oz === oz)) {
-      const entered = document.getElementById('ip-size')?.value === 'custom' ? (document.getElementById('ip-cname')?.value.trim() || '') : '';
+      const selEl = document.getElementById('ip-size');
+      const optName = (selEl && selEl.selectedOptions && selEl.selectedOptions[0] && selEl.selectedOptions[0].dataset) ? (selEl.selectedOptions[0].dataset.name || '') : '';
+      const entered = selEl?.value === 'custom' ? (document.getElementById('ip-cname')?.value.trim() || '') : optName;
       sizeLabel = entered || ((this.customSizesUsed(spec.sizeGroup) || []).find(c => c.oz === oz) || {}).name || null;
     }
     const pour  = spec.showPour ? num('ip-pour') : null;
