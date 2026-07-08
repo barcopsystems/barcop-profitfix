@@ -165,7 +165,7 @@ S.ShiftPreShift = {
           return '<tr>'
             + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
             + '<td data-label="Margin">' + mHtml + '</td>'
-            + '<td data-label="Why"><span style="font-size:12px;color:var(--t2);line-height:1.5;">' + esc(this._featureReason(it)) + '</span></td>'
+            + '<td data-label="Why"><div style="font-size:12px;color:var(--t2);line-height:1.5;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(this._featureReason(it)) + '</div></td>'
             + '<td class="no-print"><div class="row-actions">'
             +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
             +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
