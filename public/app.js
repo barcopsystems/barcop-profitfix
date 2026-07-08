@@ -3525,7 +3525,7 @@ const App = {
   // the Food/Misc stock-unit list. Single source so take-inventory,
   // product-setup and the log forms never drift from each other.
   IC_CATEGORIES: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'],
-  IC_FOOD_UNIT_TYPES: ['lb', 'oz', 'each', 'case', 'bag', 'box', 'gallon', 'quart', 'pint', 'dozen'],
+  IC_FOOD_UNIT_TYPES: ['lb', 'each', 'case', 'bag', 'box', 'gallon', 'quart', 'pint', 'dozen'],
 
   // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
   // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
@@ -4449,11 +4449,10 @@ const App = {
     if (!p) return false;
     if (['Liquor', 'Wine', 'Draft Beer'].includes(p.category)) return true;
     if (p.category === 'Bottle Beer') return false; // used by the bottle, not a pour
-    if (p.category === 'Misc' && (p.misc_type === 'Drink Mixer' || p.misc_type === 'NA Beverage')) {
-      return (parseFloat(p.container_size_oz) > 0) || this.ozPerUnit(p.unit_type) != null;
-    }
-    // Any Food/Misc bought in a volume unit (mayo by the quart, cream by the qt).
-    return this.ozPerUnit(p.unit_type) != null;
+    // Food/Misc is a liquid (recipe-costed by the ounce, fill-slider count) when the
+    // operator gave it a Container Size in ounces — NOT by its unit name or misc type.
+    // A custom unit like "bottle" becomes a liquid only when a size is entered.
+    return parseFloat(p.container_size_oz) > 0;
   },
 
   // What a Food/Misc product is, for costing + counting. Mirrors
@@ -4463,9 +4462,10 @@ const App = {
   productRole(p) {
     const ut = p && p.unit_type, mt = p && p.misc_type;
     if ((this.MISC_SUPPLY_TYPES || []).includes(mt)) return 'supply';
-    if (this.ozPerUnit(ut) != null) return 'liquid';
+    // Liquid is driven by an explicit Container Size (oz), not the unit name or
+    // misc type, so any unit (incl. a custom one) can be a liquid or a solid.
+    if (parseFloat(p && p.container_size_oz) > 0) return 'liquid';
     if (String(ut || '').toLowerCase() === 'each') return 'each';
-    if (mt === 'Drink Mixer' || mt === 'NA Beverage') return 'liquid';
     return 'serving';
   },
 
