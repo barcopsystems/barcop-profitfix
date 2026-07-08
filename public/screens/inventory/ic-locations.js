@@ -840,6 +840,9 @@ S.InventoryLocations = {
     });
   },
 
+  // Auto-save the new order on every drop. The dragged row is already in place in
+  // the DOM, so we only renumber the "#" column in place (no full re-render / jump
+  // to top) and persist — the order sticks whether or not Update Location is used.
   async _persistProductOrder(locationName, idsInOrder) {
     const prods = this.products();
     idsInOrder.forEach((pid, i) => {
@@ -848,7 +851,11 @@ S.InventoryLocations = {
       if (!p.location_sequences) p.location_sequences = {};
       p.location_sequences[locationName] = i + 1;
     });
+    const body = document.getElementById('il-arrange-body');
+    if (body) [...body.querySelectorAll('tr[data-id]')].forEach((tr, i) => {
+      const numCell = tr.children[1];   // the "#" cell
+      if (numCell) numCell.textContent = i + 1;
+    });
     await App.saveInventory();
-    this._renderEdit(this.editId);
   }
 };
