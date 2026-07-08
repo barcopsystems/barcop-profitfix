@@ -156,7 +156,8 @@ S.HubBreakEven = {
       +   wfInput('be-wf-sales', 'Weekly Sales', wf.sales, '', '$')
       +   wfInput('be-wf-nut', 'Weekly Nut', wf.nut, '', '$')
       +   wfInput('be-wf-rate', 'Variable Rate', wf.rate, '%')
-      +   '<div style="flex-shrink:0;"><button class="btn btn-ghost btn-sm" id="be-wf-reset">Reset</button></div>'
+      +   '<div class="f" style="width:auto;flex:0 0 auto;"><label style="visibility:hidden;">Reset</label>'
+      +   '<div style="display:flex;align-items:center;min-height:36px;"><button class="btn btn-ghost btn-sm" id="be-wf-reset">Reset</button></div></div>'
       + '</div>'
       + '<div id="be-wf-out" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);"></div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:14px;line-height:1.6;">' + readText + '</div>'
