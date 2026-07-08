@@ -156,7 +156,7 @@ S.HubPermits = {
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f" style="flex:1 1 120px;min-width:100px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
-      +   '<div class="f" style="width:220px;"><label>Type</label><select id="hpa-type">' + typeOpts + '</select></div>'
+      +   '<div class="f" style="width:220px;"><label>Type</label>' + App.customSelect({ id: 'hpa-type', builtin: this.TYPES, existing: this.records().map(r => r.type) }) + '</div>'
       +   '<div class="f" style="width:120px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
       +   '<div class="f" style="width:150px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
       +   '<div class="f" style="width:150px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
@@ -205,6 +205,7 @@ S.HubPermits = {
     document.getElementById('hpa-clear')?.addEventListener('click', () => this._clearAdd());
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
+    App.wireCustomSelects(this.container);
     this.container.querySelectorAll('.hp-renew').forEach(btn => {
       btn.addEventListener('click', () => {
         const rec = this.records().find(r => r.id === btn.dataset.id);
@@ -353,7 +354,7 @@ S.HubPermits = {
       + '<div class="card-title">' + (isEdit ? 'Edit Permit' : 'Add Permit') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Name</label><input type="text" id="hp-f-name" value="' + esc(rec.name) + '" placeholder="Texas Mixed Beverage Permit"/></div>'
-      +   '<div class="f"><label>Type</label><select id="hp-f-type">' + typeOpts + '</select></div>'
+      +   '<div class="f"><label>Type</label>' + App.customSelect({ id: 'hp-f-type', builtin: this.TYPES, existing: this.records().map(r => r.type), selected: rec.type }) + '</div>'
       +   '<div class="f"><label>Recurrence</label><select id="hp-f-recurrence">' + recurOpts + '</select></div>'
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
       +   '<div class="f"><label>Last Renewed</label><input type="date" id="hp-f-last" value="' + esc(rec.last_renewed || '') + '"/></div>'
@@ -366,6 +367,7 @@ S.HubPermits = {
       +   (isEdit ? '<button class="btn btn-danger" id="hp-modal-del" style="margin-left:auto;">Delete</button>' : '')
       + '</div></div>';
     App.openModal(html, { id, maxWidth: 540, noClose: true });
+    App.wireCustomSelects(document);
     const showErr = (m) => { const e = document.getElementById('hp-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
     if (isEdit) document.getElementById('hp-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
