@@ -84,6 +84,23 @@ S.RevenueMenuPlanning = {
     return stats;
   },
 
+  // A single item-specific briefing "read" line, for reuse outside this screen
+  // (e.g. the Pre-Shift featured-items list). Unique per item, from the same
+  // category-relative margin/volume read the tiles use. Returns '' if it can't
+  // be read (unpriced/unranked or the engine is unavailable).
+  briefLineFor(item) {
+    if (!item) return '';
+    try {
+      const cat = item.category || 'Uncategorized';
+      const cs = this.categoryStats()[cat];
+      if (!cs) return '';
+      const quad = (window.S && S.RevenueMenuEngineering && S.RevenueMenuEngineering.classify)
+        ? S.RevenueMenuEngineering.classify()[item.id] : null;
+      const b = this.briefing(item, cat, cs, quad, new Set());
+      return (b && b.lines && b.lines.length) ? b.lines[0] : '';
+    } catch (e) { return ''; }
+  },
+
   topCostIngredient(item) {
     if (!item || !item.recipe || !Array.isArray(item.recipe.ingredients) || !item.recipe.ingredients.length) return null;
     const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
