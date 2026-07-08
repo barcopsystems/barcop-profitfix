@@ -147,6 +147,7 @@ S.InventoryLocations = {
   sizeLabel(p) {
     if (!p) return '-';
     if (p.category === 'Food' || p.category === 'Misc') return p.unit_type || '-';
+    if (p.category === 'Bottle Beer') return p.case_size ? (p.case_size + ' btl/case') : '-';
     const SIZES = (window.S && S.InventoryProducts && S.InventoryProducts.SIZES) || [];
     const sz = SIZES.find(s => s.oz === p.container_size_oz);
     if (sz) return sz.l;

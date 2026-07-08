@@ -231,7 +231,7 @@ S.InventoryDeliveryHistory = {
         ? '<span style="color:var(--gold);font-weight:700;">was ' + App.fmtCurrency(it.prev_price) + '</span>'
         : '<span style="color:var(--t4);">-</span>';
       const containerCol = isCase && it.case_size_at_receive
-        ? (it.container_size_oz != null ? it.container_size_oz + ' oz btl &middot; ' + it.case_size_at_receive + '/case' : it.case_size_at_receive + ' btl/case')
+        ? it.case_size_at_receive + ' btl/case'
         : (it.container_size_oz != null ? it.container_size_oz + ' oz' : '-');
       const disc = this.discForLine(d, it);
       const dlabel = !disc ? 'Flag' : (disc.status === 'Resolved' ? 'Resolved' : 'Filed');

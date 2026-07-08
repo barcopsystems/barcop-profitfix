@@ -81,14 +81,15 @@ S.InventoryProducts = {
     'Bottle Beer': {
       title:           'Bottle Beer',
       noun:            'Case',
-      sizeLabel:       'Bottle Size',
-      sizeGroup:       'Beer',
-      defaultSize:     12,
+      // Bottle beer is tracked by the case / individual bottle only — the bottle's
+      // oz size is never used in any cost or count, so there is no size field.
+      sizeLabel:       null,
+      sizeGroup:       null,
+      defaultSize:     null,
       showPour:        false,
       priceLabel:      'Price per Bottle',
       costLabel:       'Cost per Case',
       costTT:          'ic-cost-per-case',
-      sizeTT:          'ic-bottle-size-beer',
       priceTT:         'ic-beer-bottle-price',
       calc1Label:      'Btls / Case',
       calc2Label:      'Cost / Btl',
@@ -187,7 +188,7 @@ S.InventoryProducts = {
   // the first location it's placed in.
   isComplete(p) {
     if (!p.name || p.unit_cost == null || p.unit_cost === '') return false;
-    if (p.category === 'Bottle Beer') return !!(p.container_size_oz && p.case_size);
+    if (p.category === 'Bottle Beer') return !!p.case_size;
     if (this.isPourable(p.category)) return !!(p.container_size_oz && p.pour_size_oz && p.menu_price);
     return true;
   },
@@ -313,7 +314,7 @@ S.InventoryProducts = {
     App.showHelpModal('How Add Products Works', [
       { p: ['Add Products is your master product list. Everything Bar Cop costs, counts, orders, and reports reads from here, so a complete product list is the best hour of setup you can put into Bar Cop. Get it right once and every count sheet, order, and pour cost downstream is right too.'] },
       { h: 'Start With A Category', p: ['Pick one of the six category cards on top: Liquor, Wine, Bottle Beer, Draft Beer, Food, Misc. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
-      { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer needs the bottle size and case size. A product missing a required field shows as Incomplete in red until you finish it. A complete product can still read Needs a location in red until you place it on a shelf over in Set Locations; it will not show up on a count sheet until it lives somewhere.'] },
+      { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer just needs its case size, the number of bottles in a case, since it is tracked by the case and the individual bottle. A product missing a required field shows as Incomplete in red until you finish it. A complete product can still read Needs a location in red until you place it on a shelf over in Set Locations; it will not show up on a count sheet until it lives somewhere.'] },
       { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
       { h: 'Other Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
@@ -359,25 +360,30 @@ S.InventoryProducts = {
 
     const spec = this.FORM_SPEC[this.activeCat];
     const isFoodMisc = (this.activeCat === 'Food' || this.activeCat === 'Misc');
-    const sizeCol = isFoodMisc ? 'Unit' : (spec && spec.sizeLabel) || 'Container';
+    const isBottleBeer = this.activeCat === 'Bottle Beer';
+    const sizeCol = isFoodMisc ? 'Unit' : (isBottleBeer ? 'Case Size' : ((spec && spec.sizeLabel) || 'Container'));
     // Column headers + fixed colgroup, shared by the populated list AND the empty
     // state so the headers always show and the empty message sits in the data row.
-    // Food / Misc show recipe-costing columns (per-unit breakdown + recipe cost)
-    // in place of the pour columns that only apply to poured drinks.
+    // Food / Misc show recipe-costing columns; Bottle Beer drops the Pour column
+    // (tracked by the case, never poured); poured drinks keep size + pour.
     const headerCols = isFoodMisc
       ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th style="white-space:nowrap;">Recipe Cost</th><th>Par</th><th></th>'
-      : '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>';
-    // Food / Misc get their own even column widths (the recipe-costing set), so
-    // Recipe Cost has room to sit on one line instead of borrowing the pour widths.
+      : isBottleBeer
+        ? '<th>Vendor</th><th>Case Size</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>'
+        : '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>';
+    // Each layout gets an even, aligned column set so cards line up down the page.
     const colgroup = isFoodMisc
       ? '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:140px;"/><col style="width:75px;"/><col style="width:105px;"/><col style="width:110px;"/><col style="width:110px;"/><col style="width:85px;"/><col style="width:120px;"/></colgroup>'
-      : '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+      : isBottleBeer
+        ? '<colgroup><col style="width:40px;"/><col style="width:210px;"/><col style="width:170px;"/><col style="width:140px;"/><col style="width:150px;"/><col style="width:100px;"/><col style="width:110px;"/><col style="width:150px;"/></colgroup>'
+        : '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+    const nCols = isBottleBeer ? 8 : 9;
 
     let body;
     if (prods.length === 0) {
       body = '<div class="card" style="overflow-x:auto;margin-top:18px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup + '<thead><tr><th></th><th>Product</th>' + headerCols + '</tr></thead>'
-        + '<tbody><tr><td colspan="9" style="color:var(--t3);">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</td></tr></tbody></table></div>';
+        + '<tbody><tr><td colspan="' + nCols + '" style="color:var(--t3);">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</td></tr></tbody></table></div>';
     } else {
       const pourable = this.isPourable(this.activeCat);
       const dismissed = this._dismissedAlerts && this._dismissedAlerts.has(this.activeCat);
@@ -459,6 +465,16 @@ S.InventoryProducts = {
         ? App.fmtCurrency(basis.costPerUnit, 2) + ' <span style="font-size:9px;color:var(--t3);">/' + esc(basis.unitLabel) + '</span>'
         : dash;
       tds = '<td>' + esc(p.unit_type || '-') + '</td><td>' + perU + '</td><td>' + plainCost + '</td><td>' + recCost + '</td>';
+    } else if (p.category === 'Bottle Beer') {
+      // Case-tracked: show Case Size (not an oz bottle size), no Pour column, and a
+      // cost % from the per-bottle cost vs the bottle price.
+      const cb = App.bottleCost ? App.bottleCost(p) : null;
+      const bpct = (cb != null && p.menu_price) ? cb / p.menu_price * 100 : null;
+      const bpc = bpct != null ? (bpct > target ? 'neg' : 'pos') : '';
+      const caseDisp = p.case_size ? esc(p.case_size + ' btl') : dash;
+      tds = '<td>' + caseDisp + '</td>'
+        + '<td>' + costDisplay + '</td>'
+        + '<td class="' + bpc + '">' + (bpct != null ? App.fmtPct(bpct) : dash) + '</td>';
     } else {
       tds = '<td>' + szL + '</td>'
         + '<td>' + (pourable ? (p.pour_size_oz ? p.pour_size_oz + ' oz' : '-') : dash) + '</td>'
@@ -653,10 +669,8 @@ S.InventoryProducts = {
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>Reorder <span style="color:var(--t4);font-weight:400;">(' + spec.parUnit + ')</span></label>'
         + '<input type="number" id="ip-reorder" value="' + v(p?.reorder_point) + '" step="1" min="0" placeholder="0"/></div>';
     } else if (spec.showCaseSize) {
-      // Bottle Beer
-      const sizeSel = p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize;
+      // Bottle Beer — tracked by the case / individual bottle; no oz size field.
       row2 = ''
-        + this._sizeCellHtml(spec, sizeSel)
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Case Size</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
@@ -772,7 +786,7 @@ S.InventoryProducts = {
   _requiredFieldIds(cat) {
     const ids = ['ip-name', 'ip-cost'];
     if (cat === 'Bottle Beer') {
-      ids.push('ip-size', 'ip-case-size');
+      ids.push('ip-case-size');
     } else if (this.isPourable(cat)) {
       ids.push('ip-size', 'ip-pour', 'ip-price');
     }
@@ -1155,6 +1169,10 @@ S.InventoryProducts = {
 
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
     let oz      = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
+    // Bottle beer has no oz field (tracked by the case / bottle). Store a fixed
+    // nominal bottle size so the Usage Variance oz round-trip still cancels; it is
+    // never shown to or entered by the operator.
+    if (cat === 'Bottle Beer') oz = 12;
     // Custom bottle/keg sizes carry the operator's own name (Gallon, 3L Box) so the
     // dropdown reads "Gallon (128 oz)"; a preset carries none. The name rides on the
     // selected option's data-name (set from the operator's edited size list).
@@ -1303,7 +1321,7 @@ S.InventoryProducts = {
   // The bulk-applicable fields per category (cost stays out — it is per-product).
   bulkFieldDefs(cat, spec) {
     const defs = [];
-    if (spec.sizeGroup || spec.showCaseSize) defs.push({ key: 'size', label: spec.sizeLabel || 'Size', type: 'size' });
+    if (spec.sizeGroup) defs.push({ key: 'size', label: spec.sizeLabel || 'Size', type: 'size' });
     if (spec.showPour)      defs.push({ key: 'pour', label: spec.pourLabel || 'Pour Size', type: 'oz' });
     if (spec.showCaseSize)  defs.push({ key: 'case', label: 'Case Size', type: 'int', suffix: 'btl' });
     if (spec.showUnitType)  defs.push({ key: 'unit', label: 'Unit Type', type: 'unit' });
@@ -1486,7 +1504,6 @@ S.InventoryProducts = {
     }
     if (cat === 'Bottle Beer') {
       return COMMON.map(f => f.key === 'unit_cost' ? {...f, label:'Cost per Case ($)'} : f).concat([
-        {key:'container_size_oz',label:'Bottle Size (oz)', required:false, aliases:['size','bottle size','container','volume','oz','ounces']},
         {key:'case_size',        label:'Case Size (bottles per case)', required:false, aliases:['case','case size','case pack','pack','bottles per case','pack size','units per case']},
         {key:'menu_price',       label:'Menu Price ($ per bottle)', required:false, aliases:['price','menu price','sell price','retail']},
         {key:'par_level',        label:'Par (cases)',      required:false, aliases:['par','par level','target stock']},
@@ -1553,7 +1570,10 @@ S.InventoryProducts = {
     rows.forEach(row => {
       const name = val(row, 'name');
       if (!name) return;
-      const oz   = numOf(val(row, 'container_size_oz'));
+      let oz     = numOf(val(row, 'container_size_oz'));
+      // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
+      // oz round-trip cancels (never shown or entered — matches the manual form).
+      if (cat === 'Bottle Beer') oz = 12;
       const pour = spec.showPour ? numOf(val(row, 'pour_size_oz')) : null;
       const cost = numOf(val(row, 'unit_cost'));
       // Menu price + servings come in for resale Food/Misc as well as pourables.
