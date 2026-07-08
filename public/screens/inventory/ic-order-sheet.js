@@ -57,6 +57,7 @@ S.InventoryOrderSheet = {
       { h: 'More Actions On A Placed Order', p: ['On an Already Ordered row, the ... button opens a menu with three moves. Export PDF gives you a purchase order to print or attach to a vendor email. Edit Order pulls that placed order back onto the page as an editable card so you can fix a quantity or add a line, then Update Order writes it back to the same order. Cancel Order removes it and returns those items to your Order Sheet so you can reorder.'] },
       { h: 'Suggested Orders', p: ['Each vendor card lists their products that fell under par in your last count, with on-hand, par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case. If a vendor card or the Order Status shows that some pars look off versus your real usage, the Dynamic Pars link takes you to tune them, because the suggested quantities are only as sharp as the pars behind them.'] },
       { h: 'Sending The Order', p: ['Once you create an order it moves to Already Ordered up top. Email to Vendor opens your email client with the order written out and addressed to the vendor on file, and marks it Submitted. The order also sits in Order History.'] },
+      { h: 'Order Minimums', p: ['If a vendor has an Order Minimum set on their vendor page, each vendor card shows your running order against it and turns amber when you are short, for example "$70 under the $250 minimum" (or a count like "2 cases under the 5 cases minimum" for a case minimum). Tap Top Off To Minimum and Bar Cop adds that vendor’s next below-par items, biggest gap first, until the order clears the minimum, so you hit it in one delivery instead of paying twice. A delivery fee or free-delivery-over amount shows here too. Order Status up top counts how many vendors are currently under minimum. You are only ever warned, so you can still create a short order if you need to.'] },
       { h: 'Create A Custom Order', p: ['Need an off-cycle order, like a party order or a one-time buy without waiting on a count? Hit Create Custom Order on the right side of the Order Status card. The build card opens up: pick the vendor, add the products and quantities, and create it the same way. Hit Cancel Custom Order on that same link to close it back up.'] },
       { h: 'Closing The Loop', p: ['When the delivery shows up, go to Receive Delivery and match it to the open order. The line items pre-fill, you confirm against the invoice, and Bar Cop marks the order Received.'] }
     ]);
@@ -201,6 +202,8 @@ S.InventoryOrderSheet = {
         return;
       }
       if (addItem) { this.addBlankLine(addItem.closest('.os-vcard')); return; }
+      const topoff = ev.target.closest('.os-topoff');
+      if (topoff) { this.topOff(topoff.dataset.vendor); return; }
       if (ev.target.closest('.os-co-toggle')) {
         this.customOpen = !this.customOpen;
         if (!this.customOpen) this.closeCustomOrder();
@@ -218,16 +221,27 @@ S.InventoryOrderSheet = {
 
   // ── Combined Order Status card (still to order + already ordered + age) ──────
   statusCardHTML(visibleVendors, hiddenVendors, data) {
-    let stillCount = 0, stillTotal = 0;
+    let stillCount = 0, stillTotal = 0, underMin = 0;
     visibleVendors.forEach(v => (data.groups[v] || []).forEach(l => {
       stillCount++; stillTotal += (l.suggested || 0) * (l.unit_cost || 0);
     }));
+    // How many suggested orders fall under their vendor's minimum right now.
+    visibleVendors.forEach(v => {
+      const info = this._vendorInfo(v);
+      if (!info || info.min == null) return;
+      const lines = data.groups[v] || [];
+      const money = info.unit === '$';
+      const measure = money ? lines.reduce((t, l) => t + (l.suggested || 0) * (l.unit_cost || 0), 0)
+                            : lines.reduce((t, l) => t + (l.suggested || 0), 0);
+      if (measure < info.min - 0.001) underMin++;
+    });
 
     const stillSection = '<div style="flex:1;min-width:220px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;">Still to Order</div>'
       + (visibleVendors.length === 0
           ? '<div style="font-size:13px;color:var(--t2);">Nothing left to order from this count.</div>'
           : '<div style="font-size:13px;color:var(--t1);line-height:1.6;"><strong>' + visibleVendors.length + ' vendor' + (visibleVendors.length === 1 ? '' : 's') + '</strong> &middot; ' + stillCount + ' item' + (stillCount === 1 ? '' : 's') + ' &middot; <strong style="color:var(--gold);">' + App.fmtCurrency(stillTotal) + '</strong> to order</div>')
+      + (underMin > 0 ? '<div style="font-size:12px;color:var(--amber);margin-top:6px;"><strong>' + underMin + ' vendor' + (underMin === 1 ? '' : 's') + '</strong> under order minimum &middot; top off on the vendor card</div>' : '')
       + '</div>';
 
     const openOrders = hiddenVendors.map(v => this.openOrderForVendor(v)).filter(Boolean);
@@ -624,7 +638,14 @@ S.InventoryOrderSheet = {
       + '<div class="calc-item"><div class="calc-label">Line Items</div><div class="calc-val lg os-vcount">0</div></div>'
       + '<div class="calc-item"><div class="calc-label">Order Total</div><div class="calc-val lg os-vtotal">$0.00</div></div>'
       + parNudge
-      + '</div></div>'
+      + '</div>'
+      // Vendor order-minimum / delivery-fee readout (filled by recalcVendor; hidden
+      // when the vendor has none set). Top Off adds their next below-par items.
+      + '<div class="os-min-row" style="display:none;align-items:center;gap:12px;margin-top:12px;font-size:12px;flex-wrap:wrap;">'
+      +   '<span class="os-min"></span>'
+      +   '<button type="button" class="btn btn-ghost btn-sm os-topoff" data-vendor="' + this.cssEsc(vendor) + '" style="display:none;">Top Off To Minimum</button>'
+      + '</div>'
+      + '</div>'
       + '</div>'
       + '<div class="os-create-row" data-vendor="' + this.cssEsc(vendor) + '" style="margin:16px 0 32px;display:flex;align-items:center;gap:8px;">'
       + actionBtns
@@ -664,20 +685,100 @@ S.InventoryOrderSheet = {
   },
 
   recalcVendor(card) {
-    let total = 0, count = 0;
+    let total = 0, count = 0, qtyTotal = 0;
     card.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
       const qty = parseFloat(inp.value) || 0;
       const cost = parseFloat(inp.dataset.cost) || 0;
       const ext = qty * cost;
       line.querySelector('.os-ext').textContent = App.fmtCurrency(ext);
-      total += ext;
+      total += ext; qtyTotal += qty;
       if (qty > 0) count++;
     });
     const cEl = card.querySelector('.os-vcount');
     const tEl = card.querySelector('.os-vtotal');
     if (cEl) cEl.textContent = count;
     if (tEl) tEl.textContent = App.fmtCurrency(total);
+    this._updateMinReadout(card, total, qtyTotal);
+  },
+
+  // ── Vendor order minimums / delivery fees ──────────────────────────────────
+  _vendorInfo(name) {
+    const v = ((App.inventoryData && App.inventoryData.ic_vendors) || []).find(x => x.name === name);
+    if (!v) return null;
+    return {
+      min:  (v.order_minimum != null && v.order_minimum > 0) ? v.order_minimum : null,
+      unit: v.order_minimum_unit || '$',
+      fee:  (v.delivery_fee > 0) ? v.delivery_fee : null,
+      free: (v.free_delivery_over > 0) ? v.free_delivery_over : null,
+    };
+  },
+  _qtyStr(x) { return Number.isInteger(x) ? String(x) : (Math.round(x * 100) / 100); },
+  // How this order measures against the minimum: dollars for a '$' minimum, else the
+  // raw quantity of units ordered.
+  _orderMeasure(card, money) {
+    let t = 0, q = 0;
+    card.querySelectorAll('.os-line').forEach(line => {
+      const inp = line.querySelector('.os-qty');
+      const qty = parseFloat(inp.value) || 0;
+      t += qty * (parseFloat(inp.dataset.cost) || 0); q += qty;
+    });
+    return money ? t : q;
+  },
+  _topOffCandidates(card) {
+    const vendor = card.dataset.vendor || '';
+    const data = this.belowParByVendor();
+    if (!data || !data.groups[vendor]) return [];
+    const onCard = new Set([...card.querySelectorAll('.os-line .os-qty')].map(i => i.dataset.productId).filter(Boolean));
+    return data.groups[vendor].filter(g => !onCard.has(g.product.id))
+      .sort((a, b) => (b.par - b.on_hand) - (a.par - a.on_hand));   // biggest gap first
+  },
+  _updateMinReadout(card, total, qtyTotal) {
+    const row = card.querySelector('.os-min-row');
+    const minEl = card.querySelector('.os-min');
+    const topBtn = card.querySelector('.os-topoff');
+    if (!row || !minEl) return;
+    const info = this._vendorInfo(card.dataset.vendor || '');
+    if (!info || (info.min == null && info.fee == null && info.free == null)) { row.style.display = 'none'; return; }
+    const parts = [];
+    let under = 0;
+    if (info.min != null) {
+      const money = info.unit === '$';
+      const measure = money ? total : qtyTotal;
+      const fmt = x => money ? App.fmtCurrency(x) : (this._qtyStr(x) + ' ' + info.unit);
+      under = info.min - measure;
+      parts.push(under > 0.001
+        ? '<span style="color:var(--amber);font-weight:700;">' + fmt(under) + ' under the ' + fmt(info.min) + ' minimum</span>'
+        : '<span style="color:var(--green);font-weight:700;">Meets the ' + fmt(info.min) + ' minimum</span>');
+    }
+    if (info.free != null) {
+      parts.push(total >= info.free
+        ? '<span style="color:var(--green);">Free delivery</span>'
+        : '<span style="color:var(--t3);">Free delivery over ' + App.fmtCurrency(info.free) + (info.fee != null ? ' (else ' + App.fmtCurrency(info.fee) + ' fee)' : '') + '</span>');
+    } else if (info.fee != null) {
+      parts.push('<span style="color:var(--t3);">' + App.fmtCurrency(info.fee) + ' delivery fee</span>');
+    }
+    minEl.innerHTML = parts.join(' <span style="color:var(--t4);">&middot;</span> ');
+    row.style.display = 'flex';
+    if (topBtn) topBtn.style.display = (under > 0.001 && this._topOffCandidates(card).length > 0) ? '' : 'none';
+  },
+  // Add the vendor's next below-par items (biggest gap first) until the order clears
+  // the minimum, so the operator hits it in one delivery instead of two.
+  topOff(vendor) {
+    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
+    if (!card) return;
+    const info = this._vendorInfo(vendor);
+    if (!info || info.min == null) return;
+    const money = info.unit === '$';
+    const tbody = card.querySelector('.os-lines-tbody');
+    if (!tbody) return;
+    for (const g of this._topOffCandidates(card)) {
+      if (this._orderMeasure(card, money) >= info.min - 0.001) break;
+      tbody.insertAdjacentHTML('beforeend', this.lineRowHTML(g.product, g.suggested, g.on_hand, g.par));
+      this.recalcVendor(card);
+    }
+    this.recalcVendor(card);
+    this._captureCard(card);
   },
 
   // ── Draft persistence (suggested vendor cards + the custom order panel) ────
@@ -764,6 +865,18 @@ S.InventoryOrderSheet = {
 
     const lineItems = this.collectLines(card);
     if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
+
+    // Warn (never block) when the order is under the vendor's minimum.
+    const info = this._vendorInfo(vendor);
+    if (info && info.min != null) {
+      const money = info.unit === '$';
+      const measure = money ? lineItems.reduce((t, i) => t + i.extended, 0) : lineItems.reduce((t, i) => t + (parseFloat(i.qty) || 0), 0);
+      if (measure < info.min - 0.001) {
+        const fmt = x => money ? App.fmtCurrency(x) : (this._qtyStr(x) + ' ' + info.unit);
+        const ok = await App.confirm({ title: 'Under the vendor minimum', message: 'This order is ' + fmt(info.min - measure) + ' under ' + vendor + '’s ' + fmt(info.min) + ' minimum. Create it anyway?', confirmText: 'Create Anyway' });
+        if (!ok) return;
+      }
+    }
 
     const rec = {
       id:         App.uid(),
