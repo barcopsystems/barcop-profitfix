@@ -2692,6 +2692,71 @@ const App = {
       + '</div>';
   },
 
+  // ── Reusable "custom option" select ─────────────────────────────────────────
+  // A <select> of built-in options + values already used on the operator's own
+  // records + a "+ Add your own..." choice that reveals a text field. A typed
+  // value is injected and selected; it persists once the record is saved and
+  // then shows up on its own next time (via opts.existing, distinct values off
+  // the records). Keeps the built-in list as the shared default so reporting
+  // stays consistent. Call App.wireCustomSelects(container) after render.
+  // opts: { id, builtin:[], existing:[], selected, style, selectClass, addLabel, newPlaceholder }
+  customSelect(opts) {
+    opts = opts || {};
+    const sel = (opts.selected == null ? '' : String(opts.selected));
+    const all = [];
+    const push = v => { v = (v == null ? '' : String(v)).trim(); if (v && !all.some(x => x.toLowerCase() === v.toLowerCase())) all.push(v); };
+    (opts.builtin || []).forEach(push);
+    (opts.existing || []).forEach(push);
+    push(sel);
+    const selLc = sel.toLowerCase();
+    const blankHtml = opts.blank ? '<option value=""' + (sel === '' ? ' selected' : '') + '>' + esc(opts.blankLabel || '-') + '</option>' : '';
+    const optionsHtml = blankHtml + all.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === selLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    const idAttr = opts.id ? ' id="' + esc(opts.id) + '"' : '';
+    const styleAttr = opts.style ? ' style="' + opts.style + '"' : '';
+    const cls = opts.selectClass || 'form-input';
+    return '<span class="cs-wrap" style="display:block;">'
+      + '<select' + idAttr + ' class="cs-select ' + cls + '"' + styleAttr + '>'
+      +   optionsHtml
+      +   '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>'
+      + '</select>'
+      + '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;margin-top:6px;width:100%;"/>'
+      + '</span>';
+  },
+  // Wire every custom-select in a container: "+ Add your own..." reveals the text
+  // field; a typed value is injected as an option and selected. Any save that
+  // clicks/tabs away blurs the field first, so the select never rests on the
+  // "+ Add your own..." sentinel.
+  wireCustomSelects(root) {
+    root = root || document;
+    root.querySelectorAll('.cs-wrap').forEach(wrap => {
+      const sel = wrap.querySelector('.cs-select');
+      const inp = wrap.querySelector('.cs-newval');
+      if (!sel || !inp || sel._csWired) return;
+      sel._csWired = true;
+      sel._csPrev = (sel.value === '__addcustom__') ? '' : sel.value;
+      sel.addEventListener('change', () => {
+        if (sel.value === '__addcustom__') { inp.style.display = ''; inp.value = ''; inp.focus(); }
+        else { sel._csPrev = sel.value; inp.style.display = 'none'; }
+      });
+      const commit = () => {
+        const val = (inp.value || '').trim();
+        inp.style.display = 'none';
+        if (!val) { sel.value = sel._csPrev || ''; return; }
+        const addOpt = sel.querySelector('option[value="__addcustom__"]');
+        if (![...sel.options].some(o => o.value.toLowerCase() === val.toLowerCase())) {
+          const o = document.createElement('option'); o.value = val; o.textContent = val;
+          sel.insertBefore(o, addOpt);
+        }
+        [...sel.options].forEach(o => { if (o.value.toLowerCase() === val.toLowerCase()) sel.value = o.value; });
+        sel._csPrev = sel.value;
+        inp.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
+  },
+
   // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
   // pars/orders in cases, draft in kegs, liquor/wine in bottles; Food/Misc use
   // the product's unit_type (lb, each, case, qt…). Keeps every category's
