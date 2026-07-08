@@ -297,6 +297,8 @@ S.ShiftIncidents = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById(p + 'date')?.value;
     if (!date) { fail('Date is required.'); return null; }
+    const type = document.getElementById(p + 'type')?.value || '';
+    if (!type) { fail('Pick a type.'); return null; }
     const description = document.getElementById(p + 'desc')?.value.trim();
     if (!description) { fail('Write what happened before saving.'); return null; }
     const status = document.getElementById(p + 'status')?.value || 'Open';
@@ -308,7 +310,7 @@ S.ShiftIncidents = {
     return {
       date,
       time:           document.getElementById(p + 'time')?.value || '',
-      type:           document.getElementById(p + 'type')?.value || 'Other',
+      type,
       severity:       document.getElementById(p + 'severity')?.value || 'Medium',
       status,
       location:       document.getElementById(p + 'loc')?.value.trim() || '',
