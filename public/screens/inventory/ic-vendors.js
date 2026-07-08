@@ -66,7 +66,7 @@ S.InventoryVendors = {
       + '<div class="f" style="flex:1 1 110px;"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
       + '<div class="f" style="flex:1.4 1 140px;"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
       + '<div class="f" style="flex:1 1 100px;"><label>Delivery Days</label><input type="text" id="iv-days" value="' + esc(v?.delivery_days || '') + '" placeholder="Mon, Thu"/></div>'
-      + '<div class="f" style="flex:0.7 1 78px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true }) + '</div>'
+      + '<div class="f" style="flex:0.7 1 78px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
       + '<div class="f" style="flex:1 1 100px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
       + App.noteField({ id: 'iv-notes', value: v?.notes, mt: 12 });

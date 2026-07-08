@@ -295,7 +295,7 @@ S.InventoryProducts = {
   },
   _unitCellHtml(ut) {
     return '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type' + App.manageListLink('unit_type') + '</label>'
-      + App.customSelect({ id: 'ip-unit', key: 'unit_type', builtin: App.IC_FOOD_UNIT_TYPES, selected: ut }) + '</div>';
+      + App.customSelect({ id: 'ip-unit', key: 'unit_type', builtin: App.IC_FOOD_UNIT_TYPES, selected: ut, blank: true, blankLabel: 'Select unit...' }) + '</div>';
   },
 
   // ── Entry point ───────────────────────────────────────────────────────────
