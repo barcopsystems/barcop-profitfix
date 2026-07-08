@@ -87,7 +87,7 @@ S.LaborPositions = {
       + '<div class="f" style="' + cs(200) + '"><label>Position Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
       + '<div class="f" style="' + cs(170) + '"><label>Department</label>'
-      + '<select id="' + p + 'dept">' + deptOpts + '</select></div>'
+      + App.customSelect({ id: p + 'dept', builtin: this.DEPARTMENTS, existing: this.records().map(x => x.department), selected: (item ? item.department : 'Bar') }) + '</div>'
       + '<div class="f" style="' + cs(130) + '"><label>Pay Type</label>'
       + '<select id="' + p + 'paytype">'
       + '<option' + (isSalPos ? '' : ' selected') + '>Hourly</option>'
@@ -201,6 +201,7 @@ S.LaborPositions = {
       else if (row)  this.openEditModal(row.dataset.id);
     };
     App.applyCollapsed(this.container);
+    App.wireCustomSelects(this.container);
     // Restore an in-progress draft before wiring so the tip-field disclosure reads
     // the restored values; then capture on every input so the draft stays current.
     const formRoot = this.container.querySelector('.form-card');
@@ -227,6 +228,7 @@ S.LaborPositions = {
       + '<button class="btn btn-danger" id="lpe-del" style="margin-left:auto;">Delete</button>'
       + '</div></div>';
     App.openModal(html, { id: 'lp-edit-modal', maxWidth: 540, noClose: true });
+    App.wireCustomSelects(document);
     this.wireTipFields('lpe-');
     document.getElementById('lpe-save')?.addEventListener('click', () => this.save('lpe-'));
     document.getElementById('lpe-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('lp-edit-modal'); this.confirmDel(id); });

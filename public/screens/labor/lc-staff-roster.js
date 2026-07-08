@@ -628,7 +628,7 @@ S.LaborStaffRoster = {
       + '<div class="card-title">' + (this.certEditId ? 'Edit Certification' : 'Add Certification') + '</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Certification Type</label>'
-          + '<select id="cert-type">' + typeOpts + '</select></div>'
+          + App.customSelect({ id: 'cert-type', builtin: this.CERT_TYPES, existing: this.certs().map(x => x.cert_type), selected: (c ? c.cert_type : '') }) + '</div>'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Cert Number <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<input type="text" id="cert-number" value="' + esc(c?.cert_number || '') + '" placeholder="Optional"/></div>'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Issuer <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
@@ -644,6 +644,7 @@ S.LaborStaffRoster = {
         + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'cert-modal', maxWidth: 540, noClose: true });
+    App.wireCustomSelects(document);
     document.getElementById('cert-save')?.addEventListener('click', () => this.saveCert(staffId));
   },
 
