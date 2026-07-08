@@ -523,9 +523,6 @@ S.InventoryOrderSheet = {
       + '<td class="os-uc">' + App.fmtCurrency(unitCost) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(qty * unitCost) + '</td>'
       + '<td><div class="row-actions"><button class="btn btn-danger btn-sm os-remove">Remove</button></div></td>'
-      // Fixed 140px empty spacer column so Product stops flex-filling the full surplus;
-      // pulls On Hand and every column 140px left. Transparent so it reads as a gap.
-      + '<td data-label="" style="background:transparent;"></td>'
       + '</tr>';
   },
 
@@ -540,9 +537,6 @@ S.InventoryOrderSheet = {
       + '<td class="os-uc">' + App.fmtCurrency(0) + '</td>'
       + '<td class="val os-ext">' + App.fmtCurrency(0) + '</td>'
       + '<td><div class="row-actions"><button class="btn btn-danger btn-sm os-remove">Remove</button></div></td>'
-      // Fixed 140px empty spacer column so Product stops flex-filling the full surplus;
-      // pulls On Hand and every column 140px left. Transparent so it reads as a gap.
-      + '<td data-label="" style="background:transparent;"></td>'
       + '</tr>';
   },
 
@@ -556,7 +550,7 @@ S.InventoryOrderSheet = {
     const filtered = pool.filter(p => !(existingProductIds || []).includes(p.id));
 
     if (filtered.length === 0) {
-      return '<option value="">Every product for this vendor is already on the order</option>';
+      return '<option value="">All products on the order</option>';
     }
     const byCat = {};
     filtered.forEach(p => { const c = p.category || 'Other'; (byCat[c] = byCat[c] || []).push(p); });
@@ -634,7 +628,7 @@ S.InventoryOrderSheet = {
     return '<div class="card form-card os-vcard" data-vendor="' + this.cssEsc(vendor) + '"' + (isEdit ? ' data-order-id="' + esc(opts.orderId) + '"' : '') + '>'
       + '<div class="card-title">' + title + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
-      + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th><th style="width:140px;"></th>'
+      + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
       + '</tr></thead><tbody class="os-lines-tbody">' + rows + '</tbody></table></div>'
       // Add Item on the left; the vendor order-minimum / delivery-fee readout sits
       // right beside it (filled by recalcVendor; hidden when the vendor has none set).
@@ -672,7 +666,7 @@ S.InventoryOrderSheet = {
       + '</div>'
       + '<div class="os-co-body" style="display:none;margin-top:12px;">'
         + '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill"><thead><tr>'
-          + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th><th style="width:140px;"></th>'
+          + '<th>Product</th><th style="width:130px;">On Hand</th><th style="width:90px;">Par</th><th style="width:140px;">Order Qty</th><th style="width:110px;">Unit Cost</th><th style="width:110px;">Extended</th><th style="width:110px;"></th>'
         + '</tr></thead><tbody class="os-lines-tbody"></tbody></table></div>'
         + '<div style="margin-top:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
           + '<button class="btn btn-ghost btn-sm os-add-item">+ Add Item</button>'
