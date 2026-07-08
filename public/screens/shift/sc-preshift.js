@@ -219,7 +219,7 @@ S.ShiftPreShift = {
           return '<tr>'
             + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
             + '<td data-label="Margin">' + mHtml + '</td>'
-            + '<td data-label="Why"><div style="font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(this._featureReason(it)) + '</div></td>'
+            + '<td data-label="Talking Point"><input class="pb-pitch" data-id="' + esc(it.id) + '" value="' + esc(it.server_pitch || '') + '" placeholder="How should servers pitch it?" maxlength="90" style="width:100%;background:var(--input);border:1px solid var(--b-edge);border-radius:6px;color:var(--t1);font-size:12px;padding:6px 9px;outline:none;"/></td>'
             + '<td class="no-print"><div class="row-actions">'
             +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
             +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
@@ -228,7 +228,7 @@ S.ShiftPreShift = {
       : '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
     const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:24%"/><col style="width:12%"/><col style="width:44%"/><col/></colgroup>'
-      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Why Feature It <span style="color:var(--t4);font-weight:400;">|</span> <span class="pb-menurundown" style="color:var(--gold);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600;">Menu Rundown</span></th><th class="no-print"></th></tr></thead>'
+      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Talking Point <span style="color:var(--t4);font-weight:400;">|</span> <span class="pb-menurundown" style="color:var(--gold);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600;">Menu Rundown</span></th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + featRows + '</tbody></table></div>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
@@ -343,6 +343,12 @@ S.ShiftPreShift = {
     c.querySelector('#pb-fadd')?.addEventListener('click', () => this._openPicker('add', -1));
     c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this._recommendedFor(this._period).map(s => s.id); this.draw(); });
     c.querySelector('.pb-menurundown')?.addEventListener('click', () => App.openScreen('r-menu-planning'));
+    // Talking point saves ONTO the menu item, so it comes back every time the
+    // item is featured, any shift.
+    c.querySelectorAll('.pb-pitch').forEach(inp => inp.addEventListener('change', () => {
+      const item = ((App.data && App.data.menu_items) || []).find(m => m.id === inp.dataset.id);
+      if (item) { item.server_pitch = inp.value.trim(); App.saveKey('menu_items'); }
+    }));
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
     c.querySelectorAll('.pb-fremove').forEach(b => b.addEventListener('click', () => {
       this._curFeatured().splice(parseInt(b.dataset.idx, 10), 1);
@@ -489,7 +495,7 @@ S.ShiftPreShift = {
     b.kv('Covers forecast', covers != null ? String(covers) : 'Not set');
     if (this._curFocus()) { b.spacer(2); b.sectionTitle(period + ' Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
     b.sectionTitle('Featured Items'); b.spacer(4);
-    if (items.length) b.table(['Item', 'Margin', 'Why Feature It'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-', this._featureReason(i)]; }), { columnStyles: { 0: { cellWidth: 135 }, 1: { cellWidth: 55, halign: 'right' }, 2: { cellWidth: 'auto' } } });
+    if (items.length) b.table(['Item', 'Margin', 'Talking Point'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-', i.server_pitch || '']; }), { columnStyles: { 0: { cellWidth: 135 }, 1: { cellWidth: 55, halign: 'left' }, 2: { cellWidth: 'auto' } } });
     else b.paragraph('No items featured. Cost and price your menu in Menu Engineering to feature your best margins.', { gray: 70 });
     b.sectionTitle('The Upsell Sequence'); b.spacer(4);
     this.upsellSeq().forEach((u, i) => b.paragraph((i + 1) + '. ' + u.title + (u.desc ? '. ' + u.desc : ''), { gray: 45 }));
@@ -500,7 +506,7 @@ S.ShiftPreShift = {
   showHowTo() {
     App.showHelpModal('How the Pre-Shift Briefing Works', [
       { p: ['The Pre-Shift Briefing is the line-up sheet, read to the floor before doors. It is per service period: pick the period at the top and Bar Cop builds a briefing for it, so a bar that runs lunch and dinner holds a separate pre-lunch and pre-dinner line-up the same day. If you run one service, you will not see the period picker. Read it at line-up, or tap Export Briefing for a paper copy.'] },
-      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin sellers, weighted to the daypart you are briefing: lighter plates and apps at lunch, the big entrees and a cocktail at dinner, drinks and apps late night. It reads that off each item\'s category and price, so it is a smart starting point, not a rule. Swap or remove any that do not fit, add your own from the menu, or reset back to the recommendations. You add one line of focus for the shift.'] },
+      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin sellers, weighted to the daypart you are briefing: lighter plates and apps at lunch, the big entrees and a cocktail at dinner, drinks and apps late night. It reads that off each item\'s category and price, so it is a smart starting point, not a rule. Swap or remove any that do not fit, add your own from the menu, or reset back to the recommendations. Give each one a Talking Point, one short line telling servers how to sell it, and it saves to that item so it comes back every time you feature it. You add one line of focus for the shift.'] },
       { h: 'Customize the upsell sequence', p: ['Tap Customize at the bottom of the upsell sequence to write your own steps, drag them into the order you want, and Save. Your version is used from then on, on screen and on the export, and applies to every briefing until you change it again.'] },
       { h: 'Run it and log it', p: ['Tap Mark Briefing Held to log that you ran it for the selected period. Logging is optional: it counts toward your Bar Cop Audit operational discipline once you start using it, and never counts against you if you do not. Briefing History keeps a record per period; delete any entry logged by mistake.'] }
     ]);
