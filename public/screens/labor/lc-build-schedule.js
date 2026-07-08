@@ -835,18 +835,17 @@ S.LaborBuildSchedule = {
     const isOverride = !!(rec && rec.total != null);
     const shown = isOverride ? rec.total : (auto > 0 ? Math.round(auto) : '');
     const note = isOverride
-      ? 'This week is set to your own number. Bar Cop would otherwise project ' + App.fmtCurrency(auto) + ' from your recent weeks and booked events.'
+      ? 'You set this number. Bar Cop calculates ' + App.fmtCurrency(auto) + ' from your recent weeks and booked events.'
       : (auto > 0
-          ? 'Bar Cop projects this automatically from your recent weeks and any events booked, and keeps it current. Type your own number only for something the projection cannot see, like a holiday or a known slow week.'
-          : 'No sales history yet to project this week. Enter your expected revenue to get a labor budget; Bar Cop starts projecting once you have a few weeks logged.');
+          ? 'Bar Cop calculates this from your recent weeks and booked events. Change it only for something it cannot see, like a holiday.'
+          : 'No sales history yet. Enter your expected revenue for a labor budget; Bar Cop calculates it once you have a few weeks logged.');
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Revenue Forecast</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">This becomes your labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast), so you can see if the schedule fits before you post it.</div>'
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:200px;"><label>Forecast for this week</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (shown === '' ? '' : esc(String(shown))) + '" placeholder="0"/></div></div></div>'
       + '<div style="font-size:11px;color:' + (isOverride ? 'var(--amber)' : 'var(--t3)') + ';line-height:1.5;margin-top:8px;">' + note + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-fc-save">Save Forecast</button>'
-      + (isOverride ? '<button class="btn btn-ghost" id="bs-fc-auto">Use Bar Cop\'s Projection</button>' : '')
+      + (isOverride ? '<button class="btn btn-ghost" id="bs-fc-auto">Use Bar Cop\'s Number</button>' : '')
       + '<span id="bs-fc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, noClose: true });
