@@ -926,26 +926,6 @@ S.InventoryProducts = {
     return App.defaultCountStyle({ unit_type: unitType, misc_type: miscType, pack_size: packV });
   },
 
-  // Common container sizes for a liquid bought in a non-volume unit (a mixer by
-  // the bottle) so the operator picks the ounces instead of typing them. Editable
-  // via the shared oz-valued list (key 'size_liquid').
-  _registerLiquidSizeList() {
-    App._listMeta['size_liquid'] = { valued: true };
-    App._listBuiltins['size_liquid'] = [
-      { label: '12 oz', v: 12 }, { label: '750ml (25.4 oz)', v: 25.4 }, { label: '32 oz (quart)', v: 32 },
-      { label: '1L (33.8 oz)', v: 33.8 }, { label: '64 oz (half gal)', v: 64 }, { label: '128 oz (gallon)', v: 128 },
-    ];
-  },
-  _foodSizeOpts(sel) {
-    this._registerLiquidSizeList();
-    let h = '<option value="">Select size...</option>';
-    const items = App.listValuedOptions('size_liquid');
-    const selN = (sel != null && sel !== '') ? parseFloat(sel) : null;
-    if (selN != null && !isNaN(selN) && !items.some(it => it.v === selN)) items.push({ label: selN + ' oz', v: selN, name: '' });
-    items.sort((a, b) => a.v - b.v);
-    items.forEach(it => { h += '<option value="' + it.v + '"' + (selN != null && it.v === selN ? ' selected' : '') + '>' + esc(it.label) + '</option>'; });
-    return h;
-  },
 
   // Only the INPUT cells for the grid. The derived cost readouts live in the calc
   // strip below (see _foodDivisorStripHTML), the way liquor shows its calc strip.
@@ -961,12 +941,19 @@ S.InventoryProducts = {
       return '<div class="f"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>';
     }
-    // Liquid: the operator gives the ounces in one container (drives cost per oz +
-    // the fill-slider count). Any unit can be a liquid this way, custom ones too.
+    // Liquid: the ounces in ONE container drive cost per oz + the fill-slider count.
+    // A prefilled volume unit (gallon/quart/pint) knows its ounces, so the field is
+    // prefilled and locked; a custom unit (bottle, jug) the operator types the
+    // ounces in. The label names the unit: "Gallon Size (oz)" / "Bottle Size (oz)".
     if (this._liquidMode) {
-      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : '';
-      return '<div class="f"><label>Container Size' + App.manageListLink('size_liquid') + '</label>'
-        + '<select id="ip-foz" class="cs-select" data-cs-key="size_liquid">' + this._foodSizeOpts(oz) + '</select></div>';
+      const ut = String(unitType || '').toLowerCase();
+      const VOL = { gallon: 128, quart: 32, pint: 16 };
+      const known = VOL[ut];
+      const uName = (unitType && unitType !== 'custom') ? unitType : 'Unit';
+      const oz = (known != null) ? known : ((p && p.container_size_oz > 0) ? p.container_size_oz : '');
+      const lock = (known != null) ? ' readonly style="opacity:0.6;cursor:not-allowed;"' : '';
+      return '<div class="f"><label>' + esc(uName) + ' Size (oz)</label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-foz" value="' + (oz === '' ? '' : oz) + '" step="0.1" min="0"' + lock + '/><span class="suf">oz</span></div></div>';
     }
     // "each": the unit IS the piece, so just the serving noun.
     if (String(unitType || '').toLowerCase() === 'each') {
