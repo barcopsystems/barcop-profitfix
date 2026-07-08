@@ -87,7 +87,7 @@ S.LaborPositions = {
       + '<div class="f" style="' + cs(200) + '"><label>Position Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
       + '<div class="f" style="' + cs(170) + '"><label>Department</label>'
-      + App.customSelect({ id: p + 'dept', builtin: this.DEPARTMENTS, existing: this.records().map(x => x.department), selected: (item ? item.department : 'Bar') }) + '</div>'
+      + App.customSelect({ id: p + 'dept', builtin: this.DEPARTMENTS, existing: this.positions().map(x => x.department), selected: (item ? item.department : 'Bar') }) + '</div>'
       + '<div class="f" style="' + cs(130) + '"><label>Pay Type</label>'
       + '<select id="' + p + 'paytype">'
       + '<option' + (isSalPos ? '' : ' selected') + '>Hourly</option>'
