@@ -316,6 +316,7 @@ S.InventoryProducts = {
       { h: 'Start With A Category', p: ['Pick one of the six category cards on top: Liquor, Wine, Bottle Beer, Draft Beer, Food, Misc. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
       { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer just needs its case size, the number of bottles in a case, since it is tracked by the case and the individual bottle. A product missing a required field shows as Incomplete in red until you finish it. A complete product can still read Needs a location in red until you place it on a shelf over in Set Locations; it will not show up on a count sheet until it lives somewhere.'] },
       { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
+      { h: 'Food and Misc: Solid or Liquid', p: ['Food and Misc pick a Unit Type, which is simply how you buy and count the product: by the pound, the case, the bag, each, the dozen, or your own word for it if you edit the list. A countable product like ground beef or limes then sets how many servings come out of one unit and what to call a serving, so recipes cost by the portion. If the product is a liquid, like simple syrup, oil, or a bottled mixer, tap "This is a liquid, track by the ounce" (or pick a volume unit like gallon or quart and Bar Cop fills the ounces in for you) and enter how many ounces are in one container. From there Bar Cop costs it by the ounce for recipes and counts it with a fill slider. That single choice is the whole difference between a solid and a liquid, so even a custom unit like "bottle" works either way.'] },
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
@@ -685,10 +686,13 @@ S.InventoryProducts = {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
+      // A Food/Misc product is a liquid (oz-costed, fill-slider) when it carries a
+      // Container Size in ounces. This drives which divisor fields show.
+      this._liquidMode = !!(p && parseFloat(p.container_size_oz) > 0);
       // Default Count By to the product's role; an existing product keeps its
       // saved choice (and counts as "touched" so a unit change never overrides).
       this._countTouched = !!(p?.count_style);
-      const cstyle = p?.count_style || this._defaultCountStyle(ut, p?.misc_type, packV);
+      const cstyle = p?.count_style || App.defaultCountStyle({ unit_type: ut, misc_type: p?.misc_type, pack_size: packV, container_size_oz: p?.container_size_oz });
       row2 = ''
         + this._unitCellHtml(ut)
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
@@ -825,8 +829,12 @@ S.InventoryProducts = {
       this.calcProduct();
       this._refreshMissing();
     });
-    document.getElementById('ip-unit')?.addEventListener('change', () => this._rerenderDivisor());
-    document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
+    document.getElementById('ip-unit')?.addEventListener('change', () => this._onUnitChange());
+    document.getElementById('ip-misctype')?.addEventListener('change', () => {
+      // A supply type (paper / cleaning) is never a liquid.
+      if (this._isSupply(document.getElementById('ip-misctype')?.value || '')) this._liquidMode = false;
+      this._rerenderDivisor();
+    });
     // Wire the "| Edit" links (and any custom-select chrome) inside this form.
     App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
@@ -941,28 +949,31 @@ S.InventoryProducts = {
 
   // Only the INPUT cells for the grid. The derived cost readouts live in the calc
   // strip below (see _foodDivisorStripHTML), the way liquor shows its calc strip.
+  // Is the misc_type a non-recipe supply (paper / cleaning)?
+  _isSupply(miscType) { return (App.MISC_SUPPLY_TYPES || []).includes(miscType); },
+
   _divisorFieldsHTML(p, unitType, miscType) {
     const vv = x => (x != null && x !== '' ? x : '');
-    const role = this._divisorRole(unitType, miscType);
     const uLabel = (unitType && unitType !== 'custom') ? unitType : 'unit';
-    if (role === 'liquid') {
-      // A volume unit derives its ounces from the unit (no input); a non-volume
-      // unit (a mixer bought by the bottle) needs the container size picked.
-      if (App.ozPerUnit(unitType) != null) return '';
-      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : '';
-      return '<div class="f"><label>Container Size' + App.manageListLink('size_liquid') + '</label>'
-        + '<select id="ip-foz" class="cs-select" data-cs-key="size_liquid">' + this._foodSizeOpts(oz) + '</select></div>';
-    }
-    if (role === 'supply') {
+    // Supply (paper / cleaning): pieces per unit for ordering, never a recipe cost.
+    if (this._isSupply(miscType)) {
       const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
       return '<div class="f"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>';
     }
-    if (role === 'each') {
+    // Liquid: the operator gives the ounces in one container (drives cost per oz +
+    // the fill-slider count). Any unit can be a liquid this way, custom ones too.
+    if (this._liquidMode) {
+      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : '';
+      return '<div class="f"><label>Container Size' + App.manageListLink('size_liquid') + '</label>'
+        + '<select id="ip-foz" class="cs-select" data-cs-key="size_liquid">' + this._foodSizeOpts(oz) + '</select></div>';
+    }
+    // "each": the unit IS the piece, so just the serving noun.
+    if (String(unitType || '').toLowerCase() === 'each') {
       return '<div class="f"><label>Serving Name</label>'
         + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="each"/></div>';
     }
-    // serving (lb / case / bag / dozen): servings per unit + the serving noun.
+    // Solid (lb / case / bag / dozen / custom): servings per unit + the serving noun.
     const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
     return '<div class="f"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
       + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 16"/><span class="suf">ea</span></div></div>'
@@ -970,48 +981,67 @@ S.InventoryProducts = {
       + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>';
   },
 
-  // The derived cost readout(s) for a Food / Misc product, in ONE calc strip below
-  // the inputs, mirroring liquor's Pours/Bottle · Cost/Pour · Pour Cost % strip.
+  // The derived cost readout for a Food / Misc product + the liquid/solid toggle,
+  // in ONE calc strip below the inputs (mirrors liquor's calc strip).
   _foodDivisorStripHTML(p, unitType, miscType) {
-    const role = this._divisorRole(unitType, miscType);
+    const isSupply = this._isSupply(miscType);
     const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
     const item = (label, val, id) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val"' + (id ? ' id="' + id + '"' : '') + '>' + val + '</div></div>';
     let items = '';
-    if (role === 'liquid') {
-      const volOz = App.ozPerUnit(unitType);
-      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : (volOz || 0);
-      const cps = (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-';
-      if (volOz != null) items += item('Ounces / ' + esc(unitType || 'unit'), volOz + ' oz', '');
-      items += item('Cost / oz', cps, 'ip-div-cps');
-    } else if (role === 'supply') {
+    if (isSupply) {
       const n = (p && p.pack_size > 0) ? p.pack_size : 0;
       items += item('Cost / Piece', (cost > 0 && n > 0) ? App.fmtCurrency(cost / n, 2) : '-', 'ip-div-cps');
+    } else if (this._liquidMode) {
+      const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : 0;
+      items += item('Cost / oz', (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-', 'ip-div-cps');
     } else {
       const n = (p && p.pack_size > 0) ? p.pack_size : 0;
       const per = n > 0 ? cost / n : cost;   // each / unset serving: 1 = the unit
       items += item('Cost / Serving', cost > 0 ? App.fmtCurrency(per, 2) : '-', 'ip-div-cps');
     }
+    // Toggle: any Food/Misc (except a supply) can be counted by piece/serving OR,
+    // when it is a liquid, tracked by the ounce. This is what makes a custom unit
+    // like "bottle" work as a liquid, and it says plainly what is happening.
+    const toggle = isSupply ? '' : (this._liquidMode
+      ? '<a class="ip-liq-toggle" data-liq="0" style="margin-left:auto;color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;">Count by the piece instead</a>'
+      : '<a class="ip-liq-toggle" data-liq="1" style="margin-left:auto;color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;">This is a liquid, track by the ounce</a>');
     return '<div style="margin-top:18px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;">'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + toggle + '</div></div>';
   },
 
   // Re-render the divisor inputs AND the derived cost strip when Unit / Misc Type
   // changes.
-  _rerenderDivisor() {
+  _rerenderDivisor(prefillOz) {
     const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
     const ut = this.getUnitType();
     const mt = document.getElementById('ip-misctype')?.value || '';
+    // Carry an in-progress container size across the re-render (or take a volume-unit
+    // prefill), so switching modes / units does not silently drop it.
+    const liveOz = prefillOz != null ? prefillOz
+      : (parseFloat(document.getElementById('ip-foz')?.value) || (cur && cur.container_size_oz) || 0);
+    const seed = Object.assign({}, cur || {}, { container_size_oz: this._liquidMode ? liveOz : 0 });
     const wrap = document.getElementById('ip-divisor-wrap');
-    if (wrap) wrap.innerHTML = this._divisorFieldsHTML(cur, ut, mt);
+    if (wrap) wrap.innerHTML = this._divisorFieldsHTML(seed, ut, mt);
     const strip = document.getElementById('ip-divisor-strip');
-    if (strip) strip.innerHTML = this._foodDivisorStripHTML(cur, ut, mt);
+    if (strip) strip.innerHTML = this._foodDivisorStripHTML(seed, ut, mt);
     this._wireDivisor();
-    // Follow the role's practical Count By as the unit changes, unless the
-    // operator has already picked one.
+    // Follow the practical Count By as the unit / mode changes, unless the operator
+    // has already picked one.
     if (!this._countTouched) {
       const sel = document.getElementById('ip-cstyle');
-      if (sel) sel.value = this._defaultCountStyle(ut, mt, document.getElementById('ip-pack')?.value || '');
+      if (sel) sel.value = App.defaultCountStyle({ unit_type: ut, misc_type: mt, pack_size: document.getElementById('ip-pack')?.value || '', container_size_oz: this._liquidMode ? liveOz : 0 });
     }
+  },
+  // Unit picked: a volume unit auto-makes it a liquid (with its ounces); a known
+  // solid unit makes it a solid; a custom unit keeps whatever mode is set.
+  _onUnitChange() {
+    const ut = String(this.getUnitType() || '').toLowerCase();
+    const VOL = { gallon: 128, quart: 32, pint: 16 };
+    const SOLID = ['lb', 'each', 'case', 'bag', 'box', 'dozen'];
+    let prefill = null;
+    if (VOL[ut] != null) { this._liquidMode = true; prefill = VOL[ut]; }
+    else if (SOLID.includes(ut)) { this._liquidMode = false; }
+    this._rerenderDivisor(prefill);
   },
 
   _wireDivisor() {
@@ -1019,6 +1049,11 @@ S.InventoryProducts = {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', () => this._calcDivisor()); el.addEventListener('change', () => this._calcDivisor()); }
     });
+    // The liquid/solid toggle links, rebuilt with the strip each time.
+    document.querySelectorAll('.ip-liq-toggle').forEach(a => a.addEventListener('click', () => {
+      this._liquidMode = a.getAttribute('data-liq') === '1';
+      this._rerenderDivisor();
+    }));
     // The liquid Container Size cell (ip-foz) carries its own "| Edit" link, which
     // is (re)built here on unit changes — wire it (idempotent via _csWired).
     App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
@@ -1031,17 +1066,20 @@ S.InventoryProducts = {
     if (!el) return;
     const cost = parseFloat(document.getElementById('ip-cost')?.value) || 0;
     if (!(cost > 0)) { el.textContent = '-'; return; }
-    const role = this._divisorRole(this.getUnitType(), document.getElementById('ip-misctype')?.value || '');
-    if (role === 'liquid') {
-      const fozEl = document.getElementById('ip-foz');
-      const oz = fozEl ? (parseFloat(fozEl.value) || 0) : (App.ozPerUnit(this.getUnitType()) || 0);
-      el.textContent = oz > 0 ? App.fmtCurrency(cost / oz, 3) : '-';
-    } else if (role === 'each') {
-      el.textContent = App.fmtCurrency(cost, 2);
-    } else {
+    const mt = document.getElementById('ip-misctype')?.value || '';
+    if (this._isSupply(mt)) {
       const n = parseFloat(document.getElementById('ip-pack')?.value) || 0;
-      el.textContent = n > 0 ? App.fmtCurrency(cost / n, 2) : (role === 'serving' ? App.fmtCurrency(cost, 2) : '-');
+      el.textContent = n > 0 ? App.fmtCurrency(cost / n, 2) : '-';
+      return;
     }
+    if (this._liquidMode) {
+      const oz = parseFloat(document.getElementById('ip-foz')?.value) || 0;
+      el.textContent = oz > 0 ? App.fmtCurrency(cost / oz, 3) : '-';
+      return;
+    }
+    // serving / each: 1 = the unit when no servings-per-unit is set.
+    const n = parseFloat(document.getElementById('ip-pack')?.value) || 0;
+    el.textContent = App.fmtCurrency(n > 0 ? cost / n : cost, 2);
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -1202,11 +1240,12 @@ S.InventoryProducts = {
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
     const miscTypeVal = cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '';
-    // Food / Misc liquids store ounces-per-container so recipes cost per ounce:
-    // an explicit container size when set, else derived from a volume unit.
-    if (spec.showUnitType && this._divisorRole(unitType, miscTypeVal) === 'liquid') {
+    // Food / Misc is a liquid ONLY when the operator set a Container Size (oz) via
+    // the "track by the ounce" toggle. That ounces value is what makes it recipe-
+    // costed per ounce and fill-slider counted; blank = counted by piece / serving.
+    if (spec.showUnitType) {
       const fromField = parseFloat(document.getElementById('ip-foz')?.value);
-      oz = (fromField > 0) ? fromField : (App.ozPerUnit(unitType) || null);
+      oz = (this._liquidMode && fromField > 0) ? fromField : null;
     }
     // Serving name (Food / Misc): the recipe noun, e.g. slice / patty / each.
     const servingName = spec.showUnitType ? (document.getElementById('ip-sname')?.value.trim() || null) : null;
