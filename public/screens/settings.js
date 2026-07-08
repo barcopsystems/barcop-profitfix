@@ -1045,6 +1045,22 @@ S.HubSettings = {
     App.data.menu_items = rMenu;
     const rItem = nm => rMenu.find(x => x.name === nm);
 
+    // Sample server talking points on the likely-featured items, so the Pre-Shift
+    // briefing ships with real pitches (the operator writes one per item, once).
+    const rPitch = (nm, p) => { const it = rItem(nm); if (it) it.server_pitch = p; };
+    rPitch('Smoked Wings',       'House dry rub, smoked in-house. Great to share with the first round.');
+    rPitch('Loaded Nachos',      'Big enough for the table. Suggest it the second they sit.');
+    rPitch('Pretzel Bites',      'Out fast with the beer cheese. A perfect opener.');
+    rPitch('Anchor Burger',      'Our signature, half-pound and never frozen. Lead with it.');
+    rPitch('Brisket Sandwich',   'Brisket smoked twelve hours. Ask if they want it loaded.');
+    rPitch('Chicken and Waffles','Fried to order with maple butter. The one everyone photographs.');
+    rPitch('Shrimp Tacos',       'Light and fast, three to an order. A good weeknight pick.');
+    rPitch('Breakfast Tacos',    'Three to an order, out of the kitchen fast. Easy add-on.');
+    rPitch('Fish and Chips',     'Beer-battered cod, hand-cut fries. The Friday go-to.');
+    rPitch('Old Fashioned',      'Top-shelf pour for a couple bucks more. Offer it first.');
+    rPitch('House Margarita',    'Fresh lime, no mix. Upsell the top-shelf tequila.');
+    rPitch('Key Lime Pie',       'House-made and big enough to share. Circle back after dinner.');
+
     // ── Price-change log ──
     const rPrice = (nm, oldP, newP, daysBack, reason, volPct) => {
       const it = rItem(nm);
