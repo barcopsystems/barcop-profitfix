@@ -2703,10 +2703,19 @@ const App = {
   customSelect(opts) {
     opts = opts || {};
     const sel = (opts.selected == null ? '' : String(opts.selected));
+    const key = opts.key || '';
     const all = [];
     const push = v => { v = (v == null ? '' : String(v)).trim(); if (v && !all.some(x => x.toLowerCase() === v.toLowerCase())) all.push(v); };
-    (opts.builtin || []).forEach(push);
-    (opts.existing || []).forEach(push);
+    if (key) {
+      // Keyed list: options come from the built-in defaults + the operator's own
+      // added options minus the ones they hid, all managed via the Manage editor
+      // (App.openListManager). No longer derived from existing records.
+      this._listBuiltins[key] = opts.builtin || this._listBuiltins[key] || [];
+      this.listOptions(key).forEach(push);
+    } else {
+      (opts.builtin || []).forEach(push);
+      (opts.existing || []).forEach(push);
+    }
     push(sel);
     const selLc = sel.toLowerCase();
     // "Add your own" replaces the "Other" bucket entirely: never offer Other as an
@@ -2715,10 +2724,11 @@ const App = {
     const blankHtml = opts.blank ? '<option value=""' + (sel === '' ? ' selected' : '') + '>' + esc(opts.blankLabel || '-') + '</option>' : '';
     const optionsHtml = blankHtml + allF.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === selLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
     const idAttr = opts.id ? ' id="' + esc(opts.id) + '"' : '';
+    const keyAttr = key ? ' data-cs-key="' + esc(key) + '"' : '';
     const styleAttr = opts.style ? ' style="' + opts.style + '"' : '';
     const cls = opts.selectClass || 'form-input';
     return '<span class="cs-wrap" style="display:block;">'
-      + '<select' + idAttr + ' class="cs-select ' + cls + '"' + styleAttr + '>'
+      + '<select' + idAttr + keyAttr + ' class="cs-select ' + cls + '"' + styleAttr + '>'
       +   optionsHtml
       +   '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>'
       + '</select>'
@@ -2747,6 +2757,10 @@ const App = {
         inp.style.display = 'none';
         sel.style.display = '';
         if (!val) { sel.value = sel._csPrev || ''; return; }
+        // Keyed list: persist the new value into the operator's list_config so it
+        // sticks across visits (and un-hides it if it had been hidden).
+        const csKey = sel.getAttribute('data-cs-key');
+        if (csKey) App.listAddOption(csKey, val);
         const addOpt = sel.querySelector('option[value="__addcustom__"]');
         if (![...sel.options].some(o => o.value.toLowerCase() === val.toLowerCase())) {
           const o = document.createElement('option'); o.value = val; o.textContent = val;
@@ -2763,6 +2777,149 @@ const App = {
         else if (e.key === 'Escape') { inp.value = ''; inp.blur(); }
       });
     });
+    // Wire the "| Manage" links that sit next to a keyed dropdown's label.
+    root.querySelectorAll('.cs-manage').forEach(a => {
+      if (a._csWired) return;
+      a._csWired = true;
+      a.addEventListener('click', e => { e.preventDefault(); App.openListManager(a.getAttribute('data-cs-key')); });
+    });
+  },
+
+  // ── Customizable dropdown lists (the 7 Bar-Cop-prefilled selects) ───────────
+  // Per-account store of which options the operator ADDED and which built-ins
+  // they HID, keyed by a stable list key (expense_category, permit_type, etc.).
+  // Built-in defaults live on each screen and are registered into _listBuiltins
+  // the first time that list's customSelect renders. Saved with saveKey.
+  _listBuiltins: {},
+  _listLabels: {
+    expense_category: 'Expense Categories', permit_type: 'Permit Types',
+    department: 'Departments', cert_type: 'Certification Types',
+    payment_term: 'Payment Terms', prep_category: 'Prep Categories',
+    incident_type: 'Incident Types',
+  },
+  listConfig(key) {
+    this.data.list_config = this.data.list_config || {};
+    const c = this.data.list_config[key] = this.data.list_config[key] || {};
+    c.added = c.added || [];
+    c.hidden = c.hidden || [];
+    return c;
+  },
+  // The live option list for a key: built-ins + added, minus hidden, minus Other.
+  listOptions(key) {
+    const c = this.listConfig(key);
+    const hid = c.hidden.map(h => String(h).toLowerCase());
+    const out = [];
+    const push = v => {
+      v = (v == null ? '' : String(v)).trim();
+      const lc = v.toLowerCase();
+      if (v && lc !== 'other' && !hid.includes(lc) && !out.some(x => x.toLowerCase() === lc)) out.push(v);
+    };
+    (this._listBuiltins[key] || []).forEach(push);
+    c.added.forEach(push);
+    return out;
+  },
+  // Add an option to a key (from the inline "+ Add your own" or the Manage editor).
+  // A brand-new value goes into added; a hidden built-in just gets un-hidden.
+  listAddOption(key, val) {
+    val = (val == null ? '' : String(val)).trim();
+    if (!val) return;
+    const c = this.listConfig(key);
+    const lc = val.toLowerCase();
+    c.hidden = c.hidden.filter(h => String(h).toLowerCase() !== lc);
+    const isBuiltin = (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc);
+    if (!isBuiltin && !c.added.some(a => a.toLowerCase() === lc)) c.added.push(val);
+    this.saveKey('list_config');
+  },
+  // Remove an option: a built-in gets hidden, a custom-added one gets deleted.
+  listRemoveOption(key, val) {
+    const c = this.listConfig(key);
+    const lc = String(val).toLowerCase();
+    const before = c.added.length;
+    c.added = c.added.filter(a => a.toLowerCase() !== lc);
+    if (c.added.length === before && (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc)) {
+      if (!c.hidden.some(h => String(h).toLowerCase() === lc)) c.hidden.push(val);
+    }
+    this.saveKey('list_config');
+  },
+  listResetDefaults(key) {
+    this.data.list_config = this.data.list_config || {};
+    this.data.list_config[key] = { added: [], hidden: [] };
+    this.saveKey('list_config');
+  },
+  // The small gold "| Manage" link that sits after a keyed dropdown's <label>.
+  // Sibling of the label (never a child) so a click doesn't focus the select.
+  manageListLink(key) {
+    return '<a class="cs-manage" data-cs-key="' + esc(key) + '" style="color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;margin-left:7px;">| Manage</a>';
+  },
+  // Rebuild every on-screen keyed select for a list after the Manage editor
+  // changes it, preserving each select's current value (and its blank option).
+  _refreshListSelects(key) {
+    const opts = this.listOptions(key);
+    document.querySelectorAll('.cs-select').forEach(sel => {
+      if (sel.getAttribute('data-cs-key') !== key) return;
+      const cur = (sel.value === '__addcustom__') ? (sel._csPrev || '') : sel.value;
+      const hadBlank = sel.options.length && sel.options[0].value === '';
+      const blankLabel = hadBlank ? sel.options[0].textContent : '';
+      const addLabel = (sel.querySelector('option[value="__addcustom__"]') || {}).textContent || '+ Add your own...';
+      const list = opts.slice();
+      const curLc = (cur || '').toLowerCase();
+      if (cur && !list.some(v => v.toLowerCase() === curLc)) list.push(cur);
+      let html = hadBlank ? '<option value="">' + esc(blankLabel) + '</option>' : '';
+      html += list.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+      html += '<option value="__addcustom__">' + esc(addLabel) + '</option>';
+      sel.innerHTML = html;
+      sel.value = cur || '';
+      sel._csPrev = sel.value;
+    });
+  },
+  // Shared "Manage list" editor: remove (× hides a built-in / deletes a custom),
+  // add, or reset to defaults. Re-renders itself after each change; on close it
+  // refreshes the live selects so the dropdowns reflect the edits.
+  openListManager(key) {
+    if (!key) return;
+    const label = this._listLabels[key] || 'List';
+    const id = 'list-mgr';
+    const render = () => {
+      const opts = this.listOptions(key);
+      const rowsHtml = opts.length
+        ? opts.map(v =>
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;">'
+            + '<span>' + esc(v) + '</span>'
+            + '<span class="ll-del" data-v="' + esc(v) + '" title="Remove" style="color:var(--t3);cursor:pointer;font-size:17px;line-height:1;">&times;</span>'
+            + '</div>').join('')
+        : '<div style="color:var(--t3);font-size:12px;padding:6px 0 10px;">No options yet. Add one below.</div>';
+      const html = '<div class="card form-card" style="margin:0;">'
+        + '<div class="card-title">Manage ' + esc(label) + '</div>'
+        + '<div style="max-height:320px;overflow:auto;margin-bottom:14px;">' + rowsHtml + '</div>'
+        + '<div class="form-row" style="align-items:flex-end;gap:8px;">'
+        +   '<div class="f" style="flex:1;"><label>Add an option</label><input type="text" id="ll-add" class="form-input" placeholder="Type it, then Add"/></div>'
+        +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+        + '</div>'
+        + '<div class="card-actions">'
+        +   '<button class="btn btn-ghost" id="ll-done">Done</button>'
+        +   '<button class="btn btn-ghost" id="ll-reset" style="margin-left:auto;">Reset to Defaults</button>'
+        + '</div>'
+        + '</div>';
+      this.openModal(html, { id, maxWidth: 460, onClose: () => { this.closeModal(id); this._refreshListSelects(key); } });
+      const root = document.getElementById(id);
+      if (!root) return;
+      root.querySelectorAll('.ll-del').forEach(x => x.addEventListener('click', () => {
+        this.listRemoveOption(key, x.getAttribute('data-v')); render();
+      }));
+      const addInp = root.querySelector('#ll-add');
+      const doAdd = () => { const v = (addInp.value || '').trim(); if (!v) return; this.listAddOption(key, v); render(); };
+      root.querySelector('#ll-add-btn').addEventListener('click', doAdd);
+      addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+      root.querySelector('#ll-done').addEventListener('click', () => { this.closeModal(id); this._refreshListSelects(key); });
+      root.querySelector('#ll-reset').addEventListener('click', () => {
+        this.confirm({
+          title: 'Reset to defaults?',
+          message: 'This restores the built-in options and removes the ones you added.',
+          confirmText: 'Reset',
+        }).then(ok => { if (ok) { this.listResetDefaults(key); render(); } });
+      });
+    };
+    render();
   },
 
   // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
