@@ -2792,9 +2792,9 @@ const App = {
   // the first time that list's customSelect renders. Saved with saveKey.
   _listBuiltins: {},
   // Per-key list metadata. `valued` = options carry a numeric value (bottle size in
-  // oz). `methoded` = each option carries a tracking method (unit_type: count/oz),
-  // shown + chosen in the editor.
-  _listMeta: { unit_type: { methoded: true } },
+  // oz), shown + chosen in the editor. (unit_type is a plain name list; how a
+  // product is tracked is a per-product "Track By" choice, not a unit property.)
+  _listMeta: {},
   _listIsMethoded(key) { return !!(this._listMeta[key] && this._listMeta[key].methoded); },
   _listLabels: {
     expense_category: 'Expense Categories', permit_type: 'Permit Types',
