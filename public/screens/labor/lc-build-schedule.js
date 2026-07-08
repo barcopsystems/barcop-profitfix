@@ -822,40 +822,43 @@ S.LaborBuildSchedule = {
   },
 
   // ── Forecast modal (writes revenue_forecasts) ────────────────────────────────
+  // Bar Cop projects every week automatically (App.effectiveForecast: the 8-week
+  // baseline plus any events booked that week). This is the one door to override
+  // that number for a week, so it shows the forecast in effect, pre-filled, with
+  // a one-click revert back to the automatic projection.
   openForecastModal() {
     if (!this.draft.week_start) return;
-    const rec = this.forecastForWeek(this.draft.week_start);
-    const cur = rec && rec.total != null ? rec.total : '';
-    const sug = App.forecastDefaultsFor ? (App.forecastDefaultsFor(this.draft.week_start).total || 0) : 0;
-    const hasDetail = !!(rec && rec.per_day && Object.values(rec.per_day).some(v => Number(v) > 0));
+    const ws = this.draft.week_start;
+    const rec = this.forecastForWeek(ws);
+    const auto = (App.forecastDefaultsFor ? (App.forecastDefaultsFor(ws).total || 0) : 0)
+               + (App.bookedEventRevenueForWeek ? (App.bookedEventRevenueForWeek(ws) || 0) : 0);
+    const isOverride = !!(rec && rec.total != null);
+    const shown = isOverride ? rec.total : (auto > 0 ? Math.round(auto) : '');
+    const note = isOverride
+      ? 'This week is set to your own number. Bar Cop would otherwise project ' + App.fmtCurrency(auto) + ' from your recent weeks and booked events.'
+      : (auto > 0
+          ? 'Bar Cop projects this automatically from your recent weeks and any events booked, and keeps it current. Type your own number only for something the projection cannot see, like a holiday or a known slow week.'
+          : 'No sales history yet to project this week. Enter your expected revenue to get a labor budget; Bar Cop starts projecting once you have a few weeks logged.');
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Revenue Forecast</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Your expected sales for this week. Bar Cop turns it into a labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast) so you can see if the schedule fits before you post it.</div>'
-      + (sug > 0
-          ? '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
-            + '<div style="font-size:12px;color:var(--t2);">From your recent weeks: <span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(sug) + '</span></div>'
-            + '<button class="btn btn-ghost btn-sm" id="bs-fc-use">Use this</button></div>'
-          : '<div style="font-size:11px;color:var(--t4);line-height:1.5;margin-bottom:16px;">Not enough sales history yet for a suggestion. Enter your own number to get a labor budget today; Bar Cop starts suggesting once you have a few weeks logged.</div>')
-      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:200px;"><label>' + (sug > 0 ? 'Or enter your own' : 'Expected Revenue') + '</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (cur === '' ? '' : esc(String(cur))) + '" placeholder="0"/></div></div></div>'
-      + (hasDetail ? '<div style="font-size:11px;color:var(--amber);margin-top:6px;line-height:1.5;">This week has a day-by-day forecast. Saving a single total here replaces it.</div>' : '')
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">This becomes your labor budget (' + App.fmtPct(this.laborTarget()) + ' of forecast), so you can see if the schedule fits before you post it.</div>'
+      + '<div class="form-row" style="gap:12px;"><div class="f" style="width:200px;"><label>Forecast for this week</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="bs-fc-val" min="0" step="100" value="' + (shown === '' ? '' : esc(String(shown))) + '" placeholder="0"/></div></div></div>'
+      + '<div style="font-size:11px;color:' + (isOverride ? 'var(--amber)' : 'var(--t3)') + ';line-height:1.5;margin-top:8px;">' + note + '</div>'
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="bs-fc-save">Save Forecast</button>'
+      + (isOverride ? '<button class="btn btn-ghost" id="bs-fc-auto">Use Bar Cop\'s Projection</button>' : '')
       + '<span id="bs-fc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
     App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, noClose: true });
-    document.getElementById('bs-fc-use')?.addEventListener('click', () => { const i = document.getElementById('bs-fc-val'); if (i) i.value = sug; });
-    document.getElementById('bs-fc-save')?.addEventListener('click', () => this.saveForecast(hasDetail));
+    document.getElementById('bs-fc-save')?.addEventListener('click', () => this.saveForecast());
+    document.getElementById('bs-fc-auto')?.addEventListener('click', () => this.clearForecast());
   },
 
-  async saveForecast(hasDetail) {
+  async saveForecast() {
     const errEl = document.getElementById('bs-fc-err');
     const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'inline'; } };
     const val = parseFloat(document.getElementById('bs-fc-val')?.value);
     if (isNaN(val) || val < 0) { fail('Enter the expected revenue for the week.'); return; }
-    if (hasDetail) {
-      const okOv = await App.confirm({ title: 'Replace day-by-day forecast?', message: 'This week has a detailed day-by-day forecast. Saving a single weekly total replaces it. You can rebuild the detailed version later in Revenue Recovery.', confirmText: 'Replace', cancelText: 'Cancel' });
-      if (!okOv) return;
-    }
     if (!Array.isArray(App.data.revenue_forecasts)) App.data.revenue_forecasts = [];
     const list = App.data.revenue_forecasts;
     const ws = this.draft.week_start;
@@ -864,6 +867,18 @@ S.LaborBuildSchedule = {
     if (existing) { existing.total = tv; existing.per_day = {}; existing.method = 'total'; existing.updated_at = new Date().toISOString(); }
     else list.push({ id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     await App.saveKey('revenue_forecasts');
+    App.closeModal('bs-fc-modal');
+    this.draw();
+  },
+
+  // Drop this week's manual override so the week goes back to Bar Cop's automatic
+  // projection (baseline + booked events).
+  async clearForecast() {
+    const ws = this.draft.week_start;
+    if (Array.isArray(App.data.revenue_forecasts)) {
+      App.data.revenue_forecasts = App.data.revenue_forecasts.filter(f => f.week_start !== ws);
+      await App.saveKey('revenue_forecasts');
+    }
     App.closeModal('bs-fc-modal');
     this.draw();
   },
