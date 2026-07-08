@@ -274,6 +274,42 @@ S.InventoryProducts = {
     return h;
   },
 
+  // ── In-place custom cells (size / unit) ─────────────────────────────────────
+  // Picking "Custom" hides the dropdown and shows the custom field(s) in its own
+  // spot (no new column), with a Back link to the presets. The select's value
+  // stays "custom" while custom is showing, so the save logic below is unchanged.
+  _backBtn(id, label) {
+    return '<button type="button" id="' + id + '" style="background:none;border:none;color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;padding:3px 0 0;">&lsaquo; ' + label + '</button>';
+  },
+  _sizeCellHtml(spec, sizeSel) {
+    return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
+      + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select>'
+      + '<div id="ip-cw" style="display:none;">'
+      +   '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div>'
+      +   this._backBtn('ip-cw-back', 'BACK TO SIZES')
+      + '</div></div>';
+  },
+  _unitCellHtml(ut, isCustomUnit) {
+    return '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
+      + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select>'
+      + '<div id="ip-uw" style="' + (isCustomUnit ? '' : 'display:none;') + '">'
+      +   '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/>'
+      +   this._backBtn('ip-uw-back', 'BACK TO UNITS')
+      + '</div></div>';
+  },
+  _toggleSizeCustom(on) {
+    const sel = document.getElementById('ip-size'), cw = document.getElementById('ip-cw');
+    if (sel) sel.style.display = on ? 'none' : '';
+    if (cw) cw.style.display = on ? '' : 'none';
+    if (on) document.getElementById('ip-cname')?.focus();
+  },
+  _toggleUnitCustom(on) {
+    const sel = document.getElementById('ip-unit'), uw = document.getElementById('ip-uw');
+    if (sel) sel.style.display = on ? 'none' : '';
+    if (uw) uw.style.display = on ? '' : 'none';
+    if (on) document.getElementById('ip-unit-custom')?.focus();
+  },
+
   // ── Entry point ───────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container;
@@ -622,10 +658,7 @@ S.InventoryProducts = {
       // Liquor / Wine / Draft Beer
       const sizeSel = p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize;
       row2 = ''
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
-        + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:180px;flex-shrink:0;display:none;"><label>Custom Size</label>'
-        + '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div></div>'
+        + this._sizeCellHtml(spec, sizeSel)
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
         + '<div class="f" style="width:100px;flex-shrink:0;"><label>' + esc(spec.pourLabel || 'Pour Size') + '</label>'
@@ -640,10 +673,7 @@ S.InventoryProducts = {
       // Bottle Beer
       const sizeSel = p?.container_size_oz != null ? p.container_size_oz : spec.defaultSize;
       row2 = ''
-        + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
-        + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select></div>'
-        + '<div class="f" id="ip-cw" style="width:180px;flex-shrink:0;display:none;"><label>Custom Size</label>'
-        + '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz"/></div></div>'
+        + this._sizeCellHtml(spec, sizeSel)
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Case Size</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-case-size" value="' + v(p?.case_size != null ? p.case_size : spec.defaultCaseSize) + '" step="1" min="1"/><span class="suf">btl</span></div></div>'
         + '<div class="f" style="width:130px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
@@ -664,10 +694,7 @@ S.InventoryProducts = {
       this._countTouched = !!(p?.count_style);
       const cstyle = p?.count_style || this._defaultCountStyle(ut, p?.misc_type, packV);
       row2 = ''
-        + '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
-        + '<select id="ip-unit">' + this.unitTypeOpts(isCustomUnit ? 'custom' : ut) + '</select></div>'
-        + '<div class="f" id="ip-uw" style="width:140px;flex-shrink:0;' + (isCustomUnit ? '' : 'display:none;') + '"><label>Custom Unit</label>'
-        + '<input type="text" id="ip-unit-custom" value="' + esc(isCustomUnit ? ut : '') + '" placeholder="gal, dozen, etc."/></div>'
+        + this._unitCellHtml(ut, isCustomUnit)
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
         // Adaptive divisor: how one stock unit breaks into the measure a recipe
@@ -802,16 +829,29 @@ S.InventoryProducts = {
     document.getElementById('ip-name')?.focus();
 
     document.getElementById('ip-size')?.addEventListener('change', () => {
-      const cw = document.getElementById('ip-cw');
-      if (cw) cw.style.display = document.getElementById('ip-size').value === 'custom' ? '' : 'none';
+      this._toggleSizeCustom(document.getElementById('ip-size').value === 'custom');
       this.calcProduct();
       this._refreshMissing();
     });
+    document.getElementById('ip-cw-back')?.addEventListener('click', () => {
+      const sel = document.getElementById('ip-size');
+      if (sel && sel.options[0]) sel.value = sel.options[0].value;
+      this._toggleSizeCustom(false);
+      this.calcProduct(); this._refreshMissing();
+    });
     document.getElementById('ip-unit')?.addEventListener('change', () => {
-      const uw = document.getElementById('ip-uw');
-      if (uw) uw.style.display = document.getElementById('ip-unit').value === 'custom' ? '' : 'none';
+      this._toggleUnitCustom(document.getElementById('ip-unit').value === 'custom');
       this._rerenderDivisor();
     });
+    document.getElementById('ip-uw-back')?.addEventListener('click', () => {
+      const sel = document.getElementById('ip-unit');
+      if (sel && sel.options[0]) sel.value = sel.options[0].value;
+      this._toggleUnitCustom(false);
+      this._rerenderDivisor();
+    });
+    // Apply the initial swap state (an existing custom unit opens in custom mode).
+    this._toggleSizeCustom(document.getElementById('ip-size')?.value === 'custom');
+    this._toggleUnitCustom(document.getElementById('ip-unit')?.value === 'custom');
     document.getElementById('ip-unit-custom')?.addEventListener('input', () => this._rerenderDivisor());
     document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
     // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
