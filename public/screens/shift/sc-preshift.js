@@ -107,24 +107,15 @@ S.ShiftPreShift = {
     return it.price - cost;
   },
 
-  // A short, server-facing reason to push this item, read from where it sits in
-  // its own category on margin and volume (the same read Menu Engineering uses).
-  // Gives the floor a concrete angle, not just a number.
+  // Why we feature this item: the item's own Menu Rundown "read" line, unique per
+  // item. Falls back to a margin line if the Rundown can't read it.
   _featureReason(it) {
+    if (window.S && S.RevenueMenuPlanning && typeof S.RevenueMenuPlanning.briefLineFor === 'function') {
+      const line = S.RevenueMenuPlanning.briefLineFor(it);
+      if (line) return line;
+    }
     const myM = this._itemMargin(it);
-    if (myM == null) return 'Feature it.';
-    const menu = (App.data && App.data.menu_items) || [];
-    const cat = it.category || '';
-    const peers = menu.filter(m => (m.category || '') === cat && !m.archived
-      && this.n(m.price) != null && this.n(App.menuItemCost(m)) != null && this.n(m.weekly_covers) != null);
-    if (peers.length < 4) return 'Strong ' + App.fmtCurrency(myM) + ' margin. Lead with it.';
-    const avgM = peers.reduce((s, m) => s + (m.price - App.menuItemCost(m)), 0) / peers.length;
-    const avgV = peers.reduce((s, m) => s + (this.n(m.weekly_covers) || 0), 0) / peers.length;
-    const hiM = myM >= avgM, hiV = (this.n(it.weekly_covers) || 0) >= avgV;
-    if (hiM && hiV) return 'Top margin and it sells. Lead every table with it.';
-    if (hiM && !hiV) return 'High margin, quiet seller. Every suggestion here is money.';
-    if (!hiM && hiV) return 'A big mover. Pair it with a high-margin add-on to lift the check.';
-    return 'Solid margin. Talk it up.';
+    return myM != null ? 'Strong ' + App.fmtCurrency(myM) + ' margin. Lead with it.' : 'Feature it.';
   },
 
   checkTarget() {
