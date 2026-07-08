@@ -686,11 +686,12 @@ S.InventoryProducts = {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       // How this product is tracked (its stock measure): by the whole unit, by
-      // pieces, or by ounces. Derived from the saved product, else the unit's
-      // default method. The operator can change it (bacon = a lb tracked by pieces).
+      // pieces, or by ounces. Derived from the saved product, else defaulted from
+      // the unit (volume units start on ounces). The operator can change it — the
+      // same unit can go either way (bacon = a lb tracked by pieces).
       this._trackBy = (p && parseFloat(p.container_size_oz) > 0) ? 'oz'
         : (p && parseFloat(p.pack_size) > 0) ? 'pieces'
-        : (App.unitMethod(ut) === 'oz' ? 'oz' : 'unit');
+        : ({ gallon: 1, quart: 1, pint: 1 }[String(ut || '').toLowerCase()] ? 'oz' : 'unit');
       // Default Count By follows Track By; an existing product keeps its saved
       // choice (and counts as "touched" so a unit change never overrides).
       this._countTouched = !!(p?.count_style);
@@ -1030,15 +1031,15 @@ S.InventoryProducts = {
       if (sel) sel.value = this._trackBy === 'oz' ? 'slider' : this._trackBy === 'pieces' ? 'loose' : 'number';
     }
   },
-  // Unit picked: a volume unit forces By ounces + prefills its ounces; otherwise if
-  // the unit's default method is ounces switch to By ounces, else leave Track By.
+  // Unit picked: a volume unit is always By ounces and knows them (prefill + lock).
+  // A known count unit can't be a fixed-oz container, so drop off By ounces to By the
+  // unit. A custom unit keeps whatever Track By the operator set.
   _onUnitChange() {
-    const unit = this.getUnitType();
+    const ul = String(this.getUnitType() || '').toLowerCase();
     const VOL = { gallon: 128, quart: 32, pint: 16 };
-    const known = VOL[String(unit || '').toLowerCase()];
-    if (known != null) { this._trackBy = 'oz'; this._rerenderDivisor(known); return; }
-    if (App.unitMethod(unit) === 'oz') this._trackBy = 'oz';
-    else if (this._trackBy === 'oz') this._trackBy = 'unit';
+    const COUNT = ['lb', 'each', 'case', 'bag', 'box', 'dozen'];
+    if (VOL[ul] != null) { this._trackBy = 'oz'; this._rerenderDivisor(VOL[ul]); return; }
+    if (COUNT.includes(ul) && this._trackBy === 'oz') this._trackBy = 'unit';
     this._rerenderDivisor();
   },
   // Track By changed by the operator.
