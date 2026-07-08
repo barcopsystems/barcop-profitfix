@@ -272,7 +272,6 @@ S.PrepBatches = {
       + '</div></div>';
     const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 660, onClose: () => this.closeEdit() });
     this._scope = overlay;
-    App.wireCustomSelects(overlay || document);
     this.renderRows();
     this.calc();
     this._wireForm(overlay);
@@ -286,6 +285,7 @@ S.PrepBatches = {
   // every form lookup hits the right copy. The list Edit/Delete checks are inert
   // inside the modal (no list there).
   _wireForm(root) {
+    App.wireCustomSelects(root);
     root.onclick = ev => {
       this._scope = root;
       const head = ev.target.closest('.card-collapse-head');
