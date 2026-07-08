@@ -2727,12 +2727,17 @@ const App = {
     const keyAttr = key ? ' data-cs-key="' + esc(key) + '"' : '';
     const styleAttr = opts.style ? ' style="' + opts.style + '"' : '';
     const cls = opts.selectClass || 'form-input';
+    // Keyed lists do all add/remove through the Edit editor — no inline
+    // "+ Add your own" option or text field. Non-keyed selects keep the old
+    // inline-add behaviour.
+    const addHtml = key ? '' : '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>';
+    const inputHtml = key ? '' : '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;width:100%;"/>';
     return '<span class="cs-wrap" style="display:block;">'
       + '<select' + idAttr + keyAttr + ' class="cs-select ' + cls + '"' + styleAttr + '>'
       +   optionsHtml
-      +   '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>'
+      +   addHtml
       + '</select>'
-      + '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;width:100%;"/>'
+      + inputHtml
       + '</span>';
   },
   // Wire every custom-select in a container. Picking "+ Add your own..." swaps the
@@ -2757,10 +2762,6 @@ const App = {
         inp.style.display = 'none';
         sel.style.display = '';
         if (!val) { sel.value = sel._csPrev || ''; return; }
-        // Keyed list: persist the new value into the operator's list_config so it
-        // sticks across visits (and un-hides it if it had been hidden).
-        const csKey = sel.getAttribute('data-cs-key');
-        if (csKey) App.listAddOption(csKey, val);
         const addOpt = sel.querySelector('option[value="__addcustom__"]');
         if (![...sel.options].some(o => o.value.toLowerCase() === val.toLowerCase())) {
           const o = document.createElement('option'); o.value = val; o.textContent = val;
@@ -2846,10 +2847,14 @@ const App = {
     this.data.list_config[key] = { added: [], hidden: [] };
     this.saveKey('list_config');
   },
-  // The small gold "| Manage" link that sits after a keyed dropdown's <label>.
-  // Sibling of the label (never a child) so a click doesn't focus the select.
+  // The "| Edit" affordance that sits after a keyed dropdown's <label> text. The
+  // pipe inherits the label's colour/size (reads as part of the title); only the
+  // word "Edit" is gold. The gold + pointer inline style picks up the global
+  // gold-link hover. Lives inside the label (labels here are unassociated, so a
+  // click never focuses the select) which keeps the row height aligned.
   manageListLink(key) {
-    return '<a class="cs-manage" data-cs-key="' + esc(key) + '" style="color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;margin-left:7px;">| Manage</a>';
+    return '<span aria-hidden="true">|</span>'
+      + '<a class="cs-manage" data-cs-key="' + esc(key) + '" style="color:var(--gold);cursor:pointer;">Edit</a>';
   },
   // Rebuild every on-screen keyed select for a list after the Manage editor
   // changes it, preserving each select's current value (and its blank option).
@@ -2857,47 +2862,58 @@ const App = {
     const opts = this.listOptions(key);
     document.querySelectorAll('.cs-select').forEach(sel => {
       if (sel.getAttribute('data-cs-key') !== key) return;
-      const cur = (sel.value === '__addcustom__') ? (sel._csPrev || '') : sel.value;
+      const cur = sel.value;
       const hadBlank = sel.options.length && sel.options[0].value === '';
       const blankLabel = hadBlank ? sel.options[0].textContent : '';
-      const addLabel = (sel.querySelector('option[value="__addcustom__"]') || {}).textContent || '+ Add your own...';
       const list = opts.slice();
       const curLc = (cur || '').toLowerCase();
+      // A record already on a now-hidden/removed value keeps that value selectable
+      // so it never orphans.
       if (cur && !list.some(v => v.toLowerCase() === curLc)) list.push(cur);
       let html = hadBlank ? '<option value="">' + esc(blankLabel) + '</option>' : '';
       html += list.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
-      html += '<option value="__addcustom__">' + esc(addLabel) + '</option>';
       sel.innerHTML = html;
       sel.value = cur || '';
       sel._csPrev = sel.value;
     });
   },
-  // Shared "Manage list" editor: remove (× hides a built-in / deletes a custom),
-  // add, or reset to defaults. Re-renders itself after each change; on close it
-  // refreshes the live selects so the dropdowns reflect the edits.
+  // Shared list editor (opened by the "| Edit" link). Remove hides a built-in /
+  // deletes a custom; Restore un-hides a hidden built-in; Add adds a custom;
+  // Reset to Defaults clears both. Corner X closes. Re-renders after each change;
+  // on close it refreshes the live selects so the dropdowns reflect the edits.
   openListManager(key) {
     if (!key) return;
     const label = this._listLabels[key] || 'List';
     const id = 'list-mgr';
+    const rowStyle = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;';
+    const linkStyle = 'color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;';
     const render = () => {
       const opts = this.listOptions(key);
+      const hidden = this.listConfig(key).hidden.slice();
       const rowsHtml = opts.length
         ? opts.map(v =>
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;">'
+            '<div style="' + rowStyle + '">'
             + '<span>' + esc(v) + '</span>'
-            + '<span class="ll-del" data-v="' + esc(v) + '" title="Remove" style="color:var(--t3);cursor:pointer;font-size:17px;line-height:1;">&times;</span>'
+            + '<span class="ll-del" data-v="' + esc(v) + '" style="' + linkStyle + '">Remove</span>'
             + '</div>').join('')
         : '<div style="color:var(--t3);font-size:12px;padding:6px 0 10px;">No options yet. Add one below.</div>';
+      const hiddenHtml = hidden.length
+        ? '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:16px 0 8px;">Hidden</div>'
+          + hidden.map(v =>
+            '<div style="' + rowStyle + 'color:var(--t3);">'
+            + '<span>' + esc(v) + '</span>'
+            + '<span class="ll-restore" data-v="' + esc(v) + '" style="' + linkStyle + '">Restore</span>'
+            + '</div>').join('')
+        : '';
       const html = '<div class="card form-card" style="margin:0;">'
-        + '<div class="card-title">Manage ' + esc(label) + '</div>'
-        + '<div style="max-height:320px;overflow:auto;margin-bottom:14px;">' + rowsHtml + '</div>'
-        + '<div class="form-row" style="align-items:flex-end;gap:8px;">'
-        +   '<div class="f" style="flex:1;"><label>Add an option</label><input type="text" id="ll-add" class="form-input" placeholder="Type it, then Add"/></div>'
+        + '<div class="card-title">Edit ' + esc(label) + '</div>'
+        + '<div style="max-height:340px;overflow:auto;">' + rowsHtml + hiddenHtml + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
+        +   '<input type="text" id="ll-add" class="form-input" placeholder="Add an option" style="flex:1;"/>'
         +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
         + '</div>'
         + '<div class="card-actions">'
-        +   '<button class="btn btn-ghost" id="ll-done">Done</button>'
-        +   '<button class="btn btn-ghost" id="ll-reset" style="margin-left:auto;">Reset to Defaults</button>'
+        +   '<button class="btn btn-ghost" id="ll-reset">Reset to Defaults</button>'
         + '</div>'
         + '</div>';
       this.openModal(html, { id, maxWidth: 460, onClose: () => { this.closeModal(id); this._refreshListSelects(key); } });
@@ -2906,11 +2922,13 @@ const App = {
       root.querySelectorAll('.ll-del').forEach(x => x.addEventListener('click', () => {
         this.listRemoveOption(key, x.getAttribute('data-v')); render();
       }));
+      root.querySelectorAll('.ll-restore').forEach(x => x.addEventListener('click', () => {
+        this.listAddOption(key, x.getAttribute('data-v')); render();
+      }));
       const addInp = root.querySelector('#ll-add');
       const doAdd = () => { const v = (addInp.value || '').trim(); if (!v) return; this.listAddOption(key, v); render(); };
       root.querySelector('#ll-add-btn').addEventListener('click', doAdd);
       addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
-      root.querySelector('#ll-done').addEventListener('click', () => { this.closeModal(id); this._refreshListSelects(key); });
       root.querySelector('#ll-reset').addEventListener('click', () => {
         this.confirm({
           title: 'Reset to defaults?',
