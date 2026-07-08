@@ -370,10 +370,8 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-primary btn-sm" id="bs-fc">Set Forecast</button></div></div>';
     } else {
       const leftCls = left >= 0 ? 'good' : 'warn';
-      const fcAuto = !this.forecastForWeek(d.week_start);
-      const fcTag = fcAuto ? ' <span style="font-size:10px;color:var(--t3);letter-spacing:.5px;vertical-align:middle;">COMPUTED</span>' : '';
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc) + fcTag
+        + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Labor Budget</div><div class="calc-val lg">' + App.fmtCurrency(budget)
         + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
