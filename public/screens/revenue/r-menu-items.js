@@ -24,7 +24,6 @@ S.RevenueMenuItems = {
   _importOpen:      false,       // Upload panel open in place of the list
   _selected:        null,        // Set of item ids checked for bulk delete
   _recipeOpen:      false,       // recipe builder revealed (allow-but-nudge toggle)
-  _otherPrices:     [],          // alternate menu prices (happy hour, specials)
 
   // ── Constants ─────────────────────────────────────────────────────────
   // All menu category groupings now live on App so they never drift across
@@ -186,7 +185,6 @@ S.RevenueMenuItems = {
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly units sold, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
       { h: 'Adding an Item', p: ['Start from the tile for the kind of item you are adding. Dishes and Cocktails get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. No Prep items link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). A poured product like draft beer or wine by the glass carries a Pour Size; a food or resale item carries a Portion; bottle beer sells whole. Enter units sold so Menu Engineering can weight the item by how often it sells.'] },
       { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and the list is yours to shape. Tap Edit next to Category to add your own sections (Happy Hour, Brunch, Featured), rename by adding and hiding, or reset to the defaults. Any item type can go in any section, so a Happy Hour section can hold a cocktail, a dish, and a beer together. Your sections show up as real grouped sections on this page and in the rest of the Menu tools. A No Prep item drops into a sensible section automatically if you do not pick one.'] },
-      { h: 'Other Selling Prices', p: ['Any item can carry more than one price. Use Add Price under Other Selling Prices to log a happy-hour or specials price, and Bar Cop shows the cost percentage at each price so you can see whether a discounted price runs into a loss before you commit to it.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review Log in Menu Engineering picks it up.'] },
       { h: 'Archived Items', p: ['An item you cut from the Dog Test lands in an Archived list at the bottom of the page, kept out of the menu and out of Menu Engineering but not deleted. Restore brings one back onto the live menu with everything intact; Delete Permanently removes it for good after a confirm. You can only get here by cutting an item, so nothing archives by accident.'] }
@@ -473,7 +471,6 @@ S.RevenueMenuItems = {
     this.rows = hasRecipe
       ? item.recipe.ingredients.map(i => ({ source: i.source || 'product', id: i.id || i.product_id, quantity: i.quantity }))
       : [];
-    this._otherPrices = (item && Array.isArray(item.other_prices)) ? item.other_prices.map(o => ({ label: o.label, price: o.price })) : [];
     this._editingIncomplete = !!(item && this.formType && this.missingFields(item, this.formType).size > 0);
 
     // Remove the inline add form (card + buttons) so its ri-* / mi-adaptive ids
@@ -498,7 +495,7 @@ S.RevenueMenuItems = {
       + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 660, onClose: () => this.cancelEditor() });
+    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 680, onClose: () => this.cancelEditor() });
     App.wireCustomSelects(document.getElementById('mi-editor') || document);
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
@@ -517,10 +514,10 @@ S.RevenueMenuItems = {
     // Category is a free-form menu SECTION, shared across every item type and
     // editable through the | Edit popup. It no longer implies the item's kind
     // (that's the type, set by the tile), so it shows on all three forms.
-    const catCell = '<div class="f" style="width:150px;flex-shrink:0;"><label>Category' + App.manageListLink('menu_category') + '</label>'
+    const catCell = '<div class="f" style="flex:1.4 1 140px;"><label>Category' + App.manageListLink('menu_category') + '</label>'
       + App.customSelect({ id: 'ri-cat', key: 'menu_category', builtin: App.MENU_ALL_CATEGORIES, selected: selCat, blank: true, blankLabel: 'Select category...' })
       + '</div>';
-    const nameSlot = '<div class="f" id="mi-name-slot" style="width:150px;flex-shrink:0;display:none;"></div>';
+    const nameSlot = '<div class="f" id="mi-name-slot" style="flex:1.5 1 140px;display:none;"></div>';
     const linkedSlot = '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
     const adaptive = '<div id="mi-adaptive" style="display:contents;"></div>';
     // Recipe types lead with Menu Name then Category; inventory leads with
@@ -577,7 +574,6 @@ S.RevenueMenuItems = {
       if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
       host.innerHTML = this.inventoryRestHtml(item);
       this.wireInventoryFields();
-      this.renderOtherPrices(item);
       return;
     }
     // Recipe types carry a real typed name, so the Menu Name field loads right
@@ -586,10 +582,8 @@ S.RevenueMenuItems = {
     host.innerHTML = this.recipeFields(item);
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     this.renderRecipeArea(item);
-    this.renderOtherPrices(item);
     document.getElementById('ri-price')?.addEventListener('input', () => { this.refreshFieldMissing(); this.calcRecipe(); });
-    // Manual cost edits (no recipe) refresh the alternate-price cost %s too.
-    document.getElementById('ri-cost')?.addEventListener('input', () => { this.refreshFieldMissing(); this.recalcAllPrices(); });
+    document.getElementById('ri-cost')?.addEventListener('input', () => this.refreshFieldMissing());
   },
 
   // The recipe area toggles: a "+ Build Recipe" button when closed (the item can
@@ -614,70 +608,6 @@ S.RevenueMenuItems = {
     }
   },
 
-  // ── Other Prices (happy hour / specials): one item, several price points ─────
-  // Same recipe cost, each price shows its own cost %, so the operator can see
-  // whether a happy-hour price runs into a loss. Margin visibility only — no
-  // sales-mix blend (that would need POS covers split by price).
-  renderOtherPrices(item) {
-    const wrap = document.getElementById('ri-other-prices-wrap');
-    if (!wrap) return;
-    const rows = (this._otherPrices || []).map((o, i) => this.priceRowHTML(o, i)).join('');
-    wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
-      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
-        + '<label style="margin:0;">Other Selling Prices</label>'
-        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-add-price">+ Add Price</button>'
-      + '</div>'
-      + '<div id="ri-op-list">' + rows + '</div>'
-      + '</div>';
-    document.getElementById('ri-add-price')?.addEventListener('click', () => {
-      this.syncOtherPrices();
-      this._otherPrices.push({ label: '', price: '' });
-      this.renderOtherPrices(item);
-    });
-    wrap.querySelectorAll('.op-row').forEach(r => this.wirePriceRow(r));
-  },
-  priceRowHTML(o) {
-    o = o || {};
-    return '<div class="op-row" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Name</label><input type="text" class="op-label" value="' + esc(o.label || '') + '" placeholder="Happy Hour"/></div>'
-      + '<div class="f" style="width:100px;flex-shrink:0;"><label>Price</label><div class="fw"><span class="pre">$</span><input class="pre op-price" type="number" step="0.25" min="0" value="' + (o.price != null && o.price !== '' ? o.price : '') + '"/></div></div>'
-      + '<div style="font-size:11px;color:var(--t3);padding-bottom:9px;white-space:nowrap;">Cost <span class="op-pct" style="font-weight:700;color:var(--t1);">-</span></div>'
-      + '<button type="button" class="btn btn-ghost btn-sm op-del" style="margin-bottom:2px;">Remove</button>'
-      + '</div>';
-  },
-  wirePriceRow(row) {
-    row.querySelector('.op-price')?.addEventListener('input', () => this.recalcPriceRow(row));
-    row.querySelector('.op-del')?.addEventListener('click', () => row.remove());
-    this.recalcPriceRow(row);
-  },
-  recalcPriceRow(row) {
-    if (!row) return;
-    const span = row.querySelector('.op-pct');
-    if (!span) return;
-    const cost = this._currentItemCost();
-    const price = parseFloat(row.querySelector('.op-price')?.value) || 0;
-    const pct = (cost > 0 && price > 0) ? (cost / price * 100) : null;
-    const target = parseFloat(document.getElementById('ri-target-pct')?.value)
-      || (this.formType === 'plate' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
-    span.textContent = pct != null ? pct.toFixed(1) + '%' : '-';
-    span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : 'var(--green)');
-  },
-  // The item's current cost, read from whichever form is open: the recipe/manual
-  // Cost input, or the inventory form's auto-computed Cost strip.
-  _currentItemCost() {
-    const c = document.getElementById('ri-cost');
-    if (c) return parseFloat(c.value) || 0;
-    const inv = document.getElementById('ri-inv-cost');
-    if (inv) return parseFloat(String(inv.textContent).replace(/[^0-9.]/g, '')) || 0;
-    return 0;
-  },
-  recalcAllPrices() { document.querySelectorAll('.op-row').forEach(r => this.recalcPriceRow(r)); },
-  syncOtherPrices() {
-    this._otherPrices = [...document.querySelectorAll('.op-row')].map(r => ({
-      label: r.querySelector('.op-label')?.value.trim() || '',
-      price: parseFloat(r.querySelector('.op-price')?.value) || ''
-    }));
-  },
 
   // The Menu Name field, loaded into #mi-name-slot. Typed for recipe items; for
   // inventory items it auto-fills from the chosen product (still editable).
@@ -689,11 +619,10 @@ S.RevenueMenuItems = {
   },
 
   recipeFields(item) {
-    return '<div class="f" style="width:90px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:85px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="width:85px;"><label>Units Sold</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
+    return '<div class="f" style="flex:1 1 90px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 85px;"><label>Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-cost" value="' + (item?.cost ? (+item.cost).toFixed(2) : '') + '" step="0.01" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 85px;"><label>Units Sold</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + '<div id="ri-recipe-wrap" style="flex:0 0 100%;"></div>'
-      + '<div id="ri-other-prices-wrap" style="flex:0 0 100%;"></div>'
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
 
@@ -734,7 +663,6 @@ S.RevenueMenuItems = {
         + '<div class="calc-item"><div class="calc-label">Cost</div><div class="calc-val" id="ri-inv-cost">' + (autoCost > 0 ? App.fmtCurrency(autoCost) : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Cost %</div><div class="calc-val" id="ri-inv-pct">' + (autoCost > 0 && item?.price > 0 ? (autoCost / item.price * 100).toFixed(1) + '%' : '-') + '</div></div>'
         + '</div></div>'
-      + '<div id="ri-other-prices-wrap" style="flex:0 0 100%;"></div>'
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
   // Which amount field a linked product uses: a pour (draft beer / wine by the
@@ -764,7 +692,6 @@ S.RevenueMenuItems = {
       const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
       const pctEl = document.getElementById('ri-inv-pct');
       if (pctEl) pctEl.textContent = (bc > 0 && price > 0) ? (bc / price * 100).toFixed(1) + '%' : '-';
-      this.recalcAllPrices();   // keep any Other Selling Prices %s in step with the live cost
     };
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
       this.linkedProductId = e.target.value || '';
@@ -945,7 +872,6 @@ S.RevenueMenuItems = {
         costInp.disabled = false;
       }
     }
-    this.recalcAllPrices();
     this.refreshFieldMissing();
   },
 
@@ -1040,14 +966,6 @@ S.RevenueMenuItems = {
       }
     }
 
-    // Other Selling Prices (happy hour / specials) on every item type: one item,
-    // several price points; same cost, each carries its own margin.
-    const otherPrices = [];
-    document.querySelectorAll('.op-row').forEach(r => {
-      const price = parseFloat(r.querySelector('.op-price')?.value);
-      if (!isNaN(price) && price > 0) otherPrices.push({ label: (r.querySelector('.op-label')?.value.trim() || 'Other'), price });
-    });
-
     // If this is an edit, snapshot the prior weekly_covers before overwriting
     // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
     // update"). Only snapshot when the value actually changes — typing the
@@ -1078,7 +996,6 @@ S.RevenueMenuItems = {
       linked_product_id:  linkedProductId,
       pour_size_oz:       pourSizeOz,
       portion:            portion,
-      other_prices:       otherPrices,
       target_cost_pct:    targetPct,
       planned_price:      priceChanged ? null : (existing && existing.planned_price != null ? existing.planned_price : null),
       planned_vol_pct:    priceChanged ? null : (existing && existing.planned_vol_pct != null ? existing.planned_vol_pct : null),
