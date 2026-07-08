@@ -156,7 +156,7 @@ S.PrepBatches = {
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Category</label>'
-          + '<select id="pb-cat"><option value="">Select...</option>' + catOpts + '</select></div>'
+          + App.customSelect({ id: 'pb-cat', builtin: this.CATEGORIES, existing: this.list().map(x => x.category), selected: (b ? b.category : ''), blank: true, blankLabel: 'Select...' }) + '</div>'
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
         + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Serving Size</label>'
@@ -272,6 +272,7 @@ S.PrepBatches = {
       + '</div></div>';
     const overlay = App.openModal(html, { id: 'pb-edit-modal', maxWidth: 660, onClose: () => this.closeEdit() });
     this._scope = overlay;
+    App.wireCustomSelects(overlay || document);
     this.renderRows();
     this.calc();
     this._wireForm(overlay);
