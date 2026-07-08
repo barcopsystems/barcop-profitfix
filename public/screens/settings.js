@@ -976,71 +976,14 @@ S.HubSettings = {
       };
     });
 
-    // ── Revenue Forecasts — one record per Monday for the last 6 weeks plus
-    // the coming week. Each weekly forecast is built from the same actuals
-    // we just generated, with a small ±4% nudge so the operator-facing
-    // "vs Forecast" tile shows a realistic variance rather than a zero.
-    // Per-day split uses the same weekday-weight curve other sample data uses
-    // (heavier Fri/Sat, lighter Mon/Tue).
-    const fcDayWeights = { Mon:0.10, Tue:0.10, Wed:0.12, Thu:0.13, Fri:0.18, Sat:0.22, Sun:0.15 };
-    const fcDays       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const monStartFor  = (dStr) => {
-      const d = new Date(dStr + 'T00:00:00');
-      const wd = (d.getDay() + 6) % 7;
-      d.setDate(d.getDate() - wd);
-      return App.ymdLocal(d);
-    };
-    // Covers forecast derives from the revenue forecast at the Anchor's blended
-    // check average. Build Schedule reads covers_per_day for its cover target.
-    const AVG_CHECK = 38;
-    const coversFor = (pd) => { const c = {}; fcDays.forEach(d => { c[d] = Math.round((pd[d] || 0) / AVG_CHECK); }); return c; };
-    const totalCoversOf = (cpd) => fcDays.reduce((t, d) => t + (cpd[d] || 0), 0);
-    const lastSix = App.data.revenue_weeks.slice(-6);
-    App.data.revenue_forecasts = lastSix.map((wk, i) => {
-      // Forecast was set the Saturday BEFORE the week, so it's a forward
-      // projection that landed close to but not exactly on actuals.
-      const total = (wk.bar_revenue + wk.floor_revenue) * (i % 2 === 0 ? 0.96 : 1.04);
-      const per_day = {};
-      fcDays.forEach(d => { per_day[d] = Math.round(total * fcDayWeights[d]); });
-      const covers_per_day = coversFor(per_day);
-      const week_start = monStartFor(wk.period_end);
-      return {
-        id: uid(),
-        week_start,
-        per_day,
-        covers_per_day,
-        total: +total.toFixed(2),
-        total_covers: totalCoversOf(covers_per_day),
-        method: 'manual',
-        notes: '',
-        created_at: new Date(week_start + 'T18:00:00').toISOString(),
-        updated_at: new Date(week_start + 'T18:00:00').toISOString()
-      };
-    });
-    // Plus a coming-week forecast so the schedule builder has something to read
-    // when the operator opens it on the demo data.
-    (() => {
-      const last = App.data.revenue_weeks[App.data.revenue_weeks.length - 1];
-      const ref  = (last.bar_revenue + last.floor_revenue) * 1.02;
-      const monAt = (offsetWeeks) => {
-        const d = new Date();
-        const wd = (d.getDay() + 6) % 7;
-        d.setDate(d.getDate() - wd + offsetWeeks * 7);
-        return App.ymdLocal(d);
-      };
-      const per_day = {};
-      fcDays.forEach(d => { per_day[d] = Math.round(ref * fcDayWeights[d]); });
-      const covers_per_day = coversFor(per_day);
-      const mk = (week_start, notes) => ({
-        id: uid(), week_start, per_day: { ...per_day }, covers_per_day: { ...covers_per_day },
-        total: +ref.toFixed(2), total_covers: totalCoversOf(covers_per_day),
-        method: 'manual', notes,
-        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-      });
-      // Both weeks feed the schedule builder's cover target and the forecast.
-      App.data.revenue_forecasts.push(mk(monAt(0), ''));
-      App.data.revenue_forecasts.push(mk(monAt(1), ''));
-    })();
+    // ── Revenue Forecasts — none seeded on purpose. Bar Cop now calculates every
+    // week's forecast live from the shift history and booked events above
+    // (App.effectiveForecast: 8-week baseline + events). A saved record here would
+    // read as a manual OVERRIDE and show a second, competing number, so the demo
+    // carries none and every week shows Bar Cop's own calculated forecast. Covers
+    // and the schedule cover target come from the same computed baseline
+    // (App.coverDefaultsFor), so nothing needs a seeded forecast to read.
+    App.data.revenue_forecasts = [];
 
     // ── Menu — the Anchor's full card, costed for Menu Engineering ──
     const rMenu = [
