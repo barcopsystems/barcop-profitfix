@@ -1431,7 +1431,7 @@ S.HubSettings = {
       { name:'Seasonal Rotating Tap',    category:'Draft Beer', vendor:"Glazer's Beer & Bev", container_size_oz:1984, pour_size_oz:16, unit_cost:185.00, menu_price:7, par_level:2, reorder_point:1, primary_location:'Walk-in Cooler' },
       // ── Resale items (bought + sold whole, marked Sold on the menu) ─────────
       { name:'Topo Chico (each)',        category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.95, menu_price:4,    servings_per_unit:1,  cost_per_serving:0.95, par_level:48, reorder_point:24, primary_location:'Walk-in Cooler' },
-      { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gal', container_size_oz:128, vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
+      { name:'House Lemonade',           category:'Misc', misc_type:'NA Beverage',  sold_on_menu:true, unit_type:'gallon', container_size_oz:128, vendor:'Sysco Foods', unit_cost:6.00, menu_price:4, servings_per_unit:12, cost_per_serving:0.50, par_level:6,  reorder_point:2,  primary_location:'Walk-in Cooler' },
       { name:'Kettle Chips (bag)',       category:'Food', sold_on_menu:true, vendor:'Sysco Foods', unit_cost:0.85, menu_price:3.5, servings_per_unit:1, cost_per_serving:0.85, par_level:60, reorder_point:24, primary_location:'Dry Storage' },
       // ── Top-shelf bottles that overstocked and barely move: a few thousand in
       //    cash sitting on the shelf. They carry zero usage between counts, so they
