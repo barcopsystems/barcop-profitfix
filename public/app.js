@@ -2807,6 +2807,11 @@ const App = {
     size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes',
   },
   _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
+  // Category-appropriate example for the "Name" field on a valued (size) list.
+  _listNameHints: {
+    size_spirits: 'e.g. Gallon', size_wine: 'e.g. Box', size_beer: 'e.g. Tallboy',
+    size_draft: 'e.g. Corny Keg', size_liquid: 'e.g. Jug',
+  },
   listConfig(key) {
     this.data.list_config = this.data.list_config || {};
     const c = this.data.list_config[key] = this.data.list_config[key] || {};
@@ -2981,7 +2986,7 @@ const App = {
         : '';
       const addRow = valued
         ? '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
-          +   '<input type="text" id="ll-add" class="form-input" placeholder="Name (e.g. Gallon)" style="flex:1;"/>'
+          +   '<input type="text" id="ll-add" class="form-input" placeholder="Name (' + esc(this._listNameHints[key] || 'e.g. Gallon') + ')" style="flex:1;"/>'
           +   '<input type="number" id="ll-add-oz" class="form-input" placeholder="oz" step="0.1" min="0" style="width:90px;"/>'
           +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
           + '</div>'
