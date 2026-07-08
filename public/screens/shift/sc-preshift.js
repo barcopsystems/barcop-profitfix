@@ -107,6 +107,26 @@ S.ShiftPreShift = {
     return it.price - cost;
   },
 
+  // A short, server-facing reason to push this item, read from where it sits in
+  // its own category on margin and volume (the same read Menu Engineering uses).
+  // Gives the floor a concrete angle, not just a number.
+  _featureReason(it) {
+    const myM = this._itemMargin(it);
+    if (myM == null) return 'Feature it.';
+    const menu = (App.data && App.data.menu_items) || [];
+    const cat = it.category || '';
+    const peers = menu.filter(m => (m.category || '') === cat && !m.archived
+      && this.n(m.price) != null && this.n(App.menuItemCost(m)) != null && this.n(m.weekly_covers) != null);
+    if (peers.length < 4) return 'Strong ' + App.fmtCurrency(myM) + ' margin. Lead with it.';
+    const avgM = peers.reduce((s, m) => s + (m.price - App.menuItemCost(m)), 0) / peers.length;
+    const avgV = peers.reduce((s, m) => s + (this.n(m.weekly_covers) || 0), 0) / peers.length;
+    const hiM = myM >= avgM, hiV = (this.n(it.weekly_covers) || 0) >= avgV;
+    if (hiM && hiV) return 'Top margin and it sells. Lead every table with it.';
+    if (hiM && !hiV) return 'High margin, quiet seller. Every suggestion here is money.';
+    if (!hiM && hiV) return 'A big mover. Pair it with a high-margin add-on to lift the check.';
+    return 'Solid margin. Talk it up.';
+  },
+
   checkTarget() {
     const t = (App.data && App.data.revenue_settings && App.data.revenue_settings.targets) || {};
     return this.n(t.check_avg);
@@ -154,15 +174,16 @@ S.ShiftPreShift = {
           return '<tr>'
             + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
             + '<td data-label="Margin">' + mHtml + '</td>'
+            + '<td data-label="Why"><span style="font-size:12px;color:var(--t2);line-height:1.5;">' + esc(this._featureReason(it)) + '</span></td>'
             + '<td class="no-print"><div class="row-actions">'
             +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
             +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
             + '</div></td></tr>';
         }).join('')
-      : '<tr><td colspan="3" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
+      : '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
     const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:46%"/><col style="width:20%"/><col/></colgroup>'
-      + '<thead><tr><th>Featured Items</th><th>Margin</th><th class="no-print"></th></tr></thead>'
+      + '<colgroup><col style="width:24%"/><col style="width:12%"/><col style="width:44%"/><col/></colgroup>'
+      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Why Feature It</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + featRows + '</tbody></table></div>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
@@ -422,7 +443,7 @@ S.ShiftPreShift = {
     b.kv('Covers forecast', covers != null ? String(covers) : 'Not set');
     if (this._curFocus()) { b.spacer(2); b.sectionTitle(period + ' Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
     b.sectionTitle('Featured Items'); b.spacer(4);
-    if (items.length) b.table(['Item', 'Margin'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-']; }), { columnStyles: { 1: { cellWidth: 90, halign: 'right' } } });
+    if (items.length) b.table(['Item', 'Margin', 'Why Feature It'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-', this._featureReason(i)]; }), { columnStyles: { 1: { cellWidth: 70, halign: 'right' } } });
     else b.paragraph('No items featured. Cost and price your menu in Menu Engineering to feature your best margins.', { gray: 70 });
     b.sectionTitle('The Upsell Sequence'); b.spacer(4);
     this.upsellSeq().forEach((u, i) => b.paragraph((i + 1) + '. ' + u.title + (u.desc ? '. ' + u.desc : ''), { gray: 45 }));
