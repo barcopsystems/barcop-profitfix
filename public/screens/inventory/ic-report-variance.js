@@ -941,25 +941,21 @@ S.InventoryVarianceReport = {
     }
     return who + ' is running ' + Math.abs(pct || 0).toFixed(1) + '% over your ' + (parseFloat(t.flag) || 0) + '% variance standard.';
   },
-  // A flagged row is an action: the status becomes a gold Flag button (cohesive
-  // with the Receive Delivery flag) that opens a variance investigation for that
-  // product in Profit Recovery. OK stays plain green text.
+  // The last column is action-only: a right-aligned Review / Reviewing / Resolved
+  // button that opens a variance investigation for that product in Profit Recovery.
+  // An in-tolerance ("OK") row shows nothing at all — no status text, no button.
   badge(key, pct, unitVar, pid, name) {
+    if (!pid) return '';
     const s = this.status(key, pct, unitVar);
-    if (pid) {
-      const list = (App.data.variance_investigations || []).filter(i => i.product_id === pid);
-      const open = list.some(i => i.status !== 'resolved');
-      const resolved = !open && list.some(i => i.status === 'resolved');
-      const reason = this.flagReason(key, pct, unitVar, name);
-      const btn = (label, color) => '<button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid) + '" data-name="' + esc(name || '')
-        + '" data-reason="' + esc(reason) + '" style="' + (color || 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;">' + label + '</button>';
-      if (open) return btn('Reviewing');
-      if (resolved) return btn('Resolved', 'color:var(--green);');
-      if (s.label === 'Flag') return btn('Review');
-    } else if (s.label === 'Flag') {
-      return '<span style="font-weight:700;color:' + s.color + ';">Review</span>';
-    }
-    return '<span style="font-weight:700;color:' + s.color + ';">' + s.label + '</span>';
+    const list = (App.data.variance_investigations || []).filter(i => i.product_id === pid);
+    const open = list.some(i => i.status !== 'resolved');
+    const resolved = !open && list.some(i => i.status === 'resolved');
+    if (!open && !resolved && s.label !== 'Flag') return '';   // OK, nothing to review
+    const reason = this.flagReason(key, pct, unitVar, name);
+    const label = open ? 'Reviewing' : resolved ? 'Resolved' : 'Review';
+    const style = (resolved ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;';
+    return '<div style="text-align:right;"><button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid)
+      + '" data-name="' + esc(name || '') + '" data-reason="' + esc(reason) + '" style="' + style + '">' + label + '</button></div>';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
   pct(v) { if (v == null) return '<span style="color:var(--t4);">-</span>'; const x = Number(v.toFixed(1)) === 0 ? 0 : v; return x.toFixed(1) + '%'; },
@@ -1007,7 +1003,7 @@ S.InventoryVarianceReport = {
 
   tabSales() {
     const restHeaders = '<th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
-      + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>';
+      + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th></th>';
     const rows = this.salesRows();
     if (!rows.length) {
       return this.dataCard('<th>Product</th>' + restHeaders, '<tr><td colspan="8" style="color:var(--t3);padding:14px 8px;">'
@@ -1025,7 +1021,7 @@ S.InventoryVarianceReport = {
           + '<td colspan="3">' + noData + '</td>'
           + '<td>' + this.pct(r.actualCostPct) + '</td>'
           + '<td class="' + profitCls(r) + '">' + this.cur(r.actualProfit) + '</td>'
-          + '<td>' + dash + '</td></tr>';
+          + '<td></td></tr>';
       }
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + (r.mixedSizes ? blended : '') + '</div></td>'
@@ -1035,7 +1031,7 @@ S.InventoryVarianceReport = {
         + '<td>' + this.pct(r.varPct) + '</td>'
         + '<td>' + this.pct(r.actualCostPct) + '</td>'
         + '<td class="' + profitCls(r) + '">' + this.cur(r.actualProfit) + '</td>'
-        + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar, r.pid, r.name) : '-') + '</td>'
+        + '<td>' + ((r.varPct != null || r.unitVar != null) ? this.badge(r.key, r.varPct, r.unitVar, r.pid, r.name) : '') + '</td>'
         + '</tr>';
     };
     // Group by category (CAT_ORDER first, extras after), name-sorted within, the
@@ -1130,9 +1126,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', '$ Var', ''], body);
   },
   usageTableBottleWine(rows, label) {
     const body = rows.map(r => {
@@ -1145,9 +1141,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(bottlesSold, 0) + '</td>' + '<td>' + this.n(bottlesUsed, 0) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', '$ Var', ''], body);
   },
   usageTableDraft(rows, label) {
     const body = rows.map(r => {
@@ -1159,9 +1155,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(r.poursMade, 0) + '</td>' + '<td>' + this.n(r.containersUsed, 2) + '</td>'
         + '<td>' + this.n(ounceVar) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', '$ Var', ''], body);
   },
   usageTableBottleBeer(rows, label) {
     const body = rows.map(r => {
@@ -1179,9 +1175,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(casesUsed) + '</td>' + '<td>' + this.n(caseVar) + '</td>'
         + '<td>' + this.n(bottleVar, 0) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', '$ Var', ''], body);
   },
   usageTableMisc(rows, label) {
     const body = rows.map(r => {
@@ -1194,9 +1190,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(recipeQt, 2) + '</td>' + '<td>' + this.n(countedQt, 2) + '</td>'
         + '<td>' + this.n(qtVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', '$ Var', ''], body);
   },
   foodUnit(name) { const m = /\(([^)]+)\)\s*$/.exec(name || ''); return m ? m[1].trim() : 'unit'; },
   foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
@@ -1213,9 +1209,9 @@ S.InventoryVarianceReport = {
         + '<td>' + this.n(recipeUse, 2) + '</td>' + '<td>' + this.n(countedUse, 2) + '</td>'
         + '<td>' + this.n(useVar, 2) + '</td>' + '<td>' + this.pct(varPct) + '</td>'
         + this.dCell(r.dollarVar)
-        + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '-') + '</td></tr>';
+        + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', '$ Var', 'Status'], body);
+    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', '$ Var', ''], body);
   },
   renderUsageCat(cat, rows) {
     // Misc rows are mixers, Food rows are recipe ingredients — name them so.
