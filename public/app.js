@@ -2709,8 +2709,11 @@ const App = {
     (opts.existing || []).forEach(push);
     push(sel);
     const selLc = sel.toLowerCase();
+    // "Add your own" replaces the "Other" bucket entirely: never offer Other as an
+    // option (keep it only if a legacy record already has it selected).
+    const allF = all.filter(v => v.toLowerCase() === selLc || v.toLowerCase() !== 'other');
     const blankHtml = opts.blank ? '<option value=""' + (sel === '' ? ' selected' : '') + '>' + esc(opts.blankLabel || '-') + '</option>' : '';
-    const optionsHtml = blankHtml + all.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === selLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    const optionsHtml = blankHtml + allF.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === selLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
     const idAttr = opts.id ? ' id="' + esc(opts.id) + '"' : '';
     const styleAttr = opts.style ? ' style="' + opts.style + '"' : '';
     const cls = opts.selectClass || 'form-input';
@@ -2719,12 +2722,13 @@ const App = {
       +   optionsHtml
       +   '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>'
       + '</select>'
-      + '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;margin-top:6px;width:100%;"/>'
+      + '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;width:100%;"/>'
       + '</span>';
   },
-  // Wire every custom-select in a container: "+ Add your own..." reveals the text
-  // field; a typed value is injected as an option and selected. Any save that
-  // clicks/tabs away blurs the field first, so the select never rests on the
+  // Wire every custom-select in a container. Picking "+ Add your own..." swaps the
+  // select out for the text field IN PLACE (no layout push); typing a value + Enter
+  // (or tabbing away) injects it as an option, selects it, and brings the select
+  // back. Empty / Escape reverts to the prior value. The select never rests on the
   // "+ Add your own..." sentinel.
   wireCustomSelects(root) {
     root = root || document;
@@ -2735,12 +2739,13 @@ const App = {
       sel._csWired = true;
       sel._csPrev = (sel.value === '__addcustom__') ? '' : sel.value;
       sel.addEventListener('change', () => {
-        if (sel.value === '__addcustom__') { inp.style.display = ''; inp.value = ''; inp.focus(); }
-        else { sel._csPrev = sel.value; inp.style.display = 'none'; }
+        if (sel.value === '__addcustom__') { sel.style.display = 'none'; inp.style.display = ''; inp.value = ''; inp.focus(); }
+        else { sel._csPrev = sel.value; }
       });
-      const commit = () => {
+      const finish = () => {
         const val = (inp.value || '').trim();
         inp.style.display = 'none';
+        sel.style.display = '';
         if (!val) { sel.value = sel._csPrev || ''; return; }
         const addOpt = sel.querySelector('option[value="__addcustom__"]');
         if (![...sel.options].some(o => o.value.toLowerCase() === val.toLowerCase())) {
@@ -2752,8 +2757,11 @@ const App = {
         inp.value = '';
         sel.dispatchEvent(new Event('change', { bubbles: true }));
       };
-      inp.addEventListener('blur', commit);
-      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+      inp.addEventListener('blur', finish);
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+        else if (e.key === 'Escape') { inp.value = ''; inp.blur(); }
+      });
     });
   },
 
