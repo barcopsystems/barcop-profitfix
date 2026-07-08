@@ -89,11 +89,65 @@ S.ShiftPreShift = {
       .slice(0, 5)
       .map(x => x.item);
   },
+
+  // ── Daypart-aware featured recommendation ───────────────────────────────────
+  // Menu items are not tagged by daypart, so we infer fit from category + price:
+  // lighter plates and apps at lunch, the big entrees and cocktails at dinner,
+  // drinks and apps late night. It only shapes the DEFAULT list for a period; the
+  // operator's swaps/removes still stick (saved per period).
+  _CATGROUP: {
+    'Appetizers': 'light', 'Sides': 'light', 'Snacks': 'light',
+    'Entrees': 'heavy', 'Specials': 'heavy', 'Desserts': 'dessert',
+    'Cocktails': 'cocktail', 'Beer': 'drink', 'Wine': 'drink', 'NA Beverages': 'drink'
+  },
+  _DAYPART: {
+    breakfast: { light: 1.3, heavy: 1.0, dessert: 0.7, cocktail: 0.3, drink: 0.9, price: 'low' },
+    lunch:     { light: 1.3, heavy: 1.0, dessert: 0.8, cocktail: 0.6, drink: 0.9, price: 'low' },
+    happy:     { light: 1.3, heavy: 0.7, dessert: 0.6, cocktail: 1.4, drink: 1.3, price: 'low' },
+    dinner:    { light: 1.1, heavy: 1.3, dessert: 1.0, cocktail: 1.2, drink: 1.1, price: 'high' },
+    latenight: { light: 1.3, heavy: 0.6, dessert: 0.7, cocktail: 1.5, drink: 1.2, price: 'neutral' }
+  },
+  // Match the operator's (freely named) service period to a daypart profile, or
+  // null for an unrecognized name (falls back to plain best-margin sellers).
+  _profileFor(period) {
+    const p = (period || '').toLowerCase();
+    if (/break|brunch|morning/.test(p))  return this._DAYPART.breakfast;
+    if (/happy|hh/.test(p))              return this._DAYPART.happy;
+    if (/late|night/.test(p))            return this._DAYPART.latenight;
+    if (/lunch|noon|mid.?day/.test(p))   return this._DAYPART.lunch;
+    if (/dinner|supper|evening/.test(p)) return this._DAYPART.dinner;
+    return null;
+  },
+
+  // Top featured items for a period: high-margin sellers, weighted to the daypart.
+  _recommendedFor(period) {
+    const all = ((App.data && App.data.menu_items) || [])
+      .filter(i => !i.archived)
+      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers) }))
+      .filter(x => x.price != null && x.cost != null && x.covers != null && x.covers > 0 && (x.price - x.cost) > 0);
+    if (all.length < 4) return this.todayStars();
+    // Prefer items that actually sell (above the menu average), unless that
+    // leaves too few to fill the list.
+    const avgCov = all.reduce((s, x) => s + x.covers, 0) / all.length;
+    let pool = all.filter(x => x.covers >= avgCov);
+    if (pool.length < 5) pool = all;
+    const profile = this._profileFor(period);
+    const prices = pool.map(x => x.price).slice().sort((a, b) => a - b);
+    const median = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+    const cm = (cat) => { if (!profile) return 1; const g = this._CATGROUP[cat]; return (g && profile[g] != null) ? profile[g] : 1; };
+    const pm = (price) => !profile ? 1 : profile.price === 'low' ? (price <= median ? 1.15 : 0.85) : profile.price === 'high' ? (price >= median ? 1.15 : 0.9) : 1;
+    return pool
+      .map(x => ({ item: x.item, s: (x.price - x.cost) * cm(x.item.category || '') * pm(x.price) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 5)
+      .map(o => o.item);
+  },
+
   _curFeatured() {   // array of item ids for the selected period
     const p = this._period;
     if (this._featuredBy[p] == null) {
       const rec = this._record();
-      this._featuredBy[p] = (rec && Array.isArray(rec.featured)) ? rec.featured.slice() : this.todayStars().map(s => s.id);
+      this._featuredBy[p] = (rec && Array.isArray(rec.featured)) ? rec.featured.slice() : this._recommendedFor(p).map(s => s.id);
     }
     return this._featuredBy[p];
   },
@@ -287,7 +341,7 @@ S.ShiftPreShift = {
 
     // Featured controls
     c.querySelector('#pb-fadd')?.addEventListener('click', () => this._openPicker('add', -1));
-    c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this.todayStars().map(s => s.id); this.draw(); });
+    c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this._recommendedFor(this._period).map(s => s.id); this.draw(); });
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
     c.querySelectorAll('.pb-fremove').forEach(b => b.addEventListener('click', () => {
       this._curFeatured().splice(parseInt(b.dataset.idx, 10), 1);
@@ -445,7 +499,7 @@ S.ShiftPreShift = {
   showHowTo() {
     App.showHelpModal('How the Pre-Shift Briefing Works', [
       { p: ['The Pre-Shift Briefing is the line-up sheet, read to the floor before doors. It is per service period: pick the period at the top and Bar Cop builds a briefing for it, so a bar that runs lunch and dinner holds a separate pre-lunch and pre-dinner line-up the same day. If you run one service, you will not see the period picker. Read it at line-up, or tap Export Briefing for a paper copy.'] },
-      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin, high-volume sellers from Menu Engineering. Swap or remove any that do not fit the period you are briefing, add your own from the menu, or reset back to the recommendations. You add one line of focus for the shift.'] },
+      { h: 'What Bar Cop fills in', p: ['The check-average target is your Revenue target. The cover forecast comes from Build Schedule. The Featured Items list pre-fills with your best-margin sellers, weighted to the daypart you are briefing: lighter plates and apps at lunch, the big entrees and a cocktail at dinner, drinks and apps late night. It reads that off each item\'s category and price, so it is a smart starting point, not a rule. Swap or remove any that do not fit, add your own from the menu, or reset back to the recommendations. You add one line of focus for the shift.'] },
       { h: 'Customize the upsell sequence', p: ['Tap Customize at the bottom of the upsell sequence to write your own steps, drag them into the order you want, and Save. Your version is used from then on, on screen and on the export, and applies to every briefing until you change it again.'] },
       { h: 'Run it and log it', p: ['Tap Mark Briefing Held to log that you ran it for the selected period. Logging is optional: it counts toward your Bar Cop Audit operational discipline once you start using it, and never counts against you if you do not. Briefing History keeps a record per period; delete any entry logged by mistake.'] }
     ]);
