@@ -316,7 +316,7 @@ S.InventoryProducts = {
       { h: 'Start With A Category', p: ['Pick one of the six category cards on top: Liquor, Wine, Bottle Beer, Draft Beer, Food, Misc. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
       { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer just needs its case size, the number of bottles in a case, since it is tracked by the case and the individual bottle. A product missing a required field shows as Incomplete in red until you finish it. A complete product can still read Needs a location in red until you place it on a shelf over in Set Locations; it will not show up on a count sheet until it lives somewhere.'] },
       { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
-      { h: 'Food and Misc: By Count or By Ounces', p: ['Food and Misc pick a Unit Type, which is how you buy and count the product: by the pound, the case, the bag, each, the dozen, or your own word for it. Every unit tracks one of two ways, shown next to it in the Edit list: By count or By ounces. Pounds, cases, bags, and eaches are By count; gallons, quarts, and pints are By ounces. A By count product sets how many servings come out of one unit and what to call a serving, so recipes cost by the portion. A By ounces product enters how many ounces are in one container (a gallon fills in 128 for you, your own units you type the ounces), and Bar Cop costs it by the ounce for recipes and counts it with a fill slider. When you add your own unit like Bottle or Jug in the Edit list, you choose By count or By ounces right there, so the form already knows what to ask for.'] },
+      { h: 'Food and Misc: How You Track It', p: ['Food and Misc pick a Unit Type (how you buy it: the pound, case, bag, each, gallon, or your own word), then a Track By, which is the one thing that decides how Bar Cop counts and costs it. Three ways. By the unit: you weigh or count whole units, like ground beef by the pound (count 11.42 lb), and recipes pull pounds. By pieces: one unit breaks into pieces, like a bag of 45 wings or a pound sliced into 16 bacon slices; you count full units plus loose pieces and recipes pull pieces. By ounces: a liquid measured by the ounce, like oil or syrup; a gallon fills in 128 for you, your own units you type the ounces, and recipes pull ounces. The same unit can go either way, which is the point: buy bacon by the pound but Track By pieces. Pick it once and the count sheet, the cost, and the recipe all line up. Serving sizes and prices are the menu side and live in the Menu Builder.'] },
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
@@ -685,22 +685,23 @@ S.InventoryProducts = {
     } else if (spec.showUnitType) {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
-      const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-      // Liquid vs solid follows the unit type's method (set in Edit Unit Types); an
-      // existing product on a saved container size stays liquid too.
-      this._liquidMode = App.unitMethod(ut) === 'oz' || !!(p && parseFloat(p.container_size_oz) > 0);
-      // Default Count By to the product's role; an existing product keeps its
-      // saved choice (and counts as "touched" so a unit change never overrides).
+      // How this product is tracked (its stock measure): by the whole unit, by
+      // pieces, or by ounces. Derived from the saved product, else the unit's
+      // default method. The operator can change it (bacon = a lb tracked by pieces).
+      this._trackBy = (p && parseFloat(p.container_size_oz) > 0) ? 'oz'
+        : (p && parseFloat(p.pack_size) > 0) ? 'pieces'
+        : (App.unitMethod(ut) === 'oz' ? 'oz' : 'unit');
+      // Default Count By follows Track By; an existing product keeps its saved
+      // choice (and counts as "touched" so a unit change never overrides).
       this._countTouched = !!(p?.count_style);
-      const cstyle = p?.count_style || App.defaultCountStyle({ unit_type: ut, misc_type: p?.misc_type, pack_size: packV, container_size_oz: p?.container_size_oz });
+      const cstyle = p?.count_style || (this._trackBy === 'oz' ? 'slider' : this._trackBy === 'pieces' ? 'loose' : 'number');
       row2 = ''
         + this._unitCellHtml(ut)
         + '<div class="f" style="width:140px;flex-shrink:0;"><label>' + esc(spec.costLabel) + '</label>'
         + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="ip-cost" value="' + v(p?.unit_cost) + '" step="0.01" placeholder="0.00"/></div></div>'
-        // Adaptive divisor: how one stock unit breaks into the measure a recipe
-        // uses (ounces for a liquid, servings for a solid, pieces for a supply).
-        // Swaps live when Unit Type or Misc Type changes (see _rerenderDivisor).
-        + '<span id="ip-divisor-wrap" style="display:contents;">' + this._divisorFieldsHTML(p, ut, p?.misc_type) + '</span>'
+        // Track By (stock measure) + the one field it needs. Swaps live when Track
+        // By, Unit, or Misc Type changes (see _rerenderDivisor).
+        + '<span id="ip-divisor-wrap" style="display:contents;">' + this._trackDivisorHTML(p, ut, p?.misc_type) + '</span>'
         // How this product is counted on the count sheet: a typed number, full
         // units + loose pieces, or a fill slider (pick the silhouette).
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Count By</label>'
@@ -830,13 +831,9 @@ S.InventoryProducts = {
       this._refreshMissing();
     });
     document.getElementById('ip-unit')?.addEventListener('change', () => this._onUnitChange());
-    document.getElementById('ip-misctype')?.addEventListener('change', () => {
-      // A supply type (paper / cleaning) is never a liquid; otherwise follow the
-      // unit type's method.
-      const mt = document.getElementById('ip-misctype')?.value || '';
-      this._liquidMode = !this._isSupply(mt) && App.unitMethod(this.getUnitType()) === 'oz';
-      this._rerenderDivisor();
-    });
+    // A supply type hides Track By (always pieces-for-ordering); the divisor handles
+    // that, so just re-render.
+    document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
     // Wire the "| Edit" links (and any custom-select chrome) inside this form.
     App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
@@ -934,6 +931,23 @@ S.InventoryProducts = {
   // Is the misc_type a non-recipe supply (paper / cleaning)?
   _isSupply(miscType) { return (App.MISC_SUPPLY_TYPES || []).includes(miscType); },
 
+  // Track By selector (the product's stock measure) + the one field that measure
+  // needs. Supply items skip the selector (always pieces-for-ordering).
+  _trackDivisorHTML(p, unitType, miscType) {
+    if (this._isSupply(miscType)) return this._divisorFieldsHTML(p, unitType, miscType);
+    const uName = (unitType && unitType !== 'custom') ? unitType : 'unit';
+    const tb = this._trackBy;
+    const opt = (val, label) => '<option value="' + val + '"' + (tb === val ? ' selected' : '') + '>' + esc(label) + '</option>';
+    return '<div class="f" style="width:150px;flex-shrink:0;"><label>Track By</label>'
+      + '<select id="ip-trackby">'
+      +   opt('unit', 'By the ' + uName)
+      +   opt('pieces', 'By pieces')
+      +   opt('oz', 'By ounces')
+      + '</select></div>'
+      + this._divisorFieldsHTML(p, unitType, miscType);
+  },
+
+  // The one measure field for the current Track By (or supply's pieces field).
   _divisorFieldsHTML(p, unitType, miscType) {
     const vv = x => (x != null && x !== '' ? x : '');
     const uLabel = (unitType && unitType !== 'custom') ? unitType : 'unit';
@@ -943,11 +957,10 @@ S.InventoryProducts = {
       return '<div class="f"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="Optional"/><span class="suf">ea</span></div></div>';
     }
-    // Liquid: the ounces in ONE container drive cost per oz + the fill-slider count.
-    // A prefilled volume unit (gallon/quart/pint) knows its ounces, so the field is
-    // prefilled and locked; a custom unit (bottle, jug) the operator types the
-    // ounces in. The label names the unit: "Gallon Size (oz)" / "Bottle Size (oz)".
-    if (this._liquidMode) {
+    // By ounces: the ounces in ONE unit drive cost per oz + the fill-slider count. A
+    // volume unit (gallon/quart/pint) knows its ounces and locks the field; a custom
+    // unit types it in. Label names the unit: "Gallon Size (oz)" / "Bottle Size (oz)".
+    if (this._trackBy === 'oz') {
       const ut = String(unitType || '').toLowerCase();
       const VOL = { gallon: 128, quart: 32, pint: 16 };
       const known = VOL[ut];
@@ -957,17 +970,17 @@ S.InventoryProducts = {
       return '<div class="f"><label>' + esc(uName) + ' Size (oz)</label>'
         + '<div class="fw"><input class="suf" type="number" id="ip-foz" value="' + (oz === '' ? '' : oz) + '" step="0.1" min="0"' + lock + '/><span class="suf">oz</span></div></div>';
     }
-    // "each": the unit IS the piece, so just the serving noun.
-    if (String(unitType || '').toLowerCase() === 'each') {
-      return '<div class="f"><label>Serving Name</label>'
-        + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="each"/></div>';
+    // By pieces: how many pieces one unit breaks into (cost per piece, full + loose
+    // count), plus what one piece is called (wing, slice) for the recipe.
+    if (this._trackBy === 'pieces') {
+      const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
+      return '<div class="f"><label>Pieces <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
+        + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 45"/><span class="suf">ea</span></div></div>'
+        + '<div class="f"><label>Piece Name</label>'
+        + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="wing, slice"/></div>';
     }
-    // Solid (lb / case / bag / dozen / custom): servings per unit + the serving noun.
-    const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-    return '<div class="f"><label>Servings <span style="color:var(--t4);font-weight:400;">(per ' + esc(uLabel) + ')</span></label>'
-      + '<div class="fw"><input class="suf" type="number" id="ip-pack" value="' + vv(packV) + '" step="1" min="1" placeholder="e.g. 16"/><span class="suf">ea</span></div></div>'
-      + '<div class="f"><label>Serving Name</label>'
-      + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>';
+    // By the unit: you count / weigh whole units, cost is per unit — no extra field.
+    return '';
   },
 
   // The derived cost readout for a Food / Misc product, in ONE calc strip below the
@@ -975,69 +988,78 @@ S.InventoryProducts = {
   // method (Edit Unit Types), so there is no on-form toggle.
   _foodDivisorStripHTML(p, unitType, miscType) {
     const isSupply = this._isSupply(miscType);
+    const uName = (unitType && unitType !== 'custom') ? unitType : 'unit';
     const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
     const item = (label, val, id) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val"' + (id ? ' id="' + id + '"' : '') + '>' + val + '</div></div>';
     let items = '';
     if (isSupply) {
       const n = (p && p.pack_size > 0) ? p.pack_size : 0;
       items += item('Cost / Piece', (cost > 0 && n > 0) ? App.fmtCurrency(cost / n, 2) : '-', 'ip-div-cps');
-    } else if (this._liquidMode) {
+    } else if (this._trackBy === 'oz') {
       const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : 0;
       items += item('Cost / oz', (cost > 0 && oz > 0) ? App.fmtCurrency(cost / oz, 3) : '-', 'ip-div-cps');
-    } else {
+    } else if (this._trackBy === 'pieces') {
       const n = (p && p.pack_size > 0) ? p.pack_size : 0;
-      const per = n > 0 ? cost / n : cost;   // each / unset serving: 1 = the unit
-      items += item('Cost / Serving', cost > 0 ? App.fmtCurrency(per, 2) : '-', 'ip-div-cps');
+      items += item('Cost / Piece', (cost > 0 && n > 0) ? App.fmtCurrency(cost / n, 2) : '-', 'ip-div-cps');
+    } else {
+      items += item('Cost / ' + esc(uName), cost > 0 ? App.fmtCurrency(cost, 2) : '-', 'ip-div-cps');
     }
     return '<div style="margin-top:18px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;">'
       + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
 
-  // Re-render the divisor inputs AND the derived cost strip when Unit / Misc Type
-  // changes.
+  // Re-render the Track By selector + measure field + cost strip on any change,
+  // carrying in-progress values (or a volume-unit oz prefill) across the rebuild.
   _rerenderDivisor(prefillOz) {
     const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
     const ut = this.getUnitType();
     const mt = document.getElementById('ip-misctype')?.value || '';
-    // Carry an in-progress container size across the re-render (or take a volume-unit
-    // prefill), so switching modes / units does not silently drop it.
     const liveOz = prefillOz != null ? prefillOz
       : (parseFloat(document.getElementById('ip-foz')?.value) || (cur && cur.container_size_oz) || 0);
-    const seed = Object.assign({}, cur || {}, { container_size_oz: this._liquidMode ? liveOz : 0 });
+    const livePack = parseFloat(document.getElementById('ip-pack')?.value) || (cur && cur.pack_size) || 0;
+    const usePack = (this._trackBy === 'pieces' || this._isSupply(mt)) ? livePack : 0;
+    const seed = Object.assign({}, cur || {}, { container_size_oz: this._trackBy === 'oz' ? liveOz : 0, pack_size: usePack });
     const wrap = document.getElementById('ip-divisor-wrap');
-    if (wrap) wrap.innerHTML = this._divisorFieldsHTML(seed, ut, mt);
+    if (wrap) wrap.innerHTML = this._trackDivisorHTML(seed, ut, mt);
     const strip = document.getElementById('ip-divisor-strip');
     if (strip) strip.innerHTML = this._foodDivisorStripHTML(seed, ut, mt);
     this._wireDivisor();
-    // Follow the practical Count By as the unit / mode changes, unless the operator
-    // has already picked one.
+    // Follow the practical Count By as Track By changes, unless the operator picked one.
     if (!this._countTouched) {
       const sel = document.getElementById('ip-cstyle');
-      if (sel) sel.value = App.defaultCountStyle({ unit_type: ut, misc_type: mt, pack_size: document.getElementById('ip-pack')?.value || '', container_size_oz: this._liquidMode ? liveOz : 0 });
+      if (sel) sel.value = this._trackBy === 'oz' ? 'slider' : this._trackBy === 'pieces' ? 'loose' : 'number';
     }
   },
-  // Unit picked: its tracking method (from Edit Unit Types) decides liquid vs solid.
-  // A prefilled volume unit also knows its ounces, so prefill the (locked) oz field.
+  // Unit picked: a volume unit forces By ounces + prefills its ounces; otherwise if
+  // the unit's default method is ounces switch to By ounces, else leave Track By.
   _onUnitChange() {
     const unit = this.getUnitType();
     const VOL = { gallon: 128, quart: 32, pint: 16 };
-    this._liquidMode = App.unitMethod(unit) === 'oz';
-    const prefill = VOL[String(unit || '').toLowerCase()];
-    this._rerenderDivisor(prefill != null ? prefill : null);
+    const known = VOL[String(unit || '').toLowerCase()];
+    if (known != null) { this._trackBy = 'oz'; this._rerenderDivisor(known); return; }
+    if (App.unitMethod(unit) === 'oz') this._trackBy = 'oz';
+    else if (this._trackBy === 'oz') this._trackBy = 'unit';
+    this._rerenderDivisor();
+  },
+  // Track By changed by the operator.
+  _onTrackByChange() {
+    const v = document.getElementById('ip-trackby')?.value;
+    this._trackBy = (v === 'oz' || v === 'pieces') ? v : 'unit';
+    this._rerenderDivisor();
   },
 
   _wireDivisor() {
+    document.getElementById('ip-trackby')?.addEventListener('change', () => this._onTrackByChange());
     ['ip-pack', 'ip-foz'].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', () => this._calcDivisor()); el.addEventListener('change', () => this._calcDivisor()); }
     });
-    // The Unit Type "| Edit" link, (re)built here on divisor rerenders — wire it
-    // (idempotent via _csWired).
+    // The Unit Type "| Edit" link, (re)built here on rerenders — wire it (idempotent).
     App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     this._calcDivisor();
   },
 
-  // Live derived cost (per ounce / serving / piece) in the calc strip.
+  // Live derived cost in the strip for the current Track By.
   _calcDivisor() {
     const el = document.getElementById('ip-div-cps');
     if (!el) return;
@@ -1049,14 +1071,17 @@ S.InventoryProducts = {
       el.textContent = n > 0 ? App.fmtCurrency(cost / n, 2) : '-';
       return;
     }
-    if (this._liquidMode) {
+    if (this._trackBy === 'oz') {
       const oz = parseFloat(document.getElementById('ip-foz')?.value) || 0;
       el.textContent = oz > 0 ? App.fmtCurrency(cost / oz, 3) : '-';
       return;
     }
-    // serving / each: 1 = the unit when no servings-per-unit is set.
-    const n = parseFloat(document.getElementById('ip-pack')?.value) || 0;
-    el.textContent = App.fmtCurrency(n > 0 ? cost / n : cost, 2);
+    if (this._trackBy === 'pieces') {
+      const n = parseFloat(document.getElementById('ip-pack')?.value) || 0;
+      el.textContent = n > 0 ? App.fmtCurrency(cost / n, 2) : '-';
+      return;
+    }
+    el.textContent = App.fmtCurrency(cost, 2);   // by the unit
   },
 
   // Cost per menu serving for a resale item = purchase cost / servings per unit.
@@ -1217,12 +1242,12 @@ S.InventoryProducts = {
       : null;
     const unitType = spec.showUnitType ? this.getUnitType() : null;
     const miscTypeVal = cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '';
-    // Food / Misc is a liquid ONLY when the operator set a Container Size (oz) via
-    // the "track by the ounce" toggle. That ounces value is what makes it recipe-
-    // costed per ounce and fill-slider counted; blank = counted by piece / serving.
+    // Food / Misc stock measure follows Track By: ounces sets container_size_oz
+    // (recipe-costed per oz, fill-slider), pieces sets pack_size (per piece, full+
+    // loose), by-the-unit sets neither (per unit, total count).
     if (spec.showUnitType) {
       const fromField = parseFloat(document.getElementById('ip-foz')?.value);
-      oz = (this._liquidMode && fromField > 0) ? fromField : null;
+      oz = (this._trackBy === 'oz' && fromField > 0) ? fromField : null;
     }
     // Serving name (Food / Misc): the recipe noun, e.g. slice / patty / each.
     const servingName = spec.showUnitType ? (document.getElementById('ip-sname')?.value.trim() || null) : null;
