@@ -241,24 +241,34 @@ S.InventoryProducts = {
     return h;
   },
 
-  // Size dropdown scoped to the form's category group. A section's own saved
-  // custom sizes merge INTO the list in ounce order (not a separate bottom group,
-  // which broke the natural flow), and they stay scoped to the group they were
-  // entered in, so a custom liquor size never leaks into wine / beer / draft.
+  // The list_config key for a size group (empty for Food/Misc, which have no group).
+  _sizeKey(group) {
+    return { 'Spirits': 'size_spirits', 'Wine': 'size_wine', 'Beer': 'size_beer', 'Draft Keg': 'size_draft' }[group] || '';
+  },
+  // Register a size group's built-in options (oz-valued) with the shared list
+  // system so the Edit editor + dropdown read them. Returns the key.
+  _registerSizeList(group) {
+    const key = this._sizeKey(group);
+    if (!key) return '';
+    App._listMeta[key] = { valued: true };
+    App._listBuiltins[key] = this.SIZES.filter(s => s.g === group && s.oz != null).map(s => ({ label: s.l, v: s.oz }));
+    return key;
+  },
+  // Size dropdown scoped to the form's category group, driven by the operator's
+  // editable list (built-ins + added minus hidden). The currently saved size stays
+  // selectable even if it was later hidden/removed, so a product never orphans.
+  // Each custom option carries its name in data-name so save can store the label.
   sizeOpts(sel, group) {
+    const key = this._registerSizeList(group);
     let h = '<option value="">Select size...</option>';
-    const items = [];
-    if (group) this.SIZES.filter(s => s.g === group && s.oz != null).forEach(s => items.push({ oz: s.oz, label: s.l }));
-    this.customSizesUsed(group).forEach(c => { if (!items.some(it => it.oz === c.oz)) items.push({ oz: c.oz, label: c.label }); });
-    items.sort((a, b) => a.oz - b.oz);
-    if (items.length) {
-      if (group) h += '<optgroup label="' + esc(group) + '">';
-      items.forEach(it => {
-        h += '<option value="' + it.oz + '"' + (sel != null && it.oz === sel ? ' selected' : '') + '>' + esc(it.label) + '</option>';
-      });
-      if (group) h += '</optgroup>';
-    }
-    h += '<option value="custom"' + (sel === 'custom' ? ' selected' : '') + '>Custom (enter oz)</option>';
+    const items = key ? App.listValuedOptions(key) : [];
+    const selN = (sel != null && sel !== '' && sel !== 'custom') ? parseFloat(sel) : null;
+    if (selN != null && !isNaN(selN) && !items.some(it => it.v === selN)) items.push({ label: selN + ' oz', v: selN, name: '' });
+    items.sort((a, b) => a.v - b.v);
+    items.forEach(it => {
+      h += '<option value="' + it.v + '"' + (it.name ? ' data-name="' + esc(it.name) + '"' : '')
+        + (selN != null && it.v === selN ? ' selected' : '') + '>' + esc(it.label) + '</option>';
+    });
     return h;
   },
 
@@ -275,53 +285,17 @@ S.InventoryProducts = {
   },
 
   // ── In-place custom cells (size / unit) ─────────────────────────────────────
-  // Picking "Custom" hides the dropdown and shows the custom field(s) in its own
-  // spot (no new column). Type it and press Enter: the value is added as a real
-  // option, selected, and the dropdown comes back (Escape or an empty commit
-  // reverts to the presets). An existing custom size/unit is already a real
-  // option, so editing never enters this mode.
+  // Both cells carry a "| Edit" link that opens the shared list editor (add /
+  // remove / hide / reset). Sizes are an oz-valued list; Unit Type is a plain list.
   _sizeCellHtml(spec, sizeSel) {
-    return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + '</label>'
-      + '<select id="ip-size">' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select>'
-      + '<div id="ip-cw" style="display:none;">'
-      +   '<div class="fj"><input type="text" id="ip-cname" placeholder="Gallon"/><input type="number" id="ip-coz" step="0.1" placeholder="oz, Enter"/></div>'
-      + '</div></div>';
+    const key = this._sizeKey(spec.sizeGroup);
+    return '<div class="f" style="width:180px;flex-shrink:0;"><label>' + esc(spec.sizeLabel) + (key ? App.manageListLink(key) : '') + '</label>'
+      + '<select id="ip-size" class="cs-select"' + (key ? ' data-cs-key="' + key + '"' : '') + '>' + this.sizeOpts(sizeSel, spec.sizeGroup) + '</select>'
+      + '</div>';
   },
   _unitCellHtml(ut) {
-    return '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type</label>'
-      + '<select id="ip-unit">' + this.unitTypeOpts(ut) + '</select>'
-      + '<div id="ip-uw" style="display:none;">'
-      +   '<input type="text" id="ip-unit-custom" placeholder="gal, dozen, then Enter"/>'
-      + '</div></div>';
-  },
-  _toggleSizeCustom(on) {
-    const sel = document.getElementById('ip-size'), cw = document.getElementById('ip-cw');
-    if (sel) sel.style.display = on ? 'none' : '';
-    if (cw) cw.style.display = on ? '' : 'none';
-    if (on) {
-      const n = document.getElementById('ip-cname'), o = document.getElementById('ip-coz');
-      if (n) n.value = ''; if (o) o.value = '';
-      n?.focus();
-    }
-  },
-  _toggleUnitCustom(on) {
-    const sel = document.getElementById('ip-unit'), uw = document.getElementById('ip-uw');
-    if (sel) sel.style.display = on ? 'none' : '';
-    if (uw) uw.style.display = on ? '' : 'none';
-    if (on) { const c = document.getElementById('ip-unit-custom'); if (c) c.value = ''; c?.focus(); }
-  },
-  // Bail out of custom entry back to the presets.
-  _sizeBack() {
-    const sel = document.getElementById('ip-size');
-    if (sel && sel.options[0]) sel.value = sel.options[0].value === 'custom' ? '' : sel.options[0].value;
-    this._toggleSizeCustom(false);
-    this.calcProduct(); this._refreshMissing();
-  },
-  _unitBack() {
-    const sel = document.getElementById('ip-unit');
-    if (sel && sel.options[0]) sel.value = sel.options[0].value === 'custom' ? '' : sel.options[0].value;
-    this._toggleUnitCustom(false);
-    this._rerenderDivisor();
+    return '<div class="f" style="width:160px;flex-shrink:0;"><label>Unit Type' + App.manageListLink('unit_type') + '</label>'
+      + App.customSelect({ id: 'ip-unit', key: 'unit_type', builtin: App.IC_FOOD_UNIT_TYPES, selected: ut }) + '</div>';
   },
 
   // ── Entry point ───────────────────────────────────────────────────────────
@@ -637,19 +611,14 @@ S.InventoryProducts = {
     // so matching styles group cleanly on the Products list instead of splintering
     // on typos.
     const subOrType = cat === 'Misc'
-      ? '<div class="f"><label>Misc Type</label>'
-        + '<select id="ip-misctype"><option value="">Select type...</option>'
-        + App.MISC_TYPES.map(t => '<option' + (p?.misc_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
-        + '</select></div>'
+      ? '<div class="f"><label>Misc Type' + App.manageListLink('misc_type') + '</label>'
+        + App.customSelect({ id: 'ip-misctype', key: 'misc_type', builtin: App.MISC_TYPES, selected: (p?.misc_type || ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
       : (() => {
           const cur = (p?.sub_category || '');
-          const opts = App.subcatSuggestions(cat).filter(o => o.toLowerCase() !== 'other');
-          return '<div class="f"><label>Sub-Category</label>'
-            + '<select id="ip-subcat-sel">'
-              + '<option value="">Select...</option>'
-              + opts.map(o => '<option' + (o.toLowerCase() === cur.toLowerCase() ? ' selected' : '') + '>' + esc(o) + '</option>').join('')
-              + '<option' + (cur.toLowerCase() === 'other' ? ' selected' : '') + '>Other</option>'
-            + '</select></div>';
+          const key = 'subcat_' + cat.toLowerCase().replace(/\s+/g, '_');
+          const builtin = (App.SUBCAT_SUGGESTIONS[cat] || []).filter(o => o.toLowerCase() !== 'other');
+          return '<div class="f"><label>Sub-Category' + App.manageListLink(key) + '</label>'
+            + App.customSelect({ id: 'ip-subcat-sel', key, builtin, selected: cur, blank: true, blankLabel: 'Select...' }) + '</div>';
         })();
 
     // All identity + spec cells flow in ONE form-row (assembled below) so they
@@ -816,11 +785,6 @@ S.InventoryProducts = {
     if (!el) return true; // not rendered in this category — not required
     const v = (el.value || '').trim();
     if (!v) return false;
-    // Size dropdown: if value is "custom", the actual size lives in ip-coz
-    if (id === 'ip-size' && v === 'custom') {
-      const cozEl = document.getElementById('ip-coz');
-      return !!(cozEl && parseFloat(cozEl.value) > 0);
-    }
     // For numeric inputs, zero counts as not-filled
     if (el.type === 'number') return parseFloat(v) > 0;
     return true;
@@ -841,59 +805,19 @@ S.InventoryProducts = {
     document.getElementById('ip-save')?.addEventListener('click', () => this.save());
     document.getElementById('ip-name')?.focus();
 
-    // ── Size: pick "Custom (enter oz)" → swap to name+oz in place; Enter commits
-    // it as a real "Name (oz oz)" option and returns to the dropdown; Escape (or an
-    // invalid oz on Enter) reverts to the presets.
-    const commitSize = () => {
-      const sel = document.getElementById('ip-size');
-      const oz = parseFloat(document.getElementById('ip-coz')?.value);
-      const name = (document.getElementById('ip-cname')?.value || '').trim();
-      if (!sel || isNaN(oz) || oz <= 0) { this._sizeBack(); return; }
-      const addOpt = [...sel.options].find(o => o.value === 'custom');
-      let opt = [...sel.options].find(o => parseFloat(o.value) === oz && o.value !== 'custom');
-      if (!opt) { opt = document.createElement('option'); opt.value = String(oz); sel.insertBefore(opt, addOpt); }
-      opt.textContent = name ? (name + ' (' + oz + ' oz)') : (oz + ' oz');
-      opt.dataset.name = name;
-      sel.value = opt.value;
-      this._toggleSizeCustom(false);
-      this.calcProduct(); this._refreshMissing();
-    };
+    // Size + Unit Type are now editable dropdowns (the "| Edit" list editor);
+    // no inline custom entry. A change just recomputes the derived costs.
     document.getElementById('ip-size')?.addEventListener('change', () => {
-      this._toggleSizeCustom(document.getElementById('ip-size').value === 'custom');
       this.calcProduct();
       this._refreshMissing();
     });
-    ['ip-cname', 'ip-coz'].forEach(fid => document.getElementById(fid)?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); commitSize(); }
-      else if (e.key === 'Escape') { e.preventDefault(); this._sizeBack(); }
-    }));
-    // ── Unit: pick "Custom (type one)" → swap to a text field; Enter (or tabbing
-    // away with a value) commits it as an option; Escape / empty reverts.
-    const commitUnit = () => {
-      const sel = document.getElementById('ip-unit');
-      const val = (document.getElementById('ip-unit-custom')?.value || '').trim();
-      if (!sel) return;
-      if (!val) { this._unitBack(); return; }
-      const addOpt = [...sel.options].find(o => o.value === 'custom');
-      let opt = [...sel.options].find(o => o.value.toLowerCase() === val.toLowerCase() && o.value !== 'custom');
-      if (!opt) { opt = document.createElement('option'); opt.value = val; opt.textContent = val; sel.insertBefore(opt, addOpt); }
-      sel.value = opt.value;
-      this._toggleUnitCustom(false);
-      this._rerenderDivisor();
-    };
-    document.getElementById('ip-unit')?.addEventListener('change', () => {
-      this._toggleUnitCustom(document.getElementById('ip-unit').value === 'custom');
-      this._rerenderDivisor();
-    });
-    document.getElementById('ip-unit-custom')?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); commitUnit(); }
-      else if (e.key === 'Escape') { e.preventDefault(); this._unitBack(); }
-    });
-    document.getElementById('ip-unit-custom')?.addEventListener('input', () => this._rerenderDivisor());
+    document.getElementById('ip-unit')?.addEventListener('change', () => this._rerenderDivisor());
     document.getElementById('ip-misctype')?.addEventListener('change', () => this._rerenderDivisor());
+    // Wire the "| Edit" links (and any custom-select chrome) inside this form.
+    App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     // Once the operator picks a Count By, stop auto-defaulting it on unit changes.
     document.getElementById('ip-cstyle')?.addEventListener('change', () => { this._countTouched = true; });
-    ['ip-coz','ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
+    ['ip-pour','ip-cost','ip-price','ip-case-size'].forEach(fid =>
       document.getElementById(fid)?.addEventListener('input', () => { this.calcProduct(); this._refreshMissing(); })
     );
     // Food / Misc: live cost per ounce / serving / piece as cost or divisor change.
@@ -950,15 +874,11 @@ S.InventoryProducts = {
   getOz() {
     const v = document.getElementById('ip-size')?.value;
     if (!v || v === '') return 0;
-    if (v === 'custom') return parseFloat(document.getElementById('ip-coz')?.value) || 0;
     return parseFloat(v) || 0;
   },
 
   getUnitType() {
-    const u = document.getElementById('ip-unit')?.value;
-    if (!u) return null;
-    if (u === 'custom') return (document.getElementById('ip-unit-custom')?.value.trim() || null);
-    return u;
+    return document.getElementById('ip-unit')?.value || null;
   },
 
   // Sub-Category value: the picked option (including the "Other" catch-all).
@@ -985,13 +905,23 @@ S.InventoryProducts = {
   },
 
   // Common container sizes for a liquid bought in a non-volume unit (a mixer by
-  // the bottle) so the operator picks the ounces instead of typing them.
+  // the bottle) so the operator picks the ounces instead of typing them. Editable
+  // via the shared oz-valued list (key 'size_liquid').
+  _registerLiquidSizeList() {
+    App._listMeta['size_liquid'] = { valued: true };
+    App._listBuiltins['size_liquid'] = [
+      { label: '12 oz', v: 12 }, { label: '750ml (25.4 oz)', v: 25.4 }, { label: '32 oz (quart)', v: 32 },
+      { label: '1L (33.8 oz)', v: 33.8 }, { label: '64 oz (half gal)', v: 64 }, { label: '128 oz (gallon)', v: 128 },
+    ];
+  },
   _foodSizeOpts(sel) {
-    const OPTS = [12, 25.4, 32, 33.8, 64, 128];
-    const LBL = { 12:'12 oz', 25.4:'750ml (25.4 oz)', 32:'32 oz (quart)', 33.8:'1L (33.8 oz)', 64:'64 oz (half gal)', 128:'128 oz (gallon)' };
+    this._registerLiquidSizeList();
     let h = '<option value="">Select size...</option>';
-    OPTS.forEach(o => { h += '<option value="' + o + '"' + (parseFloat(sel) === o ? ' selected' : '') + '>' + LBL[o] + '</option>'; });
-    if (sel && !OPTS.includes(parseFloat(sel))) h += '<option value="' + sel + '" selected>' + sel + ' oz</option>';
+    const items = App.listValuedOptions('size_liquid');
+    const selN = (sel != null && sel !== '') ? parseFloat(sel) : null;
+    if (selN != null && !isNaN(selN) && !items.some(it => it.v === selN)) items.push({ label: selN + ' oz', v: selN, name: '' });
+    items.sort((a, b) => a.v - b.v);
+    items.forEach(it => { h += '<option value="' + it.v + '"' + (selN != null && it.v === selN ? ' selected' : '') + '>' + esc(it.label) + '</option>'; });
     return h;
   },
 
@@ -1006,8 +936,8 @@ S.InventoryProducts = {
       // unit (a mixer bought by the bottle) needs the container size picked.
       if (App.ozPerUnit(unitType) != null) return '';
       const oz = (p && p.container_size_oz > 0) ? p.container_size_oz : '';
-      return '<div class="f"><label>Container Size</label>'
-        + '<select id="ip-foz">' + this._foodSizeOpts(oz) + '</select></div>';
+      return '<div class="f"><label>Container Size' + App.manageListLink('size_liquid') + '</label>'
+        + '<select id="ip-foz" class="cs-select" data-cs-key="size_liquid">' + this._foodSizeOpts(oz) + '</select></div>';
     }
     if (role === 'supply') {
       const packV = (p && p.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
@@ -1075,6 +1005,9 @@ S.InventoryProducts = {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', () => this._calcDivisor()); el.addEventListener('change', () => this._calcDivisor()); }
     });
+    // The liquid Container Size cell (ip-foz) carries its own "| Edit" link, which
+    // is (re)built here on unit changes — wire it (idempotent via _csWired).
+    App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     this._calcDivisor();
   },
 
@@ -1223,14 +1156,13 @@ S.InventoryProducts = {
     const num = id => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; };
     let oz      = spec.sizeGroup || spec.showCaseSize ? (this.getOz() || null) : null;
     // Custom bottle/keg sizes carry the operator's own name (Gallon, 3L Box) so the
-    // dropdown reads "Gallon (128 oz)"; a preset carries none. A newly typed custom
-    // reads its name from ip-cname; an existing saved custom carries its name forward.
+    // dropdown reads "Gallon (128 oz)"; a preset carries none. The name rides on the
+    // selected option's data-name (set from the operator's edited size list).
     let sizeLabel = null;
     if ((spec.sizeGroup || spec.showCaseSize) && oz != null && !this.SIZES.some(s => s.oz === oz)) {
       const selEl = document.getElementById('ip-size');
-      const optName = (selEl && selEl.selectedOptions && selEl.selectedOptions[0] && selEl.selectedOptions[0].dataset) ? (selEl.selectedOptions[0].dataset.name || '') : '';
-      const entered = selEl?.value === 'custom' ? (document.getElementById('ip-cname')?.value.trim() || '') : optName;
-      sizeLabel = entered || ((this.customSizesUsed(spec.sizeGroup) || []).find(c => c.oz === oz) || {}).name || null;
+      const opt = selEl && selEl.selectedOptions ? selEl.selectedOptions[0] : null;
+      sizeLabel = (opt && opt.dataset && opt.dataset.name) ? opt.dataset.name : null;
     }
     const pour  = spec.showPour ? num('ip-pour') : null;
     const cost  = num('ip-cost');
@@ -1399,7 +1331,8 @@ S.InventoryProducts = {
         + '</select>';
     }
     if (def.type === 'size') {
-      return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup) + '</select>'
+      return '<select id="be-size" class="be-input" data-key="size">' + this.sizeOpts(null, spec.sizeGroup)
+        + '<option value="custom">Custom (enter oz)</option></select>'
         + '<div id="be-cw" style="display:none;margin-top:6px;"><div class="fw"><input class="suf be-input" type="number" id="be-coz" step="0.1" data-key="size"/><span class="suf">oz</span></div></div>';
     }
     if (def.type === 'oz')   return '<div class="fw"><input class="suf be-input" type="number" id="be-' + k + '" step="0.25" data-key="' + k + '"/><span class="suf">oz</span></div>';
