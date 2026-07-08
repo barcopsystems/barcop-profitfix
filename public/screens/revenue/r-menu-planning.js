@@ -37,11 +37,11 @@ S.RevenueMenuPlanning = {
     const P = kind === 'margin' ? {
       best: ['the fattest margin', 'the best margin of the bunch', 'the strongest margin here'],
       worst: ['the thinnest margin', 'the weakest margin of the bunch', 'the skinniest margin here'],
-      best2: ['the second-fattest margin', 'the second-best margin of the group'],
-      worst2: ['the second-thinnest margin', 'the second-weakest margin of the group'],
-      up: ['one of the fatter margins', 'an upper-tier margin', 'a healthy margin for the group'],
-      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin for the group'],
-      mid: ['a middling margin', 'a middle-of-the-pack margin', 'an average margin for the group']
+      best2: ['the second-fattest margin', 'the second-best margin'],
+      worst2: ['the second-thinnest margin', 'the second-weakest margin'],
+      up: ['one of the fatter margins', 'an upper-tier margin', 'a healthy margin'],
+      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin'],
+      mid: ['a middling margin', 'a middle-of-the-pack margin', 'an average margin']
     } : {
       best: ['the top seller', 'your busiest of them', 'the volume leader'],
       worst: ['the slowest mover', 'the least-ordered of them', 'the volume laggard'],
@@ -175,12 +175,12 @@ S.RevenueMenuPlanning = {
                'This one is a Star. {Mword} at {margin} a {noun} and {cword} at {covers} a week. It is doing everything you want.',
                'A Star. Strong on both counts: {mword} at {margin} a {noun} and {cword} at {covers} a week.'],
         PLOWHORSE: ['A Plowhorse. {Cword} at {covers} a week, but it runs {mword} at {margin} a {noun}. The volume is propping up a thin {noun}.',
-                    'A Plowhorse. It moves, {cword} at {covers} a week, but the margin is {mword} of the group at {margin}.',
+                    'A Plowhorse. It moves, {cword} at {covers} a week, but it runs {mword} at {margin}.',
                     'This one is a Plowhorse. People order it, {cword} at {covers} a week, they just are not paying you much for it at {margin} a {noun}.',
                     'A Plowhorse. {Cword} at {covers} a week on {mword} at {margin} a {noun}. Busy, but thin.'],
         PUZZLE: ['A Puzzle. The margin is there, {mword} at {margin} a {noun}, but it is {cword} at {covers} a week. It pays when it sells, it just is not selling.',
                  'A Puzzle. {Mword} at {margin} a {noun}, yet only {cword} at {covers} a week. People are not reaching for it.',
-                 'This one is a Puzzle. Good money at {margin} a {noun}, {mword} of the group, but {cword} at {covers} a week. The plate earns, the menu is hiding it.',
+                 'This one is a Puzzle. Good money at {margin} a {noun}, {mword}, but {cword} at {covers} a week. The plate earns, the menu is hiding it.',
                  'A Puzzle. {Mword} at {margin} a {noun}, but {cword} at {covers} a week. Solve the covers and it is a winner.'],
         DOG: ['A Dog. It runs {mword} at {margin} a {noun} and it is {cword} at {covers} a week. {tail}',
               'A Dog. {Mword} at {margin} a {noun}, and {cword} at {covers} a week. {tail}',
