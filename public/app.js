@@ -2865,24 +2865,27 @@ const App = {
     const push = o => {
       if (!o || o.v == null) return;
       const vs = String(o.v);
-      if (!hid.includes(vs) && !out.some(x => String(x.v) === vs)) out.push({ label: o.label, v: o.v });
+      if (!hid.includes(vs) && !out.some(x => String(x.v) === vs)) out.push({ label: o.label, v: o.v, name: o.name || '' });
     };
     (this._listBuiltins[key] || []).forEach(push);
     c.added.forEach(push);
     out.sort((a, b) => a.v - b.v);
     return out;
   },
+  // A custom size stores its raw name AND a composed "Name (oz oz)" label so the
+  // dropdown reads like the built-ins; the name rides to the product via data-name.
   listAddValued(key, label, v) {
     v = parseFloat(v);
     if (isNaN(v) || v <= 0) return;
     const c = this.listConfig(key);
     const vs = String(v);
     c.hidden = c.hidden.filter(h => String(h) !== vs);
-    const lbl = (label || '').trim() || (v + ' oz');
+    const name = (label || '').trim();
+    const lbl = name ? (name + ' (' + v + ' oz)') : (v + ' oz');
     const existing = c.added.find(a => String(a.v) === vs);
     const isBuiltin = (this._listBuiltins[key] || []).some(b => String(b.v) === vs);
-    if (existing) existing.label = lbl;
-    else if (!isBuiltin) c.added.push({ label: lbl, v });
+    if (existing) { existing.label = lbl; existing.name = name; }
+    else if (!isBuiltin) c.added.push({ label: lbl, name, v });
     this.saveKey('list_config');
   },
   listRemoveValued(key, v) {
@@ -2920,23 +2923,25 @@ const App = {
       const cur = sel.value;
       const hadBlank = sel.options.length && sel.options[0].value === '';
       const blankLabel = hadBlank ? sel.options[0].textContent : '';
+      // If the operator just removed the option that was selected, DROP it
+      // (deselect) — don't pin it at the end of the list. (Initial render keeps a
+      // saved product's value selectable; that lives in customSelect, not here.)
+      const stillThere = valued
+        ? opts.some(o => String(o.v) === String(cur))
+        : opts.some(v => v.toLowerCase() === (cur || '').toLowerCase());
       let html = hadBlank ? '<option value="">' + esc(blankLabel) + '</option>' : '';
       if (valued) {
-        const list = opts.slice();
-        const curN = parseFloat(cur);
-        // A product already on a now-hidden/removed size keeps it selectable.
-        if (cur && !isNaN(curN) && !list.some(o => o.v === curN)) list.push({ label: curN + ' oz', v: curN });
-        list.sort((a, b) => a.v - b.v);
-        html += list.map(o => '<option value="' + o.v + '"' + (String(o.v) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
+        html += opts.map(o => '<option value="' + o.v + '"' + (o.name ? ' data-name="' + esc(o.name) + '"' : '')
+          + (stillThere && String(o.v) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
       } else {
-        const list = opts.slice();
         const curLc = (cur || '').toLowerCase();
-        if (cur && !list.some(v => v.toLowerCase() === curLc)) list.push(cur);
-        html += list.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+        html += opts.map(v => '<option value="' + esc(v) + '"' + (stillThere && v.toLowerCase() === curLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
       }
       sel.innerHTML = html;
-      sel.value = cur || '';
+      sel.value = stillThere ? cur : '';
       sel._csPrev = sel.value;
+      // Removing the live selection changes the value → let dependents recompute.
+      if (!stillThere) sel.dispatchEvent(new Event('change', { bubbles: true }));
     });
   },
   // Shared list editor (opened by the "| Edit" link). Remove hides a built-in /
