@@ -2805,7 +2805,7 @@ const App = {
     subcat_bottle_beer: 'Bottle Beer Sub-Categories', subcat_draft_beer: 'Draft Beer Sub-Categories',
     subcat_food: 'Food Sub-Categories',
     size_spirits: 'Liquor Sizes', size_wine: 'Wine Sizes', size_beer: 'Beer Sizes',
-    size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes',
+    size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes', order_min_unit: 'Order Minimum Units',
   },
   _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
   // Category-appropriate example for the "Name" field on a valued (size) list.
