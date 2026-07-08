@@ -31,8 +31,14 @@ S.RevenueMenuEngineering = {
   // for beverages / inventory items with no set target, so no price is suggested.
   targetPctFor(item) {
     if (item.target_cost_pct) return item.target_cost_pct;
-    if (item.category === 'Cocktails') return App.MENU_TARGET_COST_PCT.cocktail;
-    if ((App.MENU_PLATE_CATEGORIES || []).indexOf(item.category) !== -1) return App.MENU_TARGET_COST_PCT.plate;
+    // Target is driven by the item TYPE now that the category is a free-form menu
+    // section (a dish under "Happy Hour" is still a dish). No-prep beverages have
+    // no set target, so no price is suggested for them.
+    const type = (S.RevenueMenuItems && S.RevenueMenuItems.classifyItem)
+      ? S.RevenueMenuItems.classifyItem(item)
+      : (item.type || (item.category === 'Cocktails' ? 'cocktail' : 'plate'));
+    if (type === 'plate') return App.MENU_TARGET_COST_PCT.plate;
+    if (type === 'cocktail') return App.MENU_TARGET_COST_PCT.cocktail;
     return null;
   },
 

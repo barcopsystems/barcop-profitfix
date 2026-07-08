@@ -1,13 +1,15 @@
 'use strict';
 
-/* ── Revenue Recovery — Menu Items (THE single menu edit surface) ─────────────
-   An always-on inline Add form (Enter Manually / Import File) sits on top; the
-   menu below is grouped into category data-cards. The category you pick drives
-   the form: Cocktails and food (Appetizers/Entrees/Desserts/Specials) get the
-   recipe builder (cost auto-computes from ingredients, or type a flat cost);
-   Beer/Wine/NA link an inventory product and the cost auto-fills. Editing opens
-   one modal with the same shared form body, so add and edit never drift. This is
-   the single edit door — also opened in place from Recipe Cost Analysis. */
+/* ── Revenue Recovery — Menu Builder (THE single menu edit surface) ───────────
+   Three add tiles (Dishes / Cocktails / No Prep) open one shared modal; the menu
+   below is grouped section-first into the operator's own categories, any item
+   type mixing freely inside a section. The tile sets the item TYPE (which drives
+   the form + cost model): Dishes and Cocktails get the recipe builder (cost auto-
+   computes from ingredients, or type a flat cost); No Prep links an inventory
+   product and the cost auto-fills. The Category is a separate free-form menu
+   SECTION, shared across all three forms and edited via the | Edit popup. Editing
+   opens the same modal, so add and edit never drift. This is the single edit door
+   — also opened in place from Recipe Cost Analysis. */
 
 S.RevenueMenuItems = {
   // ── State ─────────────────────────────────────────────────────────────
@@ -48,6 +50,10 @@ S.RevenueMenuItems = {
   // Used by edit routing and tab filtering.
   classifyItem(item) {
     if (!item) return 'plate';
+    // Explicit type is the source of truth (set on save). Category is now a free-
+    // form menu section and no longer implies the item's kind. Fall back to the
+    // legacy signals for older items saved before the type field existed.
+    if (item.type === 'plate' || item.type === 'cocktail' || item.type === 'inventory') return item.type;
     if (item.linked_product_id) return 'inventory';
     if (item.recipe && item.recipe.mode === 'single') return 'cocktail';
     if (item.category === 'Cocktails') return 'cocktail';
@@ -178,7 +184,9 @@ S.RevenueMenuItems = {
   showHowTo() {
     App.showHelpModal('How Menu Builder Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly units sold, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
-      { h: 'Adding an Item', p: ['Pick a category and the form fills in. Cocktails and food (Appetizers, Entrees, Desserts, Specials) get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. Beer, Wine, NA, and Snacks link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). The product list shows only the products that fit the category you picked, so there is nothing to scroll past. Snacks are packaged items you buy and sell whole (bagged chips, bottled NA), marked Sold on the menu in Inventory; their cost comes in per serving. Enter covers so Menu Engineering can weight the item by how often it sells.'] },
+      { h: 'Adding an Item', p: ['Start from the tile for the kind of item you are adding. Dishes and Cocktails get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. No Prep items link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). A poured product like draft beer or wine by the glass carries a Pour Size; a food or resale item carries a Portion; bottle beer sells whole. Enter units sold so Menu Engineering can weight the item by how often it sells.'] },
+      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and the list is yours to shape. Tap Edit next to Category to add your own sections (Happy Hour, Brunch, Featured), rename by adding and hiding, or reset to the defaults. Any item type can go in any section, so a Happy Hour section can hold a cocktail, a dish, and a beer together. Your sections show up as real grouped sections on this page and in the rest of the Menu tools. A No Prep item drops into a sensible section automatically if you do not pick one.'] },
+      { h: 'Other Selling Prices', p: ['Any item can carry more than one price. Use Add Price under Other Selling Prices to log a happy-hour or specials price, and Bar Cop shows the cost percentage at each price so you can see whether a discounted price runs into a loss before you commit to it.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review Log in Menu Engineering picks it up.'] },
       { h: 'Archived Items', p: ['An item you cut from the Dog Test lands in an Archived list at the bottom of the page, kept out of the menu and out of Menu Engineering but not deleted. Restore brings one back onto the live menu with everything intact; Delete Permanently removes it for good after a confirm. You can only get here by cutting an item, so nothing archives by accident.'] }
@@ -190,6 +198,10 @@ S.RevenueMenuItems = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
+    // Register the menu-section builtins up front so the section-first list can
+    // order by App.listOptions('menu_category') before the editor form (which
+    // otherwise registers them on first render) has ever been opened.
+    App._listBuiltins.menu_category = App._listBuiltins.menu_category || App.MENU_ALL_CATEGORIES;
     this.renderLanding();
     // External focus (e.g. from Recipe Cost Analysis): open the editor modal in
     // place over the landing — no full-screen swap, works the same from any door.
@@ -200,23 +212,15 @@ S.RevenueMenuItems = {
     }
   },
 
-  // ── Landing: three cards + tabs + filtered table ─────────────────────
-  CAT_ORDER: ['Cocktails', 'Appetizers', 'Entrees', 'Desserts', 'Specials', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
-
-  // The three menu-item types, shown as tiles + tabs the way Add Products shows
-  // its category cards + tabs, so Inventory and the Menu Builder read as one
-  // connected surface. Each type's list groups by menu category into sections.
+  // ── Landing: three add tiles + section-first menu list ─────────────────
+  // The three menu-item TYPES, shown as tiles (the add/upload doors) the way Add
+  // Products shows its category cards. Type drives the form and cost model; the
+  // menu section (category) is chosen separately and is free-form.
   TYPES: [
     { key: 'plate',     label: 'Dishes',    add: 'Add Dish Menu Item',     imp: 'Dish List',     noun: 'dish' },
     { key: 'cocktail',  label: 'Cocktails', add: 'Add Cocktail Menu Item', imp: 'Cocktail List', noun: 'cocktail' },
     { key: 'inventory', label: 'No Prep',   add: 'Add Inventory Item',     imp: 'No Prep List',  noun: 'no prep' }
   ],
-  catsForType(type) {
-    if (type === 'cocktail')  return ['Cocktails'];
-    if (type === 'plate')     return this.PLATE_CATEGORIES.slice();
-    if (type === 'inventory') return [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
-    return null;
-  },
 
   renderLanding() {
     const everything = this.items();
@@ -244,16 +248,9 @@ S.RevenueMenuItems = {
     }).join('');
     const tilesBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">' + tiles + '</div>';
 
-    // ── Type tabs ─────────────────────────────────────────────────────────
-    const tabs = '<div class="ch-tabs no-print">'
-      + this.TYPES.map(t => {
-          const on = this.activeType === t.key;
-          const n = all.filter(i => this.classifyItem(i) === t.key).length;
-          return '<button class="ch-tab mi-tab' + (on ? ' on' : '') + '" data-type="' + t.key + '">'
-            + esc(t.label) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
-        }).join('')
-      + '</div>';
-
+    // The menu is shown section-first: one list grouped into the operator's own
+    // categories, any item type mixing freely inside a section. The three tiles
+    // above stay as the add/upload doors, so no type tabs.
     const lower = this._importOpen ? this.importPanelHTML() : this.listHTML(all);
 
     // Archived items (cut from a Dog Test, or archived here), across all types.
@@ -272,23 +269,23 @@ S.RevenueMenuItems = {
         + '</tbody></table></div>'
       : '';
 
-    this.container.innerHTML = '<div class="screen">' + tilesBlock + tabs + lower + archivedSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + tilesBlock + lower + archivedSection + '</div>';
     this.wireLanding();
   },
 
-  // The active type's items, grouped by menu category into section cards.
+  // Every live item, grouped into the operator's menu SECTIONS (categories), any
+  // item type mixing freely inside a section. Section order follows the custom
+  // menu_category list; leftover categories fall to the end, Uncategorized last.
   listHTML(all) {
-    const t = this.TYPES.find(x => x.key === this.activeType) || {};
-    const typeItems = all.filter(i => this.classifyItem(i) === this.activeType);
-    if (!typeItems.length) {
-      return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No ' + esc((t.label || 'items').toLowerCase()) + ' yet. Use <strong>+ ' + esc(t.add || 'Add') + '</strong> above, or Upload to bring your menu in at once.</div></div>';
+    if (!all.length) {
+      return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No menu items yet. Use a <strong>+ Add</strong> tile above, or Upload to bring your menu in at once.</div></div>';
     }
-    const incompleteN = typeItems.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
-    const cats = [...new Set(typeItems.map(i => i.category || 'Uncategorized'))]
-      .sort((a, b) => {
-        const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
-      });
+    const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
+    const order = App.listOptions('menu_category');
+    const present = [...new Set(all.map(i => i.category || 'Uncategorized'))];
+    const ordered = order.filter(c => present.includes(c))
+      .concat(present.filter(c => !order.includes(c) && c !== 'Uncategorized').sort())
+      .concat(present.includes('Uncategorized') ? ['Uncategorized'] : []);
     const warn = incompleteN > 0
       ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);">'
         + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
@@ -301,18 +298,23 @@ S.RevenueMenuItems = {
       + (selCount > 0 ? '<button class="btn btn-danger btn-sm mi-sel-del">Delete ' + selCount + ' Selected</button>' : '')
       + '<button class="btn btn-ghost btn-sm" id="mi-export" style="margin-left:auto;">Export PDF</button>'
       + '</div>';
-    const sections = cats.map((cat, ci) => {
-      const items = typeItems.filter(i => (i.category || 'Uncategorized') === cat)
+    let ci = 0;
+    const sections = ordered.map(cat => {
+      const items = all.filter(i => (i.category || 'Uncategorized') === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!items.length) return '';
       const rows = items.map(item => this._itemRowHTML(item)).join('');
-      return '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      const html = '<div class="card" style="overflow-x:auto;margin-top:' + (ci === 0 ? '0' : '16') + 'px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + '<colgroup><col style="width:40px;"/><col style="width:230px;"/><col/><col/><col/><col/><col/><col style="width:160px;"/></colgroup>'
         + '<thead><tr>'
         + '<th></th><th>' + esc(cat) + '</th><th>Price</th><th>Cost</th><th>Cost %</th><th>Margin</th><th>Sold/wk</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+      ci++;
+      return html;
     }).join('');
     return warn + toolbar + '<div id="mi-list-export">' + sections + '</div>';
   },
+  TYPE_LABEL: { plate: 'Dish', cocktail: 'Cocktail', inventory: 'No Prep' },
 
   _itemRowHTML(item) {
     const cost = App.menuItemCost(item) || 0;
@@ -328,7 +330,8 @@ S.RevenueMenuItems = {
     const checked = (this._selected && this._selected.has(item.id)) ? ' checked' : '';
     return '<tr>'
       + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"' + checked + '/></td>'
-      + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
+      + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name)
+      + ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;margin-left:4px;vertical-align:middle;white-space:nowrap;">' + esc(this.TYPE_LABEL[cls] || '') + '</span></div>'
       + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
       + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
       + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
@@ -372,13 +375,9 @@ S.RevenueMenuItems = {
       el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
     this.container.querySelectorAll('.mi-card-imp').forEach(el =>
       el.addEventListener('click', () => this.openImport(el.dataset.type)));
-    // Tabs switch the active type (and clear any selection).
-    this.container.querySelectorAll('.mi-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeType = b.dataset.type; this._importOpen = false; this._selected = new Set(); this.renderLanding(); }));
-
-    // Select All / Clear + per-row checkboxes + bulk delete (active type only).
+    // Select All / Clear + per-row checkboxes + bulk delete (every live item).
     this.container.querySelectorAll('.mi-sel-all').forEach(b => b.addEventListener('click', () => {
-      const rows = this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeType);
+      const rows = this.items().filter(i => !i.archived);
       this._selected = new Set(rows.map(i => i.id));
       this.renderLanding();
     }));
@@ -444,20 +443,11 @@ S.RevenueMenuItems = {
     document.getElementById('mi-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu', root: document.getElementById('mi-list-export') }));
   },
 
-  // ── Editor (ONE modal, adapts to the chosen category) ────────────────────
-  // Replaces the old three full-screen forms. Category drives the form:
-  // Cocktails + food get the recipe builder; Beer/Wine/NA link an inventory
-  // product. No "type" pre-choice, no No-Recipe toggle — add ingredients and
-  // cost auto-computes, leave them empty and the cost field is yours to type.
-  // This is the single edit door, opened here and (later) from Recipe Cost
-  // Analysis, so no cross-section jump.
-  typeForCategory(cat) {
-    if (!cat) return null;
-    if (cat === 'Cocktails') return 'cocktail';
-    if (this.PLATE_CATEGORIES.includes(cat)) return 'plate';
-    return 'inventory';
-  },
-
+  // ── Editor (ONE modal, form driven by the item TYPE) ─────────────────────
+  // Replaces the old three full-screen forms. The tile you click sets the type:
+  // Dishes + Cocktails get the recipe builder; No Prep links an inventory product.
+  // The menu section (category) is a separate free-form field. This is the single
+  // edit door, also opened from Recipe Cost Analysis, so no cross-section jump.
   openEditor(item, opts) {
     opts = opts || {};
     this._editItem = item || null;
@@ -468,9 +458,12 @@ S.RevenueMenuItems = {
     // A tile "+ Add" passes its type so the new form opens scoped + ready: the
     // category picker is limited to that type and preset to its first category.
     this._addType = (!item && opts.type) ? opts.type : null;
-    this._presetCat = this._addType ? ((this.catsForType(this._addType) || [])[0] || '') : '';
+    // Type comes from the tile you clicked, NOT the category. Cocktails preset to
+    // the Cocktails section; dishes and no-prep items let the operator pick a
+    // section (no-prep also auto-fills one when a product is chosen).
+    this._presetCat = this._addType === 'cocktail' ? 'Cocktails' : '';
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
-    this.formType  = item ? this.classifyItem(item) : (this._presetCat ? this.typeForCategory(this._presetCat) : null);
+    this.formType  = item ? this.classifyItem(item) : this._addType;
     this.linkedProductId = item?.linked_product_id || '';
     const hasRecipe = !!(item?.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
     // The recipe is optional (allow-but-nudge): an existing recipe opens expanded,
@@ -506,6 +499,7 @@ S.RevenueMenuItems = {
       + '</div></div>';
 
     App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 660, onClose: () => this.cancelEditor() });
+    App.wireCustomSelects(document.getElementById('mi-editor') || document);
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
@@ -518,21 +512,14 @@ S.RevenueMenuItems = {
   // mi-adaptive ids are identical, so only ONE of the two forms is ever in the DOM
   // at once (openEditor removes the inline form first).
   formBodyHtml(item) {
-    // On a tile "+ Add" the category picker is scoped to that type; on edit it
-    // shows every category so an item can still be recategorized.
-    const scoped = (!item && this._addType) ? this.catsForType(this._addType) : null;
-    const invMenuCats = [...new Set(this.INVENTORY_GROUPS.map(g => g.menuCat))];
-    const allCats = scoped || ['Cocktails'].concat(this.PLATE_CATEGORIES, invMenuCats);
     const selCat = item?.category || this._presetCat || '';
     const scopeType = item ? this.classifyItem(item) : this._addType;
-    // Cocktails are the only category in their tab, so the picker is hidden (kept
-    // as a fixed value); every other type shows the Category dropdown.
-    const catCell = scopeType === 'cocktail'
-      ? '<input type="hidden" id="ri-cat" value="Cocktails"/>'
-      : '<div class="f" style="width:130px;flex-shrink:0;"><label>Category</label><select class="form-input" id="ri-cat">'
-        + '<option value="">Select category...</option>'
-        + allCats.map(c => '<option' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
-        + '</select></div>';
+    // Category is a free-form menu SECTION, shared across every item type and
+    // editable through the | Edit popup. It no longer implies the item's kind
+    // (that's the type, set by the tile), so it shows on all three forms.
+    const catCell = '<div class="f" style="width:150px;flex-shrink:0;"><label>Category' + App.manageListLink('menu_category') + '</label>'
+      + App.customSelect({ id: 'ri-cat', key: 'menu_category', builtin: App.MENU_ALL_CATEGORIES, selected: selCat, blank: true, blankLabel: 'Select category...' })
+      + '</div>';
     const nameSlot = '<div class="f" id="mi-name-slot" style="width:150px;flex-shrink:0;display:none;"></div>';
     const linkedSlot = '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
     const adaptive = '<div id="mi-adaptive" style="display:contents;"></div>';
@@ -566,31 +553,12 @@ S.RevenueMenuItems = {
     this.renderLanding();
   },
 
-  onCategoryChange(cat) {
-    this.formType = this.typeForCategory(cat);
-    // Switching to (or between) an inventory category resets the linked product
-    // so the scoped picker starts blank instead of holding a stale pick from the
-    // previous category.
-    if (this.formType === 'inventory') { this.mode = null; this.rows = []; this.linkedProductId = ''; }
-    else if (this.formType) {
-      this.mode = this.formType === 'cocktail' ? 'single' : 'food';
-      if (!this.rows.length) this.rows = [{ source: 'product', id: '', quantity: '' }];
-    } else { this.mode = null; this.rows = []; }
-    this.syncEditorWidth();
-    this.renderAdaptive(this._editItem);
+  // Category is just the menu section now. It does not change the form or the item
+  // type (that comes from the tile), so picking a section — including the blank
+  // "Select category..." — never re-renders the form. Keep the missing-field
+  // highlight in step and nothing else.
+  onCategoryChange() {
     this.refreshFieldMissing();
-  },
-
-  // When the edit modal is open, keep its width + layout matched to the category:
-  // the narrow two-column form for an inventory product, the wider recipe-builder
-  // form (prep-batch width) for cocktails and plates. No-op on the inline add form.
-  syncEditorWidth() {
-    const overlay = document.getElementById('mi-editor');
-    if (!overlay) return;
-    const isInv = this.formType === 'inventory';
-    document.getElementById('mi-editor-card')?.classList.toggle('narrow-form', isInv);
-    const box = overlay.firstElementChild;
-    if (box) box.style.maxWidth = (isInv ? 540 : 660) + 'px';
   },
 
   renderAdaptive(item) {
@@ -600,10 +568,7 @@ S.RevenueMenuItems = {
     if (nameSlot) { nameSlot.innerHTML = ''; nameSlot.style.display = 'none'; }
     if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }
     if (!host) return;
-    if (!this.formType) {
-      host.innerHTML = '<div style="flex:0 0 100%;font-size:12px;color:var(--t3);padding:14px 2px;">Pick a category and the rest of the form fills in.</div>';
-      return;
-    }
+    if (!this.formType) return;   // type comes from the tile, so this never blanks the form
     if (this.formType === 'inventory') {
       // Inventory: the Inventory Product picker loads right after Category, then a
       // Menu Name that auto-fills from the product (still editable), then
@@ -612,6 +577,7 @@ S.RevenueMenuItems = {
       if (nameSlot) { nameSlot.innerHTML = this.nameFieldHtml(item); nameSlot.style.display = ''; }
       host.innerHTML = this.inventoryRestHtml(item);
       this.wireInventoryFields();
+      this.renderOtherPrices(item);
       return;
     }
     // Recipe types carry a real typed name, so the Menu Name field loads right
@@ -638,7 +604,7 @@ S.RevenueMenuItems = {
     } else {
       wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
         + '<span id="ri-build-recipe" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Build Recipe</span>'
-        + '<span style="font-size:11px;color:var(--t3);margin-left:12px;">Optional — add a recipe for accurate, auto-updating cost.</span>'
+        + '<span style="font-size:11px;color:var(--t3);margin-left:12px;">Optional. Add a recipe for accurate, auto-updating cost.</span>'
         + '</div>';
       document.getElementById('ri-build-recipe')?.addEventListener('click', () => {
         this._recipeOpen = true;
@@ -658,8 +624,8 @@ S.RevenueMenuItems = {
     const rows = (this._otherPrices || []).map((o, i) => this.priceRowHTML(o, i)).join('');
     wrap.innerHTML = '<div style="border-top:1px solid var(--b2);padding-top:14px;margin-top:6px;">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
-        + '<label style="margin:0;">Other Prices <span style="color:var(--t4);font-weight:400;">(happy hour, specials)</span></label>'
-        + '<span id="ri-add-price" style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;">+ Add Price</span>'
+        + '<label style="margin:0;">Other Selling Prices</label>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ri-add-price">+ Add Price</button>'
       + '</div>'
       + '<div id="ri-op-list">' + rows + '</div>'
       + '</div>';
@@ -688,13 +654,22 @@ S.RevenueMenuItems = {
     if (!row) return;
     const span = row.querySelector('.op-pct');
     if (!span) return;
-    const cost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
+    const cost = this._currentItemCost();
     const price = parseFloat(row.querySelector('.op-price')?.value) || 0;
     const pct = (cost > 0 && price > 0) ? (cost / price * 100) : null;
     const target = parseFloat(document.getElementById('ri-target-pct')?.value)
-      || (this.formType === 'cocktail' ? App.MENU_TARGET_COST_PCT.cocktail : App.MENU_TARGET_COST_PCT.plate);
+      || (this.formType === 'plate' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
     span.textContent = pct != null ? pct.toFixed(1) + '%' : '-';
     span.style.color = pct == null ? 'var(--t1)' : (pct > target ? 'var(--red)' : 'var(--green)');
+  },
+  // The item's current cost, read from whichever form is open: the recipe/manual
+  // Cost input, or the inventory form's auto-computed Cost strip.
+  _currentItemCost() {
+    const c = document.getElementById('ri-cost');
+    if (c) return parseFloat(c.value) || 0;
+    const inv = document.getElementById('ri-inv-cost');
+    if (inv) return parseFloat(String(inv.textContent).replace(/[^0-9.]/g, '')) || 0;
+    return 0;
   },
   recalcAllPrices() { document.querySelectorAll('.op-row').forEach(r => this.recalcPriceRow(r)); },
   syncOtherPrices() {
@@ -726,37 +701,29 @@ S.RevenueMenuItems = {
   // Category), at normal width.
   linkedFieldHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
-    const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
+    // Show every sellable product (grouped by kind) — the menu category is a free-
+    // form section now, so it no longer filters the picker. The product itself
+    // drives the cost model (pour vs portion vs whole).
     return '<label>Inventory Product</label>'
-      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId, menuCat) + '</select>';
+      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId, '') + '</select>';
   },
-  // Everything below the top row for an inventory item: price, cost, covers, pour, notes.
+  // Everything below the top row for an inventory item: price, cost, covers,
+  // pour/portion, other prices, notes.
   inventoryRestHtml(item) {
     const linkedId = this.linkedProductId || item?.linked_product_id || '';
     const linkedProd = linkedId ? this.prodById(linkedId) : null;
-    const menuCat = document.getElementById('ri-cat')?.value || item?.category || '';
-    // Poured drinks (Beer/Wine) carry a Pour Size; Food/Misc resale/side items
-    // (NA Beverages, Snacks) carry a Portion in the product's own recipe measure
-    // (servings or ounces), so the cost is portion x per-serving / per-ounce.
-    const pourEligible = menuCat !== 'NA Beverages' && menuCat !== 'Snacks';
-    const amount = pourEligible ? item?.pour_size_oz : item?.portion;
+    const kind = this._invAmountKind(linkedProd);
+    const amount = kind === 'portion' ? item?.portion : (kind === 'pour' ? item?.pour_size_oz : null);
     const autoCost = linkedProd ? (App.menuLinkCost(linkedProd, amount) || 0) : 0;
-    // Pour Size only for products SOLD BY A POUR: draft beer (from a keg) and wine
-    // by the glass. Rendered for eligible categories but hidden until a poured
-    // product is picked (toggled in the product-change handler).
-    const pourShow = this.pourVisibleFor(menuCat, linkedProd);
-    const pourField = pourEligible
-      ? '<div class="f" id="ri-pour-cell" style="width:85px;' + (pourShow ? '' : 'display:none;') + '"><label>Pour Size</label>'
-        + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : '') + '"/><span class="suf">oz</span></div></div>'
-      : '';
-    // Portion (NA Beverages / Snacks): how many servings / ounces of the linked
-    // product this menu item is. A Side of Fries is 1 serving, a Basket is 3.
     const basis = linkedProd && App.recipeBasis ? App.recipeBasis(linkedProd) : null;
     const portionUnit = basis ? basis.unitLabel : 'ea';
-    const portionField = !pourEligible
-      ? '<div class="f" id="ri-portion-cell" style="width:120px;"><label>Portion</label>'
-        + '<div class="fw"><input class="form-input suf" type="number" id="ri-portion" value="' + (item?.portion != null ? item.portion : '') + '" step="0.25" min="0" placeholder="1"/><span class="suf" id="ri-portion-unit">' + esc(portionUnit) + '</span></div></div>'
-      : '';
+    // Pour (draft beer / wine by the glass) and Portion (food / misc resale) are
+    // both rendered; only the one that fits the linked product shows, and the
+    // product-change handler flips between them. Bottle beer sells whole (neither).
+    const pourField = '<div class="f" id="ri-pour-cell" style="width:85px;' + (kind === 'pour' ? '' : 'display:none;') + '"><label>Pour Size</label>'
+      + '<div class="fw"><input class="form-input suf" type="number" id="ri-pour" value="' + (item?.pour_size_oz != null ? item.pour_size_oz : '') + '" step="0.25" min="0" placeholder="' + (linkedProd?.pour_size_oz != null ? linkedProd.pour_size_oz : '') + '"/><span class="suf">oz</span></div></div>';
+    const portionField = '<div class="f" id="ri-portion-cell" style="width:120px;' + (kind === 'portion' ? '' : 'display:none;') + '"><label>Portion</label>'
+      + '<div class="fw"><input class="form-input suf" type="number" id="ri-portion" value="' + (item?.portion != null ? item.portion : '') + '" step="0.25" min="0" placeholder="1"/><span class="suf" id="ri-portion-unit">' + esc(portionUnit) + '</span></div></div>';
     return '<div class="f" style="width:100px;"><label>Menu Price</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="ri-price" value="' + (item?.price || '') + '" step="0.01" placeholder="0.00"/></div></div>'
       + '<div class="f" style="width:95px;"><label>Units Sold</label><div class="fw"><input class="form-input suf" type="number" id="ri-cov" value="' + (item?.weekly_covers || '') + '"/><span class="suf">wk</span></div></div>'
       + pourField
@@ -767,14 +734,17 @@ S.RevenueMenuItems = {
         + '<div class="calc-item"><div class="calc-label">Cost</div><div class="calc-val" id="ri-inv-cost">' + (autoCost > 0 ? App.fmtCurrency(autoCost) : '-') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Cost %</div><div class="calc-val" id="ri-inv-pct">' + (autoCost > 0 && item?.price > 0 ? (autoCost / item.price * 100).toFixed(1) + '%' : '-') + '</div></div>'
         + '</div></div>'
+      + '<div id="ri-other-prices-wrap" style="flex:0 0 100%;"></div>'
       + '<div style="flex:0 0 100%;">' + App.noteField({ id: 'ri-notes', value: item?.notes, placeholder: 'Optional', mt: 6 }) + '</div>';
   },
-  // Pour Size applies only to products sold by a pour: draft beer and wine by the
-  // glass. Bottle beer sells whole, so it carries no pour size.
-  pourVisibleFor(menuCat, prod) {
-    if (menuCat === 'NA Beverages' || menuCat === 'Snacks') return false;
-    if (menuCat === 'Beer') return !!(prod && prod.category === 'Draft Beer');
-    return true;
+  // Which amount field a linked product uses: a pour (draft beer / wine by the
+  // glass), a portion (food / misc resale, in servings or ounces), or none (bottle
+  // beer, sold whole). Product-driven now that the menu category is free-form.
+  _invAmountKind(prod) {
+    if (!prod) return 'none';
+    if (prod.category === 'Draft Beer' || prod.category === 'Wine') return 'pour';
+    if (prod.category === 'Food' || prod.category === 'Misc') return 'portion';
+    return 'none';
   },
 
   wireInventoryFields() {
@@ -794,18 +764,19 @@ S.RevenueMenuItems = {
       const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
       const pctEl = document.getElementById('ri-inv-pct');
       if (pctEl) pctEl.textContent = (bc > 0 && price > 0) ? (bc / price * 100).toFixed(1) + '%' : '-';
+      this.recalcAllPrices();   // keep any Other Selling Prices %s in step with the live cost
     };
     document.getElementById('ri-linked-prod')?.addEventListener('change', e => {
       this.linkedProductId = e.target.value || '';
       const p = this.linkedProductId ? this.prodById(this.linkedProductId) : null;
-      // Pour Size shows only for poured products (draft beer, wine by the glass);
-      // hide and clear it for bottle beer and the like before recomputing cost.
+      // Show the amount field the product needs: Pour (draft beer / wine by the
+      // glass), Portion (food / misc), or neither (bottle beer, sold whole). Clear
+      // the hidden one so a stale value never rides along into the cost.
+      const kind = this._invAmountKind(p);
       const pourCell = document.getElementById('ri-pour-cell');
-      if (pourCell) {
-        const show = this.pourVisibleFor(document.getElementById('ri-cat')?.value || '', p);
-        pourCell.style.display = show ? '' : 'none';
-        if (!show) { const pi = document.getElementById('ri-pour'); if (pi) pi.value = ''; }
-      }
+      const portCell = document.getElementById('ri-portion-cell');
+      if (pourCell) { pourCell.style.display = kind === 'pour' ? '' : 'none'; if (kind !== 'pour') { const pi = document.getElementById('ri-pour'); if (pi) pi.value = ''; } }
+      if (portCell) { portCell.style.display = kind === 'portion' ? '' : 'none'; if (kind !== 'portion') { const pi = document.getElementById('ri-portion'); if (pi) pi.value = ''; } }
       // Update the Portion field's inline unit to the product's recipe measure
       // (slice / oz / ea) so the operator sees what they're entering.
       const punit = document.getElementById('ri-portion-unit');
@@ -819,6 +790,10 @@ S.RevenueMenuItems = {
       // Auto-fill the Menu Name from the product; the operator can still edit it.
       const nameInp = document.getElementById('ri-name');
       if (nameInp && p) nameInp.value = p.name;
+      // Auto-fill the menu section from the product's natural category if the
+      // operator hasn't picked one, so a no-prep item is never left uncategorized.
+      const catSel = document.getElementById('ri-cat');
+      if (catSel && !catSel.value && p) { const def = App.menuCatForProduct(p) || ''; if (def) catSel.value = def; }
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
@@ -1019,7 +994,7 @@ S.RevenueMenuItems = {
         computedCost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
       }
     } else if (type === 'cocktail') {
-      category = 'Cocktails';
+      category = document.getElementById('ri-cat')?.value || 'Cocktails';
       const recipeIngs = (this.rows.length && this.mode)
         ? this.rows.filter(r => r.id && (parseFloat(r.quantity) || 0) > 0).map(r => ({ source: r.source, id: r.id, quantity: parseFloat(r.quantity) || 0 }))
         : [];
@@ -1037,7 +1012,7 @@ S.RevenueMenuItems = {
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
       if (!name) name = p.name;   // Menu Name auto-fills from the product; fall back if cleared
-      category = App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
+      category = document.getElementById('ri-cat')?.value || App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
       // Cost from the per-item amount: Food/Misc by Portion, beer/wine by Pour.
       const isFoodMisc = p.category === 'Food' || p.category === 'Misc';
       const raw = parseFloat(document.getElementById(isFoodMisc ? 'ri-portion' : 'ri-pour')?.value);
@@ -1065,15 +1040,13 @@ S.RevenueMenuItems = {
       }
     }
 
-    // Other Prices (happy hour / specials) on dish + cocktail items: one item,
+    // Other Selling Prices (happy hour / specials) on every item type: one item,
     // several price points; same cost, each carries its own margin.
     const otherPrices = [];
-    if (type === 'plate' || type === 'cocktail') {
-      document.querySelectorAll('.op-row').forEach(r => {
-        const price = parseFloat(r.querySelector('.op-price')?.value);
-        if (!isNaN(price) && price > 0) otherPrices.push({ label: (r.querySelector('.op-label')?.value.trim() || 'Other'), price });
-      });
-    }
+    document.querySelectorAll('.op-row').forEach(r => {
+      const price = parseFloat(r.querySelector('.op-price')?.value);
+      if (!isNaN(price) && price > 0) otherPrices.push({ label: (r.querySelector('.op-label')?.value.trim() || 'Other'), price });
+    });
 
     // If this is an edit, snapshot the prior weekly_covers before overwriting
     // so Menu Engineering can show the Menu Mix Delta column ("covers vs prior
@@ -1092,6 +1065,7 @@ S.RevenueMenuItems = {
     const priceChanged = existing && existing.price != null && existing.price !== price;
     const entry = {
       id:                 existing?.id || App.uid(),
+      type,
       name,
       category,
       price,
@@ -1171,6 +1145,7 @@ S.RevenueMenuItems = {
       if (!name) return;
       toAdd.push({
         id:                 App.uid(),
+        type:               this.activeType,   // the tile the Upload was opened from sets the item type
         name,
         category:           (r.category || '').trim(),
         price:              num(r.price),
