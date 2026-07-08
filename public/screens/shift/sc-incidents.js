@@ -76,7 +76,7 @@ S.ShiftIncidents = {
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || '') + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Main bar"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Type' + App.manageListLink('incident_type') + '</label>' + App.customSelect({ id: p + 'type', key: 'incident_type', builtin: this.TYPES, selected: (r ? r.type : '') }) + '</div>'
+      + '<div class="f" style="flex:1;min-width:160px;"><label>Type' + App.manageListLink('incident_type') + '</label>' + App.customSelect({ id: p + 'type', key: 'incident_type', builtin: this.TYPES, selected: (r ? r.type : ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
       + '<div class="f" style="width:120px;flex-shrink:0;"><label>Severity</label><select id="' + p + 'severity">' + sevOpts + '</select></div>'
       + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
       + '</div>'
