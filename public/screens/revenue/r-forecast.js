@@ -59,21 +59,31 @@ S.RevenueForecast = {
   },
 
   // ── Projection: the next several weeks, read-only ───────────────────────────
+  // Shared colgroup so the Projection and Forecast Accuracy tables line up column
+  // for column down the page (both are five-column .row-list tables).
+  _colgroup() {
+    return '<colgroup><col style="width:26%"/><col style="width:18%"/><col style="width:19%"/><col style="width:18%"/><col style="width:19%"/></colgroup>';
+  },
+
   projectionCard() {
     const thisMon = this.currentWeekMon();
+    const laborPct = App.laborTargetPct ? App.laborTargetPct() : 30;
     const rows = [];
     for (let i = 0; i < 6; i++) {
       const ws = this.addDays(thisMon, i * 7);
       const f = App.effectiveForecast(ws) || {};
+      const total = f.total || 0;
       const ev = (f.events_total || 0) > 0 ? this.fmt(f.events_total) : '<span style="color:var(--t4);">-</span>';
       rows.push('<tr><td>' + esc(this.weekRangeLabel(ws)) + (i === 0 ? ' <span style="color:var(--gold);font-size:10px;font-weight:800;letter-spacing:.5px;">NOW</span>' : '') + '</td>'
-        + '<td>' + this.fmt(f.total || 0) + '</td>'
+        + '<td>' + this.fmt(total) + '</td>'
         + '<td>' + ev + '</td>'
-        + '<td>' + (f.total_covers || 0) + '</td></tr>');
+        + '<td>' + (f.total_covers || 0) + '</td>'
+        + '<td>' + this.fmt(total * laborPct / 100) + '</td></tr>');
     }
     return '<div class="sh" style="margin:22px 0 10px;">Projection</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
-      + '<thead><tr><th>Week</th><th>Forecast</th><th>Events</th><th>Cover Goal</th></tr></thead>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this._colgroup()
+      + '<thead><tr><th>Week</th><th>Forecast</th><th>Events</th><th>Cover Goal</th><th>Labor Budget</th></tr></thead>'
       + '<tbody>' + rows.join('') + '</tbody></table></div>';
   },
 
@@ -126,9 +136,10 @@ S.RevenueForecast = {
       + '<div class="calc-item"><div class="calc-label">Average Error</div><div class="calc-val lg">' + avgErr.toFixed(1) + '%</div></div>'
       + '<div class="calc-item"><div class="calc-label">Matched Weeks</div><div class="calc-val lg">' + recent.length + '</div></div>'
       + '</div></div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Last 12 Weeks</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this._colgroup()
+      + '<thead><tr><th>Last 12 Weeks</th><th>Forecast</th><th>Actual</th><th>Gap $</th><th>Gap %</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div></div>';
   },
 
   draw() {
