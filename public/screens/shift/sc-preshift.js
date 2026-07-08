@@ -228,7 +228,7 @@ S.ShiftPreShift = {
       : '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
     const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:24%"/><col style="width:12%"/><col style="width:44%"/><col/></colgroup>'
-      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Talking Point <span style="color:var(--t4);font-weight:400;">|</span> <span class="pb-menurundown" style="color:var(--gold);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600;">Menu Rundown</span></th><th class="no-print"></th></tr></thead>'
+      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Talking Point</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + featRows + '</tbody></table></div>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
@@ -342,7 +342,6 @@ S.ShiftPreShift = {
     // Featured controls
     c.querySelector('#pb-fadd')?.addEventListener('click', () => this._openPicker('add', -1));
     c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this._recommendedFor(this._period).map(s => s.id); this.draw(); });
-    c.querySelector('.pb-menurundown')?.addEventListener('click', () => App.openScreen('r-menu-planning'));
     // Talking point saves ONTO the menu item, so it comes back every time the
     // item is featured, any shift.
     c.querySelectorAll('.pb-pitch').forEach(inp => inp.addEventListener('change', () => {
