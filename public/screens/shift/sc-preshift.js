@@ -161,15 +161,15 @@ S.ShiftPreShift = {
     return it.price - cost;
   },
 
-  // Why we feature this item: the item's own Menu Rundown "read" line, unique per
-  // item. Falls back to a margin line if the Rundown can't read it.
+  // Why we feature this item: a tight one-liner from the Menu Rundown (class +
+  // the sharpest fact), unique per item. Falls back to a margin line.
   _featureReason(it) {
-    if (window.S && S.RevenueMenuPlanning && typeof S.RevenueMenuPlanning.briefLineFor === 'function') {
-      const line = S.RevenueMenuPlanning.briefLineFor(it);
+    if (window.S && S.RevenueMenuPlanning && typeof S.RevenueMenuPlanning.shortReadFor === 'function') {
+      const line = S.RevenueMenuPlanning.shortReadFor(it);
       if (line) return line;
     }
     const myM = this._itemMargin(it);
-    return myM != null ? 'Strong ' + App.fmtCurrency(myM) + ' margin. Lead with it.' : 'Feature it.';
+    return myM != null ? 'Strong ' + App.fmtCurrency(myM) + ' margin.' : 'Feature it.';
   },
 
   checkTarget() {
@@ -219,7 +219,7 @@ S.ShiftPreShift = {
           return '<tr>'
             + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
             + '<td data-label="Margin">' + mHtml + '</td>'
-            + '<td data-label="Why"><div style="font-size:12px;color:var(--t2);line-height:1.5;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(this._featureReason(it)) + '</div></td>'
+            + '<td data-label="Why"><div style="font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(this._featureReason(it)) + '</div></td>'
             + '<td class="no-print"><div class="row-actions">'
             +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
             +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
@@ -228,7 +228,7 @@ S.ShiftPreShift = {
       : '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
     const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:24%"/><col style="width:12%"/><col style="width:44%"/><col/></colgroup>'
-      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Why Feature It</th><th class="no-print"></th></tr></thead>'
+      + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Why Feature It <span style="color:var(--t4);font-weight:400;">|</span> <span class="pb-menurundown" style="color:var(--gold);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600;">Menu Rundown</span></th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + featRows + '</tbody></table></div>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
@@ -342,6 +342,7 @@ S.ShiftPreShift = {
     // Featured controls
     c.querySelector('#pb-fadd')?.addEventListener('click', () => this._openPicker('add', -1));
     c.querySelector('#pb-freset')?.addEventListener('click', () => { this._featuredBy[this._period] = this._recommendedFor(this._period).map(s => s.id); this.draw(); });
+    c.querySelector('.pb-menurundown')?.addEventListener('click', () => App.openScreen('r-menu-planning'));
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
     c.querySelectorAll('.pb-fremove').forEach(b => b.addEventListener('click', () => {
       this._curFeatured().splice(parseInt(b.dataset.idx, 10), 1);
@@ -488,7 +489,7 @@ S.ShiftPreShift = {
     b.kv('Covers forecast', covers != null ? String(covers) : 'Not set');
     if (this._curFocus()) { b.spacer(2); b.sectionTitle(period + ' Focus'); b.spacer(4); b.paragraph(this._curFocus(), { gray: 40 }); }
     b.sectionTitle('Featured Items'); b.spacer(4);
-    if (items.length) b.table(['Item', 'Margin', 'Why Feature It'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-', this._featureReason(i)]; }), { columnStyles: { 1: { cellWidth: 70, halign: 'right' } } });
+    if (items.length) b.table(['Item', 'Margin', 'Why Feature It'], items.map(i => { const m = this._itemMargin(i); return [i.name || 'Item', m != null ? App.fmtCurrency(m) : '-', this._featureReason(i)]; }), { columnStyles: { 0: { cellWidth: 135 }, 1: { cellWidth: 55, halign: 'right' }, 2: { cellWidth: 'auto' } } });
     else b.paragraph('No items featured. Cost and price your menu in Menu Engineering to feature your best margins.', { gray: 70 });
     b.sectionTitle('The Upsell Sequence'); b.spacer(4);
     this.upsellSeq().forEach((u, i) => b.paragraph((i + 1) + '. ' + u.title + (u.desc ? '. ' + u.desc : ''), { gray: 45 }));
