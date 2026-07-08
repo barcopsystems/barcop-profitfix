@@ -83,7 +83,8 @@ S.CashForecast = {
       + '<div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cf-cash" placeholder="0.00" value="' + (opening != null ? opening : '') + '"/></div></div>'
       + '<div class="f" style="width:170px;"><label>Available credit</label>'
       + '<div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cf-credit" placeholder="0" value="' + (CashEngine.availableCredit() || '') + '"/></div></div>'
-      + '<button class="btn btn-primary btn-sm" id="cf-save" style="margin-bottom:1px;">Save</button>'
+      + '<div class="f" style="width:auto;flex:0 0 auto;"><label style="visibility:hidden;">Save</label>'
+      + '<div style="display:flex;align-items:center;min-height:36px;"><button class="btn btn-primary btn-sm" id="cf-save">Save</button></div></div>'
       + '</div>';
     let statsHtml = '';
     if (!noData) {
