@@ -218,8 +218,8 @@ S.CashForecast = {
       + '<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Slow season</span>'
       + chip('Normal', 0) + chip('-10%', -10) + chip('-20%', -20) + chip('-30%', -30) + '</div>';
 
-    const afford = '<div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px;">'
-      + '<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);align-self:center;">Can I afford</span>'
+    const afford = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;">'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Can I afford</span>'
       + '<div class="f" style="width:150px;margin:0;"><div class="fw"><span class="pre">$</span><input type="number" class="pre" id="cf-sc-amt" placeholder="0" value="' + (this._scAmt || '') + '"/></div></div>'
       + '<button class="btn btn-ghost btn-sm cf-sc-mode" data-mode="once" style="' + onSel(!this._scRecurring) + '">One time</button>'
       + '<button class="btn btn-ghost btn-sm cf-sc-mode" data-mode="month" style="' + onSel(this._scRecurring) + '">Every week</button>'
