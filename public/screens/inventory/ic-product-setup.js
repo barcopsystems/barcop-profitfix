@@ -316,7 +316,7 @@ S.InventoryProducts = {
       { h: 'Start With A Category', p: ['Pick one of the six category cards on top: Liquor, Wine, Bottle Beer, Draft Beer, Food, Misc. Each opens a form built for that category with the right fields and labels: bottle size and pour for liquor, glass for wine, case size for bottle beer, keg size for draft, a unit type for food and misc. Add one product at a time, or upload a whole list.'] },
       { h: 'What Makes A Product Complete', p: ['Every product needs a name and a cost. Anything you pour (liquor, wine, draft) also needs its container size, pour size, and menu price so Bar Cop can figure pours per container, cost per pour, and pour cost percent. For example, a 750ml bottle of well vodka at 25.4 oz, poured at 1.5 oz, gives you about 17 pours per bottle. Bottle beer just needs its case size, the number of bottles in a case, since it is tracked by the case and the individual bottle. A product missing a required field shows as Incomplete in red until you finish it. A complete product can still read Needs a location in red until you place it on a shelf over in Set Locations; it will not show up on a count sheet until it lives somewhere.'] },
       { h: 'Bottle Beer Is By The Case', p: ['Bottle beer is bought, costed, and counted by the case, the same way liquor is the bottle and draft is the keg. Enter the cost per case and the case size, say 24 for a case of Modelo, and Bar Cop works out the per-bottle cost for the menu side on its own. You never track loose bottles as the unit; the case is the unit.'] },
-      { h: 'Food and Misc: Solid or Liquid', p: ['Food and Misc pick a Unit Type, which is simply how you buy and count the product: by the pound, the case, the bag, each, the dozen, or your own word for it if you edit the list. A countable product like ground beef or limes then sets how many servings come out of one unit and what to call a serving, so recipes cost by the portion. If the product is a liquid, like simple syrup, oil, or a bottled mixer, tap "This is a liquid, track by the ounce" (or pick a volume unit like gallon or quart and Bar Cop fills the ounces in for you) and enter how many ounces are in one container. From there Bar Cop costs it by the ounce for recipes and counts it with a fill slider. That single choice is the whole difference between a solid and a liquid, so even a custom unit like "bottle" works either way.'] },
+      { h: 'Food and Misc: By Count or By Ounces', p: ['Food and Misc pick a Unit Type, which is how you buy and count the product: by the pound, the case, the bag, each, the dozen, or your own word for it. Every unit tracks one of two ways, shown next to it in the Edit list: By count or By ounces. Pounds, cases, bags, and eaches are By count; gallons, quarts, and pints are By ounces. A By count product sets how many servings come out of one unit and what to call a serving, so recipes cost by the portion. A By ounces product enters how many ounces are in one container (a gallon fills in 128 for you, your own units you type the ounces), and Bar Cop costs it by the ounce for recipes and counts it with a fill slider. When you add your own unit like Bottle or Jug in the Edit list, you choose By count or By ounces right there, so the form already knows what to ask for.'] },
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
@@ -686,9 +686,9 @@ S.InventoryProducts = {
       // Food / Misc
       const ut = p?.unit_type || spec.defaultUnitType;
       const packV = (p?.pack_size != null && p.pack_size !== '') ? p.pack_size : '';
-      // A Food/Misc product is a liquid (oz-costed, fill-slider) when it carries a
-      // Container Size in ounces. This drives which divisor fields show.
-      this._liquidMode = !!(p && parseFloat(p.container_size_oz) > 0);
+      // Liquid vs solid follows the unit type's method (set in Edit Unit Types); an
+      // existing product on a saved container size stays liquid too.
+      this._liquidMode = App.unitMethod(ut) === 'oz' || !!(p && parseFloat(p.container_size_oz) > 0);
       // Default Count By to the product's role; an existing product keeps its
       // saved choice (and counts as "touched" so a unit change never overrides).
       this._countTouched = !!(p?.count_style);
@@ -831,8 +831,10 @@ S.InventoryProducts = {
     });
     document.getElementById('ip-unit')?.addEventListener('change', () => this._onUnitChange());
     document.getElementById('ip-misctype')?.addEventListener('change', () => {
-      // A supply type (paper / cleaning) is never a liquid.
-      if (this._isSupply(document.getElementById('ip-misctype')?.value || '')) this._liquidMode = false;
+      // A supply type (paper / cleaning) is never a liquid; otherwise follow the
+      // unit type's method.
+      const mt = document.getElementById('ip-misctype')?.value || '';
+      this._liquidMode = !this._isSupply(mt) && App.unitMethod(this.getUnitType()) === 'oz';
       this._rerenderDivisor();
     });
     // Wire the "| Edit" links (and any custom-select chrome) inside this form.
@@ -968,8 +970,9 @@ S.InventoryProducts = {
       + '<input type="text" id="ip-sname" value="' + esc((p && p.serving_name) || '') + '" placeholder="slice, portion"/></div>';
   },
 
-  // The derived cost readout for a Food / Misc product + the liquid/solid toggle,
-  // in ONE calc strip below the inputs (mirrors liquor's calc strip).
+  // The derived cost readout for a Food / Misc product, in ONE calc strip below the
+  // inputs (mirrors liquor's calc strip). Liquid vs solid is set by the unit's
+  // method (Edit Unit Types), so there is no on-form toggle.
   _foodDivisorStripHTML(p, unitType, miscType) {
     const isSupply = this._isSupply(miscType);
     const cost = (p && p.unit_cost > 0) ? parseFloat(p.unit_cost) : 0;
@@ -986,14 +989,8 @@ S.InventoryProducts = {
       const per = n > 0 ? cost / n : cost;   // each / unset serving: 1 = the unit
       items += item('Cost / Serving', cost > 0 ? App.fmtCurrency(per, 2) : '-', 'ip-div-cps');
     }
-    // Toggle: any Food/Misc (except a supply) can be counted by piece/serving OR,
-    // when it is a liquid, tracked by the ounce. This is what makes a custom unit
-    // like "bottle" work as a liquid, and it says plainly what is happening.
-    const toggle = isSupply ? '' : (this._liquidMode
-      ? '<a class="ip-liq-toggle" data-liq="0" style="margin-left:auto;color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;">Count by the piece instead</a>'
-      : '<a class="ip-liq-toggle" data-liq="1" style="margin-left:auto;color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;">This is a liquid, track by the ounce</a>');
     return '<div style="margin-top:18px;background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;">'
-      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + toggle + '</div></div>';
+      + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
   },
 
   // Re-render the divisor inputs AND the derived cost strip when Unit / Misc Type
@@ -1019,16 +1016,14 @@ S.InventoryProducts = {
       if (sel) sel.value = App.defaultCountStyle({ unit_type: ut, misc_type: mt, pack_size: document.getElementById('ip-pack')?.value || '', container_size_oz: this._liquidMode ? liveOz : 0 });
     }
   },
-  // Unit picked: a volume unit auto-makes it a liquid (with its ounces); a known
-  // solid unit makes it a solid; a custom unit keeps whatever mode is set.
+  // Unit picked: its tracking method (from Edit Unit Types) decides liquid vs solid.
+  // A prefilled volume unit also knows its ounces, so prefill the (locked) oz field.
   _onUnitChange() {
-    const ut = String(this.getUnitType() || '').toLowerCase();
+    const unit = this.getUnitType();
     const VOL = { gallon: 128, quart: 32, pint: 16 };
-    const SOLID = ['lb', 'each', 'case', 'bag', 'box', 'dozen'];
-    let prefill = null;
-    if (VOL[ut] != null) { this._liquidMode = true; prefill = VOL[ut]; }
-    else if (SOLID.includes(ut)) { this._liquidMode = false; }
-    this._rerenderDivisor(prefill);
+    this._liquidMode = App.unitMethod(unit) === 'oz';
+    const prefill = VOL[String(unit || '').toLowerCase()];
+    this._rerenderDivisor(prefill != null ? prefill : null);
   },
 
   _wireDivisor() {
@@ -1036,13 +1031,8 @@ S.InventoryProducts = {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', () => this._calcDivisor()); el.addEventListener('change', () => this._calcDivisor()); }
     });
-    // The liquid/solid toggle links, rebuilt with the strip each time.
-    document.querySelectorAll('.ip-liq-toggle').forEach(a => a.addEventListener('click', () => {
-      this._liquidMode = a.getAttribute('data-liq') === '1';
-      this._rerenderDivisor();
-    }));
-    // The liquid Container Size cell (ip-foz) carries its own "| Edit" link, which
-    // is (re)built here on unit changes — wire it (idempotent via _csWired).
+    // The Unit Type "| Edit" link, (re)built here on divisor rerenders — wire it
+    // (idempotent via _csWired).
     App.wireCustomSelects(document.getElementById('ip-form-modal') || document);
     this._calcDivisor();
   },
