@@ -17,7 +17,7 @@
 
 const RT_GREEN = '#518A79';   // = --green; the recovery/win line on every timeline
 const RT_RED  = '#C03828';
-const RT_GRID = '#16252E';
+const RT_GRID = '#121C22';
 const RT_STEEL = '#496477';
 const RT_DIM  = 'rgba(255,255,255,0.38)';   // = --t3, muted axis labels
 
