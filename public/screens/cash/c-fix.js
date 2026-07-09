@@ -86,7 +86,7 @@ S.CashFix = {
     if (id === 'free-trapped') return !!CashEngine.trapped().hasData;
     if (id === 'order-to-par') return !!CashEngine.overOrder(3).hasData;
     if (id === 'stay-ahead')   return !!CashEngine.survivalForecast(13).hasData;
-    if (id === 'pay-on-terms') return this.termsSet() > 0;
+    if (id === 'pay-on-terms') return CashEngine.vendors().length > 0;   // data = you have vendors to set terms on
     return true;
   },
 
@@ -95,6 +95,9 @@ S.CashFix = {
     const t = (this.TRACK[gapId] || {})[idx];
     if (!t) return { kind: 'guide' };
     if (t.kind === 'state') {
+      // A zero count reads "all clear" only when there is data behind it. On a fresh
+      // account a vacuous zero must not go green, so it reads Not started instead.
+      if (!this.gapHasData(gapId)) return { kind: 'state', good: false, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet' };
       if (t.key === 'tightweek') {
         const n = this.tightWeeks(); const good = n === 0;
         return { kind: 'state', good, state: good ? 'clear' : 'open', label: good ? 'Clear ahead' : n + (n === 1 ? ' tight week ahead' : ' tight weeks ahead'), color: good ? 'var(--green)' : 'var(--amber)', sub: good ? '' : 'Cover it before it bites' };
