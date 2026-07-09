@@ -1279,6 +1279,11 @@ const App = {
     // Owner sees everything.
     if (window.DB && DB.isOwner && DB.isOwner()) return false;
     const role = (window.DB && DB.role && DB.role()) || null;
+    // Demo (and any session before the membership role resolves) is full access,
+    // the same way canAccessLevel opens up when no role is set. Without this the
+    // demo user is blocked from every management page (Workflow, Settings, Team,
+    // Bar Cop Audit), since they are neither owner nor admin.
+    if (!role) return false;
     if (screen) {
       // Area-scoped hub page (e.g. Books): the member's permission grid is the
       // gate for BOTH admin and staff, so a restricted admin is held out too.
