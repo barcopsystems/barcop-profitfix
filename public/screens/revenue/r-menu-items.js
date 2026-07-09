@@ -473,6 +473,7 @@ S.RevenueMenuItems = {
     // the Cocktails section; dishes and no-prep items let the operator pick a
     // section (no-prep also auto-fills one when a product is chosen).
     this._presetCat = this._addType === 'cocktail' ? 'Cocktails' : '';
+    this._catAutoSet = '';   // the last section the No Prep picker auto-selected (never clobber a hand-picked one)
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
     this.formType  = item ? this.classifyItem(item) : this._addType;
     this.linkedProductId = item?.linked_product_id || '';
@@ -741,9 +742,15 @@ S.RevenueMenuItems = {
       if (nameInp && p) nameInp.value = p.name;
       // Auto-select the menu section only when it is unambiguous: beer, wine, and
       // NA beverages have one obvious home. Food and other Misc could be Snacks,
-      // Sides, or a custom section, so leave those on "Select category" to pick.
+      // Sides, or a custom section, so those clear back to "Select category" to pick.
+      // Overwrite our own last auto pick as the product changes, but never a section
+      // the operator chose by hand.
       const catSel = document.getElementById('ri-cat');
-      if (catSel && !catSel.value && p) { const def = this._certainMenuSection(p); if (def) catSel.value = def; }
+      if (catSel && (catSel.value === '' || catSel.value === this._catAutoSet)) {
+        const def = this._certainMenuSection(p);
+        catSel.value = def;
+        this._catAutoSet = def;
+      }
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
