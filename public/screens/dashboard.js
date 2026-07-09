@@ -105,7 +105,9 @@ S.Dashboard = {
     // read — that is when an audit has run, the last Get Started step. A logged
     // week alone fills only the cost strip, not the hero, so it stays on Get
     // Started until the audit gives it a real headline number.
-    const hasData = this.audits().length;
+    // A scored audit, not just any audit: an estimate-only run records N/A
+    // (overall null) and must not flip the hero off a guess.
+    const hasData = this.audits().some(a => a.overall_score != null);
     const insightsBtn = '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
@@ -178,7 +180,7 @@ S.Dashboard = {
   // ── Get Started: run your first audit + the Control sections that feed Recovery.
   // Drops off once all four are in place (App.controlGetStarted returns '').
   getStartedBox() {
-    const hasAudit = this.audits().length > 0;
+    const hasAudit = this.audits().some(a => a.overall_score != null);   // a real scored audit, not an N/A estimate-only run
     const hasInv   = ((App.inventoryData && App.inventoryData.ic_products) || []).length > 0;
     const hasShift = ((App.shiftData && App.shiftData.sc_shifts) || []).length > 0;
     const hasLabor = ((App.laborData && App.laborData.lc_actuals) || []).length > 0;

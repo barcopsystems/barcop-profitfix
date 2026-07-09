@@ -145,6 +145,21 @@ S.ProfitFix = {
     return d.filter(x => x && x.status !== 'Resolved').length;
   },
 
+  // Does the system behind a gap actually hold data yet? Gates the review steps so
+  // they cannot read On track on a fresh account. Cost gaps read off counts or a
+  // closed week; prime off a closed week; vendor control off deliveries or claims.
+  gapHasData(id) {
+    const inv    = App.inventoryData || {};
+    const counts = (inv.ic_counts || []).length;
+    const weeks  = ((App.data && App.data.weeks) || []).length;
+    if (id === 'pour-cost' || id === 'food-cost') return counts > 0 || weeks > 0;
+    if (id === 'prime-cost') return weeks > 0;
+    if (id === 'vendor-control') return (inv.ic_deliveries || []).length > 0
+      || ((App.data && App.data.vendor_discrepancies) || []).length > 0
+      || ((App.data && App.data.vendor_log) || []).length > 0;
+    return true;
+  },
+
   // Status for one step → {kind, good, label, color, sub} or {kind:'guide'}.
   stepStatus(gapId, idx) {
     const t = (this.TRACK[gapId] || {})[idx];
@@ -162,6 +177,12 @@ S.ProfitFix = {
       return { kind: 'state', good, state: good ? 'clear' : 'open', label, color: good ? 'var(--green)' : 'var(--amber)', sub };
     }
     const last = this.lastActivity(t.signal);
+    // A review step (view:<screen>) goes green just by opening that screen. Until the
+    // system it reviews actually holds data, that view proves nothing, so it reads
+    // Not started rather than On track off a drive-by page load on a fresh account.
+    if (t.signal && t.signal.indexOf('view:') === 0 && !this.gapHasData(gapId)) {
+      return { kind: 'recur', good: false, never: true, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet, ' + t.every };
+    }
     const ds = this.daysSince(last);
     if (ds == null) return { kind: 'recur', good: false, never: true, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No record yet, ' + t.every };
     let state, label, color;

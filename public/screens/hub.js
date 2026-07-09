@@ -221,7 +221,9 @@ S.Hub = {
     // ── Cross-system rollup ──
     const sysScores = [pA, rA, cA].map(a => a ? a.overall_score : null).filter(v => v != null);
     const overall   = sysScores.length ? Math.round(sysScores.reduce((a,b)=>a+b,0)/sysScores.length) : null;
-    const anyAudit  = !!(pAudits.length || rAudits.length || cAudits.length);
+    // A scored audit in any system, not just any recorded run: an estimate-only
+    // audit records N/A (overall null) and must not flip the Hub off a guess.
+    const anyAudit  = [].concat(pAudits, rAudits, cAudits).some(a => a && a.overall_score != null);
     const totalOpp  = auditOpp(pA) + auditOpp(rA) + auditOpp(cA);
     const trendVals = [sysTrend(pAudits), sysTrend(rAudits), sysTrend(cAudits)].filter(v => v != null);
     const netTrend  = trendVals.length ? trendVals.reduce((a,b)=>a+b,0) : null;
