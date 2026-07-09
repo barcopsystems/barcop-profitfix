@@ -3613,7 +3613,7 @@ const App = {
   // of these. Builtins are the classic sections in menu order; the operator adds
   // their own (Happy Hour, Featured, Brunch...) which then show on every form and
   // as real sections on the menu pages. Item TYPE is stored separately on the item.
-  MENU_ALL_CATEGORIES: ['Cocktails', 'Beer', 'Wine', 'Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'NA Beverages', 'Snacks'],
+  MENU_ALL_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
   // Inventory Control product categories shown as available recipe ingredients.
   // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
   MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
