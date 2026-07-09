@@ -53,8 +53,8 @@ S.InventoryVendors = {
       { p: ['Vendors are the distributors and suppliers you order from. Set each one up here with a rep, contact info, and payment terms. Products link to a vendor by name, so once a vendor exists you can set it as the Primary Vendor on the products it delivers.'] },
       { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever you have: rep, phone, email, account number, payment terms. Only the name is required. Save and the vendor is ready to attach to products.'] },
       { h: 'Delivery Days Set Your Pars', p: ['Tap the Delivery Days chips for the days this vendor delivers, or Pickup if you go get it yourself. This is not just a note: Dynamic Pars reads these days to size a tighter reorder par for everything you buy from this vendor, so a vendor who comes twice a week gives a smaller, sharper par than a once-a-week one. Leave them blank and those products fall back to your Default Delivery Cycle. Using the chips instead of typing means the days are always read correctly.'] },
-      { h: 'Order Minimums And Fees', p: ['Set the Order Minimum and pick its unit: the dollar sign for a dollar minimum, or cases, kegs, or any unit you add with Edit for a count minimum. Add a delivery fee and a free-delivery-over amount if the vendor has them. On the Order Sheet, each vendor card shows your running order against that minimum, warns when it is short, and offers Top Off To Minimum, which adds that vendor’s next below-par items so you clear the bar in one delivery instead of two. You are always warned, never blocked, so you can still place a short order when you mean to.'] },
-      { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, and account number all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
+      { h: 'Order Minimums And Fees', p: ['Set the Order Minimum and pick its unit: the dollar sign for a dollar minimum, or cases, kegs, or any unit you add with Edit for a count minimum. Add a delivery fee and a free-delivery-over amount if the vendor has them. On the Order Sheet, each vendor card shows your running order against that minimum and warns when it is short, so you can add more of that vendor’s items and clear the bar in one delivery instead of two. You are always warned, never blocked, so you can still place a short order when you mean to.'] },
+      { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
       { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything. If a name is a typo or a vendor you do not actually order from, tap Delete to clear it off those products and drop it from the list.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
       { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds the Vendor Tracker in Profit Recovery, so a vendor quietly raising prices shows up before it eats your margin.'] }
@@ -331,7 +331,7 @@ S.InventoryVendors = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your vendor list here',
-      dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, and account number come in too if your file has them.',
+      dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over come in too if your file has them.',
       actionsEl: '#iv-imp-actions',
       fields: [
         { key: 'name',           label: 'Vendor Name',   required: true,  match: ['vendor', 'vendor name', 'name', 'supplier', 'distributor', 'company', 'company name'] },
@@ -432,7 +432,13 @@ S.InventoryVendors = {
       + this.renderPriceHistoryCard(prods)
       + '</div>';
     this.wireEdit();
-    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+    // Jump to the edit form. The app scrolls inside .content (#content-area), not the
+    // window, so window.scrollTo alone is a no-op on mobile — reset the real container.
+    setTimeout(() => {
+      const sc = document.getElementById('content-area');
+      if (sc) sc.scrollTop = 0;
+      if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+    }, 0);
   },
 
   editCard(v) {

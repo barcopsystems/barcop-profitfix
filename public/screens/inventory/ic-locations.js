@@ -332,7 +332,7 @@ S.InventoryLocations = {
         + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No matching products yet. Add products on the Products screen first, then assign them here.</td></tr></tbody></table></div>';
     }
     const rowHtml = p => '<tr class="' + rowClass + '" data-id="' + esc(p.id) + '" style="cursor:pointer;">'
-      + '<td><input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/></td>'
+      + '<td class="cb-left"><input type="checkbox" class="bc-check ' + cbClass + '" value="' + esc(p.id) + '"' + (checkedSet.has(p.id) ? ' checked' : '') + '/></td>'
       + '<td><div class="val">' + esc(p.name) + '</div>' + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
       + '<td>' + esc(p.category || '-') + '</td>'
       + '<td>' + esc(this.sizeLabel(p)) + '</td>'

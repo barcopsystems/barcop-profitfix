@@ -400,7 +400,7 @@ S.InventoryProducts = {
         : '';
 
       const selCount = this._selected ? this._selected.size : 0;
-      const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+      const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm ip-sel-all">Select All</button>'
         + '<button class="btn btn-ghost btn-sm ip-sel-clear">Clear</button>'
         + (selCount > 0 ? '<button class="btn btn-ghost btn-sm ip-sel-edit">Bulk Edit ' + selCount + ' Selected</button>' : '')
@@ -487,7 +487,7 @@ S.InventoryProducts = {
         + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : dash) + '</td>';
     }
     return '<tr style="' + dim + '">'
-      + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
+      + '<td class="cb-left" style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
       + '<td><div class="val">' + esc(p.name)
       + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
@@ -532,7 +532,7 @@ S.InventoryProducts = {
 
       if (exp)     { ev.stopPropagation(); App.exportPDF({ title: this.activeCat + ' Products', root: document.getElementById('ip-list-export') }); return; }
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
-      if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); return; }
+      if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); setTimeout(() => document.getElementById('ip-import-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
@@ -1609,7 +1609,7 @@ S.InventoryProducts = {
   importPanelHTML() {
     const cat = this._import.cat;
     const spec = this.FORM_SPEC[cat] || {};
-    return '<div class="card form-card">'
+    return '<div class="card form-card" id="ip-import-panel">'
       + '<div class="card-title">Upload ' + esc(spec.title || cat) + ' Product List</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
