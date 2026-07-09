@@ -474,6 +474,7 @@ S.RevenueMenuItems = {
     // section (no-prep also auto-fills one when a product is chosen).
     this._presetCat = this._addType === 'cocktail' ? 'Cocktails' : '';
     this._catAutoSet = '';   // the last section the No Prep picker auto-selected (never clobber a hand-picked one)
+    this._pourAutoSet = '';  // the last pour size the No Prep picker auto-filled (same rule)
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
     this.formType  = item ? this.classifyItem(item) : this._addType;
     this.linkedProductId = item?.linked_product_id || '';
@@ -720,10 +721,14 @@ S.RevenueMenuItems = {
         pourCell.style.display = kind === 'pour' ? '' : 'none';
         const pi = document.getElementById('ri-pour');
         if (pi) {
-          if (kind !== 'pour') pi.value = '';
-          // Draft beer / wine by the glass: prefill the product's own pour size so
-          // the cost lands right away (still editable for an odd pour).
-          else if (!pi.value && p && p.pour_size_oz != null && p.pour_size_oz !== '') pi.value = p.pour_size_oz;
+          if (kind !== 'pour') { pi.value = ''; this._pourAutoSet = ''; }
+          else {
+            // Draft beer / wine by the glass: prefill the product's own pour size so
+            // the cost lands right away. Update it as the product changes, but never
+            // overwrite a pour the operator typed by hand.
+            const pp = (p && p.pour_size_oz != null && p.pour_size_oz !== '') ? String(p.pour_size_oz) : '';
+            if (pi.value === '' || pi.value === this._pourAutoSet) { pi.value = pp; this._pourAutoSet = pp; }
+          }
         }
       }
       if (portCell) { portCell.style.display = kind === 'portion' ? '' : 'none'; if (kind !== 'portion') { const pi = document.getElementById('ri-portion'); if (pi) pi.value = ''; } }
