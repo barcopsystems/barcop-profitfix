@@ -29,11 +29,8 @@ S.RevenueMenuItems = {
   // All menu category groupings now live on App so they never drift across
   // the screens that consume them (r-menu-items, r-menu-engineering, r-dog-test,
   // recipe-cost-analysis). Read App.MENU_* directly.
-  get PLATE_CATEGORIES()   { return App.MENU_PLATE_CATEGORIES; },
   get COCKTAIL_ING_CATS()  { return App.MENU_COCKTAIL_ING_CATS; },
   get PLATE_ING_CATS()     { return App.MENU_PLATE_ING_CATS; },
-  get INVENTORY_GROUPS()   { return App.MENU_INVENTORY_GROUPS; },
-  get IC_TO_MENU_CAT()     { return App.MENU_IC_TO_CAT; },
 
   // ── Data helpers ──────────────────────────────────────────────────────
   items() {
@@ -110,7 +107,9 @@ S.RevenueMenuItems = {
   _sellableInventory(p) {
     const c = p && p.category;
     if (c === 'Bottle Beer' || c === 'Draft Beer' || c === 'Wine') return true;
-    if ((c === 'Food' || c === 'Misc') && p.sold_on_menu) return true;
+    // A ticked Food/Misc item, but never a pure supply (paper, cleaning, bar supplies)
+    // even if its box got ticked by mistake.
+    if ((c === 'Food' || c === 'Misc') && p.sold_on_menu && !App.miscIsSupply(p)) return true;
     return false;
   },
   // The one obvious menu section for a product, or '' when it is ambiguous. Beer,
@@ -148,6 +147,7 @@ S.RevenueMenuItems = {
     if (!item) return out;
     if (formType === 'inventory') {
       if (!item.linked_product_id) out.add('ri-linked-prod');
+      if (!item.category) out.add('ri-cat');   // a No Prep item needs a menu section too
       if (!(parseFloat(item.price) > 0)) out.add('ri-price');
       if (!item.name) out.add('ri-name');   // auto-fills from the product, but required
       return out;
@@ -199,7 +199,7 @@ S.RevenueMenuItems = {
     App.showHelpModal('How Menu Builder Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly units sold, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
       { h: 'Adding an Item', p: ['Start from the tile for the kind of item you are adding. Dishes and Cocktails get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. No Prep items link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). A poured product like draft beer or wine by the glass carries a Pour Size; a food or resale item carries a Portion; bottle beer sells whole. Enter units sold so Menu Engineering can weight the item by how often it sells.'] },
-      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and the list is yours to shape. Tap Edit next to Category to add your own sections (Happy Hour, Brunch, Featured), rename by adding and hiding, or reset to the defaults. Any item type can go in any section, so a Happy Hour section can hold a cocktail, a dish, and a beer together. Your sections show up as real grouped sections on this page and in the rest of the Menu tools. A No Prep item drops into a sensible section automatically if you do not pick one.'] },
+      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and the list is yours to shape. Tap Edit next to Category to add your own sections (Happy Hour, Brunch, Featured), rename by adding and hiding, or reset to the defaults. Any item type can go in any section, so a Happy Hour section can hold a cocktail, a dish, and a beer together. Your sections show up as real grouped sections on this page and in the rest of the Menu tools. On a No Prep item, beer, wine, and NA beverages land in their obvious section on their own; anything else you pick.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review Log in Menu Engineering picks it up.'] },
       { h: 'Archived Items', p: ['An item you cut from the Dog Test lands in an Archived list at the bottom of the page, kept out of the menu and out of Menu Engineering but not deleted. Restore brings one back onto the live menu with everything intact; Delete Permanently removes it for good after a confirm. You can only get here by cutting an item, so nothing archives by accident.'] }
