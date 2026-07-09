@@ -182,7 +182,11 @@ S.InventoryDashboard = {
     let inventoryValue = 0;
     Object.keys(perp).forEach(pid => { onHand[pid] = perp[pid].onHand; inventoryValue += (perp[pid].value || 0); });
     const lastAge = latest ? this.daysSince(latest.date) : null;
-    const hasCountThisWeek = asc.some(c => this.inWeek(c.date));
+    // The count taken IN the selected week (latest one that week), so the step
+    // reads that week's date, not the globally-newest count from a later week.
+    const weekCounts = asc.filter(c => this.inWeek(c.date));
+    const weekCount = weekCounts.length ? weekCounts[weekCounts.length - 1] : null;
+    const hasCountThisWeek = !!weekCount;
 
     let base = null, periodCost = null, weeklyCogs = null, weeksOnHand = null;
     if (latest && prev) {
@@ -257,7 +261,7 @@ S.InventoryDashboard = {
     const menuOver = App.menuItemsOverTarget().length;
 
     return {
-      asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek,
+      asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek, weekCount,
       base, periodCost, weeksOnHand, sigNow, prevRaw,
       vendors, reorderTotal, reorderCount, parOff, hasReorderBasis: parChecked > 0,
       fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek, menuOver
@@ -335,7 +339,7 @@ S.InventoryDashboard = {
   stepStatus(k, isDone) {
     const st = this._st;
     if (k === 'count') {
-      if (st.hasCountThisWeek) return 'Counted ' + this.fmtDate(st.latest.date);
+      if (st.hasCountThisWeek) return 'Counted ' + this.fmtDate((st.weekCount || st.latest).date);
       if (st.lastAge != null) return 'Last count ' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ', not counted this week';
       return this._META.count.sub;
     }

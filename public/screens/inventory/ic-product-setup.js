@@ -1474,11 +1474,19 @@ S.InventoryProducts = {
     const getSize = () => {
       const n = parseFloat(document.getElementById('be-size')?.value); return isNaN(n) ? null : n;
     };
+    // The size option carries a custom name (data-name) for non-built-in sizes; the
+    // single save sets container_size_label alongside the oz, so bulk must too, or a
+    // changed size renders the OLD label against the new oz.
+    const getSizeLabel = () => {
+      const sel = document.getElementById('be-size');
+      const opt = sel && sel.selectedOptions ? sel.selectedOptions[0] : null;
+      return (opt && opt.dataset && opt.dataset.name) ? opt.dataset.name : '';
+    };
     const getUnit = () => document.getElementById('be-unit')?.value || null;
     const idSet = new Set(ids);
     this.products().forEach(p => {
       if (!idSet.has(p.id)) return;
-      if (applied.size)    p.container_size_oz = getSize();
+      if (applied.size)    { p.container_size_oz = getSize(); p.container_size_label = getSizeLabel(); }
       if (applied.pour)    p.pour_size_oz = num('be-pour');
       if (applied.case)    p.case_size = intVal('be-case');
       if (applied.unit)    p.unit_type = getUnit();

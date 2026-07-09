@@ -140,7 +140,10 @@ S.InventoryEmpties = {
           + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No empties in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
-          const deposit = (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
+          // Deposit money is only owed back on a Return for Deposit; Recycle/Trash
+          // rows show a dash, matching the Deposit Owed total which sums only those.
+          const deposit = (e.disposition === 'Return for Deposit')
+            ? (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0) : 0;
           return '<tr class="em-row" data-id="' + e.id + '" style="cursor:pointer;">'
             + '<td><div class="val">' + this.fmtDate(e.date) + '</div></td>'
             + '<td><div class="val">' + esc(e.product_name || '-') + '</div>'
