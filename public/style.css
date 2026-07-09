@@ -1316,6 +1316,21 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 .sidebar-multi-loc .smm-group-btn:hover{border-color:var(--gold);color:var(--gold);}
 
+/* Multi-location switcher hops from the top bar into the sidebar once it would
+   crowd the module nav (the collision starts ~950px on a two-bar account). The
+   desktop sidebar stays put, so navigation is untouched and we do NOT drop to the
+   mobile menu early. Single-location operators have no switcher, so this is a
+   no-op for them. On the Hub landing (no side rail in this range) the switcher
+   simply waits for a wider window or the mobile menu. Below 768px the existing
+   mobile rules already do this via the drawer. */
+@media (max-width:1100px){
+  #topbar-account-switcher,
+  #topbar-group-dashboard,
+  #hub-topbar-account-switcher,
+  #hub-topbar-group-dashboard{display:none !important;}
+  .sidebar-multi-loc{display:flex;}
+}
+
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
    wire a click handler to close. Created on demand by the hamburger handler. */
 .sidebar-backdrop{
