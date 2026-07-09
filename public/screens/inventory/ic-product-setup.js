@@ -374,11 +374,13 @@ S.InventoryProducts = {
         ? '<th>Vendor</th><th>Case Size</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>'
         : '<th>Vendor</th><th>' + esc(sizeCol) + '</th><th>Pour</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>';
     // Each layout gets an even, aligned column set so cards line up down the page.
+    // Percentage widths (not fixed px): the columns stay aligned across the Vodka/
+    // Gin/Rum tables AND the table always fits its card, so it never scrolls sideways.
     const colgroup = isFoodMisc
-      ? '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:140px;"/><col style="width:75px;"/><col style="width:105px;"/><col style="width:110px;"/><col style="width:110px;"/><col style="width:85px;"/><col style="width:120px;"/></colgroup>'
+      ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:14%;"/><col style="width:8%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:9%;"/><col style="width:12%;"/></colgroup>'
       : isBottleBeer
-        ? '<colgroup><col style="width:40px;"/><col style="width:210px;"/><col style="width:170px;"/><col style="width:140px;"/><col style="width:150px;"/><col style="width:100px;"/><col style="width:110px;"/><col style="width:150px;"/></colgroup>'
-        : '<colgroup><col style="width:40px;"/><col style="width:200px;"/><col style="width:150px;"/><col style="width:130px;"/><col style="width:80px;"/><col style="width:120px;"/><col style="width:80px;"/><col style="width:90px;"/><col style="width:150px;"/></colgroup>';
+        ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:16%;"/><col style="width:13%;"/><col style="width:14%;"/><col style="width:9%;"/><col style="width:10%;"/><col style="width:14%;"/></colgroup>'
+        : '<colgroup><col style="width:4%;"/><col style="width:19%;"/><col style="width:14%;"/><col style="width:13%;"/><col style="width:8%;"/><col style="width:12%;"/><col style="width:8%;"/><col style="width:8%;"/><col style="width:14%;"/></colgroup>';
     const nCols = isBottleBeer ? 8 : 9;
 
     let body;
