@@ -450,7 +450,7 @@ function computeRevenueAudit(appData, controlData) {
   } else if (priceLog.length === 0) {
     repriceStale = false; // no log at all — unknown, do not penalize or credit
   }
-  const dogTestsActive = dogTests.filter(t => t && (t.status === 'Testing' || t.status === 'Kept' || t.status === 'Removed')).length;
+  const dogTestsActive = dogTests.filter(t => t && t.status === 'Testing').length;   // only 'Testing' is actively running; 'Kept'/'Cut' are decided, 'Removed' is never written
   let s3 = null;
   if (menuKnown) {
     const total = stars + plow + puzzle + dog || 1;
@@ -464,9 +464,24 @@ function computeRevenueAudit(appData, controlData) {
   // ── S4 — Server Performance (check-average spread + comp discipline) ──
   // Two independent scored dimensions off the server-check data we already
   // collect. N/A when there are fewer than 3 checks and no comp data.
-  let spreadScore = null, topCA = null, botCA = null, teamCA = null, spread = null, s4Gap = 0;
+  let spreadScore = null, topCA = null, botCA = null, teamCA = null, spread = null, s4Gap = 0, serverCount = null;
   if (serverChecks.length >= 3) {
-    const cas = serverChecks.map(c => (num(c.covers) > 0 ? c.sales / c.covers : null)).filter(x => x != null).sort((a, b) => a - b);
+    // Group by SERVER (staff), not by raw shift row: a server's check average is
+    // their total sales over their total covers across the window (matching the
+    // on-screen scorecard). Scoring shift rows would compare best-shift vs worst-
+    // shift, not best server vs worst.
+    const byServer = {};
+    serverChecks.forEach(c => {
+      const key = c.staff_id || c.server_name || c.server || c.name;
+      if (!key) return;
+      if (!byServer[key]) byServer[key] = { sales: 0, covers: 0 };
+      byServer[key].sales += num(c.sales) || 0;
+      byServer[key].covers += num(c.covers) || 0;
+    });
+    const cas = Object.keys(byServer)
+      .map(k => byServer[k].covers > 0 ? byServer[k].sales / byServer[k].covers : null)
+      .filter(x => x != null).sort((a, b) => a - b);
+    serverCount = cas.length || null;
     if (cas.length >= 3) {
       botCA = round2(cas[0]); topCA = round2(cas[cas.length - 1]);
       teamCA = round2(avg(cas));
@@ -547,7 +562,7 @@ function computeRevenueAudit(appData, controlData) {
     S3_MONTHLY_GAP: 0,
 
     S4_SCORE: s4,
-    S4_SERVER_COUNT: serverChecks.length || null,
+    S4_SERVER_COUNT: serverCount,
     S4_TOP_CHECK_AVG: topCA,
     S4_BOTTOM_CHECK_AVG: botCA,
     S4_TEAM_CHECK_AVG: teamCA,
