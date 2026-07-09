@@ -311,11 +311,16 @@ S.RevenueAudit = {
 
       const d = data.auditData || {};
 
+      // Estimate-only, no real data → nothing real to score. Record it N/A (overall
+      // null) like the Cash and Bar Cop audits, so it never shows a score, counts as
+      // a run, or flips the Hub / Close-the-Week off a guess. A real week supersedes it.
+      const noData = AuditUI.projectedQuality(this._sectionsReady()).none;
+
       const auditRecord = {
         id:            App.uid(),
         date:          App.todayLocal(),
         bar_name:      d.BAR_NAME || App.data.settings?.bar_name || '',
-        overall_score: d.OVERALL_SCORE || 0,
+        overall_score: noData ? null : (d.OVERALL_SCORE || 0),
         grade:         d.DATA_TIER_LABEL || '',
         audit_period:  d.AUDIT_PERIOD || '',
         audit_id:      d.AUDIT_ID || '',
@@ -329,7 +334,7 @@ S.RevenueAudit = {
       // 12-audit blob cap is gone) and paged via "Show older" on the list.
       App.dedupeAuditToday(App.data.revenue_audits, auditRecord);
       await App.putRecord('core', 'revenue_audit', auditRecord);
-      App.markSetupDone('gs_r_audit');
+      if (!noData) App.markSetupDone('gs_r_audit');
 
       document.getElementById('topbar-sub').textContent = '';
       this.renderMain();
