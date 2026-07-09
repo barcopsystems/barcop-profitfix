@@ -779,7 +779,7 @@ S.InventoryProducts = {
     + '</div>';
     // Popup over the products list (which stays mounted behind), instead of
     // swapping the whole page out. The corner X closes it (and re-renders the landing).
-    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 660, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
+    App.openModal(formCard, { id: 'ip-form-modal', layer: 9000, maxWidth: 660, confirmDirty: true, onClose: () => { App.closeModal('ip-form-modal'); this.renderLanding(); } });
 
     this._wireForm();
   },
