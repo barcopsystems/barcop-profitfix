@@ -943,14 +943,17 @@ const DB = {
   },
 
   // ── Event offline queue ───────────────────────────────────────────────────
+  // Scoped to the active account (like every other local key) so a queued op
+  // created under one bar can never replay into another after an account switch.
   _eventQueue() {
-    try { return JSON.parse(localStorage.getItem(this._EVENTQ_KEY) || '[]'); }
+    try { return JSON.parse(localStorage.getItem(this._acctKey(this._EVENTQ_KEY)) || '[]'); }
     catch (e) { return []; }
   },
   _setEventQueue(list) {
     try {
-      if (list && list.length) localStorage.setItem(this._EVENTQ_KEY, JSON.stringify(list));
-      else localStorage.removeItem(this._EVENTQ_KEY);
+      const k = this._acctKey(this._EVENTQ_KEY);
+      if (list && list.length) localStorage.setItem(k, JSON.stringify(list));
+      else localStorage.removeItem(k);
     } catch (e) {}
   },
   _queueEvent(table, kind, op, rec) {
