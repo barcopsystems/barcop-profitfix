@@ -2562,8 +2562,11 @@ const App = {
 
   async saveKey(key) {
     const r = await DB.writeData(this._configBlob('core', this.data));
-    if (!r.ok) console.error('saveKey failed:', r.error);
-    return r.ok;
+    // An offline save is NOT a failure: the copy is kept on-device and queued, and
+    // the global offline banner tells the operator it will sync. Report success so
+    // form handlers render the record instead of a misleading "Save failed."
+    if (!r.ok && !r.offline) console.error('saveKey failed:', r.error);
+    return r.ok || !!r.offline;
   },
 
   // Mark a Hub Getting Started task as complete. Called from every save
@@ -5105,22 +5108,25 @@ const App = {
   },
   _inventoryConfig() { return this._configBlob('ic', this.inventoryData); },
 
+  // An offline save is NOT a failure (see saveKey): the copy is kept on-device and
+  // queued, and the offline banner tells the operator it will sync. Report success
+  // so form handlers render the record instead of a misleading "Save failed."
   async saveInventory() {
     const r = await DB.writeInventoryData(this._inventoryConfig());
-    if (!r.ok) console.error('saveInventory failed:', r.error);
-    return r.ok;
+    if (!r.ok && !r.offline) console.error('saveInventory failed:', r.error);
+    return r.ok || !!r.offline;
   },
 
   async saveLabor() {
     const r = await DB.writeLaborData(this._configBlob('lc', this.laborData));
-    if (!r.ok) console.error('saveLabor failed:', r.error);
-    return r.ok;
+    if (!r.ok && !r.offline) console.error('saveLabor failed:', r.error);
+    return r.ok || !!r.offline;
   },
 
   async saveShift() {
     const r = await DB.writeShiftData(this._configBlob('sc', this.shiftData));
-    if (!r.ok) console.error('saveShift failed:', r.error);
-    return r.ok;
+    if (!r.ok && !r.offline) console.error('saveShift failed:', r.error);
+    return r.ok || !!r.offline;
   },
 
   navigate(id) {
