@@ -133,7 +133,7 @@ S.RevenueFix = {
   // they cannot read On track on a fresh account. Menu review needs menu data;
   // labor review needs logged hours or a schedule.
   gapHasData(id) {
-    if (id === 'menu-engineering') return this.setupState('menudata');
+    if (id === 'menu-engineering' || id === 'pricing') return this.setupState('menudata');
     if (id === 'labor-scheduling') {
       const lab = App.laborData || {};
       return (lab.lc_actuals || []).length > 0 || (lab.lc_schedules || []).length > 0;
@@ -149,6 +149,9 @@ S.RevenueFix = {
       return { kind: 'setup', good: ok, label: ok ? 'In place' : 'Set this up', color: ok ? 'var(--green)' : 'var(--amber)' };
     }
     if (t.kind === 'state') {
+      // A zero count reads "all clear" only when there is data behind it. On a fresh
+      // account (no menu) a vacuous zero must not go green, so it reads Not started.
+      if (!this.gapHasData(gapId)) return { kind: 'state', good: false, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet' };
       const n = t.key === 'reprice' ? this.repriceOver() : 0;
       const good = n === 0;
       const label = good ? 'All at target' : n + (n === 1 ? ' item over target' : ' items over target');
