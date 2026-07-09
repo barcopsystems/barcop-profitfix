@@ -2180,19 +2180,19 @@ const App = {
         { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
         { label: 'Workflow', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
         drill('Audits', 'audit', null, null, IC.audit),
-        drill('Events', 'events', () => App.jumpToSection('events'), 'Dashboard', IC.events),
-        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Dashboard', IC.books),
+        drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),
+        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Close The Books', IC.books),
         drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Bar Cop Settings', IC.settings, 'App Settings')
       ]},
       { label: 'Control', items: [
-        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Dashboard', IC.inventory),
-        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Dashboard', IC.labor),
-        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Dashboard', IC.shift)
+        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Close The Week', IC.inventory),
+        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Close The Week', IC.labor),
+        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Close The Week', IC.shift)
       ]},
       { label: 'Recovery', items: [
-        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Dashboard', IC.profit),
-        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Dashboard', IC.revenue),
-        drill('Cash', 'cash', () => App.jumpToSection('cash'), 'Dashboard', IC.cash)
+        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Close The Week', IC.profit),
+        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Close The Week', IC.revenue),
+        drill('Cash', 'cash', () => App.jumpToSection('cash'), 'Close The Week', IC.cash)
       ]},
       { label: 'Support', items: [
         { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() }
