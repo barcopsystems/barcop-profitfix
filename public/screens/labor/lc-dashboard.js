@@ -127,7 +127,10 @@ S.LaborDashboard = {
   // ── Get Started: setup steps above the cockpit until all four are done ───────
   getStartedBox() {
     return App.controlGetStarted('Labor', [
-      { num: 1, label: 'Add positions',             screen: 'lc-positions',      done: this.positions().length > 0 },
+      // Positions come pre-seeded (STARTER_POSITIONS), so "has any position" would
+      // read as done before the operator ever touched them. Key this off the setup
+      // flag that only a real add/edit/delete sets, not the auto-seed.
+      { num: 1, label: 'Add positions',             screen: 'lc-positions',      done: !!(App.data && App.data.hub_setup_progress && App.data.hub_setup_progress.gs_lc_positions) },
       { num: 2, label: 'Add your staff',            screen: 'lc-staff-roster',   done: this.staff().length > 0 },
       { num: 3, label: 'Build your first schedule', screen: 'lc-build-schedule', done: this.schedules().length > 0 },
       { num: 4, label: 'Log your first hours',      screen: 'lc-log-hours',      done: this.actuals().length > 0 }

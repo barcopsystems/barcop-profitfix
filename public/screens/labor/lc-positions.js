@@ -311,6 +311,7 @@ S.LaborPositions = {
     }
     App.laborData.lc_positions = this.positions().filter(x => x.id !== id);
     await App.saveLabor();
+    App.markSetupDone('gs_lc_positions');   // a real delete counts as working the list
     this.renderList();
   }
 };
