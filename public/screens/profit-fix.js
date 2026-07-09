@@ -169,6 +169,9 @@ S.ProfitFix = {
       return { kind: 'setup', good: ok, label: ok ? 'In place' : 'Set this up', color: ok ? 'var(--green)' : 'var(--amber)' };
     }
     if (t.kind === 'state') {
+      // A zero count reads "all clear" only when there is data behind it. On a fresh
+      // account a vacuous zero must not go green, so it reads Not started instead.
+      if (!this.gapHasData(gapId)) return { kind: 'state', good: false, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet' };
       const n = t.key === 'reprice' ? this.repriceOver() : t.key === 'chase' ? this.chaseOpen() : 0;
       const good = n === 0;
       let label, sub;
