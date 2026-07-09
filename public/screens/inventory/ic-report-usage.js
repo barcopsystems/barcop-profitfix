@@ -21,8 +21,12 @@ S.InventoryUsageReport = {
   TABS: [['usage', 'Usage Data'], ['totals', 'Usage Totals'], ['fast', 'Fast Movers'], ['slow', 'Slow Movers'], ['trend', 'Trend vs Prior'], ['vendor', 'Vendor Spend'], ['history', 'Usage History']],
 
   countsAsc() {
-    return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort(App.cmpOldest);
+    const sorted = [...((App.inventoryData && App.inventoryData.ic_counts) || [])].sort(App.cmpOldest);
+    // One count of record per day: a same-day re-count collapses to the latest, so a
+    // usage period never comes out zero-length (e.g. "Jul 9 - Jul 9").
+    const byDate = new Map();
+    sorted.forEach(c => { const d = String(c.date || '').slice(0, 10) || ('_' + c.id); byDate.set(d, c); });
+    return [...byDate.values()];
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   productById(id) { return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
