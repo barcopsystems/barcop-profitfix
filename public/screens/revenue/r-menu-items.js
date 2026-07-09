@@ -113,6 +113,15 @@ S.RevenueMenuItems = {
     if ((c === 'Food' || c === 'Misc') && p.sold_on_menu) return true;
     return false;
   },
+  // The one obvious menu section for a product, or '' when it is ambiguous. Beer,
+  // wine, and NA beverages have a single natural home; food/other misc do not.
+  _certainMenuSection(p) {
+    if (!p) return '';
+    if (p.category === 'Bottle Beer' || p.category === 'Draft Beer') return 'Beer';
+    if (p.category === 'Wine') return 'Wine';
+    if (p.category === 'Misc' && p.misc_type === 'NA Beverage') return 'NA Beverages';
+    return '';
+  },
   inventoryProductOptions(selectedId) {
     const prods = this.products().filter(p => p.active !== false && this._sellableInventory(p));
     let h = '<option value="">Select inventory product...</option>';
@@ -706,7 +715,16 @@ S.RevenueMenuItems = {
       const kind = this._invAmountKind(p);
       const pourCell = document.getElementById('ri-pour-cell');
       const portCell = document.getElementById('ri-portion-cell');
-      if (pourCell) { pourCell.style.display = kind === 'pour' ? '' : 'none'; if (kind !== 'pour') { const pi = document.getElementById('ri-pour'); if (pi) pi.value = ''; } }
+      if (pourCell) {
+        pourCell.style.display = kind === 'pour' ? '' : 'none';
+        const pi = document.getElementById('ri-pour');
+        if (pi) {
+          if (kind !== 'pour') pi.value = '';
+          // Draft beer / wine by the glass: prefill the product's own pour size so
+          // the cost lands right away (still editable for an odd pour).
+          else if (!pi.value && p && p.pour_size_oz != null && p.pour_size_oz !== '') pi.value = p.pour_size_oz;
+        }
+      }
       if (portCell) { portCell.style.display = kind === 'portion' ? '' : 'none'; if (kind !== 'portion') { const pi = document.getElementById('ri-portion'); if (pi) pi.value = ''; } }
       // Update the Portion field's inline unit to the product's recipe measure
       // (slice / oz / ea) so the operator sees what they're entering.
@@ -721,10 +739,11 @@ S.RevenueMenuItems = {
       // Auto-fill the Menu Name from the product; the operator can still edit it.
       const nameInp = document.getElementById('ri-name');
       if (nameInp && p) nameInp.value = p.name;
-      // Auto-fill the menu section from the product's natural category if the
-      // operator hasn't picked one, so a no-prep item is never left uncategorized.
+      // Auto-select the menu section only when it is unambiguous: beer, wine, and
+      // NA beverages have one obvious home. Food and other Misc could be Snacks,
+      // Sides, or a custom section, so leave those on "Select category" to pick.
       const catSel = document.getElementById('ri-cat');
-      if (catSel && !catSel.value && p) { const def = App.menuCatForProduct(p) || ''; if (def) catSel.value = def; }
+      if (catSel && !catSel.value && p) { const def = this._certainMenuSection(p); if (def) catSel.value = def; }
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
@@ -942,7 +961,8 @@ S.RevenueMenuItems = {
       const p = this.prodById(linkedProductId);
       if (!p) { fail('Linked product not found.'); return; }
       if (!name) name = p.name;   // Menu Name auto-fills from the product; fall back if cleared
-      category = document.getElementById('ri-cat')?.value || App.menuCatForProduct(p) || this.IC_TO_MENU_CAT[p.category] || 'Other';
+      category = document.getElementById('ri-cat')?.value || '';
+      if (!category) { fail('Pick a menu category.'); return; }
       // Cost from the per-item amount: Food/Misc by Portion, beer/wine by Pour.
       const isFoodMisc = p.category === 'Food' || p.category === 'Misc';
       const raw = parseFloat(document.getElementById(isFoodMisc ? 'ri-portion' : 'ri-pour')?.value);

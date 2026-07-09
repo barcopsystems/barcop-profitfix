@@ -25,7 +25,7 @@ S.RevenueMenuEngineering = {
   MIN_PER_CAT: 4,
 
   // Menu order for the per-category sections (same order Menu Items uses).
-  CAT_ORDER: ['Appetizers', 'Entrees', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
+  CAT_ORDER: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
   // The item's margin target: its own override, else the category default. Null
   // for beverages / inventory items with no set target, so no price is suggested.
