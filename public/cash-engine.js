@@ -470,8 +470,15 @@ window.CashEngine = {
     for (let i = 0; i < numWeeks; i++) {
       const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
       const sales = this.revenueForWeek(ws) * (1 + salesAdj / 100);
+      // A SAVED forecast override already bundles this week's booked-event revenue
+      // (Build Schedule adds it into the number you type), so adding the event
+      // balance again would double-count. The baseline sales path is event-free, so
+      // events ARE added there. Only add event cash when NOT on a saved override.
+      const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
+      const onOverride = !!(savedFc && savedFc.total);
       const ev = this.eventInflow(ws, we);
-      const inflow = sales + ev.total;
+      const evAdd = onOverride ? 0 : ev.total;
+      const inflow = sales + evAdd;
       const lab = this.laborForWeek(ws);
       const billRecs = this.projectedBills(ws, we);
       const bills = billRecs.reduce((s, b) => s + b.amount, 0);
@@ -482,7 +489,7 @@ window.CashEngine = {
       const out = lab.cost + purch + bills + outflows + extraOut;
       const net = inflow - out;
       bal += net;
-      rows.push({ ws, we, i, sales, events: ev.total, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
+      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });

@@ -541,14 +541,25 @@ const DB = {
   // copy is loaded (it is newer than the server), and App prompts to sync.
   _PENDING_KEY: 'pf_pending_sync',
 
+  // Every offline/local-cache key is scoped to the ACTIVE ACCOUNT so a multi-bar
+  // owner (or a shared browser) can never be served — or sync — one bar's cached
+  // data under another. Uses the resolved account id, else the synchronously-stored
+  // active-account id (the same one _ensureAccountId resolves to), so it is correct
+  // even on the first read before the network resolves the account.
+  _acctKey(base) {
+    const acct = this._accountId || this._getStoredActiveAccountId();
+    return acct ? (base + '__' + acct) : base;
+  },
+
   _pendingList() {
-    try { const r = localStorage.getItem(this._PENDING_KEY); return r ? JSON.parse(r) : []; }
+    try { const r = localStorage.getItem(this._acctKey(this._PENDING_KEY)); return r ? JSON.parse(r) : []; }
     catch (e) { return []; }
   },
   _setPendingList(list) {
     try {
-      if (list && list.length) localStorage.setItem(this._PENDING_KEY, JSON.stringify(list));
-      else localStorage.removeItem(this._PENDING_KEY);
+      const k = this._acctKey(this._PENDING_KEY);
+      if (list && list.length) localStorage.setItem(k, JSON.stringify(list));
+      else localStorage.removeItem(k);
     } catch (e) { /* storage full or unavailable */ }
   },
   _markPending(lsKey) {
@@ -574,6 +585,12 @@ const DB = {
   // from the pending list only on its own successful write.
   async syncPending() {
     if (!this._sb || !this._user) return { ok: false, synced: 0, failed: 0, error: 'Not connected' };
+    // The pending list is account-scoped, so it only holds THIS bar's offline
+    // writes; push them back to THIS bar with the account-scoped upsert the rest of
+    // the file uses (account_id + onConflict:'account_id'), not a user_id upsert
+    // that would fail or land under the wrong bar for a multi-account owner.
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false, synced: 0, failed: 0, error: 'No account membership' };
     const tableOf = { pf_data: 'user_data', pf_ic_data: 'ic_data', pf_lc_data: 'lc_data', pf_sc_data: 'sc_data' };
     let synced = 0, failed = 0;
     for (const lsKey of this._pendingList()) {
@@ -587,8 +604,8 @@ const DB = {
       const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
       try {
         const { error } = await this._sb.from(table).upsert({
-          user_id: this._user.id, data: data, updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
+          account_id: accountId, user_id: this._user.id, data: data, updated_at: new Date().toISOString()
+        }, { onConflict: 'account_id' });
         if (error) { failed++; }
         else { this._clearPending(lsKey); synced++; }
       } catch (e) { failed++; }
@@ -599,7 +616,7 @@ const DB = {
   // ── Local storage fallback ────────────────────────────────────────────────
   _localRead() {
     try {
-      const r = localStorage.getItem('pf_data');
+      const r = localStorage.getItem(this._acctKey('pf_data'));
       return r ? JSON.parse(r) : this._defaultData();
     } catch (e) {
       return this._defaultData();
@@ -608,7 +625,7 @@ const DB = {
 
   _localWrite(data) {
     try {
-      localStorage.setItem('pf_data', JSON.stringify(data));
+      localStorage.setItem(this._acctKey('pf_data'), JSON.stringify(data));
     } catch (e) {
       console.warn('localStorage write failed:', e);
     }
@@ -708,7 +725,7 @@ const DB = {
 
   _localReadControl(lsKey) {
     try {
-      const r = localStorage.getItem(lsKey);
+      const r = localStorage.getItem(this._acctKey(lsKey));
       return r ? JSON.parse(r) : {};
     } catch (e) {
       return {};
@@ -717,7 +734,7 @@ const DB = {
 
   _localWriteControl(lsKey, data) {
     try {
-      localStorage.setItem(lsKey, JSON.stringify(data));
+      localStorage.setItem(this._acctKey(lsKey), JSON.stringify(data));
     } catch (e) {
       console.warn('localStorage write failed:', e);
     }
@@ -793,7 +810,7 @@ const DB = {
     const s = String(v).slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
   },
-  _evCacheKey(table, kind) { return 'pfev_' + table + '_' + kind; },
+  _evCacheKey(table, kind) { return this._acctKey('pfev_' + table + '_' + kind); },
   _cacheEvents(table, kind, recs) {
     try { localStorage.setItem(this._evCacheKey(table, kind), JSON.stringify(recs)); } catch (e) {}
   },
