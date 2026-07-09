@@ -722,6 +722,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .row-list tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;}
   .row-list tbody td[data-label=""]::before{content:none;}
   .row-list tbody td[data-label=""]{justify-content:flex-end;}
+  /* Row-select checkbox cell: keep it leading (top-left) in the stacked view, the
+     same on every product list (Add Products, Set Locations). */
+  .row-list tbody td.cb-left{justify-content:flex-start;}
 }
 /* Set Locations "Products In This Location" arrange list: a .row-list whose drag
    grip sits OUTSIDE the pill (first cell transparent, the pill starts at the 2nd
