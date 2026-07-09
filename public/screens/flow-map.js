@@ -136,7 +136,7 @@ S.FlowMap = {
   render() {
     const tree = this.STAGES.map(st => this.stageCard(st)).join('');
     this.container.innerHTML = this.styleBlock()
-      + '<div class="screen" style="max-width:none;padding-left:24px;padding-right:24px;">'
+      + '<div class="screen" style="max-width:none;">'
       + '<div class="fm-wrap"><div class="fm-tree">' + tree + '</div>'
       + '<div class="fm-panel-col"><div class="fm-panel" id="fm-panel">' + this.panelHtml(this._sel ? this._nodes[this._sel] : null) + '</div></div>'
       + '</div></div>';
