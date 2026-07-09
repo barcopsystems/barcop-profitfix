@@ -440,17 +440,19 @@ const App = {
     const style = document.createElement('style');
     style.id = 'demo-css';
     style.textContent =
-      'body.demo #app{margin-top:40px;height:calc(100vh - 40px);}'
-      + 'body.demo #hub-wrapper{top:40px !important;}'
+      // Slim, always-visible bar pinned to the BOTTOM. The app shrinks by its height
+      // so the last content never hides behind it and the sticky top nav is untouched.
+      'body.demo #app{height:calc(100vh - 40px);}'
+      + 'body.demo #hub-wrapper{bottom:40px !important;}'
       + 'body.demo #tn-settings{display:none;}'   // App Settings is off in the demo
-      + '#demo-banner{position:fixed;top:0;left:0;right:0;height:40px;z-index:200;'
+      + 'body.demo #signout-btn,body.demo #hub-signout{display:none;}'   // no account to sign out of in the demo; visitor just closes the tab
+      + '#demo-banner{position:fixed;bottom:0;left:0;right:0;height:40px;z-index:200;'
       + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:#1E2B34;'
-      + 'color:var(--w);box-shadow:0 2px 8px rgba(0,0,0,0.45);}';
+      + 'color:var(--w);box-shadow:0 -2px 8px rgba(0,0,0,0.45);}';
     document.head.appendChild(style);
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
-    bar.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:0.03em;flex:1;">'
-      + 'Bar Cop demo. Poke at everything and change whatever you want. Nothing you do is saved, and it all resets when you leave.</span>'
+    bar.innerHTML = '<span style="font-size:12px;font-weight:700;letter-spacing:0.03em;flex:1;">Bar Cop Live Demo</span>'
       + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Create Account</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/'; });
@@ -1182,6 +1184,22 @@ const App = {
   // every cached data structure starts fresh under the new account context.
   // Called from boot(), showApp(), and the Hub render.
   async renderAccountSwitcher() {
+    // Demo has no real account records, but the sample bar still has a name. Show it
+    // in the single-location style (name, no picker) so the demo reads like a live bar.
+    if (this.demoMode) {
+      const barName = (this.data && this.data.settings && this.data.settings.bar_name) || 'Bar Cop Demo';
+      this._acctList = [{ id: 'demo', name: barName }];
+      this._acctActiveId = 'demo';
+      ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
+        const slot = document.getElementById(slotId);
+        if (slot) { slot.style.cssText = 'display:flex;align-items:center;'; slot.innerHTML = '<span class="tn-barname">' + esc(barName) + '</span>'; }
+      });
+      ['topbar-group-dashboard', 'hub-topbar-group-dashboard', 'sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
+        const slot = document.getElementById(slotId);
+        if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+      });
+      return;
+    }
     if (!window.DB || !DB.listMyAccounts) return;
     const allAccounts = await DB.listMyAccounts();
     const activeId = (DB._accountId) || (DB._getStoredActiveAccountId && DB._getStoredActiveAccountId());
