@@ -716,7 +716,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .row-list,.row-list tbody{display:block;}
   .row-list thead{display:none;}
   .row-list tbody tr{display:block;background:#0D181E;border-radius:8px;padding:4px 14px;margin-bottom:8px;}
-  .row-list tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;background:transparent;padding:9px 0;border-radius:0;white-space:normal;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
+  .row-list tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;background:transparent;padding:9px 0;border-radius:0;white-space:normal;text-align:left;border-bottom:1px solid var(--b-edge);}
   .row-list tbody tr td:last-child{border-bottom:none;}
   .row-list tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;}
   .row-list tbody td[data-label=""]::before{content:none;}
