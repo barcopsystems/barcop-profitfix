@@ -846,9 +846,10 @@ body.chrome-on #proto-topnav{
 /* Offset both app layers below the fixed nav (mirrors the body.demo offsets). */
 body.chrome-on #app{margin-top:var(--navh);height:calc(100vh - var(--navh));}
 body.chrome-on #hub-wrapper{top:var(--navh) !important;}   /* beats the inline inset:0 */
-body.demo.chrome-on #proto-topnav{top:40px;}
-body.demo.chrome-on #app{margin-top:calc(40px + var(--navh));height:calc(100vh - 40px - var(--navh));}
-body.demo.chrome-on #hub-wrapper{top:calc(40px + var(--navh)) !important;}
+/* Demo banner is pinned to the BOTTOM now, so the nav stays at the very top (top:0)
+   like normal and the app layers just reserve 40px at the bottom for it. */
+body.demo.chrome-on #app{height:calc(100vh - var(--navh) - 40px);}
+body.demo.chrome-on #hub-wrapper{bottom:40px !important;}
 
 .app.proto{
   display:grid;
