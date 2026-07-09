@@ -102,28 +102,34 @@ S.RevenueMenuItems = {
     return { unit: b.unitLabel, costPerUnit: b.costPerUnit };
   },
 
-  // ── Inventory product picker (Card 3 / Inventory form) ───────────────
-  inventoryProductOptions(selectedId, menuCat) {
-    const prods = this.products().filter(p => p.active !== false);
+  // ── Inventory product picker (No Prep form) ──────────────────────────
+  // Shows the products you can sell as-is, grouped by what they actually are in
+  // inventory (not by menu section). Beer and Wine are always sellable; a Food or
+  // Misc item shows only when it is ticked "Sold on the menu" in Add Products, so
+  // raw ingredients and supplies stay out of the list.
+  _sellableInventory(p) {
+    const c = p && p.category;
+    if (c === 'Bottle Beer' || c === 'Draft Beer' || c === 'Wine') return true;
+    if ((c === 'Food' || c === 'Misc') && p.sold_on_menu) return true;
+    return false;
+  },
+  inventoryProductOptions(selectedId) {
+    const prods = this.products().filter(p => p.active !== false && this._sellableInventory(p));
     let h = '<option value="">Select inventory product...</option>';
-    // Scope to the menu category the operator picked, so Beer shows only beers,
-    // Wine only wines, NA only NA beverages, Snacks only packaged resale items.
-    // With no category yet, every sellable group shows. menuCatForProduct is the
-    // single classifier — each product lands in exactly one group.
-    const groups = menuCat ? this.INVENTORY_GROUPS.filter(g => g.menuCat === menuCat) : this.INVENTORY_GROUPS;
-    let totalShown = 0;
-    groups.forEach(grp => {
-      const inGrp = prods.filter(p => App.menuCatForProduct(p) === grp.menuCat)
+    const ORDER = ['Draft Beer', 'Bottle Beer', 'Wine', 'Food', 'Misc'];
+    let total = 0;
+    ORDER.forEach(cat => {
+      const inGrp = prods.filter(p => p.category === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!inGrp.length) return;
-      totalShown += inGrp.length;
-      h += '<optgroup label="' + esc(grp.menuCat) + '">';
+      total += inGrp.length;
+      h += '<optgroup label="' + esc(cat) + '">';
       inGrp.forEach(p => {
         h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
       });
       h += '</optgroup>';
     });
-    if (!totalShown) h += '<option value="" disabled>No ' + esc(menuCat || 'sellable') + ' products in Inventory Control yet</option>';
+    if (!total) h += '<option value="" disabled>No sellable products yet — mark a Food/Misc item "Sold on the menu" in Add Products, or add beer/wine.</option>';
     return h;
   },
 
@@ -523,7 +529,7 @@ S.RevenueMenuItems = {
     // auto-fills from the product. The adaptive price/cost/covers cells flow into
     // mi-adaptive (display:contents); the recipe builder and notes carry 100%.
     const order = scopeType === 'inventory'
-      ? (catCell + linkedSlot + nameSlot + adaptive)
+      ? (linkedSlot + catCell + nameSlot + adaptive)
       : (nameSlot + catCell + adaptive);
     return '<div class="form-row">' + order + '</div>';
   },
@@ -632,7 +638,7 @@ S.RevenueMenuItems = {
     // form section now, so it no longer filters the picker. The product itself
     // drives the cost model (pour vs portion vs whole).
     return '<label>Inventory Product</label>'
-      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId, '') + '</select>';
+      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select>';
   },
   // Everything below the top row for an inventory item: price, cost, covers,
   // pour/portion, other prices, notes.
