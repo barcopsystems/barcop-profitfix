@@ -1196,65 +1196,35 @@ const App = {
     ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
       const slot = document.getElementById(slotId);
       if (!slot) return;
+      const active = accounts.find(a => a.id === activeId) || accounts[0];
+      if (!active) { slot.style.display = 'none'; slot.innerHTML = ''; return; }
+      slot.style.cssText = 'display:flex;align-items:center;';
+      // Single location: the bar name (no picker needed). Multi: the compact
+      // switcher. No "Viewing" label, no Group button — same spot for both.
       if (!isMulti) {
-        slot.style.display = 'none';
-        slot.innerHTML = '';
+        slot.innerHTML = '<span class="tn-barname">' + esc(active.name || 'My Bar') + '</span>';
         return;
       }
-      const active = accounts.find(a => a.id === activeId) || accounts[0];
       const options = accounts.map(a => {
         const sel = a.id === active.id ? ' selected' : '';
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
-      slot.style.display = 'flex';
-      slot.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      slot.innerHTML = '<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Viewing</span>'
-        + '<select class="acct-switcher at-qsel" style="font-weight:600;">' + options + '</select>';
-      const sel = slot.querySelector('.acct-switcher');
-      sel.addEventListener('change', (ev) => {
+      slot.innerHTML = '<select class="acct-switcher at-qsel" style="font-weight:600;">' + options + '</select>';
+      slot.querySelector('.acct-switcher').addEventListener('change', (ev) => {
         const newId = ev.target.value;
         if (newId && newId !== active.id) DB.setActiveAccount(newId);
       });
     });
-    // Group Dashboard button -- multi-loc only. Mounts in both topbars so the
-    // operator can pop the cross-bar comparison from any screen without losing
-    // their current context. Opens as a modal overlay, not a full-page route.
+    // Group Dashboard removed. Keep the slots empty so nothing renders.
     ['topbar-group-dashboard', 'hub-topbar-group-dashboard'].forEach(slotId => {
       const slot = document.getElementById(slotId);
-      if (!slot) return;
-      if (!isMulti) {
-        slot.style.display = 'none';
-        slot.innerHTML = '';
-        return;
-      }
-      slot.style.cssText = 'display:flex;align-items:center;';
-      slot.innerHTML = '<button class="tn-grp-btn" id="' + slotId + '-btn" title="Group Dashboard">'
-        + '<svg viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="2" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>'
-        + '<span>Group</span></button>';
-      slot.querySelector('button')?.addEventListener('click', () => {
-        if (window.S && S.HubGroupDashboard) S.HubGroupDashboard.open();
-      });
+      if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
     });
-    // Sidebar multi-loc slots (mobile-only via CSS). Location switcher only
-    // -- Group Dashboard is intentionally not exposed on mobile because the
-    // 8-column comparison table does not fit on a phone screen. Multi-loc
-    // operators on a phone can still switch bars from here; comparison view
-    // stays a desktop tool.
+    // Sidebar location slot is no longer used: the topbar handles desktop/tablet
+    // and the mobile drawer's main screen handles phones. Keep it empty.
     ['sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
       const slot = document.getElementById(slotId);
-      if (!slot) return;
-      if (!isMulti) { slot.innerHTML = ''; return; }
-      const active = accounts.find(a => a.id === activeId) || accounts[0];
-      const options = accounts.map(a => {
-        const sel = a.id === active.id ? ' selected' : '';
-        return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
-      }).join('');
-      slot.innerHTML = '<select class="smm-switcher">' + options + '</select>';
-      const sel = slot.querySelector('.smm-switcher');
-      sel?.addEventListener('change', (ev) => {
-        const newId = ev.target.value;
-        if (newId && newId !== active.id) DB.setActiveAccount(newId);
-      });
+      if (slot) slot.innerHTML = '';
     });
   },
 
@@ -1824,7 +1794,7 @@ const App = {
       { h: 'Where You Stand', p: ['The money line up top. Total Opportunity is every dollar your audits have surfaced but you have not closed yet. Recovered, in gold, is the proven dollars you have put back, counted only after a fix is marked implemented and measured. Trapped Cash is the dead and overstocked inventory you could free. Break-Even is the sales you need to clear your costs. And your Bar Cop Audit score reads your operation health. Each tile is a doorway to the screen behind it, and the Bar Cop Briefing button writes a short read of the whole operation from your logged numbers.'] },
       { h: 'Priority Actions and Needs Attention', p: ['Priority Actions ranks your biggest money moves by monthly dollar impact, each one a tap from its fix. Needs Attention pulls the operational items to act on now, expiring certs and permits, projected overtime, and cash flags, worst first. All clear shows when nothing needs you outside your weekly close.'] },
       { h: 'The six section cards', p: ['One card per system: Inventory, Labor, Shift, Profit, Revenue, and Cash. Each shows that section\'s headline numbers over its weekly-close steps with a progress bar, so you see where each section stands and step into the exact work right from the Hub. The whole card is a link into that section.'] },
-      { h: 'Multiple bars', p: ['If you run more than one bar, a Viewing switcher and a Group button appear in the top bar: switch the active bar, or open the Group Dashboard to compare headline numbers across all of them.'] }
+      { h: 'Multiple bars', p: ['Your bar name shows in the top bar. If you run more than one bar, that name becomes a switcher: pick another bar and Bar Cop reloads into it.'] }
     ] },
     'flowmap': { title: 'How the Workflow Map Works', sections: [
       { h: 'What this is', p: ['The Workflow map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
@@ -1980,7 +1950,7 @@ const App = {
       const pill = ([k, l]) => '<div class="tn-sec' + (k === context ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
       secEl.innerHTML = '<span class="tn-grp-label">Control:</span>'
         + this._PROTO_CONTROL.map(pill).join('')
-        + '<span class="tn-grp-label" style="margin-left:16px;">Recovery:</span>'
+        + '<span class="tn-grp-label">Recovery:</span>'
         + this._PROTO_RECOVERY.map(pill).join('');
       secEl.querySelectorAll('.tn-sec[data-sec]').forEach(el =>
         el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
@@ -2260,18 +2230,23 @@ const App = {
         // audit intake "Select Answer" selects. Switching a unit reloads into that
         // account.
         const accts = App._acctList || [];
-        if (accts.length > 1) {
-          const active = accts.find(a => a.id === App._acctActiveId) || accts[0];
+        const active = accts.find(a => a.id === App._acctActiveId) || accts[0];
+        if (active) {
           const loc = document.createElement('div');
           loc.className = 'mnav-loc';
-          loc.innerHTML = '<div class="mnav-loc-label">Viewing</div>'
-            + '<select class="at-qsel mnav-loc-sel">'
-            + accts.map(a => '<option value="' + esc(a.id) + '"' + (a.id === active.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('')
-            + '</select>';
-          loc.querySelector('.mnav-loc-sel').addEventListener('change', (ev) => {
-            const id = ev.target.value;
-            if (id && id !== active.id) fire(() => { if (window.DB && DB.setActiveAccount) DB.setActiveAccount(id); });
-          });
+          if (accts.length > 1) {
+            // Multi-unit: the switcher (no "Viewing" label).
+            loc.innerHTML = '<select class="at-qsel mnav-loc-sel">'
+              + accts.map(a => '<option value="' + esc(a.id) + '"' + (a.id === active.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('')
+              + '</select>';
+            loc.querySelector('.mnav-loc-sel').addEventListener('change', (ev) => {
+              const id = ev.target.value;
+              if (id && id !== active.id) fire(() => { if (window.DB && DB.setActiveAccount) DB.setActiveAccount(id); });
+            });
+          } else {
+            // Single location: just the bar name, same spot.
+            loc.innerHTML = '<span class="mnav-barname">' + esc(active.name || 'My Bar') + '</span>';
+          }
           bodyEl.appendChild(loc);
           started = true;
         }

@@ -899,8 +899,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-row2{display:flex;align-items:center;gap:8px;height:66px;padding:0 16px;background:var(--surface);border-top:1px solid var(--b-edge);border-bottom:1px solid var(--b-edge);}
 .tn-collapse{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--b-edge);border-radius:var(--r2);color:var(--t3);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
 .tn-collapse:hover{background:var(--c3);color:var(--t1);}
-.tn-sections{display:flex;align-items:center;gap:4px;height:100%;min-width:0;overflow:hidden;}
-.tn-sec{display:flex;align-items:center;height:38px;padding:0 16px;border-radius:var(--r2);font-size:14px;font-weight:700;letter-spacing:0.2px;color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
+.tn-sections{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
+.tn-sec{display:flex;align-items:center;height:38px;padding:0 13px;border-radius:var(--r2);font-size:14px;font-weight:700;letter-spacing:0.2px;color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
 .tn-sec:hover{background:var(--c3);color:var(--t1);}
 .tn-sec.active{background:var(--c4);color:var(--w);}
 .tn-grp-label{font-size:14px;font-weight:700;letter-spacing:0.2px;color:#485C6A;flex-shrink:0;margin:0 8px 0 4px;}
@@ -1319,20 +1319,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 .sidebar-multi-loc .smm-group-btn:hover{border-color:var(--gold);color:var(--gold);}
 
-/* Multi-location switcher hops from the top bar into the sidebar once it would
-   crowd the module nav (the collision starts ~950px on a two-bar account). The
-   desktop sidebar stays put, so navigation is untouched and we do NOT drop to the
-   mobile menu early. Single-location operators have no switcher, so this is a
-   no-op for them. On the Hub landing (no side rail in this range) the switcher
-   simply waits for a wider window or the mobile menu. Below 768px the existing
-   mobile rules already do this via the drawer. */
-@media (max-width:1100px){
-  #topbar-account-switcher,
-  #topbar-group-dashboard,
-  #hub-topbar-account-switcher,
-  #hub-topbar-group-dashboard{display:none !important;}
-  .sidebar-multi-loc{display:flex;}
-}
+/* Bar name / compact switcher that sits top-right of the module nav (where the old
+   Group button was). Single-location = the name; multi = the .at-qsel picker. */
+.tn-barname{font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;}
+.mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
    wire a click handler to close. Created on demand by the hamburger handler. */
@@ -1387,9 +1377,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   #hub-topbar-account-switcher,
   #hub-topbar-group-dashboard{display:none !important;}
 
-  /* Sidebar multi-loc slot becomes visible. Render at the top of the
-     sidebar so it sits above the nav, just under the logo bar. */
-  .sidebar-multi-loc{display:flex;}
+  /* Sidebar multi-loc slot stays hidden: the location lives in the top bar
+     (desktop/tablet) and the mobile drawer's main screen (phones). */
 
   /* Screen container padding tightens on narrow viewports. Bottom padding
      stays generous so the last card/button on a screen never butts up
