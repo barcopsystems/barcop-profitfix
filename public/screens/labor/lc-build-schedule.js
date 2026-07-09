@@ -725,7 +725,7 @@ S.LaborBuildSchedule = {
       + '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (editing ? '<button class="btn btn-danger" id="bs-m-remove" style="margin-left:auto;">Remove</button>' : '')
       + '</div></div>';
-    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 460, noClose: true });
+    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 460, confirmDirty: true });
     const calcEl = document.getElementById('bs-m-calc');
     const errEl = document.getElementById('bs-m-err');
     const updateCalc = () => {
@@ -804,7 +804,7 @@ S.LaborBuildSchedule = {
       + '<button class="btn btn-primary" id="bs-lt-save">Save</button>'
       + '<span id="bs-lt-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'bs-lt-modal', maxWidth: 460, noClose: true });
+    App.openModal(html, { id: 'bs-lt-modal', maxWidth: 460, confirmDirty: true });
     document.getElementById('bs-lt-settings')?.addEventListener('click', () => { App.closeModal('bs-lt-modal'); if (window.S && S.HubSettings) S.HubSettings.open('recovery-targets'); });
     document.getElementById('bs-lt-save')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('bs-lt-val')?.value);
@@ -846,7 +846,7 @@ S.LaborBuildSchedule = {
       + (isOverride ? '<button class="btn btn-ghost" id="bs-fc-auto">Use Bar Cop\'s Number</button>' : '')
       + '<span id="bs-fc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
-    App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, noClose: true });
+    App.openModal(html, { id: 'bs-fc-modal', maxWidth: 460, confirmDirty: true });
     document.getElementById('bs-fc-save')?.addEventListener('click', () => this.saveForecast());
     document.getElementById('bs-fc-auto')?.addEventListener('click', () => this.clearForecast());
   },
