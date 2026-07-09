@@ -383,8 +383,11 @@ S.InventoryProducts = {
 
     let body;
     if (prods.length === 0) {
-      body = '<div class="card" style="overflow-x:auto;margin-top:18px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + colgroup + '<thead><tr><th></th><th>Product</th>' + headerCols + '</tr></thead>'
+      // Empty state: no rows to align, so skip the fixed colgroup + table-layout:fixed
+      // (their hard pixel widths forced a min-width wider than the card and made an
+      // empty table scroll sideways). Auto layout fits the container, no scroll.
+      body = '<div class="card" style="margin-top:18px;"><table class="row-list" style="width:100%;">'
+        + '<thead><tr><th></th><th>Product</th>' + headerCols + '</tr></thead>'
         + '<tbody><tr><td colspan="' + nCols + '" style="color:var(--t3);">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</td></tr></tbody></table></div>';
     } else {
       const pourable = this.isPourable(this.activeCat);
