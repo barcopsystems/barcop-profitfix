@@ -80,6 +80,16 @@ S.CashFix = {
   tightWeeks() { return CashEngine.forecast(4).filter(r => r.net < 0).length; },
   termsSet()   { return CashEngine.termVendors().length; },
 
+  // Does the system behind a gap actually hold data yet? Gates the review steps so
+  // they cannot read On track on a fresh account. Mirrors each gap's systemRead.
+  gapHasData(id) {
+    if (id === 'free-trapped') return !!CashEngine.trapped().hasData;
+    if (id === 'order-to-par') return !!CashEngine.overOrder(3).hasData;
+    if (id === 'stay-ahead')   return !!CashEngine.survivalForecast(13).hasData;
+    if (id === 'pay-on-terms') return this.termsSet() > 0;
+    return true;
+  },
+
   // Status for one step → {kind, good, label, color, sub} or {kind:'guide'}.
   stepStatus(gapId, idx) {
     const t = (this.TRACK[gapId] || {})[idx];
@@ -93,6 +103,12 @@ S.CashFix = {
       return { kind: 'state', good, state: good ? 'clear' : 'open', label: good ? n + (n === 1 ? ' vendor on terms' : ' vendors on terms') : 'No vendor terms set', color: good ? 'var(--green)' : 'var(--amber)', sub: good ? '' : 'Set your vendor terms' };
     }
     const last = this.lastActivity(t.signal);
+    // A review step (view:<screen>) goes green just by opening that screen. Until the
+    // system it reviews actually holds data, that view proves nothing, so it reads
+    // Not started rather than On track off a drive-by page load on a fresh account.
+    if (t.signal && t.signal.indexOf('view:') === 0 && !this.gapHasData(gapId)) {
+      return { kind: 'recur', good: false, never: true, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet, ' + t.every };
+    }
     const ds = this.daysSince(last);
     if (ds == null) return { kind: 'recur', good: false, never: true, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No record yet, ' + t.every };
     let state, label, color;
