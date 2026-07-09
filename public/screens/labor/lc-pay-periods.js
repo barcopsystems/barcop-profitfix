@@ -108,7 +108,7 @@ S.LaborPayPeriods = {
       const wage         = r.hours > 0 ? (r.cost / r.hours) : (r.wage || 0);
       const regularCost  = regularHours * wage;
       const otCost       = otHours * wage * 1.5;
-      return { ...r, regular_hours: regularHours, ot_hours: otHours, regular_cost: regularCost, ot_cost: otCost, gross: regularCost + otCost };
+      return { ...r, wage, regular_hours: regularHours, ot_hours: otHours, regular_cost: regularCost, ot_cost: otCost, gross: regularCost + otCost };
     });
     const totals = rows.reduce((t, r) => {
       t.hours         += r.hours;
