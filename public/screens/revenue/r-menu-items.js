@@ -475,6 +475,8 @@ S.RevenueMenuItems = {
     this._presetCat = this._addType === 'cocktail' ? 'Cocktails' : '';
     this._catAutoSet = '';   // the last section the No Prep picker auto-selected (never clobber a hand-picked one)
     this._pourAutoSet = '';  // the last pour size the No Prep picker auto-filled (same rule)
+    this._priceAutoSet = ''; // the last menu price the No Prep picker auto-filled (same rule)
+    this._nameAutoSet = '';  // the last menu name the No Prep picker auto-filled (same rule)
     this.editIdx   = item ? this.items().findIndex(i => i.id === item.id) : null;
     this.formType  = item ? this.classifyItem(item) : this._addType;
     this.linkedProductId = item?.linked_product_id || '';
@@ -736,15 +738,18 @@ S.RevenueMenuItems = {
       // (slice / oz / ea) so the operator sees what they're entering.
       const punit = document.getElementById('ri-portion-unit');
       if (punit && p && App.recipeBasis) punit.textContent = App.recipeBasis(p).unitLabel;
-      recomputeCost();
-      // Auto-fill the menu price from the linked product's saved menu price,
-      // the same way cost auto-fills. Beer + Wine carry a menu price in
-      // Inventory; the operator can still override it here. Leave it editable.
+      // Auto-fill the menu price + name from the product, updating as the product
+      // changes but never overwriting a value the operator typed by hand.
       const priceInp = document.getElementById('ri-price');
-      if (priceInp && p && p.menu_price > 0) priceInp.value = (+p.menu_price).toFixed(2);
-      // Auto-fill the Menu Name from the product; the operator can still edit it.
+      if (priceInp && p) {
+        const mp = (p.menu_price > 0) ? (+p.menu_price).toFixed(2) : '';
+        if (priceInp.value === '' || priceInp.value === this._priceAutoSet) { priceInp.value = mp; this._priceAutoSet = mp; }
+      }
       const nameInp = document.getElementById('ri-name');
-      if (nameInp && p) nameInp.value = p.name;
+      if (nameInp && p) {
+        const nm = p.name || '';
+        if (nameInp.value === '' || nameInp.value === this._nameAutoSet) { nameInp.value = nm; this._nameAutoSet = nm; }
+      }
       // Auto-select the menu section only when it is unambiguous: beer, wine, and
       // NA beverages have one obvious home. Food and other Misc could be Snacks,
       // Sides, or a custom section, so those clear back to "Select category" to pick.
@@ -756,6 +761,7 @@ S.RevenueMenuItems = {
         catSel.value = def;
         this._catAutoSet = def;
       }
+      recomputeCost();   // after the price is set, so the Cost % uses the current price
       this.refreshFieldMissing();
     });
     document.getElementById('ri-pour')?.addEventListener('input', recomputeCost);
