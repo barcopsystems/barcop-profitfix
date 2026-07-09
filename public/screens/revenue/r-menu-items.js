@@ -312,7 +312,6 @@ S.RevenueMenuItems = {
     }).join('');
     return warn + toolbar + '<div id="mi-list-export">' + sections + '</div>';
   },
-  TYPE_LABEL: { plate: 'Dish', cocktail: 'Cocktail', inventory: 'No Prep' },
 
   _itemRowHTML(item) {
     const cost = App.menuItemCost(item) || 0;
@@ -328,8 +327,7 @@ S.RevenueMenuItems = {
     const checked = (this._selected && this._selected.has(item.id)) ? ' checked' : '';
     return '<tr>'
       + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"' + checked + '/></td>'
-      + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name)
-      + ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;margin-left:4px;vertical-align:middle;white-space:nowrap;">' + esc(this.TYPE_LABEL[cls] || '') + '</span></div>'
+      + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
       + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
       + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
       + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
