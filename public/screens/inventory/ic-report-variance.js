@@ -149,7 +149,10 @@ S.InventoryVarianceReport = {
       const entry = bump(v.product_id, v.units);
       const p = this.productById(v.product_id) || {};
       const units = parseFloat(v.units) || 0;
-      entry.comp_units += (p.category === 'Bottle Beer' && p.case_size) ? units / p.case_size : units;
+      // Void/Comp logs `units` as SERVINGS (pours/drinks); usage (rawUsed) is in the
+      // product's STOCK unit (bottles/kegs/cases). Convert servings -> stock units on
+      // the same basis computeUsagePair uses, or a comped shot cancels a whole bottle.
+      entry.comp_units += this._compServingsToStock(p, units);
     });
     this.waste().forEach(w => {
       if (!w.product_id || w.units == null) return;
@@ -166,6 +169,16 @@ S.InventoryVarianceReport = {
       }
     });
     return out;
+  },
+
+  // Comped SERVINGS -> the product's STOCK unit, matching computeUsagePair's
+  // servingsPerUnit (case_size for case beer, pours_per_container for pourables).
+  // Falls back to raw when no per-serving basis is known (e.g. a by-the-unit food),
+  // which lines up with usage treating that product's servingsPerUnit as null.
+  _compServingsToStock(p, servings) {
+    if (!servings) return 0;
+    const spu = App.isCaseBeer(p) ? p.case_size : (p.pours_per_container || null);
+    return (spu && spu > 0) ? servings / spu : servings;
   },
 
   usageMap() {
