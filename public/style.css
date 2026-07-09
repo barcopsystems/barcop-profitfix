@@ -37,7 +37,8 @@
   --t3:        rgba(255,255,255,0.38);
   --t4:        rgba(255,255,255,0.22);
   --b1:        rgba(255,255,255,0.15);
-  --b2:        rgba(255,255,255,0.06);
+  --b2:        #16252E;                /* Divider/separator lines — same as the card border (--b-edge). */
+  --track:     rgba(255,255,255,0.06); /* The old --b2: faint fill behind progress bars / pips (NOT a divider). */
   --b-edge:    #16252E;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
   --row-div:   #1B262B;                /* Divider line between #0D181E data rows — opaque so it reads identically no matter what sits behind it (data-card tables + .ing-tbl batch-builder line tables) */
 
@@ -119,7 +120,7 @@ input,select,textarea{color-scheme:dark;}
 /* Logo area */
 .sidebar-logo{
   padding:14px 12px 12px;
-  border-bottom:1px solid var(--b2);
+  border-bottom:1px solid var(--b-edge);
   flex-shrink:0;
   overflow:hidden;
   height:52px;
@@ -242,7 +243,7 @@ input,select,textarea{color-scheme:dark;}
    uniform list per screen; a parent row (›) pushes its child list, the back
    arrow pops, the current location is highlighted. Strict palette: darkest
    panel, card-surface rows, the sidebar's navy for hover + selected. */
-.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--surface);}
+.mnav-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--b-edge);flex-shrink:0;background:var(--surface);}
 .mnav-title{flex:1;text-align:center;font-size:14px;font-weight:700;letter-spacing:0.3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;color:var(--t2);font-size:20px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
 .mnav-back:hover,.mnav-x:hover{background:var(--c4);color:var(--w);}
@@ -253,7 +254,7 @@ input,select,textarea{color-scheme:dark;}
    = white text + gold icon, no row background. Two-level drill stays (root rows
    with a ‹drill› chevron push a section panel). */
 .mnav-glabel{font-size:14px;font-weight:700;color:var(--w);padding:20px 18px 8px;}   /* unused in the flat menu; kept for revert */
-.mnav-divider{height:0;border-top:1px solid var(--b2);margin:11px 18px;}
+.mnav-divider{height:0;border-top:1px solid var(--b-edge);margin:11px 18px;}
 .mnav-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;font-size:14px;color:var(--t3);cursor:pointer;background:transparent;transition:color .12s;}
 .mnav-row:hover,.mnav-row:active{background:transparent;color:var(--w);}
 .mnav-row.on{background:transparent;color:var(--w);}
@@ -273,7 +274,7 @@ input,select,textarea{color-scheme:dark;}
 /* Footer */
 .sidebar-footer{
   padding:10px 12px 12px;
-  border-top:1px solid var(--b2);
+  border-top:1px solid var(--b-edge);
   flex-shrink:0;overflow:hidden;
 }
 .period-label{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t4);margin-bottom:2px;white-space:nowrap;}
@@ -360,8 +361,8 @@ input,select,textarea{color-scheme:dark;}
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
    a sibling button (e.g. Add Products' Cancel) away from the card. */
 #ip-csv-actions:empty{margin:0!important;}
-.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b2);}
-.card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b2);align-items:center;}
+.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b-edge);}
+.card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b-edge);align-items:center;}
 /* Modal close X — a thin icon inside the card's top-right corner, brightens on hover. */
 .app-modal-x{position:absolute;top:12px;right:12px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:none;color:var(--t3);cursor:pointer;z-index:2;padding:0;border-radius:50%;transition:color .12s;}
 .app-modal-x:hover{color:var(--t1);}
@@ -566,8 +567,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* ══ TABLE ══ */
 .tbl-wrap{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow-x:auto;}
 .tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--b2);white-space:nowrap;background:var(--surface);}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--b2);color:var(--t2);vertical-align:middle;}
+.tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--b-edge);white-space:nowrap;background:var(--surface);}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--b-edge);color:var(--t2);vertical-align:middle;}
 .tbl tr:last-child td{border-bottom:none;}
 .tbl tr:hover td{background:var(--hover);}
 /* Full-bleed dividers: the card title rule and the table's row separators run
@@ -593,8 +594,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    roomier form. The title's bottom margin carries the gap to the form, so it works
    for BOTH a collapsible on-page card and a plain modal card (no .collapse-body in
    the modal). Chevron is optional (a plain .card-title = no chevron). */
-.form-card > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b2);}
-.form-card .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b2);}
+.form-card > .card-title{margin:-20px -20px 18px;padding:13px 20px;border-bottom:1px solid var(--b-edge);}
+.form-card .card-actions{margin:18px -20px -20px;padding:13px 20px;border-top:1px solid var(--b-edge);}
 .f textarea.notes-ta{min-height:0;}   /* 2-row notes-style textarea */
 
 /* Collapsed "+ Add Note" box (App.noteField) + the Take Inventory note box. The
@@ -688,7 +689,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    CARD's width (never the viewport) — the sidebar can't push it into a scroll. */
 .card:has(> .row-list){container-type:inline-size;}
 .row-list{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
-.row-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 12px 9px;border-bottom:1px solid var(--b2);}
+.row-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 12px 9px;border-bottom:1px solid var(--b-edge);}
 /* Data cells wrap so the table compresses to fit instead of overflowing; only
    the action buttons stay on one line. */
 .row-list tbody td{background:#0D181E;padding:12px;color:var(--t2);vertical-align:middle;}
@@ -735,7 +736,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    but KEEPS its columns on mobile (a statement loses meaning stacked) and supports
    section-header rows (.pnl-sec) + inline sub-line indentation. Left-aligned. */
 .pnl-list{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:12px;}
-.pnl-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b2);}
+.pnl-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b-edge);}
 .pnl-list tbody td{background:#0D181E;padding:9px 14px;color:var(--t2);vertical-align:middle;}
 .pnl-list tbody td:first-child{border-radius:6px 0 0 6px;}
 .pnl-list tbody td:last-child{border-radius:0 6px 6px 0;}
@@ -808,7 +809,7 @@ select.ua-team-role-sel,select.ua-perm-level{appearance:none;-webkit-appearance:
 /* Header band one tone, rows another. Cells keep horizontal padding so the row
    fill + hover extend past the text instead of cutting off at it. */
 .page .tbl thead th{background:var(--surface);color:var(--t2);padding:12px 16px;border-bottom:none;white-space:nowrap;}
-.page .tbl tbody td{background:var(--zone);padding:14px 16px;border-bottom:1px solid var(--b2);}
+.page .tbl tbody td{background:var(--zone);padding:14px 16px;border-bottom:1px solid var(--b-edge);}
 .page .tbl tbody tr:last-child td{border-bottom:none;}
 .page .tbl tbody tr:hover td{background:var(--nav-act);}
 
@@ -994,7 +995,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 :is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-item.active{background:transparent;}
 :is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-item.active .nav-label{color:var(--w);}
 :is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-item.active .nav-icon{color:var(--gold);}
-:is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-divider{height:0;border-top:1px solid var(--b2);margin:13px 18px;}
+:is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-divider{height:0;border-top:1px solid var(--b-edge);margin:13px 18px;}
 
 @media (max-width:768px){
   :root{--navh:52px;}                 /* one row (row 2 hidden) on mobile */
@@ -1019,7 +1020,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    open; desktop never sees it (the burger is hidden above 768px). */
 .tn-mnav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;}
 .tn-mnav{position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;}
-.tn-mnav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b2);flex-shrink:0;}
+.tn-mnav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b-edge);flex-shrink:0;}
 .tn-mnav-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);}
 .tn-mnav-body{overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch;}
 .tn-mnav-grp{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:17px 18px 5px;}
@@ -1029,7 +1030,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b2);}
+.sum-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:7px 12px;text-align:left;border-bottom:1px solid var(--b-edge);}
 
 .sum-tbl td{padding:8px 12px;text-align:left;color:var(--t2);border-bottom:1px solid rgba(255,255,255,0.03);}
 .lb-tbl td{padding:14px 12px !important;}
@@ -1043,7 +1044,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .badge-dim{background:rgba(255,255,255,0.06);color:var(--t3);}
 
 /* ══ DIVIDER ══ */
-.divider{height:1px;background:var(--b2);margin:18px 0;}
+.divider{height:1px;background:var(--b-edge);margin:18px 0;}
 
 /* ══ QUICK ACTIONS ══ */
 .qa{display:flex;gap:10px;flex-wrap:wrap;}
@@ -1053,7 +1054,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .step-dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--b1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--t3);flex-shrink:0;transition:all 0.15s;}
 .step-dot.active{border-color:var(--gold);background:var(--gold);color:#000;}
 .step-dot.done{border-color:var(--t3);}
-.step-line{flex:1;height:1px;background:var(--b2);}
+.step-line{flex:1;height:1px;background:var(--track);}
 .step-line.done{background:var(--t3);}
 
 /* ══ CHART ══ */
@@ -1072,7 +1073,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    page reads as part of the same screen, not a void block of text. */
 .setup-card{max-width:540px;margin:32px auto;}
 .setup-lead{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:4px;}
-.setup-step{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-top:1px solid var(--b2);}
+.setup-step{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-top:1px solid var(--b-edge);}
 .setup-step:first-of-type{border-top:none;padding-top:14px;}
 .setup-num{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--gold);background:var(--sel-active-bg);text-shadow:0 1px 2px rgba(0,0,0,.45);}
 .setup-num.done{background:var(--green);color:var(--bg);text-shadow:none;}
@@ -1125,7 +1126,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* ══ SETTINGS ══ */
 .settings-section{margin-bottom:26px;}
-.settings-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--b2);}
+.settings-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--w);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--b-edge);}
 
 /* ══ ONBOARDING ══ */
 .ob-overlay{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
@@ -1134,7 +1135,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .ob-heading{font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;}
 .ob-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6;max-width:350px;margin-left:auto;margin-right:auto;}
 .ob-pips{display:flex;gap:4px;margin-bottom:22px;}
-.ob-pip{flex:1;height:3px;background:var(--b2);border-radius:2px;}
+.ob-pip{flex:1;height:3px;background:var(--track);border-radius:2px;}
 .ob-pip.on{background:var(--gold);}
 .ob-pip.done{background:rgba(219,171,70,0.35);}
 .ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
@@ -1178,7 +1179,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* ══ ING TABLE ══ */
 .ing-tbl{width:100%;border-collapse:collapse;}
-.ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b2);white-space:nowrap;}
+.ing-tbl th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--b-edge);white-space:nowrap;}
 .ing-tbl td{padding:8px 10px;border-bottom:1px solid var(--row-div);vertical-align:middle;color:var(--t2);}
 .ing-tbl tr:last-child td{border-bottom:none;}
 
@@ -1216,7 +1217,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 
 /* ══ PROG BAR ══ */
-.prog{height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
+.prog{height:3px;background:var(--track);border-radius:2px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
 
 /* ══ SCROLLBAR ══
@@ -1299,7 +1300,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .sidebar-multi-loc{
   display:none;
   padding:10px 12px;
-  border-bottom:1px solid var(--b2);
+  border-bottom:1px solid var(--b-edge);
   flex-direction:column;gap:8px;
 }
 .sidebar-multi-loc-label{
@@ -1532,7 +1533,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .data-card .tbl.is-pnl thead tr{display:table-row !important;}
   .data-card .tbl.is-pnl thead th{display:table-cell !important;text-align:left !important;font-size:8px;letter-spacing:.5px;padding:9px 8px;white-space:normal;}
   .data-card .tbl.is-pnl tbody tr{display:table-row !important;border-top:none !important;}
-  .data-card .tbl.is-pnl tbody td{display:table-cell !important;text-align:left !important;border-bottom:1px solid var(--b2);padding:7px 8px;}
+  .data-card .tbl.is-pnl tbody td{display:table-cell !important;text-align:left !important;border-bottom:1px solid var(--b-edge);padding:7px 8px;}
   .data-card .tbl.is-pnl tbody td::before{content:none !important;}
 }
 
