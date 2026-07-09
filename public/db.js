@@ -264,6 +264,7 @@ const DB = {
         .from('memberships')
         .select('account_id, role, permissions, accounts(owner_user_id)')
         .eq('user_id', this._user.id)
+        .order('account_id', { ascending: true })   // deterministic: a multi-account user with no stored active bar resolves to the SAME bar every time, not an arbitrary one
         .limit(1)
         .single();
       if (error || !data) return null;
