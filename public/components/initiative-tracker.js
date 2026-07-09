@@ -158,7 +158,7 @@ const InitiativeTracker = {
     const closed = all.filter(i => i.status !== 'Active');
 
     // Active Experiments — a row-list pill table inside the titled card.
-    const activeCols = '<colgroup><col style="width:32%"/><col style="width:12%"/><col style="width:12%"/><col style="width:12%"/><col style="width:12%"/><col style="width:20%"/></colgroup>';
+    const activeCols = '<colgroup><col style="width:27%"/><col style="width:11%"/><col style="width:12%"/><col style="width:12%"/><col style="width:12%"/><col style="width:26%"/></colgroup>';
     const activeHead = '<thead><tr><th>Active Experiment</th><th>Watching</th><th>Baseline</th><th>So Far</th><th>Lift</th><th></th></tr></thead>';
     const activeBody = active.length ? active.map(i => {
       const m = this._measure(module, i);
@@ -176,7 +176,7 @@ const InitiativeTracker = {
         + '<td class="val">' + this._fmtVal(metric, m.after) + '</td>'
         + '<td>' + this._fmtLift(metric, m.lift) + '</td>'
         + '<td><div class="row-actions">'
-        + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '">Mark Complete</button>'
+        + '<button class="btn btn-ghost btn-sm init-complete" data-id="' + esc(i.id) + '">Complete</button>'
         + '<button class="btn btn-ghost btn-sm init-edit" data-id="' + esc(i.id) + '">Edit</button>'
         + '<button class="btn btn-danger btn-sm init-del" data-id="' + esc(i.id) + '">Delete</button>'
         + '</div></td></tr>';
