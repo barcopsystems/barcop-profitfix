@@ -2673,7 +2673,20 @@ const App = {
     overlay.innerHTML = '<div style="width:100%;max-width:' + (opts.maxWidth || 900) + 'px;margin:auto 0;position:relative;">' + closeX + html + '</div>';
     host.appendChild(overlay);
     const x = overlay.querySelector('.app-modal-x');
-    if (x) x.addEventListener('click', () => { if (typeof opts.onClose === 'function') opts.onClose(); else App.closeModal(id); });
+    const doClose = () => { if (typeof opts.onClose === 'function') opts.onClose(); else App.closeModal(id); };
+    // opts.confirmDirty: guard against an accidental X on a form the operator has
+    // started filling. Snapshot the fields once the modal has fully rendered (next
+    // tick, after the caller's own post-open wiring/prefill), then on the X confirm
+    // ONLY if a field actually changed. A clean open-and-close never prompts.
+    let _dirtyBaseline = null;
+    if (opts.confirmDirty) setTimeout(() => { _dirtyBaseline = JSON.stringify(App.captureDraft(overlay) || {}); }, 0);
+    if (x) x.addEventListener('click', async () => {
+      if (opts.confirmDirty && _dirtyBaseline != null && JSON.stringify(App.captureDraft(overlay) || {}) !== _dirtyBaseline) {
+        const ok = await App.confirm({ title: 'Discard unsaved entry?', message: 'You have entered information that has not been saved yet. Close this form and lose it?', confirmText: 'Discard', cancelText: 'Keep Editing', danger: true });
+        if (!ok) return;
+      }
+      doClose();
+    });
     return overlay;
   },
   closeModal(id) {
