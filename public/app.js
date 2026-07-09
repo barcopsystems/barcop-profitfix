@@ -1249,8 +1249,7 @@ const App = {
         const sel = a.id === active.id ? ' selected' : '';
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
-      slot.innerHTML = '<div class="sidebar-multi-loc-label">Viewing</div>'
-        + '<select class="smm-switcher">' + options + '</select>';
+      slot.innerHTML = '<select class="smm-switcher">' + options + '</select>';
       const sel = slot.querySelector('.smm-switcher');
       sel?.addEventListener('change', (ev) => {
         const newId = ev.target.value;

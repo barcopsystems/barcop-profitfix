@@ -1293,20 +1293,23 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    visible instead. */
 .sidebar-multi-loc{
   display:none;
-  padding:14px 14px 16px;
+  padding:10px 12px;
   border-bottom:1px solid var(--b2);
-  flex-direction:column;gap:10px;
+  flex-direction:column;gap:8px;
 }
 .sidebar-multi-loc-label{
   font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
   color:var(--t3);
 }
 .sidebar-multi-loc select{
-  width:100%;height:40px;
-  background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
-  color:var(--w);font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;
-  padding:0 10px;cursor:pointer;outline:none;
+  appearance:none;-webkit-appearance:none;color-scheme:dark;cursor:pointer;width:100%;
+  background-color:var(--input);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--t1);font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;
+  padding:6px 26px 6px 10px;outline:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(200,216,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
 }
+.sidebar-multi-loc select:focus{border-color:var(--focus-cell);}
 .sidebar-multi-loc .smm-group-btn{
   width:100%;height:40px;
   background:transparent;border:1px solid var(--b1);border-radius:var(--r);
