@@ -304,7 +304,12 @@ const App = {
     });
     this._wireSyncLifecycle();
     this._initFloatNav();
-    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    // Demo entry: ?demo=1, or the clean /demo path (also tolerate a mistyped
+    // /demo=1 with no question mark). The Vercel catch-all serves index.html for
+    // /demo, so the app loads here and just needs to switch into demo mode.
+    const _demoPath = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+    if (new URLSearchParams(window.location.search).get('demo') === '1'
+        || _demoPath === '/demo' || _demoPath === '/demo=1') {
       await this.startDemo();
       return;
     }
