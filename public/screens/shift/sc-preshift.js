@@ -220,16 +220,16 @@ S.ShiftPreShift = {
             + '<td data-label="Item"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--t1);">' + esc(it.name || 'Item') + '</div></td>'
             + '<td data-label="Margin">' + mHtml + '</td>'
             + '<td data-label="Talking Point"><input class="pb-pitch" data-id="' + esc(it.id) + '" value="' + esc(it.server_pitch || '') + '" placeholder="How should servers pitch it?" maxlength="90" style="width:100%;background:var(--input);border:1px solid var(--b-edge);border-radius:6px;color:var(--t1);font-size:12px;padding:6px 9px;outline:none;"/></td>'
-            + '<td class="no-print"><div class="row-actions">'
+            + '<td class="no-print" data-label=""><div class="row-actions">'
             +   '<button class="btn btn-ghost btn-sm pb-swap" data-idx="' + idx + '">Swap</button>'
             +   '<button class="btn btn-ghost btn-sm pb-fremove" data-idx="' + idx + '">Remove</button>'
             + '</div></td></tr>';
         }).join('')
       : '<tr><td colspan="4" style="color:var(--t3);text-align:center;padding:14px;">No items featured. Add one below, or cost and price your menu in Menu Engineering and your best margins pre-fill here.</td></tr>';
-    const featTable = '<div style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+    const featTable = '<table class="row-list" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:24%"/><col style="width:12%"/><col style="width:44%"/><col/></colgroup>'
       + '<thead><tr><th>Featured Items</th><th>Margin</th><th>Talking Point</th><th class="no-print"></th></tr></thead>'
-      + '<tbody>' + featRows + '</tbody></table></div>';
+      + '<tbody>' + featRows + '</tbody></table>';
 
     const featActions = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">'
       + '<button class="btn btn-ghost btn-sm" id="pb-fadd">+ Add Item</button>'
