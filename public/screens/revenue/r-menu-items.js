@@ -512,7 +512,7 @@ S.RevenueMenuItems = {
       + '<span id="ri-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div></div>';
 
-    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 680, onClose: () => this.cancelEditor() });
+    App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 680, confirmDirty: true, onClose: () => this.cancelEditor() });
     App.wireCustomSelects(document.getElementById('mi-editor') || document);
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
