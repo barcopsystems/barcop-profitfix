@@ -621,15 +621,21 @@ S.InventoryProducts = {
     // Auto-fit grid: fits all five on one row on wide screens and wraps/stacks
     // cleanly on narrow screens instead of overflowing the form container.
     // Misc is a grab-bag, so it gets a structured Misc Type select that tags the
-    // product (NA Beverage / Drink Mixer / Food Ingredient / supplies). That tag
-    // drives the Menu Items NA picker and the recipe ingredient picker, so it
-    // replaces the unreliable free-text Sub-Category here. Every other category
-    // keeps a Sub-Category, but as a datalist (suggestions + values already used)
-    // so matching styles group cleanly on the Products list instead of splintering
-    // on typos.
+    // product (NA Beverage / Drink Mixer / Garnish / supplies). That tag drives the
+    // menu picker (NA Beverage) and the recipe ingredient picker (Mixer/Garnish),
+    // so it is a FIXED list with no | Edit — the app branches on its value, and an
+    // operator-invented type would silently drop products out of those pickers.
+    // Every other category keeps an editable Sub-Category (a pure label).
     const subOrType = cat === 'Misc'
-      ? '<div class="f"><label>Misc Type' + App.manageListLink('misc_type') + '</label>'
-        + App.customSelect({ id: 'ip-misctype', key: 'misc_type', builtin: App.MISC_TYPES, selected: (p?.misc_type || ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
+      ? (() => {
+          const mt = (p?.misc_type || '');
+          const inList = (App.MISC_TYPES || []).some(t => t === mt);
+          return '<div class="f"><label>Misc Type</label>'
+            + '<select class="form-input" id="ip-misctype"><option value="">Select type...</option>'
+            + (App.MISC_TYPES || []).map(t => '<option' + (mt === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
+            + (mt && !inList ? '<option selected>' + esc(mt) + '</option>' : '')
+            + '</select></div>';
+        })()
       : (() => {
           const cur = (p?.sub_category || '');
           const key = 'subcat_' + cat.toLowerCase().replace(/\s+/g, '_');
@@ -737,16 +743,20 @@ S.InventoryProducts = {
 
     const servingBlock = spec.showServingSizes ? this.servingSizesBlockHTML(p, spec) : '';
 
-    // Food / Misc "sold on the menu" (resale + sides) is NOT set here: each sell
-    // size is a menu item (a portion of this product at a price), built in the Menu
-    // Builder, so cost + usage blend correctly by sales mix. The product form only
-    // captures the atomic cost (the divisor above). Existing resale fields are
-    // carried through untouched on save until they migrate to menu items.
+    // Food / Misc: a single "sold on the menu" toggle that lists the product in the
+    // Menu Builder's No Prep picker (bagged chips, bottled drinks). Beer/Wine are
+    // always menu-eligible; pourables carry Other Pour Sizes here instead.
+    const menuFlagBlock = spec.showUnitType
+      ? '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:6px;">'
+        + '<input type="checkbox" class="bc-check" id="ip-soldmenu"' + (p?.sold_on_menu ? ' checked' : '') + '/>'
+        + '<span style="font-size:13px;color:var(--t1);">Include this item in the Menu Builder <span style="color:var(--t3);font-weight:400;">(bagged chips, bottled drinks)</span></span>'
+        + '</label>'
+      : '';
 
     // Sectioned three-column layout: Details, then the category's Purchase & Cost
     // (spec fields + calc strip), then Sold on the Menu (pourable Other Sizes) and
     // Notes, each divided by a rule line so the form fills in section by section.
-    const soldInner = servingBlock;
+    const soldInner = servingBlock + menuFlagBlock;
     const formCard = '<div class="card form-card ip-form">'
       + header
       + '<div class="ip-sec-label" style="margin-top:6px;">Details</div>'
@@ -1230,7 +1240,7 @@ S.InventoryProducts = {
     // untouched (seeded resale items keep working until they migrate). Pourable
     // categories still read their menu price from ip-price.
     const cur = this.editId ? this.products().find(x => x.id === this.editId) : null;
-    const soldOnMenu = spec.showUnitType ? (cur ? !!cur.sold_on_menu : false) : false;
+    const soldOnMenu = spec.showUnitType ? !!document.getElementById('ip-soldmenu')?.checked : false;
     const servingsPerUnit = spec.showUnitType ? (cur && cur.servings_per_unit != null ? cur.servings_per_unit : null) : null;
     const costPerServing = spec.showUnitType ? (cur && cur.cost_per_serving != null ? cur.cost_per_serving : null) : null;
     const price = spec.showMenuPrice ? num('ip-price') : (cur && cur.menu_price != null ? cur.menu_price : null);
@@ -1572,7 +1582,7 @@ S.InventoryProducts = {
     if (cat === 'Misc') {
       // Misc swaps free-text Sub-Category for the structured Misc Type tag.
       return COMMON.filter(f => f.key !== 'sub_category').concat([
-        {key:'misc_type', label:'Misc Type (NA Beverage / Drink Mixer / Food Ingredient / supply)', required:false, aliases:['misc type','type','group','category','sub-category','subcategory','sub category']},
+        {key:'misc_type', label:'Misc Type (NA Beverage / Drink Mixer / Garnish / supply)', required:false, aliases:['misc type','type','group','category','sub-category','subcategory','sub category']},
       ], tail);
     }
     // Food
