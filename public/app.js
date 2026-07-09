@@ -3637,14 +3637,15 @@ const App = {
     'Misc':        'NA Beverages'
   },
 
-  // 2nd-level tag on the catch-all Misc category. Misc lumps three different
-  // kinds of thing (things you sell, things you cook/mix with, and pure
-  // operating supplies), so this tag keeps each out of the wrong list:
-  // NA Beverage shows in the Menu Items NA picker (and stays available as a
-  // mixer); Drink Mixer / Food Ingredient are recipe ingredients only; the two
-  // supply types stay out of every menu/recipe picker.
-  MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Food Ingredient', 'Paper & To-Go', 'Cleaning & Supplies', 'Other'],
-  MISC_SUPPLY_TYPES: ['Paper & To-Go', 'Cleaning & Supplies'],
+  // 2nd-level tag on the catch-all Misc category. Misc lumps three kinds of thing
+  // (things you sell, things you build drinks from, and pure operating supplies),
+  // so this tag keeps each out of the wrong list: NA Beverage is sellable on the
+  // menu; Drink Mixer + Garnish are cocktail-recipe ingredients; the three supply
+  // types stay out of every menu/recipe picker. Food ingredients live in the Food
+  // category, not here. This list is FIXED (not operator-editable) because the app
+  // branches on its values — an unknown type would silently fall out of pickers.
+  MISC_TYPES: ['NA Beverage', 'Drink Mixer', 'Garnish', 'Bar Supplies', 'Paper & To-Go', 'Cleaning & Supplies', 'Other'],
+  MISC_SUPPLY_TYPES: ['Bar Supplies', 'Paper & To-Go', 'Cleaning & Supplies'],
   // Tagged as an NA beverage in Inventory (vs a mixer or a supply).
   miscSellable(p) { return !!p && p.category === 'Misc' && p.misc_type === 'NA Beverage'; },
   // Pure operating supply — not a recipe ingredient, not a menu item.
