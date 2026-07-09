@@ -91,7 +91,9 @@ function computeProfitAudit(appData, controlData) {
   const settings = appData.settings || {};
   const targets = settings.targets || {};
   const cd = controlData || {};
-  const weeks = (appData.weeks || []).filter(w => w && (w.period_end || w.week_end)).slice(-PERIOD_WEEKS);
+  const weeks = (appData.weeks || []).filter(w => w && (w.period_end || w.week_end))
+    .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
+    .slice(-PERIOD_WEEKS);   // sort oldest->newest FIRST: App.data.weeks arrives newest-first, so an unsorted slice(-4) would score the OLDEST 4 weeks
   const menuItems = appData.menu_items || [];
   const vendorLog = appData.vendor_log || [];
   const discreps = appData.vendor_discrepancies || [];
@@ -206,8 +208,11 @@ function computeProfitAudit(appData, controlData) {
   const walkedCount = num(cd.walked_tabs_count);
   const siFlags = num(cd.sales_integrity_flags);
   const haveCashRecon = reconCount > 0;
-  const s4MonthlyGap = (voidCompPct != null && voidCompPct > VOID_COMP_BENCHMARK_PCT && monthlyBarRev != null && monthlyFoodRev != null)
-    ? round0(((voidCompPct - VOID_COMP_BENCHMARK_PCT) / 100) * (monthlyBarRev + monthlyFoodRev)) : 0;
+  // Void/comp rate is measured on TOTAL revenue, so size the gap on whatever revenue
+  // exists (a bar with no kitchen, or a kitchen with no bar, still has a real gap).
+  const monthlyTotalRev = (monthlyBarRev || 0) + (monthlyFoodRev || 0);
+  const s4MonthlyGap = (voidCompPct != null && voidCompPct > VOID_COMP_BENCHMARK_PCT && monthlyTotalRev > 0)
+    ? round0(((voidCompPct - VOID_COMP_BENCHMARK_PCT) / 100) * monthlyTotalRev) : 0;
   const haveS4 = voidCompPct != null || cashShortRate != null || walkedTotal != null || siFlags != null || haveCashRecon || voidsNoApprovalPct != null;
   let s4 = null;
   if (haveS4) {
@@ -362,7 +367,8 @@ function computeRevenueAudit(appData, controlData) {
   const cd = controlData || {};
   const weeks = (appData.revenue_weeks || [])
     .filter(w => w && ((num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0) > 0 || num(w.total_revenue) > 0))
-    .slice(-PERIOD_WEEKS);
+    .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
+    .slice(-PERIOD_WEEKS);   // sort oldest->newest FIRST (revenue_weeks arrives newest-first) so slice(-4) is the most recent 4, not the oldest
   const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
   const serverChecks = (appData.revenue_server_checks || []).filter(c => (num(c.covers) > 0) && num(c.sales) != null);
   const priceLog = appData.revenue_price_log || [];
