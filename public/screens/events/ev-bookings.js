@@ -698,7 +698,7 @@ S.EventsBookings = {
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Mark This Booking Lost</div>'
       + '<div class="f" style="width:100%;"><label>Reason (optional)</label><input type="text" id="eb-lost-reason" placeholder="Booked elsewhere, date conflict, over budget"/></div>'
       + '<div class="card-actions"><button class="btn btn-primary" id="eb-lost-save">Mark Lost</button></div></div>';
-    App.openModal(html, { id: 'eb-lost-modal', maxWidth: 520, noClose: true });
+    App.openModal(html, { id: 'eb-lost-modal', maxWidth: 520, confirmDirty: true });
     document.getElementById('eb-lost-save')?.addEventListener('click', async () => {
       const reason = document.getElementById('eb-lost-reason')?.value.trim() || '';
       App.closeModal('eb-lost-modal');
@@ -817,7 +817,7 @@ S.EventsBookings = {
       + '<div class="card-actions"><button class="btn btn-primary" id="ebf-save">' + (id ? 'Save Booking' : 'Create Booking') + '</button>'
       +   '<span id="ebf-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span></div>'
       + '</div>';
-    App.openModal(html, { id: 'eb-form', maxWidth: 540, noClose: true });
+    App.openModal(html, { id: 'eb-form', maxWidth: 540, confirmDirty: true });
     document.getElementById('ebf-save')?.addEventListener('click', () => this.saveForm(id));
   },
 
