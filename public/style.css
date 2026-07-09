@@ -708,7 +708,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    640px (not 820) so tables stay columnar on a normal laptop — the sidebar eats
    ~230px, so an 820px card hit at ~1140px viewport, stacking simple tables way
    too early. Cells already wrap, so a tighter table just wraps, never scrolls. */
-@container (max-width:640px){
+/* Stack threshold is 700, not 640, on purpose: at the 768px sidebar->hamburger
+   breakpoint the card's container jumps ~452px -> ~672px, so a 640 threshold
+   would UN-stack right there and re-stack lower down (a normal/stacked/normal/
+   stacked flip-flop). 700 sits above that jump so the stack stays continuous. */
+@container (max-width:700px){
   .row-list,.row-list tbody{display:block;}
   .row-list thead{display:none;}
   .row-list tbody tr{display:block;background:#0D181E;border-radius:8px;padding:4px 14px;margin-bottom:8px;}
