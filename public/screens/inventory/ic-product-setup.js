@@ -1620,9 +1620,17 @@ S.InventoryProducts = {
     const note = (txt, color) => { const a = document.getElementById('ip-csv-actions'); if (a) a.insertAdjacentHTML('beforeend', '<span style="color:' + (color || 'var(--red)') + ';font-size:12px;margin-left:10px;">' + esc(txt) + '</span>'); };
 
     const imported = [];
+    // Block duplicate names the same way the manual Save does (case-insensitive,
+    // and de-dupes repeats within the file itself), so a re-drop never creates
+    // duplicate-named products the rest of the app treats as an error state.
+    const taken = new Set(this.products().map(p => (p.name || '').trim().toLowerCase()));
+    let dup = 0;
     rows.forEach(row => {
       const name = val(row, 'name');
       if (!name) return;
+      const nameKey = name.toLowerCase();
+      if (taken.has(nameKey)) { dup++; return; }
+      taken.add(nameKey);
       let oz     = numOf(val(row, 'container_size_oz'));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
@@ -1639,7 +1647,11 @@ S.InventoryProducts = {
       const miscType = cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '';
       // Food / Misc: pieces-or-servings per unit, the recipe noun, and the count
       // method (defaulted from the product's role, exactly like the form).
-      const packSize = spec.showPackSize ? (parseInt(val(row, 'pack_size')) || null) : null;
+      const packSizeRaw = spec.showPackSize ? (parseInt(val(row, 'pack_size')) || null) : null;
+      // A Food/Misc product is tracked ONE way: by ounces (container_size_oz) OR by
+      // pieces (pack_size), never both — otherwise the edit form picks one Track By
+      // and drops the other on save. Prefer ounces when a container size is given.
+      const packSize = (spec.showPackSize && oz != null && oz > 0) ? null : packSizeRaw;
       const servingName = spec.showUnitType ? (val(row, 'serving_name') || null) : null;
       const countStyle = spec.showPackSize
         ? App.defaultCountStyle({ unit_type: unitType, misc_type: miscType, pack_size: packSize })
@@ -1684,7 +1696,8 @@ S.InventoryProducts = {
       });
     });
 
-    if (!imported.length) { note('No rows with a product name were found.'); return; }
+    const dupMsg = dup ? (' ' + dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped.') : '';
+    if (!imported.length) { note(dup ? ('No new products imported.' + dupMsg) : 'No rows with a product name were found.'); return; }
 
     this.products().push(...imported);
     const ok = await App.saveInventory();
