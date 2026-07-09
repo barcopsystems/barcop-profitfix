@@ -2042,7 +2042,10 @@ S.HubSettings = {
       const d = new Date();
       d.setDate(d.getDate() - daysAgo);
       d.setHours(hour, min, 0, 0);
-      return d.toISOString().slice(0, 16);
+      // Local wall-clock (matches ic-adjustments.nowDateTime), NOT toISOString/UTC —
+      // a UTC evening time rolls hours/a day and is not reproducible by a real user.
+      const p2 = n => String(n).padStart(2, '0');
+      return App.ymdLocal(d) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
     };
     const adjValue = (product, qty, unit) => {
       let bottles = qty;
