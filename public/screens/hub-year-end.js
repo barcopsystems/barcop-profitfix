@@ -866,8 +866,8 @@ S.HubYearEnd = {
         v.date || '',
         v.shift_type || v.shift || '',
         v.cashier || v.name || '',
-        parseFloat(v.expected) || null,
-        parseFloat(v.counted) || null,
+        parseFloat(v.expected_cash != null ? v.expected_cash : v.expected) || null,
+        parseFloat(v.counted_cash != null ? v.counted_cash : v.counted) || null,
         parseFloat(v.variance) || null
       ]));
     }
