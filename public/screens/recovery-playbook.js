@@ -1365,7 +1365,7 @@ S.RecoveryPlaybook = {
               'Review check average by server every Monday. Flag anyone more than 15 percent below the team.',
               'Any server trending down two weeks in a row gets a coaching conversation this week.',
               'Run two table audits a week, different shifts, unannounced. Predictable audits only buy you good behavior on audit day.',
-              'Set the next week briefing items from your Menu Engineering Stars.'
+              'Keep your menu classified in Menu Engineering; the briefing features your best-margin items by daypart on its own.'
             ] },
             { t: 'docs', items: [
               { doc: 'server-standards', label: 'Server Upsell Standards and Scripts' }
