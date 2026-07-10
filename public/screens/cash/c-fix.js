@@ -77,7 +77,7 @@ S.CashFix = {
   agoText(ds) { return ds === 0 ? 'today' : ds === 1 ? 'yesterday' : ds + ' days ago'; },
 
   // State checks: "good" means no outstanding work right now.
-  tightWeeks() { return CashEngine.forecast(4).filter(r => r.net < 0).length; },
+  tightWeeks() { return CashEngine.forecast(13).filter(r => r.net < 0).length; },
   termsSet()   { return CashEngine.termVendors().length; },
 
   // Does the system behind a gap actually hold data yet? Gates the review steps so
@@ -145,7 +145,7 @@ S.CashFix = {
   systemRead(id) {
     if (id === 'free-trapped') { const t = CashEngine.trapped(); return t.hasData ? App.fmtCurrency(t.total, 0) + ' trapped on the shelf right now' : 'Take a count and Bar Cop reads what is trapped'; }
     if (id === 'order-to-par') { const o = CashEngine.overOrder(3); if (!o.hasData) return 'Take two counts and Bar Cop reads your weeks on hand'; const w = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) + ' weeks on hand' : 'on par'; return w + (o.excess > 0 ? ', ' + App.fmtCurrency(o.excess, 0) + ' tied up beyond target' : ''); }
-    if (id === 'stay-ahead') { const n = this.tightWeeks(); return n ? n + (n === 1 ? ' tight week' : ' tight weeks') + ' in the next four' : 'no tight weeks in the next four'; }
+    if (id === 'stay-ahead') { const n = this.tightWeeks(); return n ? n + (n === 1 ? ' tight week' : ' tight weeks') + ' in the next thirteen' : 'no tight weeks in the next thirteen'; }
     const tv = this.termsSet(); return tv ? tv + (tv === 1 ? ' vendor' : ' vendors') + ' on terms' : 'no vendor terms set yet';
   },
 
