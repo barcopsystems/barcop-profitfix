@@ -110,9 +110,9 @@ FIX.cash = [
         { kind: 'action',
           title: 'Take early-pay discounts worth taking',
           detail: 'If a vendor knocks two percent off for paying in ten days, that usually beats what the cash is worth sitting idle. Take those; hold the rest.' },
-        { kind: 'action',
+        { kind: 'action', target: 'ic-vendors', targetLabel: 'List Vendors',
           title: 'Review your terms each quarter',
-          detail: 'Ask your reps for better terms at your quarterly review. A vendor you spend with will often move from net 15 to net 30.' }
+          detail: 'Ask your reps for better terms at your quarterly review, then update each vendor in List Vendors. A vendor you spend with will often move from net 15 to net 30.' }
       ]
     },
     commonMistakes: [

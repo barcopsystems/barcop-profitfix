@@ -17,9 +17,9 @@ FIX.profit = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'ic-product-setup', targetLabel: 'Products',
+        { kind: 'action', target: 'ic-product-setup', targetLabel: 'Add Products',
           title: 'Set accurate bottle yields',
-          detail: 'In Inventory Control Products, enter every active product with its container size, pour size, and unit cost. Bar Cop turns that into pours per container and cost per pour.' },
+          detail: 'In Add Products, enter every active product with its container size, pour size, and unit cost. Bar Cop turns that into pours per container and cost per pour.' },
         { kind: 'action', target: 'ic-take-inventory', targetLabel: 'Take Inventory',
           title: 'Count on the same day every week',
           detail: 'Run a full count in Take Inventory on the same day each week. Count partial bottles with the bottle slider, do not eyeball them.' },
@@ -123,7 +123,7 @@ FIX.profit = [
           detail: 'Each week, open This Week with the kitchen manager and read food cost against target with the dollar gap. Cross-check it against the past week\'s Waste and Spill Log and portion audit findings, and set one action with a named owner.' },
         { kind: 'action', target: 'recipe-cost-analysis', targetLabel: 'Recipe Summary',
           title: 'Reprice the items above target',
-          detail: 'When food cost is above target, open Recipe Summary, sorted over-target first. Edit an item right there to fix its recipe or reprice it in place.' }
+          detail: 'When food cost is above target, open Recipe Summary, sorted over-target first. Work an item right there to fix its recipe or reprice it in place.' }
       ]
     },
 

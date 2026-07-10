@@ -26,12 +26,9 @@ FIX.revenue = [
         { kind: 'action', target: 'r-dog-test', targetLabel: 'Dog Test Tracker',
           title: 'Put each Dog on a 90-day test before you pull it',
           detail: 'In the Dog Test Tracker, start a 90-day test on each Dog: record its baseline weekly volume, move it to a better slot with a rewritten description, and update the volume as it runs. Keep or cut it on the day-90 number.' },
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
+        { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Reprice the Plowhorses',
-          detail: 'In Menu Builder, raise the Plowhorse prices one item at a time. A $2 bump on five Plowhorses beats a 6% raise across the whole menu.' },
-        { kind: 'action', target: 'sc-preshift', targetLabel: 'Pre-Shift Briefing',
-          title: 'Brief servers off the Stars list',
-          detail: 'Open Pre-Shift Briefing in Shift. Bar Cop builds it from tonight\'s Stars, your check average target, and the cover forecast. Feature only the Stars it lists, read it at line-up, and print it if you want a copy on the pass.' }
+          detail: 'In Menu Engineering, hit Reprice on each Plowhorse. It prices to your margin target and lets you adjust before you commit, one item at a time. A $2 bump on five Plowhorses beats a 6% raise across the whole menu.' }
       ]
     },
 
@@ -56,18 +53,18 @@ FIX.revenue = [
         { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
           title: 'Keep ingredient costs current',
           detail: 'In Menu Builder, update the yield-adjusted ingredient cost on every item whenever a vendor price moves. Make sure yield loss is in the cost before you recost the item.' },
-        { kind: 'result', target: 'r-menu-items', targetLabel: 'Menu Builder',
-          title: 'Read which items are priced below their floor',
-          detail: 'In Menu Builder, sort to the items running well over their target cost percent. Fix the worst offenders first.' },
+        { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
+          title: 'Read which items are running over target',
+          detail: 'In Menu Engineering, work the items running over their target cost percent. The Weekly Upside up top is what repricing every over-target item back to target would add each week. Fix the worst offenders first.' },
         { kind: 'result', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Weigh the margin dollars before you reprice',
           detail: 'Open Menu Engineering and sort the items you flagged by dollar margin. Start with the biggest-dollar leaks, not the highest cost percent.' },
         { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Model the change in Menu Engineering',
           detail: 'In Menu Engineering, click Reprice on the item. Enter the price you are considering and an expected volume change, and read the new margin, the weekly impact, and the break-even volume drop. Do not move the price until you have that break-even number. Save it as planned or mark it live, and Bar Cop checks it against the real result three weeks later in the Pricing Review Log.' },
-        { kind: 'action', target: 'r-menu-items', targetLabel: 'Menu Builder',
-          title: 'Apply the change directly on Menu Builder',
-          detail: 'Once you have the number, open the item in Menu Builder and update the price. Bar Cop logs the change to the Pricing system on your Recovery Scoreboard, then watches check average and revenue for the eight weeks after. Nothing to mark done.' },
+        { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
+          title: 'Mark the price live when the menu rolls out',
+          detail: 'A reprice saves as Planned first. When the new prices actually hit your menu, open the item in Menu Engineering and hit Mark Live. That is the moment Bar Cop logs the change and starts watching check average and revenue for the eight weeks after. Nothing to mark done.' },
         { kind: 'action', target: 'r-menu-engineering', targetLabel: 'Menu Engineering',
           title: 'Run the full pricing review every quarter',
           detail: 'The first week of each quarter, work the whole menu in Menu Engineering: refresh costs, reprice the items over target, set the menu print date, and confirm servers were briefed before the new menu goes live. The Pricing Review Log at the bottom checks each change against the real result three weeks on.' }
@@ -93,8 +90,8 @@ FIX.revenue = [
     process: {
       steps: [
         { kind: 'action', target: 'r-forecast', targetLabel: 'Revenue Forecast',
-          title: 'Set the revenue forecast for the coming week',
-          detail: 'In Revenue Forecast, set what you expect to bring in each day Monday through Sunday. Bar Cop pre-fills each day from the last 8 same-weekday weeks; adjust from there. Build Schedule pulls this forecast when you lay shifts in.' },
+          title: 'Let the revenue forecast set the budget',
+          detail: 'Bar Cop projects each week on its own, a weighted average of the same weekday over your last eight weeks plus any events you have booked, and Build Schedule builds against it automatically. There is nothing to enter. Adjust a week only when you know something the average cannot see: book it in Events, or set the number on Build Schedule.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Staff to the budget, department by department',
           detail: 'In Build Schedule, fill must-have coverage first, then build out to the budgeted hours. Clear any shift it flags more than 5% over budget. Budget and watch bar, kitchen, and floor separately, never as one blended number.' },
@@ -109,11 +106,11 @@ FIX.revenue = [
 
     commonMistakes: [
       'Managing labor as one blended total instead of by department. One overspending department hides in the blend.',
-      'Building the schedule before you set the revenue forecast.',
+      'Staffing off last week instead of the forecast Bar Cop already projected for the coming week.',
       'Figuring labor percent on wages only. Total labor runs 10 to 15% higher.',
       'Treating overtime as a staffing problem instead of a scheduling one. It is usually hours piled on too few people.',
       'Overstaffing slow shifts because it feels safer. That idle server bleeds your labor percent all week.',
-      'Building a schedule with no revenue number behind it.'
+      'Not booking a known event, so the forecast the schedule builds against misses it.'
     ]
   },
 
@@ -169,7 +166,7 @@ FIX.revenue = [
           detail: 'Download the Server Upsell Standards and Scripts, post it in the server area, and use it in training. Run the sequence in order: pre-dinner beverage, appetizer, dessert close.' },
         { kind: 'action', target: 'sc-preshift', targetLabel: 'Pre-Shift Briefing',
           title: 'Run the pre-shift briefing every shift',
-          detail: 'Open Pre-Shift Briefing in Shift five minutes before doors. Bar Cop fills in tonight\'s two or three Stars, the check average target, the cover forecast, and the upsell sequence. Add one line of focus, read it to the floor, and mark it held to track it.' },
+          detail: 'Open Pre-Shift Briefing in Shift five minutes before doors. Bar Cop fills in your best-margin items for the daypart, the check average target, the cover forecast, and the upsell sequence. Add one line of focus, read it to the floor, and mark it held to track it.' },
         { kind: 'action', target: 'r-server-check', targetLabel: 'Server Check',
           title: 'Watch the floor against your standard',
           detail: 'Twice a week at varied times, watch a few tables unannounced against your server upsell standard, then coach off the numbers in Server Check. Is the briefing showing up in how servers work the tables, or not?' },
@@ -220,7 +217,7 @@ FIX.revenue = [
       'Coaching the whole team when only two or three servers are below average.',
       'Starting a coaching conversation with judgment instead of the numbers. "Your tables are not selling" is an accusation, not coaching.',
       'Training new servers by shadowing without a written standard. They pick up one person\'s style, not your standard.',
-      'Not connecting the briefing Stars list to the upsell sequence.'
+      'Not connecting the briefing\'s featured items to the upsell sequence.'
     ]
   }
 
