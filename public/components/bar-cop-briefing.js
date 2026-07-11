@@ -26,7 +26,7 @@ window.BarCopBriefing = {
   attach(containerEl, snapshot) {
     if (!containerEl) return;
     if (snapshot) this._snap = snapshot;
-    containerEl.innerHTML = '<button class="btn btn-ghost btn-sm" id="bcb-btn" style="font-size:10px;padding:5px 12px;letter-spacing:1px;">Bar Cop Briefing</button>';
+    containerEl.innerHTML = '<button class="btn btn-ghost btn-sm" id="bcb-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
     const btn = containerEl.querySelector('#bcb-btn');
     if (btn) btn.addEventListener('click', () => this._handleClick());
   },
