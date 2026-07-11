@@ -156,7 +156,7 @@ S.InventoryDashboard = {
       const cur = v => App.fmtCurrency(v);
       const stats = [
         { label: 'Inventory Value', value: cur(st.inventoryValue) },
-        { label: 'To Reorder', value: cur(st.reorderTotal), warn: st.reorderCount > 0 },
+        { label: 'Below Par', value: cur(st.reorderTotal), warn: st.reorderCount > 0 },
         { label: 'Used', value: st.periodCost != null ? cur(st.periodCost) : '-' }
       ];
       return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length };
@@ -455,7 +455,7 @@ S.InventoryDashboard = {
     const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Shelf Cash Went</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
-      +   mini('To Reorder', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)') + vdiv
+      +   mini('Below Par', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)') + vdiv
       +   mini('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + vdiv
       +   mini('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)')
       + '</div>'
