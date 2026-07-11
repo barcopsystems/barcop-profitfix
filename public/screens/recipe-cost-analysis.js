@@ -23,7 +23,7 @@ S.RecipeCostAnalysis = {
     + '</colgroup>',
   THEAD:
     '<thead><tr><th>Menu Item</th><th>Category</th><th>Price</th><th>Cost</th>'
-    + '<th>Margin</th><th>Cost %</th><th>Target</th><th>Status</th><th class="no-print"></th></tr></thead>',
+    + '<th>Margin</th><th>Cost %</th><th>Target</th><th style="width:132px;">Status</th><th class="no-print" style="width:78px;"></th></tr></thead>',
 
   render(container, actions) {
     this.container = container;
@@ -57,7 +57,7 @@ S.RecipeCostAnalysis = {
       + '<td>' + (margin != null ? App.fmtCurrency(margin) : '-') + '</td>'
       + '<td class="' + (over ? 'neg' : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
       + '<td>' + (tgt != null ? tgt.toFixed(1) + '%' : '-') + '</td>'
-      + '<td>' + statusS + '</td>'
+      + '<td style="white-space:nowrap;">' + statusS + '</td>'
       + '<td class="no-print"><button class="btn btn-ghost btn-sm rca-edit" data-id="' + i.id + '">Work</button></td>'
       + '</tr>';
   },
