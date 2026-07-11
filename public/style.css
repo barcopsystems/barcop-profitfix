@@ -889,13 +889,22 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 .wr-screen{max-width:none;padding:var(--sp) 24px 24px;}
 .wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 @media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
-/* On mobile the WR stat rows drop their vertical dividers (like the Hub Where You
-   Stand card) and gap the tiles instead, and the page tightens to the app's
-   standard phone padding so the cards do not read inset. */
+.wr-tophead{padding:11px 22px;border-bottom:1px solid var(--b2);}
+.wr-topstats{padding:20px 22px;}
+.wr-head{padding:15px 20px;border-bottom:1px solid var(--b2);}
+.wr-block{padding:15px 20px;}
+.wr-foot{padding:14px 20px;}
+.wr-idiv{height:1px;background:var(--b2);margin:0 20px;}
+/* On mobile the WR page tightens to the app's phone padding, the stat rows drop
+   their vertical dividers (like the Hub Where You Stand card) and gap the tiles
+   instead, the card blocks tighten their side padding, and the block dividers go
+   full bleed to match the full-bleed section header. */
 @media (max-width:768px){
   .wr-screen{padding:16px 14px 40px;}
   .wr-vdiv{display:none;}
   .wr-statrow{column-gap:22px;}
+  .wr-tophead,.wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:14px;padding-right:14px;}
+  .wr-idiv{margin:0;}
 }
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
 body.chrome-on .hub-app .nav-section:first-child{padding-top:6px;}
