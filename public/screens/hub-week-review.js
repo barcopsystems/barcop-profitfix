@@ -334,6 +334,63 @@ S.WeekReview = {
     ]);
   },
 
+  // ── Profit (Recovery: decisions, not logs — three blocks) ───────────────────
+  _profitSection() {
+    const PD = S.Dashboard;
+    if (!PD) return '';
+    if (!((App.data && App.data.weeks) || []).length && !((App.data && App.data.audits) || []).length) return null;
+
+    const sv = PD._weekEnd;
+    PD._weekEnd = this._wkE();
+    let done, w, costRows, overCount, topLeak, auditState, recoverable, auditsThisWk;
+    try {
+      done = PD.stepDone();
+      w = PD.savedWeek(this._wkE());
+      costRows = w ? PD._costRows(w) : null;
+      overCount = costRows ? costRows.filter(r => r.over).length : 0;
+      topLeak = PD._topLeak ? PD._topLeak() : null;
+      auditState = PD._auditState();
+      const latestAudit = App.latestEvent ? App.latestEvent(PD.audits()) : null;
+      const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
+      recoverable = monthly * 12;
+      auditsThisWk = PD.audits().filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
+    } finally { PD._weekEnd = sv; }
+
+    const STEPS = [
+      { key: 'week',  label: 'Confirmed the week' },
+      { key: 'costs', label: 'Checked costs against target' },
+      { key: 'leaks', label: 'Worked the biggest leak' },
+      { key: 'audit', label: 'Ran the Profit audit' }
+    ];
+    const doneCount = STEPS.filter(s => done[s.key]).length;
+
+    const costCell = (i, label) => {
+      const r = costRows ? costRows[i] : null;
+      const has = r && r.val != null;
+      return this._res(label, has ? r.val.toFixed(1) + '%' : '-', has ? (r.over ? 'var(--red)' : 'var(--green)') : 'var(--t1)');
+    };
+    const results = this._resRow([
+      costCell(0, 'Bar Pour'), costCell(1, 'Food Cost'), costCell(2, 'Prime Cost'),
+      this._res('Recoverable/yr', recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-'),
+      this._res('Audits Run', String(auditsThisWk))
+    ]);
+
+    const open = [];
+    if (!done.week) open.push({ t: 'Week not confirmed', sev: 'red' });
+    if (w && overCount > 0) {
+      const names = costRows.filter(r => r.over).map(r => r.label.toLowerCase());
+      open.push({ t: '<b>' + overCount + '</b> of 3 costs over target (' + names.join(', ') + ')', sev: overCount >= 2 ? 'red' : 'amber' });
+    }
+    if (!done.leaks && topLeak && topLeak.dollars > 0) open.push({ t: 'Biggest leak not worked: <b>' + App.fmtCurrency(topLeak.dollars, 0) + '</b>/yr on ' + esc(topLeak.name), sev: 'red' });
+    if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Profit audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Profit audit run yet', sev: 'amber' });
+
+    return this._sectionCard('Profit', 'dashboard', 'profit', this._statusText(doneCount, STEPS.length), [
+      { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up', html: results },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ]);
+  },
+
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     if (this._wkStart == null) this._wkStart = this._monday();
@@ -365,8 +422,8 @@ S.WeekReview = {
       + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + exportBtn + '</div>';
 
-    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection()].filter(Boolean).join('');
-    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Profit, Revenue, Cash, Events, and Books roll up the same way, added next.</div>';
+    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection()].filter(Boolean).join('');
+    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Revenue, Cash, Events, and Books roll up the same way, added next.</div>';
 
     mount.innerHTML = '<div class="screen">'
       + this._topCard()
