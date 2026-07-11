@@ -69,7 +69,6 @@ S.Hub = {
     return ''
       + '<div class="nav-section"></div>'
       + row('breakeven', 'Break-Even', 'breakeven')
-      + row('week-review', 'Week Review', 'grid')
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
@@ -1318,7 +1317,6 @@ S.Hub = {
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'books-home')         S.HubBooksHome?.open?.();
       else if (action === 'breakeven')          S.HubBreakEven?.open?.();
-      else if (action === 'week-review')        S.WeekReview?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();

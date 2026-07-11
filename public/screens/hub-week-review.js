@@ -16,8 +16,8 @@ S.WeekReview = {
   _wkStart: null,   // Monday (ymd) of the selected week; null = this week
 
   open() {
-    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
-    App.openHubFullPage('Week Review', (mount) => { this.container = mount; this.render(mount); }, 'week-review');
+    if (App._hubBlocked && App._hubBlocked()) return;   // app-wide accountability view — not for Staff
+    App.openHubFullPage('Week in Review', (mount) => { this.container = mount; this.render(mount); }, 'week-review');
   },
 
   // ── Monday-based week (matches the section closes) ──────────────────────────
@@ -105,7 +105,7 @@ S.WeekReview = {
     const body = blocks.map(b => '<div style="padding:15px 20px;">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
     const footer = idiv + '<div style="padding:14px 20px;">'
       + '<button class="btn btn-ghost btn-sm no-print" onclick="' + oc + '">Open ' + esc(name) + '</button></div>';
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">' + header + body + footer + '</div>';
+    return '<div class="card" style="padding:0;overflow:hidden;margin:0;">' + header + body + footer + '</div>';
   },
 
   // ── The week's money headline (from the confirmed week, matched by Sunday) ───
@@ -646,24 +646,19 @@ S.WeekReview = {
     const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--b-edge);background:var(--sel-active-bg);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">'
       + esc(range) + (isCur ? '<span style="color:var(--gold);font-weight:800;font-size:11px;margin-left:6px;">NOW</span>' : '') + '</span>';
     const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:4px;">This Week</button>';
-    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
-    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
-      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
-      + exportBtn + '</div>';
+    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
 
     const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection(), this._cashSection(), this._eventsSection(), this._booksSection()].filter(Boolean).join('');
 
     mount.innerHTML = '<div class="screen">'
       + this._topCard()
       + selectorRow
-      + '<div id="wr-export-root">' + sections + '</div>'
+      + '<div class="wr-grid">' + sections + '</div>'
       + '</div>';
 
     mount.querySelectorAll('.wr-arrow').forEach(a =>
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
     mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._monday(); this.render(mount); });
-    document.getElementById('wr-export')?.addEventListener('click', () =>
-      App.exportPDF({ title: 'Week Review', subtitle: range, root: document.getElementById('wr-export-root') }));
   },
 
   showHowTo() {
