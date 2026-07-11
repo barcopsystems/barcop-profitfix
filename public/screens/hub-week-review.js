@@ -402,6 +402,70 @@ S.WeekReview = {
     ]);
   },
 
+  // ── Revenue (Recovery) ──────────────────────────────────────────────────────
+  _revenueSection() {
+    const RD = S.RevenueDashboard;
+    if (!RD) return '';
+    if (!((App.data && App.data.revenue_weeks) || []).length && !((App.data && App.data.revenue_audits) || []).length) return null;
+
+    const sv = RD._weekEnd;
+    RD._weekEnd = this._wkE();
+    let done, w, metrics, offCount, topLeak, auditState, recoverable;
+    try {
+      done = RD.stepDone();
+      w = RD.savedWeek(this._wkE());
+      metrics = RD.metricsRows(w || {});
+      offCount = metrics.filter(m => m.good === false).length;
+      topLeak = RD._topLeak ? RD._topLeak() : null;
+      auditState = RD._auditState();
+      const latestAudit = App.latestEvent ? App.latestEvent(RD.audits()) : null;
+      const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
+      recoverable = monthly * 12;
+    } finally { RD._weekEnd = sv; }
+
+    const dat = App.data || {};
+    const auditsWk = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
+    const priceWk  = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at)).length;
+    const expActive = (dat.initiatives || []).filter(e => e.status === 'Active').length;
+
+    const STEPS = [
+      { key: 'week',    label: 'Confirmed the week' },
+      { key: 'numbers', label: 'Checked numbers against target' },
+      { key: 'leaks',   label: 'Worked the biggest leak' },
+      { key: 'audit',   label: 'Ran the Revenue audit' }
+    ];
+    const doneCount = STEPS.filter(s => done[s.key]).length;
+
+    const activity = this._actRow([
+      this._act(auditsWk, 'Audits Run'), this._act(priceWk, 'Price Changes'), this._act(expActive, 'Experiments')
+    ]);
+    const mCell = (i, label) => {
+      const m = metrics[i];
+      const col = (m && m.good != null) ? (m.good ? 'var(--green)' : 'var(--red)') : 'var(--t1)';
+      return this._res(label, m ? m.value : '-', col);
+    };
+    const results = this._resRow([
+      mCell(0, 'Check Avg'), mCell(1, 'Labor %'), mCell(2, 'Rev / Labor Hr'),
+      this._res('Recoverable/yr', recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-')
+    ]);
+
+    const open = [];
+    if (!done.week) open.push({ t: 'Week not confirmed, so this week\'s numbers are blank', sev: 'red' });
+    if (w && offCount > 0) {
+      const names = metrics.filter(m => m.good === false).map(m => m.label.toLowerCase());
+      open.push({ t: '<b>' + offCount + '</b> off target (' + names.join(', ') + ')', sev: offCount >= 2 ? 'red' : 'amber' });
+    }
+    if (!done.leaks && topLeak && topLeak.dollars > 0) open.push({ t: 'Biggest leak not worked: <b>' + App.fmtCurrency(topLeak.dollars, 0) + '</b>/yr on ' + esc(topLeak.name), sev: 'red' });
+    if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Revenue audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Revenue audit run yet', sev: 'amber' });
+
+    return this._sectionCard('Revenue', 'r-dashboard', 'revenue', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
+      { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up', html: results },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ]);
+  },
+
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     if (this._wkStart == null) this._wkStart = this._monday();
@@ -433,8 +497,8 @@ S.WeekReview = {
       + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + exportBtn + '</div>';
 
-    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection()].filter(Boolean).join('');
-    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Revenue, Cash, Events, and Books roll up the same way, added next.</div>';
+    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection()].filter(Boolean).join('');
+    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Cash, Events, and Books roll up the same way, added next.</div>';
 
     mount.innerHTML = '<div class="screen">'
       + this._topCard()
