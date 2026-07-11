@@ -907,6 +907,15 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
   .wr-tophead,.wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:15px;padding-right:15px;}
   .wr-idiv{margin-left:15px;margin-right:15px;}
 }
+/* Hub "Where You Stand" card is hand-built (not a .card), so it needs its own
+   full-bleed-header padding that tracks the app standard: normal on desktop,
+   tightened to the phone card padding so it matches every other card. */
+.hub-wys-head{padding:15px 20px;}
+.hub-wys-body{padding:18px 20px;}
+@media (max-width:768px){
+  .hub-wys-head{padding:15px 14px;}
+  .hub-wys-body{padding:18px 14px;}
+}
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
 body.chrome-on .hub-app .nav-section:first-child{padding-top:6px;}
 body.chrome-on .hub-app .nav-item{padding:10px 20px;gap:13px;}
@@ -1471,6 +1480,20 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   /* Card padding tightens on mobile so per-product cards fit more content
      on a phone screen without horizontal scroll or cramped margins. */
   .card { padding:14px !important; }
+
+  /* The full-bleed header/band technique pulls headers out with negative margins
+     sized to the desktop 20px card padding. Since the card tightens to 14px on
+     phones (above), retune those pulls AND the matching header text padding to
+     14px so every full-bleed header lands flush to the card edge and stays
+     vertically centered, instead of overshooting the border and sitting too high.
+     (.kv-bleed already gets this treatment near its base rule.) */
+  .form-card > .card-title{margin:-14px -14px 18px;padding:13px 14px;}
+  .form-card .card-actions{margin:18px -14px -14px;padding:13px 14px;}
+  .card-bleed > .card-title{margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;}
+  .card-bleed-tbl{margin-left:-14px;margin-right:-14px;}
+  .card-bleed-tbl .tbl th:first-child,.card-bleed-tbl .tbl td:first-child{padding-left:14px;}
+  .card-bleed-tbl .tbl th:last-child,.card-bleed-tbl .tbl td:last-child{padding-right:14px;}
+  .data-card .card-bleed-tbl{margin-top:-14px;margin-bottom:-14px;}
 
   /* Any inline-styled grid with repeat(4,1fr) -- the standard 4-stat-tile
      row pattern used across the app -- collapses to 2 columns on mobile so
