@@ -48,26 +48,59 @@ S.ShiftWaste = {
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
-  // Per-product unit label so the operator sees what the Units field means for
-  // the picked product (case beer counts in btls, draft in oz on partial keg
-  // loss, food in whatever unit was set on Product Setup).
-  unitLabel(p) {
-    if (!p) return 'units';
-    if (p.category === 'Bottle Beer') return 'btls';
-    if (p.category === 'Draft Beer')  return 'oz';
+  // The whole-container unit label for a product (btls for liquor/wine/case beer,
+  // the food/misc unit; draft has no whole-container waste unit, a keg loss is
+  // ounces of a partial keg).
+  containerUnit(p) {
+    if (!p) return '';
+    if (p.category === 'Draft Beer') return '';
     if (p.category === 'Food' || p.category === 'Misc') return (p.unit_type || 'units');
     return 'btls';
   },
-
-  // Dollar value of the waste line. App.bottleCost for per-bottle cost on
-  // case-tracked beer, ounces / container × unit_cost for draft, units ×
-  // unit_cost for food/misc.
-  costFor(p, units) {
-    if (!p || !units) return 0;
-    if (p.category === 'Draft Beer') {
-      if (!p.container_size_oz || p.unit_cost == null) return 0;
-      return (units / p.container_size_oz) * p.unit_cost;
+  // Units a waste line can be logged in, default first. A liquid can be logged by
+  // the ounce (a spilled drink, the common case) or the whole container (a broken
+  // bottle). A solid is logged in its one stock unit.
+  unitChoices(p) {
+    if (!p) return [];
+    if (App.isLiquidIngredient(p)) {
+      const c = this.containerUnit(p);
+      return c ? ['oz', c] : ['oz'];
     }
+    return [this.containerUnit(p) || 'units'];
+  },
+  defaultUnit(p) { return this.unitChoices(p)[0] || 'units'; },
+  // The Unit cell: a picker when a liquid offers oz vs container, else a static
+  // label. Selected keeps a stored unit on an edit/restore.
+  unitCellHtml(p, selected) {
+    const ch = this.unitChoices(p);
+    if (ch.length <= 1) return esc(ch[0] || '-');
+    const sel = (selected && ch.includes(selected)) ? selected : ch[0];
+    return '<select class="form-input wll-unit-sel" style="width:100%;padding:6px 8px;">'
+      + ch.map(u => '<option' + (u === sel ? ' selected' : '') + '>' + esc(u) + '</option>').join('') + '</select>';
+  },
+  // The unit a line is currently set to (the picker's value, or the lone choice).
+  lineUnit(line, p) {
+    const sel = line && line.querySelector('.wll-unit-sel');
+    return sel ? sel.value : this.defaultUnit(p);
+  },
+  // Backward-compatible label used in a couple of display fallbacks.
+  unitLabel(p) { return this.defaultUnit(p); },
+  // The edit pop-up's inline unit control: a small picker for a liquid (oz vs
+  // container), else a static suffix label.
+  editUnitControl(p, selected) {
+    const ch = this.unitChoices(p);
+    if (ch.length <= 1) return '<span class="suf">' + esc(ch[0] || 'units') + '</span>';
+    const sel = (selected && ch.includes(selected)) ? selected : ch[0];
+    return '<select class="suf" id="wle-unit-sel" style="padding-right:22px;">'
+      + ch.map(u => '<option' + (u === sel ? ' selected' : '') + '>' + esc(u) + '</option>').join('') + '</select>';
+  },
+
+  // Dollar value of the waste line for the chosen unit. Ounces cost through
+  // App.costPerOz (liquor, wine, draft, liquid food/misc); a whole container
+  // costs per bottle (App.bottleCost) or per stock unit (food/misc).
+  costFor(p, units, unit) {
+    if (!p || !units) return 0;
+    if (unit === 'oz') { const c = App.costPerOz(p); return c != null ? units * c : 0; }
     if (p.category === 'Food' || p.category === 'Misc') {
       return (p.unit_cost != null) ? units * p.unit_cost : 0;
     }
@@ -104,7 +137,7 @@ S.ShiftWaste = {
     App.showHelpModal('How the Waste and Spill Log Works', [
       { p: ['Waste is product that left the building without making you a dime: a spill, a broken bottle, a dumped drink, an expired item. Log it and Bar Cop pulls it out of your inventory variance so a real loss does not read as theft.'] },
       { h: 'Enter the whole shift at once', p: ['Set the date, shift, and who is recording up top, then add a line for each waste item off your sheet. Pick the product and how many units were lost. Bar Cop shows the unit and the cost as you go. Add Line for another, and Save All writes them in one shot.'] },
-      { h: 'Units and cost', p: ['Units are in the product\'s own unit: bottles for liquor, wine, and case beer, ounces for a partial keg, the set unit for food. Cost is the product cost times units, the honest dollar weight of the waste.'] },
+      { h: 'Units and cost', p: ['For liquor, wine, and mixers you pick ounces for a spilled drink or the bottle for a broken one. Draft is ounces of a partial keg, case beer is by the bottle, food is its set unit. Cost is the product cost for that unit times how many, the honest dollar weight of the waste.'] },
       { h: 'What it feeds', p: ['Logged waste is subtracted from used product in the Variance Report so it does not read as shrinkage, and it rolls into the Profit Audit shrinkage section. Log honestly so the variance and shrinkage numbers stay clean.'] },
       { h: 'Filter, Export, Worksheet', p: ['Filter by date range and the waste totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to mark waste by hand during the rush.'] }
     ]);
@@ -153,10 +186,11 @@ S.ShiftWaste = {
   // Units together drive the read-only Cost cell.
   lineHtml(row) {
     row = row || {};
+    const p = row.product_id ? this.productById(row.product_id) : null;
     return '<tr class="wl-line">'
       + '<td><select class="form-input wll-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
       + '<td><input class="form-input wll-units" type="number" min="0" step="0.01" value="' + (row.units != null && row.units !== '' ? esc(String(row.units)) : '') + '" placeholder="0" style="width:100%;"/></td>'
-      + '<td class="wll-unit" style="color:var(--t2);font-size:12px;">-</td>'
+      + '<td class="wll-unit" style="color:var(--t2);font-size:12px;">' + this.unitCellHtml(p, row.unit) + '</td>'
       + '<td class="wll-cost val" style="font-size:12px;">-</td>'
       + '<td><select class="form-input wll-reason" style="width:100%;">' + this.reasonOptions(row.reason || '') + '</select></td>'
       + '<td><button class="btn btn-danger btn-sm wll-del" type="button">Delete</button></td>'
@@ -174,27 +208,32 @@ S.ShiftWaste = {
     else line.remove();
   },
 
-  // Refresh a line's Unit + Cost cells from its current product + units.
+  // Refresh a line's read-only Cost cell from its current product + units + unit.
   refreshLineCalc(line) {
     if (!line) return;
     const p = this.productById(line.querySelector('.wll-prod')?.value || '');
     const units = parseFloat(line.querySelector('.wll-units')?.value);
-    const unitCell = line.querySelector('.wll-unit');
     const costCell = line.querySelector('.wll-cost');
-    if (unitCell) unitCell.textContent = p ? this.unitLabel(p) : '-';
     if (costCell) {
-      const c = (p && units > 0) ? this.costFor(p, units) : 0;
+      const c = (p && units > 0) ? this.costFor(p, units, this.lineUnit(line, p)) : 0;
       costCell.textContent = c > 0 ? App.fmtCurrency(c) : '-';
     }
   },
+  // Rebuild the Unit cell (picker vs static label) when the product changes.
+  rebuildUnitCell(line) {
+    const p = this.productById(line.querySelector('.wll-prod')?.value || '');
+    const cell = line.querySelector('.wll-unit');
+    if (cell) cell.innerHTML = this.unitCellHtml(p);
+  },
 
   // Per-line conditional handler for the batch builder, shared by the landing
-  // and the running-shift log pop-up. Product drives the Unit label; product +
-  // units drive the read-only Cost cell.
+  // and the running-shift log pop-up. Product rebuilds the Unit picker; product,
+  // units, or the picked unit drive the read-only Cost cell.
   onLineChange(ev) {
     const line = ev.target.closest('.wl-line');
     if (!line) return;
-    if (ev.target.classList.contains('wll-prod') || ev.target.classList.contains('wll-units')) this.refreshLineCalc(line);
+    if (ev.target.classList.contains('wll-prod')) { this.rebuildUnitCell(line); this.refreshLineCalc(line); }
+    else if (ev.target.classList.contains('wll-units') || ev.target.classList.contains('wll-unit-sel')) this.refreshLineCalc(line);
   },
 
   async saveBatch(after) {
@@ -220,10 +259,11 @@ S.ShiftWaste = {
       if (isNaN(units) || units <= 0) { fail('Enter the units lost on every line.'); return; }
       if (!reason) { fail('Pick a reason on every line.'); return; }
       const p = this.productById(product_id);
+      const unit = this.lineUnit(line, p);
       recs.push({
         id: App.uid(), date, shift_type: shift,
         product_id, product_name: p?.name || '', product_category: p?.category || '',
-        unit: this.unitLabel(p), units, cost: this.costFor(p, units), reason,
+        unit, units, cost: this.costFor(p, units, unit), reason,
         recorded_by_id: byId, recorded_by: byName, notes: batchNotes,
         created_at: new Date().toISOString()
       });
@@ -297,7 +337,7 @@ S.ShiftWaste = {
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'waste')).map(r => {
           const p = this.productById(r.product_id);
-          const unit = p ? this.unitLabel(p) : (r.unit || 'units');
+          const unit = r.unit || (p ? this.defaultUnit(p) : 'units');
           return '<tr class="wl-row" data-id="' + r.id + '" style="cursor:pointer;">'
             + '<td><div class="val">' + this.fmtDate(r.date) + '</div></td>'
             + '<td>' + esc(r.shift_type || '-') + '</td>'
@@ -369,6 +409,7 @@ S.ShiftWaste = {
         this._draftRows = [...formRoot.querySelectorAll('.wl-line')].map(line => ({
           product_id: line.querySelector('.wll-prod')?.value || '',
           units:      line.querySelector('.wll-units')?.value || '',
+          unit:       line.querySelector('.wll-unit-sel')?.value || '',
           reason:     line.querySelector('.wll-reason')?.value || ''
         }));
       };
@@ -391,12 +432,11 @@ S.ShiftWaste = {
     const shiftOpts = '<option value="">Select shift...</option>'
       + this.shiftTypes().map(t => '<option' + (r && r.shift_type === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const p = r ? this.productById(r.product_id) : null;
-    const unit = p ? this.unitLabel(p) : 'units';
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="wle-date" value="' + esc(r?.date || '') + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>Shift Type</label><select id="wle-shift">' + shiftOpts + '</select></div>'
       + '<div class="f" style="flex:1;min-width:240px;"><label>Product</label><select id="wle-product">' + this.productOptions(r?.product_id) + '</select></div>'
-      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Units Lost</label><div class="fw"><input class="suf" type="number" id="wle-units" min="0" step="0.01" value="' + v(r?.units) + '" placeholder="0"/><span class="suf" id="wle-unit-label">' + esc(unit) + '</span></div></div>'
+      + '<div class="f" style="width:170px;flex-shrink:0;"><label>Units Lost</label><div class="fw"><input class="suf" type="number" id="wle-units" min="0" step="0.01" value="' + v(r?.units) + '" placeholder="0"/><span id="wle-unit-wrap">' + this.editUnitControl(p, r?.unit) + '</span></div></div>'
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Reason</label><select id="wle-reason">' + this.reasonOptions(r?.reason) + '</select></div>'
       + '<div class="f" style="width:200px;flex-shrink:0;"><label>Recorded By</label><select id="wle-by">' + App.staffOptions(r?.recorded_by_id || r?.recorded_by, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
@@ -417,8 +457,8 @@ S.ShiftWaste = {
       + '</div></div>';
     App.openModal(html, { id: 'wl-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('wle-product')?.addEventListener('change', e => {
-      const lbl = document.getElementById('wle-unit-label');
-      if (lbl) lbl.textContent = this.unitLabel(this.productById(e.target.value));
+      const wrap = document.getElementById('wle-unit-wrap');
+      if (wrap) wrap.innerHTML = this.editUnitControl(this.productById(e.target.value));
     });
     document.getElementById('wle-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('wle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('wl-edit-modal'); this.confirmDel(id); });
@@ -439,11 +479,12 @@ S.ShiftWaste = {
     const reason = document.getElementById('wle-reason')?.value || '';
     if (!reason) { fail('Pick a reason.'); return null; }
     const p = this.productById(product_id);
+    const unit = document.getElementById('wle-unit-sel')?.value || this.defaultUnit(p);
     const byId = document.getElementById('wle-by')?.value || '';
     return {
       date, shift_type: document.getElementById('wle-shift')?.value || '',
       product_id, product_name: p?.name || '', product_category: p?.category || '',
-      unit: this.unitLabel(p), units, cost: this.costFor(p, units), reason,
+      unit, units, cost: this.costFor(p, units, unit), reason,
       recorded_by_id: byId, recorded_by: (App.staffById(byId) || {}).name || '',
       notes: document.getElementById('wle-notes')?.value.trim() || ''
     };
