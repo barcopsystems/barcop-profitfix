@@ -271,6 +271,69 @@ S.WeekReview = {
     ]);
   },
 
+  // ── Shift ───────────────────────────────────────────────────────────────────
+  _shiftSection() {
+    const SD = S.ShiftDashboard;
+    if (!SD) return '';
+    const sh = (App.shiftData) || {};
+    if (!(sh.sc_shifts || []).length) return null;
+
+    const sv = SD._weekEnd;
+    SD._weekEnd = this._wkE();
+    let done, rev, covers, checkAvg, voidTot, compTot, netVar, days, vcN, wasteN, walkedN, reconN, shorts, oot;
+    try {
+      done = SD.stepDone();
+      const wkS = SD.shifts().filter(s => SD.inWeek(s.date));
+      rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+      covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
+      checkAvg = covers > 0 ? rev / covers : null;
+      const wkVC = SD.voidComps().filter(r => SD.inWeek(r.date));
+      voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+      compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
+      const wkVar = SD.variances().filter(v => SD.inWeek(v.date));
+      netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
+      shorts = wkVar.filter(v => v.status === 'Short').length;
+      oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
+      reconN = wkVar.length;
+      days = wkS.length;
+      vcN = wkVC.length;
+      wasteN = SD.waste().filter(r => SD.inWeek(r.date)).length;
+      walkedN = SD.walkedTabs().filter(r => SD.inWeek(r.date)).length;
+    } finally { SD._weekEnd = sv; }
+
+    const STEPS = [
+      { key: 'import', label: 'Imported the sales' },
+      { key: 'cash',   label: 'Reconciled cash' },
+      { key: 'exc',    label: 'Logged the exceptions' },
+      { key: 'review', label: 'Reviewed the loss flags' }
+    ];
+    const doneCount = STEPS.filter(s => done[s.key]).length;
+
+    const activity = this._actRow([
+      this._act(days, 'Days'), this._act(reconN, 'Reconciles'), this._act(vcN, 'Voids/Comps'),
+      this._act(wasteN, 'Waste'), this._act(walkedN, 'Walked Tabs')
+    ]);
+    const results = this._resRow([
+      this._res('Net Sales', App.fmtCurrency(rev, 0)),
+      this._res('Covers', String(covers)),
+      this._res('Check Avg', checkAvg != null ? App.fmtCurrency(checkAvg) : '-'),
+      this._res('Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar, 0), netVar < 0 ? 'var(--red)' : 'var(--t1)'),
+      this._res('Voids + Comps', App.fmtCurrency(voidTot + compTot, 0))
+    ]);
+    const open = [];
+    if (!done.review && (oot > 0 || voidTot + compTot > 0)) open.push({ t: 'Loss flags never reviewed this week', sev: 'red' });
+    if (shorts > 0) open.push({ t: '<b>' + shorts + '</b> cash-short shift' + (shorts === 1 ? '' : 's') + ' to chase', sev: 'red' });
+    if (!done.cash && reconN === 0) open.push({ t: 'Cash not reconciled this week', sev: 'amber' });
+    if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
+
+    return this._sectionCard('Shift', 'sc-dashboard', 'shift', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
+      { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up', html: results },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ]);
+  },
+
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     if (this._wkStart == null) this._wkStart = this._monday();
@@ -302,8 +365,8 @@ S.WeekReview = {
       + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + exportBtn + '</div>';
 
-    const sections = [this._inventorySection(), this._laborSection()].filter(Boolean).join('');
-    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Shift, Profit, Revenue, Cash, Events, and Books roll up the same way, added next.</div>';
+    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection()].filter(Boolean).join('');
+    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Profit, Revenue, Cash, Events, and Books roll up the same way, added next.</div>';
 
     mount.innerHTML = '<div class="screen">'
       + this._topCard()
@@ -314,15 +377,8 @@ S.WeekReview = {
     mount.querySelectorAll('.wr-arrow').forEach(a =>
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
     mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._monday(); this.render(mount); });
-    document.getElementById('wr-export')?.addEventListener('click', async () => {
-      const ok = await App.confirmExport({
-        title: 'Before You Export Your Week Review',
-        message: 'This Week Review is built from the activity and step records you logged in Bar Cop. It is a worksheet, not a filed financial statement. Verify it against your own records before you rely on it.',
-        confirmText: 'I Understand, Continue',
-        cancelText: 'Cancel'
-      });
-      if (ok) App.exportPDF({ title: 'Week Review', subtitle: range, root: document.getElementById('wr-export-root') });
-    });
+    document.getElementById('wr-export')?.addEventListener('click', () =>
+      App.exportPDF({ title: 'Week Review', subtitle: range, root: document.getElementById('wr-export-root') }));
   },
 
   showHowTo() {
