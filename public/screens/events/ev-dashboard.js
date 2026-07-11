@@ -119,7 +119,8 @@ S.EventsDashboard = {
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-act="ev-bookings">Open Bookings</button></div></div>';
 
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
+      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
       + hero + secondary + '</div>';
   },
 
@@ -223,6 +224,7 @@ S.EventsDashboard = {
   },
 
   wire() {
+    this.container.querySelectorAll('[data-insights]').forEach(el => el.addEventListener('click', () => this.showInsights()));
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => App.navigate(el.dataset.act)));
     this.container.querySelectorAll('.db-go').forEach(el => el.addEventListener('click', () => App.navigate(el.dataset.go)));
     this.container.querySelectorAll('.ek-step-head').forEach(h => h.addEventListener('click', () => {
@@ -234,6 +236,42 @@ S.EventsDashboard = {
     this.container.querySelectorAll('[data-undone]').forEach(b => b.addEventListener('click', () => {
       this.clearAck(b.dataset.undone); this.render(this.container);
     }));
+  },
+
+  // ── Bar Cop Briefing: a written read of the events pipeline. Code-generated
+  //    (no API), same button the other sections carry. ─────────────────────────
+  showInsights() {
+    const st = this._computeState();
+    if (!st.all.length) { DashUI.insightsModal('Bar Cop Briefing', 'Log a few bookings and Bar Cop can read your events pipeline for you.'); return; }
+    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
+  },
+  _insBriefing(st) {
+    const EB = this.EB();
+    const m = n => (n == null || isNaN(n)) ? '$0' : App.fmtCurrency(Number(n), 0);
+    const paras = [];
+
+    // 1 — what is booked and in the pipeline
+    let p1 = 'You have ' + m(st.bookedRev) + ' booked on the calendar across ' + st.futureBooked.length + ' event' + (st.futureBooked.length === 1 ? '' : 's') + (st.next ? ', next up ' + EB.fmtDate(st.next.event_date) : '') + '.';
+    if (st.pipeline > 0) p1 += ' Another ' + m(st.pipeline) + ' sits in the open pipeline.';
+    paras.push(p1);
+
+    // 2 — what needs a hand
+    const bits = [];
+    if (st.depositsDue > 0) bits.push(m(st.depositsDue) + ' in deposits still owed');
+    if (st.open.length) bits.push(st.open.length + ' open lead' + (st.open.length === 1 ? '' : 's') + (st.stale.length ? ', ' + st.stale.length + ' going cold' : ''));
+    if (st.noRunSheet.length) bits.push(st.noRunSheet.length + ' event' + (st.noRunSheet.length === 1 ? '' : 's') + ' in the next two weeks with no run sheet');
+    if (st.completedOpen.length) bits.push(st.completedOpen.length + ' completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' still to close out');
+    paras.push(bits.length ? 'What needs a hand: ' + bits.join(', ') + '.' : 'The pipeline is clean, nothing chasing you right now. Your win rate is ' + st.conv + ' over the last 90 days.');
+
+    // 3 — the one move
+    let move;
+    if (st.stale.length) move = 'Chase the ' + st.stale.length + ' cold lead' + (st.stale.length === 1 ? '' : 's') + ' first, before they book somewhere else.';
+    else if (st.depositsDue > 0) move = 'Collect the deposits owed. A booking is not locked until the money is in.';
+    else if (st.noRunSheet.length) move = 'Build run sheets for the events landing in the next two weeks so the kitchen and floor have the plan.';
+    else move = 'Nothing urgent. Keep the leads moving and the deposits collected.';
+    paras.push(move);
+
+    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   showHowTo() {
