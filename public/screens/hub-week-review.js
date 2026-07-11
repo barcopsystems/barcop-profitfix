@@ -1,206 +1,239 @@
 'use strict';
 
-/* ── Week Review — the whole week on one page (Books section, Hub-level) ───────
-   The output side of Close the Week: after the data is in, this rolls every
-   section's headline numbers for one closed week into a single scannable page,
-   broken down by Inventory, Labor, Shift, Profit, Revenue, Cash, Events, Books,
-   and Audits. Numbers come straight from the confirmed-week records
-   (App.data.weeks = the profit rollup, App.data.revenue_weeks = the revenue
-   rollup) so nothing is re-derived or projected. A week with no data reads
-   "Not closed" rather than a fake zero. Sidebar page, so it uses a plain top
-   stats strip (not the landing-only Where You Stand card), matching Break-Even.
-   Opened from the Books sidebar (under Break-Even). Export PDF, like the other
-   Books reports. */
+/* ── Week Review — what the crew actually did this week (Books section) ────────
+   The accountability side of Close the Week. For a chosen week it reads every
+   section's real activity (counts taken, spot checks run, deliveries received,
+   orders placed, logs filed) plus the Close-the-Week step-completion state, and
+   lays out per section: what was DONE, whether the weekly close got finished,
+   what it turned up, and what is carrying into next week. An owner reads one page
+   and sees where the team is on it and where they let things slide. Every number
+   is a real record or a real step stamp, nothing projected. Monday-based weeks,
+   to match the section cockpits. Opened from the Books sidebar (under Break-Even).
+
+   Built one section at a time. Inventory is the pattern; the rest follow it. */
 
 S.WeekReview = {
   container: null,
-  _wkIdx: 0,   // 0 = most recent closed week; higher = older
+  _wkStart: null,   // Monday (ymd) of the selected week; null = this week
 
   open() {
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     App.openHubFullPage('Week Review', (mount) => { this.container = mount; this.render(mount); }, 'week-review');
   },
 
-  // ── Shared primitives (mirror Break-Even's current style) ──────────────────
-  _statItem(label, val, colorStyle) {
-    return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg"' + (colorStyle ? ' style="' + colorStyle + '"' : '') + '>' + val + '</div></div>';
+  // ── Monday-based week (matches the section closes) ──────────────────────────
+  _monday(dstr) {
+    const d = dstr ? new Date(dstr + 'T00:00:00') : new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return App.ymdLocal(d);
   },
-  _statsCard(items) {
-    return '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div></div>';
-  },
-  _sh(t, right) {
-    return right
-      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">' + t + '</div>' + right + '</div>'
-      : '<div class="sh" style="margin:24px 0 10px;">' + t + '</div>';
-  },
-  // A section block: heading with an "Open" link on the right, then its stats.
-  _section(title, openOnclick, items, note) {
-    const btn = '<button class="btn btn-ghost btn-sm no-print" onclick="' + openOnclick + '">Open ' + esc(title) + ' &rsaquo;</button>';
-    return this._sh(title, btn) + this._statsCard(items)
-      + (note ? '<div style="font-size:11px;color:var(--t3);margin:6px 2px 0;">' + note + '</div>' : '');
+  _addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
+  _wkS() { return this._wkStart || this._monday(); },
+  _wkE() { return this._addDays(this._wkS(), 6); },
+  _inWeek(dstr) { const d = String(dstr || '').slice(0, 10); const s = this._wkS(), e = this._wkE(); return !!d && d >= s && d <= e; },
+  _isThisWeek() { return this._wkS() >= this._monday(); },
+  _step(n) {
+    const next = this._addDays(this._wkS(), n);
+    if (n > 0 && next > this._monday()) return;
+    this._wkStart = next;
+    this.render(this.container);
   },
 
-  // ── Week data ──────────────────────────────────────────────────────────────
-  // Confirmed profit weeks, newest first. This is the backbone (bar/food revenue,
-  // cogs, labor, cost %, prime, variance).
-  _weeks() {
-    return (((App.data && App.data.weeks) || []).slice())
-      .filter(w => w && w.period_end)
-      .sort((a, b) => String(b.period_end).localeCompare(String(a.period_end)));
+  // ── Shared visual bits ──────────────────────────────────────────────────────
+  _eyebrow(t) {
+    return '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:11px;">' + t + '</div>';
   },
-  // The revenue-side rollup for the same week (covers, check avg, labor %, RPLH).
-  _revWeekFor(periodEnd) {
-    return ((App.data && App.data.revenue_weeks) || []).find(w => w && w.period_end === periodEnd) || null;
+  _check() {
+    return '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:12px;font-weight:800;">&#10003;</span>';
+  },
+  _cross() {
+    return '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:rgba(192,56,40,0.14);border:1px solid var(--red);color:var(--red);font-size:11px;font-weight:800;">&#10005;</span>';
+  },
+  // One activity figure (count + label); muted when nothing happened, so "what
+  // did not get done" reads as plainly as what did.
+  _act(n, label) {
+    const zero = !n;
+    return '<div style="min-width:0;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:23px;font-weight:600;line-height:1;color:' + (zero ? 'var(--t4)' : 'var(--t1)') + ';">' + n + '</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">' + label + '</div></div>';
+  },
+  _actRow(items) {
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 22px;"></div>';
+    return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
+  },
+  // One result figure (label over value, colored by meaning).
+  _res(label, val, col) {
+    return '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+  },
+  _resRow(items) {
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 24px;"></div>';
+    return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
+  },
+  _openItem(text, sev) {
+    const col = sev === 'red' ? 'var(--red)' : 'var(--amber)';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">'
+      + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + col + ';"></span>'
+      + '<span style="font-size:12.5px;color:var(--t2);line-height:1.5;">' + text + '</span></div>';
+  },
+  // A section shell: header (name + status pill + open link) over stacked blocks.
+  _sectionCard(name, screen, mod, statusPill, blocks) {
+    const header = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid var(--b2);">'
+      + '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
+      +   statusPill
+      + '</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">Open ' + esc(name) + ' &rsaquo;</button>'
+      + '</div>';
+    const body = blocks.map((b, i) =>
+      '<div style="padding:15px 20px;' + (i < blocks.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">' + this._eyebrow(b.label) + b.html + '</div>').join('');
+    return '<div class="card" style="padding:0;overflow:hidden;">' + header + body + '</div>';
+  },
+  _statusPill(text, tone) {
+    const map = { good: 'var(--green)', warn: 'var(--amber)', bad: 'var(--red)' };
+    const col = map[tone] || 'var(--t3)';
+    return '<span style="font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:' + col + ';border:1px solid ' + col + ';border-radius:20px;padding:2px 10px;white-space:nowrap;">' + text + '</span>';
+  },
+
+  // ── Inventory section (the pattern) ─────────────────────────────────────────
+  _inventorySection() {
+    const ID = S.InventoryDashboard;
+    if (!ID) return '';
+    const inv = (App.inventoryData) || {};
+    const products = (inv.ic_products || []).filter(p => p.active !== false);
+    const counts = inv.ic_counts || [];
+    if (!products.length || !counts.length) return null;   // handled by empty state upstream
+
+    // Reuse the real cockpit compute + step stamps, forced to the chosen week,
+    // then restore so nothing about the live Inventory page changes.
+    const sv = ID._weekStart;
+    ID._weekStart = this._wkS();
+    let st, done;
+    try { st = ID.computeState(); done = ID.stepDone(st); } finally { ID._weekStart = sv; }
+
+    // Activity: real records filed in the week window.
+    const wkCounts   = counts.filter(c => this._inWeek(c.date)).length;
+    const wkSpot     = (inv.ic_spot_checks || []).filter(s => this._inWeek(s.date)).length;
+    const wkDeliv    = st.deliveriesThisWeek || 0;
+    const wkOrders   = (inv.ic_orders || []).filter(o => this._inWeek(o.date)).length;
+    const wkAdj      = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at)).length;
+    const wkTransfer = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at)).length;
+
+    // Weekly close: which of the four steps got signed off.
+    const STEPS = [
+      { key: 'count',      label: 'Took the count' },
+      { key: 'deliveries', label: 'Received deliveries' },
+      { key: 'orders',     label: 'Placed the orders' },
+      { key: 'review',     label: 'Reviewed the flags' }
+    ];
+    const doneCount = STEPS.filter(s => done[s.key]).length;
+    const pill = doneCount === STEPS.length
+      ? this._statusPill('Complete', 'good')
+      : this._statusPill((STEPS.length - doneCount) + ' skipped', doneCount >= 2 ? 'warn' : 'bad');
+
+    const activity = this._actRow([
+      this._act(wkCounts, 'Counts'),
+      this._act(wkDeliv, 'Deliveries'),
+      this._act(wkOrders, 'Orders'),
+      this._act(wkSpot, 'Spot Checks'),
+      this._act(wkAdj, 'Adjustments'),
+      this._act(wkTransfer, 'Transfers')
+    ]);
+
+    const closeList = '<div style="display:flex;flex-direction:column;gap:9px;">'
+      + STEPS.map(s => '<div style="display:flex;align-items:center;gap:11px;">'
+          + (done[s.key] ? this._check() : this._cross())
+          + '<span style="font-size:13px;color:' + (done[s.key] ? 'var(--t2)' : 'var(--t1)') + ';font-weight:' + (done[s.key] ? '400' : '600') + ';">' + s.label + '</span></div>').join('')
+      + '</div>';
+
+    const results = this._resRow([
+      this._res('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-'),
+      this._res('To Reorder', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)'),
+      this._res('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)'),
+      this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)'),
+      this._res('Over Target', String(st.menuOver), st.menuOver > 0 ? 'var(--red)' : 'var(--t1)')
+    ]);
+
+    // Carrying over: real open items (skipped steps + unresolved findings).
+    const open = [];
+    const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0 || st.menuOver > 0;
+    if (!done.review && anyFlag) open.push({ t: 'Variance flags never reviewed this week', sev: 'red' });
+    if (!done.orders && st.reorderCount > 0) open.push({ t: '<b>' + st.reorderCount + '</b> item' + (st.reorderCount === 1 ? '' : 's') + ' below par, no order placed', sev: 'red' });
+    if (st.deadAll > 0) open.push({ t: '<b>' + st.deadAll + '</b> dead-stock item' + (st.deadAll === 1 ? '' : 's') + ' tying up cash', sev: 'amber' });
+    if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
+    if (st.menuOver > 0) open.push({ t: '<b>' + st.menuOver + '</b> menu item' + (st.menuOver === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
+    const openHtml = open.length
+      ? open.slice(0, 4).map(o => this._openItem(o.t, o.sev)).join('')
+      : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; Nothing open. Clean week.</div>';
+
+    return this._sectionCard('Inventory', 'ic-dashboard', 'inventory', pill, [
+      { label: 'Done This Week', html: activity },
+      { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: closeList },
+      { label: 'What It Turned Up', html: results },
+      { label: 'Carrying Into Next Week', html: openHtml }
+    ]);
   },
 
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
-    const weeks = this._weeks();
+    if (this._wkStart == null) this._wkStart = this._monday();
 
-    if (!weeks.length) {
+    const products = ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
+    const counts = (App.inventoryData && App.inventoryData.ic_counts) || [];
+    if (!products.length || !counts.length) {
       App.setupCard(mount, {
         title: 'Week Review',
-        lead: 'Week Review rolls your whole week onto one page once the data is in, broken down by every section. Close a week first and it lands here.',
-        steps: [{ title: 'Close a week', desc: 'Confirm a week in any Recovery section and Bar Cop rolls the numbers up here.', btn: 'Close The Week', screen: 'dashboard', done: false }]
+        lead: 'Week Review shows what your team actually did in each section this week, what got skipped, and what is carrying over. It reads from your real logs, so set up and work a section first.',
+        steps: [{ title: 'Set up Inventory', desc: 'Add products and take a count, then work a weekly close. Week Review reads it back here.', btn: 'Open Inventory', screen: 'ic-dashboard', done: false }]
       });
       return;
     }
 
-    if (this._wkIdx > weeks.length - 1) this._wkIdx = weeks.length - 1;
-    if (this._wkIdx < 0) this._wkIdx = 0;
-    const w  = weeks[this._wkIdx];
-    const rw = this._revWeekFor(w.period_end);
+    // ── Week selector (one pill, arrows, This Week) ────────────────────────────
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase(); };
+    const range = fmt(this._wkS()) + ' - ' + fmt(this._wkE());
+    const isCur = this._isThisWeek();
+    const prevBtn = '<span class="wr-arrow" data-step="-7" style="cursor:pointer;color:var(--t2);font-size:20px;padding:0 4px;user-select:none;">&lsaquo;</span>';
+    const nextBtn = isCur
+      ? '<span style="color:var(--t4);font-size:20px;padding:0 4px;user-select:none;">&rsaquo;</span>'
+      : '<span class="wr-arrow" data-step="7" style="cursor:pointer;color:var(--t2);font-size:20px;padding:0 4px;user-select:none;">&rsaquo;</span>';
+    const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--b-edge);background:var(--sel-active-bg);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">'
+      + esc(range) + (isCur ? '<span style="color:var(--gold);font-weight:800;font-size:11px;margin-left:6px;">NOW</span>' : '') + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:6px;">This Week</button>';
+    const selector = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
+    const intro = '<div style="font-size:12px;color:var(--t3);margin-bottom:18px;">What your team did in each section this week, what got skipped, and what is carrying over.</div>';
 
-    const f  = v => App.fmtCurrency(v, 0);
-    const f2 = v => App.fmtCurrency(v);
-    const pct = v => (v != null && !isNaN(v)) ? (Number(v).toFixed(1) + '%') : '-';
-
-    // ── Week selector pill (one pill, arrows outside, This Week when off-latest) ─
-    const ws = App.weekStartFor ? App.weekStartFor(w.period_end) : null;
-    const label = (App.dateRangeLabel && ws) ? App.dateRangeLabel(ws, w.period_end).toUpperCase()
-                 : ('WEEK ENDING ' + String(w.period_end).slice(0, 10));
-    const isLatest = this._wkIdx === 0;
-    const canOlder = this._wkIdx < weeks.length - 1;
-    const arrow = (dir, live) => live
-      ? '<span class="wr-arrow" data-step="' + dir + '" style="cursor:pointer;color:var(--t2);font-size:20px;padding:0 4px;user-select:none;">' + (dir < 0 ? '&lsaquo;' : '&rsaquo;') + '</span>'
-      : '<span style="color:var(--t4);font-size:20px;padding:0 4px;user-select:none;">' + (dir < 0 ? '&lsaquo;' : '&rsaquo;') + '</span>';
-    const pill = '<div style="display:inline-flex;align-items:center;background:var(--sel-active-bg);border:1px solid var(--b-edge);border-radius:6px;padding:6px 14px;">'
-      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:600;letter-spacing:0.5px;color:var(--t1);">' + esc(label) + '</span>'
-      + (isLatest ? '<span style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--gold);margin-left:6px;">NOW</span>' : '')
-      + '</div>';
-    const selector = '<div class="no-print" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:18px;">'
-      + arrow(-1, canOlder) + pill + arrow(1, !isLatest)
-      + (!isLatest ? '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:8px;">This Week</button>' : '')
-      + '</div>';
-
-    // ── Numbers off the confirmed week ─────────────────────────────────────────
-    const bar = w.bar || {}, food = w.food || {}, cat = w.catering || {}, oth = w.other || {};
-    const netSales = (bar.revenue || 0) + (food.revenue || 0) + (cat.revenue || 0) + (oth.revenue || 0);
-    const cogs     = (bar.cogs || 0) + (food.cogs || 0) + (cat.cogs || 0) + (oth.cogs || 0);
-    const laborCost = rw ? (rw.total_labor_cost || 0) : ((bar.labor || 0) + (food.labor || 0));
-    const laborPct = rw && rw.labor_pct_blended != null ? rw.labor_pct_blended
-                    : (netSales > 0 ? ((bar.labor || 0) + (food.labor || 0)) / netSales * 100 : null);
-    const covers   = rw ? rw.covers : null;
-    const checkAvg = rw ? rw.check_avg : null;
-    const overTgt  = Math.max(0, bar.vs_target_dollar || 0) + Math.max(0, food.vs_target_dollar || 0);
-    const varDollar = Array.isArray(w.bar_variance)
-      ? w.bar_variance.reduce((s, v) => s + Math.abs(v && v.variance_dollar || 0), 0) : null;
-
-    // ── Header strip: the week at a glance ─────────────────────────────────────
-    const strip = this._statsCard(
-        this._statItem('Net Sales', f(netSales))
-      + this._statItem('Prime Cost', pct(w.prime_cost_pct))
-      + this._statItem('Labor', pct(laborPct))
-      + this._statItem('Covers', covers != null ? String(covers) : '-')
-    );
-
-    // ── Section cards (deep-link into each section) ────────────────────────────
-    const go = (screen, mod) => "S.Hub._enter('" + screen + "','" + mod + "')";
-
-    const inventory = this._section('Inventory', go('ic-dashboard', 'inventory'),
-        this._statItem('Product Used', f(cogs))
-      + this._statItem('Bar Pour Cost', pct(bar.cost_pct))
-      + this._statItem('Food Cost', pct(food.cost_pct))
-      + this._statItem('Pour Variance', varDollar != null ? f2(varDollar) : '-'));
-
-    const labor = this._section('Labor', go('lc-dashboard', 'labor'),
-        this._statItem('Labor Cost', f(laborCost))
-      + this._statItem('Hours', rw && rw.total_hours != null ? String(rw.total_hours) : '-')
-      + this._statItem('Labor %', pct(laborPct))
-      + this._statItem('Rev / Labor Hr', rw && rw.rplh_blended != null ? f2(rw.rplh_blended) : '-'));
-
-    const shift = this._section('Shift', go('sc-dashboard', 'shift'),
-        this._statItem('Net Sales', f(netSales))
-      + this._statItem('Covers', covers != null ? String(covers) : '-')
-      + this._statItem('Check Average', checkAvg != null ? f2(checkAvg) : '-'));
-
-    const profit = this._section('Profit', go('dashboard', 'profit'),
-        this._statItem('Pour Cost', pct(bar.cost_pct))
-      + this._statItem('Food Cost', pct(food.cost_pct))
-      + this._statItem('Prime Cost', pct(w.prime_cost_pct))
-      + this._statItem('Over Target', overTgt > 0 ? f(overTgt) : '$0', overTgt > 0 ? 'color:var(--red);' : 'color:var(--green);'));
-
-    const revenue = this._section('Revenue', go('r-dashboard', 'revenue'),
-        this._statItem('Check Average', checkAvg != null ? f2(checkAvg) : '-')
-      + this._statItem('Rev / Labor Hr', rw && rw.rplh_blended != null ? f2(rw.rplh_blended) : '-')
-      + this._statItem('Labor %', pct(laborPct)));
-
-    // Cash is a live position (trapped capital / runway), not a per-week figure,
-    // so it is labeled as the current standing, honestly.
-    const trapped = (window.CashEngine && CashEngine.trapped) ? CashEngine.trapped() : { total: 0, hasData: false };
-    const cashSF  = (window.CashEngine && CashEngine.survivalForecast) ? CashEngine.survivalForecast(13) : { hasData: false };
-    const runwayTxt = !cashSF.hasData ? '-' : (cashSF.runway == null ? '13+ wks' : cashSF.runway === 0 ? 'This wk' : cashSF.runway + ' wk' + (cashSF.runway === 1 ? '' : 's'));
-    const cash = this._section('Cash', go('c-dashboard', 'cash'),
-        this._statItem('Trapped Cash', trapped.hasData ? f(trapped.total || 0) : '-')
-      + this._statItem('Runway', runwayTxt),
-      'Cash is your position right now, not a single week.');
-
-    // Events: catering / event revenue booked into this week's rollup.
-    const eventsRev = cat.revenue || 0;
-    const events = this._section('Events', go('ev-dashboard', 'events'),
-        this._statItem('Event Revenue', f(eventsRev)),
-      eventsRev > 0 ? null : 'No event revenue in this week.');
-
-    // Books: the week's top line + prime dollars, with a link to the full P&L.
-    const primeDollars = cogs + laborCost;
-    const books = this._section('Books', "S.HubBooksHome&&S.HubBooksHome.open&&S.HubBooksHome.open()",
-        this._statItem('Revenue', f(netSales))
-      + this._statItem('Prime Cost', f(primeDollars))
-      + this._statItem('Prime %', pct(w.prime_cost_pct)),
-      'Open the Weekly P&L Brief in Books for the full statement.');
-
-    const audits = this._sh('Audits', '<button class="btn btn-ghost btn-sm no-print" onclick="S.HubBarCopAudit&&S.HubBarCopAudit.open&&S.HubBarCopAudit.open()">Open Audits &rsaquo;</button>')
-      + '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">Run a Bar Cop, Profit, Revenue, or Cash audit any time to score the week against your own data. Open Audits to generate one or see your latest scores.</div></div>';
+    const inv = this._inventorySection() || '';
+    const note = '<div style="margin-top:16px;font-size:11.5px;color:var(--t4);line-height:1.6;">This is the Inventory pattern. Labor, Shift, Profit, Revenue, Cash, Events, and Books roll up the same way, added once this shape is signed off.</div>';
 
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
-    const body = this._sh('The Week', exportBtn)
-      + '<div id="wr-export-root">'
-      + strip + inventory + labor + shift + profit + revenue + cash + events + books + audits
-      + '</div>';
+    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;"><div class="sh" style="margin:0;">The Week</div>' + exportBtn + '</div>';
 
-    mount.innerHTML = '<div class="screen">' + selector + body + '</div>';
+    mount.innerHTML = '<div class="screen">' + selector + intro
+      + '<div id="wr-export-root">' + head + inv + note + '</div></div>';
 
-    // Wire the week selector + export.
     mount.querySelectorAll('.wr-arrow').forEach(a =>
-      a.addEventListener('click', () => { this._wkIdx += parseInt(a.dataset.step, 10); this.render(mount); }));
-    mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkIdx = 0; this.render(mount); });
+      a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
+    mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._monday(); this.render(mount); });
     document.getElementById('wr-export')?.addEventListener('click', async () => {
       const ok = await App.confirmExport({
         title: 'Before You Export Your Week Review',
-        message: 'This Week Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Verify it against your own records before you rely on it.',
+        message: 'This Week Review is built from the activity and step records you logged in Bar Cop. It is a worksheet, not a filed financial statement. Verify it against your own records before you rely on it.',
         confirmText: 'I Understand, Continue',
         cancelText: 'Cancel'
       });
-      if (ok) App.exportPDF({ title: 'Week Review', subtitle: label, root: document.getElementById('wr-export-root') });
+      if (ok) App.exportPDF({ title: 'Week Review', subtitle: range, root: document.getElementById('wr-export-root') });
     });
   },
 
   showHowTo() {
     App.showHelpModal('How Week Review Works', [
-      { p: ['Week Review is the output side of your weekly close. Once the data is in, it pulls every section\'s headline numbers for one week onto a single page, so you read the whole operation at a glance instead of walking eight sections.'] },
-      { h: 'Pick a week', p: ['Use the arrows to step back through your closed weeks. NOW marks the current one. Everything on the page reads from that week\'s confirmed numbers, nothing projected.'] },
-      { h: 'Broken down by section', p: ['Inventory, Labor, Shift, Profit, Revenue, Books, and Events each show their key numbers for the week, with a link into the section. Cash shows your position right now, since trapped capital and runway are live, not weekly. Audits links you out to run or review a score.'] },
-      { h: 'Export', p: ['Export PDF saves the week as a one-page report you can keep or hand off, the operational companion to the Weekly P&L Brief.'] }
+      { p: ['Week Review is the accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the weekly close got finished, what it turned up, and what is carrying into next week, so you can see in one place where the crew is on it and where things slid.'] },
+      { h: 'Pick a week', p: ['Use the arrows to step back through your weeks. NOW marks the current one. Everything reads from your real logs and the steps you marked done, nothing projected.'] },
+      { h: 'Read a section', p: ['Done This Week is the raw activity, counts, spot checks, deliveries, orders, and logs filed. The Weekly Close shows which sign-off steps got finished and which got skipped. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
+      { h: 'Export', p: ['Export PDF saves the week as a one-page accountability report you can keep or hand off.'] }
     ]);
   }
 };
